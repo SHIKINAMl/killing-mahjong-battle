@@ -37,7 +37,7 @@ class PlayerState:
     #name: str
     hand: list[int] = field(default_factory=list)  # 手牌
     discards: list[int] = field(default_factory=list)  # 捨て牌
-    health: int = 0  # 体力
+    health: int = 20000  # 体力
     status: PlayerStatus = PlayerStatus.WAITING
 
 
@@ -45,10 +45,9 @@ class PlayerState:
 class RoundState:
     """局の状態"""
     round_number: int  # 第何局か
-    # wind: str  # 風（東南西北）　そもそもあるか？
     honba: int  # 本場数
     status: RoundStatus = RoundStatus.DEALING
-    current_player: int = 0  # 現在のプレイヤーID
+    current_player: int = 0  # 手番のプレイヤーID
 
 
 @dataclass
@@ -58,7 +57,6 @@ class GameState:
     players: list[PlayerState] = field(default_factory=list)
     round_state: RoundState = field(default_factory=lambda: RoundState(
         round_number=1,
-        # wind="東",
         honba=0
     ))
 

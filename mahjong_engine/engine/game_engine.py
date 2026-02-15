@@ -3,6 +3,7 @@
 """
 from typing import Callable, Optional
 from .game_state import GameState, GameStatus, RoundStatus, PlayerStatus, PlayerState, RoundState
+from .dealing_manager import DealingManager
 
 
 class GameEngine:
@@ -20,11 +21,15 @@ class GameEngine:
         self.num_players = num_players
         self.target_status = GameStatus.GAME_END  # 目標ステータス
 
+        # 配牌マネージャーを初期化
+        self.dealing_manager = DealingManager(num_players)
+
         # 各種コールバック
         self.on_status_change: Optional[Callable[[GameStatus], None]] = None
         self.on_round_start: Optional[Callable[[RoundState], None]] = None
         self.on_round_end: Optional[Callable[[], None]] = None
         self.on_game_end: Optional[Callable[[], None]] = None
+        self.on_dealing_complete: Optional[Callable[[list], None]] = None
 
     def initialize_players(self):
         """プレイヤーを初期化"""
@@ -32,7 +37,7 @@ class GameEngine:
         self.state.players = [
             PlayerState(
                 player_id=i,
-                health=0,
+                health=20000,  # 初期体力
                 status=PlayerStatus.WAITING
             )
             for i in range(self.num_players)
@@ -81,6 +86,9 @@ class GameEngine:
         """局を開始"""
 
         self.state.round_state.status = RoundStatus.DEALING
+
+        # 配牌を実行
+        self._deal_tiles()
         self._set_status(GameStatus.PLAYING)
 
         self.state.add_log("round_started", {
@@ -89,6 +97,22 @@ class GameEngine:
 
         if self.on_round_start:
             self.on_round_start(self.state.round_state)
+
+    def _deal_tiles(self):
+        """各プレイヤーに牌を配る"""
+
+        hands = self.dealing_manager.deal_initial_hands()
+
+        for i, player in enumerate(self.state.players):
+            player.hand = hands[i]
+            player.discards = []
+
+        self.state.add_log("dealing_complete", {
+            "hand_sizes": [len(p.hand) for p in self.state.players]
+        })
+
+        if self.on_dealing_complete:
+            self.on_dealing_complete(hands)
 
     def _play_round(self):
         """
@@ -178,3 +202,13 @@ class GameEngine:
                 for p in self.state.players
             ]
         }
+
+if __name__ == "__main__":
+    # 簡単なテストコード
+    engine = GameEngine(num_players=2)
+    engine.initialize_players()
+    engine.run_game_loop(max_rounds=1)
+
+    print("\n--- Game Log ---")
+    for log in engine.state.game_log:
+        print(f"{log['event']}: {log['data']}")
