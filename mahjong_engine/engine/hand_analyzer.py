@@ -1,279 +1,403 @@
 """
-手牌の聴牌判定と翻数計算
+手牌の聴牌判定と役計算
 """
-from typing import List, Set, Tuple
 from collections import Counter
+from typing import List, Tuple
 
 
 class HandAnalyzer:
     """手牌の分析・判定を行うクラス"""
-    
+
+    # ========== 聴牌判定 ==========
+
     @staticmethod
-    def is_tenpai(hand: List[int]) -> bool:
+    def is_tenpai(hand: List[int], wall: List[int]) -> bool:
         """
-        聴牌判定（簡易版）
-        
+        聴牌判定
+
         Args:
-            hand: 手牌のリスト
-            
+            hand: 手牌のリスト（13枚を想定）
+            wall: 山牌のリスト
+
         Returns:
             聴牌かどうか
         """
-        # 全ての牌を試して、1枚加えて和了形になるか確認
-        for tile_id in range(34):
-            test_hand = hand + [tile_id]
-            if HandAnalyzer._is_winning_hand(test_hand):
+        wall_counter = Counter(wall)
+        skip_tiles = {tile_id for tile_id, count in wall_counter.items() if count >= 4}
+        hand_counter = Counter(t & 0b11111 for t in hand)
+
+        for tile_id in range(29):
+            if tile_id in skip_tiles:
+                continue
+            sup_counter = hand_counter.copy()
+            sup_counter[tile_id] += 1
+            if HandAnalyzer._is_win(sup_counter):
                 return True
+
         return False
-    
+
     @staticmethod
-    def _is_winning_hand(hand: List[int]) -> bool:
-        """
-        和了形判定（簡易版）
-        
-        Args:
-            hand: 手牌のリスト（14枚想定）
-            
-        Returns:
-            和了形かどうか
-        """
-        if len(hand) != 14:
-            return False
-        
-        counter = Counter(hand)
-        
-        # 七対子チェック
+    def _is_win(counter: Counter) -> bool:
+        """和了形かどうかの判定"""
         if HandAnalyzer._is_seven_pairs(counter):
             return True
-        
-        # 国士無双チェック
-        if HandAnalyzer._is_kokushi(counter):
-            return True
-        
-        # 通常の和了形チェック（雀頭1つ+面子4つ）
-        for tile_id, count in counter.items():
-            if count >= 2:
-                # この牌を雀頭とする
-                temp_counter = counter.copy()
-                temp_counter[tile_id] -= 2
-                if temp_counter[tile_id] == 0:
-                    del temp_counter[tile_id]
-                
-                if HandAnalyzer._check_mentsu(temp_counter):
-                    return True
-        
+
+        for tile_id in HandAnalyzer._head_candidates(counter):
+            temp_counter = counter.copy()
+            temp_counter[tile_id] -= 2
+            if any(len(melds) == 4 for melds in HandAnalyzer._generate_melds(temp_counter)):
+                return True
+
         return False
-    
+
+    # ========== 役計算 ==========
+
+    @staticmethod
+    def calc_yaku(hand: List[int]) -> List[str]:
+        """
+        役計算
+
+        Args:
+            hand: 手牌（14枚を想定）
+
+        Returns:
+            役名のリスト
+        """
+        base_tiles = [t & 0b11111 for t in hand]
+        counter = Counter(base_tiles)
+
+        # ドラと赤ドラの枚数
+        dora_count = sum(1 for t in hand if (t >> 5) & 0b1 == 1)
+        aka_count = sum(1 for t in hand if (t >> 6) & 0b1 == 1)
+        dora_han = dora_count + aka_count
+
+        best_yaku: List[str] = []
+        best_han = 0
+
+        # 七対子判定
+        if HandAnalyzer._is_seven_pairs(counter):
+            yaku = ["七対子"]
+            han = 2
+            if HandAnalyzer._is_tanyao(counter):
+                yaku.append("断么九")
+                han += 1
+            if HandAnalyzer._is_chinitsu(counter):
+                yaku.append("清一色")
+                han += 6
+            elif HandAnalyzer._is_honitsu(counter):
+                yaku.append("混一色")
+                han += 3
+            if HandAnalyzer._is_honroutou(counter):
+                yaku.append("混老頭")
+                han += 2
+
+            best_yaku = yaku
+            best_han = han
+
+        # 通常手（4面子1雀頭）の全分解を探索
+        for head_tile in HandAnalyzer._head_candidates(counter):
+            temp_counter = counter.copy()
+            temp_counter[head_tile] -= 2
+
+            for melds in HandAnalyzer._generate_melds(temp_counter):
+                if len(melds) != 4:
+                    continue
+
+                yaku, han = HandAnalyzer._evaluate_melds(counter, melds, head_tile)
+
+                if han > best_han:
+                    best_han = han
+                    best_yaku = yaku
+
+        return best_yaku
+
+    @staticmethod
+    def _evaluate_melds(
+        counter: Counter, melds: List[Tuple[str, int]], head: int
+    ) -> Tuple[List[str], int]:
+        """面子と雀頭から役を判定する"""
+        yaku: List[str] = []
+        han = 0
+
+        # 役満
+        if HandAnalyzer._is_churen_poutou(counter):
+            return ["九蓮宝燈"]
+        elif HandAnalyzer._is_ryuuisou(counter):
+            return ["緑一色"]
+        elif HandAnalyzer._is_chinroutou(counter):
+            return ["清老頭"]
+        elif HandAnalyzer._is_suuankou(melds):
+            return ["四暗刻"]
+
+        # 基本役：色系
+        if HandAnalyzer._is_chinitsu(counter):
+            yaku.append("清一色")
+            han += 6
+        elif HandAnalyzer._is_honitsu(counter):
+            yaku.append("混一色")
+            han += 3
+
+        # 基本役：数系
+        if HandAnalyzer._is_tanyao(counter):
+            yaku.append("断么九")
+            han += 1
+        if HandAnalyzer._is_honroutou(counter):
+            yaku.append("混老頭")
+            han += 2
+
+        # 面子系
+        if HandAnalyzer._is_ikkitsuukan(melds):
+            yaku.append("一気通貫")
+            han += 2
+        if HandAnalyzer._is_sanshoku_doujun(melds):
+            yaku.append("三色同順")
+            han += 2
+        if HandAnalyzer._is_sanshoku_doukou(melds):
+            yaku.append("三色同刻")
+            han += 2
+        if HandAnalyzer._is_sanankou(melds):
+            yaku.append("三暗刻")
+            han += 2
+
+        # 帯幺九系
+        if HandAnalyzer._is_junchan(melds, head):
+            yaku.append("純全帯么九")
+            han += 3
+        elif HandAnalyzer._is_chanta(melds, head):
+            yaku.append("混全帯么九")
+            han += 2
+
+        # ペアシステム
+        if HandAnalyzer._is_ryanpeikou(melds):
+            yaku.append("二盃口")
+            han += 3
+        elif HandAnalyzer._is_ipeikou(melds):
+            yaku.append("一盃口")
+            han += 1
+
+        # 翻牌（役牌）
+        if HandAnalyzer._is_ton(melds):
+            yaku.append("東")
+            han += 1
+        if HandAnalyzer._is_sha(melds):
+            yaku.append("西")
+            han += 1
+
+        yaku.append("立直")
+        han += 1
+
+        return yaku, han
+
+    # ========== 面子分解 ==========
+
     @staticmethod
     def _is_seven_pairs(counter: Counter) -> bool:
-        """七対子判定"""
-        return len(counter) == 7 and all(count == 2 for count in counter.values())
-    
+        """七対子の判定"""
+        return all(count == 2 for count in counter.values())
+
     @staticmethod
-    def _is_kokushi(counter: Counter) -> bool:
-        """国士無双判定"""
-        yaochu = [0, 8, 9, 17, 18, 26, 27, 28, 29, 30, 31, 32, 33]  # 么九牌
-        tiles = list(counter.keys())
-        
-        # 13種類の么九牌が全て含まれているか
-        if not all(tile in tiles for tile in yaochu):
+    def _head_candidates(counter: Counter) -> List[int]:
+        """対子候補の牌IDを返す"""
+        return [tile_id for tile_id, count in counter.items() if count >= 2]
+
+    @staticmethod
+    def _generate_melds(counter: Counter) -> List[List[Tuple[str, int]]]:
+        """面子分解を全探索して返す"""
+        tile_id = None
+        for tid in range(29):
+            if counter[tid] > 0:
+                tile_id = tid
+                break
+
+        if tile_id is None:
+            return [[]]
+
+        results: List[List[Tuple[str, int]]] = []
+
+        # 刻子
+        if counter[tile_id] >= 3:
+            counter[tile_id] -= 3
+            for rest in HandAnalyzer._generate_melds(counter):
+                results.append([("triplet", tile_id)] + rest)
+            counter[tile_id] += 3
+
+        # 順子
+        if HandAnalyzer._can_form_run(counter, tile_id):
+            counter[tile_id] -= 1
+            counter[tile_id + 1] -= 1
+            counter[tile_id + 2] -= 1
+            for rest in HandAnalyzer._generate_melds(counter):
+                results.append([("run", tile_id)] + rest)
+            counter[tile_id] += 1
+            counter[tile_id + 1] += 1
+            counter[tile_id + 2] += 1
+
+        return results
+
+    @staticmethod
+    def _can_form_run(counter: Counter, tile_id: int) -> bool:
+        """順子を作れるかどうかの判定"""
+        if not HandAnalyzer._is_suited(tile_id):
             return False
-        
-        # そのうち1種類が2枚、他が1枚ずつ
-        counts = list(counter.values())
-        return sorted(counts) == [1] * 12 + [2]
-    
+        if tile_id % 9 >= 7:
+            return False
+        return counter[tile_id + 1] > 0 and counter[tile_id + 2] > 0
+
+    # ========== 基本判定（牌単位） ==========
+
     @staticmethod
-    def _check_mentsu(counter: Counter) -> bool:
-        """
-        残りの牌が面子（刻子または順子）で構成できるか判定
-        
-        Args:
-            counter: 牌のカウンター（雀頭を除いた状態）
-            
-        Returns:
-            面子で構成できるかどうか
-        """
-        if not counter:
-            return True
-        
-        # 最小の牌IDを取得
-        tile_id = min(counter.keys())
-        count = counter[tile_id]
-        
-        # 刻子を試す
-        if count >= 3:
-            temp_counter = counter.copy()
-            temp_counter[tile_id] -= 3
-            if temp_counter[tile_id] == 0:
-                del temp_counter[tile_id]
-            if HandAnalyzer._check_mentsu(temp_counter):
-                return True
-        
-        # 順子を試す（数牌のみ）
-        if tile_id <= 24:  # 数牌（萬子、筒子、索子）
-            suit_base = (tile_id // 9) * 9
-            tile_num = tile_id % 9
-            
-            # 順子が作れるか（例: 1-2-3）
-            if tile_num <= 6:  # 7以下の数字なら順子の起点になれる
-                next1 = tile_id + 1
-                next2 = tile_id + 2
-                
-                if next1 in counter and next2 in counter:
-                    temp_counter = counter.copy()
-                    temp_counter[tile_id] -= 1
-                    temp_counter[next1] -= 1
-                    temp_counter[next2] -= 1
-                    
-                    if temp_counter[tile_id] == 0:
-                        del temp_counter[tile_id]
-                    if temp_counter[next1] == 0:
-                        del temp_counter[next1]
-                    if temp_counter[next2] == 0:
-                        del temp_counter[next2]
-                    
-                    if HandAnalyzer._check_mentsu(temp_counter):
-                        return True
-        
-        return False
-    
+    def _is_suited(tile_id: int) -> bool:
+        """数牌かどうかの判定"""
+        return tile_id < 27
+
     @staticmethod
-    def calculate_han(hand: List[int], winning_tile: int) -> int:
-        """
-        翻数を計算（簡易版）
-        
-        Args:
-            hand: 手牌のリスト
-            winning_tile: 和了牌
-            
-        Returns:
-            翻数
-        """
-        counter = Counter(hand)
-        han = 0
-        
-        # 七対子: 2翻
-        if HandAnalyzer._is_seven_pairs(counter):
-            han += 2
-        
-        # 国士無双: 役満（13翻相当）
-        if HandAnalyzer._is_kokushi(counter):
-            han += 13
-        
-        # 対々和: 2翻（全て刻子）
-        if HandAnalyzer._is_toitoi(counter):
-            han += 2
-        
-        # 混一色: 3翻
-        if HandAnalyzer._is_honitsu(counter):
-            han += 3
-        
-        # 清一色: 6翻
-        if HandAnalyzer._is_chinitsu(counter):
-            han += 6
-        
-        # 断么九: 1翻
-        if HandAnalyzer._is_tanyao(counter):
-            han += 1
-        
-        # 平和: 1翻（簡易判定）
-        if han == 0 and HandAnalyzer._is_pinfu(counter):
-            han += 1
-        
-        # 最低でも1翻
-        return max(han, 1)
-    
+    def _is_honor(tile_id: int) -> bool:
+        """字牌かどうかの判定"""
+        return tile_id >= 27
+
     @staticmethod
-    def _is_toitoi(counter: Counter) -> bool:
-        """対々和判定（全て刻子+雀頭）"""
-        # 雀頭を除いた後、全て3枚ずつになっているか
-        for tile_id, count in counter.items():
-            if count == 2:
-                temp_counter = counter.copy()
-                temp_counter[tile_id] -= 2
-                if temp_counter[tile_id] == 0:
-                    del temp_counter[tile_id]
-                
-                # 残りが全て3の倍数か
-                return all(c % 3 == 0 for c in temp_counter.values())
-        return False
-    
+    def _is_terminal(tile_id: int) -> bool:
+        """么九牌かどうかの判定"""
+        return tile_id % 9 == 0 or tile_id % 9 == 8
+
     @staticmethod
-    def _is_honitsu(counter: Counter) -> bool:
-        """混一色判定（1種類の数牌+字牌）"""
-        man = any(0 <= tile <= 8 for tile in counter.keys())
-        pin = any(9 <= tile <= 17 for tile in counter.keys())
-        sou = any(18 <= tile <= 26 for tile in counter.keys())
-        jihai = any(27 <= tile <= 33 for tile in counter.keys())
-        
-        suit_count = sum([man, pin, sou])
-        return suit_count == 1 and jihai
-    
-    @staticmethod
-    def _is_chinitsu(counter: Counter) -> bool:
-        """清一色判定（1種類の数牌のみ）"""
-        man = any(0 <= tile <= 8 for tile in counter.keys())
-        pin = any(9 <= tile <= 17 for tile in counter.keys())
-        sou = any(18 <= tile <= 26 for tile in counter.keys())
-        jihai = any(27 <= tile <= 33 for tile in counter.keys())
-        
-        suit_count = sum([man, pin, sou])
-        return suit_count == 1 and not jihai
-    
+    def _tile_suit(tile_id: int) -> int:
+        """牌の種類を返す（萬子=0、筒子=1、索子=2、字牌=3）"""
+        if tile_id < 9:
+            return 0
+        elif tile_id < 18:
+            return 1
+        elif tile_id < 27:
+            return 2
+        else:
+            return 3
+
+    # ========== 役判定（手全体） ==========
+
     @staticmethod
     def _is_tanyao(counter: Counter) -> bool:
-        """断么九判定（么九牌を含まない）"""
-        yaochu = {0, 8, 9, 17, 18, 26, 27, 28, 29, 30, 31, 32, 33}
-        return not any(tile in yaochu for tile in counter.keys())
-    
+        """断么九かどうかの判定"""
+        return all(not HandAnalyzer._is_terminal(tile_id) for tile_id in counter.keys())
+
     @staticmethod
-    def _is_pinfu(counter: Counter) -> bool:
-        """平和判定（簡易版）"""
-        # 字牌がなく、全て順子で構成されているか
-        if any(27 <= tile <= 33 for tile in counter.keys()):
-            return False
-        # より詳細な判定は省略
-        return True
-    
+    def _is_chinitsu(counter: Counter) -> bool:
+        """清一色かどうかの判定"""
+        suits = {HandAnalyzer._tile_suit(tile_id) for tile_id in counter.keys() if not HandAnalyzer._is_honor(tile_id)}
+        return len(suits) == 1 and all(not HandAnalyzer._is_honor(tile_id) for tile_id in counter.keys())
+
     @staticmethod
-    def get_tenpai_tiles(hand: List[int]) -> List[int]:
-        """
-        聴牌時の待ち牌を取得
-        
-        Args:
-            hand: 手牌のリスト
-            
-        Returns:
-            待ち牌のリスト
-        """
-        waiting_tiles = []
-        for tile_id in range(34):
-            test_hand = hand + [tile_id]
-            if HandAnalyzer._is_winning_hand(test_hand):
-                waiting_tiles.append(tile_id)
-        return waiting_tiles
-    
+    def _is_honitsu(counter: Counter) -> bool:
+        """混一色かどうかの判定"""
+        suits = {HandAnalyzer._tile_suit(tile_id) for tile_id in counter.keys() if not HandAnalyzer._is_honor(tile_id)}
+        return len(suits) == 1 and any(HandAnalyzer._is_honor(tile_id) for tile_id in counter.keys())
+
     @staticmethod
-    def has_four_han_tenpai(hand: List[int]) -> bool:
-        """
-        4翻以上の聴牌形があるか判定
-        
-        Args:
-            hand: 手牌のリスト（13枚）
-            
-        Returns:
-            4翻以上の聴牌があるか
-        """
-        if len(hand) != 13:
-            return False
-        
-        waiting_tiles = HandAnalyzer.get_tenpai_tiles(hand)
-        
-        for waiting_tile in waiting_tiles:
-            test_hand = hand + [waiting_tile]
-            han = HandAnalyzer.calculate_han(test_hand, waiting_tile)
-            if han >= 4:
+    def _is_ryuuisou(counter: Counter) -> bool:
+        """緑一色かどうかの判定"""
+        green_tiles = {19, 20, 21, 23, 25}
+        return all(tile_id in green_tiles for tile_id in counter.keys())
+
+    @staticmethod
+    def _is_churen_poutou(counter: Counter) -> bool:
+        """九蓮宝燈かどうかの判定"""
+        for suit_base in (0, 9, 18):
+            if all(counter[suit_base + i] >= (3 if i in (0, 8) else 1) for i in range(9)):
                 return True
-        
         return False
+
+    # ========== 役判定（面子単位） ==========
+
+    @staticmethod
+    def _is_suuankou(melds: List[Tuple[str, int]]) -> bool:
+        """四暗刻かどうかの判定"""
+        return all(kind == "triplet" for kind, _ in melds)
+
+    @staticmethod
+    def _is_sanankou(melds: List[Tuple[str, int]]) -> bool:
+        """三暗刻かどうかの判定"""
+        return sum(1 for kind, _ in melds if kind == "triplet") == 3
+
+    @staticmethod
+    def _is_ikkitsuukan(melds: List[Tuple[str, int]]) -> bool:
+        """一気通貫かどうかの判定"""
+        run_starts = {start for kind, start in melds if kind == "run"}
+        for suit_base in (0, 9, 18):
+            if {suit_base, suit_base + 3, suit_base + 6}.issubset(run_starts):
+                return True
+        return False
+
+    @staticmethod
+    def _is_sanshoku_doujun(melds: List[Tuple[str, int]]) -> bool:
+        """三色同順かどうかの判定"""
+        run_starts = {start for kind, start in melds if kind == "run"}
+        for base in range(0, 7):
+            if {base, base + 9, base + 18}.issubset(run_starts):
+                return True
+        return False
+
+    @staticmethod
+    def _is_sanshoku_doukou(melds: List[Tuple[str, int]]) -> bool:
+        """三色同刻かどうかの判定"""
+        triplet_tiles = {tile_id for kind, tile_id in melds if kind == "triplet"}
+        for base in range(0, 9):
+            if {base, base + 9, base + 18}.issubset(triplet_tiles):
+                return True
+        return False
+
+    @staticmethod
+    def _is_chanta(melds: List[Tuple[str, int]], head: int) -> bool:
+        """混全帯么九かどうかの判定"""
+        if not HandAnalyzer._is_honor(head) and not HandAnalyzer._is_terminal(head):
+            return False
+        for kind, tile_id in melds:
+            if kind == "run" and (tile_id % 9 != 0 and tile_id % 9 != 7):
+                return False
+            elif kind == "triplet" and not (HandAnalyzer._is_honor(tile_id) or HandAnalyzer._is_terminal(tile_id)):
+                return False
+        return True
+
+    @staticmethod
+    def _is_junchan(melds: List[Tuple[str, int]], head: int) -> bool:
+        """純全帯么九かどうかの判定"""
+        if not HandAnalyzer._is_terminal(head):
+            return False
+        for kind, tile_id in melds:
+            if kind == "run" and (tile_id % 9 != 0 and tile_id % 9 != 7):
+                return False
+            elif kind == "triplet" and not HandAnalyzer._is_terminal(tile_id):
+                return False
+        return True
+
+    @staticmethod
+    def _is_honroutou(counter: Counter) -> bool:
+        """混老頭かどうかの判定"""
+        return all(HandAnalyzer._is_terminal(tile_id) or HandAnalyzer._is_honor(tile_id) for tile_id in counter.keys())
+
+    @staticmethod
+    def _is_chinroutou(counter: Counter) -> bool:
+        """清老頭かどうかの判定"""
+        all_tile = all(HandAnalyzer._is_terminal(tile_id) for tile_id in counter.keys())
+        all_honor = all(not HandAnalyzer._is_honor(tile_id) for tile_id in counter.keys())
+        return all_tile and all_honor
+
+    @staticmethod
+    def _is_ipeikou(melds: List[Tuple[str, int]]) -> bool:
+        """一盃口かどうかの判定"""
+        run_counts = Counter(start for kind, start in melds if kind == "run")
+        return any(count >= 2 for count in run_counts.values())
+
+    @staticmethod
+    def _is_ryanpeikou(melds: List[Tuple[str, int]]) -> bool:
+        """二盃口かどうかの判定"""
+        run_counts = Counter(start for kind, start in melds if kind == "run")
+        return sum(count >= 2 for count in run_counts.values()) >= 2
+
+    @staticmethod
+    def _is_ton(melds: List[Tuple[str, int]]) -> bool:
+        """東の刻子かどうかの判定"""
+        return any(kind == "triplet" and tile_id == 27 for kind, tile_id in melds)
+
+    @staticmethod
+    def _is_sha(melds: List[Tuple[str, int]]) -> bool:
+        """西の刻子かどうかの判定"""
+        return any(kind == "triplet" and tile_id == 28 for kind, tile_id in melds)

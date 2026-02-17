@@ -20,7 +20,10 @@ class TileWall:
     def __init__(self):
         """牌山を初期化"""
         self.tiles: List[int] = []
+        self.dora_id: int = None
+
         self._initialize_wall()
+        self.shuffle()
 
     def _initialize_wall(self):
         """116枚の牌山を生成"""
@@ -28,6 +31,7 @@ class TileWall:
 
         # ドラをランダムに選択
         dora = random.randrange(0, TileDefinitions.TOTAL_TILE_TYPES)
+        self.dora_id = dora
 
         # 各牌を4枚ずつ追加
         for tile_id in range(TileDefinitions.TOTAL_TILE_TYPES):
@@ -63,10 +67,13 @@ class TileWall:
 if __name__ == "__main__":
     # テストコード
     from ..utils.tile_converter import TileConverter
+    from .hand_analyzer import HandAnalyzer
+    import itertools
 
-    wall = TileWall()
-    print("山牌:", TileConverter.array_to_tiles(wall.tiles))  # 116枚
-    wall.shuffle()
+    analyzer = HandAnalyzer()
+    print(analyzer.calc_yaku([
+        0, 0, 1, 1, 2, 2,
+        9, 9, 10, 10, 11, 11,
 
-    hand = wall.deal(34)
-    print("配られた牌:", TileConverter.array_to_tiles(hand))  # 配られた牌の表示
+        18, 18,
+    ]))
