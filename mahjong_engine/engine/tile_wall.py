@@ -63,17 +63,3 @@ class TileWall:
     def reset(self):
         """牌山をリセット"""
         self._initialize_wall()
-
-if __name__ == "__main__":
-    # テストコード
-    from ..utils.tile_converter import TileConverter
-    from .hand_analyzer import HandAnalyzer
-    import itertools
-
-    analyzer = HandAnalyzer()
-    print(analyzer.calc_yaku([
-        0, 0, 1, 1, 2, 2,
-        9, 9, 10, 10, 11, 11,
-
-        18, 18,
-    ]))
