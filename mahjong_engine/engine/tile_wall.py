@@ -4,6 +4,8 @@
 import random
 from typing import List
 
+from .hand_analyzer import HandAnalyzer
+
 
 class TileDefinitions:
     """牌の定義"""
@@ -45,7 +47,7 @@ class TileWall:
         """牌山をシャッフル"""
         random.shuffle(self.tiles)
 
-    def deal(self, count: int = 34) -> List[int]:
+    def deal(self, count: int = 34) -> tuple[List[int], List[int]]:
         """
         牌山から指定枚数を配る
 
@@ -54,11 +56,20 @@ class TileWall:
 
         Returns:
             配った牌のリスト
+            聴牌形の例
         """
 
         dealt_tiles = self.tiles[:count]
-        self.tiles = self.tiles[count:]
-        return dealt_tiles
+        rest_tiles = self.tiles[count:]
+
+        hands = HandAnalyzer.serch_tenpai(dealt_tiles)
+        sample = HandAnalyzer.filter_mangan_hands(hands, rest_tiles, self.dora_id)
+        if not sample:
+            return self.deal(count)
+
+        self.tiles = rest_tiles
+
+        return dealt_tiles, sample
 
     def reset(self):
         """牌山をリセット"""

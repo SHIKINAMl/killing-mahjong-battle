@@ -3,6 +3,7 @@
 """
 from typing import Callable, Optional
 from .game_state import GameState, GameStatus, RoundStatus, PlayerStatus, PlayerState, RoundState
+from .tile_wall import TileWall
 
 
 class GameEngine:
@@ -17,29 +18,28 @@ class GameEngine:
         """
 
         self.state = GameState()
+        self.tile_wall = TileWall()
         self.num_players = num_players
-        self.target_status = GameStatus.GAME_END  # 目標ステータス
+        #self.target_status = GameStatus.GAME_END  # 目標ステータス
 
-        # 配牌マネージャーを初期化
-        self.dealing_manager = DealingManager(num_players)
 
         # 各種コールバック
         self.on_status_change: Optional[Callable[[GameStatus], None]] = None
         self.on_round_start: Optional[Callable[[RoundState], None]] = None
         self.on_round_end: Optional[Callable[[], None]] = None
         self.on_game_end: Optional[Callable[[], None]] = None
-        self.on_dealing_complete: Optional[Callable[[list], None]] = None
+        self.on_dealing_complete: Optional[Callable[[int, list], None]] = None
 
-    def initialize_players(self):
+    def initialize_players(self, player_ids: list[str]):
         """プレイヤーを初期化"""
 
         self.state.players = [
             PlayerState(
-                player_id=i,
+                player_id=player_id,
                 health=20000,  # 初期体力
                 status=PlayerStatus.WAITING
             )
-            for i in range(self.num_players)
+            for player_id in player_ids
         ]
 
         self.state.add_log("players_initialized", {
@@ -54,6 +54,8 @@ class GameEngine:
 
         self._set_status(GameStatus.ROUND_START)
         self.state.add_log("game_started", {})
+
+        self._start_round()
 
     def run_game_loop(self, max_rounds: int = 4):
         """
@@ -100,10 +102,11 @@ class GameEngine:
     def _deal_tiles(self):
         """各プレイヤーに牌を配る"""
 
-        hands = self.dealing_manager.deal_initial_hands()
+        hands = [self.tile_wall.deal() for _ in range(self.num_players)]
 
         for i, player in enumerate(self.state.players):
-            player.hand = hands[i]
+            player.wall = hands[i][1]
+            player.hand = hands[i][0]
             player.discards = []
 
         self.state.add_log("dealing_complete", {
@@ -111,7 +114,7 @@ class GameEngine:
         })
 
         if self.on_dealing_complete:
-            self.on_dealing_complete(hands)
+            self.on_dealing_complete(self.tile_wall.dora_id, hands)
 
     def _play_round(self):
         """
@@ -123,7 +126,7 @@ class GameEngine:
         # 現在は骨組みなので、ここで局を進める必要あり
         # AIプレイヤーかWebSocket APIでの入力を待ち
 
-        pass
+        return
 
     def _end_round(self) -> bool:
         """
@@ -174,15 +177,11 @@ class GameEngine:
 
     def get_current_player(self) -> PlayerState:
         """現在のプレイヤーを取得"""
-
-        return self.state.players[self.state.round_state.current_player]
+        return self.state.players[self.state.round_state.current_player_index]
 
     def advance_player(self):
         """プレイヤーを次に進める"""
-
-        self.state.round_state.current_player = (
-            self.state.round_state.current_player + 1
-        ) % self.num_players
+        self.state.round_state.current_player_index = (self.state.round_state.current_player_index + 1) % self.num_players
 
     def get_game_state(self) -> dict:
         """ゲーム状態を辞書で取得（API用）"""
@@ -190,24 +189,17 @@ class GameEngine:
         return {
             "status": self.state.status.value,
             "round": self.state.round_state.round_number,
+            "honba": self.state.round_state.honba,
+            "dora_id": self.state.round_state.dora_id,
             "current_player": self.get_current_player().player_id,
             "players": [
                 {
                     "id": p.player_id,
                     "health": p.health,
-                    "hand_size": len(p.hand),
-                    "discard_size": len(p.discards)
+                    "hand": p.hand,
+                    "wall": p.wall,
+                    "discards": p.discards
                 }
                 for p in self.state.players
             ]
         }
-
-if __name__ == "__main__":
-    # 簡単なテストコード
-    engine = GameEngine(num_players=2)
-    engine.initialize_players()
-    engine.run_game_loop(max_rounds=1)
-
-    print("\n--- Game Log ---")
-    for log in engine.state.game_log:
-        print(f"{log['event']}: {log['data']}")

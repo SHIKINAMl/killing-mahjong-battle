@@ -4,6 +4,7 @@
 from collections import Counter
 from typing import List, Tuple, Generator
 from itertools import combinations
+import random
 
 from .yaku import Yaku
 
@@ -166,7 +167,7 @@ class HandAnalyzer:
     # ========== 役計算 ==========
 
     @staticmethod
-    def filter_mangan_hands(list: list[list[int]], wall: List[int], dora: int) -> list[Tuple[list[int], int, list[str], int]]:
+    def filter_mangan_hands(list: list[list[int]], wall: List[int], dora: int) -> list[int]:
         """
         聴牌形の手牌リストのうち
         満貫以上となる上がりを持つものを返す
@@ -176,12 +177,7 @@ class HandAnalyzer:
             wall: 山牌のリスト
             dora: ドラの牌ID
         Returns:
-            満貫以上の聴牌形の
-            - 手牌のリスト（14枚を想定）
-            - 待ち牌
-            - 役のリスト
-            - 翻数
-            → テスト後、手配リストのみ返すように変更予定
+            満貫以上の聴牌形の手牌のうちランダムな手牌
         """
 
         aka_list = [t & 0b11111 for t in wall if (t >> 6) & 0b1 == 1]
@@ -205,11 +201,11 @@ class HandAnalyzer:
                     if t == dora:
                         h[h.index(t)] = t | (1 << 5)
 
-                yaku = HandAnalyzer.enum_yaku(h)
                 han = HandAnalyzer.calc_yaku(h)
                 if han >= 4:
-                    mangan_hands.append((hand, waiting_tiles, yaku, han))
-        return mangan_hands
+                    mangan_hands.append(hand)
+
+        return random.choice(mangan_hands) if mangan_hands else None
 
     @staticmethod
     def check_mangan(hand: List[int]) -> bool:

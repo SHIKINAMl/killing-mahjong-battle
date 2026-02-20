@@ -33,9 +33,9 @@ class PlayerStatus(Enum):
 @dataclass
 class PlayerState:
     """プレイヤーの状態"""
-    player_id: int
-    #name: str
+    player_id: str  # プレイヤーID
     hand: list[int] = field(default_factory=list)  # 手牌
+    wall: list[int] = field(default_factory=list)  # 牌山
     discards: list[int] = field(default_factory=list)  # 捨て牌
     health: int = 20000  # 体力
     status: PlayerStatus = PlayerStatus.WAITING
@@ -47,7 +47,8 @@ class RoundState:
     round_number: int  # 第何局か
     honba: int  # 本場数
     status: RoundStatus = RoundStatus.DEALING
-    current_player: int = 0  # 手番のプレイヤーID
+    current_player_index: int # 現在のプレイヤーのインデックス
+    dora_id: int = None  # ドラのID
 
 
 @dataclass
@@ -57,7 +58,8 @@ class GameState:
     players: list[PlayerState] = field(default_factory=list)
     round_state: RoundState = field(default_factory=lambda: RoundState(
         round_number=1,
-        honba=0
+        honba=0,
+        current_player_index=0
     ))
 
     game_log: list[dict] = field(default_factory=list)  # ゲームログ
