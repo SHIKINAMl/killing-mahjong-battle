@@ -8,9 +8,7 @@ from dataclasses import dataclass, field
 class GameStatus(Enum):
     """ゲームのステータス"""
     WAITING = "waiting"  # ゲーム開始待機中
-    ROUND_START = "round_start"  # 局開始
     PLAYING = "playing"  # プレイ中
-    ROUND_END = "round_end"  # 局終了
     GAME_END = "game_end"  # ゲーム終了
 
 
@@ -21,6 +19,7 @@ class RoundStatus(Enum):
     BETTING = "betting"  # 掛け金設定フェーズ
     TURN_DECISION = "turn_decision"  # 手番決定フェーズ
     DISCARD = "discard"  # 打牌フェーズ
+    LIQUIDATION = "liquidation"  # 清算フェーズ
 
 
 class PlayerStatus(Enum):
@@ -36,8 +35,10 @@ class PlayerState:
     player_id: str  # プレイヤーID
     hand: list[int] = field(default_factory=list)  # 手牌
     wall: list[int] = field(default_factory=list)  # 牌山
+    wait: list[int] = field(default_factory=list)  # 待ち牌
     discards: list[int] = field(default_factory=list)  # 捨て牌
     health: int = 20000  # 体力
+    bet: int = 0  # 掛け金
     status: PlayerStatus = PlayerStatus.WAITING
 
 
@@ -46,8 +47,8 @@ class RoundState:
     """局の状態"""
     round_number: int  # 第何局か
     honba: int  # 本場数
-    status: RoundStatus = RoundStatus.DEALING
     current_player_index: int # 現在のプレイヤーのインデックス
+    status: RoundStatus = RoundStatus.DEALING
     dora_id: int = None  # ドラのID
 
 
@@ -61,10 +62,3 @@ class GameState:
         honba=0,
         current_player_index=0
     ))
-
-    game_log: list[dict] = field(default_factory=list)  # ゲームログ
-
-    def add_log(self, event: str, data: dict = None):
-        """ゲームログにイベントを記録"""
-        log_entry = {"event": event, "data": data or {}}
-        self.game_log.append(log_entry)

@@ -15,7 +15,7 @@ class HandAnalyzer:
     # ========== 聴牌判定 ==========
 
     @staticmethod
-    def serch_tenpai(wall: List[int]) -> List[list[int]]:
+    def search_tenpai(wall: List[int]) -> List[list[int]]:
         """
         34枚の山牌から聴牌形を検索する
 
@@ -111,7 +111,7 @@ class HandAnalyzer:
         return False
 
     @staticmethod
-    def serch_waiting_tiles(hand: List[int], wall: List[int]) -> List[int]:
+    def get_tenpai_waiting_tiles(hand: List[int], wall: List[int]) -> List[int]:
         """
         待ち牌の検索
 
@@ -135,6 +135,30 @@ class HandAnalyzer:
             if HandAnalyzer._is_win(sup_counter):
                 waiting_tiles.append(tile_id)
         return waiting_tiles
+
+    @staticmethod
+    def without_hand(hand: List[int], wall: List[int]) -> List[int]:
+        """
+        手牌を除外した山牌のリストを返す
+
+        Args:
+            hand: 手牌のリスト
+            wall: 山牌のリスト
+
+        Returns:
+            手牌を除外した山牌のリスト
+        """
+        hand_counter = Counter(hand)
+        wall_counter = Counter(wall)
+
+        for tile_id, count in hand_counter.items():
+            wall_counter[tile_id] -= count
+
+        result = []
+        for tile_id, count in wall_counter.items():
+            result.extend([tile_id] * count)
+
+        return result
 
     @staticmethod
     def skip_tenpai_tiles(wall: List[int]) -> List[int]:
@@ -185,7 +209,7 @@ class HandAnalyzer:
         mangan_hands = []
         for hand in list:
 
-            waiting_tiles = HandAnalyzer.serch_waiting_tiles(hand, wall)
+            waiting_tiles = HandAnalyzer.get_tenpai_waiting_tiles(hand, wall)
 
             hands = [hand + [tile_id] for tile_id in waiting_tiles]
 
@@ -205,7 +229,15 @@ class HandAnalyzer:
                 if han >= 4:
                     mangan_hands.append(hand)
 
-        return random.choice(mangan_hands) if mangan_hands else None
+        sample = random.choice(mangan_hands) if mangan_hands else None
+        for t in sample:
+            if t in temp_aka_list:
+                sample[sample.index(t)] = t | (1 << 6)
+                temp_aka_list.remove(t)
+            if t == dora:
+                sample[sample.index(t)] = t | (1 << 5)
+
+        return sample
 
     @staticmethod
     def check_mangan(hand: List[int]) -> bool:

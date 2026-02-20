@@ -31,13 +31,19 @@ class TileWall:
         """116枚の牌山を生成"""
         self.tiles = []
 
-        # ドラをランダムに選択
-        dora = random.randrange(0, TileDefinitions.TOTAL_TILE_TYPES)
+        # ドラ表示牌をランダムに選択
+        hyouji = random.randrange(0, TileDefinitions.TOTAL_TILE_TYPES)
+        if hyouji < 27:
+            dora = (hyouji + 1) % 9 + (hyouji // 9) * 9 # ドラは同じ種類の次の牌
+        else:
+            dora = 55 - hyouji # 字牌のドラは特例で、東→西→東の順でループ
         self.dora_id = dora
 
         # 各牌を4枚ずつ追加
         for tile_id in range(TileDefinitions.TOTAL_TILE_TYPES):
             for i in range(TileDefinitions.TILES_PER_TYPE):
+                if tile_id == hyouji and i == 0:  # ドラ表示牌は1枚だけ抜く
+                    continue
                 dora_flag = 1 if tile_id == dora else 0 # ドラの場合はフラグを立てる
                 dora_flag += 1 << 1 if (tile_id == 4 or tile_id == 13 or tile_id == 22) and i == 0 else 0 # 赤ドラの場合はさらにフラグを立てる
 
@@ -62,7 +68,7 @@ class TileWall:
         dealt_tiles = self.tiles[:count]
         rest_tiles = self.tiles[count:]
 
-        hands = HandAnalyzer.serch_tenpai(dealt_tiles)
+        hands = HandAnalyzer.search_tenpai(dealt_tiles)
         sample = HandAnalyzer.filter_mangan_hands(hands, rest_tiles, self.dora_id)
         if not sample:
             return self.deal(count)

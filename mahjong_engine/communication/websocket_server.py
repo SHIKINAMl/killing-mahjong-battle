@@ -240,7 +240,6 @@ class WebSocketGameServer:
 				await self._enqueue_for_matchmaking(client_id)
 			return
 
-
 		if msg_type == "action":
 			client_id = self._client_id_by_socket.get(websocket)
 			if client_id:
