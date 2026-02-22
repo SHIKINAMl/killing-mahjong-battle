@@ -120,8 +120,10 @@ class WebSocketGameServer:
 				websocket,
 				{
 					"type": "connected",
-					"client_id": client_id,
-				},
+					"data": {
+						"client_id": client_id,
+					},
+				}
 			)
 
 			print(f"[WebSocketGameServer] client connected: {client_id}")
@@ -190,8 +192,10 @@ class WebSocketGameServer:
 
 				cancel_payload = {
 					"type": "match_cancelled",
-					"match_id": match_id,
-					"reason": "player_disconnected",
+					"data": {
+						"match_id": match_id,
+						"reason": "player_disconnected",
+					},
 				}
 				notify_sockets = [self._socket_by_client_id.get(cid) for cid in other_players]
 
@@ -222,17 +226,20 @@ class WebSocketGameServer:
 			await self._send_json(websocket, {"type": "error", "message": "type is required"})
 			return
 
-
-
 		if msg_type == "ping":
-			await self._send_json(websocket, {"type": "pong", "ts": time.time()})
+			await self._send_json(websocket, {
+				"type": "ping",
+				"data": {
+					"ts": time.time()
+				},
+			})
 			return
 
-		if msg_type == "status":
-			client_id = self._client_id_by_socket.get(websocket)
-			if client_id:
-				await self._send_matchmaking_status(websocket, client_id)
-			return
+#		if msg_type == "status":
+#			client_id = self._client_id_by_socket.get(websocket)
+#			if client_id:
+#				await self._send_matchmaking_status(websocket, client_id)
+#			return
 
 		if msg_type == "join":
 			client_id = self._client_id_by_socket.get(websocket)
@@ -252,10 +259,13 @@ class WebSocketGameServer:
 		"""プレイヤーを待機キューへ追加し、揃えば自動でマッチさせる"""
 		async with self._lock:
 			if client_id in self._active_match_by_client:
+				await self._send_to_client(client_id, {"type": "error", "message": "Already in a match"})
 				return
 			if client_id in self._waiting_queue:
+				await self._send_to_client(client_id, {"type": "error", "message": "Already in matchmaking queue"})
 				return
 			if client_id not in self._socket_by_client_id:
+				await self._send_to_client(client_id, {"type": "error", "message": "Client not connected"})
 				return
 
 			self._waiting_queue.append(client_id)
@@ -292,7 +302,6 @@ class WebSocketGameServer:
 		if match is None:
 			return
 
-		print(f"[WebSocketGameServer] match created: {match_id} with players {player_ids}")
 		await self._game_session.start_match(match)
 		#await self._broadcast_matchmaking_state()
 
@@ -309,9 +318,11 @@ class WebSocketGameServer:
 			client_id,
 			{
 				"type": "matching_waiting",
-				"queue_position": queue_pos,
-				"queue_size": queue_size,
-				"need_players": max(self.max_players - queue_size, 0),
+				"data": {
+					"queue_position": queue_pos,
+					"queue_size": queue_size,
+					"need_players": max(self.max_players - queue_size, 0),
+				},
 			},
 		)
 
@@ -334,11 +345,13 @@ class WebSocketGameServer:
 			websocket,
 			{
 				"type": "matchmaking_status",
-				"in_queue": queue_pos is not None,
-				"queue_position": queue_pos,
-				"queue_size": queue_size,
-				"in_game": match_payload is not None,
-				"match": match_payload,
+				"data": {
+					"in_queue": queue_pos is not None,
+					"queue_position": queue_pos,
+					"queue_size": queue_size,
+					"in_game": match_payload is not None,
+					"match": match_payload,
+				},
 			},
 		)
 
@@ -347,8 +360,10 @@ class WebSocketGameServer:
 		async with self._lock:
 			payload = {
 				"type": "matchmaking_state",
-				"queue_size": len(self._waiting_queue),
-				"active_matches": len(self._matches),
+				"data": {
+					"queue_size": len(self._waiting_queue),
+					"active_matches": len(self._matches),
+				},
 			}
 		await self._broadcast(payload)
 

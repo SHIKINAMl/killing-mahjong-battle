@@ -128,23 +128,3 @@ class TileConverter:
 
         dora_value = (dora_type[0] << 1) | dora_type[1]
         return tile_id | (dora_value << 5)
-
-    @staticmethod
-    def format_hand(values: list[int]) -> str:
-        """
-        手牌を見やすい形式で表示
-
-        未実装
-        """
-
-        pass
-
-
-if __name__ == "__main__":
-    # テストコード
-    test_values = [0, 1, 2, 0b0100000, 0b1001101]
-    tiles = TileConverter.array_to_tiles(test_values)
-    print(tiles)  # ['1萬', '2萬', '3萬', '1萬(ドラ)', '5筒(赤ドラ)']
-
-    binary_value = TileConverter.tile_to_binary("東", [1, 0])
-    print(f"0b{binary_value:07b}")

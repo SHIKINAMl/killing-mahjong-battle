@@ -1,3 +1,4 @@
+import time
 import asyncio
 import heapq
 from typing import Any, Awaitable, Callable, Dict, List, Optional
@@ -33,13 +34,6 @@ class GameSession:
 		engine = GameEngine(num_players=len(match.players))
 		engine.initialize_players(match.players)
 
-		engine.on_hand_selecting = lambda: asyncio.create_task(
-			self.on_hand_selecting(match.match_id)
-		)
-		engine.on_betting = lambda: asyncio.create_task(
-			self.on_betting(match.match_id)
-		)
-
 		engine.on_wall_dealt = lambda: asyncio.create_task(
 			self.on_dealt(match.match_id)
 		)
@@ -53,8 +47,8 @@ class GameSession:
 			self.on_turn_decision_complete(match.match_id)
 		)
 
-		engine.on_round_start = lambda round_state: asyncio.create_task(
-			self.on_round_start(match.match_id, round_state)
+		engine.on_round_start = lambda: asyncio.create_task(
+			self.on_round_start(match.match_id)
 		)
 		engine.on_round_end = lambda: asyncio.create_task(
 			self.on_round_end(match.match_id)
@@ -95,7 +89,14 @@ class GameSession:
 
 		engine = self._game_engines[match_id]
 		action_type = data.get("action")
-		action_data = data.get("data", {})
+		action_data = data.get("data")
+
+		if not action_type:
+			await self._send_to_client(client_id, {"type": "error", "message": "No action type specified"})
+			return
+		if not action_data or type(action_data) is not dict:
+			await self._send_to_client(client_id, {"type": "error", "message": "Invalid action data"})
+			return
 
 		try:
 			if action_type == "is_tenpai": # 手牌の聴牌判定
@@ -116,25 +117,45 @@ class GameSession:
 
 	async def _is_tenpai(self, engine: GameEngine, client_id: str, action_data: Dict[str, Any]) -> None:
 		"""手牌の聴牌判定の処理"""
+
 		if engine.state.round_state.status != RoundStatus.HAND_SELECTION:
 			await self._send_to_client(client_id, {"type": "error", "message": "Not in hand selection phase"})
 			return
 
-		hand = action_data.get("hand", [])
+		if type(action_data) is not dict:
+			await self._send_to_client(client_id, {"type": "error", "message": "Invalid action data"})
+			return
+
+		hand = action_data.get("hand")
+
 		if not hand:
 			await self._send_to_client(client_id, {"type": "error", "message": "No hand provided"})
 			return
 
-		if HandAnalyzer.is_tenpai(hand) and HandAnalyzer.check_mangan(hand):
+		player = next((p for p in engine.state.players if p.player_id == client_id), None)
+
+		if HandAnalyzer.is_tenpai(hand, player.wall):
+			waits = HandAnalyzer.get_tenpai_waiting_tiles(hand, player.wall)
+
+			waits = [w+32 if w == engine.state.round_state.dora_id else w for w in waits]
+
 			await self._send_to_client(client_id, {
-				"type": "true",
-				"message": "Hand is in tenpai and has mangan potential",
+				"type": "is_tenpai",
+				"data": {
+					"waits": [
+						{
+							"tile" : w,
+							"mangan_or_more" : HandAnalyzer.check_mangan(hand + [w]),
+							"yaku" : HandAnalyzer.enum_yaku(hand + [w]),
+						} for w in waits
+					]
+				},
 			})
 
 		else:
 			await self._send_to_client(client_id, {
-				"type": "false",
-				"message": "Hand is not in tenpai or does not have mangan potential",
+				"type": "not_tenpai",
+				"message": "Hand is not in tenpai",
 			})
 
 	async def _skill(self, engine: GameEngine, client_id: str, action_data: Dict[str, Any]) -> None:
@@ -147,28 +168,37 @@ class GameSession:
 		# ブロードキャストで通知
 
 	async def _selected(self, engine: GameEngine, client_id: str, action_data: Dict[str, Any]) -> None:
-		"""決定アクションの処理"""
+		"""手牌選択完了の処理"""
 		if engine.state.round_state.status != RoundStatus.HAND_SELECTION:
 			await self._send_to_client(client_id, {"type": "error", "message": "Not in hand selection phase"})
 			return
 
-		hand = action_data.get("hand", [])
+		if type(action_data) is not dict:
+			await self._send_to_client(client_id, {"type": "error", "message": "Invalid action data"})
+			return
+
+		hand = action_data.get("hand")
+
 		if not hand:
 			await self._send_to_client(client_id, {"type": "error", "message": "No hand provided"})
 			return
 
-		if HandAnalyzer.is_tenpai(hand) and HandAnalyzer.check_mangan(hand):
+		player = next((p for p in engine.state.players if p.player_id == client_id), None)
+
+		if HandAnalyzer.is_tenpai(hand, player.wall):
 			for p in engine.state.players:
 				if p.player_id == client_id:
 					p.hand = hand
-					p.wait = HandAnalyzer.get_tenpai_waiting_tiles(hand, p.wall, engine.state.round_state.dora_id)
+					p.wait = HandAnalyzer.get_tenpai_waiting_tiles(hand, p.wall)
 					p.wall = HandAnalyzer.without_hand(hand, p.wall)
 
 					await self._send_to_client(client_id, {
 						"type": "hand_selected",
-						"hand": TileConverter.array_to_tiles(p.hand),
-						"wait": TileConverter.array_to_tiles(p.wait),
-						"wall": TileConverter.array_to_tiles(p.wall),
+						"data": {
+							"hand": p.hand,
+							"wait": p.wait,
+							"wall": p.wall,
+						},
 					})
 
 		else:
@@ -177,29 +207,8 @@ class GameSession:
 				"message": "Selected hand is not in tenpai or does not have mangan potential",
 			})
 
-	async def _betting(self, match_id: str) -> None:
-		"""
-		掛け金設定の処理
-		ここでは、プレイヤーからの掛け金設定が完了するまで待機する
-		Args:
-			match_id: 対象のマッチID
-		"""
-		while True:
-			if all(p.bet != 0 for p in self._game_engines[match_id].state.players):
-				break
-			await asyncio.sleep(1)
-
-	async def on_selecting(self, match_id: str) -> None:
-		"""
-		手牌選択の処理
-		ここでは、全プレイヤーの手牌選択が完了するまで待機する
-		Args:
-			match_id: 対象のマッチID
-		"""
-		while True:
-			if all(p.wait for p in self._game_engines[match_id].state.players):
-				break
-			await asyncio.sleep(1)
+		if all(p.wait for p in engine.state.players):
+			await engine.selected()
 
 	async def on_dealt(self, match_id: str) -> None:
 		"""
@@ -217,8 +226,8 @@ class GameSession:
 			hand_payload.append(
 				{
 					"client_id": await self.resolve_client_id(match_id, i),
-					"hand": TileConverter.array_to_tiles(h[0]),  # 配られた牌
-					"tenpai_examples": TileConverter.array_to_tiles(h[1]),  # 聴牌形の例
+					"hand": h[0],  # 配られた牌
+					"tenpai_examples": h[1],  # 聴牌形の例
 				}
 			)
 
@@ -226,12 +235,12 @@ class GameSession:
 			match_id,
 			{
 				"type": "wall_dealt",
-				"dora_id": TileConverter.binary_to_tile(dora),
+				"dora_id": dora,
 				"hands": hand_payload,
 			},
 		)
 
-	async def on_selected(self, match_id: str) -> None:
+	async def on_hand_selected(self, match_id: str) -> None:
 		"""
 		手牌選択完了時の処理
 		Args:
@@ -243,9 +252,9 @@ class GameSession:
 			hand_payload.append(
 				{
 					"client_id": await self.resolve_client_id(match_id, i),
-					"hand": TileConverter.array_to_tiles(h[0]),  # 選択された手牌
-					"wait": TileConverter.array_to_tiles(h[1]),  # 待ち牌
-					"wall": TileConverter.array_to_tiles(h[2]),  # 配られた牌から選択された手牌を除いたもの
+					"hand": h[0],  # 選択された手牌
+					"wait": h[1],  # 待ち牌
+					"wall": h[2],  # 配られた牌から選択された手牌を除いたもの
 				}
 			)
 		await self._broadcast_match_members(
@@ -269,33 +278,31 @@ class GameSession:
 			},
 		)
 
-	async def on_turn_decision_complete(self, match_id: str, current_player: int) -> None:
+	async def on_turn_decided(self, match_id: str) -> None:
 		"""
 		手番決定完了時の処理
 		Args:
 			match_id: 対象のマッチID
-			current_player: 現在のプレイヤーのインデックス
 		"""
 		await self._broadcast_match_members(
 			match_id,
 			{
 				"type": "turn_decided",
-				"current_player": current_player,
+				"current_player": self._game_engines[match_id].state.round_state.current_player_index,
 			},
 		)
 
-	async def on_round_start(self, match_id: str, round_state: Any) -> None:
+	async def on_round_start(self, match_id: str) -> None:
 		"""
 		ラウンド開始時の処理
 		Args:
 			match_id: 対象のマッチID
-			round_state: ラウンドの状態
 		"""
 		await self._broadcast_match_members(
 			match_id,
 			{
 				"type": "round_start",
-				"round": round_state.round_number,
+				"round": self._game_engines[match_id].state.round_state.round_number,
 			},
 		)
 

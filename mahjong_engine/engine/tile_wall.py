@@ -3,6 +3,7 @@
 """
 import random
 from typing import List
+import itertools
 
 from .hand_analyzer import HandAnalyzer
 
@@ -53,7 +54,7 @@ class TileWall:
         """牌山をシャッフル"""
         random.shuffle(self.tiles)
 
-    def deal(self, count: int = 34) -> tuple[List[int], List[int]]:
+    def deal(self, count: int = 34, max_size: int = 3) -> tuple[List[int], List[int]]: #, List[List[int]]]:
         """
         牌山から指定枚数を配る
 
@@ -63,19 +64,28 @@ class TileWall:
         Returns:
             配った牌のリスト
             聴牌形の例
+            交換不可な牌の組み合わせのリスト
         """
 
         dealt_tiles = self.tiles[:count]
         rest_tiles = self.tiles[count:]
 
         hands = HandAnalyzer.search_tenpai(dealt_tiles)
-        sample = HandAnalyzer.filter_mangan_hands(hands, rest_tiles, self.dora_id)
-        if not sample:
+        hands = HandAnalyzer.filter_mangan_hands(hands, rest_tiles, self.dora_id)
+        if not hands:
             return self.deal(count)
+
+        sample = random.choice(hands)
+
+        combs = []
+        comb = itertools.combinations(dealt_tiles, max_size)
+        for c in comb:
+            if all(any(t in hand for t in c) for hand in hands):
+                combs.append(list(c))
 
         self.tiles = rest_tiles
 
-        return dealt_tiles, sample
+        return dealt_tiles, sample#, combs
 
     def reset(self):
         """牌山をリセット"""

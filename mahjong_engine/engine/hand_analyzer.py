@@ -191,7 +191,7 @@ class HandAnalyzer:
     # ========== 役計算 ==========
 
     @staticmethod
-    def filter_mangan_hands(list: list[list[int]], wall: List[int], dora: int) -> list[int]:
+    def filter_mangan_hands(list: list[list[int]], wall: List[int], dora: int) -> List[list[int]]:
         """
         聴牌形の手牌リストのうち
         満貫以上となる上がりを持つものを返す
@@ -201,7 +201,7 @@ class HandAnalyzer:
             wall: 山牌のリスト
             dora: ドラの牌ID
         Returns:
-            満貫以上の聴牌形の手牌のうちランダムな手牌
+            満貫以上の聴牌形の手牌リスト
         """
 
         aka_list = [t & 0b11111 for t in wall if (t >> 6) & 0b1 == 1]
@@ -227,17 +227,16 @@ class HandAnalyzer:
 
                 han = HandAnalyzer.calc_yaku(h)
                 if han >= 4:
+                    for t in hand:
+                        if t in temp_aka_list:
+                            hand[hand.index(t)] = t | (1 << 6)
+                            temp_aka_list.remove(t)
+                        if t == dora:
+                            hand[hand.index(t)] = t | (1 << 5)
+
                     mangan_hands.append(hand)
 
-        sample = random.choice(mangan_hands) if mangan_hands else None
-        for t in sample:
-            if t in temp_aka_list:
-                sample[sample.index(t)] = t | (1 << 6)
-                temp_aka_list.remove(t)
-            if t == dora:
-                sample[sample.index(t)] = t | (1 << 5)
-
-        return sample
+        return mangan_hands
 
     @staticmethod
     def check_mangan(hand: List[int]) -> bool:

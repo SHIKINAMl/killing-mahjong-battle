@@ -7,7 +7,6 @@ import random
 from .game_state import GameState, GameStatus, RoundStatus, PlayerStatus, PlayerState, RoundState
 from .tile_wall import TileWall
 
-from ..utils import TileConverter
 
 
 class GameEngine:
@@ -20,30 +19,25 @@ class GameEngine:
         Args:
             num_players: プレイヤー数（デフォルト2人）
         """
-
         self.state = GameState()
         self.tile_wall = TileWall()
         self.num_players = num_players
         #self.target_status = GameStatus.GAME_END  # 目標ステータス
 
         # 各種コールバック
-        self.on_hand_selecting: Optional[Callable[[], None]] = None
-        self.on_betting: Optional[Callable[[], list[int]]] = None
-
-        self.on_wall_dealt: Optional[Callable[[int, list[list[int]]], None]] = None
+        self.on_wall_dealt: Optional[Callable[[], None]] = None
         self.on_hand_selected: Optional[Callable[[], None]] = None
-        self.on_bet: Optional[Callable[[], list[int]]] = None
-        self.on_turn_decided: Optional[Callable[[], int]] = None
+        self.on_bet: Optional[Callable[[], None]] = None
+        self.on_turn_decided: Optional[Callable[[], None]] = None
 
         #self.on_status_change: Optional[Callable[[GameStatus], None]] = None
-        self.on_round_start: Optional[Callable[[RoundState], None]] = None
+        self.on_round_start: Optional[Callable[[], None]] = None
         self.on_round_end: Optional[Callable[[], None]] = None
         self.on_game_end: Optional[Callable[[], None]] = None
 
 
     def initialize_players(self, player_ids: list[str]):
         """プレイヤーを初期化"""
-
         self.state.players = [
             PlayerState(
                 player_id=player_id,
@@ -55,7 +49,6 @@ class GameEngine:
 
     def start_game(self, max_rounds: int = 4):
         """ゲームを開始"""
-
         if self.state.status != GameStatus.WAITING:
             raise RuntimeError("ゲームはすでに開始されています")
 
@@ -64,9 +57,8 @@ class GameEngine:
 
     def _start_round(self):
         """局を開始"""
-
         if self.on_round_start:
-            self.on_round_start(self.state.round_state)
+            self.on_round_start()
 
         # 配牌を実行
         self.state.round_state.status = RoundStatus.DEALING
@@ -74,7 +66,6 @@ class GameEngine:
 
     def _deal_tiles(self):
         """各プレイヤーに牌を配る"""
-
         hands = [self.tile_wall.deal() for _ in range(self.num_players)]
 
         for i, player in enumerate(self.state.players):
@@ -87,28 +78,17 @@ class GameEngine:
             self.on_wall_dealt()
 
         self.state.round_state.status = RoundStatus.HAND_SELECTION
-        self._select_hand()
 
-    def _select_hand(self):
-        """手牌の選択を行う"""
-
-        # ここでプレイヤーからの手牌選択を待ち、選択された手牌を反映する
-        if self.on_hand_selecting:
-            self.on_hand_selecting()
-
+    def selected(self):
+        """手牌の選択が完了したときの処理"""
         if self.on_hand_selected:
             self.on_hand_selected()
 
         self.state.round_state.status = RoundStatus.BETTING
         self._betting()
 
-    def _betting(self):
-        """掛け金の設定を行う"""
-
-        # ここでプレイヤーからの掛け金設定を待ち、設定された掛け金を反映する
-        if self.on_betting:
-            self.on_betting()
-
+    def bet(self):
+        """掛け金の設定が完了したときの処理"""
         if self.on_bet:
             self.on_bet()
 
