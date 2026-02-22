@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 using System.Collections.Generic;
 
 namespace KillingMahjong.UI
@@ -21,27 +22,30 @@ namespace KillingMahjong.UI
 
         private void Update()
         {
-            if (Input.GetMouseButtonDown(0))
+            if (Mouse.current == null) return;
+
+            if (Mouse.current.leftButton.wasPressedThisFrame)
             {
                 // Start selection if we NOT clicking on a Tile or Button
-                if (!IsPointerOverInteractive())
+                Vector2 mousePos = Mouse.current.position.ReadValue();
+                if (!IsPointerOverInteractive(mousePos))
                 {
                     isSelecting = true;
-                    startPosition = Input.mousePosition;
+                    startPosition = mousePos;
                     if (selectionBox != null)
                     {
                         selectionBox.gameObject.SetActive(true);
-                        UpdateSelectionBox(Input.mousePosition);
+                        UpdateSelectionBox(mousePos);
                     }
                 }
             }
 
-            if (isSelecting && Input.GetMouseButton(0))
+            if (isSelecting && Mouse.current.leftButton.isPressed)
             {
-                UpdateSelectionBox(Input.mousePosition);
+                UpdateSelectionBox(Mouse.current.position.ReadValue());
             }
 
-            if (isSelecting && Input.GetMouseButtonUp(0))
+            if (isSelecting && Mouse.current.leftButton.wasReleasedThisFrame)
             {
                 isSelecting = false;
                 PerformSelection();
@@ -49,13 +53,13 @@ namespace KillingMahjong.UI
             }
         }
 
-        private bool IsPointerOverInteractive()
+        private bool IsPointerOverInteractive(Vector2 mousePos)
         {
             if (EventSystem.current == null) return false;
 
             PointerEventData pointerData = new PointerEventData(EventSystem.current)
             {
-                position = Input.mousePosition
+                position = mousePos
             };
 
             List<RaycastResult> results = new List<RaycastResult>();

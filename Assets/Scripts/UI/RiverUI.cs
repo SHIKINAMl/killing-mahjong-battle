@@ -53,5 +53,17 @@ namespace KillingMahjong.UI
             }
             discardedTiles.Clear();
         }
+
+        public void SetRiver(List<int> tileIds)
+        {
+            Clear();
+            if (tileIds != null)
+            {
+                foreach(int tileId in tileIds)
+                {
+                    AddTile(tileId);
+                }
+            }
+        }
     }
 }
