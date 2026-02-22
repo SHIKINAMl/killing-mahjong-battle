@@ -318,11 +318,11 @@ class WebSocketGameServer:
 			client_id,
 			{
 				"type": "matching_waiting",
-				"data": {
-					"queue_position": queue_pos,
-					"queue_size": queue_size,
-					"need_players": max(self.max_players - queue_size, 0),
-				},
+				#"data": {
+				#	"queue_position": queue_pos,
+				#	"queue_size": queue_size,
+				#	"need_players": max(self.max_players - queue_size, 0),
+				#},
 			},
 		)
 

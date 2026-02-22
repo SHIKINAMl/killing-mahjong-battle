@@ -59,12 +59,11 @@ class GameSession:
 
 		payload = {
 			"type": "game_started",
-			"match": {
-				"match_id": match.match_id,
-				"players": [{"client_id": cid} for cid in match.players],
-				"status": match.status,
-			},
-			"game_state": None,
+			#"data": {
+			#	"match_id": match.match_id,
+			#	"players": [{"client_id": cid} for cid in match.players],
+			#	"status": match.status,
+			#},
 		}
 
 		await asyncio.gather(
