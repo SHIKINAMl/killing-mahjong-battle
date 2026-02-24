@@ -23,6 +23,19 @@ namespace KillingMahjong.UI
         [SerializeField] private float maxBetRatio = 0.25f; // 1/4 of initial hp
         [SerializeField] private float slideDuration = 0.5f;
 
+        [Header("Auto Dialogue Settings")]
+        [SerializeField] private float dialogueInterval = 5.0f;
+        [SerializeField] private string[] enemyDialogueLines = new string[]
+        {
+            "ふふっ、そんな麻雀で私に勝てるとでも？",
+            "ん〜？ どーしたのー？ 早く賭けなよぉ♡",
+            "震えてるよ？ 怖いの？",
+            "全額いっちゃう？ いっくわけないかぁ〜雑魚だもんね♡",
+            "ざぁこ♡ ざぁこ♡ よわよわ雀士♡"
+        };
+        private DialogueUI dialogueUI;
+        private Coroutine autoDialogueCoroutine;
+
         private int initialMoney = 20000;
         private int currentMoney = 20000;
         private int currentBet = 0;
@@ -42,6 +55,9 @@ namespace KillingMahjong.UI
                 hiddenPos = new Vector2(visiblePos.x + hpBarPanel.rect.width + 100f, visiblePos.y); // Hide to the right
                 hpBarPanel.anchoredPosition = hiddenPos;
             }
+
+            // Get DialogueUI reference
+            dialogueUI = FindFirstObjectByType<DialogueUI>();
 
             increaseBetButton.onClick.AddListener(IncreaseBet);
             decreaseBetButton.onClick.AddListener(DecreaseBet);
@@ -67,10 +83,22 @@ namespace KillingMahjong.UI
                 StopAllCoroutines();
                 StartCoroutine(SlidePanel(hiddenPos, visiblePos));
             }
+            
+            // Start Auto Dialogue
+            if (dialogueUI != null && enemyDialogueLines.Length > 0)
+            {
+                autoDialogueCoroutine = StartCoroutine(AutoDialogueRoutine());
+            }
         }
 
         public void HideBettingPhase()
         {
+            if (autoDialogueCoroutine != null)
+            {
+                StopCoroutine(autoDialogueCoroutine);
+                autoDialogueCoroutine = null;
+            }
+
             if (hpBarPanel != null)
             {
                 StopAllCoroutines();
@@ -144,6 +172,25 @@ namespace KillingMahjong.UI
 
             hpBarPanel.anchoredPosition = end;
             onComplete?.Invoke();
+        }
+
+        private IEnumerator AutoDialogueRoutine()
+        {
+            // Initial delay or immediate text
+            yield return new WaitForSeconds(1.0f);
+
+            while (true)
+            {
+                // Select a random line
+                int randomIndex = UnityEngine.Random.Range(0, enemyDialogueLines.Length);
+                string textToTalk = enemyDialogueLines[randomIndex];
+                
+                // Show the dialogue
+                dialogueUI.ShowText(textToTalk);
+
+                // Wait for the next interval
+                yield return new WaitForSeconds(dialogueInterval);
+            }
         }
     }
 }

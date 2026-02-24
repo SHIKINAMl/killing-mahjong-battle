@@ -267,16 +267,25 @@ namespace KillingMahjong.UI
              if (phaseTransitionUI != null)
              {
                  Debug.Log("Triggering Phase Transition Animation.");
+                 
+                 // 画面に横線が入る瞬間で敵の会話UIが消えるようにする
+                 if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
+
                  // Start transition
                  phaseTransitionUI.PlayTransition(roundString, 
                     onMidpoint: () => {
                          // Swap UI to Match UI here behind the dark screen if necessary
                          // This is where you might enable HandUI, WallUI, etc, if they were hidden during betting
                          Debug.Log("Midpoint of Transition (Screen is Dark)");
+
+                         // なお、ここでは会話UIは非表示のまま維持する
                     },
                     onComplete: () => {
                          Debug.Log("Transition Complete, Match Phase begins.");
                          SetMatchUIVisibility(true); // Restore match UI
+                         
+                         // 対局（手牌フェイズ）が始まったら会話UIを出す
+                         if (dialogueUI != null) dialogueUI.gameObject.SetActive(true);
                     }
                  );
              }

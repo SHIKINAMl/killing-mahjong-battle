@@ -22,8 +22,8 @@ namespace KillingMahjong.UI
             List<int> randomIds = new List<int>();
             for (int i = 0; i < tileCount; i++)
             {
-                // IDs 0-33
-                randomIds.Add(Random.Range(0, 34));
+                // IDs 0-28
+                randomIds.Add(Random.Range(0, 29));
             }
             
             handUI.SetHand(randomIds);

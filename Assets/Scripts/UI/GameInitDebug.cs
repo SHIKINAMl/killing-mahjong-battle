@@ -8,7 +8,7 @@ namespace KillingMahjong.UI
     public class GameInitDebug : MonoBehaviour
     {
         [SerializeField] private GameUIManager gameUIManager;
-        [SerializeField] private int initialCount = 34;
+        [SerializeField] private int initialCount = 29;
         
         [Header("Debug Controls")]
         [SerializeField] private Toggle debugBettingToggle; // UI Checkbox to test betting phase
@@ -55,7 +55,7 @@ namespace KillingMahjong.UI
                 status = 2, // 2 = Betting Phase (mock)
                 round = 1,
                 honba = 0,
-                dora_id = Random.Range(0, 34),
+                dora_id = Random.Range(0, 29),
                 current_player = "Player1",
                 players = new PlayerStateData[]
                 {
@@ -106,7 +106,7 @@ namespace KillingMahjong.UI
                 status = 2, // Start with Betting Phase
                 round = 1,
                 honba = 0,
-                dora_id = Random.Range(0, 34),
+                dora_id = Random.Range(0, 29),
                 current_player = "Player1",
                 players = new PlayerStateData[]
                 {
@@ -140,7 +140,7 @@ namespace KillingMahjong.UI
             int[] tiles = new int[count];
             for (int i = 0; i < count; i++)
             {
-                tiles[i] = Random.Range(0, 34);
+                tiles[i] = Random.Range(0, 29);
             }
             return tiles;
         }
