@@ -1,17 +1,28 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using System.Collections.Generic;
 
 namespace KillingMahjong.UI
 {
-    public class HandUI : MonoBehaviour
+    public class HandUI : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
     {
         [Header("Hand Slots")]
         [SerializeField] private Transform handSlotContainer;
         [SerializeField] private GameObject tilePrefab;
         [SerializeField] private List<Transform> handSlots; // Changed from Image to Transform
+        public List<Transform> GetHandSlots() => handSlots; // Getter for GameUIManager
+
         [SerializeField] private TileResourceManager tileResourceManager;
         [SerializeField] private RectTransform handAreaRect; // For drag detection
+
+        [Header("Layout Settings")]
+        [SerializeField] private float tileSpacingX = 50f;
+        [SerializeField] private float tileSpacingY = 70f;
+        
+        // --- Dragging the Hand Panel ---
+        private RectTransform panelRect;
+        private Vector2 dragOffset;
 
         private GameUIManager gameUIManager;
 
@@ -31,103 +42,197 @@ namespace KillingMahjong.UI
 
         private void Start()
         {
+            panelRect = GetComponent<RectTransform>();
             decideButton.onClick.AddListener(OnDecideClicked);
             autoManganButton.onClick.AddListener(OnAutoManganClicked);
             UpdateCursorPosition();
         }
 
-        public void SetHand(List<int> tileIds)
+        // --- Drag Panel Implementation ---
+        public void OnBeginDrag(PointerEventData eventData)
         {
-            // 1. Convert to TileData
-            List<TileData> allTiles = new List<TileData>();
-            foreach (var id in tileIds)
+            // パネル移動用 (タイル自体のドラッグの妨げにならないよう必要に応じて背景などをターゲットにします)
+            if (panelRect != null)
             {
-                allTiles.Add(new TileData(id));
+                RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    panelRect, eventData.position, eventData.pressEventCamera, out dragOffset);
             }
+        }
 
-            // 2. Group by Category
-            var manzu = new List<TileData>();
-            var pinzu = new List<TileData>();
-            var souzu = new List<TileData>();
-            var honors = new List<TileData>();
-
-            foreach (var t in allTiles)
+        public void OnDrag(PointerEventData eventData)
+        {
+            if (panelRect != null)
             {
-                switch (t.Category)
+                Vector2 localPointerPosition;
+                if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                    panelRect.parent as RectTransform, eventData.position, eventData.pressEventCamera, out localPointerPosition))
                 {
-                    case TileCategory.Manzu: manzu.Add(t); break;
-                    case TileCategory.Pinzu: pinzu.Add(t); break;
-                    case TileCategory.Souzu: souzu.Add(t); break;
-                    case TileCategory.Honor: honors.Add(t); break;
+                    panelRect.localPosition = localPointerPosition - dragOffset;
                 }
             }
+        }
 
-            // 3. Sort Categories
-            var categoryLists = new List<List<TileData>> { souzu, manzu, pinzu, honors };
-            categoryLists.Sort((a, b) =>
+        public void OnEndDrag(PointerEventData eventData)
+        {
+            // 必要に応じてスナップ処理等
+        }
+
+        public void AddTileToHand(Transform tileTransform, int tileId)
+        {
+            if (tileTransform == null) return;
+            
+            // 既存の手牌リストに追加
+            handSlots.Add(tileTransform);
+
+            // コンテナ移動
+            tileTransform.SetParent(handSlotContainer, false);
+            tileTransform.localPosition = Vector3.zero;
+            
+            RectTransform rt = tileTransform.GetComponent<RectTransform>();
+            if (rt != null)
             {
-                int countCompare = b.Count.CompareTo(a.Count);
-                if (countCompare != 0) return countCompare;
-                int priorityA = GetCategoryPriority(a);
-                int priorityB = GetCategoryPriority(b);
-                return priorityA.CompareTo(priorityB);
+                rt.anchoredPosition3D = Vector3.zero;
+            }
+            
+            tileTransform.localRotation = Quaternion.identity;
+            tileTransform.localScale = Vector3.one;
+            tileTransform.gameObject.SetActive(true);
+
+            // インタラクション設定の更新（Handに移動したフラグをTrueにする）
+            var interaction = tileTransform.GetComponent<TileInteraction>();
+            if (interaction != null && gameUIManager != null)
+            {
+                Canvas canvas = GetComponentInParent<Canvas>();
+                interaction.Initialize(tileId, true, gameUIManager, canvas);
+            }
+
+            Debug.Log($"HandUI: Added tile {tileId}. Total handSlots: {handSlots.Count}");
+            
+            // LayoutGroup が並び替えてくれるため、ここでのソートや自前整列処理はいったん省略します。
+            // (本来は TileID順 に並び変えるなら Transform の SiblingIndex を操作します)
+            if (gameUIManager != null)
+            {
+                UpdateLayout(gameUIManager.CurrentPhaseStatus);
+            }
+            else
+            {
+                UpdateLayout(""); // Fallback
+            }
+        }
+
+        public void RemoveTileFromHand(Transform tileTransform, int tileId)
+        {
+            if (handSlots.Contains(tileTransform))
+            {
+                handSlots.Remove(tileTransform);
+                // インタラクション設定の更新（Wallに移動したフラグをFalseにする）
+                var interaction = tileTransform.GetComponent<TileInteraction>();
+                if (interaction != null && gameUIManager != null)
+                {
+                    Canvas canvas = GetComponentInParent<Canvas>();
+                    interaction.Initialize(tileId, false, gameUIManager, canvas);
+                }
+            }
+        }
+
+        public void UpdateLayout(string phaseStatus)
+        {
+            var layoutGroup = handSlotContainer.GetComponent<UnityEngine.UI.LayoutGroup>();
+            
+            // 手牌選択フェイズなどは既存のLayoutGroup（もしあれば）に任せるか、単純にならべる
+            if (phaseStatus != "discard")
+            {
+                if (layoutGroup != null) layoutGroup.enabled = true;
+                
+                // 既存の簡易ソート（ID順）
+                handSlots.Sort((a, b) => 
+                {
+                    var interactionA = a.GetComponent<TileInteraction>();
+                    var interactionB = b.GetComponent<TileInteraction>();
+                    if (interactionA == null || interactionB == null) return 0;
+                    return interactionA.TileId.CompareTo(interactionB.TileId);
+                });
+
+                for (int i = 0; i < handSlots.Count; i++)
+                {
+                    handSlots[i].SetSiblingIndex(i);
+                }
+                return;
+            }
+
+            // ---------------------------------------------
+            // 打牌（Discard）フェイズ時の特別なレイアウトとソート
+            // ---------------------------------------------
+            if (layoutGroup != null) layoutGroup.enabled = false;
+
+            // 1. ソート処理: 萬子 → 筒子 → 索子 → 字牌 の順、かつ数字順
+            handSlots.Sort((a, b) => 
+            {
+                var intA = a.GetComponent<TileInteraction>();
+                var intB = b.GetComponent<TileInteraction>();
+                if (intA == null || intB == null) return 0;
+
+                TileData dataA = new TileData(intA.TileId);
+                TileData dataB = new TileData(intB.TileId);
+
+                // カテゴリで比較 (0:Manzu, 1:Pinzu, 2:Souzu, 3:Honor)
+                if (dataA.Category != dataB.Category)
+                {
+                    return dataA.Category.CompareTo(dataB.Category);
+                }
+                
+                // 同じカテゴリなら数字で比較 (1-9)
+                if (dataA.Number != dataB.Number)
+                {
+                    return dataA.Number.CompareTo(dataB.Number);
+                }
+                
+                // 完全一致
+                return 0;
             });
 
-            // 4. Fill Slots (Layout handled by HorizontalLayoutGroup component)
-            int flatIndex = 0;
-            
-            for (int i = 0; i < categoryLists.Count; i++)
+            // SiblingIndexを更新（見た目の重なり順対応）
+            for (int i = 0; i < handSlots.Count; i++)
             {
-                var list = categoryLists[i];
-                if (list.Count == 0) continue;
+                handSlots[i].SetSiblingIndex(i);
+            }
 
-                // Sort inside category
-                list.Sort((a, b) => a.Id.CompareTo(b.Id));
+            // 2. 2列 × 7枚 の直接配置（隙間なし）
+            // 「奥から左に」→ Yを奥(上)から手前(下)へ、列を右から左へ並べる想定の実装
+            if (handSlots.Count == 0) return;
+            
+            RectTransform firstTileRT = handSlots[0].GetComponent<RectTransform>();
+            float tileWidth = firstTileRT.rect.width;
+            float tileHeight = firstTileRT.rect.height;
 
-                foreach (var tile in list)
+            for (int i = 0; i < handSlots.Count; i++)
+            {
+                // 1行につき7牌 (2行×7列を想定)
+                int rowIndex = i / 7; // 0:奥(上)の行, 1:手前(下)の行
+                int colIndex = i % 7; // 0〜6: 左から右へのインデックス
+
+                // Inspectorで設定した独自の間隔を使用（デフォルトは画像のサイズ等）
+                float w = tileSpacingX;
+                float h = tileSpacingY;
+
+                // 牌同士をピタッとくっつける場合、Inspectorで `tileSpacingX` と `tileSpacingY` を 
+                // タイル画像ジャストの幅・高さに設定してください。
+
+                // 奥(上)から手前(下)へ： 行番号が増えるほどYはマイナス方向へ
+                float targetY = -rowIndex * h;
+                
+                // 左から右へ： 列番号が増えるほどXはプラス方向へ
+                float targetX = colIndex * w;
+
+                RectTransform rt = handSlots[i].GetComponent<RectTransform>();
+                if (rt != null)
                 {
-                    Transform slot = null;
-                    if (flatIndex < handSlots.Count) slot = handSlots[flatIndex];
-                    else
-                    {
-                        if (tilePrefab != null && handSlotContainer != null)
-                        {
-                            var obj = Instantiate(tilePrefab, handSlotContainer);
-                            slot = obj.transform;
-                            handSlots.Add(slot);
-                        }
-                    }
-
-                    if (slot != null)
-                    {
-                         // No manual position set
-                         slot.localRotation = Quaternion.identity;
-                         slot.gameObject.SetActive(true);
-
-                         if (tileResourceManager != null)
-                         {
-                             var visual = slot.GetComponent<TileVisual>();
-                             if (visual != null) visual.SetTile(tile.Id, tileResourceManager.GetTileSprite(tile.Id));
-                         }
-
-                         // Interaction
-                         var interaction = slot.GetComponent<TileInteraction>();
-                         if (interaction == null) interaction = slot.gameObject.AddComponent<TileInteraction>();
-                         // Ensure canvas is found. HandUI should be under canvas?
-                         Canvas canvas = GetComponentInParent<Canvas>();
-                         if (gameUIManager != null) interaction.Initialize(tile.Id, true, gameUIManager, canvas);
-                    }
-                    flatIndex++;
+                    rt.anchorMin = new Vector2(0, 1); // 左上を基準に変更
+                    rt.anchorMax = new Vector2(0, 1);
+                    rt.pivot = new Vector2(0, 1);
+                    rt.anchoredPosition = new Vector2(targetX, targetY);
                 }
             }
-            
-            // Hide unused slots
-            for (int k = flatIndex; k < handSlots.Count; k++)
-            {
-                if (handSlots[k] != null)
-                    handSlots[k].gameObject.SetActive(false);
-            }
-            Debug.Log($"Hand set. Total tiles: {flatIndex}");
         }
 
         private int GetCategoryPriority(List<TileData> list)
@@ -165,8 +270,18 @@ namespace KillingMahjong.UI
 
         private void OnDecideClicked()
         {
-            Debug.Log($"Selected index: {currentSelectionIndex}");
-            // Notify Game logic
+            Debug.Log($"Decide Clicked. Current Hand Count: {handSlots.Count}");
+            if (handSlots.Count == 13)
+            {
+                if (gameUIManager != null)
+                {
+                    gameUIManager.CompleteHandSelection();
+                }
+            }
+            else
+            {
+                Debug.LogWarning("Hand must have exactly 13 tiles to proceed!");
+            }
         }
 
         private void OnAutoManganClicked()

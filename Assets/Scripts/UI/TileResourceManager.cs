@@ -6,8 +6,8 @@ namespace KillingMahjong.UI
     [CreateAssetMenu(fileName = "TileResourceManager", menuName = "Mahjong/TileResourceManager")]
     public class TileResourceManager : ScriptableObject
     {
-        [Header("Tile Sprites (Order: Manzu 1-9, Pinzu 1-9, Souzu 1-9, Honors 1-7)")]
-        [Tooltip("Ensure exactly 34 sprites are assigned in standard order.")]
+        [Header("Tile Sprites (Order: Manzu 1-9, Pinzu 1-9, Souzu 1-9, Honors: East, West)")]
+        [Tooltip("Ensure exactly 29 sprites are assigned in standard order.")]
         [SerializeField] private List<Sprite> tileSprites;
 
         [Header("Prefabs")]
@@ -19,7 +19,7 @@ namespace KillingMahjong.UI
             // 0-8: Manzu 1-9
             // 9-17: Pinzu 1-9
             // 18-26: Souzu 1-9
-            // 27-33: Honors (East, South, West, North, White, Green, Red)
+            // 27-28: Honors (East, West)
             
             if (id < 0 || id >= tileSprites.Count)
             {

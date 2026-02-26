@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
+using KillingMahjong.EngineData;
 
 namespace KillingMahjong.UI
 {
@@ -10,9 +11,12 @@ namespace KillingMahjong.UI
         [SerializeField] private WallUI wallUI;
         [SerializeField] private RiverUI riverUI;
         [SerializeField] private DialogueUI dialogueUI;
-        [SerializeField] private PlayerInfoUI playerInfoUI;
+        [SerializeField] private PlayerInfoUI playerInfoUI; // プレイヤー自身のHP
+        [SerializeField] private EnemyInfoUI enemyInfoUI;  // 敵のUI管理（HP、パネル）
         [SerializeField] private AbilityUI abilityUI;
         [SerializeField] private YakuListUI yakuListUI;
+        [SerializeField] private BettingUI bettingUI;
+        [SerializeField] private PhaseTransitionUI phaseTransitionUI;
 
         private void Start()
         {
@@ -32,17 +36,23 @@ namespace KillingMahjong.UI
         private System.Collections.Generic.List<int> currentHandTiles = new System.Collections.Generic.List<int>();
         private System.Collections.Generic.List<int> currentWallTiles = new System.Collections.Generic.List<int>();
         private System.Collections.Generic.List<int> selectedTileIds = new System.Collections.Generic.List<int>();
+        
+        private string currentPhaseStatus = "";
+        public string CurrentPhaseStatus => currentPhaseStatus;
 
         public void InitializeGame(System.Collections.Generic.List<int> initialWall)
         {
             currentWallTiles = new System.Collections.Generic.List<int>(initialWall);
             currentHandTiles.Clear();
             selectedTileIds.Clear();
-            RefreshUI();
+            RebuildAllTilesFromState();
         }
 
         public void MoveTileToHand(int tileId)
         {
+            // 手牌選択フェイズでのみ移動を許可
+            if (currentPhaseStatus != "hand_selection") return;
+
             if (selectedTileIds.Contains(tileId))
             {
                 MoveSelectedFiles(true);
@@ -51,9 +61,23 @@ namespace KillingMahjong.UI
             {
                 if (currentWallTiles.Contains(tileId))
                 {
-                    currentWallTiles.Remove(tileId);
-                    currentHandTiles.Add(tileId);
-                    RefreshUI();
+                    // 手牌は13枚まで
+                    if (currentHandTiles.Count < 13)
+                    {
+                        currentWallTiles.Remove(tileId);
+                        currentHandTiles.Add(tileId);
+                        
+                        // 以前のようなRefreshUI()による全再構築は行わず、
+                        // WallUIからTransformを引き抜いてHandUIにそのまま渡す
+                        if (wallUI != null && handUI != null)
+                        {
+                            Transform movedTile = wallUI.GrabTile(tileId);
+                            if (movedTile != null)
+                            {
+                                handUI.AddTileToHand(movedTile, tileId);
+                            }
+                        }
+                    }
                 }
             }
             ClearSelection();
@@ -61,6 +85,9 @@ namespace KillingMahjong.UI
 
         public void MoveTileToWall(int tileId)
         {
+            // 手牌選択フェイズでのみ移動を許可
+            if (currentPhaseStatus != "hand_selection") return;
+
              if (selectedTileIds.Contains(tileId))
             {
                 MoveSelectedFiles(false);
@@ -71,7 +98,29 @@ namespace KillingMahjong.UI
                 {
                     currentHandTiles.Remove(tileId);
                     currentWallTiles.Add(tileId);
-                    RefreshUI();
+                    
+                    if (handUI != null && wallUI != null)
+                    {
+                        // 1. HandUIからTransformを探して取得
+                        Transform movedTile = null;
+                        foreach (Transform t in handUI.GetHandSlots())
+                        {
+                            var interaction = t.GetComponent<TileInteraction>();
+                            if (interaction != null && interaction.TileId == tileId)
+                            {
+                                movedTile = t;
+                                break;
+                            }
+                        }
+
+                        // 2. HandUIから取り除く
+                        if (movedTile != null)
+                        {
+                            handUI.RemoveTileFromHand(movedTile, tileId);
+                            // 3. WallUIに戻す
+                            wallUI.ReturnTileToWall(movedTile, tileId);
+                        }
+                    }
                 }
             }
             ClearSelection();
@@ -86,11 +135,44 @@ namespace KillingMahjong.UI
             {
                 if (sourceList.Contains(id))
                 {
+                    // 手牌へ送る場合で、かつ既に13枚持っているならこれ以上は追加しない
+                    if (toHand && targetList.Count >= 13)
+                    {
+                        continue;
+                    }
+
                     sourceList.Remove(id);
                     targetList.Add(id);
+
+                    // Transformの物理移動
+                    if (toHand && wallUI != null && handUI != null)
+                    {
+                        // Wall -> Hand
+                        Transform movedTile = wallUI.GrabTile(id);
+                        if (movedTile != null) handUI.AddTileToHand(movedTile, id);
+                    }
+                    else if (!toHand && handUI != null && wallUI != null)
+                    {
+                        // Hand -> Wall
+                        Transform movedTile = null;
+                        foreach (Transform t in handUI.GetHandSlots()) 
+                        {
+                            var interaction = t.GetComponent<TileInteraction>();
+                            if (interaction != null && interaction.TileId == id)
+                            {
+                                movedTile = t;
+                                break;
+                            }
+                        }
+                        if (movedTile != null)
+                        {
+                            handUI.RemoveTileFromHand(movedTile, id);
+                            wallUI.ReturnTileToWall(movedTile, id);
+                        }
+                    }
                 }
             }
-            RefreshUI();
+            // RefreshUI();
         }
 
         public void SelectTile(int tileId, bool isInHand, bool multiSelect)
@@ -128,17 +210,296 @@ namespace KillingMahjong.UI
 
         private void RefreshUI()
         {
-            if (handUI != null) handUI.SetHand(currentHandTiles);
-            if (wallUI != null) wallUI.SetWall(currentWallTiles);
+            // 旧RefreshUIは廃止し、全体再構築はRebuildAllTilesFromStateで行う想定です。
+            // ここは空にしておくか、削除します。
+            Debug.Log($"UI Data state - Hand: {currentHandTiles.Count}, Wall: {currentWallTiles.Count}");
+        }
+
+        public void CompleteHandSelection()
+        {
+            if (currentPhaseStatus != "hand_selection") return;
             
-            Debug.Log($"UI Refreshed. Hand: {currentHandTiles.Count}, Wall: {currentWallTiles.Count}");
+            Debug.Log("Hand Selection Complete! Transitioning to discard phase.");
+            
+            // TODO: 本来はエンジンにJSON（クライアント選択完了など）を返す
+            // ここでは仮に直接 discard フェーズに移行させます
+            currentPhaseStatus = "discard";
+            
+            // 状態に応じたUIの切り替え
+            // PlayerStateDataが手元にないので、簡易的にnullを渡すか現在のHPを保持する等で対処
+            // 今回はHandlePhaseVisibilityがPlayerStateDataを使わずにUI切り替えできる範囲で呼び出し
+            HandlePhaseVisibility("discard", null);
+
+            if (handUI != null)
+            {
+                handUI.UpdateLayout(currentPhaseStatus);
+            }
+        }
+
+        [Header("Tile Prefab")]
+        [SerializeField] private GameObject tilePrefab; // JSON受信時など全体再構築用に保持
+
+        private void RebuildAllTilesFromState()
+        {
+            if (tilePrefab == null)
+            {
+                Debug.LogError("GameUIManager: tilePrefab is missing! Cannot rebuild Hand/Wall from scratch.");
+                return;
+            }
+
+            // --- 1. HandUIの再構築 ---
+            if (handUI != null)
+            {
+                // 一旦手牌のTransformをすべて破棄
+                for (int i = handUI.GetHandSlots().Count - 1; i >= 0; i--)
+                {
+                    Transform t = handUI.GetHandSlots()[i];
+                    if (t != null) Destroy(t.gameObject);
+                }
+                handUI.GetHandSlots().Clear();
+
+                foreach (var id in currentHandTiles)
+                {
+                    GameObject obj = Instantiate(tilePrefab, transform); // 一時的にUIManager下
+                    handUI.AddTileToHand(obj.transform, id);
+                }
+            }
+
+            // --- 2. WallUIの再構築 ---
+            // ※WallUI側のLayoutロジック（隙間開けなど）が複雑な場合は、
+            // 以前のSetWallのような処理をWallUI内に「RebuildWall(List<int>)」として残すのが正解ですが、
+            // 今回の依頼「再生成はせずに単純移動(HandUIからSetHandを消去)」に伴いコンパイルエラーを解消するため
+            // WallUI.cs自体に `Rebuild` メソッドを追加する前提とするか、
+            // コンパイルエラー部分のみを対象とします。
+            // HandDebug が落ちていたので、ひとまず `wallUI.SetWall` が残っているならそれを呼びます。
+            if (wallUI != null)
+            {
+                // もしWallUIからSetWallを消していないならそのまま呼ぶ。
+                // 消しているなら同様にInstantiateしてReturnTileToWallで渡す。
+                // (WallUI.csの変更差分では SetWall 自体は消していなかったので呼び出せるはず)
+                wallUI.SetWall(currentWallTiles);
+            }
         }
         
         // Public methods to access UI components if needed
         public HandUI HandUI => handUI;
         public DialogueUI DialogueUI => dialogueUI;
         public PlayerInfoUI PlayerInfoUI => playerInfoUI;
+        public EnemyInfoUI EnemyInfoUI => enemyInfoUI;
         public AbilityUI AbilityUI => abilityUI;
         public YakuListUI YakuListUI => yakuListUI;
+        public BettingUI BettingUI => bettingUI;
+        public PhaseTransitionUI PhaseTransitionUI => phaseTransitionUI;
+
+        // Engine Integration
+        public void ApplyGameStateFromJSON(string jsonString, string localPlayerId)
+        {
+            try
+            {
+                GameStateData state = JsonUtility.FromJson<GameStateData>(jsonString);
+                if (state != null)
+                {
+                    ApplyGameState(state, localPlayerId);
+                }
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"Failed to parse GameStateData JSON: {e.Message}\nJSON:\n{jsonString}");
+            }
+        }
+
+        public void ApplyGameState(GameStateData state, string localPlayerId)
+        {
+            // 1. Find Local Player
+            PlayerStateData localPlayer = null;
+            if (state.players != null)
+            {
+                foreach (var p in state.players)
+                {
+                    if (p.id == localPlayerId)
+                    {
+                        localPlayer = p;
+                        break;
+                    }
+                }
+            }
+
+            if (localPlayer == null)
+            {
+                Debug.LogWarning($"Local player {localPlayerId} not found in state data.");
+                return;
+            }
+
+            // 2. Update HP
+            if (playerInfoUI != null)
+            {
+                playerInfoUI.SetHP(localPlayer.health);
+            }
+
+            // 3. Update internal tracking lists and UI
+            if (localPlayer.hand != null)
+            {
+                currentHandTiles = new List<int>(localPlayer.hand);
+            }
+
+            if (localPlayer.wall != null)
+            {
+                currentWallTiles = new List<int>(localPlayer.wall);
+            }
+
+            // フルデータ受信時は再構築
+            RebuildAllTilesFromState();
+
+            if (localPlayer.discards != null)
+            {
+                if (riverUI != null) riverUI.SetRiver(new List<int>(localPlayer.discards));
+            }
+            
+            // 4. Update Game Status Text
+            string statusMsg = $"Round {state.round} - {state.honba} Honba\nTarget: {state.status}";
+            if (state.current_player == localPlayerId)
+                statusMsg += "\nYour Turn!";
+            
+            if (dialogueUI != null) dialogueUI.ShowText(statusMsg);
+            
+            currentPhaseStatus = state.status; // ★ 現在のフェーズを保存
+            
+            ClearSelection();
+
+            // 5. Handle Phase Logic
+            HandlePhaseVisibility(state.status, localPlayer);
+        }
+
+        private void HandlePhaseVisibility(string status, PlayerStateData localPlayer)
+        {
+            // デフォルトでriverUIは非表示にし、打牌(discard)フェーズのみ表示する
+            if (riverUI != null)
+            {
+                riverUI.gameObject.SetActive(status == "discard");
+            }
+
+            // HPの表示状態を更新（手牌選択中は非表示、対局中(discard等)は表示したい場合はここでオンオフ可能）
+            // ユーザー要望: 掛け金決定と手牌決定フェイズの間（つまり、transitonUIの処理の間）敵のHPのUIを消しておきたい
+            // ※ここではデフォルト非表示などにしておき、必要なフェーズで表示する形も可能ですが、
+            // 今回は Transition の前後で制御するため MatchUI の表示非表示のロジックに組み込ませます
+
+            switch (status)
+            {
+                case "betting":
+                    // 賭けフェイズでは手牌などは消すが、敵のHPや立ち絵は表示する
+                    SetMatchUIVisibility(false); 
+                    if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(true);
+                    
+                    StartBettingPhase(localPlayer);
+                    break;
+                case "turn_decision":
+                case "dealing":
+                case "hand_selection":
+                    // トランジションが終わるまではMatchUI(= playerInfoUI含む)は非表示のままになるため、自動的に消えます。
+                    // 敵の立ち絵・HPもここで非表示リストに含めます。
+                    if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(false);
+                    // 以降のフェーズ処理
+                    break;
+                case "discard":
+                    if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(true);
+                    if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(true);
+                    break;
+                case "liquidation":
+                    break;
+                default:
+                    Debug.LogWarning($"Unknown phase status: {status}");
+                    break;
+            }
+        }
+
+        private void StartBettingPhase(PlayerStateData localPlayer)
+        {
+            if (bettingUI != null)
+            {
+                Debug.Log($"Starting Betting Phase for {localPlayer.id}");
+                bettingUI.ShowBettingPhase(20000, localPlayer.health, OnBetConfirmed);
+            }
+            else
+            {
+                Debug.LogError("BettingUI reference is missing in GameUIManager! Please assign it in the Inspector.");
+            }
+        }
+
+        public void SetMatchUIVisibility(bool visible)
+        {
+            // The components to hide during betting phase & phase transition
+            if (handUI != null) handUI.gameObject.SetActive(visible);
+            if (wallUI != null) wallUI.gameObject.SetActive(visible);
+            // riverUI visibility is managed by HandlePhaseVisibility now
+            
+            // playerInfoUI(Enemy HP) は Transition 中〜手牌選択前などで非表示にしたい場合、ここでコントロールされます。
+            // visible == false なら確実に消えます。
+            if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(visible); 
+
+            // Bettingフェーズで固有に呼び出されるため、SetMatchUIVisibility自体ではEnemyPanelはいったん何もしないか、あるいは一括で消す。
+            // 今回は Transition のアニメーション側からフェーズ判定抜きで表示コントロールされる可能性があるので連動させます。
+            if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(visible); 
+
+            if (yakuListUI != null) yakuListUI.gameObject.SetActive(visible);
+            
+            // DialogueUI (enemy comments) and BettingUI remain active
+        }
+
+        private void OnBetConfirmed(int betAmount)
+        {
+            Debug.Log($"Bet confirmed: {betAmount}");
+            bettingUI.HideBettingPhase();
+
+            // Wait for all players to confirm in real game, then trigger animation phase.
+            // For now, simulate all players confirming immediately.
+            TriggerBettingAnimationPhase($"Round 1"); // We will pass actual round string
+        }
+
+        public void TriggerBettingAnimationPhase(string roundString)
+        {
+             if (phaseTransitionUI != null)
+             {
+                 Debug.Log("Triggering Phase Transition Animation.");
+                 
+                 // 画面に横線が入る瞬間で敵の会話UIが消えるようにする
+                 if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
+
+                 // Start transition
+                 phaseTransitionUI.PlayTransition(roundString, playerInfoUI, 
+                    onMidpoint: () => {
+                         // Swap UI to Match UI here behind the dark screen if necessary
+                         // This is where you might enable HandUI, WallUI, etc, if they were hidden during betting
+                         Debug.Log("Midpoint of Transition (Screen is Dark)");
+
+                         // なお、ここでは会話UIは非表示のまま維持する
+                    },
+                    onComplete: () => {
+                         Debug.Log("Transition Complete, Match Phase begins.");
+                         
+                         // トランジションが終了したら「対局画面（MatchUI）」のUI要素を表示するが、
+                         // 今回のご要望として「HP表示などは、特定のフェーズまで非表示にしたい」かによって対応が変わります。
+                         // ここでは HandUI / WallUI などを復帰させます。
+                         SetMatchUIVisibility(true); 
+                         
+                         // riverUIはdiscardフェーズ限定なので強制的に非表示にしておく
+                         if (riverUI != null) riverUI.gameObject.SetActive(false);
+                         
+                         // 対局（手牌フェイズ）が始まったら会話UIを出す
+                         if (dialogueUI != null) dialogueUI.gameObject.SetActive(true);
+
+                         // ----------------------------------------------------
+                         // TODO: [仮の処理（JSONマージ後に削除）]
+                         // ※本来は麻雀エンジンからのState通知(JSON)によってフェーズが進むため、
+                         // ※エンジン側実装がマージされたら、以下の1行は削除してください。
+                         currentPhaseStatus = "hand_selection";
+                         // ----------------------------------------------------
+                    }
+                 );
+             }
+             else
+             {
+                 Debug.LogError("PhaseTransitionUI reference is missing in GameUIManager! Please assign it in the Inspector.");
+             }
+        }
     }
 }

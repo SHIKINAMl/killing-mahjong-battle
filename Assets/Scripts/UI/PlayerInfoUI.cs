@@ -18,6 +18,10 @@ namespace KillingMahjong.UI
 
         public void SetHP(int hp)
         {
+            if (hp > maxHP)
+            {
+                maxHP = hp; // Update maxHP if the incoming HP is larger
+            }
             currentHP = Mathf.Clamp(hp, 0, maxHP);
             UpdateHPDisplay();
         }
