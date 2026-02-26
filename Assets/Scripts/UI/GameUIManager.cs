@@ -17,6 +17,8 @@ namespace KillingMahjong.UI
         [SerializeField] private YakuListUI yakuListUI;
         [SerializeField] private BettingUI bettingUI;
         [SerializeField] private PhaseTransitionUI phaseTransitionUI;
+        [SerializeField] private WebSocketGameClientSample webSocketClient;
+        [SerializeField] private MatchmakingUI matchmakingUI;
 
         private void Start()
         {
@@ -221,19 +223,13 @@ namespace KillingMahjong.UI
             
             Debug.Log("Hand Selection Complete! Transitioning to discard phase.");
             
-            // TODO: 本来はエンジンにJSON（クライアント選択完了など）を返す
-            // ここでは仮に直接 discard フェーズに移行させます
-            currentPhaseStatus = "discard";
+            // エンジンに選択完了（打牌フェーズへの移行等）を通知する
+            SendActionToServer("hand_selected", new {
+                selected_tiles = currentHandTiles
+            });
             
-            // 状態に応じたUIの切り替え
-            // PlayerStateDataが手元にないので、簡易的にnullを渡すか現在のHPを保持する等で対処
-            // 今回はHandlePhaseVisibilityがPlayerStateDataを使わずにUI切り替えできる範囲で呼び出し
-            HandlePhaseVisibility("discard", null);
-
-            if (handUI != null)
-            {
-                handUI.UpdateLayout(currentPhaseStatus);
-            }
+            // 状態に応じたUIの切り替えなどは今後Engineからの {"type":"game_state"} 受信時に ApplyGameState で一括処理されるため、
+            // ここでの直書き（currentPhaseStatus = "discard"）は原則不要ですが、レスポンス前の先行UI変更として残すことも可能です。
         }
 
         [Header("Tile Prefab")]
@@ -291,7 +287,31 @@ namespace KillingMahjong.UI
         public BettingUI BettingUI => bettingUI;
         public PhaseTransitionUI PhaseTransitionUI => phaseTransitionUI;
 
-        // Engine Integration
+        public void ShowMatchmakingWaiting()
+        {
+            if (matchmakingUI != null)
+            {
+                matchmakingUI.ShowWaiting();
+            }
+            
+            // その他のUI構造を待機中は非表示にする
+            SetMatchUIVisibility(false);
+            if (riverUI != null) riverUI.gameObject.SetActive(false);
+            if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
+        }
+
+        public void OnGameStarted()
+        {
+            // マッチ成立！待機UIを消す
+            if (matchmakingUI != null) matchmakingUI.Hide();
+            // DialogueUIで開始を知らせる
+            if (dialogueUI != null) 
+            {
+                dialogueUI.gameObject.SetActive(true);
+                dialogueUI.ShowText("Match Found! Game Starting...");
+            }
+        }
+
         public void ApplyGameStateFromJSON(string jsonString, string localPlayerId)
         {
             try
@@ -308,8 +328,28 @@ namespace KillingMahjong.UI
             }
         }
 
+        // Helper string sending method targeting Network
+        public async void SendActionToServer(string actionType, object dataPayload)
+        {
+            if (webSocketClient == null) return;
+
+            string json = JsonUtility.ToJson(new
+            {
+                type = "action",
+                data = new
+                {
+                    action = actionType,
+                    payload = dataPayload
+                }
+            });
+            await webSocketClient.SendAsync(json);
+        }
+
         public void ApplyGameState(GameStateData state, string localPlayerId)
         {
+            // ゲーム開始（状態を受信）したので待機UIを消す
+            if (matchmakingUI != null) matchmakingUI.Hide();
+
             // 1. Find Local Player
             PlayerStateData localPlayer = null;
             if (state.players != null)
@@ -450,9 +490,11 @@ namespace KillingMahjong.UI
             Debug.Log($"Bet confirmed: {betAmount}");
             bettingUI.HideBettingPhase();
 
-            // Wait for all players to confirm in real game, then trigger animation phase.
-            // For now, simulate all players confirming immediately.
-            TriggerBettingAnimationPhase($"Round 1"); // We will pass actual round string
+            // エンジンに通知
+            SendActionToServer("bet", new { amount = betAmount });
+
+            // アニメーションなどのトリガー（本来はサーバー側のステータスがターン決定に変わった段階で呼ぶべきですが、仮配置）
+            TriggerBettingAnimationPhase($"Round 1"); 
         }
 
         public void TriggerBettingAnimationPhase(string roundString)
@@ -487,12 +529,7 @@ namespace KillingMahjong.UI
                          // 対局（手牌フェイズ）が始まったら会話UIを出す
                          if (dialogueUI != null) dialogueUI.gameObject.SetActive(true);
 
-                         // ----------------------------------------------------
-                         // TODO: [仮の処理（JSONマージ後に削除）]
-                         // ※本来は麻雀エンジンからのState通知(JSON)によってフェーズが進むため、
-                         // ※エンジン側実装がマージされたら、以下の1行は削除してください。
-                         currentPhaseStatus = "hand_selection";
-                         // ----------------------------------------------------
+                         // 仮のフェーズ直書きを削除し、サーバーからの `{"type": "game_state"}` 待機とする
                     }
                  );
              }
