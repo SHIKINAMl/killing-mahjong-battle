@@ -7,27 +7,17 @@ namespace KillingMahjong.UI
     {
         [Header("Enemy HP Display")]
         [SerializeField] private TextMeshProUGUI hpText;
-        [SerializeField] private int maxHP = 100000;
         
         [Header("Enemy Panel Settings")]
         [SerializeField] private GameObject enemyPanel; // 敵パネルの参照
 
-        private int currentHP;
-
-        private void Start()
-        {
-            currentHP = maxHP;
-            UpdateHPDisplay();
-        }
-
         public void SetHP(int hp)
         {
-            if (hp > maxHP)
+            if (hpText != null)
             {
-                maxHP = hp; // 最大HPの更新が必要な場合
+                // MaxHPの概念は一旦表示せず、現在HPのみそのまま表示します
+                hpText.text = $"Enemy HP: {hp}";
             }
-            currentHP = Mathf.Clamp(hp, 0, maxHP);
-            UpdateHPDisplay();
         }
 
         public void SetPanelVisible(bool visible)
@@ -35,14 +25,6 @@ namespace KillingMahjong.UI
             if (enemyPanel != null)
             {
                 enemyPanel.SetActive(visible);
-            }
-        }
-
-        private void UpdateHPDisplay()
-        {
-            if (hpText != null)
-            {
-                hpText.text = $"Enemy HP: {currentHP} / {maxHP}";
             }
         }
     }

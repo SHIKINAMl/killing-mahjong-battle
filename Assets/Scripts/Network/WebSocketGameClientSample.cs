@@ -274,6 +274,13 @@ public class WebSocketGameClientSample : MonoBehaviour
                         gameUIManager.OnGameStarted();
                     }
                     break;
+                case "bet":
+                    Log("[WebSocket] Betting complete for both players. Starting animation...");
+                    if (gameUIManager != null)
+                    {
+                        gameUIManager.OnBettingCompleteFromServer();
+                    }
+                    break;
                 case "game_state":
                     if (gameUIManager != null)
                     {

@@ -224,9 +224,8 @@ namespace KillingMahjong.UI
             Debug.Log("Hand Selection Complete! Transitioning to discard phase.");
             
             // エンジンに選択完了（打牌フェーズへの移行等）を通知する
-            SendActionToServer("hand_selected", new {
-                selected_tiles = currentHandTiles
-            });
+            // Pythonエンジン側は action="selected" を待っている
+            SendActionToServer("selected", new ActionPayload { hand = currentHandTiles });
             
             // 状態に応じたUIの切り替えなどは今後Engineからの {"type":"game_state"} 受信時に ApplyGameState で一括処理されるため、
             // ここでの直書き（currentPhaseStatus = "discard"）は原則不要ですが、レスポンス前の先行UI変更として残すことも可能です。
@@ -328,20 +327,45 @@ namespace KillingMahjong.UI
             }
         }
 
+        // シリアライズ用の構造体を定義（JsonUtilityは匿名クラスをシリアライズできないため）
+        [System.Serializable]
+        public class ActionMessage
+        {
+            public string type = "action";
+            public ActionData data;
+        }
+
+        [System.Serializable]
+        public class ActionData
+        {
+            public string action;
+            public ActionPayload data; // python側では action_data = data.get("data") として取得されている
+        }
+
+        [System.Serializable]
+        public class ActionPayload
+        {
+            public int amount;
+            public List<int> hand;
+            public int tile; // For discard, etc.
+        }
+
         // Helper string sending method targeting Network
-        public async void SendActionToServer(string actionType, object dataPayload)
+        public async void SendActionToServer(string actionType, ActionPayload dataPayload)
         {
             if (webSocketClient == null) return;
 
-            string json = JsonUtility.ToJson(new
+            var msg = new ActionMessage
             {
                 type = "action",
-                data = new
+                data = new ActionData
                 {
                     action = actionType,
-                    payload = dataPayload
+                    data = dataPayload
                 }
-            });
+            };
+
+            string json = JsonUtility.ToJson(msg);
             await webSocketClient.SendAsync(json);
         }
 
@@ -350,8 +374,10 @@ namespace KillingMahjong.UI
             // ゲーム開始（状態を受信）したので待機UIを消す
             if (matchmakingUI != null) matchmakingUI.Hide();
 
-            // 1. Find Local Player
+            // 1. Find Local Player & Enemy Player
             PlayerStateData localPlayer = null;
+            PlayerStateData enemyPlayer = null;
+
             if (state.players != null)
             {
                 foreach (var p in state.players)
@@ -359,7 +385,11 @@ namespace KillingMahjong.UI
                     if (p.id == localPlayerId)
                     {
                         localPlayer = p;
-                        break;
+                    }
+                    else
+                    {
+                        // 2人対戦前提なので、自分以外なら敵
+                        enemyPlayer = p;
                     }
                 }
             }
@@ -374,6 +404,10 @@ namespace KillingMahjong.UI
             if (playerInfoUI != null)
             {
                 playerInfoUI.SetHP(localPlayer.health);
+            }
+            if (enemyPlayer != null && enemyInfoUI != null)
+            {
+                enemyInfoUI.SetHP(enemyPlayer.health);
             }
 
             // 3. Update internal tracking lists and UI
@@ -490,10 +524,15 @@ namespace KillingMahjong.UI
             Debug.Log($"Bet confirmed: {betAmount}");
             bettingUI.HideBettingPhase();
 
-            // エンジンに通知
-            SendActionToServer("bet", new { amount = betAmount });
+            // エンジンに通知 (Pythonエンジン側は action="betting" を待っている)
+            SendActionToServer("betting", new ActionPayload { amount = betAmount });
 
-            // アニメーションなどのトリガー（本来はサーバー側のステータスがターン決定に変わった段階で呼ぶべきですが、仮配置）
+            // アニメーションなどのトリガーは、ここで直接呼ばずにサーバー検証後 ("bet" メッセージ受信後) に行います。
+        }
+
+        public void OnBettingCompleteFromServer()
+        {
+            // サーバーから "bet" (両者のベットが完了した) 通知が来たらアニメーション開始
             TriggerBettingAnimationPhase($"Round 1"); 
         }
 
