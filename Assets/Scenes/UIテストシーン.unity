@@ -183,12 +183,6 @@ MonoBehaviour:
   maxBetRatio: 0.25
   slideDuration: 0.5
   dialogueInterval: 5
-  enemyDialogueLines:
-  - "\u3075\u3075\u3063\u3001\u305D\u3093\u306A\u9EBB\u96C0\u3067\u79C1\u306B\u52DD\u3066\u308B\u3068\u3067\u3082\uFF1F"
-  - "\u3093\u301C\uFF1F \u3069\u30FC\u3057\u305F\u306E\u30FC\uFF1F \u65E9\u304F\u8CED\u3051\u306A\u3088\u3049\u2661"
-  - "\u304A\u3061\u3093\u3061\u3093\u9707\u3048\u3066\u308B\u3088\uFF1F \u6016\u3044\u306E\uFF1F"
-  - "\u5168\u984D\u3044\u3063\u3061\u3083\u3046\uFF1F \u3044\u3063\u304F\u308F\u3051\u306A\u3044\u304B\u3041\u301C\u96D1\u9B5A\u3060\u3082\u3093\u306D\u2661"
-  - "\u3056\u3041\u3053\u2661 \u3056\u3041\u3053\u2661 \u3088\u308F\u3088\u308F\u96C0\u58EB\u2661"
 --- !u!114 &1648168
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -724,6 +718,7 @@ GameObject:
   - component: {fileID: 118077726}
   - component: {fileID: 118077728}
   - component: {fileID: 118077727}
+  - component: {fileID: 118077729}
   m_Layer: 0
   m_Name: WallContainer
   m_TagString: Untagged
@@ -748,7 +743,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: -299.1}
-  m_SizeDelta: {x: 1000, y: 200}
+  m_SizeDelta: {x: 1200, y: 200}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &118077727
 MonoBehaviour:
@@ -763,7 +758,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 0.392}
+  m_Color: {r: 0.1, g: 0.4, b: 0.8, a: 0.8}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -788,6 +783,21 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 118077725}
   m_CullTransparentMesh: 1
+--- !u!114 &118077729
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 118077725}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
+  m_EffectColor: {r: 0, g: 0, b: 0, a: 1}
+  m_EffectDistance: {x: 3, y: -3}
+  m_UseGraphicAlpha: 1
 --- !u!1 &118286698
 GameObject:
   m_ObjectHideFlags: 0
@@ -799,6 +809,7 @@ GameObject:
   - component: {fileID: 118286699}
   - component: {fileID: 118286701}
   - component: {fileID: 118286700}
+  - component: {fileID: 118286702}
   m_Layer: 5
   m_Name: BettingPanel
   m_TagString: Untagged
@@ -841,7 +852,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 0.392}
+  m_Color: {r: 0.1, g: 0.4, b: 0.8, a: 0.8}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -866,6 +877,21 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 118286698}
   m_CullTransparentMesh: 1
+--- !u!114 &118286702
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 118286698}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
+  m_EffectColor: {r: 0, g: 0, b: 0, a: 1}
+  m_EffectDistance: {x: 3, y: -3}
+  m_UseGraphicAlpha: 1
 --- !u!1 &210818350
 GameObject:
   m_ObjectHideFlags: 0
@@ -1236,6 +1262,7 @@ GameObject:
   - component: {fileID: 268140675}
   - component: {fileID: 268140677}
   - component: {fileID: 268140676}
+  - component: {fileID: 268140678}
   m_Layer: 5
   m_Name: "\u5F79ListPanel"
   m_TagString: Untagged
@@ -1275,7 +1302,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 0.392}
+  m_Color: {r: 0.1, g: 0.4, b: 0.8, a: 0.8}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -1300,6 +1327,21 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 268140674}
   m_CullTransparentMesh: 1
+--- !u!114 &268140678
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 268140674}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
+  m_EffectColor: {r: 0, g: 0, b: 0, a: 1}
+  m_EffectDistance: {x: 3, y: -3}
+  m_UseGraphicAlpha: 1
 --- !u!1 &273681792
 GameObject:
   m_ObjectHideFlags: 0
@@ -1805,8 +1847,8 @@ MonoBehaviour:
 
 '
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
-  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: f3d816b387a3bb84f9b2c1534ff1676e, type: 2}
+  m_sharedMaterial: {fileID: -7773937864974576783, guid: f3d816b387a3bb84f9b2c1534ff1676e, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -1830,8 +1872,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 200
-  m_fontSizeBase: 200
+  m_fontSize: 170
+  m_fontSizeBase: 170
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -1868,7 +1910,7 @@ MonoBehaviour:
   m_VertexBufferAutoSizeReduction: 0
   m_useMaxVisibleDescender: 1
   m_pageToDisplay: 1
-  m_margin: {x: -466.5625, y: -100.14453, z: -462.84375, w: -80.214355}
+  m_margin: {x: -466.5625, y: -65.328125, z: -462.84375, w: -66.2793}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
   m_hasFontAssetChanged: 0
@@ -1893,6 +1935,7 @@ GameObject:
   - component: {fileID: 385541336}
   - component: {fileID: 385541338}
   - component: {fileID: 385541337}
+  - component: {fileID: 385541339}
   m_Layer: 0
   m_Name: EnemyPanel
   m_TagString: Untagged
@@ -1933,7 +1976,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 0.392}
+  m_Color: {r: 0.1, g: 0.4, b: 0.8, a: 0.8}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -1958,6 +2001,21 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 385541335}
   m_CullTransparentMesh: 1
+--- !u!114 &385541339
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 385541335}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
+  m_EffectColor: {r: 0, g: 0, b: 0, a: 1}
+  m_EffectDistance: {x: 3, y: -3}
+  m_UseGraphicAlpha: 1
 --- !u!1 &479651967
 GameObject:
   m_ObjectHideFlags: 0
@@ -2653,10 +2711,12 @@ MonoBehaviour:
   riverUI: {fileID: 1511801355}
   dialogueUI: {fileID: 1566128114}
   playerInfoUI: {fileID: 74800415}
+  enemyInfoUI: {fileID: 603402878}
   abilityUI: {fileID: 953889643}
   yakuListUI: {fileID: 604324884}
   bettingUI: {fileID: 1648167}
   phaseTransitionUI: {fileID: 1075082340}
+  tilePrefab: {fileID: 7371004981101527939, guid: 8ebe538fe6c930d45a4f9da8cf02bd0d, type: 3}
 --- !u!1 &571445528
 GameObject:
   m_ObjectHideFlags: 0
@@ -2853,6 +2913,7 @@ GameObject:
   - component: {fileID: 603402877}
   - component: {fileID: 603402876}
   - component: {fileID: 603402875}
+  - component: {fileID: 603402878}
   m_Layer: 0
   m_Name: EenemyInfoUI
   m_TagString: Untagged
@@ -2943,6 +3004,21 @@ Canvas:
   m_SortingLayerID: 0
   m_SortingOrder: 0
   m_TargetDisplay: 0
+--- !u!114 &603402878
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 603402873}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 93b0baa4d6a2ff849a708248eca94081, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.EnemyInfoUI
+  hpText: {fileID: 252598135}
+  maxHP: 100000
+  enemyPanel: {fileID: 385541335}
 --- !u!1 &604324882
 GameObject:
   m_ObjectHideFlags: 0
@@ -4617,10 +4693,11 @@ MonoBehaviour:
   wallContainer: {fileID: 118077726}
   tilePrefab: {fileID: 3470249716998659876, guid: 665b2ddf3e8ccac4aa366c094061ee09, type: 3}
   tileResourceManager: {fileID: 11400000, guid: 26e956d32b644284b942ac0044639558, type: 2}
-  startPosition: {x: 40, y: 150}
+  startPosition: {x: -500, y: 50}
   tileIntervalX: 55
   gapIntervalX: 80
   rowIntervalY: 95
+  maxWidthX: 1100
 --- !u!114 &1170257567
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5128,8 +5205,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 50
-  m_fontSizeBase: 50
+  m_fontSize: 40
+  m_fontSizeBase: 40
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -5166,7 +5243,7 @@ MonoBehaviour:
   m_VertexBufferAutoSizeReduction: 0
   m_useMaxVisibleDescender: 1
   m_pageToDisplay: 1
-  m_margin: {x: -99.49988, y: -93.10016, z: -96.61182, w: 0}
+  m_margin: {x: -95.16577, y: -93.10016, z: -96.61182, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
   m_hasFontAssetChanged: 0
@@ -5356,6 +5433,7 @@ GameObject:
   - component: {fileID: 1384299215}
   - component: {fileID: 1384299217}
   - component: {fileID: 1384299216}
+  - component: {fileID: 1384299218}
   m_Layer: 0
   m_Name: RiverContainer
   m_TagString: Untagged
@@ -5395,7 +5473,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 0.392}
+  m_Color: {r: 0.1, g: 0.4, b: 0.8, a: 0.8}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -5420,6 +5498,21 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1384299214}
   m_CullTransparentMesh: 1
+--- !u!114 &1384299218
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1384299214}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
+  m_EffectColor: {r: 0, g: 0, b: 0, a: 1}
+  m_EffectDistance: {x: 3, y: -3}
+  m_UseGraphicAlpha: 1
 --- !u!1 &1406324083
 GameObject:
   m_ObjectHideFlags: 0
@@ -5455,7 +5548,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 1980, y: 100}
+  m_SizeDelta: {x: 1980, y: 180}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1406324085
 MonoBehaviour:
@@ -6530,6 +6623,7 @@ GameObject:
   - component: {fileID: 1680596210}
   - component: {fileID: 1680596212}
   - component: {fileID: 1680596211}
+  - component: {fileID: 1680596213}
   m_Layer: 5
   m_Name: HPPanel
   m_TagString: Untagged
@@ -6570,7 +6664,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 0.392}
+  m_Color: {r: 0.1, g: 0.4, b: 0.8, a: 0.8}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -6595,6 +6689,21 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1680596209}
   m_CullTransparentMesh: 1
+--- !u!114 &1680596213
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1680596209}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
+  m_EffectColor: {r: 0, g: 0, b: 0, a: 1}
+  m_EffectDistance: {x: 3, y: -3}
+  m_UseGraphicAlpha: 1
 --- !u!1 &1708963800
 GameObject:
   m_ObjectHideFlags: 0
@@ -7427,6 +7536,7 @@ GameObject:
   - component: {fileID: 1895046173}
   - component: {fileID: 1895046175}
   - component: {fileID: 1895046174}
+  - component: {fileID: 1895046176}
   m_Layer: 5
   m_Name: DialoguePanel
   m_TagString: Untagged
@@ -7469,7 +7579,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 0.392}
+  m_Color: {r: 0.1, g: 0.4, b: 0.8, a: 0.8}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -7494,6 +7604,21 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1895046172}
   m_CullTransparentMesh: 1
+--- !u!114 &1895046176
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1895046172}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
+  m_EffectColor: {r: 0, g: 0, b: 0, a: 1}
+  m_EffectDistance: {x: 3, y: -3}
+  m_UseGraphicAlpha: 1
 --- !u!1 &1950104315
 GameObject:
   m_ObjectHideFlags: 0
@@ -7626,7 +7751,9 @@ MonoBehaviour:
   - {fileID: 0}
   - {fileID: 0}
   tileResourceManager: {fileID: 11400000, guid: 26e956d32b644284b942ac0044639558, type: 2}
-  handAreaRect: {fileID: 0}
+  handAreaRect: {fileID: 231615393}
+  tileSpacingX: 50
+  tileSpacingY: 70
   cursor: {fileID: 1765297969}
   decideButton: {fileID: 519346419}
   autoManganButton: {fileID: 874971844}
@@ -7844,6 +7971,7 @@ GameObject:
   - component: {fileID: 1985042108}
   - component: {fileID: 1985042111}
   - component: {fileID: 1985042110}
+  - component: {fileID: 1985042112}
   m_Layer: 5
   m_Name: HandPanel
   m_TagString: Untagged
@@ -7887,7 +8015,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 0.392}
+  m_Color: {r: 0.1, g: 0.4, b: 0.8, a: 0.8}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -7912,6 +8040,21 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1985042107}
   m_CullTransparentMesh: 1
+--- !u!114 &1985042112
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1985042107}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
+  m_EffectColor: {r: 0, g: 0, b: 0, a: 1}
+  m_EffectDistance: {x: 3, y: -3}
+  m_UseGraphicAlpha: 1
 --- !u!1 &2044738475
 GameObject:
   m_ObjectHideFlags: 0
@@ -8241,6 +8384,7 @@ GameObject:
   - component: {fileID: 2061276892}
   - component: {fileID: 2061276894}
   - component: {fileID: 2061276893}
+  - component: {fileID: 2061276895}
   m_Layer: 0
   m_Name: AbilityMenuPanel
   m_TagString: Untagged
@@ -8282,7 +8426,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 0.392}
+  m_Color: {r: 0.1, g: 0.4, b: 0.8, a: 0.8}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -8307,6 +8451,21 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2061276891}
   m_CullTransparentMesh: 1
+--- !u!114 &2061276895
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2061276891}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
+  m_EffectColor: {r: 0, g: 0, b: 0, a: 1}
+  m_EffectDistance: {x: 3, y: -3}
+  m_UseGraphicAlpha: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

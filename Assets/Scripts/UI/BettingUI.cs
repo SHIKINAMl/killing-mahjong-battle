@@ -25,7 +25,7 @@ namespace KillingMahjong.UI
 
         [Header("Auto Dialogue Settings")]
         [SerializeField] private float dialogueInterval = 5.0f;
-        [SerializeField] private string[] enemyDialogueLines = new string[]
+        private string[] enemyDialogueLines = new string[]
         {
             "ふふっ、そんな麻雀で私に勝てるとでも？",
             "ん〜？ どーしたのー？ 早く賭けなよぉ♡",

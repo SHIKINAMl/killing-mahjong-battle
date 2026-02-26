@@ -15,6 +15,7 @@ namespace KillingMahjong.UI
         [SerializeField] private float tileIntervalX = 55f;
         [SerializeField] private float gapIntervalX = 80f;
         [SerializeField] private float rowIntervalY = 95f;
+        [SerializeField] private float maxWidthX = 1400f; // 画面端での折り返し幅
 
         private GameUIManager gameUIManager;
 
@@ -72,6 +73,9 @@ namespace KillingMahjong.UI
             });
 
             // 4. Layout
+            float currentY = startPosition.y;
+            float currentX = startPosition.x; // カテゴリを跨いでもXをリセットしない
+
             for (int i = 0; i < categoryLists.Count; i++)
             {
                 var list = categoryLists[i];
@@ -79,9 +83,6 @@ namespace KillingMahjong.UI
 
                 // Sort inside category
                 list.Sort((a, b) => a.Id.CompareTo(b.Id));
-
-                float currentX = startPosition.x;
-                float currentY = startPosition.y - (i * rowIntervalY);
 
                 int j = 0;
                 while (j < list.Count)
@@ -110,6 +111,14 @@ namespace KillingMahjong.UI
 
                     int groupSize = (isKoutsu || isShuntsu) ? 3 : 1;
                     
+                    // ★ 描画する前に、このグループを描画したら maxWidthX を超えるかチェックし、超えるなら先に改行する
+                    float expectedWidth = (groupSize - 1) * tileIntervalX;
+                    if (currentX + expectedWidth > startPosition.x + maxWidthX)
+                    {
+                        currentX = startPosition.x;
+                        currentY -= rowIntervalY;
+                    }
+
                     // Render current group
                     for (int k = 0; k < groupSize; k++)
                     {
@@ -160,6 +169,11 @@ namespace KillingMahjong.UI
 
                                 currentX += (needGap ? gapIntervalX : tileIntervalX);
                             }
+                            else if (i < categoryLists.Count - 1)
+                            {
+                                // 別のカテゴリ（萬子→筒子など）になる時も隙間を空ける
+                                currentX += gapIntervalX;
+                            }
                         }
                     }
                     j += groupSize;
@@ -193,6 +207,45 @@ namespace KillingMahjong.UI
                 // "お互いにその21個から順番に捨てる" -> Usually specific order.
                 // If specific order (left to right), we define which one is next.
             }
+        }
+
+        public Transform GrabTile(int tileId)
+        {
+            // WallSlotの中から該当IDを持つTransformを探し出して返す
+            for (int i = 0; i < wallSlots.Count; i++)
+            {
+                if (wallSlots[i] == null) continue;
+                var interaction = wallSlots[i].GetComponent<TileInteraction>();
+                if (interaction != null && interaction.TileId == tileId)
+                {
+                    Transform t = wallSlots[i];
+                    wallSlots.RemoveAt(i);
+                    return t;
+                }
+            }
+            return null;
+        }
+
+        public void ReturnTileToWall(Transform tileTransform, int tileId)
+        {
+            if (tileTransform == null) return;
+
+            // 戻す（末尾に追加するか、再配置するか）
+            wallSlots.Add(tileTransform);
+            tileTransform.SetParent(wallContainer, false);
+            
+            // Interactionリセット
+            var interaction = tileTransform.GetComponent<TileInteraction>();
+            if (interaction != null && gameUIManager != null)
+            {
+                Canvas canvas = GetComponentInParent<Canvas>();
+                interaction.Initialize(tileId, false, gameUIManager, canvas);
+            }
+
+            // 本格的に再配置したい場合は SetWall() を再度呼ぶ必要がありますが、
+            // 「そのまま元あった場所」に戻すなら元の座標を記憶しておくなどの工夫が必要です。
+            // 今回は一旦 SetWall 全体を再構築する方針は避けるため、簡易的に末尾配置か無視します。
+            // 将来的に壁の隙間を埋めるならLayout関数を分離して呼び出します。
         }
     }
 }

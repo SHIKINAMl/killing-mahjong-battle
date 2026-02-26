@@ -52,7 +52,7 @@ namespace KillingMahjong.UI
             // Generate dummy GameStateData matching mahjong_engine json output
             GameStateData dummyState = new GameStateData
             {
-                status = 2, // 2 = Betting Phase (mock)
+                status = "betting", // Betting Phase
                 round = 1,
                 honba = 0,
                 dora_id = Random.Range(0, 29),
@@ -63,8 +63,8 @@ namespace KillingMahjong.UI
                     {
                         id = "Player1",
                         health = 20000,
-                        hand = GenerateRandomTiles(13),
-                        wall = GenerateRandomTiles(21),
+                        hand = GenerateRandomTiles(0),
+                        wall = GenerateRandomTiles(34),
                         wait = new int[0],
                         discards = new int[0]
                     },
@@ -103,7 +103,7 @@ namespace KillingMahjong.UI
             // Generate dummy GameStateData matching mahjong_engine json output
             GameStateData dummyState = new GameStateData
             {
-                status = 2, // Start with Betting Phase
+                status = "betting", // Start with Betting Phase
                 round = 1,
                 honba = 0,
                 dora_id = Random.Range(0, 29),
@@ -114,8 +114,8 @@ namespace KillingMahjong.UI
                     {
                         id = "Player1",
                         health = 20000,
-                        hand = GenerateRandomTiles(13),
-                        wall = GenerateRandomTiles(21),
+                        hand = GenerateRandomTiles(0),
+                        wall = GenerateRandomTiles(34),
                         wait = new int[0],
                         discards = new int[0]
                     },

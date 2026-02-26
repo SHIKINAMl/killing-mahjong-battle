@@ -5,7 +5,7 @@ namespace KillingMahjong.EngineData
     [Serializable]
     public class GameStateData
     {
-        public int status;
+        public string status;
         public int round;
         public int honba;
         public int dora_id;

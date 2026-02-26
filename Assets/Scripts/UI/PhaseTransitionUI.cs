@@ -54,14 +54,23 @@ namespace KillingMahjong.UI
             if (hpBetContainer != null) hpBetContainer.SetActive(false);
         }
 
-        public void PlayTransition(string roundName, Action onMidpoint, Action onComplete)
+        private PlayerInfoUI targetPlayerInfoUI;
+
+        public void PlayTransition(string roundName, PlayerInfoUI playerInfoUI, Action onMidpoint, Action onComplete)
         {
+            this.targetPlayerInfoUI = playerInfoUI;
             StartCoroutine(SequenceRoutine(roundName, onMidpoint, onComplete));
         }
 
         private IEnumerator SequenceRoutine(string roundName, Action onMidpoint, Action onComplete)
         {
             ResetVisuals();
+
+            // トランジション（対局開始演出）が開始された瞬間に敵のHPなどのUIを非表示にする
+            if (targetPlayerInfoUI != null)
+            {
+                targetPlayerInfoUI.gameObject.SetActive(false);
+            }
 
             Debug.Log("PhaseTransition: Step 1 - Line In");
             // === 1. 一本線が入る + 「対局開始」 ===
