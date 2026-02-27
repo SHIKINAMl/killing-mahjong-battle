@@ -172,11 +172,50 @@ namespace KillingMahjong.UI
 
         public void SelectTile(int tileId, bool isInHand, bool multiSelect)
         {
-            if (!multiSelect) selectedTileIds.Clear();
-            if (!selectedTileIds.Contains(tileId)) selectedTileIds.Add(tileId);
+            if (!multiSelect) ClearSelection();
+            if (!selectedTileIds.Contains(tileId)) 
+            {
+                selectedTileIds.Add(tileId);
+                UpdateSelectedTileVisuals();
+            }
             
             Debug.Log($"Selected Tiles Count: {selectedTileIds.Count}");
             DeselectAbility();
+        }
+
+        private void UpdateSelectedTileVisuals()
+        {
+            // Simple visual feedback: move selected tiles up slightly
+            // In Discard phase, we select from Wall. In other phases (maybe ability targeting?), from Hand.
+            if (handUI != null)
+            {
+                var slots = handUI.GetHandSlots();
+                foreach (var t in slots)
+                {
+                    var interaction = t.GetComponent<TileInteraction>();
+                    if (interaction != null && selectedTileIds.Contains(interaction.TileId))
+                        t.anchoredPosition = new Vector2(t.anchoredPosition.x, 20f);
+                    else if (interaction != null)
+                        t.anchoredPosition = new Vector2(t.anchoredPosition.x, 0f);
+                }
+            }
+            if (wallUI != null)
+            {
+                var slots = wallUI.GetWallSlots();
+                foreach (var t in slots)
+                {
+                    var interaction = t.GetComponent<TileInteraction>();
+                    if (interaction != null && selectedTileIds.Contains(interaction.TileId))
+                    {
+                        // 壁の牌は元の位置からY軸に少し浮かせる
+                        t.localPosition = interaction.OriginalWallPosition + new Vector3(0, 20f, 0); 
+                    }
+                    else if (interaction != null)
+                    {
+                        t.localPosition = interaction.OriginalWallPosition;
+                    }
+                }
+            }
         }
         
         public void SelectTiles(System.Collections.Generic.List<int> ids)
@@ -189,7 +228,52 @@ namespace KillingMahjong.UI
         private void ClearSelection()
         {
             selectedTileIds.Clear();
-            // TODO: Visual Update
+            UpdateSelectedTileVisuals();
+        }
+
+        private void SyncDiscardPhaseVisuals(PlayerStateData localPlayer)
+        {
+            if (localPlayer.hand == null || localPlayer.wall == null) return;
+
+            // ツモ無しルール：Handは不変。Wallから減っていく
+            // 壁から無くなった牌（打牌された牌）をWallUIから削除
+            if (wallUI != null)
+            {
+                List<RectTransform> slots = wallUI.GetWallSlots();
+                for (int i = slots.Count - 1; i >= 0; i--)
+                {
+                    if (slots[i] == null) continue;
+                    var interaction = slots[i].GetComponent<TileInteraction>();
+                    if (interaction != null && !System.Array.Exists(localPlayer.wall, t => t == interaction.TileId))
+                    {
+                        // WallSlots からも除去されるよう GrabTile などを経由するか直接消す
+                        RectTransform t = wallUI.GrabTile(interaction.TileId);
+                        if (t != null)
+                        {
+                            Destroy(t.gameObject);
+                        }
+                    }
+                }
+            }
+
+            // 3. Update internal tracking
+            currentHandTiles = new List<int>(localPlayer.hand);
+            currentWallTiles = new List<int>(localPlayer.wall);
+        }
+
+        public void DiscardSelectedTile()
+        {
+            if (currentPhaseStatus != "discard") return;
+            if (selectedTileIds.Count == 0) return;
+
+            int tileToDiscard = selectedTileIds[0];
+            Debug.Log($"Discarding tile: {tileToDiscard}");
+
+            // Send action to server
+            SendActionToServer("discard", new ActionPayload { tile = tileToDiscard });
+            
+            // Wait for GameState update to actually remove tile and add to river
+            ClearSelection();
         }
 
         public void DeselectAbility()
@@ -449,21 +533,20 @@ namespace KillingMahjong.UI
                 enemyInfoUI.SetHP(enemyPlayer.health);
             }
 
-            // 3. Update internal tracking lists and UI
-            if (localPlayer.hand != null)
-            {
-                currentHandTiles = new List<int>(localPlayer.hand);
-            }
-
-            if (localPlayer.wall != null)
-            {
-                currentWallTiles = new List<int>(localPlayer.wall);
-            }
-
             // フルデータ受信時は再構築（手牌フェイズに入った初回のみ生成する）
             if (currentPhaseStatus != "hand_selection" && state.status == "hand_selection")
             {
+                // 3. Update internal tracking lists
+                if (localPlayer.hand != null) currentHandTiles = new List<int>(localPlayer.hand);
+                if (localPlayer.wall != null) currentWallTiles = new List<int>(localPlayer.wall);
+                
                 RebuildAllTilesFromState();
+            }
+            else if (currentPhaseStatus == "discard" && state.status == "discard" || 
+                     currentPhaseStatus == "hand_selection" && state.status == "discard")
+            {
+                // 手牌フェイズ完了後、または打牌フェイズ中のデータ更新時は、差分のみをUIに反映する（ツモ・打牌のエフェクト）
+                SyncDiscardPhaseVisuals(localPlayer);
             }
 
             if (localPlayer.discards != null)

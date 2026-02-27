@@ -9,8 +9,13 @@ namespace KillingMahjong.UI
     {
         [Header("Hand Slots")]
         [SerializeField] private Transform handSlotContainer;
-        [SerializeField] private List<RectTransform> handSlots; // Changed back to RectTransform
-        public List<RectTransform> GetHandSlots() => handSlots; // Getter for GameUIManager
+        // 以前のInspectorで設定されていたnullの要素が残ってクラッシュするのを防ぐため、シリアライズ対象外にする
+        private List<RectTransform> handSlots = new List<RectTransform>();
+        public List<RectTransform> GetHandSlots() 
+        {
+            if (handSlots == null) handSlots = new List<RectTransform>();
+            return handSlots;
+        }
 
         [SerializeField] private TileResourceManager tileResourceManager;
         [SerializeField] private RectTransform handAreaRect; // For drag detection
@@ -269,17 +274,23 @@ namespace KillingMahjong.UI
 
         private void OnDecideClicked()
         {
-            Debug.Log($"Decide Clicked. Current Hand Count: {handSlots.Count}");
-            if (handSlots.Count == 13)
+            if (gameUIManager == null) return;
+
+            if (gameUIManager.CurrentPhaseStatus == "discard")
             {
-                if (gameUIManager != null)
+                gameUIManager.DiscardSelectedTile();
+            }
+            else if (gameUIManager.CurrentPhaseStatus == "hand_selection")
+            {
+                Debug.Log($"Decide Clicked. Current Hand Count: {handSlots.Count}");
+                if (handSlots.Count == 13)
                 {
                     gameUIManager.CompleteHandSelection();
                 }
-            }
-            else
-            {
-                Debug.LogWarning("Hand must have exactly 13 tiles to proceed!");
+                else
+                {
+                    Debug.LogWarning("Hand must have exactly 13 tiles to proceed!");
+                }
             }
         }
 

@@ -29,6 +29,14 @@ namespace KillingMahjong.Network
         private int lastLocalBet = 0;
         private int lastEnemyBet = 0;
 
+        private List<int> mockLocalHand = new List<int>();
+        private List<int> mockLocalWall = new List<int>();
+        private List<int> mockLocalDiscards = new List<int>();
+        
+        private List<int> mockEnemyHand = new List<int>();
+        private List<int> mockEnemyWall = new List<int>();
+        private List<int> mockEnemyDiscards = new List<int>();
+
         private void Start()
         {
             if (gameUIManager == null)
@@ -41,6 +49,16 @@ namespace KillingMahjong.Network
         public void StartMockConnection()
         {
             Debug.Log("[Debug Client] Starting Mock Connection Sequence...");
+            
+            // Initialize mock state data
+            mockLocalWall = new List<int> { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34 };
+            mockLocalHand.Clear();
+            mockLocalDiscards.Clear();
+
+            mockEnemyWall = new List<int> { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34 };
+            mockEnemyHand.Clear();
+            mockEnemyDiscards.Clear();
+
             StartCoroutine(MockConnectionSequence());
         }
 
@@ -99,14 +117,51 @@ namespace KillingMahjong.Network
                     break;
 
                 case "selected":
+                    if (payload.hand != null)
+                    {
+                        mockLocalHand = new List<int>(payload.hand);
+                        foreach (int tile in payload.hand)
+                        {
+                            mockLocalWall.Remove(tile);
+                        }
+                    }
+
+                    // ====== 本ゲーム特有ルール ======
+                    // ツモ無し。13枚の手牌を決めたら、以後は残りの「壁（Wall）」21枚から選んで打牌する。
+                    // したがってここでツモは行わない。
+
                     // Transition to discard phase for local player
                     SendMockGameState("discard");
                     break;
 
                 case "discard":
-                    // Simulate enemy turn and then back to local player
+                    if (payload.tile > 0)
+                    {
+                        // プレイヤーは「壁(Wall)」から牌を選んで打牌する
+                        if (mockLocalWall.Contains(payload.tile))
+                        {
+                            mockLocalWall.Remove(payload.tile);
+                            mockLocalDiscards.Add(payload.tile);
+                        }
+                        else
+                        {
+                            Debug.LogWarning($"[Debug Client] Player tried to discard {payload.tile} but it is not in Wall!");
+                        }
+                    }
+
+                    // Simulate enemy turn
                     SendMockGameState("discard", isEnemyTurn: true);
                     yield return new WaitForSeconds(networkDelay * 2f);
+                    
+                    // Enemy discards a random tile from their wall
+                    if (mockEnemyWall.Count > 0)
+                    {
+                        int enemyDiscard = mockEnemyWall[0];
+                        mockEnemyWall.RemoveAt(0);
+                        mockEnemyDiscards.Add(enemyDiscard);
+                    }
+
+                    // 自分ターンに戻る（ツモは無いのでこのまま）
                     SendMockGameState("discard");
                     break;
 
@@ -143,17 +198,11 @@ namespace KillingMahjong.Network
             var p = new PlayerStateData
             {
                 id = localPlayerId,
-                health = localPlayerHp, // Use tracked HP
-                wall = new int[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34 },
-                hand = new int[] { },
-                discards = new int[] { }
+                health = localPlayerHp,
+                wall = mockLocalWall.ToArray(),
+                hand = mockLocalHand.ToArray(),
+                discards = mockLocalDiscards.ToArray()
             };
-
-            // 手牌フェイズになっても、Mockサーバーからは自動で手牌を構築せずユーザーのクリック操作に任せる
-            if (status == "discard")
-            {
-                p.discards = new int[] { 34 };
-            }
 
             return p;
         }
@@ -163,11 +212,10 @@ namespace KillingMahjong.Network
             return new PlayerStateData
             {
                 id = enemyPlayerId,
-                health = enemyPlayerHp, // Use tracked HP
-                // changed max from 30 to 34 to match local player count
-                wall = new int[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34 },
-                hand = new int[] { }, // Initialize as empty for all phases as user requested
-                discards = new int[] { } // Reset mock discards initially
+                health = enemyPlayerHp,
+                wall = mockEnemyWall.ToArray(),
+                hand = mockEnemyHand.ToArray(),
+                discards = mockEnemyDiscards.ToArray()
             };
         }
     }

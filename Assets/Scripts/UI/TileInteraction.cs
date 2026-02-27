@@ -7,6 +7,7 @@ namespace KillingMahjong.UI
     {
         public int TileId { get; private set; }
         public bool IsInHand { get; private set; }
+        public Vector3 OriginalWallPosition { get; set; } // ★ 壁の本来の座標を記憶するプロパティ追加
 
         private GameUIManager _gameUIManager;
         private Canvas _canvas;
@@ -28,6 +29,16 @@ namespace KillingMahjong.UI
 
         public void OnPointerClick(PointerEventData eventData)
         {
+            if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == "discard")
+            {
+                // ツモ無しルール：Hand（手牌）は固定で、Wall（残りの21枚）から選んで捨てる
+                if (!IsInHand)
+                {
+                    _gameUIManager.SelectTile(TileId, IsInHand, false);
+                }
+                return;
+            }
+
             // Any Click -> Move (Left or Right)
             if (IsInHand)
                 _gameUIManager.MoveTileToWall(TileId);
@@ -37,6 +48,8 @@ namespace KillingMahjong.UI
 
         public void OnBeginDrag(PointerEventData eventData)
         {
+            if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == "discard") return;
+
             _originalPosition = transform.position;
             _originalParent = transform.parent;
             
@@ -53,6 +66,8 @@ namespace KillingMahjong.UI
 
         public void OnDrag(PointerEventData eventData)
         {
+            if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == "discard") return;
+
             // If Screen Space Overlay/Camera
             if (_rectTransform != null && _canvas != null)
             {
@@ -73,6 +88,8 @@ namespace KillingMahjong.UI
 
         public void OnEndDrag(PointerEventData eventData)
         {
+            if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == "discard") return;
+
             _canvasGroup.blocksRaycasts = true;
 
             // Hit Detection

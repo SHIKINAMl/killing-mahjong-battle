@@ -135,11 +135,18 @@ namespace KillingMahjong.UI
                         slot.pivot = new Vector2(0.5f, 0.5f);
                         
                         // Position
-                        slot.localPosition = new Vector3(currentX, currentY, 0);
+                        Vector3 finalPos = new Vector3(currentX, currentY, 0);
+                        slot.localPosition = finalPos;
                         slot.localRotation = Quaternion.identity;
 
                         // Interaction initialize should be done by GameUIManager now, 
                         // but we can ensure they are added to wall slots
+                        var interaction = slot.GetComponent<TileInteraction>();
+                        if (interaction != null)
+                        {
+                            interaction.OriginalWallPosition = finalPos;
+                        }
+
                         wallSlots.Add(slot);
                         slot.gameObject.SetActive(true);
                         
@@ -211,16 +218,22 @@ namespace KillingMahjong.UI
         {
             if (tileTransform == null) return;
 
-            // 戻す（末尾に追加するか、再配置するか）
+            // 戻す（リストに追加して、親を設定）
             wallSlots.Add(tileTransform);
             tileTransform.SetParent(wallContainer, false);
             
-            // Interactionリセット
+            // Interactionリセットと初期座標の復元
             var interaction = tileTransform.GetComponent<TileInteraction>();
-            if (interaction != null && gameUIManager != null)
+            if (interaction != null)
             {
-                Canvas canvas = GetComponentInParent<Canvas>();
-                interaction.Initialize(tileId, false, gameUIManager, canvas);
+                if (gameUIManager != null)
+                {
+                    Canvas canvas = GetComponentInParent<Canvas>();
+                    interaction.Initialize(tileId, false, gameUIManager, canvas);
+                }
+                
+                // 本来の壁の座標に戻す
+                tileTransform.localPosition = interaction.OriginalWallPosition;
             }
         }
     }

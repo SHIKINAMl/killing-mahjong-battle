@@ -152,7 +152,6 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 118286699}
-  - {fileID: 1377815165}
   m_Father: {fileID: 1728639663}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -568,7 +567,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.PlayerInfoUI
   hpText: {fileID: 485330929}
-  maxHP: 100
 --- !u!1 &93588683
 GameObject:
   m_ObjectHideFlags: 0
@@ -1087,7 +1085,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: -365.9, y: 0}
-  m_SizeDelta: {x: 100, y: 100}
+  m_SizeDelta: {x: 105, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &231615394
 MonoBehaviour:
@@ -1601,7 +1599,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WebSocketGameClientSample
   serverUrl: ws://127.0.0.1:8765
-  autoConnectOnStart: 1
+  autoConnectOnStart: 0
   sampleMessage: '{"type":"ping"}'
   verboseLog: 1
   gameUIManager: {fileID: 536350430}
@@ -2724,37 +2722,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 519346417}
   m_CullTransparentMesh: 1
---- !u!1 &524354380
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 524354381}
-  m_Layer: 0
-  m_Name: MatchmakingUI
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &524354381
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 524354380}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &536350428
 GameObject:
   m_ObjectHideFlags: 0
@@ -2811,7 +2778,10 @@ MonoBehaviour:
   phaseTransitionUI: {fileID: 1075082340}
   webSocketClient: {fileID: 300672385}
   matchmakingUI: {fileID: 644427441}
-  tilePrefab: {fileID: 7371004981101527939, guid: 8ebe538fe6c930d45a4f9da8cf02bd0d, type: 3}
+  useDebugClient: 1
+  debugWebSocketClient: {fileID: 1644618189}
+  tilePrefab: {fileID: 3470249716998659876, guid: 665b2ddf3e8ccac4aa366c094061ee09, type: 3}
+  tileResourceManager: {fileID: 11400000, guid: 26e956d32b644284b942ac0044639558, type: 2}
 --- !u!1 &571445528
 GameObject:
   m_ObjectHideFlags: 0
@@ -3112,7 +3082,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.EnemyInfoUI
   hpText: {fileID: 252598135}
-  maxHP: 100000
   enemyPanel: {fileID: 385541335}
 --- !u!1 &604324882
 GameObject:
@@ -4705,37 +4674,6 @@ Canvas:
   m_SortingLayerID: 0
   m_SortingOrder: 0
   m_TargetDisplay: 0
---- !u!1 &1075216220
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1075216221}
-  m_Layer: 0
-  m_Name: GameObject
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1075216221
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1075216220}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 1297.717, y: 0, z: 1234.7004}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1131278702
 GameObject:
   m_ObjectHideFlags: 0
@@ -5039,8 +4977,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.WallUI
   wallContainer: {fileID: 118077726}
-  tilePrefab: {fileID: 3470249716998659876, guid: 665b2ddf3e8ccac4aa366c094061ee09, type: 3}
-  tileResourceManager: {fileID: 11400000, guid: 26e956d32b644284b942ac0044639558, type: 2}
   startPosition: {x: -500, y: 50}
   tileIntervalX: 55
   gapIntervalX: 80
@@ -5695,81 +5631,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1377815164
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1377815165}
-  - component: {fileID: 1377815167}
-  - component: {fileID: 1377815166}
-  m_Layer: 5
-  m_Name: Image
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!224 &1377815165
-RectTransform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1377815164}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1648166}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0.5}
-  m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 100, y: 100}
-  m_Pivot: {x: 0.5, y: 0.5}
---- !u!114 &1377815166
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1377815164}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
-  m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_RaycastTarget: 1
-  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
-  m_Maskable: 1
-  m_OnCullStateChanged:
-    m_PersistentCalls:
-      m_Calls: []
-  m_Sprite: {fileID: 0}
-  m_Type: 0
-  m_PreserveAspect: 0
-  m_FillCenter: 1
-  m_FillMethod: 4
-  m_FillAmount: 1
-  m_FillClockwise: 1
-  m_FillOrigin: 0
-  m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
---- !u!222 &1377815167
-CanvasRenderer:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1377815164}
-  m_CullTransparentMesh: 1
 --- !u!1 &1384299214
 GameObject:
   m_ObjectHideFlags: 0
@@ -6839,6 +6700,54 @@ MonoBehaviour:
   logPanel: {fileID: 1954987631}
   logText: {fileID: 1513022940}
   toggleLogButton: {fileID: 2046538996}
+--- !u!1 &1644618188
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1644618190}
+  - component: {fileID: 1644618189}
+  m_Layer: 0
+  m_Name: Debugwebsocket
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1644618189
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1644618188}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ab978ed9abe2c9947afded2c4ec4f506, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.Network.DebugWebSocketClient
+  gameUIManager: {fileID: 536350430}
+  networkDelay: 0.5
+  localPlayerId: player_local
+  enemyPlayerId: enemy_bot
+--- !u!4 &1644618190
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1644618188}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 921.07965, y: 397.38394, z: -124.83131}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1660999212
 GameObject:
   m_ObjectHideFlags: 0
@@ -8084,21 +7993,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.HandUI
   handSlotContainer: {fileID: 231615393}
-  tilePrefab: {fileID: 3470249716998659876, guid: 665b2ddf3e8ccac4aa366c094061ee09, type: 3}
-  handSlots:
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
   tileResourceManager: {fileID: 11400000, guid: 26e956d32b644284b942ac0044639558, type: 2}
   handAreaRect: {fileID: 231615393}
   tileSpacingX: 50
@@ -8830,6 +8724,5 @@ SceneRoots:
   - {fileID: 1355573765}
   - {fileID: 52962405}
   - {fileID: 592429296}
-  - {fileID: 1075216221}
   - {fileID: 300672384}
-  - {fileID: 524354381}
+  - {fileID: 1644618190}
