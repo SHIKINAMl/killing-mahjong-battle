@@ -17,17 +17,16 @@ class RoundStatus(Enum):
     DEALING = "dealing"  # 配牌フェーズ
     HAND_SELECTION = "hand_selection"  # 手牌選択フェーズ
     BETTING = "betting"  # 掛け金設定フェーズ
-    TURN_DECISION = "turn_decision"  # 手番決定フェーズ
     DISCARD = "discard"  # 打牌フェーズ
     LIQUIDATION = "liquidation"  # 清算フェーズ
 
 
-class PlayerStatus(Enum):
-    """プレイヤーのステータス"""
-    WAITING = "waiting"  # 待機中
-    ACTIVE = "active"  # アクティブ（自分の番）
-    INACTIVE = "inactive"  # 非アクティブ
-
+class SkillType(Enum):
+    """スキルの種類"""
+    MULLIGAN = "mulligan"  # 配牌や手牌の一部をやり直す
+    BOOST_HAND = "boost_hand"  # 指定役の翻数を上げる
+    PERSPECTIVE = "perspective"  # 他プレイヤーの手牌の一部を覗き見る
+    SPESIAL_VICTORY = "special_victory"  # 特定の条件で勝利を得る
 
 @dataclass
 class PlayerState:
@@ -37,9 +36,9 @@ class PlayerState:
     wall: list[int] = field(default_factory=list)  # 牌山
     wait: list[int] = field(default_factory=list)  # 待ち牌
     discards: list[int] = field(default_factory=list)  # 捨て牌
+    skills: dict[SkillType: any] = field(default_factory=list)  # スキル
     health: int = 20000  # 体力
     bet: int = 0  # 掛け金
-    status: PlayerStatus = PlayerStatus.WAITING
 
 
 @dataclass

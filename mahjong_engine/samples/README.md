@@ -159,7 +159,7 @@
 ```json
 {
   "type": "action",
-  "action": "selected",
+  "action": "select",
   "data": {
     "hand": list[int]
   }
