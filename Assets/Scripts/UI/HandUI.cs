@@ -9,9 +9,8 @@ namespace KillingMahjong.UI
     {
         [Header("Hand Slots")]
         [SerializeField] private Transform handSlotContainer;
-        [SerializeField] private GameObject tilePrefab;
-        [SerializeField] private List<Transform> handSlots; // Changed from Image to Transform
-        public List<Transform> GetHandSlots() => handSlots; // Getter for GameUIManager
+        [SerializeField] private List<RectTransform> handSlots; // Changed back to RectTransform
+        public List<RectTransform> GetHandSlots() => handSlots; // Getter for GameUIManager
 
         [SerializeField] private TileResourceManager tileResourceManager;
         [SerializeField] private RectTransform handAreaRect; // For drag detection
@@ -77,7 +76,7 @@ namespace KillingMahjong.UI
             // 必要に応じてスナップ処理等
         }
 
-        public void AddTileToHand(Transform tileTransform, int tileId)
+        public void AddTileToHand(RectTransform tileTransform, int tileId)
         {
             if (tileTransform == null) return;
             
@@ -120,7 +119,7 @@ namespace KillingMahjong.UI
             }
         }
 
-        public void RemoveTileFromHand(Transform tileTransform, int tileId)
+        public void RemoveTileFromHand(RectTransform tileTransform, int tileId)
         {
             if (handSlots.Contains(tileTransform))
             {

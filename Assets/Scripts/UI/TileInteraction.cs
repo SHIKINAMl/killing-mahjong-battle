@@ -28,20 +28,11 @@ namespace KillingMahjong.UI
 
         public void OnPointerClick(PointerEventData eventData)
         {
-            if (eventData.button == PointerEventData.InputButton.Right)
-            {
-                // Right Click -> Move
-                if (IsInHand)
-                    _gameUIManager.MoveTileToWall(TileId);
-                else
-                    _gameUIManager.MoveTileToHand(TileId);
-            }
-            else if (eventData.button == PointerEventData.InputButton.Left)
-            {
-                // Left Click -> Select (Toggle?)
-                // Implementation for Selection later
-                _gameUIManager.SelectTile(TileId, IsInHand, true); // additive?
-            }
+            // Any Click -> Move (Left or Right)
+            if (IsInHand)
+                _gameUIManager.MoveTileToWall(TileId);
+            else
+                _gameUIManager.MoveTileToHand(TileId);
         }
 
         public void OnBeginDrag(PointerEventData eventData)

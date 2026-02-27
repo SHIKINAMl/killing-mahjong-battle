@@ -20,10 +20,19 @@ namespace KillingMahjong.UI
         [SerializeField] private WebSocketGameClientSample webSocketClient;
         [SerializeField] private MatchmakingUI matchmakingUI;
 
+        [Header("Debug Client")]
+        [SerializeField] private bool useDebugClient;
+        [SerializeField] private KillingMahjong.Network.DebugWebSocketClient debugWebSocketClient;
+
         private void Start()
         {
             // Initialization if needed
             SetupUI();
+
+            if (useDebugClient && debugWebSocketClient != null)
+            {
+                debugWebSocketClient.StartMockConnection();
+            }
         }
 
         private void SetupUI()
@@ -55,29 +64,20 @@ namespace KillingMahjong.UI
             // 手牌選択フェイズでのみ移動を許可
             if (currentPhaseStatus != "hand_selection") return;
 
-            if (selectedTileIds.Contains(tileId))
+            if (currentWallTiles.Contains(tileId))
             {
-                MoveSelectedFiles(true);
-            }
-            else
-            {
-                if (currentWallTiles.Contains(tileId))
+                // 手牌は13枚まで
+                if (currentHandTiles.Count < 13)
                 {
-                    // 手牌は13枚まで
-                    if (currentHandTiles.Count < 13)
+                    currentWallTiles.Remove(tileId);
+                    currentHandTiles.Add(tileId);
+                    
+                    if (wallUI != null && handUI != null)
                     {
-                        currentWallTiles.Remove(tileId);
-                        currentHandTiles.Add(tileId);
-                        
-                        // 以前のようなRefreshUI()による全再構築は行わず、
-                        // WallUIからTransformを引き抜いてHandUIにそのまま渡す
-                        if (wallUI != null && handUI != null)
+                        RectTransform movedTile = wallUI.GrabTile(tileId);
+                        if (movedTile != null)
                         {
-                            Transform movedTile = wallUI.GrabTile(tileId);
-                            if (movedTile != null)
-                            {
-                                handUI.AddTileToHand(movedTile, tileId);
-                            }
+                            handUI.AddTileToHand(movedTile, tileId);
                         }
                     }
                 }
@@ -90,38 +90,31 @@ namespace KillingMahjong.UI
             // 手牌選択フェイズでのみ移動を許可
             if (currentPhaseStatus != "hand_selection") return;
 
-             if (selectedTileIds.Contains(tileId))
+            if (currentHandTiles.Contains(tileId))
             {
-                MoveSelectedFiles(false);
-            }
-            else
-            {
-                if (currentHandTiles.Contains(tileId))
+                currentHandTiles.Remove(tileId);
+                currentWallTiles.Add(tileId);
+                
+                if (handUI != null && wallUI != null)
                 {
-                    currentHandTiles.Remove(tileId);
-                    currentWallTiles.Add(tileId);
-                    
-                    if (handUI != null && wallUI != null)
+                    // 1. HandUIからTransformを探して取得
+                    RectTransform movedTile = null;
+                    foreach (RectTransform t in handUI.GetHandSlots())
                     {
-                        // 1. HandUIからTransformを探して取得
-                        Transform movedTile = null;
-                        foreach (Transform t in handUI.GetHandSlots())
+                        var interaction = t.GetComponent<TileInteraction>();
+                        if (interaction != null && interaction.TileId == tileId)
                         {
-                            var interaction = t.GetComponent<TileInteraction>();
-                            if (interaction != null && interaction.TileId == tileId)
-                            {
-                                movedTile = t;
-                                break;
-                            }
+                            movedTile = t;
+                            break;
                         }
+                    }
 
-                        // 2. HandUIから取り除く
-                        if (movedTile != null)
-                        {
-                            handUI.RemoveTileFromHand(movedTile, tileId);
-                            // 3. WallUIに戻す
-                            wallUI.ReturnTileToWall(movedTile, tileId);
-                        }
+                    // 2. HandUIから取り除く
+                    if (movedTile != null)
+                    {
+                        handUI.RemoveTileFromHand(movedTile, tileId);
+                        // 3. WallUIに戻す
+                        wallUI.ReturnTileToWall(movedTile, tileId);
                     }
                 }
             }
@@ -150,14 +143,14 @@ namespace KillingMahjong.UI
                     if (toHand && wallUI != null && handUI != null)
                     {
                         // Wall -> Hand
-                        Transform movedTile = wallUI.GrabTile(id);
+                        RectTransform movedTile = wallUI.GrabTile(id);
                         if (movedTile != null) handUI.AddTileToHand(movedTile, id);
                     }
                     else if (!toHand && handUI != null && wallUI != null)
                     {
                         // Hand -> Wall
-                        Transform movedTile = null;
-                        foreach (Transform t in handUI.GetHandSlots()) 
+                        RectTransform movedTile = null;
+                        foreach (RectTransform t in handUI.GetHandSlots()) 
                         {
                             var interaction = t.GetComponent<TileInteraction>();
                             if (interaction != null && interaction.TileId == id)
@@ -232,7 +225,8 @@ namespace KillingMahjong.UI
         }
 
         [Header("Tile Prefab")]
-        [SerializeField] private GameObject tilePrefab; // JSON受信時など全体再構築用に保持
+        [SerializeField] private GameObject tilePrefab;
+        [SerializeField] private TileResourceManager tileResourceManager; // Added to set visuals centrally // JSON受信時など全体再構築用に保持
 
         private void RebuildAllTilesFromState()
         {
@@ -256,24 +250,63 @@ namespace KillingMahjong.UI
                 foreach (var id in currentHandTiles)
                 {
                     GameObject obj = Instantiate(tilePrefab, transform); // 一時的にUIManager下
-                    handUI.AddTileToHand(obj.transform, id);
+                    RectTransform rt = obj.GetComponent<RectTransform>();
+                    if (rt == null) rt = obj.transform as RectTransform; // Fallback
+                    
+                    if (rt != null) {
+                        // Initialize interaction and visual here centrally for Hand
+                        InitializeTileComponent(rt, id, true);
+                        handUI.AddTileToHand(rt, id);
+                    }
                 }
             }
 
             // --- 2. WallUIの再構築 ---
-            // ※WallUI側のLayoutロジック（隙間開けなど）が複雑な場合は、
-            // 以前のSetWallのような処理をWallUI内に「RebuildWall(List<int>)」として残すのが正解ですが、
-            // 今回の依頼「再生成はせずに単純移動(HandUIからSetHandを消去)」に伴いコンパイルエラーを解消するため
-            // WallUI.cs自体に `Rebuild` メソッドを追加する前提とするか、
-            // コンパイルエラー部分のみを対象とします。
-            // HandDebug が落ちていたので、ひとまず `wallUI.SetWall` が残っているならそれを呼びます。
             if (wallUI != null)
             {
-                // もしWallUIからSetWallを消していないならそのまま呼ぶ。
-                // 消しているなら同様にInstantiateしてReturnTileToWallで渡す。
-                // (WallUI.csの変更差分では SetWall 自体は消していなかったので呼び出せるはず)
-                wallUI.SetWall(currentWallTiles);
+                // 一旦壁のTransformをすべて破棄
+                for (int i = wallUI.GetWallSlots().Count - 1; i >= 0; i--)
+                {
+                    Transform t = wallUI.GetWallSlots()[i];
+                    if (t != null) Destroy(t.gameObject);
+                }
+                wallUI.GetWallSlots().Clear();
+
+                // Generate physical tiles for Wall
+                List<RectTransform> wallGenerated = new List<RectTransform>();
+                foreach (var id in currentWallTiles)
+                {
+                    GameObject obj = Instantiate(tilePrefab, transform);
+                    RectTransform rt = obj.GetComponent<RectTransform>();
+                    if (rt == null) rt = obj.transform as RectTransform;
+
+                    if (rt != null) {
+                        InitializeTileComponent(rt, id, false);
+                        wallGenerated.Add(rt);
+                    }
+                }
+
+                // Pass generated tiles to WallUI for layout only
+                wallUI.LayoutWallTiles(wallGenerated, currentWallTiles);
             }
+        }
+        
+        // Helper method to set up components freshly instantiated by GameUIManager
+        private void InitializeTileComponent(RectTransform rt, int id, bool inHand)
+        {
+            if (tileResourceManager != null)
+            {
+                var visual = rt.GetComponent<TileVisual>();
+                if (visual != null) visual.SetTile(id, tileResourceManager.GetTileSprite(id));
+            }
+
+            var interaction = rt.GetComponent<TileInteraction>();
+            if (interaction == null) interaction = rt.gameObject.AddComponent<TileInteraction>();
+            
+            Canvas canvas = GetComponentInParent<Canvas>();
+            if (canvas == null) canvas = FindFirstObjectByType<Canvas>(); // Fallback
+            
+            interaction.Initialize(id, inHand, this, canvas);
         }
         
         // Public methods to access UI components if needed
@@ -353,6 +386,12 @@ namespace KillingMahjong.UI
         // Helper string sending method targeting Network
         public async void SendActionToServer(string actionType, ActionPayload dataPayload)
         {
+            if (useDebugClient && debugWebSocketClient != null)
+            {
+                debugWebSocketClient.ReceiveActionFromPlayer(actionType, dataPayload);
+                return;
+            }
+
             if (webSocketClient == null) return;
 
             var msg = new ActionMessage
@@ -421,8 +460,11 @@ namespace KillingMahjong.UI
                 currentWallTiles = new List<int>(localPlayer.wall);
             }
 
-            // フルデータ受信時は再構築
-            RebuildAllTilesFromState();
+            // フルデータ受信時は再構築（手牌フェイズに入った初回のみ生成する）
+            if (currentPhaseStatus != "hand_selection" && state.status == "hand_selection")
+            {
+                RebuildAllTilesFromState();
+            }
 
             if (localPlayer.discards != null)
             {
@@ -530,13 +572,13 @@ namespace KillingMahjong.UI
             // アニメーションなどのトリガーは、ここで直接呼ばずにサーバー検証後 ("bet" メッセージ受信後) に行います。
         }
 
-        public void OnBettingCompleteFromServer()
+        public void OnBettingCompleteFromServer(int playerBet, int enemyBet, int playerHp, int enemyHp)
         {
             // サーバーから "bet" (両者のベットが完了した) 通知が来たらアニメーション開始
-            TriggerBettingAnimationPhase($"Round 1"); 
+            TriggerBettingAnimationPhase($"Round 1", playerBet, enemyBet, playerHp, enemyHp); 
         }
 
-        public void TriggerBettingAnimationPhase(string roundString)
+        public void TriggerBettingAnimationPhase(string roundString, int playerBet, int enemyBet, int playerHp, int enemyHp)
         {
              if (phaseTransitionUI != null)
              {
@@ -546,7 +588,7 @@ namespace KillingMahjong.UI
                  if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
 
                  // Start transition
-                 phaseTransitionUI.PlayTransition(roundString, playerInfoUI, 
+                 phaseTransitionUI.PlayTransition(roundString, playerInfoUI, playerBet, enemyBet, playerHp, enemyHp,
                     onMidpoint: () => {
                          // Swap UI to Match UI here behind the dark screen if necessary
                          // This is where you might enable HandUI, WallUI, etc, if they were hidden during betting

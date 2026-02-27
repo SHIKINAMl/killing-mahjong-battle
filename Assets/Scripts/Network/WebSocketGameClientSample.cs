@@ -278,7 +278,8 @@ public class WebSocketGameClientSample : MonoBehaviour
                     Log("[WebSocket] Betting complete for both players. Starting animation...");
                     if (gameUIManager != null)
                     {
-                        gameUIManager.OnBettingCompleteFromServer();
+                        // サーバーからのレスポンス形式が確定するまで、一旦ダミー値を入れてエラーを解消します
+                        gameUIManager.OnBettingCompleteFromServer(2000, 2000, 50000, 50000);
                     }
                     break;
                 case "game_state":

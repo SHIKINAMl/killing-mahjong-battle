@@ -7,8 +7,6 @@ namespace KillingMahjong.UI
     {
         [Header("Wall Configuration")]
         [SerializeField] private Transform wallContainer;
-        [SerializeField] private GameObject tilePrefab;
-        [SerializeField] private TileResourceManager tileResourceManager;
         
         [Header("Layout Settings")]
         [SerializeField] private Vector2 startPosition = new Vector2(40, 150);
@@ -24,15 +22,12 @@ namespace KillingMahjong.UI
             this.gameUIManager = manager;
         }
 
-        private List<Transform> wallSlots = new List<Transform>();
+        private List<RectTransform> wallSlots = new List<RectTransform>();
+        public List<RectTransform> GetWallSlots() => wallSlots;
 
-        public void SetWall(List<int> tileIds)
+        public void LayoutWallTiles(List<RectTransform> generatedTiles, List<int> tileIds)
         {
-            // Clear existing
-            foreach (Transform t in wallSlots)
-            {
-                if (t != null) Destroy(t.gameObject);
-            }
+            // Clear existing tracking list (but DO NOT destroy, GameUIManager manages their lifecycle)
             wallSlots.Clear();
 
             // 1. Convert to TileData
@@ -75,6 +70,8 @@ namespace KillingMahjong.UI
             // 4. Layout
             float currentY = startPosition.y;
             float currentX = startPosition.x; // カテゴリを跨いでもXをリセットしない
+
+            int tileIndex = 0; // generatedTilesを上から順に消費するためのインデックス
 
             for (int i = 0; i < categoryLists.Count; i++)
             {
@@ -122,31 +119,29 @@ namespace KillingMahjong.UI
                     // Render current group
                     for (int k = 0; k < groupSize; k++)
                     {
-                        int currentIndex = j + k;
-                        var tile = list[currentIndex];
+                        if (tileIndex >= generatedTiles.Count)
+                        {
+                            Debug.LogWarning("WallUI: Not enough generated tiles provided for layout.");
+                            break;
+                        }
 
-                        // Instantiate Tile
-                        GameObject obj = Instantiate(tilePrefab, wallContainer);
-                        Transform slot = obj.transform;
+                        RectTransform slot = generatedTiles[tileIndex++];
+                        slot.SetParent(wallContainer, false);
+                        
+                        // Reset scaling and anchors properly to avoid overlap/squishing
+                        slot.localScale = Vector3.one;
+                        slot.anchorMin = new Vector2(0.5f, 0.5f);
+                        slot.anchorMax = new Vector2(0.5f, 0.5f);
+                        slot.pivot = new Vector2(0.5f, 0.5f);
                         
                         // Position
                         slot.localPosition = new Vector3(currentX, currentY, 0);
                         slot.localRotation = Quaternion.identity;
 
-                        // Visual
-                        if (tileResourceManager != null)
-                        {
-                            var visual = slot.GetComponent<TileVisual>();
-                            if (visual != null) visual.SetTile(tile.Id, tileResourceManager.GetTileSprite(tile.Id));
-                        }
-
-                        // Interaction
-                        var interaction = slot.GetComponent<TileInteraction>();
-                        if (interaction == null) interaction = slot.gameObject.AddComponent<TileInteraction>();
-                        Canvas canvas = GetComponentInParent<Canvas>();
-                        if (gameUIManager != null) interaction.Initialize(tile.Id, false, gameUIManager, canvas);
-                        
+                        // Interaction initialize should be done by GameUIManager now, 
+                        // but we can ensure they are added to wall slots
                         wallSlots.Add(slot);
+                        slot.gameObject.SetActive(true);
                         
                         // Advance X Logic
                         if (k < groupSize - 1)
@@ -195,21 +190,7 @@ namespace KillingMahjong.UI
             }
         }
 
-        // Logic to remove a tile when discarded?
-        public void RemoveTile(int index)
-        {
-            if (index >= 0 && index < wallSlots.Count)
-            {
-                Destroy(wallSlots[index].gameObject);
-                wallSlots.RemoveAt(index);
-                // Re-layout? For now, just leaving a gap or simpler to not re-layout.
-                // In real game, wall shrinks? 
-                // "お互いにその21個から順番に捨てる" -> Usually specific order.
-                // If specific order (left to right), we define which one is next.
-            }
-        }
-
-        public Transform GrabTile(int tileId)
+        public RectTransform GrabTile(int tileId)
         {
             // WallSlotの中から該当IDを持つTransformを探し出して返す
             for (int i = 0; i < wallSlots.Count; i++)
@@ -218,15 +199,15 @@ namespace KillingMahjong.UI
                 var interaction = wallSlots[i].GetComponent<TileInteraction>();
                 if (interaction != null && interaction.TileId == tileId)
                 {
-                    Transform t = wallSlots[i];
+                    RectTransform t = wallSlots[i];
                     wallSlots.RemoveAt(i);
-                    return t;
+                    return t; 
                 }
             }
             return null;
         }
 
-        public void ReturnTileToWall(Transform tileTransform, int tileId)
+        public void ReturnTileToWall(RectTransform tileTransform, int tileId)
         {
             if (tileTransform == null) return;
 
@@ -241,11 +222,6 @@ namespace KillingMahjong.UI
                 Canvas canvas = GetComponentInParent<Canvas>();
                 interaction.Initialize(tileId, false, gameUIManager, canvas);
             }
-
-            // 本格的に再配置したい場合は SetWall() を再度呼ぶ必要がありますが、
-            // 「そのまま元あった場所」に戻すなら元の座標を記憶しておくなどの工夫が必要です。
-            // 今回は一旦 SetWall 全体を再構築する方針は避けるため、簡易的に末尾配置か無視します。
-            // 将来的に壁の隙間を埋めるならLayout関数を分離して呼び出します。
         }
     }
 }

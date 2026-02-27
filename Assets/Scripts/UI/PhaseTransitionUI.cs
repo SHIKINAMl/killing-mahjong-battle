@@ -56,13 +56,13 @@ namespace KillingMahjong.UI
 
         private PlayerInfoUI targetPlayerInfoUI;
 
-        public void PlayTransition(string roundName, PlayerInfoUI playerInfoUI, Action onMidpoint, Action onComplete)
+        public void PlayTransition(string roundName, PlayerInfoUI playerInfoUI, int playerBet, int enemyBet, int playerInitialHp, int enemyInitialHp, Action onMidpoint, Action onComplete)
         {
             this.targetPlayerInfoUI = playerInfoUI;
-            StartCoroutine(SequenceRoutine(roundName, onMidpoint, onComplete));
+            StartCoroutine(SequenceRoutine(roundName, playerBet, enemyBet, playerInitialHp, enemyInitialHp, onMidpoint, onComplete));
         }
 
-        private IEnumerator SequenceRoutine(string roundName, Action onMidpoint, Action onComplete)
+        private IEnumerator SequenceRoutine(string roundName, int playerBetAmount, int enemyBetAmount, int dummyInitialPlayerHp, int dummyInitialEnemyHp, Action onMidpoint, Action onComplete)
         {
             ResetVisuals();
 
@@ -140,24 +140,24 @@ namespace KillingMahjong.UI
                 hpBetContainer.SetActive(true);
                 // 仮のデータアニメーション
                 // 実際はGameUIManager等からデータを引数で渡しますが、ここではモックします
-                int dummyInitialHp = 20000;
-                int playerBetAmount = 2000; // 仮
-                int targetHp = dummyInitialHp - playerBetAmount;
+                int targetPlayerHp = dummyInitialPlayerHp - playerBetAmount;
+                int targetEnemyHp = dummyInitialEnemyHp - enemyBetAmount;
 
-                if (enemyBetObj != null) enemyBetObj.text = "Enemy Bet: " + playerBetAmount;
+                if (enemyBetObj != null) enemyBetObj.text = "Enemy Bet: " + enemyBetAmount;
                 if (playerBetObj != null) playerBetObj.text = "Your Bet: " + playerBetAmount;
 
                 t = 0;
                 while (t < hpDeductionDuration)
                 {
-                    int currentAnimHp = Mathf.RoundToInt(Mathf.Lerp(dummyInitialHp, targetHp, t / hpDeductionDuration));
-                    if (enemyHpObj != null) enemyHpObj.text = "Enemy HP: " + currentAnimHp;
-                    if (playerHpObj != null) playerHpObj.text = "Your HP: " + currentAnimHp;
+                    int currentPlayerAnimHp = Mathf.RoundToInt(Mathf.Lerp(dummyInitialPlayerHp, targetPlayerHp, t / hpDeductionDuration));
+                    int currentEnemyAnimHp = Mathf.RoundToInt(Mathf.Lerp(dummyInitialEnemyHp, targetEnemyHp, t / hpDeductionDuration));
+                    if (enemyHpObj != null) enemyHpObj.text = "Enemy HP: " + currentEnemyAnimHp;
+                    if (playerHpObj != null) playerHpObj.text = "Your HP: " + currentPlayerAnimHp;
                     t += Time.deltaTime;
                     yield return null;
                 }
-                if (enemyHpObj != null) enemyHpObj.text = "Enemy HP: " + targetHp;
-                if (playerHpObj != null) playerHpObj.text = "Your HP: " + targetHp;
+                if (enemyHpObj != null) enemyHpObj.text = "Enemy HP: " + targetEnemyHp;
+                if (playerHpObj != null) playerHpObj.text = "Your HP: " + targetPlayerHp;
                 
                 yield return new WaitForSeconds(1.0f);
                 hpBetContainer.SetActive(false);

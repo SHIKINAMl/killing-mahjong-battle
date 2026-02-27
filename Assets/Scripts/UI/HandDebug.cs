@@ -36,8 +36,10 @@ namespace KillingMahjong.UI
             
             foreach(var id in randomIds)
             {
-                var clone = Instantiate(tempPrefab).transform;
-                handUI.AddTileToHand(clone, id);
+                var clone = Instantiate(tempPrefab).transform as RectTransform;
+                if (clone != null) {
+                    handUI.AddTileToHand(clone, id);
+                }
             }
             Destroy(tempPrefab);
         }
