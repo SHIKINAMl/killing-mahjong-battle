@@ -174,6 +174,20 @@ class HandAnalyzer:
         wall_counter = Counter(t & 0b11111 for t in wall)
         return [tile_id for tile_id, count in wall_counter.items() if count >= 4]
 
+    def is_win(self, hand: List[int]) -> bool:
+        """
+        和了形かどうかの判定
+
+        Args:
+            hand: 手牌のリスト（14枚を想定）
+
+        Returns:
+            和了形かどうか
+        """
+        base_tiles = [t & 0b11111 for t in hand]
+        counter = Counter(base_tiles)
+        return HandAnalyzer._is_win(counter)
+
     @staticmethod
     def _is_win(counter: Counter) -> bool:
         """和了形かどうかの判定"""
