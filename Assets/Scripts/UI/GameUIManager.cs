@@ -10,6 +10,7 @@ namespace KillingMahjong.UI
         [SerializeField] private HandUI handUI;
         [SerializeField] private WallUI wallUI;
         [SerializeField] private RiverUI riverUI;
+        [SerializeField] private WaitUI waitUI; // 追加: 待ち牌表示UI
         [SerializeField] private DialogueUI dialogueUI;
         [SerializeField] private PlayerInfoUI playerInfoUI; // プレイヤー自身のHP
         [SerializeField] private EnemyInfoUI enemyInfoUI;  // 敵のUI管理（HP、パネル）
@@ -259,6 +260,12 @@ namespace KillingMahjong.UI
             // 3. Update internal tracking
             currentHandTiles = new List<int>(localPlayer.hand);
             currentWallTiles = new List<int>(localPlayer.wall);
+
+            // 4. 待ち牌表示の更新
+            if (waitUI != null)
+            {
+                waitUI.DisplayWaits(localPlayer.wait != null ? new List<int>(localPlayer.wait) : new List<int>());
+            }
         }
 
         public void DiscardSelectedTile()
@@ -553,6 +560,11 @@ namespace KillingMahjong.UI
             {
                 if (riverUI != null) riverUI.SetRiver(new List<int>(localPlayer.discards));
             }
+
+            if (waitUI != null && localPlayer.wait != null)
+            {
+                waitUI.DisplayWaits(new List<int>(localPlayer.wait));
+            }
             
             // 4. Update Game Status Text
             string statusMsg = $"Round {state.round} - {state.honba} Honba\nTarget: {state.status}";
@@ -701,6 +713,13 @@ namespace KillingMahjong.UI
              {
                  Debug.LogError("PhaseTransitionUI reference is missing in GameUIManager! Please assign it in the Inspector.");
              }
+        }
+        public void ShowDialogue(string text)
+        {
+            if (dialogueUI != null)
+            {
+                dialogueUI.ShowText(text);
+            }
         }
     }
 }

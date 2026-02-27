@@ -47,5 +47,22 @@ namespace KillingMahjong
                 Number = id - 27 + 1;
             }
         }
+
+        public string GetTileName()
+        {
+            string[] numbers = { "", "一", "二", "三", "四", "五", "六", "七", "八", "九" };
+            switch (Category)
+            {
+                case TileCategory.Manzu: return numbers[Number] + "萬";
+                case TileCategory.Pinzu: return numbers[Number] + "筒";
+                case TileCategory.Souzu: return numbers[Number] + "索";
+                case TileCategory.Honor:
+                    string[] honors = { "", "東", "南", "西", "北", "白", "發", "中" };
+                    if (Number >= 1 && Number <= 7) return honors[Number];
+                    return "不明な字牌";
+                default:
+                    return "不明な牌";
+            }
+        }
     }
 }

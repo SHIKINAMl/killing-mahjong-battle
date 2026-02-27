@@ -159,6 +159,14 @@ namespace KillingMahjong.Network
                         int enemyDiscard = mockEnemyWall[0];
                         mockEnemyWall.RemoveAt(0);
                         mockEnemyDiscards.Add(enemyDiscard);
+
+                        // 女の子（敵）の打牌宣言
+                        TileData discardedData = new TileData(enemyDiscard);
+                        string tileName = discardedData.GetTileName();
+                        gameUIManager.ShowDialogue($"「{tileName}を切るわ！」");
+                        
+                        // 宣言を見せるため少し待機時間を増やす
+                        yield return new WaitForSeconds(1.0f);
                     }
 
                     // 自分ターンに戻る（ツモは無いのでこのまま）
@@ -201,7 +209,8 @@ namespace KillingMahjong.Network
                 health = localPlayerHp,
                 wall = mockLocalWall.ToArray(),
                 hand = mockLocalHand.ToArray(),
-                discards = mockLocalDiscards.ToArray()
+                discards = mockLocalDiscards.ToArray(),
+                wait = CalculateSimpleWaits(mockLocalHand).ToArray()
             };
 
             return p;
@@ -215,8 +224,22 @@ namespace KillingMahjong.Network
                 health = enemyPlayerHp,
                 wall = mockEnemyWall.ToArray(),
                 hand = mockEnemyHand.ToArray(),
-                discards = mockEnemyDiscards.ToArray()
+                discards = mockEnemyDiscards.ToArray(),
+                wait = new int[] {} // 敵の待ちは表示しない
             };
+        }
+
+        // --- Mock Utility: Simple Wait Calculation ---
+        // 開発用の仮データ：サーバーから「一萬（0）」と「四萬（3）」が待ち牌として送られてくる想定
+        private List<int> CalculateSimpleWaits(List<int> hand)
+        {
+            List<int> waits = new List<int>();
+            if (hand.Count == 13) // 手牌が13枚揃っている時だけ待ちを表示する
+            {
+                waits.Add(0); // 1萬
+                waits.Add(3); // 4萬
+            }
+            return waits;
         }
     }
 }
