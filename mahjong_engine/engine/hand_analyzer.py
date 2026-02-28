@@ -227,22 +227,22 @@ class HandAnalyzer:
 
                 temp_aka_list = aka_list.copy()
 
-                for t in h:
+                for i, t in enumerate(h):
                     if t in temp_aka_list:
-                        h[h.index(t)] = t | (1 << 6)
+                        h[i] = t | (1 << 6)
                         temp_aka_list.remove(t)
 
                     if t == dora:
-                        h[h.index(t)] = t | (1 << 5)
+                        h[i] |= (1 << 5)
 
                 han = HandAnalyzer.calc_yaku(h)
                 if han >= 4:
-                    for t in hand:
+                    for i, t in enumerate(hand):
                         if t in temp_aka_list:
-                            hand[hand.index(t)] = t | (1 << 6)
+                            hand[i] = t | (1 << 6)
                             temp_aka_list.remove(t)
                         if t == dora:
-                            hand[hand.index(t)] = t | (1 << 5)
+                            hand[i] |= (1 << 5)
 
                     mangan_hands.append(hand)
 

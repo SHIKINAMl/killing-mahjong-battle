@@ -178,6 +178,11 @@ class GameSession:
 
 		player = engine.get_player_by_id(client_id)
 
+		for t in hand:
+			if t not in player.wall:
+				await self._send_error(client_id, "Tile not in your wall")
+				return
+
 		waits = engine.get_waits(hand, player)
 		if waits is not None:
 			await self._respond_to_client(client_id, {
