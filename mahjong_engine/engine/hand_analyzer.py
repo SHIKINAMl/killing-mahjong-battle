@@ -4,7 +4,6 @@
 from collections import Counter
 from typing import List, Tuple, Generator
 from itertools import combinations
-import random
 
 from .yaku import Yaku
 
@@ -123,13 +122,14 @@ class HandAnalyzer:
             待ち牌のリスト
         """
         skip_tiles = HandAnalyzer.skip_tenpai_tiles(wall)
+        hand_counter = Counter(t & 0b11111 for t in hand)
         waiting_tiles = []
 
         for tile_id in range(29):
             if tile_id in skip_tiles:
                 continue
 
-            sup_counter = Counter(t & 0b11111 for t in hand)
+            sup_counter = hand_counter.copy()
             sup_counter[tile_id] += 1
 
             if HandAnalyzer._is_win(sup_counter):
@@ -154,11 +154,7 @@ class HandAnalyzer:
         for tile_id, count in hand_counter.items():
             wall_counter[tile_id] -= count
 
-        result = []
-        for tile_id, count in wall_counter.items():
-            result.extend([tile_id] * count)
-
-        return result
+        return list(wall_counter.elements())
 
     @staticmethod
     def skip_tenpai_tiles(wall: List[int]) -> List[int]:
@@ -174,7 +170,8 @@ class HandAnalyzer:
         wall_counter = Counter(t & 0b11111 for t in wall)
         return [tile_id for tile_id, count in wall_counter.items() if count >= 4]
 
-    def is_win(self, hand: List[int]) -> bool:
+    @staticmethod
+    def is_win(hand: List[int]) -> bool:
         """
         和了形かどうかの判定
 
@@ -184,8 +181,7 @@ class HandAnalyzer:
         Returns:
             和了形かどうか
         """
-        base_tiles = [t & 0b11111 for t in hand]
-        counter = Counter(base_tiles)
+        counter = Counter(t & 0b11111 for t in hand)
         return HandAnalyzer._is_win(counter)
 
     @staticmethod
@@ -205,13 +201,13 @@ class HandAnalyzer:
     # ========== 役計算 ==========
 
     @staticmethod
-    def filter_mangan_hands(list: list[list[int]], wall: List[int], dora: int) -> List[list[int]]:
+    def filter_mangan_hands(hands: list[list[int]], wall: List[int], dora: int) -> List[list[int]]:
         """
         聴牌形の手牌リストのうち
         満貫以上となる上がりを持つものを返す
 
         Args:
-            list: 聴牌形の手牌リスト（13枚を想定）
+            hands: 聴牌形の手牌リスト（13枚を想定）
             wall: 山牌のリスト
             dora: ドラの牌ID
         Returns:
@@ -221,7 +217,7 @@ class HandAnalyzer:
         aka_list = [t & 0b11111 for t in wall if (t >> 6) & 0b1 == 1]
 
         mangan_hands = []
-        for hand in list:
+        for hand in hands:
 
             waiting_tiles = HandAnalyzer.get_tenpai_waiting_tiles(hand, wall)
 
@@ -486,14 +482,7 @@ class HandAnalyzer:
     @staticmethod
     def _tile_suit(tile_id: int) -> int:
         """牌の種類を返す（萬子=0、筒子=1、索子=2、字牌=3）"""
-        if tile_id < 9:
-            return 0
-        elif tile_id < 18:
-            return 1
-        elif tile_id < 27:
-            return 2
-        else:
-            return 3
+        return min(tile_id // 9, 3)
 
     # ========== 役判定（手全体） ==========
 
@@ -512,10 +501,7 @@ class HandAnalyzer:
         """平和かどうかの判定"""
         if HandAnalyzer._is_honor(head):
             return False
-        for kind, tile_id in melds:
-            if kind != "run":
-                return False
-        return True
+        return all(kind == "run" for kind, _ in melds)
 
     @staticmethod
     def _is_honitsu(counter: Counter) -> bool:

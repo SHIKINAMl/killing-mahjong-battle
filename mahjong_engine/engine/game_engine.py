@@ -4,7 +4,7 @@
 from typing import Callable, Optional
 import random
 
-from .game_state import GameState, GameStatus, RoundStatus, SkillType, PlayerState, RoundState
+from .game_state import GameState, RoundStatus, SkillType, PlayerState
 from .tile_wall import TileWall
 from .hand_analyzer import HandAnalyzer
 
@@ -12,17 +12,17 @@ from .hand_analyzer import HandAnalyzer
 class GameEngine:
     """麻雀ゲームエンジン"""
 
-    def __init__(self, num_players: int = 2):
+    def __init__(self, max_rounds: int = 4):
         """
         ゲームエンジンを初期化
 
         Args:
-            num_players: プレイヤー数（デフォルト2人）
+            max_rounds: 最大ラウンド数（デフォルト4）
         """
         self.state = GameState()
         self.tile_wall = TileWall()
-        self.num_players = num_players
-        #self.target_status = GameStatus.GAME_END  # 目標ステータス
+        self.num_players = 2
+        self.max_rounds = max_rounds
 
         # 各種コールバック
         # 準備フェーズ
@@ -51,16 +51,12 @@ class GameEngine:
 
     def start_game(self, max_rounds: int = 4):
         """ゲームを開始"""
-        if self.state.status != GameStatus.WAITING:
-            raise RuntimeError("ゲームはすでに開始されています")
-
-        self.state.status = GameStatus.PLAYING
+        self.max_rounds = max_rounds
         self._start_round()
 
     def _start_round(self):
         """局を開始"""
-        if self.on_round_start:
-            self.on_round_start()
+        self._invoke_callback(self.on_round_start)
 
         # 配牌を実行
         self._set_phase(RoundStatus.DEALING)
@@ -70,34 +66,30 @@ class GameEngine:
         """各プレイヤーに牌を配る"""
         hands = [self.tile_wall.deal() for _ in range(self.num_players)]
 
-        for i, player in enumerate(self.state.players):
-            player.wall = hands[i][0] # 配られた牌
-            player.hand = hands[i][1] # 聴牌形の例
+        for player, (wall, hand) in zip(self.state.players, hands):
+            player.wall = wall # 配られた牌
+            player.hand = hand # 聴牌形の例
 
         self.state.round_state.dora_id = self.tile_wall.dora_id
 
-        if self.on_dealt:
-            self.on_dealt()
+        self._invoke_callback(self.on_dealt)
 
         self._set_phase(RoundStatus.HAND_SELECTION)
 
     def selected(self):
         """手牌の選択が完了したときの処理"""
-        if self.on_selected:
-            self.on_selected()
+        self._invoke_callback(self.on_selected)
 
         self._set_phase(RoundStatus.BETTING)
 
     def bet(self):
         """掛け金の設定が完了したときの処理"""
-        if self.on_bet:
-            self.on_bet()
+        self._invoke_callback(self.on_bet)
 
         self._set_phase(RoundStatus.DISCARD)
         self.state.round_state.current_player_index = random.randrange(0, self.num_players)
 
-        if self.on_discard_started:
-            self.on_discard_started()
+        self._invoke_callback(self.on_discard_started)
 
     def select_hand(self, hand: list[int], player: PlayerState) -> bool:
         """
@@ -105,7 +97,7 @@ class GameEngine:
 
         Args:
             hand: 選択された手牌のリスト
-            player: プレイヤー状態
+            player: プレイヤーの状態
         Returns:
             手牌が有効であれば True、そうでなければ False
         """
@@ -125,8 +117,7 @@ class GameEngine:
             player_id: 捨てたプレイヤーのID
             tile_id: 捨てた牌のID
         """
-        if self.on_discarded:
-            self.on_discarded(player_id, tile_id)
+        self._invoke_callback(self.on_discarded, player_id, tile_id)
 
         discarding_player = self.get_player_by_id(player_id)
 
@@ -165,8 +156,7 @@ class GameEngine:
 
         self.state.round_state.round_number += 1
 
-        if self.state.round_state.round_number > 4: # x局終了でゲーム終了(今は4局で固定)
-            self.state.status = GameStatus.GAME_END
+        if self.state.round_state.round_number > self.max_rounds:
             self._on_game_end()
             return
 
@@ -176,7 +166,7 @@ class GameEngine:
                 health=p.health,
                 hand=[],
                 wall=[],
-                wait=[],
+                waits=[],
                 discards=[],
                 skills={SkillType.SPESIAL_VICTORY: p.skills.get(SkillType.SPESIAL_VICTORY, None)}
             )
@@ -187,19 +177,19 @@ class GameEngine:
 
     def _on_game_end(self) -> None:
         """ゲーム終了時の処理"""
-
-        if self.on_game_end:
-            self.on_game_end()
+        self._invoke_callback(self.on_game_end)
 
     def _set_phase(self, new_status: RoundStatus) -> None:
         """ラウンドフェーズを変更"""
 
         if self.state.round_state.status != new_status:
-            old_status = self.state.round_state.status
             self.state.round_state.status = new_status
 
-            if self.on_phase_change:
-                self.on_phase_change(new_status)
+            self._invoke_callback(self.on_phase_change, new_status)
+
+    def _invoke_callback(self, callback: Optional[Callable], *args) -> None:
+        if callback:
+            callback(*args)
 
     def get_current_player(self) -> PlayerState:
         """現在のプレイヤーを取得"""
@@ -208,6 +198,16 @@ class GameEngine:
     def get_player_by_id(self, player_id: str) -> PlayerState:
         """プレイヤーIDからプレイヤー状態を取得"""
         return next((p for p in self.state.players if p.player_id == player_id), None)
+
+    def update_player_state(self, player_id: str, **kwargs) -> None:
+        """プレイヤーの状態を更新"""
+        player = self.get_player_by_id(player_id)
+        if not player:
+            return
+
+        for key, value in kwargs.items():
+            if key in player.__dataclass_fields__:
+                setattr(player, key, value)
 
     def get_waits(self, hand: list[int], player: PlayerState) -> list[tuple[int, bool, list[str]]]:
         """
@@ -255,7 +255,7 @@ class GameEngine:
                     "health": p.health,
                     "hand": p.hand,
                     "wall": p.wall,
-                    "wait": p.wait,
+                    "waits": p.waits,
                     "discards": p.discards
                 }
                 for p in self.state.players

@@ -5,13 +5,6 @@ from enum import Enum
 from dataclasses import dataclass, field
 
 
-class GameStatus(Enum):
-    """ゲームのステータス"""
-    WAITING = "waiting"  # ゲーム開始待機中
-    PLAYING = "playing"  # プレイ中
-    GAME_END = "game_end"  # ゲーム終了
-
-
 class RoundStatus(Enum):
     """局内のステータス"""
     DEALING = "dealing"  # 配牌フェーズ
@@ -34,9 +27,9 @@ class PlayerState:
     player_id: str  # プレイヤーID
     hand: list[int] = field(default_factory=list)  # 手牌
     wall: list[int] = field(default_factory=list)  # 牌山
-    wait: list[int] = field(default_factory=list)  # 待ち牌
+    waits: list[int] = field(default_factory=list)  # 待ち牌
     discards: list[int] = field(default_factory=list)  # 捨て牌
-    skills: dict[SkillType: any] = field(default_factory=list)  # スキル
+    skills: dict[SkillType, any] = field(default_factory=dict)  # スキル
     health: int = 20000  # 体力
     bet: int = 0  # 掛け金
 
@@ -47,14 +40,13 @@ class RoundState:
     round_number: int  # 第何局か
     honba: int  # 本場数
     current_player_index: int # 現在のプレイヤーのインデックス
-    status: RoundStatus = RoundStatus.DEALING
+    status: RoundStatus = None  # 現在の局のステータス
     dora_id: int = None  # ドラのID
 
 
 @dataclass
 class GameState:
     """ゲーム全体の状態"""
-    status: GameStatus = GameStatus.WAITING
     players: list[PlayerState] = field(default_factory=list)
     round_state: RoundState = field(default_factory=lambda: RoundState(
         round_number=1,
