@@ -8,7 +8,8 @@ namespace KillingMahjong.UI
     public class HandUI : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
     {
         [Header("Hand Slots")]
-        [SerializeField] private Transform handSlotContainer;
+        [SerializeField] private Transform handSlotContainer; // For Dealing / Hand Selection Phase
+        [SerializeField] private Transform discardPhaseContainer; // For Discard Phase (New 2-row layout)
         // 以前のInspectorで設定されていたnullの要素が残ってクラッシュするのを防ぐため、シリアライズ対象外にする
         private List<RectTransform> handSlots = new List<RectTransform>();
         public List<RectTransform> GetHandSlots() 
@@ -88,7 +89,7 @@ namespace KillingMahjong.UI
             // 既存の手牌リストに追加
             handSlots.Add(tileTransform);
 
-            // コンテナ移動
+            // コンテナ移動 (デフォルトは handSlotContainer だが UpdateLayout で適切な方に再配置される)
             tileTransform.SetParent(handSlotContainer, false);
             tileTransform.localPosition = Vector3.zero;
             
@@ -142,11 +143,29 @@ namespace KillingMahjong.UI
         public void UpdateLayout(string phaseStatus)
         {
             var layoutGroup = handSlotContainer.GetComponent<UnityEngine.UI.LayoutGroup>();
+            Transform activeContainer = (phaseStatus == "discard" && discardPhaseContainer != null) 
+                                        ? discardPhaseContainer : handSlotContainer;
             
+            // コンテナの表示・非表示を切り替える
+            if (discardPhaseContainer != null)
+            {
+                discardPhaseContainer.gameObject.SetActive(activeContainer == discardPhaseContainer);
+            }
+            if (handSlotContainer != null)
+            {
+                handSlotContainer.gameObject.SetActive(activeContainer == handSlotContainer);
+            }
+
             // 手牌選択フェイズなどは既存のLayoutGroup（もしあれば）に任せるか、単純にならべる
             if (phaseStatus != "discard")
             {
                 if (layoutGroup != null) layoutGroup.enabled = true;
+                
+                // 親コンテナを元に戻す
+                foreach (var st in handSlots)
+                {
+                    if (st.parent != activeContainer) st.SetParent(activeContainer, false);
+                }
                 
                 // 既存の簡易ソート（ID順）
                 handSlots.Sort((a, b) => 
@@ -168,6 +187,12 @@ namespace KillingMahjong.UI
             // 打牌（Discard）フェイズ時の特別なレイアウトとソート
             // ---------------------------------------------
             if (layoutGroup != null) layoutGroup.enabled = false;
+            
+            // 全ての牌を Discard 用コンテナに移動する
+            foreach (var st in handSlots)
+            {
+                if (st.parent != activeContainer) st.SetParent(activeContainer, false);
+            }
 
             // 1. ソート処理: 萬子 → 筒子 → 索子 → 字牌 の順、かつ数字順
             handSlots.Sort((a, b) => 
@@ -185,10 +210,11 @@ namespace KillingMahjong.UI
                     return dataA.Category.CompareTo(dataB.Category);
                 }
                 
-                // 同じカテゴリなら数字で比較 (1-9)
-                if (dataA.Number != dataB.Number)
+                // 同じカテゴリなら同じ牌（ID）を優先してまとめる（同じ種類の牌を先に並べる）
+                if (dataA.Id != dataB.Id)
                 {
-                    return dataA.Number.CompareTo(dataB.Number);
+                    // 同じタイルIDが連続するように並べる。数字順の前にID順でソートすればOK
+                    return dataA.Id.CompareTo(dataB.Id);
                 }
                 
                 // 完全一致
@@ -202,7 +228,7 @@ namespace KillingMahjong.UI
             }
 
             // 2. 2列 × 7枚 の直接配置（隙間なし）
-            // 「奥から左に」→ Yを奥(上)から手前(下)へ、列を右から左へ並べる想定の実装
+            // 奥（上）から左から右へ並べ、7枚超えたら手前（下）の左から右へ並べる
             if (handSlots.Count == 0) return;
             
             RectTransform firstTileRT = handSlots[0].GetComponent<RectTransform>();
@@ -222,10 +248,10 @@ namespace KillingMahjong.UI
                 // 牌同士をピタッとくっつける場合、Inspectorで `tileSpacingX` と `tileSpacingY` を 
                 // タイル画像ジャストの幅・高さに設定してください。
 
-                // 奥(上)から手前(下)へ： 行番号が増えるほどYはマイナス方向へ
+                // 奥(上)から手前(下)へ： 行番号が増えるほどYはマイナス方向へ (0〜1)
                 float targetY = -rowIndex * h;
                 
-                // 左から右へ： 列番号が増えるほどXはプラス方向へ
+                // 左から右へ： 列番号が増えるほどXはプラス方向へ (0〜6)
                 float targetX = colIndex * w;
 
                 RectTransform rt = handSlots[i].GetComponent<RectTransform>();

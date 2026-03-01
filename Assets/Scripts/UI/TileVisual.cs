@@ -52,5 +52,34 @@ namespace KillingMahjong.UI
         }
         
         public int GetId() => _currentId;
+
+        public void SetFuritenHighlight(bool isFuriten)
+        {
+            if (uiImage != null)
+            {
+                var outline = uiImage.GetComponent<UnityEngine.UI.Outline>();
+                if (isFuriten)
+                {
+                    if (outline == null)
+                    {
+                        outline = uiImage.gameObject.AddComponent<UnityEngine.UI.Outline>();
+                        outline.effectDistance = new Vector2(3, 3);
+                    }
+                    outline.effectColor = Color.red;
+                    outline.enabled = true;
+                }
+                else
+                {
+                    if (outline != null) outline.enabled = false;
+                }
+            }
+            else if (spriteRenderer != null)
+            {
+                // Note: For SpriteRenderer, a custom shader is usually required.
+                // Assuming Image UI is primarily used for the 2D canvas here.
+                if (isFuriten) spriteRenderer.color = Color.red;
+                else spriteRenderer.color = Color.white;
+            }
+        }
     }
 }

@@ -3,7 +3,7 @@ using UnityEngine.EventSystems;
 
 namespace KillingMahjong.UI
 {
-    public class TileInteraction : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDragHandler, IEndDragHandler
+    public class TileInteraction : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerEnterHandler, IPointerExitHandler
     {
         public int TileId { get; private set; }
         public bool IsInHand { get; private set; }
@@ -31,13 +31,24 @@ namespace KillingMahjong.UI
         {
             if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == "discard")
             {
-                // ツモ無しルール：Hand（手牌）は固定で、Wall（残りの21枚）から選んで捨てる
                 if (!IsInHand)
                 {
-                    _gameUIManager.SelectTile(TileId, IsInHand, false);
+                    if (eventData.button == PointerEventData.InputButton.Left)
+                    {
+                        // 左クリック：選択（または選択解除）
+                        _gameUIManager.SelectTile(TileId, IsInHand, false);
+                    }
+                    else if (eventData.button == PointerEventData.InputButton.Right)
+                    {
+                        // 右クリック：選択して即座に打牌
+                        _gameUIManager.SelectTile(TileId, IsInHand, false);
+                        _gameUIManager.DiscardSelectedTile();
+                    }
                 }
                 return;
             }
+
+            if (eventData.button != PointerEventData.InputButton.Left) return;
 
             // Any Click -> Move (Left or Right)
             if (IsInHand)
@@ -48,6 +59,7 @@ namespace KillingMahjong.UI
 
         public void OnBeginDrag(PointerEventData eventData)
         {
+            if (eventData.button != PointerEventData.InputButton.Left) return;
             if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == "discard") return;
 
             _originalPosition = transform.position;
@@ -66,6 +78,7 @@ namespace KillingMahjong.UI
 
         public void OnDrag(PointerEventData eventData)
         {
+            if (eventData.button != PointerEventData.InputButton.Left) return;
             if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == "discard") return;
 
             // If Screen Space Overlay/Camera
@@ -88,6 +101,7 @@ namespace KillingMahjong.UI
 
         public void OnEndDrag(PointerEventData eventData)
         {
+            if (eventData.button != PointerEventData.InputButton.Left) return;
             if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == "discard") return;
 
             _canvasGroup.blocksRaycasts = true;
@@ -129,6 +143,37 @@ namespace KillingMahjong.UI
         {
             transform.position = _originalPosition;
             transform.SetParent(_originalParent);
+        }
+
+        public void OnPointerEnter(PointerEventData eventData)
+        {
+            if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == "discard" && !IsInHand)
+            {
+                // Wallにある牌をホバーしたときに少し浮かせる（選択時よりは低め）
+                // ただし、既に選択されている場合はその高さを維持する
+                if (!_gameUIManager.IsTileSelected(TileId))
+                {
+                    if (_rectTransform != null)
+                    {
+                        _rectTransform.localPosition = OriginalWallPosition + new Vector3(0, 10f, 0);
+                    }
+                }
+            }
+        }
+
+        public void OnPointerExit(PointerEventData eventData)
+        {
+            if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == "discard" && !IsInHand)
+            {
+                // ホバーが外れたら元の位置に戻す
+                if (!_gameUIManager.IsTileSelected(TileId))
+                {
+                    if (_rectTransform != null)
+                    {
+                        _rectTransform.localPosition = OriginalWallPosition;
+                    }
+                }
+            }
         }
     }
 }

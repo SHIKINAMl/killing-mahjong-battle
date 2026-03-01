@@ -9,7 +9,9 @@ namespace KillingMahjong.UI
         [SerializeField] private Transform wallContainer;
         
         [Header("Layout Settings")]
-        [SerializeField] private Vector2 startPosition = new Vector2(40, 150);
+        [SerializeField] private Vector2 normalContainerPos = new Vector2(0, 0);       // 通常時のコンテナ位置
+        [SerializeField] private Vector2 discardContainerPos = new Vector2(0, -100);   // 打牌フェイズ時のコンテナ位置
+        [SerializeField] private Vector2 startPosition = new Vector2(40, 150);         // コンテナ内での牌の基点
         [SerializeField] private float tileIntervalX = 55f;
         [SerializeField] private float gapIntervalX = 80f;
         [SerializeField] private float rowIntervalY = 95f;
@@ -25,10 +27,17 @@ namespace KillingMahjong.UI
         private List<RectTransform> wallSlots = new List<RectTransform>();
         public List<RectTransform> GetWallSlots() => wallSlots;
 
-        public void LayoutWallTiles(List<RectTransform> generatedTiles, List<int> tileIds)
+        public void LayoutWallTiles(List<RectTransform> generatedTiles, List<int> tileIds, List<int> waitTiles, bool isDiscardPhase)
         {
             // Clear existing tracking list (but DO NOT destroy, GameUIManager manages their lifecycle)
             wallSlots.Clear();
+
+            // コンテナ自体の位置をフェイズに応じて移動する
+            if (wallContainer != null)
+            {
+                wallContainer.localPosition = isDiscardPhase ? new Vector3(discardContainerPos.x, discardContainerPos.y, 0) 
+                                                             : new Vector3(normalContainerPos.x, normalContainerPos.y, 0);
+            }
 
             // 1. Convert to TileData
             List<TileData> allTiles = new List<TileData>();
@@ -69,8 +78,10 @@ namespace KillingMahjong.UI
 
             // 4. Layout
             float currentY = startPosition.y;
-            float currentX = startPosition.x; // カテゴリを跨いでもXをリセットしない
+            float currentX = startPosition.x;
 
+            int currentSlot = 0;
+            int maxSlotsPerRow = 20;
             int tileIndex = 0; // generatedTilesを上から順に消費するためのインデックス
 
             for (int i = 0; i < categoryLists.Count; i++)
@@ -108,12 +119,24 @@ namespace KillingMahjong.UI
 
                     int groupSize = (isKoutsu || isShuntsu) ? 3 : 1;
                     
-                    // ★ 描画する前に、このグループを描画したら maxWidthX を超えるかチェックし、超えるなら先に改行する
-                    float expectedWidth = (groupSize - 1) * tileIntervalX;
-                    if (currentX + expectedWidth > startPosition.x + maxWidthX)
+                    if (isDiscardPhase)
                     {
-                        currentX = startPosition.x;
-                        currentY -= rowIntervalY;
+                        // 新レイアウト: 1列は空きスペース含めて最大20牌まで
+                        int currentRow = currentSlot / maxSlotsPerRow;
+                        if ((currentSlot % maxSlotsPerRow) + groupSize > maxSlotsPerRow)
+                        {
+                            currentSlot = (currentRow + 1) * maxSlotsPerRow; // 改行
+                        }
+                    }
+                    else
+                    {
+                        // 旧レイアウト: 描画する前に、このグループを描画したら maxWidthX を超えるかチェック
+                        float expectedWidth = (groupSize - 1) * tileIntervalX;
+                        if (currentX + expectedWidth > startPosition.x + maxWidthX)
+                        {
+                            currentX = startPosition.x;
+                            currentY -= rowIntervalY;
+                        }
                     }
 
                     // Render current group
@@ -134,50 +157,83 @@ namespace KillingMahjong.UI
                         slot.anchorMax = new Vector2(0.5f, 0.5f);
                         slot.pivot = new Vector2(0.5f, 0.5f);
                         
-                        // Position
-                        Vector3 finalPos = new Vector3(currentX, currentY, 0);
+                        float targetX = startPosition.x;
+                        float targetY = startPosition.y;
+
+                        if (isDiscardPhase)
+                        {
+                            int r = currentSlot / maxSlotsPerRow;
+                            int c = currentSlot % maxSlotsPerRow;
+                            targetX = startPosition.x + c * tileIntervalX;
+                            targetY = startPosition.y - r * rowIntervalY; // マイナスで下に配置する
+                        }
+                        else
+                        {
+                            targetX = currentX;
+                            targetY = currentY;
+                        }
+
+                        Vector3 finalPos = new Vector3(targetX, targetY, 0);
                         slot.localPosition = finalPos;
                         slot.localRotation = Quaternion.identity;
 
-                        // Interaction initialize should be done by GameUIManager now, 
-                        // but we can ensure they are added to wall slots
                         var interaction = slot.GetComponent<TileInteraction>();
                         if (interaction != null)
                         {
                             interaction.OriginalWallPosition = finalPos;
                         }
+                        
+                        var visual = slot.GetComponent<TileVisual>();
+                        if (visual != null && waitTiles != null)
+                        {
+                            // 待ち牌リストに含まれていれば、振聴アラート（赤枠）を出す (Discard phaseのみ)
+                            visual.SetFuritenHighlight(isDiscardPhase && waitTiles.Contains(list[j + k].Id));
+                        }
 
                         wallSlots.Add(slot);
                         slot.gameObject.SetActive(true);
-                        
-                        // Advance X Logic
-                        if (k < groupSize - 1)
+
+                        if (isDiscardPhase)
                         {
-                            currentX += tileIntervalX;
+                            currentSlot++;
                         }
                         else
                         {
-                            if (j + groupSize < list.Count)
-                            {
-                                var lastTile = list[j + groupSize - 1];
-                                var nextTile = list[j + groupSize];
-                                
-                                bool needGap = false;
-                                if (isKoutsu || isShuntsu) needGap = true;
-                                else if (lastTile.Category == nextTile.Category && lastTile.Category != TileCategory.Honor)
-                                {
-                                    if (nextTile.Number - lastTile.Number > 1) needGap = true;
-                                }
+                            if (k < groupSize - 1) currentX += tileIntervalX;
+                        }
+                    }
 
-                                currentX += (needGap ? gapIntervalX : tileIntervalX);
-                            }
-                            else if (i < categoryLists.Count - 1)
+                    // グループ間やカテゴリ間のギャップ処理
+                    if (j + groupSize < list.Count)
+                    {
+                        var lastTile = list[j + groupSize - 1];
+                        var nextTile = list[j + groupSize];
+                        
+                        bool needGap = false;
+                        if (isKoutsu || isShuntsu) needGap = true;
+                        else if (lastTile.Category == nextTile.Category && lastTile.Category != TileCategory.Honor)
+                        {
+                            if (nextTile.Number - lastTile.Number > 1) needGap = true;
+                        }
+
+                        if (isDiscardPhase)
+                        {
+                            if (needGap) currentSlot++;
+                        }
+                        else
+                        {
+                            if (!isDiscardPhase) // currentX update is the last tile iteration above for intra-group
                             {
-                                // 別のカテゴリ（萬子→筒子など）になる時も隙間を空ける
-                                currentX += gapIntervalX;
+                                currentX += (needGap ? gapIntervalX : tileIntervalX);
                             }
                         }
                     }
+                    else if (i < categoryLists.Count - 1)
+                    {
+                        if (isDiscardPhase) currentSlot++;
+                        else currentX += gapIntervalX;
+                    }
+
                     j += groupSize;
                 }
             }

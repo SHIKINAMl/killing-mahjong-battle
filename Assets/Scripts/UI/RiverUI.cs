@@ -9,6 +9,7 @@ namespace KillingMahjong.UI
         [SerializeField] private Transform riverContainer;
         [SerializeField] private GameObject tilePrefab;
         [SerializeField] private TileResourceManager tileResourceManager;
+        [SerializeField] private TMPro.TextMeshProUGUI turnText; // 左上の打目表示用UI
 
         [Header("Layout Settings")]
         [SerializeField] private float tileWidth = 50.0f;
@@ -57,6 +58,39 @@ namespace KillingMahjong.UI
             }
 
             discardedTiles.Add(obj.transform);
+            UpdateTurnText();
+        }
+
+        private void UpdateTurnText()
+        {
+            if (turnText != null)
+            {
+                int turnCount = discardedTiles.Count;
+                if (turnCount > 0)
+                {
+                    turnText.text = $"{ToKanji(turnCount)}打目";
+                    turnText.gameObject.SetActive(true);
+                }
+                else
+                {
+                    turnText.gameObject.SetActive(false);
+                }
+            }
+        }
+
+        private string ToKanji(int number)
+        {
+            string[] kanjiNumbers = { "", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十" };
+            if (number <= 0) return "零";
+            if (number <= 10) return kanjiNumbers[number];
+            if (number < 20) return "十" + kanjiNumbers[number % 10];
+            if (number < 100)
+            {
+                int tens = number / 10;
+                int ones = number % 10;
+                return kanjiNumbers[tens] + "十" + kanjiNumbers[ones];
+            }
+            return number.ToString(); // Fallback for >= 100
         }
 
         public void Clear()
@@ -78,6 +112,7 @@ namespace KillingMahjong.UI
                     AddTile(tileId);
                 }
             }
+            UpdateTurnText();
         }
     }
 }

@@ -47,6 +47,7 @@ namespace KillingMahjong.UI
         // Data State
         private System.Collections.Generic.List<int> currentHandTiles = new System.Collections.Generic.List<int>();
         private System.Collections.Generic.List<int> currentWallTiles = new System.Collections.Generic.List<int>();
+        private System.Collections.Generic.List<int> currentWaitTiles = new System.Collections.Generic.List<int>();
         private System.Collections.Generic.List<int> selectedTileIds = new System.Collections.Generic.List<int>();
         
         private string currentPhaseStatus = "";
@@ -57,6 +58,7 @@ namespace KillingMahjong.UI
             currentWallTiles = new System.Collections.Generic.List<int>(initialWall);
             currentHandTiles.Clear();
             selectedTileIds.Clear();
+            currentWaitTiles.Clear();
             RebuildAllTilesFromState();
         }
 
@@ -188,6 +190,7 @@ namespace KillingMahjong.UI
         {
             // Simple visual feedback: move selected tiles up slightly
             // In Discard phase, we select from Wall. In other phases (maybe ability targeting?), from Hand.
+            /*
             if (handUI != null)
             {
                 var slots = handUI.GetHandSlots();
@@ -197,9 +200,10 @@ namespace KillingMahjong.UI
                     if (interaction != null && selectedTileIds.Contains(interaction.TileId))
                         t.anchoredPosition = new Vector2(t.anchoredPosition.x, 20f);
                     else if (interaction != null)
-                        t.anchoredPosition = new Vector2(t.anchoredPosition.x, 0f);
+                        t.anchoredPosition = new Vector2(t.anchoredPosition.x, 0f); // BUG: This breaks HandUI layout
                 }
             }
+            */
             if (wallUI != null)
             {
                 var slots = wallUI.GetWallSlots();
@@ -232,6 +236,11 @@ namespace KillingMahjong.UI
             UpdateSelectedTileVisuals();
         }
 
+        public bool IsTileSelected(int tileId)
+        {
+            return selectedTileIds.Contains(tileId);
+        }
+
         private void SyncDiscardPhaseVisuals(PlayerStateData localPlayer)
         {
             if (localPlayer.hand == null || localPlayer.wall == null) return;
@@ -255,16 +264,26 @@ namespace KillingMahjong.UI
                         }
                     }
                 }
+                
+                // 再レイアウト（フリテンや打牌後の整頓のため）
+                List<RectTransform> remainingTiles = new List<RectTransform>();
+                foreach (var st in wallUI.GetWallSlots())
+                {
+                    if (st != null) remainingTiles.Add(st);
+                }
+                wallUI.LayoutWallTiles(remainingTiles, new List<int>(localPlayer.wall), 
+                    localPlayer.wait != null ? new List<int>(localPlayer.wait) : new List<int>(), true);
             }
 
             // 3. Update internal tracking
             currentHandTiles = new List<int>(localPlayer.hand);
             currentWallTiles = new List<int>(localPlayer.wall);
+            currentWaitTiles = new List<int>(localPlayer.wait != null ? localPlayer.wait : new int[0]);
 
             // 4. 待ち牌表示の更新
             if (waitUI != null)
             {
-                waitUI.DisplayWaits(localPlayer.wait != null ? new List<int>(localPlayer.wait) : new List<int>());
+                waitUI.DisplayWaits(currentWaitTiles);
             }
         }
 
@@ -378,7 +397,7 @@ namespace KillingMahjong.UI
                 }
 
                 // Pass generated tiles to WallUI for layout only
-                wallUI.LayoutWallTiles(wallGenerated, currentWallTiles);
+                wallUI.LayoutWallTiles(wallGenerated, currentWallTiles, currentWaitTiles, currentPhaseStatus == "discard");
             }
         }
         
@@ -546,6 +565,7 @@ namespace KillingMahjong.UI
                 // 3. Update internal tracking lists
                 if (localPlayer.hand != null) currentHandTiles = new List<int>(localPlayer.hand);
                 if (localPlayer.wall != null) currentWallTiles = new List<int>(localPlayer.wall);
+                if (localPlayer.wait != null) currentWaitTiles = new List<int>(localPlayer.wait);
                 
                 RebuildAllTilesFromState();
             }
@@ -566,6 +586,8 @@ namespace KillingMahjong.UI
                 waitUI.DisplayWaits(new List<int>(localPlayer.wait));
             }
             
+            currentPhaseStatus = state.status; // ★ 現在のフェーズを保存
+            
             // 4. Update Game Status Text
             string statusMsg = $"Round {state.round} - {state.honba} Honba\nTarget: {state.status}";
             if (state.current_player == localPlayerId)
@@ -573,9 +595,13 @@ namespace KillingMahjong.UI
             
             if (dialogueUI != null) dialogueUI.ShowText(statusMsg);
             
-            currentPhaseStatus = state.status; // ★ 現在のフェーズを保存
-            
             ClearSelection();
+
+            // 手牌のレイアウト更新 (コンテナ切り替えのため)
+            if (handUI != null)
+            {
+                handUI.UpdateLayout(currentPhaseStatus);
+            }
 
             // 5. Handle Phase Logic
             HandlePhaseVisibility(state.status, localPlayer);
