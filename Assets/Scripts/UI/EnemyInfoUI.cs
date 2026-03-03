@@ -8,6 +8,9 @@ namespace KillingMahjong.UI
         [Header("Enemy HP Display")]
         [SerializeField] private TextMeshProUGUI hpText;
         
+        [Header("Character Portrait")]
+        [SerializeField] private UnityEngine.UI.Image characterImage;
+
         [Header("Enemy Panel Settings")]
         [SerializeField] private GameObject enemyPanel; // 敵パネルの参照
 
@@ -25,6 +28,14 @@ namespace KillingMahjong.UI
             if (enemyPanel != null)
             {
                 enemyPanel.SetActive(visible);
+            }
+        }
+
+        public void SetCharacterSprite(Sprite sprite)
+        {
+            if (characterImage != null && sprite != null)
+            {
+                characterImage.sprite = sprite;
             }
         }
     }

@@ -26,6 +26,8 @@ namespace KillingMahjong.UI
 
         public void ShowText(string text)
         {
+            StopAllCoroutines(); // 既存の文字送り演出などがあれば即座にキャンセルする
+
             if (dialogueText != null)
                 dialogueText.text = text;
             

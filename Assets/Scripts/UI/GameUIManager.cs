@@ -25,6 +25,13 @@ namespace KillingMahjong.UI
         [SerializeField] private bool useDebugClient;
         [SerializeField] private KillingMahjong.Network.DebugWebSocketClient debugWebSocketClient;
 
+        [Header("Character Reactions")]
+        [SerializeField] private float reactionDelay = 0.8f; // 打牌宣言からリアクション開始までの遅延時間
+        
+        // --- 内部状態トラッキング用 ---
+        private int lastLocalDiscardsCount = 0;
+        private int lastEnemyDiscardsCount = 0;
+
         private void Start()
         {
             // Initialization if needed
@@ -579,6 +586,25 @@ namespace KillingMahjong.UI
             if (localPlayer.discards != null)
             {
                 if (riverUI != null) riverUI.SetRiver(new List<int>(localPlayer.discards));
+                
+                // --- 自分の打牌検知 ---
+                if (localPlayer.discards.Length > lastLocalDiscardsCount)
+                {
+                    int discardedTileId = localPlayer.discards[localPlayer.discards.Length - 1];
+                    OnTileDiscarded(discardedTileId, true);
+                }
+                lastLocalDiscardsCount = localPlayer.discards.Length;
+            }
+
+            // --- 敵の打牌検知 ---
+            if (enemyPlayer != null && enemyPlayer.discards != null)
+            {
+                if (enemyPlayer.discards.Length > lastEnemyDiscardsCount)
+                {
+                    int discardedTileId = enemyPlayer.discards[enemyPlayer.discards.Length - 1];
+                    OnTileDiscarded(discardedTileId, false);
+                }
+                lastEnemyDiscardsCount = enemyPlayer.discards.Length;
             }
 
             if (waitUI != null && localPlayer.wait != null)
@@ -605,6 +631,66 @@ namespace KillingMahjong.UI
 
             // 5. Handle Phase Logic
             HandlePhaseVisibility(state.status, localPlayer);
+        }
+
+        private void OnTileDiscarded(int tileId, bool isLocalPlayer)
+        {
+            // 打牌された牌の名前を取得
+            string tileName = new TileData(tileId).GetTileName();
+
+            if (!isLocalPlayer)
+            {
+                // 敵が打牌した場合：即座に打牌宣言テキストを表示し、現在再生中のテキストを中断する
+                if (dialogueUI != null)
+                {
+                    dialogueUI.ShowText($"【打牌】 {tileName}");
+                }
+            }
+            else
+            {
+                // プレイヤーの打牌時も表示したい場合はここに追加（例：「（あなたの打牌）{tileName}」）
+                // ひとまず仕様書通り、敵の打牌時のみ宣言とするか、両方か。今回は要件に合わせて敵を優先。
+            }
+
+            // リアクションがある場合、指定時間遅らせて表示するコルーチンを開始
+            StartCoroutine(HandleReactionDelay(tileId, isLocalPlayer));
+        }
+
+        private System.Collections.IEnumerator HandleReactionDelay(int tileId, bool isLocalPlayer)
+        {
+            // 指定時間待機
+            yield return new WaitForSeconds(reactionDelay);
+
+            // リアクションの有無を確認（今回は仮のデバッグ実装。後日スプレッドシートに基づく条件判定に差し替える）
+            // 例: 特定の牌(例: 發=32)が出た時のみ反応するなどのロジックを入れる場所
+            bool hasReaction = false;
+            string reactionText = "";
+            Sprite reactionSprite = null; // 本来はResources等から取得
+
+            /* --- 仮実装エリア --- */
+            hasReaction = true; // テスト用に常に反応させる
+            reactionText = isLocalPlayer ? $"「プレイヤーが牌を捨てたな…」" : $"「ターンエンドだ！」";
+            /* ------------------ */
+
+            if (hasReaction)
+            {
+                if (dialogueUI != null)
+                {
+                    dialogueUI.ShowText(reactionText);
+                }
+
+                // キャラクターの立ち絵（表情など）を変更
+                if (isLocalPlayer)
+                {
+                    // 敵が、プレイヤーの打牌に反応して表情を変える場合
+                    if (enemyInfoUI != null && reactionSprite != null) enemyInfoUI.SetCharacterSprite(reactionSprite);
+                }
+                else
+                {
+                    // プレイヤー側のキャラが、敵の打牌に反応して表情を変える場合
+                    if (playerInfoUI != null && reactionSprite != null) playerInfoUI.SetCharacterSprite(reactionSprite);
+                }
+            }
         }
 
         private void HandlePhaseVisibility(string status, PlayerStateData localPlayer)
