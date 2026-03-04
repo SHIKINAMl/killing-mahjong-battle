@@ -10,6 +10,8 @@ namespace KillingMahjong.UI
         [SerializeField] private HandUI handUI;
         [SerializeField] private WallUI wallUI;
         [SerializeField] private RiverUI riverUI;
+        [SerializeField] private EnemyHandUI enemyHandUI; // 追加: 敵の手牌UI
+        [SerializeField] private RiverUI enemyRiverUI;   // 追加: 敵の河UI
         [SerializeField] private WaitUI waitUI; // 追加: 待ち牌表示UI
         [SerializeField] private DialogueUI dialogueUI;
         [SerializeField] private PlayerInfoUI playerInfoUI; // プレイヤー自身のHP
@@ -24,6 +26,7 @@ namespace KillingMahjong.UI
         [Header("Debug Client")]
         [SerializeField] private bool useDebugClient;
         [SerializeField] private KillingMahjong.Network.DebugWebSocketClient debugWebSocketClient;
+        [SerializeField] private bool showEnemyHandDebug = true;
 
         [Header("Character Reactions")]
         [SerializeField] private float reactionDelay = 0.8f; // 打牌宣言からリアクション開始までの遅延時間
@@ -60,6 +63,8 @@ namespace KillingMahjong.UI
         
         private string currentPhaseStatus = "";
         public string CurrentPhaseStatus => currentPhaseStatus;
+
+        private System.Collections.Generic.List<int> currentEnemyHandTiles = new System.Collections.Generic.List<int>();
 
         public void InitializeGame(System.Collections.Generic.List<int> initialWall)
         {
@@ -413,6 +418,35 @@ namespace KillingMahjong.UI
                 // Pass generated tiles to WallUI for layout only
                 wallUI.LayoutWallTiles(wallGenerated, currentWallTiles, currentWaitTiles, currentPhaseStatus == "discard");
             }
+            // --- 3. Enemy HandUIの再構築 ---
+            if (enemyHandUI != null)
+            {
+                enemyHandUI.ClearHand();
+
+                // 敵の手牌データが届いていなくても、見た目上13枚生み出して配置する
+                int targetHandCount = 13;
+                List<int> tilesToSpawn = new List<int>(currentEnemyHandTiles);
+                while (tilesToSpawn.Count < targetHandCount)
+                {
+                    tilesToSpawn.Add(0); // 伏せ牌用のダミーID
+                }
+
+                foreach (var id in tilesToSpawn)
+                {
+                    GameObject obj = Instantiate(tilePrefab, transform); 
+                    RectTransform rt = obj.GetComponent<RectTransform>();
+                    if (rt == null) rt = obj.transform as RectTransform; 
+                    
+                    if (rt != null) {
+                        // プレイヤーのテストやデバッグ向けに敵の牌をすぐ見えるようにするオプション
+                        int visualId = showEnemyHandDebug ? id : 0;
+                        InitializeTileComponent(rt, visualId, false);
+                        
+                        // 敵専用のメソッドで「表示用のダミーID」と「後で公開するための本当のID」を両方渡す
+                        enemyHandUI.AddEnemyTile(rt, visualId, id);
+                    }
+                }
+            }
         }
         
         // Helper method to set up components freshly instantiated by GameUIManager
@@ -580,6 +614,7 @@ namespace KillingMahjong.UI
                 if (localPlayer.hand != null) currentHandTiles = new List<int>(localPlayer.hand);
                 if (localPlayer.wall != null) currentWallTiles = new List<int>(localPlayer.wall);
                 if (localPlayer.wait != null) currentWaitTiles = new List<int>(localPlayer.wait);
+                if (enemyPlayer != null && enemyPlayer.hand != null) currentEnemyHandTiles = new List<int>(enemyPlayer.hand);
                 
                 RebuildAllTilesFromState();
             }
@@ -588,6 +623,13 @@ namespace KillingMahjong.UI
             {
                 // 手牌フェイズ完了後、または打牌フェイズ中のデータ更新時は、差分のみをUIに反映する（ツモ・打牌のエフェクト）
                 SyncDiscardPhaseVisuals(localPlayer);
+                
+                // TODO: Sync enemy hand visuals if needed
+                if (enemyPlayer != null && enemyPlayer.hand != null)
+                {
+                    currentEnemyHandTiles = new List<int>(enemyPlayer.hand);
+                    // 簡易的な同期 (枚数が合わなければ再構築など)
+                }
             }
 
             if (localPlayer.discards != null)
@@ -606,6 +648,8 @@ namespace KillingMahjong.UI
             // --- 敵の打牌検知 ---
             if (enemyPlayer != null && enemyPlayer.discards != null)
             {
+                if (enemyRiverUI != null) enemyRiverUI.SetRiver(new List<int>(enemyPlayer.discards));
+
                 if (enemyPlayer.discards.Length > lastEnemyDiscardsCount)
                 {
                     int discardedTileId = enemyPlayer.discards[enemyPlayer.discards.Length - 1];
@@ -736,6 +780,14 @@ namespace KillingMahjong.UI
             if (riverUI != null)
             {
                 riverUI.gameObject.SetActive(status == "discard");
+            }
+            if (enemyRiverUI != null)
+            {
+                enemyRiverUI.gameObject.SetActive(status == "discard");
+            }
+            if (enemyHandUI != null)
+            {
+                enemyHandUI.gameObject.SetActive(status == "discard");
             }
 
             // HPの表示状態を更新（手牌選択中は非表示、対局中(discard等)は表示したい場合はここでオンオフ可能）

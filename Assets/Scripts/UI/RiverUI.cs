@@ -15,6 +15,9 @@ namespace KillingMahjong.UI
         [SerializeField] private float tileWidth = 50.0f;
         [SerializeField] private float tileHeight = 70.0f;
         [SerializeField] private int maxPerRow = 6;
+        [SerializeField] private bool isEnemyRiver = false; // 相手の河として扱う場合、180度回転させる
+        [SerializeField] private float enemyOffsetX = 350f; // 敵の河の位置手前寄せ調整X（ユーザー要望: 350）
+        [SerializeField] private float enemyOffsetY = -200f; // 敵の河の位置手前寄せ調整Y（ユーザー要望: -200）
 
         private List<Transform> discardedTiles = new List<Transform>();
 
@@ -35,8 +38,17 @@ namespace KillingMahjong.UI
             float targetX = col * tileWidth;
             float targetY = -row * tileHeight; 
             
+            // 敵の河の場合、並行方向も奥から手前、右から左へ反転させる
+            if (isEnemyRiver)
+            {
+                targetX = -targetX; // 左へ伸びる（相手視点での右から左）
+                targetY = -targetY; // 手前へ伸びる（相手視点での手前から奥）
+                
+                targetX += enemyOffsetX;
+                targetY += enemyOffsetY;
+            }
+
             obj.transform.localPosition = new Vector3(targetX, targetY, 0);
-            obj.transform.localRotation = Quaternion.identity;
             
             // UI上のRectTransformの場合はリセット
             RectTransform rt = obj.GetComponent<RectTransform>();
@@ -48,6 +60,21 @@ namespace KillingMahjong.UI
                 rt.pivot = new Vector2(0, 1);
                 rt.anchoredPosition = new Vector2(targetX, targetY);
                 rt.localScale = Vector3.one;
+
+                // 相手用の河として設定されているRiverUIであれば180度回転させる
+                if (isEnemyRiver)
+                {
+                    rt.localRotation = Quaternion.Euler(0, 0, 180f);
+                }
+                else
+                {
+                    rt.localRotation = Quaternion.identity;
+                }
+            }
+            else
+            {
+                // UIでない場合（3Dオブジェクト等）
+                obj.transform.localRotation = isEnemyRiver ? Quaternion.Euler(0, 0, 180f) : Quaternion.identity;
             }
 
             // Visual
