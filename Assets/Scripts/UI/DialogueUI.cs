@@ -13,14 +13,19 @@ namespace KillingMahjong.UI
 
         [Header("Log")]
         [SerializeField] private GameObject logPanel;
-        [SerializeField] private TextMeshProUGUI logText;
         [SerializeField] private Button toggleLogButton;
+        [SerializeField] private Button closeLogBackgroundButton; // 追加: 全画面背景のボタン
+        [SerializeField] private Transform logContainer; // 各ログを入れる親(ScrollRectのContentなど)
+        [SerializeField] private GameObject logItemPrefab; // 1つ1つのログを表示するプレハブ（TextやUI四角などを持つ）
 
         private List<string> dialogueHistory = new List<string>();
 
+        public bool IsLogOpen => logPanel != null && logPanel.activeSelf;
+
         private void Start()
         {
-            toggleLogButton.onClick.AddListener(ToggleLog);
+            if (toggleLogButton != null) toggleLogButton.onClick.AddListener(ToggleLog);
+            if (closeLogBackgroundButton != null) closeLogBackgroundButton.onClick.AddListener(CloseLog);
             logPanel.SetActive(false);
         }
 
@@ -38,15 +43,43 @@ namespace KillingMahjong.UI
         private void AddToLog(string text)
         {
             dialogueHistory.Add(text);
-            if (logText != null)
+            
+            if (logContainer != null && logItemPrefab != null)
             {
-                logText.text += text + "\n";
+                // 新しいログ枠（四角）を生成して配置
+                GameObject newLogItem = Instantiate(logItemPrefab, logContainer);
+                
+                // プレハブ内の TextMeshProUGUI を探してテキストをセットする
+                // 仮に直下に TextMeshProUGUI がある、あるいは子オブジェクトにある想定
+                TextMeshProUGUI tmp = newLogItem.GetComponentInChildren<TextMeshProUGUI>();
+                if (tmp != null)
+                {
+                    tmp.text = text;
+                }
             }
         }
 
         public void ToggleLog()
         {
-            logPanel.SetActive(!logPanel.activeSelf);
+            if (logPanel.activeSelf) CloseLog();
+            else OpenLog();
+        }
+
+        public void OpenLog()
+        {
+            logPanel.SetActive(true);
+        }
+
+        public void CloseLog()
+        {
+            logPanel.SetActive(false);
+
+            // ログが閉じられたら、GameUIManager側で止まっていたリアクションの消化を再開する
+            var uiManager = FindFirstObjectByType<GameUIManager>();
+            if (uiManager != null)
+            {
+                uiManager.ProcessNextReaction(); // 止まっていた場合、ここから再開される
+            }
         }
     }
 }

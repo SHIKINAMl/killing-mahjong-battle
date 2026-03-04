@@ -27,6 +27,7 @@ namespace KillingMahjong.UI
 
         [Header("Character Reactions")]
         [SerializeField] private float reactionDelay = 0.8f; // 打牌宣言からリアクション開始までの遅延時間
+        [SerializeField] private float reactionDisplayDuration = 2.0f; // リアクションを表示したまま待つ時間
         
         // --- 内部状態トラッキング用 ---
         private int lastLocalDiscardsCount = 0;
@@ -298,6 +299,9 @@ namespace KillingMahjong.UI
         {
             if (currentPhaseStatus != "discard") return;
             if (selectedTileIds.Count == 0) return;
+            
+            // ログ確認中は打牌を無効化する
+            if (dialogueUI != null && dialogueUI.IsLogOpen) return;
 
             int tileToDiscard = selectedTileIds[0];
             Debug.Log($"Discarding tile: {tileToDiscard}");
@@ -330,6 +334,9 @@ namespace KillingMahjong.UI
         public void CompleteHandSelection()
         {
             if (currentPhaseStatus != "hand_selection") return;
+            
+            // ログ確認中は無効化
+            if (dialogueUI != null && dialogueUI.IsLogOpen) return;
             
             Debug.Log("Hand Selection Complete! Transitioning to discard phase.");
             
@@ -619,7 +626,8 @@ namespace KillingMahjong.UI
             if (state.current_player == localPlayerId)
                 statusMsg += "\nYour Turn!";
             
-            if (dialogueUI != null) dialogueUI.ShowText(statusMsg);
+            // DialogueUIはセリフ専用にするためゲームの進行状況ロゴは出力しない
+            // if (dialogueUI != null) dialogueUI.ShowText(statusMsg);
             
             ClearSelection();
 
@@ -633,64 +641,93 @@ namespace KillingMahjong.UI
             HandlePhaseVisibility(state.status, localPlayer);
         }
 
+        // --- リアクション用キュー ---
+        private Queue<System.Action> reactionQueue = new Queue<System.Action>();
+        private bool isProcessingReactions = false;
+
         private void OnTileDiscarded(int tileId, bool isLocalPlayer)
         {
-            // 打牌された牌の名前を取得
-            string tileName = new TileData(tileId).GetTileName();
-
-            if (!isLocalPlayer)
+            reactionQueue.Enqueue(() => StartCoroutine(ProcessDiscardEvent(tileId, isLocalPlayer)));
+            if (!isProcessingReactions)
             {
-                // 敵が打牌した場合：即座に打牌宣言テキストを表示し、現在再生中のテキストを中断する
-                if (dialogueUI != null)
+                ProcessNextReaction();
+            }
+        }
+
+        public void ProcessNextReaction()
+        {
+            if (reactionQueue.Count > 0)
+            {
+                // ログが開かれている間はキューの消化を止める
+                if (dialogueUI != null && dialogueUI.IsLogOpen)
                 {
-                    dialogueUI.ShowText($"【打牌】 {tileName}");
+                    isProcessingReactions = false; // 止まっている状態
+                    return;
                 }
+
+                isProcessingReactions = true;
+                var action = reactionQueue.Dequeue();
+                action.Invoke();
             }
             else
             {
-                // プレイヤーの打牌時も表示したい場合はここに追加（例：「（あなたの打牌）{tileName}」）
-                // ひとまず仕様書通り、敵の打牌時のみ宣言とするか、両方か。今回は要件に合わせて敵を優先。
+                isProcessingReactions = false;
             }
-
-            // リアクションがある場合、指定時間遅らせて表示するコルーチンを開始
-            StartCoroutine(HandleReactionDelay(tileId, isLocalPlayer));
         }
 
-        private System.Collections.IEnumerator HandleReactionDelay(int tileId, bool isLocalPlayer)
+        private System.Collections.IEnumerator WaitWhileLogIsOpen(float duration)
         {
-            // 指定時間待機
-            yield return new WaitForSeconds(reactionDelay);
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                // ログが開いている間はタイマーを進めずに待機
+                if (dialogueUI != null && dialogueUI.IsLogOpen)
+                {
+                    yield return null;
+                    continue;
+                }
 
-            // リアクションの有無を確認（今回は仮のデバッグ実装。後日スプレッドシートに基づく条件判定に差し替える）
-            // 例: 特定の牌(例: 發=32)が出た時のみ反応するなどのロジックを入れる場所
-            bool hasReaction = false;
-            string reactionText = "";
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+        }
+
+        private System.Collections.IEnumerator ProcessDiscardEvent(int tileId, bool isLocalPlayer)
+        {
+            // 打牌された牌の名前を取得
+            string tileName = new TileData(tileId).GetTileName();
             Sprite reactionSprite = null; // 本来はResources等から取得
 
-            /* --- 仮実装エリア --- */
-            hasReaction = true; // テスト用に常に反応させる
-            reactionText = isLocalPlayer ? $"「プレイヤーが牌を捨てたな…」" : $"「ターンエンドだ！」";
-            /* ------------------ */
-
-            if (hasReaction)
+            if (isLocalPlayer)
             {
+                // プレイヤーの打牌：敵がそれに反応するのみ
                 if (dialogueUI != null)
                 {
-                    dialogueUI.ShowText(reactionText);
+                    dialogueUI.ShowText("「プレイヤーが何かを捨てたな…」");
                 }
-
-                // キャラクターの立ち絵（表情など）を変更
-                if (isLocalPlayer)
-                {
-                    // 敵が、プレイヤーの打牌に反応して表情を変える場合
-                    if (enemyInfoUI != null && reactionSprite != null) enemyInfoUI.SetCharacterSprite(reactionSprite);
-                }
-                else
-                {
-                    // プレイヤー側のキャラが、敵の打牌に反応して表情を変える場合
-                    if (playerInfoUI != null && reactionSprite != null) playerInfoUI.SetCharacterSprite(reactionSprite);
-                }
+                
+                // キャラクターの立ち絵を変更（プレイヤーの打牌への反応）
+                if (enemyInfoUI != null && reactionSprite != null) 
+                    enemyInfoUI.SetCharacterSprite(reactionSprite);
             }
+            else
+            {
+                // 敵の打牌：自身が打牌する宣言のみ
+                if (dialogueUI != null)
+                {
+                    dialogueUI.ShowText($"「{tileName}を切るわ！」");
+                }
+                
+                // 必要に応じてキャラクターの立ち絵も変更
+                if (enemyInfoUI != null && reactionSprite != null) 
+                    enemyInfoUI.SetCharacterSprite(reactionSprite);
+            }
+
+            // ログが開かれている間は時間のカウントを一時停止して待つ
+            yield return StartCoroutine(WaitWhileLogIsOpen(reactionDisplayDuration));
+
+            // 次のイベントへ
+            ProcessNextReaction();
         }
 
         private void HandlePhaseVisibility(string status, PlayerStateData localPlayer)
