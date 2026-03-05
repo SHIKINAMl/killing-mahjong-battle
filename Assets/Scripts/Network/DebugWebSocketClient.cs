@@ -112,7 +112,11 @@ namespace KillingMahjong.Network
                     // アニメーション（PhaseTransitionUI）が画面を覆う時間分だけ待機し、ファントムタイル現象を防ぎます
                     yield return new WaitForSeconds(3.5f);
                     
-                    // Transition to dealing -> hand_selection
+                    // エンジンから配牌データが届き、初期手牌が決定されるフェーズ
+                    SendMockGameState("dealing");
+                    yield return new WaitForSeconds(1.0f); // 少し待機
+                    
+                    // 配牌後、手牌選択フェーズへ移行
                     SendMockGameState("hand_selection");
                     break;
 
@@ -167,9 +171,25 @@ namespace KillingMahjong.Network
                         
                         // 宣言を見せるため少し待機時間を増やす
                         yield return new WaitForSeconds(1.0f);
+
+                        // ★ オートロン判定 (Auto-Ron Check)
+                        List<int> localWaits = CalculateSimpleWaits(mockLocalHand);
+                        if (localWaits.Contains(enemyDiscard))
+                        {
+                            Debug.Log($"[Debug Client] AUTO-RON TRIGGERED! Enemy discarded {enemyDiscard} which is a winning tile!");
+                            
+                            // 相手の打牌が手牌に追加される演出（GameUIManager.cs等で対応）用に保持するか、
+                            // そのまま agari ステータスとして送信する
+                            mockLocalHand.Add(enemyDiscard); // 上がった牌を手牌の最後に加える形にする
+                            
+                            // 少しだけ間を置いてロン演出へ（宣言が出た直後）
+                            yield return new WaitForSeconds(1.0f);
+                            SendMockGameState("agari", isEnemyTurn: false);
+                            yield break; // これ以降の処理（ターン遷移）は行わず終了
+                        }
                     }
 
-                    // 自分ターンに戻る（ツモは無いのでこのまま）
+                    // オートロンしなかった場合は、自分ターンに戻る（ツモは無いのでこのまま）
                     SendMockGameState("discard");
                     break;
 
@@ -240,6 +260,21 @@ namespace KillingMahjong.Network
                 waits.Add(3); // 4萬
             }
             return waits;
+        }
+
+        // --- Tester Context Menus for Ron ---
+        [ContextMenu("Test Ron (Player Win)")]
+        private void TriggerPlayerRon()
+        {
+            Debug.Log("[Debug Client] Triggering Player Ron Animation Test");
+            SendMockGameState("agari", isEnemyTurn: false);
+        }
+
+        [ContextMenu("Test Ron (Enemy Win)")]
+        private void TriggerEnemyRon()
+        {
+            Debug.Log("[Debug Client] Triggering Enemy Ron Animation Test");
+            SendMockGameState("agari", isEnemyTurn: true); 
         }
     }
 }

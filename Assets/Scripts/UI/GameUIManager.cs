@@ -20,8 +20,13 @@ namespace KillingMahjong.UI
         [SerializeField] private YakuListUI yakuListUI;
         [SerializeField] private BettingUI bettingUI;
         [SerializeField] private PhaseTransitionUI phaseTransitionUI;
+        [SerializeField] private RonAnimationUI ronAnimationUI; // 追加: ロン演出管理UI
         [SerializeField] private WebSocketGameClientSample webSocketClient;
         [SerializeField] private MatchmakingUI matchmakingUI;
+
+        [Header("Effects")]
+        [SerializeField] private GameObject victoryEffectPrefab;
+        [SerializeField] private GameObject damageEffectPrefab;
 
         [Header("Debug Client")]
         [SerializeField] private bool useDebugClient;
@@ -682,7 +687,7 @@ namespace KillingMahjong.UI
             }
 
             // 5. Handle Phase Logic
-            HandlePhaseVisibility(state.status, localPlayer);
+            HandlePhaseVisibility(state.status, localPlayer, enemyPlayer);
         }
 
         // --- リアクション用キュー ---
@@ -774,7 +779,7 @@ namespace KillingMahjong.UI
             ProcessNextReaction();
         }
 
-        private void HandlePhaseVisibility(string status, PlayerStateData localPlayer)
+        private void HandlePhaseVisibility(string status, PlayerStateData localPlayer, PlayerStateData enemyPlayer)
         {
             // デフォルトでriverUIは非表示にし、打牌(discard)フェーズのみ表示する
             if (riverUI != null)
@@ -816,12 +821,70 @@ namespace KillingMahjong.UI
                     if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(true);
                     if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(true);
                     break;
+                case "agari":
+                case "ron":
+                case "result":
+                    // ★ ロン（あがり）演出の開始
+                    if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(true);
+                    if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(true);
+                    
+                    if (ronAnimationUI != null)
+                    {
+                        // サーバーのGameState拡張により、実際の役リストや上がったプレイヤー情報が渡される想定ですが、
+                        // まずは「自分の手牌」か「敵の手牌」かを current_player（あるいは勝者フラグ）等で判定してアニメーションに渡します
+                        bool isLocalWin = (localPlayer != null); // TODO: 本来は勝者IDとlocalPlayerIdを比較する
+                        List<int> winningHand = isLocalWin ? new List<int>(localPlayer.hand) : new List<int>(enemyPlayer.hand);
+                        
+                        // 今回はテストとして仮データを渡してアニメーションを実行
+                        List<string> dummyYaku = new List<string> { "立直 (1飜)", "一発 (1飜)" };
+                        string dummyFormula = "30符 2飜";
+                        string dummyRank = "満貫";
+                        int dummyRonTile = winningHand.Count > 0 ? winningHand[winningHand.Count - 1] : 0; // 手牌の最後を仮に当たり牌とする
+                        
+                        // 川や会話ログはいったん隠す
+                        if (riverUI != null) riverUI.gameObject.SetActive(false);
+                        if (enemyRiverUI != null) enemyRiverUI.gameObject.SetActive(false);
+                        if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
+                        SetMatchUIVisibility(false); // 手牌や壁を隠してロン専用のオーバーレイを出す
+
+                        ronAnimationUI.PlayRonSequence(
+                            winningHand, 
+                            dummyRonTile, 
+                            dummyYaku, 
+                            dummyFormula, 
+                            dummyRank, 
+                            isLocalWin, 
+                            () => OnRonAnimationComplete(isLocalWin)
+                        );
+                    }
+                    break;
                 case "liquidation":
                     break;
                 default:
                     Debug.LogWarning($"Unknown phase status: {status}");
                     break;
             }
+        }
+        
+        private void OnRonAnimationComplete(bool isLocalWin)
+        {
+            // 演出終了後、エフェクトを再生する
+            if (isLocalWin)
+            {
+                if (victoryEffectPrefab != null && playerInfoUI != null) 
+                    Instantiate(victoryEffectPrefab, playerInfoUI.transform.position, Quaternion.identity);
+                if (damageEffectPrefab != null && enemyInfoUI != null) 
+                    Instantiate(damageEffectPrefab, enemyInfoUI.transform.position, Quaternion.identity);
+            }
+            else
+            {
+                if (victoryEffectPrefab != null && enemyInfoUI != null) 
+                    Instantiate(victoryEffectPrefab, enemyInfoUI.transform.position, Quaternion.identity);
+                if (damageEffectPrefab != null && playerInfoUI != null) 
+                    Instantiate(damageEffectPrefab, playerInfoUI.transform.position, Quaternion.identity);
+            }
+            
+            Debug.Log("Ron Animation and Effects Complete.");
         }
 
         private void StartBettingPhase(PlayerStateData localPlayer)
