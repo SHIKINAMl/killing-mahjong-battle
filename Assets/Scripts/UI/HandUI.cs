@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using System.Collections.Generic;
+using KillingMahjong.EngineData;
 
 namespace KillingMahjong.UI
 {
@@ -96,11 +97,11 @@ namespace KillingMahjong.UI
         {
             if (gameUIManager == null) return;
 
-            if (gameUIManager.CurrentPhaseStatus == "discard")
+            if (gameUIManager.CurrentPhaseStatus == RoundStatus.Discard)
             {
                 gameUIManager.DiscardSelectedTile();
             }
-            else if (gameUIManager.CurrentPhaseStatus == "hand_selection")
+            else if (gameUIManager.CurrentPhaseStatus == RoundStatus.HandSelection)
             {
                 Debug.Log($"Decide Clicked. Current Hand Count: {handSlots.Count}");
                 if (handSlots.Count == 13)

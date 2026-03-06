@@ -21,7 +21,6 @@ namespace KillingMahjong.UI
 
         private AbilityUI parentUI;
         private int abilityIndex;
-        private bool isSelected;
         private float currentScrollX;
         private float descriptionWidth;
         private float containerWidth;
@@ -67,13 +66,11 @@ namespace KillingMahjong.UI
 
         public void Select()
         {
-            isSelected = true;
             if (background != null) background.color = selectedColor;
         }
 
         public void Deselect()
         {
-            isSelected = false;
             if (background != null) background.color = normalColor;
         }
 

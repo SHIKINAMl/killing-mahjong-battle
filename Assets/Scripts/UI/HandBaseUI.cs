@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
+using KillingMahjong.EngineData;
 
 namespace KillingMahjong.UI
 {
@@ -61,7 +62,7 @@ namespace KillingMahjong.UI
             }
             else
             {
-                UpdateLayout(""); // Fallback
+                UpdateLayout(RoundStatus.None); // Fallback
             }
         }
 
@@ -79,11 +80,11 @@ namespace KillingMahjong.UI
             }
         }
 
-        public virtual void UpdateLayout(string phaseStatus)
+        public virtual void UpdateLayout(RoundStatus phaseStatus)
         {
             if (handSlotContainer == null) return;
             var layoutGroup = handSlotContainer.GetComponent<UnityEngine.UI.LayoutGroup>();
-            Transform activeContainer = (phaseStatus == "discard" && discardPhaseContainer != null) 
+            Transform activeContainer = (phaseStatus == RoundStatus.Discard && discardPhaseContainer != null) 
                                         ? discardPhaseContainer : handSlotContainer;
             
             if (discardPhaseContainer != null)
@@ -95,7 +96,7 @@ namespace KillingMahjong.UI
                 handSlotContainer.gameObject.SetActive(activeContainer == handSlotContainer);
             }
 
-            if (phaseStatus != "discard")
+            if (phaseStatus != RoundStatus.Discard)
             {
                 if (layoutGroup != null) layoutGroup.enabled = true;
                 

@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
+using KillingMahjong.EngineData;
 
 namespace KillingMahjong.UI
 {
@@ -29,7 +30,7 @@ namespace KillingMahjong.UI
 
         public void OnPointerClick(PointerEventData eventData)
         {
-            if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == "discard")
+            if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard)
             {
                 if (!IsInHand)
                 {
@@ -60,8 +61,8 @@ namespace KillingMahjong.UI
         public void OnBeginDrag(PointerEventData eventData)
         {
             if (eventData.button != PointerEventData.InputButton.Left) return;
-            if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == "discard") return;
-
+            if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard) return;
+            
             _originalPosition = transform.position;
             _originalParent = transform.parent;
             
@@ -79,7 +80,7 @@ namespace KillingMahjong.UI
         public void OnDrag(PointerEventData eventData)
         {
             if (eventData.button != PointerEventData.InputButton.Left) return;
-            if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == "discard") return;
+            if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard) return;
 
             // If Screen Space Overlay/Camera
             if (_rectTransform != null && _canvas != null)
@@ -102,7 +103,7 @@ namespace KillingMahjong.UI
         public void OnEndDrag(PointerEventData eventData)
         {
             if (eventData.button != PointerEventData.InputButton.Left) return;
-            if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == "discard") return;
+            if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard) return;
 
             _canvasGroup.blocksRaycasts = true;
 
@@ -147,7 +148,7 @@ namespace KillingMahjong.UI
 
         public void OnPointerEnter(PointerEventData eventData)
         {
-            if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == "discard" && !IsInHand)
+            if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard && !IsInHand)
             {
                 // Wallにある牌をホバーしたときに少し浮かせる（選択時よりは低め）
                 // ただし、既に選択されている場合はその高さを維持する
@@ -163,7 +164,7 @@ namespace KillingMahjong.UI
 
         public void OnPointerExit(PointerEventData eventData)
         {
-            if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == "discard" && !IsInHand)
+            if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard && !IsInHand)
             {
                 // ホバーが外れたら元の位置に戻す
                 if (!_gameUIManager.IsTileSelected(TileId))

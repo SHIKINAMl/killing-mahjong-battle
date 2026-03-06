@@ -20,8 +20,6 @@ namespace KillingMahjong.Network
         [Header("Mock Data Options")]
         public string localPlayerId = "player_local";
         public string enemyPlayerId = "enemy_bot";
-
-        private int currentRound = 1;
         
         // Mock State Variables
         private int localPlayerHp = 50000;
@@ -73,13 +71,13 @@ namespace KillingMahjong.Network
             yield return new WaitForSeconds(networkDelay * 2f);
 
             // "game_started"
-            gameUIManager.OnGameStarted();
+            SendMockMessage(new ServerMessageBase { type = "game_started" });
             Debug.Log("[Debug Client] Match found! Game started.");
 
             yield return new WaitForSeconds(networkDelay);
 
-            // "betting" state
-            SendMockGameState("betting");
+            // Wait HandSelection etc. are triggered via SendMockMessage explicitly from here on.
+            // Since Betting Phase is not the start anymore, we just send "game_started" and let the UI handle it.
         }
 
         // --- Handle Incoming Actions from Player ---
@@ -113,11 +111,8 @@ namespace KillingMahjong.Network
                     yield return new WaitForSeconds(3.5f);
                     
                     // エンジンから配牌データが届き、初期手牌が決定されるフェーズ
-                    SendMockGameState("dealing");
+                    SendMockWallDealt();
                     yield return new WaitForSeconds(1.0f); // 少し待機
-                    
-                    // 配牌後、手牌選択フェーズへ移行
-                    SendMockGameState("hand_selection");
                     break;
 
                 case "selected":
@@ -135,7 +130,7 @@ namespace KillingMahjong.Network
                     // したがってここでツモは行わない。
 
                     // Transition to discard phase for local player
-                    SendMockGameState("discard");
+                    SendMockHandSelected();
                     break;
 
                 case "discard":
@@ -153,8 +148,10 @@ namespace KillingMahjong.Network
                         }
                     }
 
+                    // To Simulate discard event we'd send a TurnDecided, but we just trigger the discard visually here
+                    gameUIManager.HandleDiscardEvent(payload.tile, true);
+
                     // Simulate enemy turn
-                    SendMockGameState("discard", isEnemyTurn: true);
                     yield return new WaitForSeconds(networkDelay * 2f);
                     
                     // Enemy discards a random tile from their wall
@@ -184,13 +181,13 @@ namespace KillingMahjong.Network
                             
                             // 少しだけ間を置いてロン演出へ（宣言が出た直後）
                             yield return new WaitForSeconds(1.0f);
-                            SendMockGameState("agari", isEnemyTurn: false);
+                            // TODO: Send proper agari JSON
                             yield break; // これ以降の処理（ターン遷移）は行わず終了
                         }
                     }
 
                     // オートロンしなかった場合は、自分ターンに戻る（ツモは無いのでこのまま）
-                    SendMockGameState("discard");
+                    // SendMockGameState(RoundStatus.Discard); -> 状態の送信ではなくTurnDecisionへ
                     break;
 
                 default:
@@ -199,54 +196,63 @@ namespace KillingMahjong.Network
             }
         }
 
-        // --- Mock State Generation ---
-        private void SendMockGameState(string status, bool isEnemyTurn = false)
+        // --- Mock JSON Generation ---
+        private void SendMockMessage<T>(T messageObj)
         {
-            GameStateData mockState = new GameStateData
-            {
-                status = status,
-                round = currentRound,
-                honba = 0,
-                dora_id = 15,
-                current_player = isEnemyTurn ? enemyPlayerId : localPlayerId,
-                players = new PlayerStateData[]
-                {
-                    GenerateMockLocalPlayer(status),
-                    GenerateMockEnemyPlayer(status)
-                }
-            };
-
-            string json = JsonUtility.ToJson(mockState);
-            Debug.Log($"[Debug Client] Applying Mock GameState: {status}");
+            string json = JsonUtility.ToJson(messageObj);
+            Debug.Log($"[Debug Client] Applying Mock Message: {json}");
             gameUIManager.ApplyGameStateFromJSON(json, localPlayerId);
         }
 
-        private PlayerStateData GenerateMockLocalPlayer(string status)
+        private void SendMockWallDealt()
         {
-            var p = new PlayerStateData
+            var msg = new WallDealtMessage
             {
-                id = localPlayerId,
-                health = localPlayerHp,
-                wall = mockLocalWall.ToArray(),
-                hand = mockLocalHand.ToArray(),
-                discards = mockLocalDiscards.ToArray(),
-                wait = CalculateSimpleWaits(mockLocalHand).ToArray()
+                type = "wall_dealt",
+                dora_id = 15,
+                hands = new WallDealtHand[]
+                {
+                    new WallDealtHand
+                    {
+                        client_id = localPlayerId,
+                        hand = mockLocalWall.ToArray(),
+                        tenpai_examples = new int[] {} // TODO: Generate dummy data if requested
+                    },
+                    new WallDealtHand
+                    {
+                        client_id = enemyPlayerId,
+                        hand = mockEnemyWall.ToArray(),
+                        tenpai_examples = new int[] {}
+                    }
+                }
             };
-
-            return p;
+            SendMockMessage(msg);
         }
-
-        private PlayerStateData GenerateMockEnemyPlayer(string status)
+        
+        private void SendMockHandSelected()
         {
-            return new PlayerStateData
+            var msg = new HandSelectedMessage
             {
-                id = enemyPlayerId,
-                health = enemyPlayerHp,
-                wall = mockEnemyWall.ToArray(),
-                hand = mockEnemyHand.ToArray(),
-                discards = mockEnemyDiscards.ToArray(),
-                wait = new int[] {} // 敵の待ちは表示しない
+                type = "hand_selected",
+                hands = new HandSelectedData[]
+                {
+                    new HandSelectedData
+                    {
+                        client_id = localPlayerId,
+                        hand = mockLocalHand.ToArray(),
+                        wall = mockLocalWall.ToArray(),
+                        wait = CalculateSimpleWaits(mockLocalHand).ToArray()
+                    },
+                    new HandSelectedData
+                    {
+                        client_id = enemyPlayerId,
+                        hand = mockEnemyHand.ToArray(),
+                        wall = mockEnemyWall.ToArray(),
+                        wait = new int[] {}
+                    }
+                }
             };
+            SendMockMessage(msg);
         }
 
         // --- Mock Utility: Simple Wait Calculation ---
@@ -267,14 +273,14 @@ namespace KillingMahjong.Network
         private void TriggerPlayerRon()
         {
             Debug.Log("[Debug Client] Triggering Player Ron Animation Test");
-            SendMockGameState("agari", isEnemyTurn: false);
+            // SendMockGameState(RoundStatus.Agari, isEnemyTurn: false);
         }
 
         [ContextMenu("Test Ron (Enemy Win)")]
         private void TriggerEnemyRon()
         {
             Debug.Log("[Debug Client] Triggering Enemy Ron Animation Test");
-            SendMockGameState("agari", isEnemyTurn: true); 
+            // SendMockGameState(RoundStatus.Agari, isEnemyTurn: true); 
         }
     }
 }

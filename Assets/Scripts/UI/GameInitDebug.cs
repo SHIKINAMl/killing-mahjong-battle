@@ -8,7 +8,6 @@ namespace KillingMahjong.UI
     public class GameInitDebug : MonoBehaviour
     {
         [SerializeField] private GameUIManager gameUIManager;
-        [SerializeField] private int initialCount = 29;
         
         [Header("Debug Controls")]
         [SerializeField] private Toggle debugBettingToggle; // UI Checkbox to test betting phase

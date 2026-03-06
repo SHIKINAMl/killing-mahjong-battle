@@ -47,6 +47,12 @@ namespace KillingMahjong.UI
             }
         }
 
+        public void Hide()
+        {
+            gameObject.SetActive(false);
+            ClearWaits();
+        }
+
         public void ClearWaits()
         {
             foreach (var t in activeWaitTiles)

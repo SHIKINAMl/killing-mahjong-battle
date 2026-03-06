@@ -1,6 +1,7 @@
 using UnityEngine;
 using System.Collections.Generic;
 using KillingMahjong.EngineData;
+using KillingMahjong.Managers;
 
 namespace KillingMahjong.UI
 {
@@ -34,12 +35,9 @@ namespace KillingMahjong.UI
         [SerializeField] private bool showEnemyHandDebug = true;
 
         [Header("Character Reactions")]
-        [SerializeField] private float reactionDelay = 0.8f; // 打牌宣言からリアクション開始までの遅延時間
         [SerializeField] private float reactionDisplayDuration = 2.0f; // リアクションを表示したまま待つ時間
         
         // --- 内部状態トラッキング用 ---
-        private int lastLocalDiscardsCount = 0;
-        private int lastEnemyDiscardsCount = 0;
 
         private void Start()
         {
@@ -66,8 +64,8 @@ namespace KillingMahjong.UI
         private System.Collections.Generic.List<int> currentWaitTiles = new System.Collections.Generic.List<int>();
         private System.Collections.Generic.List<int> selectedTileIds = new System.Collections.Generic.List<int>();
         
-        private string currentPhaseStatus = "";
-        public string CurrentPhaseStatus => currentPhaseStatus;
+        private RoundStatus currentPhaseStatus = RoundStatus.None;
+        public RoundStatus CurrentPhaseStatus => currentPhaseStatus;
 
         private System.Collections.Generic.List<int> currentEnemyHandTiles = new System.Collections.Generic.List<int>();
 
@@ -83,7 +81,7 @@ namespace KillingMahjong.UI
         public void MoveTileToHand(int tileId)
         {
             // 手牌選択フェイズでのみ移動を許可
-            if (currentPhaseStatus != "hand_selection") return;
+            if (currentPhaseStatus != RoundStatus.HandSelection) return;
 
             if (currentWallTiles.Contains(tileId))
             {
@@ -109,7 +107,7 @@ namespace KillingMahjong.UI
         public void MoveTileToWall(int tileId)
         {
             // 手牌選択フェイズでのみ移動を許可
-            if (currentPhaseStatus != "hand_selection") return;
+            if (currentPhaseStatus != RoundStatus.HandSelection) return;
 
             if (currentHandTiles.Contains(tileId))
             {
@@ -307,7 +305,7 @@ namespace KillingMahjong.UI
 
         public void DiscardSelectedTile()
         {
-            if (currentPhaseStatus != "discard") return;
+            if (currentPhaseStatus != RoundStatus.Discard) return;
             if (selectedTileIds.Count == 0) return;
             
             // ログ確認中は打牌を無効化する
@@ -343,7 +341,7 @@ namespace KillingMahjong.UI
 
         public void CompleteHandSelection()
         {
-            if (currentPhaseStatus != "hand_selection") return;
+            if (currentPhaseStatus != RoundStatus.HandSelection) return;
             
             // ログ確認中は無効化
             if (dialogueUI != null && dialogueUI.IsLogOpen) return;
@@ -421,7 +419,7 @@ namespace KillingMahjong.UI
                 }
 
                 // Pass generated tiles to WallUI for layout only
-                wallUI.LayoutWallTiles(wallGenerated, currentWallTiles, currentWaitTiles, currentPhaseStatus == "discard");
+                wallUI.LayoutWallTiles(wallGenerated, currentWallTiles, currentWaitTiles, currentPhaseStatus == RoundStatus.Discard);
             }
             // --- 3. Enemy HandUIの再構築 ---
             if (enemyHandUI != null)
@@ -511,16 +509,162 @@ namespace KillingMahjong.UI
         {
             try
             {
-                GameStateData state = JsonUtility.FromJson<GameStateData>(jsonString);
-                if (state != null)
+                ServerMessageBase baseMsg = JsonUtility.FromJson<ServerMessageBase>(jsonString);
+                if (baseMsg == null || string.IsNullOrEmpty(baseMsg.type))
                 {
-                    ApplyGameState(state, localPlayerId);
+                    Debug.LogWarning($"Unknown or empty JSON received: {jsonString}");
+                    return;
+                }
+
+                switch (baseMsg.type)
+                {
+                    case "matching_waiting":
+                        Debug.Log("[GameUIManager] Waiting for match...");
+                        break;
+
+                    case "game_started":
+                        Debug.Log("[GameUIManager] Game Started!");
+                        if (matchmakingUI != null) matchmakingUI.Hide();
+                        if (dialogueUI != null) 
+                        {
+                            dialogueUI.gameObject.SetActive(true);
+                            dialogueUI.ShowText("Match Found! Game Starting...");
+                        }
+                        UpdatePhaseStatus(RoundStatus.Dealing);
+                        break;
+
+                    case "wall_dealt":
+                        WallDealtMessage dealtMsg = JsonUtility.FromJson<WallDealtMessage>(jsonString);
+                        HandleWallDealt(dealtMsg, localPlayerId);
+                        break;
+
+                    case "hand_selected":
+                        HandSelectedMessage handMsg = JsonUtility.FromJson<HandSelectedMessage>(jsonString);
+                        HandleHandSelected(handMsg, localPlayerId);
+                        break;
+
+                    case "turn_decided":
+                        // TODO: Update which player is active
+                        UpdatePhaseStatus(RoundStatus.Discard);
+                        break;
+                        
+                    case "is_tenpai":
+                        IsTenpaiMessage tenpaiMsg = JsonUtility.FromJson<IsTenpaiMessage>(jsonString);
+                        if (tenpaiMsg != null && tenpaiMsg.data != null && tenpaiMsg.data.waits != null)
+                        {
+                            List<int> waitTiles = new List<int>();
+                            foreach (var wait in tenpaiMsg.data.waits)
+                            {
+                                waitTiles.Add(wait.tile);
+                            }
+                            if (waitUI != null) waitUI.DisplayWaits(waitTiles);
+                        }
+                        break;
+                        
+                    case "not_tenpai":
+                        if (waitUI != null) waitUI.Hide();
+                        break;
+
+                    case "error":
+                        ErrorMessage errorMsg = JsonUtility.FromJson<ErrorMessage>(jsonString);
+                        Debug.LogError($"[Server Error] {errorMsg?.message}");
+                        break;
+
+                    default:
+                        // Debug.Log($"[GameUIManager] Unhandled message type: {baseMsg.type}");
+                        break;
                 }
             }
             catch (System.Exception e)
             {
-                Debug.LogError($"Failed to parse GameStateData JSON: {e.Message}\nJSON:\n{jsonString}");
+                Debug.LogError($"Failed to parse JSON: {e.Message}\nJSON:\n{jsonString}");
             }
+        }
+        
+        private void UpdatePhaseStatus(RoundStatus newStatus)
+        {
+            currentPhaseStatus = newStatus;
+            if (PhaseManager.Instance != null)
+            {
+                PhaseManager.Instance.ChangeRoundStatus(newStatus);
+            }
+            
+            // 手牌のレイアウト更新 (コンテナ切り替えのため)
+            if (handUI != null)
+            {
+                handUI.UpdateLayout(currentPhaseStatus);
+            }
+            
+            // UI制御 (GameUIManagerのこれまでの処理を流用)
+            HandlePhaseVisibility(newStatus, null, null);
+        }
+        
+        private void HandleWallDealt(WallDealtMessage msg, string localPlayerId)
+        {
+            UpdatePhaseStatus(RoundStatus.HandSelection);
+            
+            if (msg.hands == null) return;
+            
+            foreach (var h in msg.hands)
+            {
+                if (h.client_id == localPlayerId)
+                {
+                    currentWallTiles = new List<int>(h.hand);
+                    currentHandTiles = new List<int>();
+                    
+                    // Display potential tenpai waits if any
+                    // サーバーから渡された h.tenpai_examples を使ってハイライト処理などをここに追加できます
+                    break;
+                }
+                else
+                {
+                    if (h.hand != null)
+                    {
+                        currentEnemyHandTiles = new List<int>(h.hand);
+                    }
+                }
+            }
+            
+            RebuildAllTilesFromState();
+            // We already call HandlePhaseVisibility within UpdatePhaseStatus
+        }
+
+        private void HandleHandSelected(HandSelectedMessage msg, string localPlayerId)
+        {
+            UpdatePhaseStatus(RoundStatus.Betting);
+            
+            if (msg.hands == null) return;
+            
+            foreach (var h in msg.hands)
+            {
+                if (h.client_id == localPlayerId)
+                {
+                    currentHandTiles = new List<int>(h.hand);
+                    currentWallTiles = new List<int>(h.wall);
+                    currentWaitTiles = new List<int>(h.wait);
+                    
+                    if (waitUI != null && currentWaitTiles != null)
+                    {
+                        waitUI.DisplayWaits(currentWaitTiles);
+                    }
+                    else if (waitUI != null)
+                    {
+                        waitUI.Hide();
+                    }
+                    break;
+                }
+                else
+                {
+                    if (h.hand != null)
+                    {
+                        currentEnemyHandTiles = new List<int>(h.hand);
+                    }
+                }
+            }
+            
+            RebuildAllTilesFromState();
+            ClearSelection();
+            // We already call HandlePhaseVisibility within UpdatePhaseStatus
         }
 
         // シリアライズ用の構造体を定義（JsonUtilityは匿名クラスをシリアライズできないため）
@@ -571,123 +715,14 @@ namespace KillingMahjong.UI
             await webSocketClient.SendAsync(json);
         }
 
-        public void ApplyGameState(GameStateData state, string localPlayerId)
+        // --- イベントベースに移行したため、フルデータ同期（ApplyGameState）は不要になります ---
+        // 打牌イベントなどの差分用処理のみを今後ここに追加します
+
+        public void HandleDiscardEvent(int discardedTileId, bool isLocalPlayer)
         {
-            // ゲーム開始（状態を受信）したので待機UIを消す
-            if (matchmakingUI != null) matchmakingUI.Hide();
-
-            // 1. Find Local Player & Enemy Player
-            PlayerStateData localPlayer = null;
-            PlayerStateData enemyPlayer = null;
-
-            if (state.players != null)
-            {
-                foreach (var p in state.players)
-                {
-                    if (p.id == localPlayerId)
-                    {
-                        localPlayer = p;
-                    }
-                    else
-                    {
-                        // 2人対戦前提なので、自分以外なら敵
-                        enemyPlayer = p;
-                    }
-                }
-            }
-
-            if (localPlayer == null)
-            {
-                Debug.LogWarning($"Local player {localPlayerId} not found in state data.");
-                return;
-            }
-
-            // 2. Update HP
-            if (playerInfoUI != null)
-            {
-                playerInfoUI.SetHP(localPlayer.health);
-            }
-            if (enemyPlayer != null && enemyInfoUI != null)
-            {
-                enemyInfoUI.SetHP(enemyPlayer.health);
-            }
-
-            // フルデータ受信時は再構築（手牌フェイズに入った初回のみ生成する）
-            if (currentPhaseStatus != "hand_selection" && state.status == "hand_selection")
-            {
-                // 3. Update internal tracking lists
-                if (localPlayer.hand != null) currentHandTiles = new List<int>(localPlayer.hand);
-                if (localPlayer.wall != null) currentWallTiles = new List<int>(localPlayer.wall);
-                if (localPlayer.wait != null) currentWaitTiles = new List<int>(localPlayer.wait);
-                if (enemyPlayer != null && enemyPlayer.hand != null) currentEnemyHandTiles = new List<int>(enemyPlayer.hand);
-                
-                RebuildAllTilesFromState();
-            }
-            else if (currentPhaseStatus == "discard" && state.status == "discard" || 
-                     currentPhaseStatus == "hand_selection" && state.status == "discard")
-            {
-                // 手牌フェイズ完了後、または打牌フェイズ中のデータ更新時は、差分のみをUIに反映する（ツモ・打牌のエフェクト）
-                SyncDiscardPhaseVisuals(localPlayer);
-                
-                // TODO: Sync enemy hand visuals if needed
-                if (enemyPlayer != null && enemyPlayer.hand != null)
-                {
-                    currentEnemyHandTiles = new List<int>(enemyPlayer.hand);
-                    // 簡易的な同期 (枚数が合わなければ再構築など)
-                }
-            }
-
-            if (localPlayer.discards != null)
-            {
-                if (riverUI != null) riverUI.SetRiver(new List<int>(localPlayer.discards));
-                
-                // --- 自分の打牌検知 ---
-                if (localPlayer.discards.Length > lastLocalDiscardsCount)
-                {
-                    int discardedTileId = localPlayer.discards[localPlayer.discards.Length - 1];
-                    OnTileDiscarded(discardedTileId, true);
-                }
-                lastLocalDiscardsCount = localPlayer.discards.Length;
-            }
-
-            // --- 敵の打牌検知 ---
-            if (enemyPlayer != null && enemyPlayer.discards != null)
-            {
-                if (enemyRiverUI != null) enemyRiverUI.SetRiver(new List<int>(enemyPlayer.discards));
-
-                if (enemyPlayer.discards.Length > lastEnemyDiscardsCount)
-                {
-                    int discardedTileId = enemyPlayer.discards[enemyPlayer.discards.Length - 1];
-                    OnTileDiscarded(discardedTileId, false);
-                }
-                lastEnemyDiscardsCount = enemyPlayer.discards.Length;
-            }
-
-            if (waitUI != null && localPlayer.wait != null)
-            {
-                waitUI.DisplayWaits(new List<int>(localPlayer.wait));
-            }
-            
-            currentPhaseStatus = state.status; // ★ 現在のフェーズを保存
-            
-            // 4. Update Game Status Text
-            string statusMsg = $"Round {state.round} - {state.honba} Honba\nTarget: {state.status}";
-            if (state.current_player == localPlayerId)
-                statusMsg += "\nYour Turn!";
-            
-            // DialogueUIはセリフ専用にするためゲームの進行状況ロゴは出力しない
-            // if (dialogueUI != null) dialogueUI.ShowText(statusMsg);
-            
-            ClearSelection();
-
-            // 手牌のレイアウト更新 (コンテナ切り替えのため)
-            if (handUI != null)
-            {
-                handUI.UpdateLayout(currentPhaseStatus);
-            }
-
-            // 5. Handle Phase Logic
-            HandlePhaseVisibility(state.status, localPlayer, enemyPlayer);
+            // 打牌が送信されたことを通知するイベントハンドラです
+            // TODO: ServerMessagesに DiscardMessage 用の定義を書き、それを受け取った時にこのメソッドを呼び出します。
+            OnTileDiscarded(discardedTileId, isLocalPlayer);
         }
 
         // --- リアクション用キュー ---
@@ -779,20 +814,20 @@ namespace KillingMahjong.UI
             ProcessNextReaction();
         }
 
-        private void HandlePhaseVisibility(string status, PlayerStateData localPlayer, PlayerStateData enemyPlayer)
+        private void HandlePhaseVisibility(RoundStatus status, int? localHealth = null, int? enemyHealth = null)
         {
             // デフォルトでriverUIは非表示にし、打牌(discard)フェーズのみ表示する
             if (riverUI != null)
             {
-                riverUI.gameObject.SetActive(status == "discard");
+                riverUI.gameObject.SetActive(status == RoundStatus.Discard);
             }
             if (enemyRiverUI != null)
             {
-                enemyRiverUI.gameObject.SetActive(status == "discard");
+                enemyRiverUI.gameObject.SetActive(status == RoundStatus.Discard);
             }
             if (enemyHandUI != null)
             {
-                enemyHandUI.gameObject.SetActive(status == "discard");
+                enemyHandUI.gameObject.SetActive(status == RoundStatus.Discard);
             }
 
             // HPの表示状態を更新（手牌選択中は非表示、対局中(discard等)は表示したい場合はここでオンオフ可能）
@@ -802,28 +837,28 @@ namespace KillingMahjong.UI
 
             switch (status)
             {
-                case "betting":
+                case RoundStatus.Betting:
                     // 賭けフェイズでは手牌などは消すが、敵のHPや立ち絵は表示する
                     SetMatchUIVisibility(false); 
                     if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(true);
                     
-                    StartBettingPhase(localPlayer);
+                    StartBettingPhase(localHealth ?? 20000);
                     break;
-                case "turn_decision":
-                case "dealing":
-                case "hand_selection":
+                case RoundStatus.TurnDecision:
+                case RoundStatus.Dealing:
+                case RoundStatus.HandSelection:
                     // トランジションが終わるまではMatchUI(= playerInfoUI含む)は非表示のままになるため、自動的に消えます。
                     // 敵の立ち絵・HPもここで非表示リストに含めます。
                     if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(false);
                     // 以降のフェーズ処理
                     break;
-                case "discard":
+                case RoundStatus.Discard:
                     if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(true);
                     if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(true);
                     break;
-                case "agari":
-                case "ron":
-                case "result":
+                case RoundStatus.Agari:
+                case RoundStatus.Ron:
+                case RoundStatus.Result:
                     // ★ ロン（あがり）演出の開始
                     if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(true);
                     if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(true);
@@ -832,8 +867,8 @@ namespace KillingMahjong.UI
                     {
                         // サーバーのGameState拡張により、実際の役リストや上がったプレイヤー情報が渡される想定ですが、
                         // まずは「自分の手牌」か「敵の手牌」かを current_player（あるいは勝者フラグ）等で判定してアニメーションに渡します
-                        bool isLocalWin = (localPlayer != null); // TODO: 本来は勝者IDとlocalPlayerIdを比較する
-                        List<int> winningHand = isLocalWin ? new List<int>(localPlayer.hand) : new List<int>(enemyPlayer.hand);
+                        bool isLocalWin = true; // TODO: Send proper isLocalWin flag from ServerMessage
+                        List<int> winningHand = isLocalWin ? new List<int>(currentHandTiles) : new List<int>(currentEnemyHandTiles);
                         
                         // 今回はテストとして仮データを渡してアニメーションを実行
                         List<string> dummyYaku = new List<string> { "立直 (1飜)", "一発 (1飜)" };
@@ -858,7 +893,7 @@ namespace KillingMahjong.UI
                         );
                     }
                     break;
-                case "liquidation":
+                case RoundStatus.Liquidation:
                     break;
                 default:
                     Debug.LogWarning($"Unknown phase status: {status}");
@@ -887,12 +922,12 @@ namespace KillingMahjong.UI
             Debug.Log("Ron Animation and Effects Complete.");
         }
 
-        private void StartBettingPhase(PlayerStateData localPlayer)
+        private void StartBettingPhase(int currentHealth)
         {
             if (bettingUI != null)
             {
-                Debug.Log($"Starting Betting Phase for {localPlayer.id}");
-                bettingUI.ShowBettingPhase(20000, localPlayer.health, OnBetConfirmed);
+                Debug.Log($"Starting Betting Phase with HP: {currentHealth}");
+                bettingUI.ShowBettingPhase(20000, currentHealth, OnBetConfirmed);
             }
             else
             {
