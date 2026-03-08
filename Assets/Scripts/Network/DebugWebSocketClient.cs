@@ -76,8 +76,9 @@ namespace KillingMahjong.Network
 
             yield return new WaitForSeconds(networkDelay);
 
-            // Wait HandSelection etc. are triggered via SendMockMessage explicitly from here on.
-            // Since Betting Phase is not the start anymore, we just send "game_started" and let the UI handle it.
+            // Automatically transition to HandSelection (Dealing) phase
+            Debug.Log("[Debug Client] Sending initial wall (Haipai)...");
+            SendMockWallDealt();
         }
 
         // --- Handle Incoming Actions from Player ---
@@ -110,8 +111,10 @@ namespace KillingMahjong.Network
                     // アニメーション（PhaseTransitionUI）が画面を覆う時間分だけ待機し、ファントムタイル現象を防ぎます
                     yield return new WaitForSeconds(3.5f);
                     
-                    // エンジンから配牌データが届き、初期手牌が決定されるフェーズ
-                    SendMockWallDealt();
+                    // ベッティング終了後、ターンの決定（打牌フェイズの開始）へ移行する
+                    Debug.Log("[Debug Client] Betting complete. Transitioning to TurnDecision.");
+                    SendMockMessage(new TurnDecidedMessage { type = "turn_decided", current_player = 0 });
+                    
                     yield return new WaitForSeconds(1.0f); // 少し待機
                     break;
 

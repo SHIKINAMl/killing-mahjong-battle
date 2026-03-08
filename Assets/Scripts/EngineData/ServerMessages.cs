@@ -106,4 +106,12 @@ namespace KillingMahjong.EngineData
         public bool mangan_or_more;
         public string[] yaku;
     }
+
+    [Serializable]
+    public class DiscardMessage
+    {
+        public string type;
+        public string client_id;
+        public int tile;
+    }
 }

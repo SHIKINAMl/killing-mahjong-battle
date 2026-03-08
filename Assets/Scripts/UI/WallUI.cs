@@ -35,8 +35,15 @@ namespace KillingMahjong.UI
             // コンテナ自体の位置をフェイズに応じて移動する
             if (wallContainer != null)
             {
-                wallContainer.localPosition = isDiscardPhase ? new Vector3(discardContainerPos.x, discardContainerPos.y, 0) 
-                                                             : new Vector3(normalContainerPos.x, normalContainerPos.y, 0);
+                if (wallContainer is RectTransform rectTransform)
+                {
+                    rectTransform.anchoredPosition = isDiscardPhase ? discardContainerPos : normalContainerPos;
+                }
+                else
+                {
+                    wallContainer.localPosition = isDiscardPhase ? new Vector3(discardContainerPos.x, discardContainerPos.y, 0) 
+                                                                 : new Vector3(normalContainerPos.x, normalContainerPos.y, 0);
+                }
             }
 
             // 1. Convert to TileData

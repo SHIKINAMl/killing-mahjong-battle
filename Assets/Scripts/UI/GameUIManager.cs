@@ -12,6 +12,7 @@ namespace KillingMahjong.UI
         [SerializeField] private WallUI wallUI;
         [SerializeField] private RiverUI riverUI;
         [SerializeField] private EnemyHandUI enemyHandUI; // 追加: 敵の手牌UI
+        [SerializeField] private EnemyWallUI enemyWallUI; // 追加: 敵の壁UI
         [SerializeField] private RiverUI enemyRiverUI;   // 追加: 敵の河UI
         [SerializeField] private WaitUI waitUI; // 追加: 待ち牌表示UI
         [SerializeField] private DialogueUI dialogueUI;
@@ -55,10 +56,13 @@ namespace KillingMahjong.UI
             // Initial setup logic
             if (handUI != null) handUI.Setup(this);
             if (wallUI != null) wallUI.Setup(this);
-            dialogueUI.ShowText("Game Start!");
+            if (enemyWallUI != null) enemyWallUI.Setup(this);
+            if (waitUI != null) waitUI.gameObject.SetActive(false);
+            if (dialogueUI != null) dialogueUI.ShowText("Game Start!");
         }
         
         // Data State
+        private bool isTransitioning = false;
         private System.Collections.Generic.List<int> currentHandTiles = new System.Collections.Generic.List<int>();
         private System.Collections.Generic.List<int> currentWallTiles = new System.Collections.Generic.List<int>();
         private System.Collections.Generic.List<int> currentWaitTiles = new System.Collections.Generic.List<int>();
@@ -68,11 +72,14 @@ namespace KillingMahjong.UI
         public RoundStatus CurrentPhaseStatus => currentPhaseStatus;
 
         private System.Collections.Generic.List<int> currentEnemyHandTiles = new System.Collections.Generic.List<int>();
+        private System.Collections.Generic.List<int> currentEnemyWallTiles = new System.Collections.Generic.List<int>();
 
         public void InitializeGame(System.Collections.Generic.List<int> initialWall)
         {
             currentWallTiles = new System.Collections.Generic.List<int>(initialWall);
             currentHandTiles.Clear();
+            currentEnemyHandTiles.Clear();
+            currentEnemyWallTiles.Clear();
             selectedTileIds.Clear();
             currentWaitTiles.Clear();
             RebuildAllTilesFromState();
@@ -138,6 +145,40 @@ namespace KillingMahjong.UI
                 }
             }
             ClearSelection();
+        }
+
+        public void SelectRandomHand()
+        {
+            if (currentPhaseStatus != RoundStatus.HandSelection) return;
+
+            // まず手牌を一度すべて壁に戻す（リセット）
+            // ループ中に要素を削除・移動するため、コピーリストを使用
+            List<int> currentHandCopy = new List<int>(currentHandTiles);
+            foreach (int id in currentHandCopy)
+            {
+                MoveTileToWall(id);
+            }
+
+            // ランダムに13個の牌を選ぶ
+            int tilesToPick = Mathf.Min(13, currentWallTiles.Count);
+            
+            // 一時的な壁リストを作成し、そこからランダムにピックしていく
+            List<int> tempWall = new List<int>(currentWallTiles);
+            List<int> targetIds = new List<int>();
+
+            for (int i = 0; i < tilesToPick; i++)
+            {
+                int randomIndex = UnityEngine.Random.Range(0, tempWall.Count);
+                int selectedId = tempWall[randomIndex];
+                targetIds.Add(selectedId);
+                tempWall.RemoveAt(randomIndex);
+            }
+
+            // 選択された牌をUIと内部データで手牌へ移動する
+            foreach (int id in targetIds)
+            {
+                MoveTileToHand(id);
+            }
         }
         
         private void MoveSelectedFiles(bool toHand)
@@ -450,6 +491,34 @@ namespace KillingMahjong.UI
                     }
                 }
             }
+
+            // --- 4. Enemy WallUIの再構築 ---
+            if (enemyWallUI != null)
+            {
+                // 一旦壁のTransformをすべて破棄
+                for (int i = enemyWallUI.GetEnemyWallSlots().Count - 1; i >= 0; i--)
+                {
+                    Transform t = enemyWallUI.GetEnemyWallSlots()[i];
+                    if (t != null) Destroy(t.gameObject);
+                }
+                enemyWallUI.GetEnemyWallSlots().Clear();
+
+                List<RectTransform> enemyWallGenerated = new List<RectTransform>();
+                foreach (var id in currentEnemyWallTiles)
+                {
+                    GameObject obj = Instantiate(tilePrefab, transform);
+                    RectTransform rt = obj.GetComponent<RectTransform>();
+                    if (rt == null) rt = obj.transform as RectTransform;
+
+                    if (rt != null) {
+                        InitializeTileComponent(rt, id, false);
+                        enemyWallGenerated.Add(rt);
+                    }
+                }
+
+                // Pass generated tiles to EnemyWallUI for layout
+                enemyWallUI.LayoutEnemyWallTiles(enemyWallGenerated, currentEnemyWallTiles, currentPhaseStatus == RoundStatus.Discard);
+            }
         }
         
         // Helper method to set up components freshly instantiated by GameUIManager
@@ -488,9 +557,20 @@ namespace KillingMahjong.UI
             }
             
             // その他のUI構造を待機中は非表示にする
-            SetMatchUIVisibility(false);
+            SetMatchUIVisibility(false); // Hand, Wall, YakuListなどを隠す
+            
             if (riverUI != null) riverUI.gameObject.SetActive(false);
+            if (enemyRiverUI != null) enemyRiverUI.gameObject.SetActive(false);
+            if (enemyHandUI != null) enemyHandUI.gameObject.SetActive(false);
+            if (waitUI != null) waitUI.gameObject.SetActive(false);
             if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
+            
+            // HPパネル等も確実に非表示
+            if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(false);
+            if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(false);
+            
+            // BettingUIも見えてしまわないように隠す
+            if (bettingUI != null) bettingUI.HideBettingPhase();
         }
 
         public void OnGameStarted()
@@ -552,22 +632,34 @@ namespace KillingMahjong.UI
                         IsTenpaiMessage tenpaiMsg = JsonUtility.FromJson<IsTenpaiMessage>(jsonString);
                         if (tenpaiMsg != null && tenpaiMsg.data != null && tenpaiMsg.data.waits != null)
                         {
-                            List<int> waitTiles = new List<int>();
+                            currentWaitTiles.Clear();
                             foreach (var wait in tenpaiMsg.data.waits)
                             {
-                                waitTiles.Add(wait.tile);
+                                currentWaitTiles.Add(wait.tile);
                             }
-                            if (waitUI != null) waitUI.DisplayWaits(waitTiles);
+                            if (waitUI != null && currentPhaseStatus == RoundStatus.Discard) 
+                                waitUI.DisplayWaits(currentWaitTiles);
                         }
                         break;
                         
                     case "not_tenpai":
+                        currentWaitTiles.Clear();
                         if (waitUI != null) waitUI.Hide();
                         break;
 
                     case "error":
                         ErrorMessage errorMsg = JsonUtility.FromJson<ErrorMessage>(jsonString);
                         Debug.LogError($"[Server Error] {errorMsg?.message}");
+                        break;
+                        
+                    case "discard":
+                        DiscardMessage discardMsg = JsonUtility.FromJson<DiscardMessage>(jsonString);
+                        if (discardMsg != null)
+                        {
+                            bool isLocal = (discardMsg.client_id == localPlayerId);
+                            // イベントをトリガーしてUIやアニメーションを連動
+                            HandleDiscardEvent(discardMsg.tile, isLocal);
+                        }
                         break;
 
                     default:
@@ -594,6 +686,17 @@ namespace KillingMahjong.UI
             {
                 handUI.UpdateLayout(currentPhaseStatus);
             }
+
+            // 壁のレイアウト更新 (打牌フェイズへの移行などのため)
+            if (wallUI != null)
+            {
+                List<RectTransform> remainingTiles = new List<RectTransform>();
+                foreach (var st in wallUI.GetWallSlots())
+                {
+                    if (st != null) remainingTiles.Add(st);
+                }
+                wallUI.LayoutWallTiles(remainingTiles, currentWallTiles, currentWaitTiles, currentPhaseStatus == RoundStatus.Discard);
+            }
             
             // UI制御 (GameUIManagerのこれまでの処理を流用)
             HandlePhaseVisibility(newStatus, null, null);
@@ -614,13 +717,13 @@ namespace KillingMahjong.UI
                     
                     // Display potential tenpai waits if any
                     // サーバーから渡された h.tenpai_examples を使ってハイライト処理などをここに追加できます
-                    break;
                 }
                 else
                 {
                     if (h.hand != null)
                     {
-                        currentEnemyHandTiles = new List<int>(h.hand);
+                        currentEnemyWallTiles = new List<int>(h.hand);
+                        currentEnemyHandTiles = new List<int>();
                     }
                 }
             }
@@ -642,22 +745,16 @@ namespace KillingMahjong.UI
                     currentHandTiles = new List<int>(h.hand);
                     currentWallTiles = new List<int>(h.wall);
                     currentWaitTiles = new List<int>(h.wait);
-                    
-                    if (waitUI != null && currentWaitTiles != null)
-                    {
-                        waitUI.DisplayWaits(currentWaitTiles);
-                    }
-                    else if (waitUI != null)
-                    {
-                        waitUI.Hide();
-                    }
-                    break;
                 }
                 else
                 {
                     if (h.hand != null)
                     {
                         currentEnemyHandTiles = new List<int>(h.hand);
+                        if (h.wall != null)
+                        {
+                            currentEnemyWallTiles = new List<int>(h.wall);
+                        }
                     }
                 }
             }
@@ -722,6 +819,63 @@ namespace KillingMahjong.UI
         {
             // 打牌が送信されたことを通知するイベントハンドラです
             // TODO: ServerMessagesに DiscardMessage 用の定義を書き、それを受け取った時にこのメソッドを呼び出します。
+            
+            // 1. UIの表示を更新: Wallから削除しRiverへ追加
+            if (isLocalPlayer)
+            {
+                if (currentWallTiles.Contains(discardedTileId))
+                {
+                    currentWallTiles.Remove(discardedTileId);
+                }
+
+                if (wallUI != null)
+                {
+                    // WallSlotsから取り出し、ゲームオブジェクトを破棄（RiverUIは新規生成するため）
+                    RectTransform tileRt = wallUI.GrabTile(discardedTileId);
+                    if (tileRt != null)
+                    {
+                        Destroy(tileRt.gameObject);
+                    }
+                    
+                    // 隙間を詰めるなどの再レイアウト
+                    List<RectTransform> remainingTiles = new List<RectTransform>();
+                    foreach (var st in wallUI.GetWallSlots())
+                    {
+                        if (st != null) remainingTiles.Add(st);
+                    }
+                    wallUI.LayoutWallTiles(remainingTiles, currentWallTiles, currentWaitTiles, currentPhaseStatus == RoundStatus.Discard);
+                }
+
+                if (riverUI != null)
+                {
+                    riverUI.AddTile(discardedTileId);
+                }
+            }
+            else
+            {
+                if (currentEnemyWallTiles.Count > 0)
+                {
+                    // 先頭の牌を削除（ランダムまたは順番に消費）
+                    currentEnemyWallTiles.RemoveAt(0);
+                }
+
+                if (enemyWallUI != null)
+                {
+                    // 敵の壁から1枚取り除く
+                    RectTransform tileRt = enemyWallUI.GrabEnemyTile();
+                    if (tileRt != null)
+                    {
+                        Destroy(tileRt.gameObject);
+                    }
+                }
+
+                if (enemyRiverUI != null)
+                {
+                    enemyRiverUI.AddTile(discardedTileId);
+                }
+            }
+
+            // 2. キャラクターのアニメーションや会話を再生
             OnTileDiscarded(discardedTileId, isLocalPlayer);
         }
 
@@ -816,6 +970,8 @@ namespace KillingMahjong.UI
 
         private void HandlePhaseVisibility(RoundStatus status, int? localHealth = null, int? enemyHealth = null)
         {
+            if (isTransitioning) return; // トランジション中は画面表示を強制上書きしない
+
             // デフォルトでriverUIは非表示にし、打牌(discard)フェーズのみ表示する
             if (riverUI != null)
             {
@@ -838,23 +994,44 @@ namespace KillingMahjong.UI
             switch (status)
             {
                 case RoundStatus.Betting:
-                    // 賭けフェイズでは手牌などは消すが、敵のHPや立ち絵は表示する
+                    // 賭けフェイズでは手牌などは消すが、敵のHPや立ち絵は表示する。自分のHPは非表示にする。
                     SetMatchUIVisibility(false); 
                     if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(true);
+                    if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(false);
+                    if (waitUI != null) waitUI.gameObject.SetActive(false); // 待ち牌UIを非表示
                     
                     StartBettingPhase(localHealth ?? 20000);
                     break;
-                case RoundStatus.TurnDecision:
                 case RoundStatus.Dealing:
                 case RoundStatus.HandSelection:
-                    // トランジションが終わるまではMatchUI(= playerInfoUI含む)は非表示のままになるため、自動的に消えます。
-                    // 敵の立ち絵・HPもここで非表示リストに含めます。
+                    // 手牌選択フェイズでは手牌・壁、および自分・敵のHPパネルを表示する
+                    SetMatchUIVisibility(true);
+                    
+                    if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(true);
+                    if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(true);
+                    if (waitUI != null) waitUI.gameObject.SetActive(false); // 待ち牌UIを非表示
+                    break;
+                case RoundStatus.TurnDecision:
+                    // トランジション中（掛け金→打牌移行時）、敵も自分もHP（パネル全体）を非表示にする
                     if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(false);
-                    // 以降のフェーズ処理
+                    if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(false);
+                    if (waitUI != null) waitUI.gameObject.SetActive(false); // 待ち牌UIを非表示
                     break;
                 case RoundStatus.Discard:
+                    // 打牌フェイズでは自分の手牌UI自体は表示し、内部のコンテナ切り替えで打牌用レイアウトを見せる
+                    if (handUI != null) handUI.gameObject.SetActive(true);
+                    // 自分の壁UIは表示したままとし、打牌用配置になっていることを保証する
+                    if (wallUI != null) wallUI.gameObject.SetActive(true);
+                    
                     if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(true);
                     if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(true);
+                    
+                    // 打牌フェイズに入ったら、待ち牌がある場合のみ表示する
+                    if (waitUI != null && currentWaitTiles != null && currentWaitTiles.Count > 0)
+                    {
+                        waitUI.gameObject.SetActive(true);
+                        waitUI.DisplayWaits(currentWaitTiles);
+                    }
                     break;
                 case RoundStatus.Agari:
                 case RoundStatus.Ron:
@@ -944,13 +1121,20 @@ namespace KillingMahjong.UI
             
             // playerInfoUI(Enemy HP) は Transition 中〜手牌選択前などで非表示にしたい場合、ここでコントロールされます。
             // visible == false なら確実に消えます。
-            if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(visible); 
-
-            // Bettingフェーズで固有に呼び出されるため、SetMatchUIVisibility自体ではEnemyPanelはいったん何もしないか、あるいは一括で消す。
-            // 今回は Transition のアニメーション側からフェーズ判定抜きで表示コントロールされる可能性があるので連動させます。
-            if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(visible); 
-
+            // ※ここではHPの表示を個別で制御するため、SetMatchUIVisibility から playerInfoUI, enemyInfoUI の個別の制御を外します。
+            
             if (yakuListUI != null) yakuListUI.gameObject.SetActive(visible);
+            
+            // 待ち牌表示も打牌フェイズ以外では消すベースとし、特定のフェーズ（基本Discard）のみ表示したい場合
+            // ここで一旦手牌フェイズ・掛け金フェイズに合わせて消しておく（表示されるかは後続の処理次第）
+            if (waitUI != null && currentWaitTiles != null && currentWaitTiles.Count > 0)
+            {
+                // Discardフェーズの時は内容に応じて残し、それ以外の一時不可視（Transition等）の場合は隠す
+                if (!visible)
+                {
+                    waitUI.gameObject.SetActive(false);
+                }
+            }
             
             // DialogueUI (enemy comments) and BettingUI remain active
         }
@@ -977,6 +1161,11 @@ namespace KillingMahjong.UI
              if (phaseTransitionUI != null)
              {
                  Debug.Log("Triggering Phase Transition Animation.");
+                 isTransitioning = true;
+                 
+                 // トランジション（移行時）なので、HPパネルを自分も敵も非表示にする
+                 if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(false);
+                 if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(false);
                  
                  // 画面に横線が入る瞬間で敵の会話UIが消えるようにする
                  if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
@@ -992,16 +1181,15 @@ namespace KillingMahjong.UI
                     },
                     onComplete: () => {
                          Debug.Log("Transition Complete, Match Phase begins.");
+                         isTransitioning = false;
                          
-                         // トランジションが終了したら「対局画面（MatchUI）」のUI要素を表示するが、
-                         // 今回のご要望として「HP表示などは、特定のフェーズまで非表示にしたい」かによって対応が変わります。
-                         // ここでは HandUI / WallUI などを復帰させます。
+                         // トランジションが終了したら「対局画面（MatchUI）」のUI要素を表示する
                          SetMatchUIVisibility(true); 
                          
-                         // riverUIはdiscardフェーズ限定なので強制的に非表示にしておく
-                         if (riverUI != null) riverUI.gameObject.SetActive(false);
+                         // トランジション中に送られてきた最新のフェーズ（打牌フェイズ等）に合わせて表示状態を反映する
+                         HandlePhaseVisibility(currentPhaseStatus);
                          
-                         // 対局（手牌フェイズ）が始まったら会話UIを出す
+                         // 対局（打牌フェイズ）が始まったら会話UIを出す
                          if (dialogueUI != null) dialogueUI.gameObject.SetActive(true);
 
                          // 仮のフェーズ直書きを削除し、サーバーからの `{"type": "game_state"}` 待機とする

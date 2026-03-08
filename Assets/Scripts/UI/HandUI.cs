@@ -117,8 +117,11 @@ namespace KillingMahjong.UI
 
         private void OnAutoManganClicked()
         {
-            Debug.Log("Auto Mangan Clicked");
-            // Notify Game logic to auto-complete hand
+            Debug.Log("Auto Random Hand Clicked");
+            if (gameUIManager != null && gameUIManager.CurrentPhaseStatus == RoundStatus.HandSelection)
+            {
+                gameUIManager.SelectRandomHand();
+            }
         }
         public bool IsPointInHandArea(Vector2 screenPoint)
         {
