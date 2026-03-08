@@ -198,7 +198,9 @@ namespace KillingMahjong.Network
                             
                             // 少しだけ間を置いてロン演出へ（宣言が出た直後）
                             yield return new WaitForSeconds(1.0f);
-                            // TODO: Send proper agari JSON
+                            
+                            // "agari" イベントを送信
+                            SendMockMessage(new ServerMessageBase { type = "agari" });
                             yield break; // これ以降の処理（ターン遷移）は行わず終了
                         }
                     }
@@ -232,14 +234,14 @@ namespace KillingMahjong.Network
                     new WallDealtHand
                     {
                         client_id = localPlayerId,
-                        hand = mockLocalWall.ToArray(),
-                        tenpai_examples = new int[] {} // TODO: Generate dummy data if requested
+                        hand = new List<int>(mockLocalWall),
+                        tenpai_examples = new List<int[]>() // TODO: Generate dummy data if requested
                     },
                     new WallDealtHand
                     {
                         client_id = enemyPlayerId,
-                        hand = mockEnemyWall.ToArray(),
-                        tenpai_examples = new int[] {}
+                        hand = new List<int>(mockEnemyWall),
+                        tenpai_examples = new List<int[]>()
                     }
                 }
             };
@@ -277,10 +279,13 @@ namespace KillingMahjong.Network
         private List<int> CalculateSimpleWaits(List<int> hand)
         {
             List<int> waits = new List<int>();
-            if (hand.Count == 13) // 手牌が13枚揃っている時だけ待ちを表示する
+            if (hand.Count >= 13) // 手牌が13枚以上揃っている時だけ待ちを表示する
             {
-                waits.Add(0); // 1萬
-                waits.Add(3); // 4萬
+                // テスト用：全ての牌（0〜33）を待ち牌とする
+                for (int i = 0; i < 34; i++)
+                {
+                    waits.Add(i);
+                }
             }
             return waits;
         }

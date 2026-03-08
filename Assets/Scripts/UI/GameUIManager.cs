@@ -147,6 +147,36 @@ namespace KillingMahjong.UI
             ClearSelection();
         }
 
+        private List<int[]> currentTenpaiExamples = new List<int[]>();
+
+        public void SelectManganHand()
+        {
+            if (currentPhaseStatus != RoundStatus.HandSelection) return;
+            if (currentTenpaiExamples == null || currentTenpaiExamples.Count == 0)
+            {
+                Debug.LogWarning("No tenpai examples available. Falling back to random hand.");
+                SelectRandomHand();
+                return;
+            }
+
+            // まず手牌を一度すべて壁に戻す（リセット）
+            List<int> currentHandCopy = new List<int>(currentHandTiles);
+            foreach (int id in currentHandCopy)
+            {
+                MoveTileToWall(id);
+            }
+
+            // tenpai_examples の中からランダムに1つの形（13枚）を選ぶ
+            int exampleIndex = UnityEngine.Random.Range(0, currentTenpaiExamples.Count);
+            int[] targetHand = currentTenpaiExamples[exampleIndex];
+            
+            // 選ばれた13枚のIDを手牌へ移動する
+            foreach (int id in targetHand)
+            {
+                MoveTileToHand(id);
+            }
+        }
+
         public void SelectRandomHand()
         {
             if (currentPhaseStatus != RoundStatus.HandSelection) return;
@@ -477,11 +507,11 @@ namespace KillingMahjong.UI
                     if (rt == null) rt = obj.transform as RectTransform; 
                     
                     if (rt != null) {
-                        // wallから選ばれた表示のまま（ダミーの裏面にしない）
-                        int visualId = id;
+                        // デバッグフラグがONの場合のみ実際のIDで表示。通常は裏向き(0)
+                        int visualId = showEnemyHandDebug ? id : 0;
                         InitializeTileComponent(rt, visualId, false);
                         
-                        // 敵専用のメソッドへ追加
+                        // 敵専用のメソッドへ追加（realIdに本来のIDを渡す）
                         enemyHandUI.AddEnemyTile(rt, visualId, id);
                     }
                 }
@@ -506,7 +536,9 @@ namespace KillingMahjong.UI
                     if (rt == null) rt = obj.transform as RectTransform;
 
                     if (rt != null) {
-                        InitializeTileComponent(rt, id, false);
+                        // 相手の壁牌は裏向き(0)で表示する
+                        int visualId = showEnemyHandDebug ? id : 0;
+                        InitializeTileComponent(rt, visualId, false);
                         enemyWallGenerated.Add(rt);
                     }
                 }
@@ -595,6 +627,7 @@ namespace KillingMahjong.UI
                 {
                     case "matching_waiting":
                         Debug.Log("[GameUIManager] Waiting for match...");
+                        ShowMatchmakingWaiting();
                         break;
 
                     case "game_started":
@@ -608,9 +641,18 @@ namespace KillingMahjong.UI
                         UpdatePhaseStatus(RoundStatus.Dealing);
                         break;
 
+                    case "bet":
+                        Debug.Log("[GameUIManager] Betting complete for both players. Starting animation...");
+                        // サーバーからのレスポンス形式が確定するまで、一旦ダミー値を入れてエラーを解消します
+                        OnBettingCompleteFromServer(2000, 2000, 50000, 50000);
+                        break;
+
                     case "wall_dealt":
+                        Debug.Log($"[GameUIManager] parsing wall_dealt: {jsonString}");
                         WallDealtMessage dealtMsg = JsonUtility.FromJson<WallDealtMessage>(jsonString);
-                        HandleWallDealt(dealtMsg, localPlayerId);
+                        // tenpai_examplesはJsonUtilityでデシリアライズできないため手動パースする
+                        List<List<int>> tenpaiExamplesForLocal = ParseTenpaiExamplesFromJson(jsonString, localPlayerId);
+                        HandleWallDealt(dealtMsg, localPlayerId, tenpaiExamplesForLocal);
                         break;
 
                     case "hand_selected":
@@ -656,6 +698,11 @@ namespace KillingMahjong.UI
                             HandleDiscardEvent(discardMsg.tile, isLocal);
                         }
                         break;
+                        
+                    case "agari":
+                        // ロンやツモの上がりイベント
+                        UpdatePhaseStatus(RoundStatus.Agari);
+                        break;
 
                     default:
                         // Debug.Log($"[GameUIManager] Unhandled message type: {baseMsg.type}");
@@ -697,21 +744,37 @@ namespace KillingMahjong.UI
             HandlePhaseVisibility(newStatus, null, null);
         }
         
-        private void HandleWallDealt(WallDealtMessage msg, string localPlayerId)
+        private void HandleWallDealt(WallDealtMessage msg, string localPlayerId, List<List<int>> tenpaiExamples = null)
         {
             UpdatePhaseStatus(RoundStatus.HandSelection);
             
-            if (msg.hands == null) return;
+            if (msg.hands == null)
+            {
+                Debug.LogWarning("[HandleWallDealt] msg.hands is null!");
+                return;
+            }
             
+            Debug.Log($"[HandleWallDealt] myClientId='{localPlayerId}', hands count={msg.hands.Length}");
             foreach (var h in msg.hands)
             {
+                Debug.Log($"[HandleWallDealt] checking h.client_id='{h.client_id}' == localPlayerId='{localPlayerId}' => {h.client_id == localPlayerId}");
                 if (h.client_id == localPlayerId)
                 {
                     currentWallTiles = new List<int>(h.hand);
                     currentHandTiles = new List<int>();
+                    Debug.Log($"[HandleWallDealt] => 自分のWall ({currentWallTiles.Count}枚) をセット");
                     
-                    // Display potential tenpai waits if any
-                    // サーバーから渡された h.tenpai_examples を使ってハイライト処理などをここに追加できます
+                    // 手動パースされた tenpai_examples を使用
+                    if (tenpaiExamples != null && tenpaiExamples.Count > 0)
+                    {
+                        currentTenpaiExamples = tenpaiExamples.ConvertAll(e => e.ToArray());
+                        Debug.Log($"[HandleWallDealt] tenpai_examples: {currentTenpaiExamples.Count}形");
+                    }
+                    else
+                    {
+                        currentTenpaiExamples.Clear();
+                        Debug.LogWarning("[HandleWallDealt] tenpai_examplesが空です");
+                    }
                 }
                 else
                 {
@@ -719,27 +782,34 @@ namespace KillingMahjong.UI
                     {
                         currentEnemyWallTiles = new List<int>(h.hand);
                         currentEnemyHandTiles = new List<int>();
+                        Debug.Log($"[HandleWallDealt] => 相手({h.client_id})のWall ({currentEnemyWallTiles.Count}枚) をセット");
                     }
                 }
             }
             
             RebuildAllTilesFromState();
-            // We already call HandlePhaseVisibility within UpdatePhaseStatus
         }
 
         private void HandleHandSelected(HandSelectedMessage msg, string localPlayerId)
         {
             UpdatePhaseStatus(RoundStatus.Betting);
             
-            if (msg.hands == null) return;
+            if (msg.hands == null)
+            {
+                Debug.LogWarning("[HandleHandSelected] msg.hands is null!");
+                return;
+            }
             
+            Debug.Log($"[HandleHandSelected] myClientId='{localPlayerId}', hands count={msg.hands.Length}");
             foreach (var h in msg.hands)
             {
+                Debug.Log($"[HandleHandSelected] checking h.client_id='{h.client_id}' == localPlayerId='{localPlayerId}' => {h.client_id == localPlayerId}");
                 if (h.client_id == localPlayerId)
                 {
                     currentHandTiles = new List<int>(h.hand);
                     currentWallTiles = new List<int>(h.wall);
                     currentWaitTiles = new List<int>(h.wait);
+                    Debug.Log($"[HandleHandSelected] => 自分のHand ({currentHandTiles.Count}枚), Wall ({currentWallTiles.Count}枚) をセット");
                 }
                 else
                 {
@@ -750,6 +820,7 @@ namespace KillingMahjong.UI
                         {
                             currentEnemyWallTiles = new List<int>(h.wall);
                         }
+                        Debug.Log($"[HandleHandSelected] => 相手({h.client_id})のHand ({currentEnemyHandTiles.Count}枚) をセット");
                     }
                 }
             }
@@ -780,6 +851,86 @@ namespace KillingMahjong.UI
             public int amount;
             public List<int> hand;
             public int tile; // For discard, etc.
+        }
+
+        /// <summary>
+        /// wall_dealt JSONから指定client_idのtenpai_examplesを手動パースして取得する。
+        /// JsonUtilityはList&lt;int[]&gt;(ネストした配列)をデシリアライズできないため必要。
+        /// </summary>
+        private List<List<int>> ParseTenpaiExamplesFromJson(string jsonString, string targetClientId)
+        {
+            var result = new List<List<int>>();
+            try
+            {
+                // "hands" の中から targetClientId のブロックを探す
+                // JSONは {"type":"wall_dealt","hands":[{"client_id":"C0001","hand":[...],"tenpai_examples":[[...],[...]]},...],...}
+                int handsStart = jsonString.IndexOf("\"hands\"");
+                if (handsStart < 0) return result;
+
+                // client_idを持つブロックを探す
+                int searchFrom = handsStart;
+                while (true)
+                {
+                    int cidStart = jsonString.IndexOf("\"client_id\"", searchFrom);
+                    if (cidStart < 0) break;
+
+                    // client_idの値を取得
+                    int valStart = jsonString.IndexOf('"', cidStart + 11) + 1;
+                    int valEnd = jsonString.IndexOf('"', valStart);
+                    if (valStart < 0 || valEnd < 0) break;
+                    string cid = jsonString.Substring(valStart, valEnd - valStart);
+
+                    if (cid == targetClientId)
+                    {
+                        // tenpai_examplesを探す
+                        int tenpaiKey = jsonString.IndexOf("\"tenpai_examples\"", valEnd);
+                        if (tenpaiKey < 0) break;
+
+                        int arrStart = jsonString.IndexOf('[', tenpaiKey + 17);
+                        if (arrStart < 0) break;
+
+                        // 外側の [ を見つけてその中の各 [ ] を個別に取り出す
+                        int depth = 0;
+                        int innerStart = -1;
+                        for (int i = arrStart; i < jsonString.Length; i++)
+                        {
+                            if (jsonString[i] == '[')
+                            {
+                                depth++;
+                                if (depth == 2) innerStart = i;
+                            }
+                            else if (jsonString[i] == ']')
+                            {
+                                if (depth == 2 && innerStart >= 0)
+                                {
+                                    // [innerStart, i] が1つの手牌例
+                                    string inner = jsonString.Substring(innerStart + 1, i - innerStart - 1);
+                                    var hand = new List<int>();
+                                    foreach (var token in inner.Split(','))
+                                    {
+                                        if (int.TryParse(token.Trim(), out int val))
+                                            hand.Add(val);
+                                    }
+                                    if (hand.Count > 0) result.Add(hand);
+                                    innerStart = -1;
+                                }
+                                depth--;
+                                if (depth == 0) break;
+                            }
+                        }
+                        break; // 対象のclient_idが見つかったので終了
+                    }
+
+                    searchFrom = valEnd + 1;
+                }
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"[ParseTenpaiExamples] パースエラー: {e.Message}");
+            }
+
+            Debug.Log($"[ParseTenpaiExamples] client_id='{targetClientId}' -> {result.Count}形の聴牌例を取得");
+            return result;
         }
 
         // Helper string sending method targeting Network
@@ -1080,6 +1231,7 @@ namespace KillingMahjong.UI
                         if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
                         SetMatchUIVisibility(false); // 手牌や壁を隠してロン専用のオーバーレイを出す
 
+                        ronAnimationUI.gameObject.SetActive(true); // Coroutineを実行するためアクティブ化
                         ronAnimationUI.PlayRonSequence(
                             winningHand, 
                             dummyRonTile, 

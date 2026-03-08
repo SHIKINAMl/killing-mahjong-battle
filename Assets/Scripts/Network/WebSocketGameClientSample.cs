@@ -250,65 +250,18 @@ public class WebSocketGameClientSample : MonoBehaviour
 
             if (msg == null || string.IsNullOrEmpty(msg.type)) return;
 
-            switch (msg.type)
+            if (msg.type == "connected")
             {
-                case "connected":
-                    myClientId = msg.data.client_id;
-                    Log($"[WebSocket] Connection confirmed! Client ID: {myClientId}");
-                    // "join" を送信してマッチングキューに入る
-                    await SendAsync("{\"type\":\"join\"}");
-                    break;
-                case "matchmaking_state":
-                case "matching_waiting":
-                    // 待機中 UIを表示する
-                    Log("[WebSocket] In matchmaking queue, waiting for opponents...");
-                    if (gameUIManager != null)
-                    {
-                        gameUIManager.ShowMatchmakingWaiting();
-                    }
-                    break;
-                case "game_started":
-                    Log("[WebSocket] Match found! Game started.");
-                    if (gameUIManager != null)
-                    {
-                        gameUIManager.OnGameStarted();
-                    }
-                    break;
-                case "bet":
-                    Log("[WebSocket] Betting complete for both players. Starting animation...");
-                    if (gameUIManager != null)
-                    {
-                        // サーバーからのレスポンス形式が確定するまで、一旦ダミー値を入れてエラーを解消します
-                        gameUIManager.OnBettingCompleteFromServer(2000, 2000, 50000, 50000);
-                    }
-                    break;
-                case "game_state":
-                    if (gameUIManager != null)
-                    {
-                        // `state`オブジェクトの中身を取り出して文字列化し直すか、
-                        // サーバーから送られてくるフォーマットに合わせて処理します。
-                        // 今回はサーバーからのJSON構成に厳密に合わせるため、 raw JSON を直接投げるか再構築します。
-                        // Pythonエンジンの `get_game_state()` に合わせる必要があります。
-                        
-                        // NOTE: もし Pythonエンジン側が {"type":"game_state", "data": {"status":...}} 
-                        // と返すのであれば、下記のようにパースします。
-                        string stateJson = JsonUtility.ToJson(msg.data); 
-                        gameUIManager.ApplyGameStateFromJSON(stateJson, myClientId);
-                    }
-                    break;
-                case "error":
-                    Debug.LogError($"[WebSocket] Error from server: {msg.message}");
-                    break;
-                default:
-                    // fallback parse direct GameState
-                    if (raw.Contains("\"status\"") && raw.Contains("\"players\"") && raw.Contains("\"health\""))
-                    {
-                        if (gameUIManager != null)
-                        {
-                            gameUIManager.ApplyGameStateFromJSON(raw, myClientId);
-                        }
-                    }
-                    break;
+                myClientId = msg.data.client_id;
+                Log($"[WebSocket] Connection confirmed! Client ID: {myClientId}");
+                // "join" を送信してマッチングキューに入る
+                await SendAsync("{\"type\":\"join\"}");
+            }
+
+            // Route all messages to GameUIManager for phase updates and UI logic
+            if (gameUIManager != null)
+            {
+                gameUIManager.ApplyGameStateFromJSON(raw, myClientId);
             }
         }
         catch (Exception ex)

@@ -40,12 +40,19 @@ namespace KillingMahjong.EngineData
         public int dora_id;
         public WallDealtHand[] hands;
     }
+    // JsonUtilityはネストした配列をデシリアライズできないためラッパークラスを使用する
+    [Serializable]
+    public class IntArray
+    {
+        public int[] items;
+    }
+
     [Serializable]
     public class WallDealtHand
     {
         public string client_id;
-        public int[] hand;
-        public int[] tenpai_examples;
+        public List<int> hand;
+        public List<IntArray> tenpai_examples;
     }
 
     [Serializable]

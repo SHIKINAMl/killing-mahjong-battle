@@ -10,6 +10,7 @@ namespace KillingMahjong.UI
     {
         [Header("UI Containers")]
         [SerializeField] private GameObject ronPanel; // The full-screen/modal panel for Ron
+        [SerializeField] private GameObject yakuBackgroundPanel; // The panel containing hand/yaku info (役パネル)
         
         [Header("Step 1: Cut-in")]
         [SerializeField] private GameObject cutInContainer;
@@ -22,6 +23,17 @@ namespace KillingMahjong.UI
         [SerializeField] private RectTransform ronTileSlot; // Separate slot visually decoupled but conceptually part of hand
         [SerializeField] private GameObject tilePrefab;
         [SerializeField] private TileResourceManager tileResourceManager;
+
+        [Header("Hand Display Positions & Scales")]
+        [SerializeField] private Vector2 playerHandPosition = new Vector2(0, -200f);
+        [SerializeField] private Vector3 playerHandScale = new Vector3(1.5f, 1.5f, 1f);
+        [SerializeField] private Vector2 playerRonTilePosition = new Vector2(400f, -200f);
+        [SerializeField] private Vector3 playerRonTileScale = new Vector3(1.5f, 1.5f, 1f);
+        
+        [SerializeField] private Vector2 enemyHandPosition = new Vector2(0, 200f);
+        [SerializeField] private Vector3 enemyHandScale = new Vector3(1.5f, 1.5f, 1f);
+        [SerializeField] private Vector2 enemyRonTilePosition = new Vector2(-400f, 200f);
+        [SerializeField] private Vector3 enemyRonTileScale = new Vector3(1.5f, 1.5f, 1f);
         
         [Header("Step 3: Yaku Display")]
         [SerializeField] private GameObject yakuContainer;
@@ -57,6 +69,7 @@ namespace KillingMahjong.UI
 
         private void ResetVisuals()
         {
+            if (yakuBackgroundPanel != null) yakuBackgroundPanel.SetActive(false);
             if (cutInContainer != null) cutInContainer.SetActive(false);
             if (handDisplayContainer != null) handDisplayContainer.SetActive(false);
             if (yakuContainer != null) yakuContainer.SetActive(false);
@@ -108,17 +121,43 @@ namespace KillingMahjong.UI
 
             // --- Step 2: Hand and Ron Tile Display ---
             Debug.Log("[RonAnimation] Step 2: Hand Display");
+            
+            // Cut-in演出が終わったので、役パネル（背景等）を表示する
+            if (yakuBackgroundPanel != null) yakuBackgroundPanel.SetActive(true);
+
             if (handDisplayContainer != null)
             {
                 handDisplayContainer.SetActive(true);
                 
+                // 選択された基準位置・スケールを取得
+                Vector2 baseHandPos = isLocalPlayerWin ? playerHandPosition : enemyHandPosition;
+                Vector3 baseHandScale = isLocalPlayerWin ? playerHandScale : enemyHandScale;
+                Vector2 ronPos = isLocalPlayerWin ? playerRonTilePosition : enemyRonTilePosition;
+                Vector3 ronScale = isLocalPlayerWin ? playerRonTileScale : enemyRonTileScale;
+                
+                // 横並び配置のためのベース変数 (例: 中心位置からタイル幅*スケール分ずらして並べる)
+                float tileWidth = 50f; // RiverUI等から持ってきたり適宜設定
+                
                 // 手牌の生成
                 if (tilePrefab != null && tileResourceManager != null)
                 {
-                    foreach (int tileId in handTiles)
+                    // 中心揃えにするため、全体の横幅を計算して初期Xオフセットを決定（中心基準のanchoredPositionとして配置）
+                    int handCount = handTiles.Count;
+                    float totalWidth = (handCount - 1) * (tileWidth * baseHandScale.x);
+                    float startX = baseHandPos.x - (totalWidth / 2f);
+
+                    for (int i = 0; i < handCount; i++)
                     {
                         GameObject obj = Instantiate(tilePrefab, handTilesParent);
-                        InitializeTileVisual(obj, tileId);
+                        InitializeTileVisual(obj, handTiles[i]);
+                        
+                        RectTransform rt = obj.GetComponent<RectTransform>();
+                        if (rt != null)
+                        {
+                            rt.localScale = baseHandScale;
+                            float targetX = startX + (i * tileWidth * baseHandScale.x);
+                            rt.anchoredPosition = new Vector2(targetX, baseHandPos.y);
+                        }
                     }
                     
                     // アガリ牌（ロン牌）の生成
@@ -126,6 +165,13 @@ namespace KillingMahjong.UI
                     {
                         GameObject obj = Instantiate(tilePrefab, ronTileSlot);
                         InitializeTileVisual(obj, ronTile);
+                        
+                        RectTransform rt = obj.GetComponent<RectTransform>();
+                        if (rt != null)
+                        {
+                            rt.localScale = ronScale;
+                            rt.anchoredPosition = new Vector2(ronPos.x, ronPos.y);
+                        }
                         
                         // ここでロン側の牌に「エフェクト」をアタッチ・再生させることも可能です。
                         // PlayRonTileVfx(obj.transform);

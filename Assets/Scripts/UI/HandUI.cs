@@ -117,10 +117,10 @@ namespace KillingMahjong.UI
 
         private void OnAutoManganClicked()
         {
-            Debug.Log("Auto Random Hand Clicked");
+            Debug.Log("Auto Mangan Hand Clicked");
             if (gameUIManager != null && gameUIManager.CurrentPhaseStatus == RoundStatus.HandSelection)
             {
-                gameUIManager.SelectRandomHand();
+                gameUIManager.SelectManganHand();
             }
         }
         public bool IsPointInHandArea(Vector2 screenPoint)
