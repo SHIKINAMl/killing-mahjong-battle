@@ -99,6 +99,16 @@ namespace KillingMahjong.UI
                 autoDialogueCoroutine = null;
             }
 
+            if (!gameObject.activeInHierarchy)
+            {
+                // すでに非アクティブなら、コルーチンを回さずにそのまま終了
+                if (hpBarPanel != null)
+                {
+                    hpBarPanel.anchoredPosition = hiddenPos;
+                }
+                return;
+            }
+
             if (hpBarPanel != null)
             {
                 StopAllCoroutines();

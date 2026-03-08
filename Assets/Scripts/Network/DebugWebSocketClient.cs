@@ -128,6 +128,17 @@ namespace KillingMahjong.Network
                         }
                     }
 
+                    // ====== 敵の手牌ランダム取得 ======
+                    if (mockEnemyHand.Count == 0 && mockEnemyWall.Count >= 13)
+                    {
+                        for (int i = 0; i < 13; i++)
+                        {
+                            int r = UnityEngine.Random.Range(0, mockEnemyWall.Count);
+                            mockEnemyHand.Add(mockEnemyWall[r]);
+                            mockEnemyWall.RemoveAt(r);
+                        }
+                    }
+
                     // ====== 本ゲーム特有ルール ======
                     // ツモ無し。13枚の手牌を決めたら、以後は残りの「壁（Wall）」21枚から選んで打牌する。
                     // したがってここでツモは行わない。
@@ -171,6 +182,9 @@ namespace KillingMahjong.Network
                         
                         // 宣言を見せるため少し待機時間を増やす
                         yield return new WaitForSeconds(1.0f);
+
+                        // ここでゲームUI側に敵が打牌したことを伝える（これがないと画面上で動かない）
+                        gameUIManager.HandleDiscardEvent(enemyDiscard, false);
 
                         // ★ オートロン判定 (Auto-Ron Check)
                         List<int> localWaits = CalculateSimpleWaits(mockLocalHand);

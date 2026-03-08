@@ -54,10 +54,10 @@ namespace KillingMahjong.UI
                 slot.localPosition = finalPos;
                 
                 // Keep it facedown
-                slot.localRotation = Quaternion.Euler(0, 0, 180f);
+                slot.localRotation = Quaternion.identity;
 
                 enemyWallSlots.Add(slot);
-                slot.gameObject.SetActive(isDiscardPhase);
+                slot.gameObject.SetActive(true);
 
                 currentSlot++;
             }

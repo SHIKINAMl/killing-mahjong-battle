@@ -21,62 +21,37 @@ namespace KillingMahjong.UI
 
         private List<Transform> discardedTiles = new List<Transform>();
 
+        // 既存のタイル(Wallなどから)をRiverに入れるための新しいメソッド
+        public void AddExistingTile(RectTransform rt, int tileId)
+        {
+            if (rt == null || riverContainer == null) return;
+            
+            rt.SetParent(riverContainer, true);
+            rt.SetAsLastSibling();
+
+            ApplyRiverLayout(rt);
+
+            // Visual Setup
+            TileVisual visual = rt.GetComponent<TileVisual>();
+            if (visual != null && tileResourceManager != null)
+            {
+                visual.SetTile(tileId, tileResourceManager.GetTileSprite(tileId));
+            }
+
+            discardedTiles.Add(rt);
+            UpdateTurnText();
+        }
+
         public void AddTile(int tileId)
         {
             if (tilePrefab == null || riverContainer == null) return;
 
             GameObject obj = Instantiate(tilePrefab, riverContainer);
-            
-            // Layout Logic (6 tiles per row)
-            int index = discardedTiles.Count;
-            
-            // 3行（18枚）を超過した場合は3行目の末尾に重ねる等の対処も可能だが、
-            // 現状は4行目以降もそのまま下に伸びるようにする
-            int row = index / maxPerRow;
-            int col = index % maxPerRow;
-
-            float targetX = col * tileWidth;
-            float targetY = -row * tileHeight; 
-            
-            // 敵の河の場合、並行方向も奥から手前、右から左へ反転させる
-            if (isEnemyRiver)
-            {
-                targetX = -targetX; // 左へ伸びる（相手視点での右から左）
-                targetY = -targetY; // 手前へ伸びる（相手視点での手前から奥）
-                
-                targetX += enemyOffsetX;
-                targetY += enemyOffsetY;
-            }
-
-            obj.transform.localPosition = new Vector3(targetX, targetY, 0);
-            
-            // UI上のRectTransformの場合はリセット
             RectTransform rt = obj.GetComponent<RectTransform>();
-            if (rt != null)
-            {
-                // 左上基準などにしている場合は環境に合わせる（親コンテナの左上にAnchorを置く前提）
-                rt.anchorMin = new Vector2(0, 1);
-                rt.anchorMax = new Vector2(0, 1);
-                rt.pivot = new Vector2(0, 1);
-                rt.anchoredPosition = new Vector2(targetX, targetY);
-                rt.localScale = Vector3.one;
+            if (rt == null) rt = obj.transform as RectTransform;
 
-                // 相手用の河として設定されているRiverUIであれば180度回転させる
-                if (isEnemyRiver)
-                {
-                    rt.localRotation = Quaternion.Euler(0, 0, 180f);
-                }
-                else
-                {
-                    rt.localRotation = Quaternion.identity;
-                }
-            }
-            else
-            {
-                // UIでない場合（3Dオブジェクト等）
-                obj.transform.localRotation = isEnemyRiver ? Quaternion.Euler(0, 0, 180f) : Quaternion.identity;
-            }
-
+            ApplyRiverLayout(rt);
+            
             // Visual
             TileVisual visual = obj.GetComponent<TileVisual>();
             if (visual != null && tileResourceManager != null)
@@ -86,6 +61,43 @@ namespace KillingMahjong.UI
 
             discardedTiles.Add(obj.transform);
             UpdateTurnText();
+        }
+
+        private void ApplyRiverLayout(RectTransform rt)
+        {
+            int index = discardedTiles.Count;
+            int row = index / maxPerRow;
+            int col = index % maxPerRow;
+
+            float targetX = col * tileWidth;
+            float targetY = -row * tileHeight; 
+            
+            if (isEnemyRiver)
+            {
+                targetX = -targetX;
+                targetY = -targetY;
+                
+                targetX += enemyOffsetX;
+                targetY += enemyOffsetY;
+            }
+
+            if (rt != null)
+            {
+                rt.anchorMin = new Vector2(0, 1);
+                rt.anchorMax = new Vector2(0, 1);
+                rt.pivot = new Vector2(0, 1);
+                rt.anchoredPosition = new Vector2(targetX, targetY);
+                rt.localScale = Vector3.one;
+
+                if (isEnemyRiver)
+                {
+                    rt.localRotation = Quaternion.Euler(0, 0, 180f);
+                }
+                else
+                {
+                    rt.localRotation = Quaternion.identity;
+                }
+            }
         }
 
         private void UpdateTurnText()

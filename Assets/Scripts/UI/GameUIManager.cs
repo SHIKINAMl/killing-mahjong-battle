@@ -467,13 +467,8 @@ namespace KillingMahjong.UI
             {
                 enemyHandUI.ClearHand();
 
-                // 敵の手牌データが届いていなくても、見た目上13枚生み出して配置する
-                int targetHandCount = 13;
+                // サーバーから13枚の手牌データが届いている（またはモックで生成された）ものだけを生成
                 List<int> tilesToSpawn = new List<int>(currentEnemyHandTiles);
-                while (tilesToSpawn.Count < targetHandCount)
-                {
-                    tilesToSpawn.Add(0); // 伏せ牌用のダミーID
-                }
 
                 foreach (var id in tilesToSpawn)
                 {
@@ -482,11 +477,11 @@ namespace KillingMahjong.UI
                     if (rt == null) rt = obj.transform as RectTransform; 
                     
                     if (rt != null) {
-                        // プレイヤーのテストやデバッグ向けに敵の牌をすぐ見えるようにするオプション
-                        int visualId = showEnemyHandDebug ? id : 0;
+                        // wallから選ばれた表示のまま（ダミーの裏面にしない）
+                        int visualId = id;
                         InitializeTileComponent(rt, visualId, false);
                         
-                        // 敵専用のメソッドで「表示用のダミーID」と「後で公開するための本当のID」を両方渡す
+                        // 敵専用のメソッドへ追加
                         enemyHandUI.AddEnemyTile(rt, visualId, id);
                     }
                 }
@@ -855,21 +850,19 @@ namespace KillingMahjong.UI
             {
                 if (currentEnemyWallTiles.Count > 0)
                 {
-                    // 先頭の牌を削除（ランダムまたは順番に消費）
-                    currentEnemyWallTiles.RemoveAt(0);
+                    currentEnemyWallTiles.RemoveAt(0); // 内部データから削除
                 }
 
-                if (enemyWallUI != null)
+                if (enemyWallUI != null && enemyRiverUI != null)
                 {
-                    // 敵の壁から1枚取り除く
                     RectTransform tileRt = enemyWallUI.GrabEnemyTile();
                     if (tileRt != null)
                     {
-                        Destroy(tileRt.gameObject);
+                        // アニメーションや小手先のハックなしで、完全にWallContainerの子からRiverContainerの子へ付け替える
+                        enemyRiverUI.AddExistingTile(tileRt, discardedTileId);
                     }
                 }
-
-                if (enemyRiverUI != null)
+                else if (enemyRiverUI != null)
                 {
                     enemyRiverUI.AddTile(discardedTileId);
                 }
@@ -877,6 +870,31 @@ namespace KillingMahjong.UI
 
             // 2. キャラクターのアニメーションや会話を再生
             OnTileDiscarded(discardedTileId, isLocalPlayer);
+        }
+
+        private System.Collections.IEnumerator AnimateTileToRiver(RectTransform tileRt, Vector3 targetLocalPos, float duration, System.Action onComplete)
+        {
+            if (tileRt == null) yield break;
+
+            Vector3 startPos = tileRt.localPosition;
+            float elapsed = 0f;
+
+            while (elapsed < duration)
+            {
+                if (tileRt == null) yield break;
+                float t = elapsed / duration;
+                // Ease out quad
+                t = t * (2f - t);
+                tileRt.localPosition = Vector3.Lerp(startPos, targetLocalPos, t);
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+
+            if (tileRt != null)
+            {
+                tileRt.localPosition = targetLocalPos;
+            }
+            onComplete?.Invoke();
         }
 
         // --- リアクション用キュー ---
@@ -1023,6 +1041,9 @@ namespace KillingMahjong.UI
                     // 自分の壁UIは表示したままとし、打牌用配置になっていることを保証する
                     if (wallUI != null) wallUI.gameObject.SetActive(true);
                     
+                    // 敵の壁UIも表示したままとする
+                    if (enemyWallUI != null) enemyWallUI.gameObject.SetActive(true);
+                    
                     if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(true);
                     if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(true);
                     
@@ -1117,6 +1138,7 @@ namespace KillingMahjong.UI
             // The components to hide during betting phase & phase transition
             if (handUI != null) handUI.gameObject.SetActive(visible);
             if (wallUI != null) wallUI.gameObject.SetActive(visible);
+            if (enemyWallUI != null) enemyWallUI.gameObject.SetActive(visible);
             // riverUI visibility is managed by HandlePhaseVisibility now
             
             // playerInfoUI(Enemy HP) は Transition 中〜手牌選択前などで非表示にしたい場合、ここでコントロールされます。
