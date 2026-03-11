@@ -835,14 +835,8 @@ namespace KillingMahjong.UI
         public class ActionMessage
         {
             public string type = "action";
-            public ActionData data;
-        }
-
-        [System.Serializable]
-        public class ActionData
-        {
             public string action;
-            public ActionPayload data; // python側では action_data = data.get("data") として取得されている
+            public ActionPayload data;
         }
 
         [System.Serializable]
@@ -947,11 +941,8 @@ namespace KillingMahjong.UI
             var msg = new ActionMessage
             {
                 type = "action",
-                data = new ActionData
-                {
-                    action = actionType,
-                    data = dataPayload
-                }
+                action = actionType,
+                data = dataPayload
             };
 
             string json = JsonUtility.ToJson(msg);

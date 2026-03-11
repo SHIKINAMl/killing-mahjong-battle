@@ -235,13 +235,13 @@ namespace KillingMahjong.Network
                     {
                         client_id = localPlayerId,
                         hand = new List<int>(mockLocalWall),
-                        tenpai_examples = new List<int[]>() // TODO: Generate dummy data if requested
+                        tenpai_examples = new List<IntArray>() // TODO: Generate dummy data if requested
                     },
                     new WallDealtHand
                     {
                         client_id = enemyPlayerId,
                         hand = new List<int>(mockEnemyWall),
-                        tenpai_examples = new List<int[]>()
+                        tenpai_examples = new List<IntArray>()
                     }
                 }
             };
