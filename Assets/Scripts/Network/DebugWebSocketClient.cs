@@ -200,7 +200,7 @@ namespace KillingMahjong.Network
                             yield return new WaitForSeconds(1.0f);
                             
                             // "agari" イベントを送信
-                            SendMockMessage(new ServerMessageBase { type = "agari" });
+                            SendMockMessage(new AgariMessage { type = "agari", winner_client_id = localPlayerId });
                             yield break; // これ以降の処理（ターン遷移）は行わず終了
                         }
                     }
@@ -235,7 +235,11 @@ namespace KillingMahjong.Network
                     {
                         client_id = localPlayerId,
                         hand = new List<int>(mockLocalWall),
-                        tenpai_examples = new List<IntArray>() // TODO: Generate dummy data if requested
+                        tenpai_examples = new List<IntArray> 
+                        {
+                            new IntArray { items = new int[] { 1, 1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9, 9 } },
+                            new IntArray { items = new int[] { 3, 4, 5, 10, 11, 12, 17, 18, 19, 21, 21, 28, 28 } }
+                        }
                     },
                     new WallDealtHand
                     {

@@ -36,8 +36,16 @@ namespace KillingMahjong.UI
                 {
                     if (eventData.button == PointerEventData.InputButton.Left)
                     {
-                        // 左クリック：選択（または選択解除）
-                        _gameUIManager.SelectTile(TileId, IsInHand, false);
+                        // 既に選択されていたら（浮いている状態なら）捨てる
+                        if (_gameUIManager.IsTileSelected(TileId))
+                        {
+                            _gameUIManager.DiscardSelectedTile();
+                        }
+                        else
+                        {
+                            // 左クリック：選択（または選択解除）
+                            _gameUIManager.SelectTile(TileId, IsInHand, false);
+                        }
                     }
                     else if (eventData.button == PointerEventData.InputButton.Right)
                     {

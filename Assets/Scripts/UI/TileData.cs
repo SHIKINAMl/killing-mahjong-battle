@@ -17,15 +17,19 @@ namespace KillingMahjong
         public TileCategory Category;
         public int Number; // 1-9 for suits, ID offset for honors
         
-        public TileData(int id)
+        public TileData(int encodedId)
         {
-            Id = id;
-            // Standard MJ ID mapping assumption:
-            // 0-8: Manzu 1-9
-            // 9-17: Pinzu 1-9
-            // 18-26: Souzu 1-9
-            // 27-33: East, South, West, North, White, Green, Red
+            Id = encodedId;
             
+            // サーバー側のビット構造:
+            //   bit 6 (0x40): 赤ドラ (五萬・五筒・五索 最初の1枚)
+            //   bit 5 (0x20): ドラ
+            //   bit 4-0 (0x1F): 基本牌種別 (0-28)
+            IsRedDora = (encodedId & 0x40) != 0;
+            IsDora    = (encodedId & 0x20) != 0;
+            
+            int id = encodedId & 0x1F; // 下位5ビットが牌種別
+
             if (id >= 0 && id <= 8)
             {
                 Category = TileCategory.Manzu;
@@ -47,6 +51,11 @@ namespace KillingMahjong
                 Number = id - 27 + 1;
             }
         }
+
+        /// <summary>ドラ牌かどうか</summary>
+        public bool IsDora { get; private set; }
+        /// <summary>赤ドラ牌かどうか（五萬・五筒・五索）</summary>
+        public bool IsRedDora { get; private set; }
 
         public string GetTileName()
         {

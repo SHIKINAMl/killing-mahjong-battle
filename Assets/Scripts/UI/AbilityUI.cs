@@ -161,7 +161,15 @@ namespace KillingMahjong.UI
                 {
                     var data = mockAbilities[index];
                     Debug.Log($"Activting Ability: {data.name} (Cost: {data.cost})");
-                    // TODO: Deduct cost, Apply effect
+                    // TODO: Send skill selection event to server using GameUIManager.SendActionToServer
+                    
+                    // Client-side visual deduction
+                    var uiMgr = FindObjectOfType<GameUIManager>();
+                    if (uiMgr != null && uiMgr.PlayerInfoUI != null)
+                    {
+                        uiMgr.PlayerInfoUI.ReduceHp(data.cost);
+                        uiMgr.ShowDialogue($"アビリティ「{data.name}」を発動！");
+                    }
                 }
                 DeselectAll();
                 // Optionally close window? User said "Activate and deselect". Didn't say close.

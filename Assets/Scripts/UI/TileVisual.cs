@@ -1,7 +1,5 @@
 using UnityEngine;
 using UnityEngine.UI; // For Image if UI
-// If using SpriteRenderer for 2D/3D object
-// using UnityEngine; 
 
 namespace KillingMahjong.UI
 {
@@ -11,6 +9,10 @@ namespace KillingMahjong.UI
         [SerializeField] private SpriteRenderer spriteRenderer; // 2D Sprite
         [SerializeField] private Image uiImage;                 // UI Image
         [SerializeField] private MeshRenderer meshRenderer;     // 3D Object (Cube/Quad)
+
+        [Header("Dora Overlay")]
+        [Tooltip("ドラ牌の時に表示するオーバーレイImage（子オブジェクトのImageを指定）")]
+        [SerializeField] private Image doraOverlayImage;
 
         private void OnValidate()
         {
@@ -29,25 +31,22 @@ namespace KillingMahjong.UI
 
         private int _currentId = -1;
 
-        public void SetTile(int id, Sprite sprite)
+        public void SetTile(int encodedId, Sprite sprite, TileResourceManager resourceManager = null)
         {
-            _currentId = id;
+            _currentId = encodedId;
             if (sprite == null) return;
 
-            if (spriteRenderer != null)
+            if (spriteRenderer != null)        spriteRenderer.sprite = sprite;
+            else if (uiImage != null)          uiImage.sprite = sprite;
+            else if (meshRenderer != null)     meshRenderer.material.mainTexture = sprite.texture;
+
+            // ドラ枠オーバーレイ
+            if (doraOverlayImage != null)
             {
-                spriteRenderer.sprite = sprite;
-            }
-            else if (uiImage != null)
-            {
-                uiImage.sprite = sprite;
-            }
-            else if (meshRenderer != null)
-            {
-                // For 3D objects, we set the texture.
-                // Note: This modifies the shared material instance in Editor, or instance in runtime.
-                // Allow Texture based on Sprite
-                meshRenderer.material.mainTexture = sprite.texture;
+                bool isDora = resourceManager != null
+                    ? resourceManager.IsDora(encodedId)
+                    : new TileData(encodedId).IsDora || new TileData(encodedId).IsRedDora;
+                doraOverlayImage.gameObject.SetActive(isDora);
             }
         }
         
@@ -75,8 +74,6 @@ namespace KillingMahjong.UI
             }
             else if (spriteRenderer != null)
             {
-                // Note: For SpriteRenderer, a custom shader is usually required.
-                // Assuming Image UI is primarily used for the 2D canvas here.
                 if (isFuriten) spriteRenderer.color = Color.red;
                 else spriteRenderer.color = Color.white;
             }

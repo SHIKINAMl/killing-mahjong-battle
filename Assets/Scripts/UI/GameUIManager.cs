@@ -58,7 +58,19 @@ namespace KillingMahjong.UI
             if (wallUI != null) wallUI.Setup(this);
             if (enemyWallUI != null) enemyWallUI.Setup(this);
             if (waitUI != null) waitUI.gameObject.SetActive(false);
-            if (dialogueUI != null) dialogueUI.ShowText("Game Start!");
+            if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
+            
+            // Ensure UI is hidden at very beginning before matching starts
+            SetMatchUIVisibility(false);
+            if (riverUI != null) riverUI.gameObject.SetActive(false);
+            if (enemyRiverUI != null) enemyRiverUI.gameObject.SetActive(false);
+            if (enemyHandUI != null) enemyHandUI.gameObject.SetActive(false);
+            if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(false);
+            if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(false);
+            if (abilityUI != null) abilityUI.gameObject.SetActive(false);
+            if (bettingUI != null) bettingUI.HideBettingPhase();
+            
+            // dialogueUI.ShowText("Game Start!"); // 待機中には見せないためコメントアウト
         }
         
         // Data State
@@ -73,6 +85,8 @@ namespace KillingMahjong.UI
 
         private System.Collections.Generic.List<int> currentEnemyHandTiles = new System.Collections.Generic.List<int>();
         private System.Collections.Generic.List<int> currentEnemyWallTiles = new System.Collections.Generic.List<int>();
+        
+        private bool lastIsLocalWin = true; // Temporary state for Agari processing
 
         public void InitializeGame(System.Collections.Generic.List<int> initialWall)
         {
@@ -90,25 +104,32 @@ namespace KillingMahjong.UI
             // 手牌選択フェイズでのみ移動を許可
             if (currentPhaseStatus != RoundStatus.HandSelection) return;
 
-            if (currentWallTiles.Contains(tileId))
+            // tenpai_examplesはベースID（下位5ビット＝牌種別）で返ってくるが、
+            // currentWallTilesはドラフラグ付きの実際IDで格納されている。
+            // 完全一致を先に試み、なければ牌種別（& 0x1F）で検索する。
+            int actualId = tileId;
+            if (!currentWallTiles.Contains(tileId))
             {
-                // 手牌は13枚まで
-                if (currentHandTiles.Count < 13)
+                int baseId = tileId & 0x1F;
+                actualId = currentWallTiles.Find(t => (t & 0x1F) == baseId);
+                // Find returns 0 if not found; check it's genuinely in the list
+                if (!currentWallTiles.Contains(actualId)) return;
+            }
+
+            if (currentHandTiles.Count < 13)
+            {
+                currentWallTiles.Remove(actualId);
+                currentHandTiles.Add(actualId);
+                
+                if (wallUI != null && handUI != null)
                 {
-                    currentWallTiles.Remove(tileId);
-                    currentHandTiles.Add(tileId);
-                    
-                    if (wallUI != null && handUI != null)
+                    RectTransform movedTile = wallUI.GrabTile(actualId);
+                    if (movedTile != null)
                     {
-                        RectTransform movedTile = wallUI.GrabTile(tileId);
-                        if (movedTile != null)
-                        {
-                            handUI.AddTileToHand(movedTile, tileId);
-                        }
+                        handUI.AddTileToHand(movedTile, actualId);
                     }
                 }
             }
-            ClearSelection();
         }
 
         public void MoveTileToWall(int tileId)
@@ -269,7 +290,8 @@ namespace KillingMahjong.UI
                 UpdateSelectedTileVisuals();
             }
             
-            Debug.Log($"Selected Tiles Count: {selectedTileIds.Count}");
+            string tileName = new TileData(tileId).GetTileName();
+            Debug.Log($"[SelectTile] ID: {tileId} ({tileName}) | Selected Count: {selectedTileIds.Count}");
             DeselectAbility();
         }
 
@@ -388,7 +410,7 @@ namespace KillingMahjong.UI
             // Send action to server
             SendActionToServer("discard", new ActionPayload { tile = tileToDiscard });
             
-            // Wait for GameState update to actually remove tile and add to river
+            // Wait for GameState update or explicit discard response to actually remove tile and add to river
             ClearSelection();
         }
 
@@ -596,6 +618,9 @@ namespace KillingMahjong.UI
             if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(false);
             if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(false);
             
+            if (abilityUI != null) abilityUI.gameObject.SetActive(false);
+            if (ronAnimationUI != null) ronAnimationUI.gameObject.SetActive(false);
+            
             // BettingUIも見えてしまわないように隠す
             if (bettingUI != null) bettingUI.HideBettingPhase();
         }
@@ -610,6 +635,8 @@ namespace KillingMahjong.UI
                 dialogueUI.gameObject.SetActive(true);
                 dialogueUI.ShowText("Match Found! Game Starting...");
             }
+            // ゲーム開始でアビリティボタン等も表示を許可するならここでSetActive(true)するか、
+            // 後の HandSelection(Dealing) フェーズで一括制御します
         }
 
         public void ApplyGameStateFromJSON(string jsonString, string localPlayerId)
@@ -661,7 +688,14 @@ namespace KillingMahjong.UI
                         break;
 
                     case "turn_decided":
-                        // TODO: Update which player is active
+                        TurnDecidedMessage turnMsg = JsonUtility.FromJson<TurnDecidedMessage>(jsonString);
+                        // Update which player is active based on turnMsg.current_player
+                        if (turnMsg != null)
+                        {
+                            bool isLocalTurn = (turnMsg.current_player == 0); // Assuming 0 is local, 1 is enemy
+                            Debug.Log($"[GameUIManager] Turn Decided. Local Turn: {isLocalTurn}");
+                            // TODO: Show visual indicator for turn
+                        }
                         UpdatePhaseStatus(RoundStatus.Discard);
                         break;
                         
@@ -701,7 +735,22 @@ namespace KillingMahjong.UI
                         
                     case "agari":
                         // ロンやツモの上がりイベント
+                        AgariMessage agariMsg = JsonUtility.FromJson<AgariMessage>(jsonString);
+                        if (agariMsg != null)
+                        {
+                            bool isLocalWin = (agariMsg.winner_client_id == localPlayerId);
+                            // Store the win state temporarily for HandlePhaseVisibility to read.
+                            // To avoid adding fields, we will pass it indirectly or handle it in UpdatePhaseStatus.
+                            // Due to script length limits, we will handle it directly below.
+                            lastIsLocalWin = isLocalWin;
+                        }
                         UpdatePhaseStatus(RoundStatus.Agari);
+                        break;
+
+                    case "game_end":
+                        // Python: {"type": "game_end", "final_scores": {"client_id1": score1, "client_id2": score2}}
+                        Debug.Log($"[GameUIManager] Game End Received: {jsonString}");
+                        ParseGameEndAndShowResults(jsonString, localPlayerId);
                         break;
 
                     default:
@@ -760,7 +809,7 @@ namespace KillingMahjong.UI
                 Debug.Log($"[HandleWallDealt] checking h.client_id='{h.client_id}' == localPlayerId='{localPlayerId}' => {h.client_id == localPlayerId}");
                 if (h.client_id == localPlayerId)
                 {
-                    currentWallTiles = new List<int>(h.hand);
+                    currentWallTiles = SortTileIds(new List<int>(h.hand));
                     currentHandTiles = new List<int>();
                     Debug.Log($"[HandleWallDealt] => 自分のWall ({currentWallTiles.Count}枚) をセット");
                     
@@ -792,13 +841,17 @@ namespace KillingMahjong.UI
 
         private void HandleHandSelected(HandSelectedMessage msg, string localPlayerId)
         {
-            UpdatePhaseStatus(RoundStatus.Betting);
-            
+            // msg.handsが存在しない場合は個人向け確認メッセージ（自分の選択が受理された）
+            // msg.handsが存在する場合は全員完了のブロードキャスト → ベットフェイズへ
             if (msg.hands == null)
             {
-                Debug.LogWarning("[HandleHandSelected] msg.hands is null!");
+                // 自分の手牌選択が受理された。相手の選択待ち。
+                Debug.Log("[HandleHandSelected] 自分の手牌選択が受理されました。相手の選択を待っています...");
+                if (dialogueUI != null) dialogueUI.ShowText("相手の手牌選択を待っています...");
                 return;
             }
+            
+            UpdatePhaseStatus(RoundStatus.Betting);
             
             Debug.Log($"[HandleHandSelected] myClientId='{localPlayerId}', hands count={msg.hands.Length}");
             foreach (var h in msg.hands)
@@ -806,8 +859,8 @@ namespace KillingMahjong.UI
                 Debug.Log($"[HandleHandSelected] checking h.client_id='{h.client_id}' == localPlayerId='{localPlayerId}' => {h.client_id == localPlayerId}");
                 if (h.client_id == localPlayerId)
                 {
-                    currentHandTiles = new List<int>(h.hand);
-                    currentWallTiles = new List<int>(h.wall);
+                    currentHandTiles = SortTileIds(new List<int>(h.hand));
+                    currentWallTiles = SortTileIds(new List<int>(h.wall));
                     currentWaitTiles = new List<int>(h.wait);
                     Debug.Log($"[HandleHandSelected] => 自分のHand ({currentHandTiles.Count}枚), Wall ({currentWallTiles.Count}枚) をセット");
                 }
@@ -831,10 +884,17 @@ namespace KillingMahjong.UI
         }
 
         // シリアライズ用の構造体を定義（JsonUtilityは匿名クラスをシリアライズできないため）
+        // サーバー期待形式: {"type":"action","data":{"action":"...","data":{...}}}
         [System.Serializable]
         public class ActionMessage
         {
             public string type = "action";
+            public ActionMessageData data;
+        }
+
+        [System.Serializable]
+        public class ActionMessageData
+        {
             public string action;
             public ActionPayload data;
         }
@@ -883,33 +943,56 @@ namespace KillingMahjong.UI
                         int arrStart = jsonString.IndexOf('[', tenpaiKey + 17);
                         if (arrStart < 0) break;
 
-                        // 外側の [ を見つけてその中の各 [ ] を個別に取り出す
-                        int depth = 0;
-                        int innerStart = -1;
-                        for (int i = arrStart; i < jsonString.Length; i++)
+                        // 配列の直後の最初の非空白文字を確認する
+                        // '[' なら入れ子配列（2D）、それ以外なら1Dフラット配列
+                        int peek = arrStart + 1;
+                        while (peek < jsonString.Length && jsonString[peek] == ' ') peek++;
+
+                        if (peek < jsonString.Length && jsonString[peek] == '[')
                         {
-                            if (jsonString[i] == '[')
+                            // 2Dネスト配列: [[id, id, ...], [...]] 各 [] を1つの例として取得
+                            int depth = 0;
+                            int innerStart = -1;
+                            for (int i = arrStart; i < jsonString.Length; i++)
                             {
-                                depth++;
-                                if (depth == 2) innerStart = i;
-                            }
-                            else if (jsonString[i] == ']')
-                            {
-                                if (depth == 2 && innerStart >= 0)
+                                if (jsonString[i] == '[')
                                 {
-                                    // [innerStart, i] が1つの手牌例
-                                    string inner = jsonString.Substring(innerStart + 1, i - innerStart - 1);
-                                    var hand = new List<int>();
-                                    foreach (var token in inner.Split(','))
-                                    {
-                                        if (int.TryParse(token.Trim(), out int val))
-                                            hand.Add(val);
-                                    }
-                                    if (hand.Count > 0) result.Add(hand);
-                                    innerStart = -1;
+                                    depth++;
+                                    if (depth == 2) innerStart = i;
                                 }
-                                depth--;
-                                if (depth == 0) break;
+                                else if (jsonString[i] == ']')
+                                {
+                                    if (depth == 2 && innerStart >= 0)
+                                    {
+                                        string inner = jsonString.Substring(innerStart + 1, i - innerStart - 1);
+                                        var hand = new List<int>();
+                                        foreach (var token in inner.Split(','))
+                                        {
+                                            if (int.TryParse(token.Trim(), out int val))
+                                                hand.Add(val);
+                                        }
+                                        if (hand.Count > 0) result.Add(hand);
+                                        innerStart = -1;
+                                    }
+                                    depth--;
+                                    if (depth == 0) break;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            // 1Dフラット配列: [id, id, ...] → 1つの例として扱う（サーバーが単一例を送る場合）
+                            int arrEnd = jsonString.IndexOf(']', arrStart);
+                            if (arrEnd > arrStart)
+                            {
+                                string inner = jsonString.Substring(arrStart + 1, arrEnd - arrStart - 1);
+                                var hand = new List<int>();
+                                foreach (var token in inner.Split(','))
+                                {
+                                    if (int.TryParse(token.Trim(), out int val))
+                                        hand.Add(val);
+                                }
+                                if (hand.Count > 0) result.Add(hand);
                             }
                         }
                         break; // 対象のclient_idが見つかったので終了
@@ -927,6 +1010,17 @@ namespace KillingMahjong.UI
             return result;
         }
 
+        /// <summary>
+        /// 牌IDリストを「萬子(0-8) → 筒子(9-17) → 索子(18-26) → 字牌(27-33)」の順に、
+        /// かつ同じIDの牌が隣り合うようにソートする。
+        /// </summary>
+        private List<int> SortTileIds(List<int> ids)
+        {
+            // IDの昇順でソートするだけで自然に 萬子→筒子→索子→字牌 の順になる
+            ids.Sort();
+            return ids;
+        }
+
         // Helper string sending method targeting Network
         public async void SendActionToServer(string actionType, ActionPayload dataPayload)
         {
@@ -941,8 +1035,11 @@ namespace KillingMahjong.UI
             var msg = new ActionMessage
             {
                 type = "action",
-                action = actionType,
-                data = dataPayload
+                data = new ActionMessageData
+                {
+                    action = actionType,
+                    data = dataPayload
+                }
             };
 
             string json = JsonUtility.ToJson(msg);
@@ -955,7 +1052,6 @@ namespace KillingMahjong.UI
         public void HandleDiscardEvent(int discardedTileId, bool isLocalPlayer)
         {
             // 打牌が送信されたことを通知するイベントハンドラです
-            // TODO: ServerMessagesに DiscardMessage 用の定義を書き、それを受け取った時にこのメソッドを呼び出します。
             
             // 1. UIの表示を更新: Wallから削除しRiverへ追加
             if (isLocalPlayer)
@@ -1170,6 +1266,7 @@ namespace KillingMahjong.UI
                     if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(true);
                     if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(true);
                     if (waitUI != null) waitUI.gameObject.SetActive(false); // 待ち牌UIを非表示
+                    if (abilityUI != null) abilityUI.gameObject.SetActive(true); // 手牌選択時はアビリティ使用可能
                     break;
                 case RoundStatus.TurnDecision:
                     // トランジション中（掛け金→打牌移行時）、敵も自分もHP（パネル全体）を非表示にする
@@ -1195,6 +1292,7 @@ namespace KillingMahjong.UI
                         waitUI.gameObject.SetActive(true);
                         waitUI.DisplayWaits(currentWaitTiles);
                     }
+                    if (abilityUI != null) abilityUI.gameObject.SetActive(true); // スキルボタンは出しておく
                     break;
                 case RoundStatus.Agari:
                 case RoundStatus.Ron:
@@ -1207,7 +1305,7 @@ namespace KillingMahjong.UI
                     {
                         // サーバーのGameState拡張により、実際の役リストや上がったプレイヤー情報が渡される想定ですが、
                         // まずは「自分の手牌」か「敵の手牌」かを current_player（あるいは勝者フラグ）等で判定してアニメーションに渡します
-                        bool isLocalWin = true; // TODO: Send proper isLocalWin flag from ServerMessage
+                        bool isLocalWin = lastIsLocalWin; // Agariイベントで保存したフラグを使用
                         List<int> winningHand = isLocalWin ? new List<int>(currentHandTiles) : new List<int>(currentEnemyHandTiles);
                         
                         // 今回はテストとして仮データを渡してアニメーションを実行
@@ -1312,7 +1410,20 @@ namespace KillingMahjong.UI
             // エンジンに通知 (Pythonエンジン側は action="betting" を待っている)
             SendActionToServer("betting", new ActionPayload { amount = betAmount });
 
-            // アニメーションなどのトリガーは、ここで直接呼ばずにサーバー検証後 ("bet" メッセージ受信後) に行います。
+            // 本来はサーバーからの "bet" メッセージ受信後にアニメーションを開始しますが、
+            // サーバー側の_betting実装が未完了のため、今回は直接ローカルで完了処理を呼び出してフェーズを進めます。
+            StartCoroutine(MockBettingCompleteRoutine(betAmount));
+        }
+
+        private System.Collections.IEnumerator MockBettingCompleteRoutine(int playerBet)
+        {
+            yield return new WaitForSeconds(1.0f); // 相手のベット完了を少し待機する演出
+            
+            // 適当なダミー値を渡して進める。必要なら自分・相手のHPを反映
+            int localHp = playerInfoUI != null ? 20000 : 20000;
+            int enemyHp = enemyInfoUI != null ? 20000 : 20000;
+            
+            OnBettingCompleteFromServer(playerBet, playerBet, localHp, enemyHp);
         }
 
         public void OnBettingCompleteFromServer(int playerBet, int enemyBet, int playerHp, int enemyHp)
@@ -1351,13 +1462,18 @@ namespace KillingMahjong.UI
                          // トランジションが終了したら「対局画面（MatchUI）」のUI要素を表示する
                          SetMatchUIVisibility(true); 
                          
-                         // トランジション中に送られてきた最新のフェーズ（打牌フェイズ等）に合わせて表示状態を反映する
+                         // 今回はサーバーからの "bet" 以降のステート移行応答がないため、
+                         // アニメーション完了時に強制的に打牌フェイズ (Discard) へ進めます。
+                         if (currentPhaseStatus == RoundStatus.Betting)
+                         {
+                             UpdatePhaseStatus(RoundStatus.Discard);
+                         }
+
+                         // 現在のフェーズに合わせて表示状態を反映する
                          HandlePhaseVisibility(currentPhaseStatus);
                          
                          // 対局（打牌フェイズ）が始まったら会話UIを出す
                          if (dialogueUI != null) dialogueUI.gameObject.SetActive(true);
-
-                         // 仮のフェーズ直書きを削除し、サーバーからの `{"type": "game_state"}` 待機とする
                     }
                  );
              }
@@ -1371,6 +1487,43 @@ namespace KillingMahjong.UI
             if (dialogueUI != null)
             {
                 dialogueUI.ShowText(text);
+            }
+        }
+        
+        private void ParseGameEndAndShowResults(string jsonString, string localPlayerId)
+        {
+            // JsonUtility cannot parse Dictionaries. We need to parse "final_scores": {"client1": score, "client2": score}
+            int scoresStart = jsonString.IndexOf("\"final_scores\"");
+            if (scoresStart >= 0)
+            {
+                int dictStart = jsonString.IndexOf('{', scoresStart);
+                int dictEnd = jsonString.IndexOf('}', dictStart);
+                if (dictStart >= 0 && dictEnd > dictStart)
+                {
+                    string dictStr = jsonString.Substring(dictStart + 1, dictEnd - dictStart - 1);
+                    string[] pairs = dictStr.Split(',');
+                    
+                    int localScore = 0;
+                    int enemyScore = 0;
+
+                    foreach (var pair in pairs)
+                    {
+                        string[] kvp = pair.Split(':');
+                        if (kvp.Length == 2)
+                        {
+                            string key = kvp[0].Replace("\"", "").Trim();
+                            string val = kvp[1].Trim();
+                            if (int.TryParse(val, out int score))
+                            {
+                                if (key == localPlayerId) localScore = score;
+                                else enemyScore = score;
+                            }
+                        }
+                    }
+
+                    Debug.Log($"[GameEnd] Final Scores - Local: {localScore}, Enemy: {enemyScore}");
+                    // TODO: Implement Result screen/UI call here using the parsed scores
+                }
             }
         }
     }

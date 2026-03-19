@@ -89,8 +89,15 @@ namespace KillingMahjong.EngineData
     public class GameEndMessage
     {
         public string type;
-        // Python: {"client_id1": score1, "client_id2": score2} という辞書なので専用または独自パース必要
-        // TODO: Dictionary対応または string処理
+        // Python: {"client_id1": score1, "client_id2": score2}
+        // Parsing of final_scores dictionary is handled manually in GameUIManager.cs ApplyGameStateFromJSON
+    }
+
+    [Serializable]
+    public class AgariMessage
+    {
+        public string type;
+        public string winner_client_id;
     }
     
     // アクション送信用のJSON定義は GameUIManager 内部に定義されていますが、

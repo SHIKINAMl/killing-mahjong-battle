@@ -11,13 +11,22 @@ namespace KillingMahjong.UI
         [Header("Character Portrait")]
         [SerializeField] private UnityEngine.UI.Image characterImage;
 
+        private int currentHp = 20000; // 暫定の初期HP
+
         public void SetHP(int hp)
         {
+            currentHp = hp;
             if (hpText != null)
             {
                 // MaxHPの概念は一旦表示せず、現在HPのみそのまま表示します
-                hpText.text = $"HP: {hp}";
+                hpText.text = $"HP: {currentHp}";
             }
+        }
+        
+        public void ReduceHp(int amount)
+        {
+            currentHp -= amount;
+            SetHP(currentHp);
         }
 
         public void SetCharacterSprite(Sprite sprite)

@@ -216,7 +216,7 @@ namespace KillingMahjong.UI
                 rankContainer.SetActive(true);
                 if (rankText != null) rankText.text = rankName;
                 
-                // TODO: 勝利側・敗北側のエフェクト再生指示（GameUIManagerへ渡す、またはここからPlayerInfoUIを叩く）
+                // 勝利側・敗北側のエフェクト再生はGameUIManagerのOnRonAnimationCompleteで行うためここは通過のみ
                 // NotifyEffectsTrigger(isLocalPlayerWin);
                 
                 yield return new WaitForSeconds(durationBeforeClosing);

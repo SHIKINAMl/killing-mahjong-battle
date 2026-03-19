@@ -250,7 +250,7 @@ class WebSocketGameServer:
 		if msg_type == "action":
 			client_id = self._client_id_by_socket.get(websocket)
 			if client_id:
-				await self._game_session.handle_game_action(client_id, data)
+				await self._game_session.handle_game_action(client_id, data.get("data", {}))
 			return
 
 		await self._send_json(websocket, {"type": "error", "message": f"Unknown type: {msg_type}"})

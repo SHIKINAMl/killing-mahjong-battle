@@ -41,5 +41,14 @@ MonoBehaviour:
   - {fileID: 21300000, guid: 4bb185d67a7054a4a97d653588f12cab, type: 3}
   - {fileID: 21300000, guid: 5ce2a0ae4d6e1554d899c607cad1bebe, type: 3}
   - {fileID: 21300000, guid: aaa275d386a73f84f8adb323e8cb51e9, type: 3}
+  - {fileID: 21300000, guid: 4ee6f2000a42790408238ebf8e75cb73, type: 3}
   - {fileID: 21300000, guid: 81b498faae33d6a498fffcbcf1e09f46, type: 3}
+  - {fileID: 21300000, guid: dfb9533009e5ee144a1d59acf1bfdde5, type: 3}
+  - {fileID: 21300000, guid: f01d768ceafffc84bbbfe7f96350f309, type: 3}
+  - {fileID: 21300000, guid: 629c659bc2b82b84b9c114f598f158d6, type: 3}
+  - {fileID: 21300000, guid: 8322f25840fae2e48bac3d30083b7f86, type: 3}
+  redDoraSprites:
+  - {fileID: 21300000, guid: ae12c990f8739e14d840883bb74f88b4, type: 3}
+  - {fileID: 21300000, guid: 3c032d59f0ef70342b987b8e9ccadd51, type: 3}
+  - {fileID: 21300000, guid: ba18159b956c02d489159174e79becfc, type: 3}
   tilePrefab: {fileID: 7371004981101527939, guid: 8ebe538fe6c930d45a4f9da8cf02bd0d, type: 3}
