@@ -111,9 +111,16 @@ namespace KillingMahjong.UI
             if (!currentWallTiles.Contains(tileId))
             {
                 int baseId = tileId & 0x1F;
-                actualId = currentWallTiles.Find(t => (t & 0x1F) == baseId);
-                // Find returns 0 if not found; check it's genuinely in the list
-                if (!currentWallTiles.Contains(actualId)) return;
+                int foundIndex = currentWallTiles.FindIndex(t => (t & 0x1F) == baseId);
+                if (foundIndex != -1)
+                {
+                    actualId = currentWallTiles[foundIndex];
+                }
+                else
+                {
+                    Debug.LogWarning($"[MoveTileToHand] Tile ID {tileId} (Base {baseId}) is not in currentWallTiles!");
+                    return;
+                }
             }
 
             if (currentHandTiles.Count < 13)

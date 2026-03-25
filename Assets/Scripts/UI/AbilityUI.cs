@@ -164,7 +164,7 @@ namespace KillingMahjong.UI
                     // TODO: Send skill selection event to server using GameUIManager.SendActionToServer
                     
                     // Client-side visual deduction
-                    var uiMgr = FindObjectOfType<GameUIManager>();
+                    var uiMgr = FindFirstObjectByType<GameUIManager>();
                     if (uiMgr != null && uiMgr.PlayerInfoUI != null)
                     {
                         uiMgr.PlayerInfoUI.ReduceHp(data.cost);
