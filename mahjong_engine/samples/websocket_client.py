@@ -41,21 +41,21 @@ def build_action_message(command: str) -> dict[str, Any] | None:
             "data": {"hand": hand},
         }
 
-    if name == "bet":
+    if name == "tenpai":
+        wall_indexes = parse_int_list(args)
         return {
             "type": "action",
-            "action": "bet",
-            "data": {"bet": int(args.strip())},
+            "action": "is_tenpai",
+            "data": {"wall_indexes": wall_indexes},
         }
 
-    if name == "discard":
+    if name == "select":
+        wall_indexes = parse_int_list(args)
         return {
             "type": "action",
-            "action": "discard",
-            "data": {"tile": int(args.strip())},
+            "action": "select",
+            "data": {"wall_indexes": wall_indexes},
         }
-
-    if name == "win":
         return {
             "type": "action",
             "action": "declare_win",

@@ -21,6 +21,14 @@ class SkillType(Enum):
     PERSPECTIVE = "perspective"  # 他プレイヤーの手牌の一部を覗き見る
     SPESIAL_VICTORY = "special_victory"  # 特定の条件で勝利を得る
 
+
+SKILL_HP_COSTS: dict[SkillType, int] = {
+    SkillType.MULLIGAN: 1000,
+    SkillType.BOOST_HAND: 1500,
+    SkillType.PERSPECTIVE: 2000,
+    SkillType.SPESIAL_VICTORY: 3000,
+}
+
 @dataclass
 class PlayerState:
     """プレイヤーの状態"""
@@ -38,7 +46,6 @@ class PlayerState:
 class RoundState:
     """局の状態"""
     round_number: int  # 第何局か
-    honba: int  # 本場数
     current_player_index: int # 現在のプレイヤーのインデックス
     status: RoundStatus = None  # 現在の局のステータス
     dora_id: int = None  # ドラのID
@@ -50,6 +57,5 @@ class GameState:
     players: list[PlayerState] = field(default_factory=list)
     round_state: RoundState = field(default_factory=lambda: RoundState(
         round_number=1,
-        honba=0,
         current_player_index=0
     ))

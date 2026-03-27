@@ -4,7 +4,7 @@
 from typing import Callable, Optional
 import random
 
-from .game_state import GameState, RoundStatus, SkillType, PlayerState
+from .game_state import GameState, RoundStatus, SkillType, PlayerState, SKILL_HP_COSTS
 from .tile_wall import TileWall
 from .hand_analyzer import HandAnalyzer
 
@@ -12,12 +12,12 @@ from .hand_analyzer import HandAnalyzer
 class GameEngine:
     """麻雀ゲームエンジン"""
 
-    def __init__(self, max_rounds: int = 4):
+    def __init__(self, max_rounds: int = 25):
         """
         ゲームエンジンを初期化
 
         Args:
-            max_rounds: 最大ラウンド数（デフォルト4）
+            max_rounds: 最大ラウンド数（デフォルト25）
         """
         self.state = GameState()
         self.tile_wall = TileWall()
@@ -33,6 +33,7 @@ class GameEngine:
         # 打牌フェーズ
         self.on_discard_started: Optional[Callable[[], None]] = None
         self.on_discarded: Optional[Callable[[str, int], None]] = None
+        self.on_skill_casted: Optional[Callable[[str, SkillType, int], None]] = None
 
         self.on_round_start: Optional[Callable[[], None]] = None
         self.on_round_end: Optional[Callable[[], None]] = None
@@ -49,7 +50,7 @@ class GameEngine:
             for player_id in player_ids
         ]
 
-    def start_game(self, max_rounds: int = 4):
+    def start_game(self, max_rounds: int = 25):
         """ゲームを開始"""
         self.max_rounds = max_rounds
         self._start_round()
@@ -76,7 +77,7 @@ class GameEngine:
 
         self._set_phase(RoundStatus.HAND_SELECTION)
 
-    def selected(self):
+    def selected_hand(self):
         """手牌の選択が完了したときの処理"""
         self._invoke_callback(self.on_selected)
 
@@ -110,24 +111,63 @@ class GameEngine:
 
         return True
 
-    def discard(self, player_id: str, tile_id: int) -> None:
+    def bet(self, bet_amount: int, player: PlayerState) -> bool:
+        """
+        プレイヤーが掛け金を設定したときの処理
+
+        Args:
+            bet_amount: 掛け金の額
+            player: プレイヤーの状態
+        Returns:
+            掛け金が有効であれば True、そうでなければ False
+        """
+        if bet_amount < 0:
+            return False
+
+        return True
+
+    def use_skill(self, player: PlayerState, skill_type: SkillType) -> bool:
+        """スキルを使用し、固定コストのHPを消費する。"""
+        cost = SKILL_HP_COSTS.get(skill_type)
+        if cost is None:
+            return False
+
+        if player.health < cost:
+            return False
+
+        player.health -= cost
+        player.skills[skill_type] = {
+            "last_used_round": self.state.round_state.round_number,
+        }
+
+        self._invoke_callback(self.on_skill_casted, player.player_id, skill_type, cost)
+        return True
+
+    def discard(self, player_id: str, wall_index: int) -> None:
         """
         プレイヤーが牌を捨てたときの処理
         Args:
             player_id: 捨てたプレイヤーのID
-            tile_id: 捨てた牌のID
+            wall_index: 捨てる牌の wall 内 index
         """
-        self._invoke_callback(self.on_discarded, player_id, tile_id)
-
         discarding_player = self.get_player_by_id(player_id)
+
+        if discarding_player is None:
+            return
+
+        if wall_index < 0 or wall_index >= len(discarding_player.wall):
+            return
+
+        discarded_tile = discarding_player.wall.pop(wall_index)
+        discarding_player.discards.append(discarded_tile)
+
+        self._invoke_callback(self.on_discarded, player_id, discarded_tile)
 
         if len(discarding_player.discards) >= 13: # 13枚以上捨てたら流局（今は局終了）
             self.state.round_state.honba += 1
             self.end_round()
             return
 
-        discarding_player.wall.remove(tile_id)
-        discarding_player.discards.append(tile_id)
         self._advance_player()
 
     def liquidation(self, player_id: str, hand: list[int]) -> bool:
@@ -242,7 +282,6 @@ class GameEngine:
 
     def get_game_state(self) -> dict:
         """ゲーム状態を辞書で取得（API用）"""
-
         return {
             "status": self.state.status.value,
             "round": self.state.round_state.round_number,
