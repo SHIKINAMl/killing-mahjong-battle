@@ -51,4 +51,43 @@ MonoBehaviour:
   - {fileID: 21300000, guid: ae12c990f8739e14d840883bb74f88b4, type: 3}
   - {fileID: 21300000, guid: 3c032d59f0ef70342b987b8e9ccadd51, type: 3}
   - {fileID: 21300000, guid: ba18159b956c02d489159174e79becfc, type: 3}
+  discardTileSprites:
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  discardRedDoraSprites:
+  - {fileID: 21300000, guid: 92f1bd991bd8d164b81c69cd8128efbf, type: 3}
+  - {fileID: 21300000, guid: 92f1bd991bd8d164b81c69cd8128efbf, type: 3}
+  - {fileID: 21300000, guid: 92f1bd991bd8d164b81c69cd8128efbf, type: 3}
   tilePrefab: {fileID: 7371004981101527939, guid: 8ebe538fe6c930d45a4f9da8cf02bd0d, type: 3}

@@ -701,7 +701,10 @@ namespace KillingMahjong.UI
                         {
                             bool isLocalTurn = (turnMsg.current_player == 0); // Assuming 0 is local, 1 is enemy
                             Debug.Log($"[GameUIManager] Turn Decided. Local Turn: {isLocalTurn}");
-                            // TODO: Show visual indicator for turn
+                            
+                            // ターンに応じた画像表示（打牌フェイズ時の画像へ切り替え）
+                            if (playerInfoUI != null) playerInfoUI.SetDiscardingState(isLocalTurn);
+                            if (enemyInfoUI != null) enemyInfoUI.SetDiscardingState(!isLocalTurn);
                         }
                         UpdatePhaseStatus(RoundStatus.Discard);
                         break;
@@ -1060,6 +1063,10 @@ namespace KillingMahjong.UI
         {
             // 打牌が送信されたことを通知するイベントハンドラです
             
+            // 打牌が完了したら両者の画像を通常に戻す
+            if (playerInfoUI != null) playerInfoUI.SetDiscardingState(false);
+            if (enemyInfoUI != null) enemyInfoUI.SetDiscardingState(false);
+
             // 1. UIの表示を更新: Wallから削除しRiverへ追加
             if (isLocalPlayer)
             {

@@ -35,7 +35,7 @@ namespace KillingMahjong.UI
             TileVisual visual = rt.GetComponent<TileVisual>();
             if (visual != null && tileResourceManager != null)
             {
-                visual.SetTile(tileId, tileResourceManager.GetTileSprite(tileId));
+                visual.SetTile(tileId, tileResourceManager.GetDiscardTileSprite(tileId));
             }
 
             discardedTiles.Add(rt);
@@ -56,7 +56,7 @@ namespace KillingMahjong.UI
             TileVisual visual = obj.GetComponent<TileVisual>();
             if (visual != null && tileResourceManager != null)
             {
-                visual.SetTile(tileId, tileResourceManager.GetTileSprite(tileId));
+                visual.SetTile(tileId, tileResourceManager.GetDiscardTileSprite(tileId));
             }
 
             discardedTiles.Add(obj.transform);
