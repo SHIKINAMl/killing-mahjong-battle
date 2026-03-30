@@ -40,6 +40,19 @@ namespace KillingMahjong.UI
             if (fullScreenCheckerImage != null && checkerMaterial != null)
             {
                 checkerMaterial.SetFloat("_Progress", 0f);
+                
+                // 確実に画面(親Canvas)全体を覆うようにアンカー設定を強制し、
+                // さらに万が一親コンテナが画面より小さい場合に備えて圧倒的なスケールをかける
+                RectTransform rt = fullScreenCheckerImage.rectTransform;
+                if (rt != null)
+                {
+                    rt.anchorMin = Vector2.zero;
+                    rt.anchorMax = Vector2.one;
+                    rt.sizeDelta = Vector2.zero;
+                    rt.anchoredPosition = Vector2.zero;
+                    rt.localScale = new Vector3(10f, 10f, 1f); // 画面を10倍で覆う
+                }
+
                 fullScreenCheckerImage.material = checkerMaterial;
                 fullScreenCheckerImage.gameObject.SetActive(false);
             }
@@ -47,6 +60,13 @@ namespace KillingMahjong.UI
             if (horizontalLineRt != null)
             {
                 horizontalLineRt.localScale = new Vector3(0, 0, 1); // target (1,1,1)
+                
+                // 横線が画面の左右端まで確実に届くように横方向ストレッチを設定
+                horizontalLineRt.anchorMin = new Vector2(0, 0.5f);
+                horizontalLineRt.anchorMax = new Vector2(1, 0.5f);
+                horizontalLineRt.sizeDelta = new Vector2(0, horizontalLineRt.sizeDelta.y);
+                horizontalLineRt.anchoredPosition = Vector2.zero;
+
                 horizontalLineRt.gameObject.SetActive(false);
             }
 
@@ -80,11 +100,12 @@ namespace KillingMahjong.UI
             float t = 0;
             while (t < lineInDuration)
             {
-                horizontalLineRt.localScale = new Vector3(Mathf.Lerp(0, 1, t / lineInDuration), 2f, 1f);
+                // 横幅を10倍(10f)にして確実に画面外まで届かせる
+                horizontalLineRt.localScale = new Vector3(Mathf.Lerp(0, 10f, t / lineInDuration), 2f, 1f);
                 t += Time.deltaTime;
                 yield return null;
             }
-            horizontalLineRt.localScale = new Vector3(1, 2f, 1f);
+            horizontalLineRt.localScale = new Vector3(10f, 2f, 1f);
 
             if (centerText != null)
             {
@@ -94,23 +115,15 @@ namespace KillingMahjong.UI
             yield return new WaitForSeconds(textWaitDuration);
 
             Debug.Log("PhaseTransition: Step 2 - Line Expand and Checker Fade In");
-            // === 2. 線が上下に広がりつつ、市松模様が画面を埋める ===
+            // === 2. 線を中心に、市松模様が上下に広がり画面を埋める ===
             
-            // Expand line vertically using localScale
-            t = 0;
-            while (t < lineExpandDuration)
-            {
-                float normalizedTime = t / lineExpandDuration;
-                float easedT = normalizedTime * normalizedTime * (3f - 2f * normalizedTime);
-                horizontalLineRt.localScale = new Vector3(1, Mathf.Lerp(2f, 100f, easedT), 1f);
-                t += Time.deltaTime;
-                yield return null;
-            }
-            horizontalLineRt.localScale = new Vector3(1, 100f, 1f);
-
             // Enable fullscreen checker
             if (fullScreenCheckerImage != null) fullScreenCheckerImage.gameObject.SetActive(true);
-            if (checkerMaterial != null) checkerMaterial.SetFloat("_Progress", 0f);
+            if (checkerMaterial != null)
+            {
+                checkerMaterial.SetFloat("_AspectRatio", (float)Screen.width / Screen.height);
+                checkerMaterial.SetFloat("_Progress", 0f);
+            }
 
             t = 0;
             while (t < checkerFadeDuration)
@@ -189,11 +202,11 @@ namespace KillingMahjong.UI
             t = 0;
             while (t < lineInDuration)
             {
-                horizontalLineRt.localScale = new Vector3(Mathf.Lerp(0, 1, t / lineInDuration), 2f, 1f);
+                horizontalLineRt.localScale = new Vector3(Mathf.Lerp(0, 10f, t / lineInDuration), 2f, 1f);
                 t += Time.deltaTime;
                 yield return null;
             }
-            horizontalLineRt.localScale = new Vector3(1, 2f, 1f);
+            horizontalLineRt.localScale = new Vector3(10f, 2f, 1f);
 
             if (centerText != null)
             {
@@ -209,7 +222,7 @@ namespace KillingMahjong.UI
             t = 0;
             while (t < lineInDuration)
             {
-                horizontalLineRt.localScale = new Vector3(Mathf.Lerp(1, 0, t / lineInDuration), 2f, 1f);
+                horizontalLineRt.localScale = new Vector3(Mathf.Lerp(10f, 0, t / lineInDuration), 2f, 1f);
                 t += Time.deltaTime;
                 yield return null;
             }

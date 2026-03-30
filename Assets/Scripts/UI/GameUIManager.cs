@@ -1441,6 +1441,11 @@ namespace KillingMahjong.UI
 
         public void TriggerBettingAnimationPhase(string roundString, int playerBet, int enemyBet, int playerHp, int enemyHp)
         {
+             if (isTransitioning) return; // 既にアニメーション中なら重複実行を防ぐ
+             
+             // 既にBettingフェイズ以外に進んでいる場合は、遅れてきたサーバー応答等による重複実行を防ぐ
+             if (currentPhaseStatus != RoundStatus.Betting) return;
+
              if (phaseTransitionUI != null)
              {
                  Debug.Log("Triggering Phase Transition Animation.");
