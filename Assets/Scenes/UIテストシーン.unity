@@ -643,6 +643,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.PlayerInfoUI
   hpText: {fileID: 485330929}
   characterImage: {fileID: 0}
+  characterData: {fileID: 0}
 --- !u!1 &93588683
 GameObject:
   m_ObjectHideFlags: 0
@@ -4196,6 +4197,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.EnemyInfoUI
   hpText: {fileID: 252598135}
   characterImage: {fileID: 0}
+  characterData: {fileID: 0}
   enemyPanel: {fileID: 385541335}
 --- !u!1 &604324882
 GameObject:
