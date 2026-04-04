@@ -26,7 +26,6 @@ namespace KillingMahjong.UI
         [Header("Animation Durations")]
         [SerializeField] private float lineInDuration = 0.5f;
         [SerializeField] private float textWaitDuration = 1.0f;
-        [SerializeField] private float lineExpandDuration = 0.3f;
         [SerializeField] private float checkerFadeDuration = 1.0f;
         [SerializeField] private float hpDeductionDuration = 1.5f;
 

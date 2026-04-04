@@ -82,13 +82,13 @@ namespace KillingMahjong.Network
         }
 
         // --- Handle Incoming Actions from Player ---
-        public void ReceiveActionFromPlayer(string actionType, GameUIManager.ActionPayload payload)
+        public void ReceiveActionFromPlayer(string actionType, ActionPayload payload)
         {
             Debug.Log($"[Debug Client] Received action from player: {actionType}");
             StartCoroutine(HandleActionWithDelay(actionType, payload));
         }
 
-        private IEnumerator HandleActionWithDelay(string actionType, GameUIManager.ActionPayload payload)
+        private IEnumerator HandleActionWithDelay(string actionType, ActionPayload payload)
         {
             yield return new WaitForSeconds(networkDelay);
 
@@ -205,8 +205,8 @@ namespace KillingMahjong.Network
                         }
                     }
 
-                    // オートロンしなかった場合は、自分ターンに戻る（ツモは無いのでこのまま）
-                    // SendMockGameState(RoundStatus.Discard); -> 状態の送信ではなくTurnDecisionへ
+                    // オートロンしなかった場合は、自分ターンに戻る
+                    SendMockMessage(new TurnDecidedMessage { type = "turn_decided", current_player = 0 });
                     break;
 
                 default:

@@ -141,10 +141,7 @@ namespace KillingMahjong.UI
                 // 手牌の生成
                 if (tilePrefab != null && tileResourceManager != null)
                 {
-                    // 中心揃えにするため、全体の横幅を計算して初期Xオフセットを決定（中心基準のanchoredPositionとして配置）
                     int handCount = handTiles.Count;
-                    float totalWidth = (handCount - 1) * (tileWidth * baseHandScale.x);
-                    float startX = baseHandPos.x - (totalWidth / 2f);
 
                     for (int i = 0; i < handCount; i++)
                     {
@@ -152,29 +149,18 @@ namespace KillingMahjong.UI
                         InitializeTileVisual(obj, handTiles[i]);
                         
                         RectTransform rt = obj.GetComponent<RectTransform>();
-                        if (rt != null)
-                        {
-                            rt.localScale = baseHandScale;
-                            float targetX = startX + (i * tileWidth * baseHandScale.x);
-                            rt.anchoredPosition = new Vector2(targetX, baseHandPos.y);
-                        }
+                        ApplyTileRectSettings(rt, baseHandScale);
                     }
                     
                     // アガリ牌（ロン牌）の生成
+                    // HorizontalLayoutGroupの影響を避けるため、専用の ronTileSlot に生成します
                     if (ronTile > 0 && ronTileSlot != null)
                     {
                         GameObject obj = Instantiate(tilePrefab, ronTileSlot);
                         InitializeTileVisual(obj, ronTile);
                         
                         RectTransform rt = obj.GetComponent<RectTransform>();
-                        if (rt != null)
-                        {
-                            rt.localScale = ronScale;
-                            rt.anchoredPosition = new Vector2(ronPos.x, ronPos.y);
-                        }
-                        
-                        // ここでロン側の牌に「エフェクト」をアタッチ・再生させることも可能です。
-                        // PlayRonTileVfx(obj.transform);
+                        ApplyTileRectSettings(rt, baseHandScale);
                     }
                 }
                 
@@ -239,6 +225,18 @@ namespace KillingMahjong.UI
             // Interactionは不要なので消すか無効化する
             TileInteraction interaction = tileObj.GetComponent<TileInteraction>();
             if (interaction != null) Destroy(interaction);
+        }
+
+        private void ApplyTileRectSettings(RectTransform rt, Vector3 scale)
+        {
+            if (rt == null) return;
+            rt.anchorMin = new Vector2(0.5f, 0.5f);
+            rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta = new Vector2(45f, 40f);
+            rt.anchoredPosition3D = Vector3.zero;
+            rt.localRotation = Quaternion.identity;
+            rt.localScale = scale;
         }
 
         // --- Tester Context Menu ---

@@ -75,10 +75,10 @@ namespace KillingMahjong.UI
             logPanel.SetActive(false);
 
             // ログが閉じられたら、GameUIManager側で止まっていたリアクションの消化を再開する
-            var uiManager = FindFirstObjectByType<GameUIManager>();
-            if (uiManager != null)
+            var reactionController = KillingMahjong.Managers.ReactionController.Instance;
+            if (reactionController != null)
             {
-                uiManager.ProcessNextReaction(); // 止まっていた場合、ここから再開される
+                reactionController.ProcessNextReaction(); // 止まっていた場合、ここから再開される
             }
         }
     }
