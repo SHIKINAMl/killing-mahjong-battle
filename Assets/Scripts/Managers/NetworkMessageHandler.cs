@@ -6,25 +6,32 @@ using KillingMahjong.EngineData;
 namespace KillingMahjong.Network
 {
     [System.Serializable]
-    public class ActionMessage
-    {
-        public string type = "action";
-        public ActionMessageData data;
-    }
-
-    [System.Serializable]
-    public class ActionMessageData
+    public class ActionPayloadWrapper
     {
         public string action;
         public ActionPayload data;
     }
 
     [System.Serializable]
+    public class ActionMessage
+    {
+        public string type = "action";
+        public ActionPayloadWrapper data;
+    }
+
+    [System.Serializable]
     public class ActionPayload
     {
+        public int bet_amount;
+        public List<int> hand_indexes;
+        public List<int> wall_indexes;
+        public int wall_index;
+        public string skill_type;
+        
+        // --- 互換性維持 ---
         public int amount;
         public List<int> hand;
-        public int tile; // For discard, etc.
+        public int tile; 
     }
 
     /// <summary>
@@ -90,7 +97,7 @@ namespace KillingMahjong.Network
             var msg = new ActionMessage
             {
                 type = "action",
-                data = new ActionMessageData
+                data = new ActionPayloadWrapper
                 {
                     action = actionType,
                     data = dataPayload
@@ -116,41 +123,56 @@ namespace KillingMahjong.Network
 
                     case "game_started":
                         OnGameStarted?.Invoke();
-                        OnPhaseStatusChanged?.Invoke(RoundStatus.Dealing);
+                        break;
+                        
+                    case "phase_change":
+                        PhaseChangeMessage pMsg = JsonUtility.FromJson<PhaseChangeMessage>(jsonString);
+                        if (pMsg != null) {
+                            if (pMsg.new_status == "dealing") OnPhaseStatusChanged?.Invoke(RoundStatus.Dealing);
+                            else if (pMsg.new_status == "hand_selection") OnPhaseStatusChanged?.Invoke(RoundStatus.HandSelection);
+                            else if (pMsg.new_status == "betting") OnPhaseStatusChanged?.Invoke(RoundStatus.Betting);
+                            else if (pMsg.new_status == "discard") OnPhaseStatusChanged?.Invoke(RoundStatus.Discard);
+                        }
                         break;
 
-                    case "bet":
-                        // サーバーからのレスポンス形式確定までダミー値を渡す
-                        OnBettingComplete?.Invoke(2000, 2000, 50000, 50000);
+                    case "dealing_completed":
+                        HandleDealingCompleted(jsonString);
                         break;
 
-                    case "wall_dealt":
-                        HandleWallDealt(jsonString);
+                    case "hand_selection_completed":
+                        HandleHandSelectionCompleted(jsonString);
                         break;
 
-                    case "hand_selected":
-                        HandleHandSelected(jsonString);
+                    case "bet_completed":
+                        BetCompletedMessage bMsg = JsonUtility.FromJson<BetCompletedMessage>(jsonString);
+                        if (bMsg != null && bMsg.data != null && bMsg.data.bets != null) {
+                            int pBet = 0; int eBet = 0;
+                            foreach(var b in bMsg.data.bets) {
+                                if (b.client_id == localPlayerId) pBet = b.bet;
+                                else eBet = b.bet;
+                            }
+                            OnBettingComplete?.Invoke(pBet, eBet, 20000, 20000);
+                        }
                         break;
 
-                    case "turn_decided":
-                        TurnDecidedMessage turnMsg = JsonUtility.FromJson<TurnDecidedMessage>(jsonString);
-                        bool isLocalTurn = (turnMsg != null && turnMsg.current_player == 0);
+                    case "discard_phase_started":
+                        DiscardPhaseStartedMessage dpsMsg = JsonUtility.FromJson<DiscardPhaseStartedMessage>(jsonString);
+                        bool isLocalTurn = (dpsMsg != null && dpsMsg.data != null && dpsMsg.data.first_player == localPlayerId);
                         Managers.BoardStateManager.Instance.SetLocalTurn(isLocalTurn);
                         OnPhaseStatusChanged?.Invoke(RoundStatus.Discard);
                         break;
-                        
+
                     case "is_tenpai":
                         IsTenpaiMessage tenpaiMsg = JsonUtility.FromJson<IsTenpaiMessage>(jsonString);
                         if (tenpaiMsg != null && tenpaiMsg.data != null && tenpaiMsg.data.waits != null)
                         {
                             var waits = new List<int>();
                             foreach (var w in tenpaiMsg.data.waits) waits.Add(w.tile);
-                            // BoardStateManagerのデータを上書きしてRebuildトリガー
                             Managers.BoardStateManager.Instance.SetLocalState(null, null, waits);
                             Managers.BoardStateManager.Instance.FireRebuildEvent();
                         }
                         break;
-                        
+
                     case "not_tenpai":
                         Managers.BoardStateManager.Instance.SetLocalState(null, null, new List<int>());
                         Managers.BoardStateManager.Instance.FireRebuildEvent();
@@ -160,29 +182,48 @@ namespace KillingMahjong.Network
                         ErrorMessage errorMsg = JsonUtility.FromJson<ErrorMessage>(jsonString);
                         Debug.LogError($"[Server Error] {errorMsg?.message}");
                         break;
-                        
-                    case "discard":
-                        DiscardMessage discardMsg = JsonUtility.FromJson<DiscardMessage>(jsonString);
-                        if (discardMsg != null)
+
+                    case "discard_completed":
+                        DiscardCompletedMessage discardMsg = JsonUtility.FromJson<DiscardCompletedMessage>(jsonString);
+                        if (discardMsg != null && discardMsg.data != null)
                         {
-                            bool isLocal = (discardMsg.client_id == localPlayerId);
+                            bool isLocal = (discardMsg.data.player_id == localPlayerId);
                             if (isLocal)
                             {
                                 Managers.BoardStateManager.Instance.SetLocalTurn(false);
                             }
-                            OnTileDiscarded?.Invoke(discardMsg.tile, isLocal);
+                            OnTileDiscarded?.Invoke(discardMsg.data.tile, isLocal);
                         }
                         break;
-                        
-                    case "agari":
-                        AgariMessage agariMsg = JsonUtility.FromJson<AgariMessage>(jsonString);
-                        if (agariMsg != null)
+
+                    case "hand_selection_accepted":
+                        HandSelectionAcceptedMessage hsaMsg = JsonUtility.FromJson<HandSelectionAcceptedMessage>(jsonString);
+                        OnHandSelectionAccepted?.Invoke();
+                        break;
+
+                    case "discard_accepted":
+                        DiscardAcceptedMessage daMsg = JsonUtility.FromJson<DiscardAcceptedMessage>(jsonString);
+                        if (daMsg != null && daMsg.data != null)
                         {
-                            bool isLocalWin = (agariMsg.winner_client_id == localPlayerId);
-                            Managers.BoardStateManager.Instance.LastIsLocalWin = isLocalWin;
-                            OnAgari?.Invoke(isLocalWin);
+                            if (daMsg.data.is_win) {
+                                Managers.BoardStateManager.Instance.LastIsLocalWin = true;
+                                OnPhaseStatusChanged?.Invoke(RoundStatus.Agari);
+                                OnAgari?.Invoke(true);
+                            }
                         }
-                        OnPhaseStatusChanged?.Invoke(RoundStatus.Agari);
+                        break;
+
+                    case "round_end":
+                        RoundEndMessage reMsg = JsonUtility.FromJson<RoundEndMessage>(jsonString);
+                        if (reMsg != null && reMsg.data != null) {
+                            if (!reMsg.data.is_draw && reMsg.data.liquidation != null) {
+                                // 誰かがあがった
+                                bool isLocalWin = (reMsg.data.liquidation.winner_id == localPlayerId);
+                                Managers.BoardStateManager.Instance.LastIsLocalWin = isLocalWin;
+                                OnPhaseStatusChanged?.Invoke(RoundStatus.Agari);
+                                OnAgari?.Invoke(isLocalWin);
+                            }
+                        }
                         break;
 
                     case "game_end":
@@ -196,56 +237,109 @@ namespace KillingMahjong.Network
             }
         }
 
-        private void HandleWallDealt(string jsonString)
+        private void HandleDealingCompleted(string jsonString)
         {
-            OnPhaseStatusChanged?.Invoke(RoundStatus.HandSelection);
-            
-            WallDealtMessage msg = JsonUtility.FromJson<WallDealtMessage>(jsonString);
+            DealingCompletedMessage msg = JsonUtility.FromJson<DealingCompletedMessage>(jsonString);
             if (msg.hands == null) return;
             
             var tenpaiExamples = ParseTenpaiExamplesFromJson(jsonString, localPlayerId);
             var convertedExamples = tenpaiExamples.ConvertAll(e => e.ToArray());
             Managers.BoardStateManager.Instance.SetTenpaiExamples(convertedExamples);
 
+            // 手動独自パースで wall 配列を抽出 (JsonUtilityが int[] を上手くさばけない場合のフェールセーフ)
+            var wallDict = ParseIntArrays(jsonString, "wall");
+
             foreach (var h in msg.hands)
             {
+                List<int> wallTiles = new List<int>();
+                if (wallDict.ContainsKey(h.client_id)) wallTiles = wallDict[h.client_id];
+                // JsonUtility が取得できていればそちらを優先
+                if (h.wall != null && h.wall.Length > 0) wallTiles = new List<int>(h.wall);
+
                 if (h.client_id == localPlayerId)
                 {
-                    Managers.BoardStateManager.Instance.SetLocalState(new List<int>(h.hand), new List<int>());
+                    Managers.BoardStateManager.Instance.SetLocalState(wallTiles, new List<int>());
                 }
-                else if (h.hand != null)
+                else
                 {
-                    Managers.BoardStateManager.Instance.SetEnemyState(new List<int>(h.hand), new List<int>());
+                    Managers.BoardStateManager.Instance.SetEnemyState(wallTiles, new List<int>());
                 }
             }
             Managers.BoardStateManager.Instance.FireRebuildEvent();
         }
 
-        private void HandleHandSelected(string jsonString)
+        private void HandleHandSelectionCompleted(string jsonString)
         {
-            HandSelectedMessage msg = JsonUtility.FromJson<HandSelectedMessage>(jsonString);
-            if (msg.hands == null)
-            {
-                OnHandSelectionAccepted?.Invoke();
-                return;
-            }
-            
-            OnPhaseStatusChanged?.Invoke(RoundStatus.Betting);
+            HandSelectionCompletedMessage msg = JsonUtility.FromJson<HandSelectionCompletedMessage>(jsonString);
+            if (msg.data == null || msg.data.hands == null) return;
 
-            foreach (var h in msg.hands)
+            var handDict = ParseIntArrays(jsonString, "hand");
+            var wallDict = ParseIntArrays(jsonString, "wall");
+            var waitDict = ParseIntArrays(jsonString, "wait"); // wait or waits, API doc depends
+            if (waitDict.Count == 0) waitDict = ParseIntArrays(jsonString, "waits");
+
+            foreach (var h in msg.data.hands)
             {
+                List<int> handTiles = new List<int>();
+                List<int> wallTiles = new List<int>();
+                List<int> waitTiles = new List<int>();
+
+                if (handDict.ContainsKey(h.client_id)) handTiles = handDict[h.client_id];
+                if (wallDict.ContainsKey(h.client_id)) wallTiles = wallDict[h.client_id];
+                if (waitDict.ContainsKey(h.client_id)) waitTiles = waitDict[h.client_id];
+
+                if (h.hand != null) handTiles = new List<int>(h.hand);
+                if (h.wall != null) wallTiles = new List<int>(h.wall);
+                if (h.waits != null) waitTiles = new List<int>(h.waits);
+
                 if (h.client_id == localPlayerId)
                 {
-                    Managers.BoardStateManager.Instance.SetLocalState(new List<int>(h.wall), new List<int>(h.hand), new List<int>(h.wait));
+                    Managers.BoardStateManager.Instance.SetLocalState(wallTiles, handTiles, waitTiles);
                 }
-                else if (h.hand != null)
+                else
                 {
-                    Managers.BoardStateManager.Instance.SetEnemyState(h.wall != null ? new List<int>(h.wall) : null, new List<int>(h.hand));
+                    Managers.BoardStateManager.Instance.SetEnemyState(wallTiles, handTiles);
                 }
             }
             
             Managers.BoardStateManager.Instance.ClearSelection();
             Managers.BoardStateManager.Instance.FireRebuildEvent();
+        }
+
+        // JsonUtilityがプリミティブ配列をパースできない問題等のフォールバック
+        private Dictionary<string, List<int>> ParseIntArrays(string jsonString, string arrayKeyName)
+        {
+            var result = new Dictionary<string, List<int>>();
+            int searchFrom = 0;
+            while (true)
+            {
+                int cidStart = jsonString.IndexOf("\"client_id\"", searchFrom);
+                if (cidStart < 0) break;
+
+                int valStart = jsonString.IndexOf('"', cidStart + 11) + 1;
+                int valEnd = jsonString.IndexOf('"', valStart);
+                if (valStart < 0 || valEnd < 0) break;
+                string cid = jsonString.Substring(valStart, valEnd - valStart);
+
+                int keyStart = jsonString.IndexOf($"\"{arrayKeyName}\"", valEnd);
+                if (keyStart > 0 && keyStart < cidStart + 200) // 次のデータに飛びすぎないよう簡易チェック
+                {
+                    int arrStart = jsonString.IndexOf('[', keyStart);
+                    int arrEnd = jsonString.IndexOf(']', arrStart);
+                    if (arrStart > 0 && arrEnd > arrStart)
+                    {
+                        string inner = jsonString.Substring(arrStart + 1, arrEnd - arrStart - 1);
+                        var list = new List<int>();
+                        foreach (var token in inner.Split(','))
+                        {
+                            if (int.TryParse(token.Trim(), out int val)) list.Add(val);
+                        }
+                        result[cid] = list;
+                    }
+                }
+                searchFrom = valEnd + 1;
+            }
+            return result;
         }
 
         private List<List<int>> ParseTenpaiExamplesFromJson(string jsonString, string targetClientId)

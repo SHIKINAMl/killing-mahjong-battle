@@ -182,7 +182,10 @@ namespace KillingMahjong.UI
 
             BoardStateManager.Instance.SetLocalTurn(false);
 
-            SendActionToServer("discard", new ActionPayload { tile = tileToDiscard });
+            int wallIndex = BoardStateManager.Instance.OriginalWallTiles.IndexOf(tileToDiscard);
+            if (wallIndex < 0) wallIndex = tileToDiscard; // フォールバック
+
+            SendActionToServer("discard", new ActionPayload { wall_index = wallIndex, tile = tileToDiscard });
             ClearSelection();
         }
 
@@ -191,7 +194,26 @@ namespace KillingMahjong.UI
             if (currentPhaseStatus != RoundStatus.HandSelection) return;
             if (dialogueUI != null && dialogueUI.IsLogOpen) return;
             
-            SendActionToServer("selected", new ActionPayload { hand = BoardStateManager.Instance.CurrentHandTiles });
+            List<int> handIndexes = new List<int>();
+            HashSet<int> usedIndexes = new HashSet<int>();
+            foreach(int tileId in BoardStateManager.Instance.CurrentHandTiles) {
+                 var wallTiles = BoardStateManager.Instance.OriginalWallTiles;
+                 int idx = -1;
+                 for (int i = 0; i < wallTiles.Count; i++)
+                 {
+                     if (wallTiles[i] == tileId && !usedIndexes.Contains(i))
+                     {
+                         idx = i;
+                         break;
+                     }
+                 }
+                 if (idx >= 0) {
+                     handIndexes.Add(idx);
+                     usedIndexes.Add(idx);
+                 }
+            }
+            
+            SendActionToServer("select", new ActionPayload { hand_indexes = handIndexes, hand = BoardStateManager.Instance.CurrentHandTiles });
         }
 
         public void DeselectAbility()
@@ -327,11 +349,7 @@ namespace KillingMahjong.UI
                 foreach (var t in wallUI.GetWallSlots())
                 {
                     var interaction = t.GetComponent<TileInteraction>();
-                    if (interaction != null && selectedIds.Contains(interaction.TileId))
-                    {
-                        t.localPosition = interaction.OriginalWallPosition + new Vector3(0, 20f, 0); 
-                    }
-                    else if (interaction != null)
+                    if (interaction != null)
                     {
                         t.localPosition = interaction.OriginalWallPosition;
                     }
@@ -564,7 +582,7 @@ namespace KillingMahjong.UI
         private void OnBetConfirmed(int betAmount)
         {
             bettingUI.HideBettingPhase();
-            SendActionToServer("betting", new ActionPayload { amount = betAmount });
+            SendActionToServer("bet", new ActionPayload { bet_amount = betAmount, amount = betAmount });
         }
 
         public void OnBettingCompleteFromServer(int playerBet, int enemyBet, int playerHp, int enemyHp)

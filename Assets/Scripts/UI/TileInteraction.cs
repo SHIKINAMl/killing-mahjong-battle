@@ -9,6 +9,7 @@ namespace KillingMahjong.UI
         public int TileId { get; private set; }
         public bool IsInHand { get; private set; }
         public Vector3 OriginalWallPosition { get; set; } // ★ 壁の本来の座標を記憶するプロパティ追加
+        public bool IsHovered { get; private set; }
 
         private GameUIManager _gameUIManager;
         private Canvas _canvas;
@@ -156,33 +157,12 @@ namespace KillingMahjong.UI
 
         public void OnPointerEnter(PointerEventData eventData)
         {
-            if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard && !IsInHand)
-            {
-                // Wallにある牌をホバーしたときに少し浮かせる（選択時よりは低め）
-                // ただし、既に選択されている場合はその高さを維持する
-                if (!_gameUIManager.IsTileSelected(TileId))
-                {
-                    if (_rectTransform != null)
-                    {
-                        _rectTransform.localPosition = OriginalWallPosition + new Vector3(0, 10f, 0);
-                    }
-                }
-            }
+            IsHovered = true;
         }
 
         public void OnPointerExit(PointerEventData eventData)
         {
-            if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard && !IsInHand)
-            {
-                // ホバーが外れたら元の位置に戻す
-                if (!_gameUIManager.IsTileSelected(TileId))
-                {
-                    if (_rectTransform != null)
-                    {
-                        _rectTransform.localPosition = OriginalWallPosition;
-                    }
-                }
-            }
+            IsHovered = false;
         }
     }
 }

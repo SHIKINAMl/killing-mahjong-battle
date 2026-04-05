@@ -17,8 +17,35 @@ namespace KillingMahjong.EngineData
         public string message;
     }
 
+    // --- 共通データ構造 ---
+    [Serializable]
+    public class PlayerRef { public string client_id; }
+
+    [Serializable]
+    public class LiquidationData
+    {
+        public string winner_id;
+        public string loser_id;
+        public int han;
+        public float multiplier;
+        public int winner_bet;
+        public int loser_bet;
+        public int winner_gain;
+        public int loser_loss;
+        public int winner_health;
+        public int loser_health;
+    }
+
+    // JsonUtilityはネストした配列をデシリアライズできないためラッパークラスを使用する
+    // ただし、Unityのリモートデシリアライズで List<int> は可能ですが、List<List<int>> 等はラッパーが必要です
+    [Serializable]
+    public class IntArray
+    {
+        public int[] items;
+    }
+
     // --- 各種イベントデータ構造 ---
-    // (Pythonの `{"type": "connected", "data": {"client_id": "C0001"}}` など)
+
     [Serializable]
     public class ConnectedMessage
     {
@@ -31,28 +58,17 @@ namespace KillingMahjong.EngineData
         public string client_id;
     }
 
-    // `ping` や `matching_waiting` は data不要/汎用ベースでパース可能
-
     [Serializable]
-    public class WallDealtMessage
+    public class GameStartedMessage
     {
         public string type;
-        public int dora_id;
-        public WallDealtHand[] hands;
+        public GameStartedData data;
     }
-    // JsonUtilityはネストした配列をデシリアライズできないためラッパークラスを使用する
     [Serializable]
-    public class IntArray
+    public class GameStartedData
     {
-        public int[] items;
-    }
-
-    [Serializable]
-    public class WallDealtHand
-    {
-        public string client_id;
-        public List<int> hand;
-        public List<IntArray> tenpai_examples;
+        public string match_id;
+        public PlayerRef[] players;
     }
 
     [Serializable]
@@ -63,45 +79,106 @@ namespace KillingMahjong.EngineData
     }
 
     [Serializable]
-    public class HandSelectedMessage
+    public class PhaseChangeMessage
     {
         public string type;
-        public HandSelectedData[] hands;
-    }
-    
-    [Serializable]
-    public class HandSelectedData
-    {
-        public string client_id;
-        public int[] hand;
-        public int[] wait;
-        public int[] wall;
-    }
-    
-    [Serializable]
-    public class TurnDecidedMessage
-    {
-        public string type;
-        public int current_player; 
-    }
-    
-    [Serializable]
-    public class GameEndMessage
-    {
-        public string type;
-        // Python: {"client_id1": score1, "client_id2": score2}
-        // Parsing of final_scores dictionary is handled manually in GameUIManager.cs ApplyGameStateFromJSON
+        public string new_status;
     }
 
     [Serializable]
-    public class AgariMessage
+    public class DealingCompletedMessage
     {
         public string type;
-        public string winner_client_id;
+        public int dora_id;
+        public DealingCompletedHand[] hands;
     }
-    
-    // アクション送信用のJSON定義は GameUIManager 内部に定義されていますが、
-    // 追加の `is_tenpai` 受信用等が必要ならここに追加します
+    [Serializable]
+    public class DealingCompletedHand
+    {
+        public string client_id;
+        public int[] wall;
+        // string(JSON)で独自パースする場合はここでは定義しなくても良いが、一応
+        // List<IntArray>等でパースするためには手動対応が必要 (NetworkMessageHandler側で行う)
+    }
+
+    [Serializable]
+    public class HandSelectionCompletedMessage
+    {
+        public string type;
+        public HandSelectionCompletedData data;
+    }
+    [Serializable]
+    public class HandSelectionCompletedData
+    {
+        public HandData[] hands;
+    }
+    [Serializable]
+    public class HandData
+    {
+        public string client_id;
+        public int[] hand;
+        public int[] waits;
+        public int[] wall;
+    }
+
+    [Serializable]
+    public class BetCompletedMessage
+    {
+        public string type;
+        public BetCompletedData data;
+    }
+    [Serializable]
+    public class BetCompletedData
+    {
+        public PlayerBetData[] bets;
+    }
+    [Serializable]
+    public class PlayerBetData
+    {
+        public string client_id;
+        public int bet;
+    }
+
+    [Serializable]
+    public class DiscardPhaseStartedMessage
+    {
+        public string type;
+        public DiscardPhaseStartedData data;
+    }
+    [Serializable]
+    public class DiscardPhaseStartedData
+    {
+        public string first_player;
+    }
+
+    [Serializable]
+    public class DiscardCompletedMessage
+    {
+        public string type;
+        public DiscardCompletedData data;
+    }
+    [Serializable]
+    public class DiscardCompletedData
+    {
+        public string player_id;
+        public int tile;
+    }
+
+    [Serializable]
+    public class RoundEndMessage
+    {
+        public string type;
+        public RoundEndData data;
+    }
+    [Serializable]
+    public class RoundEndData
+    {
+        public bool is_draw;
+        public LiquidationData liquidation;
+    }
+
+    // --- アクション応答系 ---
+
     [Serializable]
     public class IsTenpaiMessage
     {
@@ -122,10 +199,57 @@ namespace KillingMahjong.EngineData
     }
 
     [Serializable]
-    public class DiscardMessage
+    public class HandSelectionAcceptedMessage
     {
         public string type;
-        public string client_id;
+        public HandData data; // サーバーの仕様では単一HandDataが返る
+    }
+
+    [Serializable]
+    public class BetAcceptedMessage
+    {
+        public string type;
+        public BetAcceptedData data;
+    }
+    [Serializable]
+    public class BetAcceptedData
+    {
+        public int bet_amount;
+        public int max_bet;
+        public int bet_unit;
+    }
+
+    [Serializable]
+    public class DiscardAcceptedMessage
+    {
+        public string type;
+        public DiscardAcceptedData data;
+    }
+    [Serializable]
+    public class DiscardAcceptedData
+    {
+        public int wall_index;
         public int tile;
+        public bool is_win;
+        public LiquidationData liquidation;
+    }
+
+    [Serializable]
+    public class SpecialVictoryMessage
+    {
+        public string type;
+        public SpecialVictoryData data;
+    }
+    [Serializable]
+    public class SpecialVictoryData
+    {
+        public string player_id;
+    }
+
+    [Serializable]
+    public class GameEndMessage
+    {
+        public string type;
+        // Parsing of final_scores dictionary is handled manually via string operations
     }
 }

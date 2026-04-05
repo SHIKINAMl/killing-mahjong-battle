@@ -16,6 +16,7 @@ namespace KillingMahjong.Managers
         // --- データモデル ---
         public List<int> CurrentHandTiles { get; private set; } = new List<int>();
         public List<int> CurrentWallTiles { get; private set; } = new List<int>();
+        public List<int> OriginalWallTiles { get; private set; } = new List<int>();
         public List<int> CurrentWaitTiles { get; private set; } = new List<int>();
         
         public List<int> CurrentEnemyHandTiles { get; private set; } = new List<int>();
@@ -63,7 +64,14 @@ namespace KillingMahjong.Managers
         /// </summary>
         public void SetLocalState(List<int> wall, List<int> hand, List<int> wait = null)
         {
-            if (wall != null) CurrentWallTiles = SortTileIds(new List<int>(wall));
+            if (wall != null) 
+            {
+                if (OriginalWallTiles.Count == 0 || OriginalWallTiles.Count != wall.Count) 
+                {
+                    OriginalWallTiles = new List<int>(wall);
+                }
+                CurrentWallTiles = SortTileIds(new List<int>(wall));
+            }
             if (hand != null) CurrentHandTiles = SortTileIds(new List<int>(hand));
             if (wait != null) CurrentWaitTiles = new List<int>(wait);
         }
@@ -148,9 +156,13 @@ namespace KillingMahjong.Managers
             int exampleIndex = UnityEngine.Random.Range(0, CurrentTenpaiExamples.Count);
             int[] targetHand = CurrentTenpaiExamples[exampleIndex];
             
-            foreach (int id in targetHand)
+            foreach (int index in targetHand)
             {
-                MoveTileToHand(id);
+                if (index >= 0 && index < OriginalWallTiles.Count)
+                {
+                    int tileId = OriginalWallTiles[index];
+                    MoveTileToHand(tileId);
+                }
             }
         }
 

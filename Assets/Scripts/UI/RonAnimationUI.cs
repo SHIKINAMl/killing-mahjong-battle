@@ -135,8 +135,8 @@ namespace KillingMahjong.UI
                 Vector2 ronPos = isLocalPlayerWin ? playerRonTilePosition : enemyRonTilePosition;
                 Vector3 ronScale = isLocalPlayerWin ? playerRonTileScale : enemyRonTileScale;
                 
-                // 横並び配置のためのベース変数 (例: 中心位置からタイル幅*スケール分ずらして並べる)
-                float tileWidth = 50f; // RiverUI等から持ってきたり適宜設定
+                // タイルのベース幅 (SizeDeltaのXと同じ合わせる)
+                float tileWidth = 45f; 
                 
                 // 手牌の生成
                 if (tilePrefab != null && tileResourceManager != null)
@@ -150,6 +150,10 @@ namespace KillingMahjong.UI
                         
                         RectTransform rt = obj.GetComponent<RectTransform>();
                         ApplyTileRectSettings(rt, baseHandScale);
+                        
+                        // 横に並べるためにX座標を計算 (要素がすべて中心に揃うようにハンド全体の幅から算出)
+                        float offset_x = (i - (handCount - 1) / 2f) * (tileWidth * baseHandScale.x);
+                        rt.anchoredPosition3D = new Vector3(offset_x, 0, 0);
                     }
                     
                     // アガリ牌（ロン牌）の生成
