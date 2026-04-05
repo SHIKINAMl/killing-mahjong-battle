@@ -19,6 +19,8 @@ namespace KillingMahjong.UI
         [SerializeField] private Button activateButton; // The Activate button
         
         [Header("Layout Settings")]
+        [SerializeField] private float itemOffsetX = 0f; // ★インスペクターでX座標を調整可能に
+        [SerializeField] private float itemOffsetY = 0f; // ★インスペクターで1個目のY座標を調整可能に
         [SerializeField] private float itemHeight = 100f;
         [SerializeField] private float itemSpacing = 5f;
 
@@ -64,7 +66,7 @@ namespace KillingMahjong.UI
             foreach(Transform child in contentContainer) Destroy(child.gameObject);
             instantiatedItems.Clear();
 
-            float currentY = 0;
+            float currentY = itemOffsetY; // ★初期値にitemOffsetYを指定する
             for (int i = 0; i < mockAbilities.Count; i++)
             {
                 var data = mockAbilities[i];
@@ -87,8 +89,8 @@ namespace KillingMahjong.UI
                     // Set SizeDelta (X=0 means stretch to fill width, Y=Height)
                     rt.sizeDelta = new Vector2(0, itemHeight);
 
-                    // Set Position (Top goes down)
-                    rt.anchoredPosition = new Vector2(0, -currentY);
+                    // Set Position (Top goes down). Use 3D to ensure Z is 0.
+                    rt.anchoredPosition3D = new Vector3(itemOffsetX, -currentY, 0);
                 }
 
                 instantiatedItems.Add(itemObj);
@@ -159,7 +161,15 @@ namespace KillingMahjong.UI
                 {
                     var data = mockAbilities[index];
                     Debug.Log($"Activting Ability: {data.name} (Cost: {data.cost})");
-                    // TODO: Deduct cost, Apply effect
+                    // TODO: Send skill selection event to server using GameUIManager.SendActionToServer
+                    
+                    // Client-side visual deduction
+                    var uiMgr = FindFirstObjectByType<GameUIManager>();
+                    if (uiMgr != null && uiMgr.PlayerInfoUI != null)
+                    {
+                        uiMgr.PlayerInfoUI.ReduceHp(data.cost);
+                        uiMgr.ShowDialogue($"アビリティ「{data.name}」を発動！");
+                    }
                 }
                 DeselectAll();
                 // Optionally close window? User said "Activate and deselect". Didn't say close.

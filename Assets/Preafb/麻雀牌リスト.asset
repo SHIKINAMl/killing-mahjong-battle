@@ -1,0 +1,93 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6ae873ee100317c489ad3c05c35ca401, type: 3}
+  m_Name: "\u9EBB\u96C0\u724C\u30EA\u30B9\u30C8"
+  m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.TileResourceManager
+  tileSprites:
+  - {fileID: 21300000, guid: 661140b19eec38a4e8bfc9a72dbdbbc2, type: 3}
+  - {fileID: 21300000, guid: bc31fe9e168e2d5448961816ed428bbb, type: 3}
+  - {fileID: 21300000, guid: fb691211aabb16045a0eaaa3ee8df813, type: 3}
+  - {fileID: 21300000, guid: ec57f2ab3c7a28746b4ed18934a97b69, type: 3}
+  - {fileID: 21300000, guid: b818c119e7304094282ea510cb2a316d, type: 3}
+  - {fileID: 21300000, guid: 960daf7b34d8afa47953f845dfb7e539, type: 3}
+  - {fileID: 21300000, guid: 60bf14425e2132e46a52add3a5ca18f8, type: 3}
+  - {fileID: 21300000, guid: 6e1436aba2044594ab9fe6b889cd5bb2, type: 3}
+  - {fileID: 21300000, guid: 6caa064c5440826499de8d4a154ca579, type: 3}
+  - {fileID: 21300000, guid: 95a1e5ee508d73f488e8676b2325315c, type: 3}
+  - {fileID: 21300000, guid: d6191890b1d45a747985c452bdbfd4bb, type: 3}
+  - {fileID: 21300000, guid: ac8954bef5cdafa409a897767d56b507, type: 3}
+  - {fileID: 21300000, guid: fa1f53fa0add31642aba126b9af0e80a, type: 3}
+  - {fileID: 21300000, guid: ad1e0ff3a5925cc4486fcce4d5fd2172, type: 3}
+  - {fileID: 21300000, guid: 302b98ae6696afe47aedffa5a3ef9241, type: 3}
+  - {fileID: 21300000, guid: 6d54ff0d93e865346a2fe5070a6f55da, type: 3}
+  - {fileID: 21300000, guid: e0c4c33dbd2463e4c9cba452f076a64e, type: 3}
+  - {fileID: 21300000, guid: d5dace9cde24c3440a3eafb801368fc3, type: 3}
+  - {fileID: 21300000, guid: 7132e13853c67ad41aafaf205bd909a7, type: 3}
+  - {fileID: 21300000, guid: db74a071eefee01429539a3ce3b67881, type: 3}
+  - {fileID: 21300000, guid: c0cb4d764203f114a876486cca784092, type: 3}
+  - {fileID: 21300000, guid: f8f2ca3bd567f1340a2d970193faf211, type: 3}
+  - {fileID: 21300000, guid: 77a08763d333a234198b4a17d42ea94c, type: 3}
+  - {fileID: 21300000, guid: 86de4efe440782a4585d86fee78bb49d, type: 3}
+  - {fileID: 21300000, guid: c491813ed6418f440b994a6ab135e105, type: 3}
+  - {fileID: 21300000, guid: 4bb185d67a7054a4a97d653588f12cab, type: 3}
+  - {fileID: 21300000, guid: 5ce2a0ae4d6e1554d899c607cad1bebe, type: 3}
+  - {fileID: 21300000, guid: aaa275d386a73f84f8adb323e8cb51e9, type: 3}
+  - {fileID: 21300000, guid: 4ee6f2000a42790408238ebf8e75cb73, type: 3}
+  - {fileID: 21300000, guid: 81b498faae33d6a498fffcbcf1e09f46, type: 3}
+  - {fileID: 21300000, guid: dfb9533009e5ee144a1d59acf1bfdde5, type: 3}
+  - {fileID: 21300000, guid: f01d768ceafffc84bbbfe7f96350f309, type: 3}
+  - {fileID: 21300000, guid: 629c659bc2b82b84b9c114f598f158d6, type: 3}
+  - {fileID: 21300000, guid: 8322f25840fae2e48bac3d30083b7f86, type: 3}
+  redDoraSprites:
+  - {fileID: 21300000, guid: ae12c990f8739e14d840883bb74f88b4, type: 3}
+  - {fileID: 21300000, guid: 3c032d59f0ef70342b987b8e9ccadd51, type: 3}
+  - {fileID: 21300000, guid: ba18159b956c02d489159174e79becfc, type: 3}
+  discardTileSprites:
+  - {fileID: 21300000, guid: 1a8e4a63a96837e43b7532f310a5dd61, type: 3}
+  - {fileID: 21300000, guid: 65e7312bb11d06b48b994b94450a7bbb, type: 3}
+  - {fileID: 21300000, guid: f75f98592fe95b7409495a34b21e69d1, type: 3}
+  - {fileID: 21300000, guid: 2a8ba36f318b5f34887ff402df2a14ee, type: 3}
+  - {fileID: 21300000, guid: 5b0c1834162818645a038433ff68f86b, type: 3}
+  - {fileID: 21300000, guid: 49779bf34389f764db9a6dff0aa09c4e, type: 3}
+  - {fileID: 21300000, guid: 68465ddfea5d7374dad3c6aca2435a18, type: 3}
+  - {fileID: 21300000, guid: 485d5eebd413a914fa773a396dac29b7, type: 3}
+  - {fileID: 21300000, guid: e99c3e304631d5e4ca8153f9504b6262, type: 3}
+  - {fileID: 21300000, guid: da981677e6fc74343bdd78ffa7ca390e, type: 3}
+  - {fileID: 21300000, guid: 0bb08ec0ff630f14f8278e251917035a, type: 3}
+  - {fileID: 21300000, guid: 459b1c017c497dd4fa0de47308c64e94, type: 3}
+  - {fileID: 21300000, guid: 96f8597c65a39ee4c8db7d0c99c2cf1a, type: 3}
+  - {fileID: 21300000, guid: 1fe720e024004d346851a829e0cd77bb, type: 3}
+  - {fileID: 21300000, guid: 6af8a1fe087a192429b5dafb51c91010, type: 3}
+  - {fileID: 21300000, guid: 32e0d86d5485371429fa654d73240e48, type: 3}
+  - {fileID: 21300000, guid: 6b4ef70caeb5ed34baea60aa57cc34e1, type: 3}
+  - {fileID: 21300000, guid: 1431135eb16b59c42a8e38e0983f5ceb, type: 3}
+  - {fileID: 21300000, guid: 716d4237aab3db94cbda3b554aa38d8d, type: 3}
+  - {fileID: 21300000, guid: d7f2337254dcd7f49ad87f6452e940bf, type: 3}
+  - {fileID: 21300000, guid: b5c5fa90f01757843a986a7bd1f562e3, type: 3}
+  - {fileID: 21300000, guid: 8f143fa0a68bf2f4287fb81f55bec67a, type: 3}
+  - {fileID: 21300000, guid: bfac563e82e3c724b951735044facf1c, type: 3}
+  - {fileID: 21300000, guid: 59b0067d41444e6478c665cf57443220, type: 3}
+  - {fileID: 21300000, guid: 016222ecf21827a4db93ba956ad2f4fb, type: 3}
+  - {fileID: 21300000, guid: 56c9f948d8e2f6b4eae47b25797c74ff, type: 3}
+  - {fileID: 21300000, guid: 7db8414403b8b7241a0b3b1ca93cf64b, type: 3}
+  - {fileID: 21300000, guid: f992db27445b8a440ae8186be975e07a, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  - {fileID: 21300000, guid: 9a4c3ed656f20624f9f535f1244c3fb0, type: 3}
+  discardRedDoraSprites:
+  - {fileID: 21300000, guid: 1bf0712420172d94f88f7dfb9d3ed510, type: 3}
+  - {fileID: 21300000, guid: 98e7f00a2e9947745a47407fc0bf0b54, type: 3}
+  - {fileID: 21300000, guid: 92f1bd991bd8d164b81c69cd8128efbf, type: 3}
+  tilePrefab: {fileID: 7371004981101527939, guid: 8ebe538fe6c930d45a4f9da8cf02bd0d, type: 3}

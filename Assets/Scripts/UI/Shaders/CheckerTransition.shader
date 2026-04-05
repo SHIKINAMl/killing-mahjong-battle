@@ -5,7 +5,8 @@ Shader "UI/CheckerboardTransition"
         [PerRendererData] _MainTex ("Sprite Texture", 2D) = "white" {}
         _Color ("Tint", Color) = (0,0,0,1)
         _Progress ("Progress", Range(0, 1)) = 0
-        _CheckerSize ("Checker Size", Float) = 50.0
+        _MaxRows ("Max Rows", Float) = 20.0
+        _AspectRatio ("Aspect Ratio", Float) = 1.777778
         
         // --- Required for UI Masking ---
         _StencilComp ("Stencil Comparison", Float) = 8
@@ -73,7 +74,8 @@ Shader "UI/CheckerboardTransition"
             sampler2D _MainTex;
             fixed4 _Color;
             float _Progress;
-            float _CheckerSize;
+            float _MaxRows;
+            float _AspectRatio;
 
             v2f vert(appdata_t v)
             {
@@ -89,42 +91,43 @@ Shader "UI/CheckerboardTransition"
 
             fixed4 frag(v2f IN) : SV_Target
             {
-                // UI Coordinate mapping for Checkers
-                float2 pos = IN.worldPosition.xy / _CheckerSize;
+                // UI Coordinate mapping for Checkers: SCREE SPACE
+                // SV_Position (IN.vertex) には物理スクリーンのピクセル座標が入っているため、
+                // _ScreenParams.xy を使って 0～1 の完全なスクリーンUVを取得する。
+                // これにより、UIのRectがどれだけ巨大/変形していても確実に画面端から端まで均等なマス目になる。
+                float2 uv = IN.vertex.xy / _ScreenParams.xy;
                 
-                // Determine if this checker square is "on" or "off"
-                float checker = fmod(floor(pos.x) + floor(pos.y), 2.0);
+                // Yを画面中心(0.5)からの距離とし、指定した行数(MaxRows)で分割
+                float rowIdx = floor(abs(uv.y - 0.5) * 2.0 * _MaxRows);
                 
-                // For a diagonal sweep from bottom-left (0,0) to top-right (1,1) in relative screen space
-                // We need relative screen coordinates.
-                // Depending on the canvas, IN.texcoord is 0..1 across the image
-                float diagonal = (IN.texcoord.x + IN.texcoord.y) / 2.0;
-
-                // Pattern evolution based on _Progress
-                // As progress goes 0 -> 1, the diagonal threshold moves 0 -> 1
-                // We want the fade to spread diagonally.
-                // Let's create a soft threshold around the diagonal.
+                // Xは画面の物理アスペクト比を掛けて正方形サイズとして扱う
+                float aspect = _ScreenParams.x / _ScreenParams.y;
+                float colIdx = floor((uv.x - 0.5) * 2.0 * _MaxRows * aspect);
                 
-                float fadeEdge = 0.3; // How soft the diagonal diagonal edge is
-                // Mapping progress to allow full coverage
-                float mappedProgress = _Progress * (1.0 + fadeEdge) - (fadeEdge / 2.0);
+                // 市松模様の判定 (0 or 1)
+                float checker = abs(fmod(rowIdx + colIdx, 2.0));
                 
-                float localP = saturate((mappedProgress - diagonal + (fadeEdge / 2.0)) / fadeEdge);
+                // アニメーション進行度（_Progressを各行のタイムラインにマッピング）
+                // 最後の行が完全に黒くなるまで余裕を持たせる（+8.0に増やし、端まで確実にカバー）
+                float t = _Progress * (_MaxRows + 8.0);
                 
-                float alpha = 0;
+                float alpha = 0.0;
                 
-                // The checker pattern should reveal first, then the remaining negative space
-                // Checker is 0 or 1
-                if (checker < 0.5) {
-                    alpha = localP; // Checker squares fade in first along the diagonal
-                } else {
-                    // Non-checker squares fade in a bit later along the same diagonal
-                    float delayedP = saturate((mappedProgress - 0.1 - diagonal + (fadeEdge / 2.0)) / fadeEdge);
-                    alpha = delayedP;
+                // 指定行+3のタイミングで全体が黒になる
+                if (t >= rowIdx + 3.0) 
+                {
+                    alpha = 1.0;
+                } 
+                // その前は市松模様（半分だけ黒）になる
+                else if (t >= rowIdx) 
+                {
+                    alpha = (checker < 0.5) ? 1.0 : 0.0;
                 }
-
+                
                 fixed4 color = IN.color;
                 color.a *= alpha;
+                
+                // alphaがほぼ0のピクセルはカリングする（透過部分）
                 clip (color.a - 0.001);
 
                 return color;

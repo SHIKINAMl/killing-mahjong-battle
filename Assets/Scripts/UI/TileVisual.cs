@@ -1,7 +1,5 @@
 using UnityEngine;
 using UnityEngine.UI; // For Image if UI
-// If using SpriteRenderer for 2D/3D object
-// using UnityEngine; 
 
 namespace KillingMahjong.UI
 {
@@ -11,6 +9,10 @@ namespace KillingMahjong.UI
         [SerializeField] private SpriteRenderer spriteRenderer; // 2D Sprite
         [SerializeField] private Image uiImage;                 // UI Image
         [SerializeField] private MeshRenderer meshRenderer;     // 3D Object (Cube/Quad)
+
+        [Header("Dora Overlay")]
+        [Tooltip("ドラ牌の時に表示するオーバーレイImage（子オブジェクトのImageを指定）")]
+        [SerializeField] private Image doraOverlayImage;
 
         private void OnValidate()
         {
@@ -29,28 +31,52 @@ namespace KillingMahjong.UI
 
         private int _currentId = -1;
 
-        public void SetTile(int id, Sprite sprite)
+        public void SetTile(int encodedId, Sprite sprite, TileResourceManager resourceManager = null)
         {
-            _currentId = id;
+            _currentId = encodedId;
             if (sprite == null) return;
 
-            if (spriteRenderer != null)
+            if (spriteRenderer != null)        spriteRenderer.sprite = sprite;
+            else if (uiImage != null)          uiImage.sprite = sprite;
+            else if (meshRenderer != null)     meshRenderer.material.mainTexture = sprite.texture;
+
+            // ドラ枠オーバーレイ
+            if (doraOverlayImage != null)
             {
-                spriteRenderer.sprite = sprite;
-            }
-            else if (uiImage != null)
-            {
-                uiImage.sprite = sprite;
-            }
-            else if (meshRenderer != null)
-            {
-                // For 3D objects, we set the texture.
-                // Note: This modifies the shared material instance in Editor, or instance in runtime.
-                // Allow Texture based on Sprite
-                meshRenderer.material.mainTexture = sprite.texture;
+                bool isDora = resourceManager != null
+                    ? resourceManager.IsDora(encodedId)
+                    : new TileData(encodedId).IsDora || new TileData(encodedId).IsRedDora;
+                doraOverlayImage.gameObject.SetActive(isDora);
             }
         }
         
         public int GetId() => _currentId;
+
+        public void SetFuritenHighlight(bool isFuriten)
+        {
+            if (uiImage != null)
+            {
+                var outline = uiImage.GetComponent<UnityEngine.UI.Outline>();
+                if (isFuriten)
+                {
+                    if (outline == null)
+                    {
+                        outline = uiImage.gameObject.AddComponent<UnityEngine.UI.Outline>();
+                        outline.effectDistance = new Vector2(3, 3);
+                    }
+                    outline.effectColor = Color.red;
+                    outline.enabled = true;
+                }
+                else
+                {
+                    if (outline != null) outline.enabled = false;
+                }
+            }
+            else if (spriteRenderer != null)
+            {
+                if (isFuriten) spriteRenderer.color = Color.red;
+                else spriteRenderer.color = Color.white;
+            }
+        }
     }
 }

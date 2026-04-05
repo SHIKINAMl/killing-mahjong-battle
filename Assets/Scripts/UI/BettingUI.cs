@@ -99,6 +99,16 @@ namespace KillingMahjong.UI
                 autoDialogueCoroutine = null;
             }
 
+            if (!gameObject.activeInHierarchy)
+            {
+                // すでに非アクティブなら、コルーチンを回さずにそのまま終了
+                if (hpBarPanel != null)
+                {
+                    hpBarPanel.anchoredPosition = hiddenPos;
+                }
+                return;
+            }
+
             if (hpBarPanel != null)
             {
                 StopAllCoroutines();
@@ -131,7 +141,7 @@ namespace KillingMahjong.UI
         private void UpdateUI()
         {
             if (currentMoneyText != null)
-                currentMoneyText.text = $"HP / Money: {currentMoney}";
+                currentMoneyText.text = $"HP: {currentMoney}";
 
             if (currentBetText != null)
                 currentBetText.text = $"Bet: {currentBet}";

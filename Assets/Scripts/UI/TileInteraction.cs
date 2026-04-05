@@ -1,12 +1,14 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
+using KillingMahjong.EngineData;
 
 namespace KillingMahjong.UI
 {
-    public class TileInteraction : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDragHandler, IEndDragHandler
+    public class TileInteraction : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerEnterHandler, IPointerExitHandler
     {
         public int TileId { get; private set; }
         public bool IsInHand { get; private set; }
+        public Vector3 OriginalWallPosition { get; set; } // ★ 壁の本来の座標を記憶するプロパティ追加
 
         private GameUIManager _gameUIManager;
         private Canvas _canvas;
@@ -28,24 +30,47 @@ namespace KillingMahjong.UI
 
         public void OnPointerClick(PointerEventData eventData)
         {
-            if (eventData.button == PointerEventData.InputButton.Right)
+            if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard)
             {
-                // Right Click -> Move
-                if (IsInHand)
-                    _gameUIManager.MoveTileToWall(TileId);
-                else
-                    _gameUIManager.MoveTileToHand(TileId);
+                if (!IsInHand)
+                {
+                    if (eventData.button == PointerEventData.InputButton.Left)
+                    {
+                        // 既に選択されていたら（浮いている状態なら）捨てる
+                        if (_gameUIManager.IsTileSelected(TileId))
+                        {
+                            _gameUIManager.DiscardSelectedTile();
+                        }
+                        else
+                        {
+                            // 左クリック：選択（または選択解除）
+                            _gameUIManager.SelectTile(TileId, IsInHand, false);
+                        }
+                    }
+                    else if (eventData.button == PointerEventData.InputButton.Right)
+                    {
+                        // 右クリック：選択して即座に打牌
+                        _gameUIManager.SelectTile(TileId, IsInHand, false);
+                        _gameUIManager.DiscardSelectedTile();
+                    }
+                }
+                return;
             }
-            else if (eventData.button == PointerEventData.InputButton.Left)
-            {
-                // Left Click -> Select (Toggle?)
-                // Implementation for Selection later
-                _gameUIManager.SelectTile(TileId, IsInHand, true); // additive?
-            }
+
+            if (eventData.button != PointerEventData.InputButton.Left) return;
+
+            // Any Click -> Move (Left or Right)
+            if (IsInHand)
+                _gameUIManager.MoveTileToWall(TileId);
+            else
+                _gameUIManager.MoveTileToHand(TileId);
         }
 
         public void OnBeginDrag(PointerEventData eventData)
         {
+            if (eventData.button != PointerEventData.InputButton.Left) return;
+            if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard) return;
+            
             _originalPosition = transform.position;
             _originalParent = transform.parent;
             
@@ -62,6 +87,9 @@ namespace KillingMahjong.UI
 
         public void OnDrag(PointerEventData eventData)
         {
+            if (eventData.button != PointerEventData.InputButton.Left) return;
+            if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard) return;
+
             // If Screen Space Overlay/Camera
             if (_rectTransform != null && _canvas != null)
             {
@@ -82,6 +110,9 @@ namespace KillingMahjong.UI
 
         public void OnEndDrag(PointerEventData eventData)
         {
+            if (eventData.button != PointerEventData.InputButton.Left) return;
+            if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard) return;
+
             _canvasGroup.blocksRaycasts = true;
 
             // Hit Detection
@@ -121,6 +152,37 @@ namespace KillingMahjong.UI
         {
             transform.position = _originalPosition;
             transform.SetParent(_originalParent);
+        }
+
+        public void OnPointerEnter(PointerEventData eventData)
+        {
+            if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard && !IsInHand)
+            {
+                // Wallにある牌をホバーしたときに少し浮かせる（選択時よりは低め）
+                // ただし、既に選択されている場合はその高さを維持する
+                if (!_gameUIManager.IsTileSelected(TileId))
+                {
+                    if (_rectTransform != null)
+                    {
+                        _rectTransform.localPosition = OriginalWallPosition + new Vector3(0, 10f, 0);
+                    }
+                }
+            }
+        }
+
+        public void OnPointerExit(PointerEventData eventData)
+        {
+            if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard && !IsInHand)
+            {
+                // ホバーが外れたら元の位置に戻す
+                if (!_gameUIManager.IsTileSelected(TileId))
+                {
+                    if (_rectTransform != null)
+                    {
+                        _rectTransform.localPosition = OriginalWallPosition;
+                    }
+                }
+            }
         }
     }
 }

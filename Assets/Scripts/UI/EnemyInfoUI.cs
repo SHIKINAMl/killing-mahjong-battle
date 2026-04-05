@@ -7,27 +7,42 @@ namespace KillingMahjong.UI
     {
         [Header("Enemy HP Display")]
         [SerializeField] private TextMeshProUGUI hpText;
-        [SerializeField] private int maxHP = 100000;
         
+        [Header("Character Portrait")]
+        [SerializeField] private UnityEngine.UI.Image characterImage;
+        [SerializeField] private CharacterData characterData; // キャラクター管理データ
+
         [Header("Enemy Panel Settings")]
         [SerializeField] private GameObject enemyPanel; // 敵パネルの参照
 
-        private int currentHP;
+        private Sprite normalSprite;
+        private Sprite discardSprite;
 
-        private void Start()
+        private void Awake()
         {
-            currentHP = maxHP;
-            UpdateHPDisplay();
+            if (characterData != null)
+            {
+                normalSprite = characterData.normalSprite;
+                discardSprite = characterData.discardSprite;
+                
+                if (characterImage != null && normalSprite != null)
+                {
+                    characterImage.sprite = normalSprite;
+                }
+            }
+            else if (characterImage != null)
+            {
+                normalSprite = characterImage.sprite;
+            }
         }
 
         public void SetHP(int hp)
         {
-            if (hp > maxHP)
+            if (hpText != null)
             {
-                maxHP = hp; // 最大HPの更新が必要な場合
+                // MaxHPの概念は一旦表示せず、現在HPのみそのまま表示します
+                hpText.text = $"Enemy HP: {hp}";
             }
-            currentHP = Mathf.Clamp(hp, 0, maxHP);
-            UpdateHPDisplay();
         }
 
         public void SetPanelVisible(bool visible)
@@ -38,11 +53,29 @@ namespace KillingMahjong.UI
             }
         }
 
-        private void UpdateHPDisplay()
+        public void SetCharacterSprite(Sprite sprite)
         {
-            if (hpText != null)
+            if (characterImage != null && sprite != null)
             {
-                hpText.text = $"Enemy HP: {currentHP} / {maxHP}";
+                characterImage.sprite = sprite;
+            }
+        }
+
+        /// <summary>
+        /// 打牌する時の画像（あるいは元の画像）に切り替える
+        /// </summary>
+        public void SetDiscardingState(bool isDiscarding)
+        {
+            if (characterImage != null)
+            {
+                if (isDiscarding && discardSprite != null)
+                {
+                    characterImage.sprite = discardSprite;
+                }
+                else if (!isDiscarding && normalSprite != null)
+                {
+                    characterImage.sprite = normalSprite;
+                }
             }
         }
     }
