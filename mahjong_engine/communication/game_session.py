@@ -1,10 +1,14 @@
-import time
 import asyncio
 import heapq
+import logging
+import traceback
 from typing import Any, Awaitable, Callable, Dict, List, Optional
 
 from ..engine.game_engine import GameEngine
-from ..engine.game_state import GameStatus, RoundStatus
+from ..engine.game_state import RoundStatus, SkillType, PlayerState
+from ..engine.yaku import Yaku
+
+logger = logging.getLogger(__name__)
 
 
 class GameSession:
@@ -28,9 +32,77 @@ class GameSession:
 		self._send_to_client = send_to_client
 		self._broadcast_match_members = broadcast_match_members
 
+	async def _send_error(self, client_id: str, message: str) -> None:
+		"""クライアントへのエラー通知"""
+		try:
+			await self._send_to_client(client_id, {"type": "error", "message": message})
+		except Exception:
+			pass
+
+	async def _respond_to_client(self, client_id: str, payload: Dict[str, Any]) -> bool:
+		"""クライアント応答。送信失敗時はエラー通知を試行する。"""
+		try:
+			await self._send_to_client(client_id, payload)
+			return True
+		except Exception:
+			await self._send_error(client_id, "Failed to deliver response")
+			return False
+
+	def _extract_hand_from_wall_indexes(self, wall: List[int], wall_indexes: List[Any]) -> Optional[List[int]]:
+		"""壁牌リストの index 配列から手牌リストを組み立てる。"""
+		if not isinstance(wall_indexes, list) or not wall_indexes:
+			return None
+
+		if not all(isinstance(index, int) for index in wall_indexes):
+			return None
+
+		if len(set(wall_indexes)) != len(wall_indexes):
+			return None
+
+		for index in wall_indexes:
+			if index < 0 or index >= len(wall):
+				return None
+
+		return [wall[index] for index in wall_indexes]
+
+	def _convert_tiles_to_wall_indexes(self, wall: List[int], tiles: List[int]) -> Optional[List[int]]:
+		"""牌IDの並びを、対応する wall index の並びへ変換する（重複牌対応）。"""
+		if not isinstance(tiles, list):
+			return None
+
+		used = [False] * len(wall)
+		result: List[int] = []
+
+		for tile in tiles:
+			found_index = None
+			for idx, wall_tile in enumerate(wall):
+				if used[idx]:
+					continue
+				if wall_tile == tile:
+					found_index = idx
+					break
+
+			if found_index is None:
+				return None
+
+			used[found_index] = True
+			result.append(found_index)
+
+		return result
+
 	async def start_match(self, match: Any) -> None:
-		engine = GameEngine(num_players=len(match.players))
+		try:
+			await self._start_match_inner(match)
+		except Exception:
+			logger.exception("マッチ開始に失敗: match_id=%s", getattr(match, 'match_id', '?'))
+			raise
+
+	async def _start_match_inner(self, match: Any) -> None:
+		engine = GameEngine(max_rounds=4)
 		engine.initialize_players(match.players)
+		original_deal_tiles = engine._deal_tiles
+		round_start_done = asyncio.Event()
+		dealing_phase_done = asyncio.Event()
 
 		engine.on_dealt = lambda: asyncio.create_task(
 			self.on_dealt(match.match_id)
@@ -48,37 +120,68 @@ class GameSession:
 		engine.on_discarded = lambda player_id, tile_id: asyncio.create_task(
 			self.on_discarded(match.match_id, player_id, tile_id)
 		)
-
-		engine.on_round_start = lambda: asyncio.create_task(
-			self.on_round_start(match.match_id)
+		engine.on_skill_casted = lambda player_id, skill_type, cost, exposed_indexes: asyncio.create_task(
+			self.on_skill_casted(match.match_id, player_id, skill_type, cost, exposed_indexes)
 		)
-		engine.on_round_end = lambda: asyncio.create_task(
-			self.on_round_end(match.match_id)
+
+		def _on_round_start() -> None:
+			round_start_done.clear()
+			dealing_phase_done.clear()
+
+			async def _notify_round_start() -> None:
+				try:
+					await self.on_round_start(match.match_id)
+				finally:
+					round_start_done.set()
+
+			async def _wait_and_start_deal() -> None:
+				await round_start_done.wait()
+				await dealing_phase_done.wait()
+				original_deal_tiles()
+
+			asyncio.create_task(_notify_round_start())
+			asyncio.create_task(_wait_and_start_deal())
+
+		engine.on_round_start = _on_round_start
+		engine.on_round_end = lambda is_draw: asyncio.create_task(
+			self.on_round_end(match.match_id, is_draw)
 		)
 		engine.on_game_end = lambda: asyncio.create_task(
 			self.on_game_end(match.match_id)
 		)
-
-		engine.on_phase_change = lambda new_status: asyncio.create_task(
-			self.on_phase_change(match.match_id, new_status)
+		engine.on_special_victory_won = lambda player_id: asyncio.create_task(
+			self.on_special_victory_won(match.match_id, player_id)
 		)
+
+		def _on_phase_change(new_status: RoundStatus) -> None:
+			async def _notify_phase_change() -> None:
+				try:
+					await self.on_phase_change(match.match_id, new_status)
+				finally:
+					if new_status == RoundStatus.DEALING:
+						dealing_phase_done.set()
+
+			asyncio.create_task(_notify_phase_change())
+
+		engine.on_phase_change = _on_phase_change
+		engine._deal_tiles = lambda: None
 
 		payload = {
 			"type": "game_started",
-			#"data": {
-			#	"match_id": match.match_id,
-			#	"players": [{"client_id": cid} for cid in match.players],
-			#	"status": match.status,
-			#},
+			"data": {
+				"match_id": match.match_id,
+				"players": [{"client_id": cid} for cid in match.players],
+			},
 		}
 
 		await asyncio.gather(
-			*(self._send_to_client(cid, payload) for cid in match.players),
+			*(self._respond_to_client(cid, payload) for cid in match.players),
 			return_exceptions=True,
 		)
 
 		self._game_engines[match.match_id] = engine
-		engine.start_game(4)  # 最大4局でゲーム開始
+		logger.info("マッチ開始: match_id=%s  players=%s", match.match_id, match.players)
+		engine.start_game(4)
 
 	async def handle_game_action(self, client_id: str, data: Dict[str, Any]) -> None:
 		"""
@@ -89,7 +192,7 @@ class GameSession:
 		"""
 		match_id = self._active_match_by_client.get(client_id)
 		if not match_id or match_id not in self._game_engines:
-			await self._send_to_client(client_id, {"type": "error", "message": "Not in game"})
+			await self._send_error(client_id, "Not in game")
 			return
 
 		engine = self._game_engines[match_id]
@@ -97,50 +200,55 @@ class GameSession:
 		action_data = data.get("data")
 
 		if not action_type:
-			await self._send_to_client(client_id, {"type": "error", "message": "No action type specified"})
+			await self._send_error(client_id, "No action type specified")
 			return
-		if not action_data or type(action_data) is not dict:
-			await self._send_to_client(client_id, {"type": "error", "message": "Invalid action data"})
+		if not isinstance(action_data, dict):
+			await self._send_error(client_id, "Invalid action data")
+			return
+
+		action_handlers = {
+			"is_tenpai": self._is_tenpai,
+			"skill": self._skill,
+			"select": self._select,
+			"bet": self._bet,
+			"discard": self._discard,
+		}
+		handler = action_handlers.get(action_type)
+		if handler is None:
+			await self._send_error(client_id, "Unsupported action type")
 			return
 
 		try:
-			if action_type == "is_tenpai": # 手牌の聴牌判定
-				await self._is_tenpai(engine, client_id, action_data)
-			elif action_type == "skill": # スキルアクション
-				await self._skill(engine, client_id, action_data)
-			elif action_type == "select": # 手牌選択の確定
-				await self._select(engine, client_id, action_data)
-			elif action_type == "bet": # 掛け金設定アクション
-				await self._bet(engine, client_id, action_data)
-			elif action_type == "discard": # 打牌アクション
-				await self._discard(engine, client_id, action_data)
-			elif action_type == "declare_win": # 上がり宣言アクション
-				await self._declare_win(engine, client_id, action_data)
-				pass
-
-			elif True:  # 他のアクションタイプもここで処理
-				pass
-		except Exception as exc:
-			return
+			await handler(engine, client_id, action_data)
+		except Exception:
+			tb = traceback.format_exc()
+			logger.error("アクション処理中に例外: client=%s  action=%s\n%s",
+						 client_id, action_type, tb)
+			await self._send_error(client_id, f"Internal error while processing '{action_type}'")
 
 	async def _is_tenpai(self, engine: GameEngine, client_id: str, action_data: Dict[str, Any]) -> None:
 		"""手牌の聴牌判定の処理"""
 
 		if engine.state.round_state.status != RoundStatus.HAND_SELECTION:
-			await self._send_to_client(client_id, {"type": "error", "message": "Not in hand selection phase"})
+			cur = engine.state.round_state.status.value if engine.state.round_state.status else None
+			await self._send_error(client_id, f"is_tenpai は HAND_SELECTION フェーズでのみ実行可能 (current={cur})")
 			return
 
-		hand = action_data.get("hand")
-
-		if not hand:
-			await self._send_to_client(client_id, {"type": "error", "message": "No hand provided"})
-			return
+		wall_indexes = action_data.get("wall_indexes")
 
 		player = engine.get_player_by_id(client_id)
+		if player is None:
+			await self._send_error(client_id, "Player not found")
+			return
 
-		waits = engine.get_waits(hand, player)
+		hand = self._extract_hand_from_wall_indexes(player.wall, wall_indexes)
+		if hand is None:
+			await self._send_error(client_id, "Invalid wall_indexes")
+			return
+
+		waits = engine.get_waits(wall_indexes, player)
 		if waits is not None:
-			await self._send_to_client(client_id, {
+			await self._respond_to_client(client_id, {
 				"type": "is_tenpai",
 				"data": {
 					"waits": [
@@ -154,7 +262,7 @@ class GameSession:
 			})
 
 		else:
-			await self._send_to_client(client_id, {
+			await self._respond_to_client(client_id, {
 				"type": "not_tenpai",
 				"message": "Hand is not in tenpai",
 			})
@@ -162,125 +270,213 @@ class GameSession:
 	async def _skill(self, engine: GameEngine, client_id: str, action_data: Dict[str, Any]) -> None:
 		"""スキルアクションの処理"""
 		if engine.state.round_state.status != RoundStatus.HAND_SELECTION:
-			await self._send_to_client(client_id, {"type": "error", "message": "Not in hand selection phase"})
+			cur = engine.state.round_state.status.value if engine.state.round_state.status else None
+			await self._send_error(client_id, f"skill は HAND_SELECTION フェーズでのみ実行可能 (current={cur})")
 			return
 
-		# スキルの処理は未実装
-		# ブロードキャストで通知
+		# スキル種別の検証
+		raw_skill_type = action_data.get("skill_type")
+		if not isinstance(raw_skill_type, str):
+			await self._send_error(client_id, "Invalid skill_type")
+			return
+
+		try:
+			skill_type = SkillType(raw_skill_type)
+		except ValueError:
+			await self._send_error(client_id, f"Unsupported skill_type: {raw_skill_type}")
+			return
+
+		# プレイヤーの取得
+		player = engine.get_player_by_id(client_id)
+		if player is None:
+			await self._send_error(client_id, "Player not found")
+			return
+
+		# スキル実行（入力値は options に詰める）
+		options = {}
+		cost = await self._execute_skill(engine, player, skill_type, action_data, options)
+
+		if cost is None:
+			try:
+				from ..engine.game_state import get_skill_cost
+				skill_cost = get_skill_cost(skill_type, player.special_victory_count)
+				detail = f" (cost={skill_cost}, health={player.health})"
+			except Exception:
+				detail = ""
+			await self._send_error(client_id, f"スキル '{skill_type.value}' の発動に失敗しました{detail}")
+			return
+
+		# レスポンス（Python の snake_case を JSON のキャメルケースに変換）
+		await self._respond_to_client(client_id, {
+			"type": "skill_accepted",
+			"data": {
+				"skillType": skill_type.value,
+				"cost": cost,
+				"currentHealth": player.health,
+			},
+		})
+
+	async def _execute_skill(self, engine: GameEngine, user: PlayerState, skill_type: SkillType, action_data: Dict[str, Any], options: dict) -> Optional[int]:
+		"""
+		スキルを実行（種別ごとの入力検証 + engine 呼び出し）
+
+		Returns:
+			HP コスト。失敗時は None
+		"""
+		if skill_type == SkillType.BOOST_HAND:
+			# 対象役名を検証
+			yaku_name = action_data.get("yaku_name")
+			if not isinstance(yaku_name, str) or Yaku.get_han_by_name(yaku_name) == -1:
+				return None
+			options["yaku_name"] = yaku_name
+			return engine.use_skill(user, skill_type, yaku_name)
+
+		elif skill_type == SkillType.SPECIAL_VICTORY:
+			return engine.use_skill(user, skill_type)
+
+		elif skill_type == SkillType.PERSPECTIVE:
+			# 相手を取得
+			target = next((p for p in engine.state.players if p.player_id != user.player_id), None)
+			if target is None:
+				return None
+			return engine.use_skill_on_opponent(user, target, skill_type)
+
+		elif skill_type == SkillType.MULLIGAN:
+			# 交換対象インデックスを検証
+			target_index = action_data.get("target_hand_index")
+			if not isinstance(target_index, int) or target_index < 0 or target_index >= len(user.hand):
+				return None
+			options["target_hand_index"] = target_index
+			return engine.use_mulligan(user, target_index)
+
+		return None
 
 	async def _select(self, engine: GameEngine, client_id: str, action_data: Dict[str, Any]) -> None:
 		"""手牌選択アクションの処理"""
 		if engine.state.round_state.status != RoundStatus.HAND_SELECTION:
-			await self._send_to_client(client_id, {"type": "error", "message": "Not in hand selection phase"})
-			return
-
-		hand = action_data.get("hand")
-
-		if not hand:
-			await self._send_to_client(client_id, {"type": "error", "message": "No hand provided"})
+			cur = engine.state.round_state.status.value if engine.state.round_state.status else None
+			await self._send_error(client_id, f"select は HAND_SELECTION フェーズでのみ実行可能 (current={cur})")
 			return
 
 		player = engine.get_player_by_id(client_id)
+		if player is None:
+			await self._send_error(client_id, "Player not found")
+			return
 
-		if engine.select_hand(hand, player):
-			await self._send_to_client(client_id, {
-				"type": "hand_select_accepted",
+		wall_indexes = action_data.get("hand_indexes", action_data.get("hand"))
+	
+		if not isinstance(wall_indexes, list) or not wall_indexes:
+			await self._send_error(client_id, "hand_indexes は空でない整数配列が必要です")
+			return
+	
+		# wall_indexesのバリデーション (複数チェック、範囲チェック)
+		if not all(isinstance(idx, int) for idx in wall_indexes):
+			await self._send_error(client_id, "hand_indexes の各要素は整数でなければなりません")
+			return
+	
+		if len(set(wall_indexes)) != len(wall_indexes):
+			await self._send_error(client_id, "hand_indexes に重複値が含まれています")
+			return
+	
+		for idx in wall_indexes:
+			if idx < 0 or idx >= len(player.wall):
+				await self._send_error(client_id, f"hand_indexes[値={idx}] が wall 範囲外です (wall長={len(player.wall)})")
+				return
+
+		if engine.select_hand(wall_indexes, player):
+			# player.hand は wall 内 index を保持するため、クライアントへは牌 ID に変換して送信する
+			hand_tiles = [player.wall[idx] for idx in player.hand]
+
+			await self._respond_to_client(client_id, {
+				"type": "hand_selection_accepted",
 				"data": {
-					"hand": player.hand,
-					"wait": player.wait,
+					"hand": hand_tiles,  # 牌 ID
+					"waits": player.waits,
 					"wall": player.wall,
 				},
 			})
 
-			if all(p.wait for p in engine.state.players):
-				await engine.selected()
+			if all(p.waits for p in engine.state.players):
+				engine.selected_hand()
 
 		else:
-			await self._send_to_client(client_id, {
-				"type": "error",
-				"message": "Selected hand is not in tenpai or does not have mangan potential",
-			})
+			await self._send_error(client_id, "手牌が聴牌であるか、満貫以上の役の可能性が必要です")
 
 	async def _bet(self, engine: GameEngine, client_id: str, action_data: Dict[str, Any]) -> None:
 		"""掛け金設定アクションの処理"""
-		# 掛け金の処理は未実装
 		if engine.state.round_state.status != RoundStatus.BETTING:
-			await self._send_to_client(client_id, {"type": "error", "message": "Not in betting phase"})
-			return
-
-		bet = action_data.get("bet")
-
-		if bet is None or type(bet) is not int or bet < 0:
-			await self._send_to_client(client_id, {"type": "error", "message": "Invalid bet amount"})
+			cur = engine.state.round_state.status.value if engine.state.round_state.status else None
+			await self._send_error(client_id, f"bet は BETTING フェーズでのみ実行可能 (current={cur})")
 			return
 
 		player = engine.get_player_by_id(client_id)
+		if player is None:
+			await self._send_error(client_id, "Player not found")
+			return
 
-		if player: # 本来は賭け可能な金額のチェックをする（未実装）
-			player.bet = bet
-			await self._send_to_client(client_id, {
-				"type": "bet_accepted",
-				"data": {
-					"bet": bet,
-				},
-			})
+		bet_amount = action_data.get("bet_amount", action_data.get("bet"))
+		if not isinstance(bet_amount, int):
+			await self._send_error(client_id, f"bet_amount は整数で必要です (got={type(bet_amount).__name__})")
+			return
 
-			if all(p.bet > 0 for p in engine.state.players):
-				await engine.bet()
+		max_bet, bet_unit = engine.get_bet_rule(player)
+		if not engine.place_bet(player, bet_amount):
+			await self._send_error(
+				client_id,
+				f"Invalid bet_amount (max={max_bet}, unit={bet_unit}, health={player.health})",
+			)
+			return
+
+		await self._respond_to_client(client_id, {
+			"type": "bet_accepted",
+			"data": {
+				"bet_amount": bet_amount,
+				"max_bet": max_bet,
+				"bet_unit": bet_unit,
+			},
+		})
+
+		if all(p.bet > 0 for p in engine.state.players):
+			engine.bet()
 
 	async def _discard(self, engine: GameEngine, client_id: str, action_data: Dict[str, Any]) -> None:
 		"""打牌アクションの処理"""
 		if engine.state.round_state.status != RoundStatus.DISCARD:
-			await self._send_to_client(client_id, {"type": "error", "message": "Not in discard phase"})
+			cur = engine.state.round_state.status.value if engine.state.round_state.status else None
+			await self._send_error(client_id, f"discard は DISCARD フェーズでのみ実行可能 (current={cur})")
 			return
 
 		player = engine.get_current_player()
 		if player.player_id != client_id:
-			await self._send_to_client(client_id, {"type": "error", "message": "Not your turn"})
+			await self._send_error(client_id, f"現在の手番ではありません (current_player={player.player_id})")
 			return
 
-		if "tile" not in action_data:
-			await self._send_to_client(client_id, {"type": "error", "message": "No tile specified"})
+		if "wall_index" not in action_data:
+			await self._send_error(client_id, "No wall_index specified")
 			return
 
-		tile = action_data["tile"]
-
-		if tile not in player.wall:
-			await self._send_to_client(client_id, {"type": "error", "message": "Tile not in your wall"})
+		wall_index = action_data["wall_index"]
+		if not isinstance(wall_index, int):
+			await self._send_error(client_id, f"wall_index は整数で必要です (got={type(wall_index).__name__})")
 			return
 
-		await self._send_to_client(client_id, {
+		if wall_index < 0 or wall_index >= len(player.wall):
+			await self._send_error(client_id, f"wall_index が範囲外です (index={wall_index}, wall長={len(player.wall)})")
+			return
+
+		tile = player.wall[wall_index]
+		is_win = engine.discard(client_id, wall_index)
+		liquidation_result = engine.get_last_liquidation_result() if is_win else None
+
+		await self._respond_to_client(client_id, {
 			"type": "discard_accepted",
 			"data": {
+				"wall_index": wall_index,
 				"tile": tile,
+				"is_win": is_win,
+				"liquidation": liquidation_result,
 			},
 		})
-
-		engine.discard(client_id, tile)
-
-	async def _declare_win(self, engine: GameEngine, client_id: str, action_data: Dict[str, Any]) -> None:
-		"""上がり宣言アクションの処理"""
-		if engine.state.round_state.status != RoundStatus.DISCARD:
-			await self._send_to_client(client_id, {"type": "error", "message": "Not in discard phase"})
-			return
-
-		player = engine.get_current_player()
-		if player.player_id != client_id:
-			await self._send_to_client(client_id, {"type": "error", "message": "Not your turn"})
-			return
-
-		wait = action_data.get("wait")
-		if not wait:
-			await self._send_to_client(client_id, {"type": "error", "message": "No wait specified"})
-			return
-
-		if wait not in player.wait:
-			await self._send_to_client(client_id, {"type": "error", "message": "Specified wait is not valid"})
-			return
-
-		engine.liquidation()
-
-		pass
 
 	async def on_dealt(self, match_id: str) -> None:
 		"""配牌完了時の処理"""
@@ -289,18 +485,28 @@ class GameSession:
 
 		hand_payload = []
 		for i, h in enumerate(wall):
+			wall_tiles = h[0]
+			tenpai_example_tiles = h[1]
+			tenpai_example_indexes = self._convert_tiles_to_wall_indexes(
+				wall_tiles,
+				tenpai_example_tiles,
+			)
+
+			if tenpai_example_indexes is None:
+				tenpai_example_indexes = []
+
 			hand_payload.append(
 				{
 					"client_id": await self.resolve_client_id(match_id, i),
-					"wall": h[0],
-					"tenpai_examples": h[1],
+					"wall": wall_tiles,
+					"tenpai_examples": tenpai_example_indexes,
 				}
 			)
 
 		await self._broadcast_match_members(
 			match_id,
 			{
-				"type": "wall_deal_completed",
+				"type": "dealing_completed",
 				"dora_id": dora,
 				"hands": hand_payload,
 			},
@@ -308,25 +514,15 @@ class GameSession:
 
 	async def on_selected(self, match_id: str) -> None:
 		"""手牌選択完了の処理"""
-		new_status = [(
-			p.hand,
-			p.wait,
-			p.wall,
-			p.skills,
-		) for p in self._game_engines[match_id].state.players]
-
-		payload = []
-
-		for i, h in enumerate(new_status):
-			payload.append(
-				{
-					"client_id": await self.resolve_client_id(match_id, i),
-					"hand": h[0],
-					"wait": h[1],
-					"wall": h[2],
-					"skills": h[3],
-				}
-			)
+		payload = [
+			{
+				"client_id": await self.resolve_client_id(match_id, i),
+				"hand": [self._game_engines[match_id].state.players[i].wall[idx] for idx in player.hand],  # indexから牌 ID に変換
+				"waits": player.waits,
+				"wall": player.wall,
+			}
+			for i, player in enumerate(self._game_engines[match_id].state.players)
+		]
 
 		await self._broadcast_match_members(
 			match_id,
@@ -341,15 +537,13 @@ class GameSession:
 	async def on_bet(self, match_id: str) -> None:
 		"""掛け金設定完了時の処理"""
 		bet = [(p.bet) for p in self._game_engines[match_id].state.players]
-		bet_payload = []
-
-		for i, b in enumerate(bet):
-			bet_payload.append(
-				{
-					"client_id": await self.resolve_client_id(match_id, i),
-					"bet": b,
-				}
-			)
+		bet_payload = [
+			{
+				"client_id": await self.resolve_client_id(match_id, i),
+				"bet": b,
+			}
+			for i, b in enumerate(bet)
+		]
 
 		await self._broadcast_match_members(
 			match_id,
@@ -364,7 +558,6 @@ class GameSession:
 	async def on_discard_started(self, match_id: str) -> None:
 		"""打牌フェーズ開始時の処理"""
 		engine = self._game_engines[match_id]
-		current_player_idx = engine.state.round_state.current_player_index
 
 		await self._broadcast_match_members(
 			match_id,
@@ -389,6 +582,24 @@ class GameSession:
 			},
 		)
 
+	async def on_skill_casted(self, match_id: str, player_id: str, skill_type: SkillType, cost: int, exposed_indexes: set) -> None:
+		"""スキル使用時の処理"""
+		player = self._game_engines[match_id].get_player_by_id(player_id)
+
+		await self._broadcast_match_members(
+			match_id,
+			{
+				"type": "skill_casted",
+				"data": {
+					"player_id": player_id,
+					"skillType": skill_type.value,
+					"cost": cost,
+					"health": player.health if player else None,
+					"exposedHandIndexes": list(exposed_indexes) if exposed_indexes else [],
+				},
+			},
+		)
+
 	async def on_round_start(self, match_id: str) -> None:
 		"""ラウンド開始時の処理"""
 		await self._broadcast_match_members(
@@ -399,16 +610,45 @@ class GameSession:
 			},
 		)
 
-	async def on_round_end(self, match_id: str) -> None:
+	async def on_round_end(self, match_id: str, is_draw: bool = False) -> None:
 		"""ラウンド終了時の処理"""
+		engine = self._game_engines.get(match_id)
+		liquidation = engine.get_last_liquidation_result() if engine and not is_draw else None
+
 		await self._broadcast_match_members(
 			match_id,
 			{
 				"type": "round_end",
+				"data": {
+					"is_draw": is_draw,
+					"liquidation": liquidation,
+				},
 			},
 		)
 
+	async def on_special_victory_won(self, match_id: str, player_id: str) -> None:
+		"""特殊勝利（3回目使用）による勝利時の処理"""
+		engine = self._game_engines.get(match_id)
+		if not engine:
+			return
+
+		# 勝者情報をブロードキャスト
+		await self._broadcast_match_members(
+			match_id,
+			{
+				"type": "special_victory_won",
+				"data": {
+					"player_id": player_id,
+				},
+			},
+		)
+
+		# ゲーム終了処理を直接呼ぶ（on_game_end が呼ばれる）
+		await self.on_game_end(match_id)
+
 	async def on_game_end(self, match_id: str) -> None:
+		"""ゲーム終了時の処理"""
+		logger.info("ゲーム終了: match_id=%s", match_id)
 		engine = self._game_engines.get(match_id)
 		if engine:
 			final_scores = {}
