@@ -59,6 +59,10 @@ namespace KillingMahjong.Network
         
         // ハンド選択のフェーズに関するイベント（UI制御用）
         public event Action OnHandSelectionAccepted; 
+        
+        // ローディング表示用：配牌生成の待機状態イベント
+        public event Action OnDealingStarted;
+        public event Action OnDealingCompleted;
 
         private string localPlayerId = ""; // GameManager等からセットされる想定
 
@@ -128,7 +132,11 @@ namespace KillingMahjong.Network
                     case "phase_change":
                         PhaseChangeMessage pMsg = JsonUtility.FromJson<PhaseChangeMessage>(jsonString);
                         if (pMsg != null) {
-                            if (pMsg.new_status == "dealing") OnPhaseStatusChanged?.Invoke(RoundStatus.Dealing);
+                            if (pMsg.new_status == "dealing") 
+                            {
+                                OnPhaseStatusChanged?.Invoke(RoundStatus.Dealing);
+                                OnDealingStarted?.Invoke();
+                            }
                             else if (pMsg.new_status == "hand_selection") OnPhaseStatusChanged?.Invoke(RoundStatus.HandSelection);
                             else if (pMsg.new_status == "betting") OnPhaseStatusChanged?.Invoke(RoundStatus.Betting);
                             else if (pMsg.new_status == "discard") OnPhaseStatusChanged?.Invoke(RoundStatus.Discard);
@@ -136,6 +144,7 @@ namespace KillingMahjong.Network
                         break;
 
                     case "dealing_completed":
+                        OnDealingCompleted?.Invoke();
                         HandleDealingCompleted(jsonString);
                         break;
 
@@ -243,6 +252,16 @@ namespace KillingMahjong.Network
             if (msg.hands == null) return;
             
             var tenpaiExamples = ParseTenpaiExamplesFromJson(jsonString, localPlayerId);
+            
+            // --- デバッグログ追加 ---
+            Debug.Log($"[Network] サーバーからのJSON: {jsonString}");
+            Debug.Log($"[Network] 抽出されたお手本の数: {tenpaiExamples.Count}");
+            for (int i = 0; i < tenpaiExamples.Count; i++)
+            {
+                Debug.Log($"[Network] お手本 {i}: [{string.Join(", ", tenpaiExamples[i])}]");
+            }
+            // ------------------------
+
             var convertedExamples = tenpaiExamples.ConvertAll(e => e.ToArray());
             Managers.BoardStateManager.Instance.SetTenpaiExamples(convertedExamples);
 
