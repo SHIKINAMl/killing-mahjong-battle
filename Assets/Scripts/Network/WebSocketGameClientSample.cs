@@ -140,9 +140,16 @@ public class WebSocketGameClientSample : MonoBehaviour
             cancellationTokenSource?.Cancel();
             if (webSocket.State == WebSocketState.Open || webSocket.State == WebSocketState.CloseReceived)
             {
-                // 正常クローズを送信
-                await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Client disconnect", CancellationToken.None);
+                // タイムアウト付きでクローズを送信（サーバーがブロック中でもハングしない）
+                using (var closeCts = new CancellationTokenSource(TimeSpan.FromSeconds(2)))
+                {
+                    await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Client disconnect", closeCts.Token);
+                }
             }
+        }
+        catch (OperationCanceledException)
+        {
+            Debug.LogWarning("WebSocket close timed out (server may be busy). Forcing disconnect.");
         }
         catch (Exception ex)
         {
@@ -154,6 +161,26 @@ public class WebSocketGameClientSample : MonoBehaviour
             webSocket = null;
             cancellationTokenSource?.Dispose();
             cancellationTokenSource = null;
+        }
+    }
+
+    /// <summary>
+    /// アプリ終了/エディタ再生停止時に確実に切断する。
+    /// </summary>
+    private void OnApplicationQuit()
+    {
+        if (webSocket != null && webSocket.State == WebSocketState.Open)
+        {
+            try
+            {
+                // 同期的にAbortして即座に接続を切る（OnDestroyのasyncが間に合わない場合の保険）
+                webSocket.Abort();
+                Debug.Log("[WebSocket] Connection aborted on application quit.");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"WebSocket abort warning: {ex.Message}");
+            }
         }
     }
 

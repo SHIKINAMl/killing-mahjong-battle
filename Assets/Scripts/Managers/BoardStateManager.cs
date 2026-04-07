@@ -145,9 +145,11 @@ namespace KillingMahjong.Managers
 
         public void SelectManganHand()
         {
+            Debug.Log($"[SelectManganHand] CurrentTenpaiExamples count: {CurrentTenpaiExamples?.Count ?? -1}, OriginalWallTiles count: {OriginalWallTiles.Count}, CurrentWallTiles count: {CurrentWallTiles.Count}");
+            
             if (CurrentTenpaiExamples == null || CurrentTenpaiExamples.Count == 0)
             {
-                SelectRandomHand();
+                Debug.LogError("[SelectManganHand] サーバーからお手本データが届いていません（赤ドラフラグ不一致の可能性）。Python側の _convert_tiles_to_wall_indexes を確認してください。");
                 return;
             }
 
@@ -155,15 +157,22 @@ namespace KillingMahjong.Managers
 
             int exampleIndex = UnityEngine.Random.Range(0, CurrentTenpaiExamples.Count);
             int[] targetHand = CurrentTenpaiExamples[exampleIndex];
+            Debug.Log($"[SelectManganHand] Using example {exampleIndex}, indexes: [{string.Join(", ", targetHand)}]");
             
             foreach (int index in targetHand)
             {
                 if (index >= 0 && index < OriginalWallTiles.Count)
                 {
                     int tileId = OriginalWallTiles[index];
-                    MoveTileToHand(tileId);
+                    bool moved = MoveTileToHand(tileId);
+                    if (!moved) Debug.LogWarning($"[SelectManganHand] Failed to move tile {tileId} (index={index}) to hand!");
+                }
+                else
+                {
+                    Debug.LogWarning($"[SelectManganHand] Index {index} is out of range! OriginalWallTiles.Count={OriginalWallTiles.Count}");
                 }
             }
+            Debug.Log($"[SelectManganHand] Result: hand has {CurrentHandTiles.Count} tiles: [{string.Join(", ", CurrentHandTiles)}]");
         }
 
         public void SelectRandomHand()
