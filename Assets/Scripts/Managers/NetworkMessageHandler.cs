@@ -160,7 +160,11 @@ namespace KillingMahjong.Network
                                 if (b.client_id == localPlayerId) pBet = b.bet;
                                 else eBet = b.bet;
                             }
-                            OnBettingComplete?.Invoke(pBet, eBet, 20000, 20000);
+                            int currentLocalHp = Managers.BoardStateManager.Instance.LocalPlayerHp;
+                            int currentEnemyHp = Managers.BoardStateManager.Instance.EnemyPlayerHp;
+                            
+                            Managers.BoardStateManager.Instance.UpdateHp(currentLocalHp - pBet, currentEnemyHp - eBet);
+                            OnBettingComplete?.Invoke(pBet, eBet, currentLocalHp, currentEnemyHp);
                         }
                         break;
 
@@ -201,6 +205,10 @@ namespace KillingMahjong.Network
                             {
                                 Managers.BoardStateManager.Instance.SetLocalTurn(false);
                             }
+                            else
+                            {
+                                Managers.BoardStateManager.Instance.SetLocalTurn(true);
+                            }
                             OnTileDiscarded?.Invoke(discardMsg.data.tile, isLocal);
                         }
                         break;
@@ -229,6 +237,11 @@ namespace KillingMahjong.Network
                                 // 誰かがあがった
                                 bool isLocalWin = (reMsg.data.liquidation.winner_id == localPlayerId);
                                 Managers.BoardStateManager.Instance.LastIsLocalWin = isLocalWin;
+                                
+                                int newLocalHp = isLocalWin ? reMsg.data.liquidation.winner_health : reMsg.data.liquidation.loser_health;
+                                int newEnemyHp = isLocalWin ? reMsg.data.liquidation.loser_health : reMsg.data.liquidation.winner_health;
+                                Managers.BoardStateManager.Instance.UpdateHp(newLocalHp, newEnemyHp);
+
                                 OnPhaseStatusChanged?.Invoke(RoundStatus.Agari);
                                 OnAgari?.Invoke(isLocalWin);
                             }
@@ -383,9 +396,15 @@ namespace KillingMahjong.Network
                     if (cid == targetClientId)
                     {
                         int tenpaiKey = jsonString.IndexOf("\"tenpai_examples\"", valEnd);
+                        int keyLength = 17;
+                        if (tenpaiKey < 0)
+                        {
+                            tenpaiKey = jsonString.IndexOf("\"tenpai_example\"", valEnd);
+                            keyLength = 16;
+                        }
                         if (tenpaiKey < 0) break;
 
-                        int arrStart = jsonString.IndexOf('[', tenpaiKey + 17);
+                        int arrStart = jsonString.IndexOf('[', tenpaiKey + keyLength);
                         if (arrStart < 0) break;
 
                         int peek = arrStart + 1;

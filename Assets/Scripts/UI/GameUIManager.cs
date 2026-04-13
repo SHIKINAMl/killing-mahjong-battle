@@ -55,7 +55,7 @@ namespace KillingMahjong.UI
             if (ReactionController.Instance == null) 
             {
                 var reaction = gameObject.AddComponent<ReactionController>();
-                reaction.Setup(dialogueUI, enemyInfoUI);
+                reaction.Setup(dialogueUI, enemyInfoUI, playerInfoUI);
             }
             if (NetworkMessageHandler.Instance == null) gameObject.AddComponent<NetworkMessageHandler>();
         }
@@ -465,6 +465,8 @@ namespace KillingMahjong.UI
                 dialogueUI.gameObject.SetActive(true);
                 dialogueUI.ShowText("Match Found! Game Starting...");
             }
+            if (playerInfoUI != null) playerInfoUI.SetHP(20000);
+            if (enemyInfoUI != null) enemyInfoUI.SetHP(20000);
         }
 
         private void UpdatePhaseStatus(RoundStatus newStatus)
@@ -617,6 +619,10 @@ namespace KillingMahjong.UI
                          }
 
                          HandlePhaseVisibility(currentPhaseStatus);
+                         
+                         if (playerInfoUI != null) playerInfoUI.SetHP(Managers.BoardStateManager.Instance.LocalPlayerHp);
+                         if (enemyInfoUI != null) enemyInfoUI.SetHP(Managers.BoardStateManager.Instance.EnemyPlayerHp);
+                         
                          if (dialogueUI != null) dialogueUI.gameObject.SetActive(true);
                     }
                  );

@@ -27,6 +27,9 @@ namespace KillingMahjong.Managers
         
         public bool LastIsLocalWin { get; set; } = true; // Agari処理時の一時ステート
         public bool IsLocalTurn { get; private set; } = false;
+        
+        public int LocalPlayerHp { get; private set; } = 20000;
+        public int EnemyPlayerHp { get; private set; } = 20000;
 
         public void SetLocalTurn(bool isLocalTurn)
         {
@@ -56,6 +59,8 @@ namespace KillingMahjong.Managers
             CurrentEnemyWallTiles.Clear();
             SelectedTileIds.Clear();
             CurrentWaitTiles.Clear();
+            LocalPlayerHp = 20000;
+            EnemyPlayerHp = 20000;
             OnBoardStateRebuilt?.Invoke();
         }
 
@@ -112,6 +117,12 @@ namespace KillingMahjong.Managers
             {
                 CurrentTenpaiExamples.Clear();
             }
+        }
+
+        public void UpdateHp(int localHp, int enemyHp)
+        {
+            LocalPlayerHp = localHp;
+            EnemyPlayerHp = enemyHp;
         }
 
         public void FireRebuildEvent()

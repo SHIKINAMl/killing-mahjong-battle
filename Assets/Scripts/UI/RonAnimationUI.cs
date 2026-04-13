@@ -27,6 +27,8 @@ namespace KillingMahjong.UI
         [Header("Hand Display Layout")]
         [Tooltip("The horizontal gap between each tile in the hand")]
         [SerializeField] private float tileSpacing = 68f;
+        [Tooltip("The visual scale of each tile in the hand")]
+        [SerializeField] private float tileScale = 1.5f;
         
         [Header("Step 3: Yaku Display")]
         [SerializeField] private GameObject yakuContainer;
@@ -222,11 +224,9 @@ namespace KillingMahjong.UI
             rt.anchorMax = new Vector2(0.5f, 0.5f);
             rt.pivot = new Vector2(0.5f, 0.5f);
             
-            // サイズは既存のPrefabのスケールを尊重し、スクリプトからは変更しないことで
-            // エディタ側での細かいサイズ調整を可能にします
             rt.anchoredPosition3D = Vector3.zero;
             rt.localRotation = Quaternion.identity;
-            rt.localScale = Vector3.one;
+            rt.localScale = new Vector3(tileScale, tileScale, 1f);
         }
 
         // --- Tester Context Menu ---
