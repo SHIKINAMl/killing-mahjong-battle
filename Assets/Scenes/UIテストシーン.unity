@@ -3075,14 +3075,7 @@ MonoBehaviour:
   ronTileSlot: {fileID: 1219001132}
   tilePrefab: {fileID: 3470249716998659876, guid: 665b2ddf3e8ccac4aa366c094061ee09, type: 3}
   tileResourceManager: {fileID: 11400000, guid: 26e956d32b644284b942ac0044639558, type: 2}
-  playerHandPosition: {x: 0, y: -200}
-  playerHandScale: {x: 1.5, y: 1.5, z: 1}
-  playerRonTilePosition: {x: 400, y: -200}
-  playerRonTileScale: {x: -5, y: 25, z: 1}
-  enemyHandPosition: {x: 0, y: 200}
-  enemyHandScale: {x: 1.5, y: 1.5, z: 1}
-  enemyRonTilePosition: {x: -5, y: 25}
-  enemyRonTileScale: {x: 1.5, y: 1.5, z: 1}
+  tileSpacing: 30
   yakuContainer: {fileID: 903232556}
   yakuTextTemplate: {fileID: 2048484995458514547, guid: a76b1de240cde3f4fbfbee734e235550, type: 3}
   formulaContainer: {fileID: 245328076}

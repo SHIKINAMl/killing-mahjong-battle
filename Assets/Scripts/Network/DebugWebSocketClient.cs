@@ -116,20 +116,27 @@ namespace KillingMahjong.Network
                 case "select": // "selected" から "select" へ
                     if (payload.hand_indexes != null)
                     {
-                        mockLocalHand = new List<int>(payload.hand_indexes);
-                        foreach (int tile in payload.hand_indexes)
+                        mockLocalHand.Clear();
+                        foreach (int idx in payload.hand_indexes)
                         {
-                            mockLocalWall.Remove(tile);
+                            if (idx >= 0 && idx < mockLocalWall.Count)
+                            {
+                                mockLocalHand.Add(mockLocalWall[idx]);
+                            }
                         }
                     }
 
                     if (mockEnemyHand.Count == 0 && mockEnemyWall.Count >= 13)
                     {
+                        List<int> availableIndices = new List<int>();
+                        for (int i = 0; i < mockEnemyWall.Count; i++) availableIndices.Add(i);
+
                         for (int i = 0; i < 13; i++)
                         {
-                            int r = UnityEngine.Random.Range(0, mockEnemyWall.Count);
-                            mockEnemyHand.Add(mockEnemyWall[r]);
-                            mockEnemyWall.RemoveAt(r);
+                            int r = UnityEngine.Random.Range(0, availableIndices.Count);
+                            int idx = availableIndices[r];
+                            mockEnemyHand.Add(mockEnemyWall[idx]);
+                            availableIndices.RemoveAt(r);
                         }
                     }
 
@@ -140,24 +147,30 @@ namespace KillingMahjong.Network
                     break;
 
                 case "discard":
-                    int discardTile = payload.wall_index > 0 ? payload.wall_index : payload.tile; // 互換
-                    if (discardTile > 0)
+                    int discardTileId = -1;
+                    if (payload.wall_index >= 0 && payload.wall_index < mockLocalWall.Count)
                     {
-                        if (mockLocalWall.Contains(discardTile))
-                        {
-                            mockLocalWall.Remove(discardTile);
-                            mockLocalDiscards.Add(discardTile);
-                        }
+                        // インデックスからタイルIDを取得
+                        discardTileId = mockLocalWall[payload.wall_index];
+                    }
+                    else if (payload.tile > 0) // 互換性のためのフォールバック
+                    {
+                        discardTileId = payload.tile;
                     }
 
-                    gameUIManager.HandleDiscardEvent(discardTile, true);
+                    if (discardTileId > 0)
+                    {
+                        mockLocalDiscards.Add(discardTileId);
+                    }
+
+                    gameUIManager.HandleDiscardEvent(discardTileId, true);
 
                     yield return new WaitForSeconds(networkDelay * 2f);
                     
-                    if (mockEnemyWall.Count > 0)
+                    if (mockEnemyHand.Count > 0)
                     {
-                        int enemyDiscard = mockEnemyWall[0];
-                        mockEnemyWall.RemoveAt(0);
+                        int enemyDiscard = mockEnemyHand[0];
+                        mockEnemyHand.RemoveAt(0);
                         mockEnemyDiscards.Add(enemyDiscard);
 
                         string tileName = new TileData(enemyDiscard).GetTileName();
@@ -194,8 +207,9 @@ namespace KillingMahjong.Network
 
         private void SendMockWallDealt()
         {
+            // tenpai_examples は「インデックスの配列」を指定するように修正
             string json = "{\"type\":\"dealing_completed\",\"dora_id\":15,\"hands\":[";
-            json += "{\"client_id\":\"" + localPlayerId + "\",\"wall\":[" + string.Join(",", mockLocalWall) + "],\"tenpai_examples\":[[1,2,3],[4,5,6]]},";
+            json += "{\"client_id\":\"" + localPlayerId + "\",\"wall\":[" + string.Join(",", mockLocalWall) + "],\"tenpai_examples\":[[0,1,2,3,4,5,6,7,8,9,10,11,12]]},";
             json += "{\"client_id\":\"" + enemyPlayerId + "\",\"wall\":[" + string.Join(",", mockEnemyWall) + "]}";
             json += "]}";
             gameUIManager.ApplyGameStateFromJSON(json, localPlayerId);

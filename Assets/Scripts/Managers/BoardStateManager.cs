@@ -70,7 +70,16 @@ namespace KillingMahjong.Managers
                 {
                     OriginalWallTiles = new List<int>(wall);
                 }
-                CurrentWallTiles = SortTileIds(new List<int>(wall));
+                
+                List<int> displayWall = new List<int>(wall);
+                if (hand != null)
+                {
+                    foreach (int hTile in hand)
+                    {
+                        displayWall.Remove(hTile);
+                    }
+                }
+                CurrentWallTiles = SortTileIds(displayWall);
             }
             if (hand != null) CurrentHandTiles = SortTileIds(new List<int>(hand));
             if (wait != null) CurrentWaitTiles = new List<int>(wait);
@@ -78,7 +87,18 @@ namespace KillingMahjong.Managers
 
         public void SetEnemyState(List<int> wall, List<int> hand)
         {
-            if (wall != null) CurrentEnemyWallTiles = new List<int>(wall);
+            if (wall != null) 
+            {
+                List<int> displayEnemyWall = new List<int>(wall);
+                if (hand != null)
+                {
+                    foreach (int hTile in hand)
+                    {
+                        displayEnemyWall.Remove(hTile);
+                    }
+                }
+                CurrentEnemyWallTiles = displayEnemyWall;
+            }
             if (hand != null) CurrentEnemyHandTiles = new List<int>(hand);
         }
 
@@ -149,7 +169,8 @@ namespace KillingMahjong.Managers
             
             if (CurrentTenpaiExamples == null || CurrentTenpaiExamples.Count == 0)
             {
-                Debug.LogError("[SelectManganHand] サーバーからお手本データが届いていません（赤ドラフラグ不一致の可能性）。Python側の _convert_tiles_to_wall_indexes を確認してください。");
+                Debug.LogWarning("[SelectManganHand] サーバーからお手本データが届いていません。テスト続行のため、代わりにランダムな手牌を選択します。");
+                SelectRandomHand();
                 return;
             }
 
