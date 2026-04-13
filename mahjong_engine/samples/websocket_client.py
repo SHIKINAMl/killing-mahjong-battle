@@ -382,16 +382,8 @@ async def sender(ws) -> None:
 
 async def receiver(ws) -> None:
     async for message in ws:
-        try:
-            data = json.loads(message)
-        except json.JSONDecodeError:
-            print(f"[RAW] {message}")
-            continue
-
-        try:
-            handle_message(data)
-        except Exception as exc:
-            print(f"[表示エラー] {exc}  raw={json.dumps(data, ensure_ascii=False)}")
+        # サーバーから受信した JSON テキストを原文のまま表示
+        print(message)
 
 
 # ─── エントリーポイント ────────────────────────────────────────────────────

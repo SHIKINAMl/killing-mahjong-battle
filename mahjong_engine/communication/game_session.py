@@ -6,6 +6,7 @@ from typing import Any, Awaitable, Callable, Dict, List, Optional
 
 from ..engine.game_engine import GameEngine
 from ..engine.game_state import RoundStatus, SkillType, PlayerState
+from ..engine.hand_analyzer import HandAnalyzer
 from ..engine.yaku import Yaku
 
 logger = logging.getLogger(__name__)
@@ -75,10 +76,12 @@ class GameSession:
 
 		for tile in tiles:
 			found_index = None
+			tile_base = tile & 0b11111
 			for idx, wall_tile in enumerate(wall):
 				if used[idx]:
 					continue
-				if wall_tile == tile:
+				# dora/aka など上位ビット差で不一致にならないよう牌種で比較
+				if (wall_tile & 0b11111) == tile_base:
 					found_index = idx
 					break
 
@@ -89,6 +92,20 @@ class GameSession:
 			result.append(found_index)
 
 		return result
+
+	def _find_any_tenpai_example_indexes(self, wall: List[int]) -> Optional[List[int]]:
+		"""wall から聴牌形を再探索して、最初に index 変換できる例を返す。"""
+		try:
+			candidates = HandAnalyzer.search_tenpai(wall)
+		except Exception:
+			return None
+
+		for hand_tiles in candidates:
+			indexes = self._convert_tiles_to_wall_indexes(wall, hand_tiles)
+			if indexes is not None:
+				return indexes
+
+		return None
 
 	async def start_match(self, match: Any) -> None:
 		try:
@@ -493,7 +510,11 @@ class GameSession:
 			)
 
 			if tenpai_example_indexes is None:
-				tenpai_example_indexes = []
+				# 稀に牌IDの差異で変換できないケースがあるため、wallから再探索して補完
+				tenpai_example_indexes = self._find_any_tenpai_example_indexes(wall_tiles)
+				if tenpai_example_indexes is None:
+					logger.warning("tenpai_example の index 変換に失敗: match_id=%s player_index=%s", match_id, i)
+					tenpai_example_indexes = []
 
 			hand_payload.append(
 				{
