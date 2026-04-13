@@ -16,6 +16,7 @@ namespace KillingMahjong.Managers
         // --- データモデル ---
         public List<int> CurrentHandTiles { get; private set; } = new List<int>();
         public List<int> CurrentWallTiles { get; private set; } = new List<int>();
+        public List<int> OriginalWallTiles { get; private set; } = new List<int>();
         public List<int> CurrentWaitTiles { get; private set; } = new List<int>();
         
         public List<int> CurrentEnemyHandTiles { get; private set; } = new List<int>();
@@ -63,14 +64,41 @@ namespace KillingMahjong.Managers
         /// </summary>
         public void SetLocalState(List<int> wall, List<int> hand, List<int> wait = null)
         {
-            if (wall != null) CurrentWallTiles = SortTileIds(new List<int>(wall));
+            if (wall != null) 
+            {
+                if (OriginalWallTiles.Count == 0 || OriginalWallTiles.Count != wall.Count) 
+                {
+                    OriginalWallTiles = new List<int>(wall);
+                }
+                
+                List<int> displayWall = new List<int>(wall);
+                if (hand != null)
+                {
+                    foreach (int hTile in hand)
+                    {
+                        displayWall.Remove(hTile);
+                    }
+                }
+                CurrentWallTiles = SortTileIds(displayWall);
+            }
             if (hand != null) CurrentHandTiles = SortTileIds(new List<int>(hand));
             if (wait != null) CurrentWaitTiles = new List<int>(wait);
         }
 
         public void SetEnemyState(List<int> wall, List<int> hand)
         {
-            if (wall != null) CurrentEnemyWallTiles = new List<int>(wall);
+            if (wall != null) 
+            {
+                List<int> displayEnemyWall = new List<int>(wall);
+                if (hand != null)
+                {
+                    foreach (int hTile in hand)
+                    {
+                        displayEnemyWall.Remove(hTile);
+                    }
+                }
+                CurrentEnemyWallTiles = displayEnemyWall;
+            }
             if (hand != null) CurrentEnemyHandTiles = new List<int>(hand);
         }
 
@@ -137,8 +165,11 @@ namespace KillingMahjong.Managers
 
         public void SelectManganHand()
         {
+            Debug.Log($"[SelectManganHand] CurrentTenpaiExamples count: {CurrentTenpaiExamples?.Count ?? -1}, OriginalWallTiles count: {OriginalWallTiles.Count}, CurrentWallTiles count: {CurrentWallTiles.Count}");
+            
             if (CurrentTenpaiExamples == null || CurrentTenpaiExamples.Count == 0)
             {
+                Debug.LogWarning("[SelectManganHand] サーバーからお手本データが届いていません。テスト続行のため、代わりにランダムな手牌を選択します。");
                 SelectRandomHand();
                 return;
             }
@@ -147,11 +178,22 @@ namespace KillingMahjong.Managers
 
             int exampleIndex = UnityEngine.Random.Range(0, CurrentTenpaiExamples.Count);
             int[] targetHand = CurrentTenpaiExamples[exampleIndex];
+            Debug.Log($"[SelectManganHand] Using example {exampleIndex}, indexes: [{string.Join(", ", targetHand)}]");
             
-            foreach (int id in targetHand)
+            foreach (int index in targetHand)
             {
-                MoveTileToHand(id);
+                if (index >= 0 && index < OriginalWallTiles.Count)
+                {
+                    int tileId = OriginalWallTiles[index];
+                    bool moved = MoveTileToHand(tileId);
+                    if (!moved) Debug.LogWarning($"[SelectManganHand] Failed to move tile {tileId} (index={index}) to hand!");
+                }
+                else
+                {
+                    Debug.LogWarning($"[SelectManganHand] Index {index} is out of range! OriginalWallTiles.Count={OriginalWallTiles.Count}");
+                }
             }
+            Debug.Log($"[SelectManganHand] Result: hand has {CurrentHandTiles.Count} tiles: [{string.Join(", ", CurrentHandTiles)}]");
         }
 
         public void SelectRandomHand()

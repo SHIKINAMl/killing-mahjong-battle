@@ -3,6 +3,7 @@ using UnityEngine.UI;
 using TMPro;
 using System.Collections;
 using System;
+using KillingMahjong.Network;
 
 namespace KillingMahjong.UI
 {
@@ -29,9 +30,80 @@ namespace KillingMahjong.UI
         [SerializeField] private float checkerFadeDuration = 1.0f;
         [SerializeField] private float hpDeductionDuration = 1.5f;
 
+        [Header("Loading UI Settings")]
+        [SerializeField] private Vector2 loadingTextPosition = new Vector2(-50, 50);
+        [SerializeField] private Color loadingTextColor = Color.white;
+
+        private bool isWaitingForDeal = false;
+        private float dealWaitTimer = 0f;
+        private TextMeshProUGUI loadingText;
+
         private void Start()
         {
             ResetVisuals();
+
+            if (centerText != null && loadingText == null)
+            {
+                loadingText = Instantiate(centerText, centerText.transform.parent);
+                loadingText.gameObject.name = "LoadingText";
+                RectTransform rt = loadingText.GetComponent<RectTransform>();
+                
+                // 右下に配置 (Inspectorから位置調整可能)
+                rt.anchorMin = new Vector2(1, 0);
+                rt.anchorMax = new Vector2(1, 0);
+                rt.pivot = new Vector2(1, 0);
+                rt.anchoredPosition = loadingTextPosition; // 変更点
+                
+                loadingText.enableAutoSizing = false;
+                loadingText.fontSize = 60;
+                loadingText.color = loadingTextColor; // 変更点
+                loadingText.alignment = TextAlignmentOptions.BottomRight;
+                loadingText.gameObject.SetActive(false);
+            }
+
+            if (NetworkMessageHandler.Instance != null)
+            {
+                NetworkMessageHandler.Instance.OnDealingStarted += HandleDealingStarted;
+                NetworkMessageHandler.Instance.OnDealingCompleted += HandleDealingCompleted;
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (NetworkMessageHandler.Instance != null)
+            {
+                NetworkMessageHandler.Instance.OnDealingStarted -= HandleDealingStarted;
+                NetworkMessageHandler.Instance.OnDealingCompleted -= HandleDealingCompleted;
+            }
+        }
+
+        private void HandleDealingStarted()
+        {
+            isWaitingForDeal = true;
+            dealWaitTimer = 0f;
+            if (loadingText != null)
+            {
+                loadingText.text = "山牌構築中... 0.0s";
+                loadingText.gameObject.SetActive(true);
+            }
+        }
+
+        private void HandleDealingCompleted()
+        {
+            isWaitingForDeal = false;
+            if (loadingText != null)
+            {
+                loadingText.gameObject.SetActive(false);
+            }
+        }
+
+        private void Update()
+        {
+            if (isWaitingForDeal && loadingText != null)
+            {
+                dealWaitTimer += Time.deltaTime;
+                loadingText.text = $"山牌構築中... {dealWaitTimer:F1}s";
+            }
         }
 
         private void ResetVisuals()

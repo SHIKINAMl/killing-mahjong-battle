@@ -42,13 +42,25 @@ namespace KillingMahjong.UI
 
             if (isSelecting && Mouse.current.leftButton.isPressed)
             {
-                UpdateSelectionBox(Mouse.current.position.ReadValue());
+                if (Vector2.Distance(startPosition, Mouse.current.position.ReadValue()) > 10f)
+                {
+                    UpdateSelectionBox(Mouse.current.position.ReadValue());
+                }
             }
 
             if (isSelecting && Mouse.current.leftButton.wasReleasedThisFrame)
             {
                 isSelecting = false;
-                PerformSelection();
+                
+                if (Vector2.Distance(startPosition, Mouse.current.position.ReadValue()) > 10f)
+                {
+                    PerformSelection();
+                }
+                else
+                {
+                    if (gameUIManager != null) gameUIManager.ClearSelection();
+                }
+
                 if (selectionBox != null) selectionBox.gameObject.SetActive(false);
             }
         }

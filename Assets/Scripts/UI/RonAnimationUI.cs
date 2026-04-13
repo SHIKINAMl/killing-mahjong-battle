@@ -24,16 +24,9 @@ namespace KillingMahjong.UI
         [SerializeField] private GameObject tilePrefab;
         [SerializeField] private TileResourceManager tileResourceManager;
 
-        [Header("Hand Display Positions & Scales")]
-        [SerializeField] private Vector2 playerHandPosition = new Vector2(0, -200f);
-        [SerializeField] private Vector3 playerHandScale = new Vector3(1.5f, 1.5f, 1f);
-        [SerializeField] private Vector2 playerRonTilePosition = new Vector2(400f, -200f);
-        [SerializeField] private Vector3 playerRonTileScale = new Vector3(1.5f, 1.5f, 1f);
-        
-        [SerializeField] private Vector2 enemyHandPosition = new Vector2(0, 200f);
-        [SerializeField] private Vector3 enemyHandScale = new Vector3(1.5f, 1.5f, 1f);
-        [SerializeField] private Vector2 enemyRonTilePosition = new Vector2(-400f, 200f);
-        [SerializeField] private Vector3 enemyRonTileScale = new Vector3(1.5f, 1.5f, 1f);
+        [Header("Hand Display Layout")]
+        [Tooltip("The horizontal gap between each tile in the hand")]
+        [SerializeField] private float tileSpacing = 68f;
         
         [Header("Step 3: Yaku Display")]
         [SerializeField] private GameObject yakuContainer;
@@ -129,15 +122,6 @@ namespace KillingMahjong.UI
             {
                 handDisplayContainer.SetActive(true);
                 
-                // 選択された基準位置・スケールを取得
-                Vector2 baseHandPos = isLocalPlayerWin ? playerHandPosition : enemyHandPosition;
-                Vector3 baseHandScale = isLocalPlayerWin ? playerHandScale : enemyHandScale;
-                Vector2 ronPos = isLocalPlayerWin ? playerRonTilePosition : enemyRonTilePosition;
-                Vector3 ronScale = isLocalPlayerWin ? playerRonTileScale : enemyRonTileScale;
-                
-                // 横並び配置のためのベース変数 (例: 中心位置からタイル幅*スケール分ずらして並べる)
-                float tileWidth = 50f; // RiverUI等から持ってきたり適宜設定
-                
                 // 手牌の生成
                 if (tilePrefab != null && tileResourceManager != null)
                 {
@@ -149,18 +133,22 @@ namespace KillingMahjong.UI
                         InitializeTileVisual(obj, handTiles[i]);
                         
                         RectTransform rt = obj.GetComponent<RectTransform>();
-                        ApplyTileRectSettings(rt, baseHandScale);
+                        ApplyTileRectSettings(rt);
+                        
+                        // 横に並べるためにX座標を計算 (要素がすべて中心に揃うようにハンド全体の幅から算出)
+                        float offset_x = (i - (handCount - 1) / 2f) * tileSpacing;
+                        rt.anchoredPosition3D = new Vector3(offset_x, 0, 0);
                     }
                     
                     // アガリ牌（ロン牌）の生成
-                    // HorizontalLayoutGroupの影響を避けるため、専用の ronTileSlot に生成します
                     if (ronTile > 0 && ronTileSlot != null)
                     {
                         GameObject obj = Instantiate(tilePrefab, ronTileSlot);
                         InitializeTileVisual(obj, ronTile);
                         
                         RectTransform rt = obj.GetComponent<RectTransform>();
-                        ApplyTileRectSettings(rt, baseHandScale);
+                        ApplyTileRectSettings(rt);
+                        rt.anchoredPosition3D = Vector3.zero;
                     }
                 }
                 
@@ -227,16 +215,18 @@ namespace KillingMahjong.UI
             if (interaction != null) Destroy(interaction);
         }
 
-        private void ApplyTileRectSettings(RectTransform rt, Vector3 scale)
+        private void ApplyTileRectSettings(RectTransform rt)
         {
             if (rt == null) return;
             rt.anchorMin = new Vector2(0.5f, 0.5f);
             rt.anchorMax = new Vector2(0.5f, 0.5f);
             rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.sizeDelta = new Vector2(45f, 40f);
+            
+            // サイズは既存のPrefabのスケールを尊重し、スクリプトからは変更しないことで
+            // エディタ側での細かいサイズ調整を可能にします
             rt.anchoredPosition3D = Vector3.zero;
             rt.localRotation = Quaternion.identity;
-            rt.localScale = scale;
+            rt.localScale = Vector3.one;
         }
 
         // --- Tester Context Menu ---
