@@ -229,6 +229,7 @@ class GameSession:
 			"select": self._select,
 			"bet": self._bet,
 			"discard": self._discard,
+			"next_round": self._next_round,
 		}
 		handler = action_handlers.get(action_type)
 		if handler is None:
@@ -240,7 +241,7 @@ class GameSession:
 		except Exception:
 			tb = traceback.format_exc()
 			logger.error("アクション処理中に例外: client=%s  action=%s\n%s",
-						 client_id, action_type, tb)
+				client_id, action_type, tb)
 			await self._send_error(client_id, f"Internal error while processing '{action_type}'")
 
 	async def _is_tenpai(self, engine: GameEngine, client_id: str, action_data: Dict[str, Any]) -> None:
@@ -481,6 +482,10 @@ class GameSession:
 			await self._send_error(client_id, f"wall_index が範囲外です (index={wall_index}, wall長={len(player.wall)})")
 			return
 
+		if wall_index in player.discarded_wall_indexes:
+			await self._send_error(client_id, f"wall_index={wall_index} は既に打牌済みです")
+			return
+
 		tile = player.wall[wall_index]
 		is_win = engine.discard(client_id, wall_index)
 		liquidation_result = engine.get_last_liquidation_result() if is_win else None
@@ -494,6 +499,54 @@ class GameSession:
 				"liquidation": liquidation_result,
 			},
 		})
+
+	async def _next_round(self, engine: GameEngine, client_id: str, action_data: Dict[str, Any]) -> None:
+		"""次局進行承認アクションの処理"""
+		match_id = self._active_match_by_client.get(client_id)
+		if not match_id:
+			await self._send_error(client_id, "Not in game")
+			return
+
+		if engine.state.round_state.status != RoundStatus.ROUND_END_WAITING:
+			cur = engine.state.round_state.status.value if engine.state.round_state.status else None
+			await self._send_error(client_id, f"next_round は ROUND_END_WAITING フェーズでのみ実行可能 (current={cur})")
+			return
+
+		if engine.get_player_by_id(client_id) is None:
+			await self._send_error(client_id, "Player not found")
+			return
+
+		already_ready = client_id in engine.get_next_round_ready_players()
+		if not engine.confirm_next_round(client_id):
+			await self._send_error(client_id, "Failed to accept next round")
+			return
+
+		ready_players = engine.get_next_round_ready_players()
+		is_still_waiting = engine.state.round_state.status == RoundStatus.ROUND_END_WAITING
+		ready_count = len(ready_players) if is_still_waiting else engine.num_players
+		await self._respond_to_client(client_id, {
+			"type": "next_round_accepted",
+			"data": {
+				"already_ready": already_ready,
+				"ready_players": ready_players,
+				"ready_count": ready_count,
+				"required_count": engine.num_players,
+				"started": not is_still_waiting,
+			},
+		})
+
+		if is_still_waiting:
+			await self._broadcast_match_members(
+				match_id,
+				{
+					"type": "next_round_waiting",
+					"data": {
+						"ready_players": ready_players,
+						"ready_count": len(ready_players),
+						"required_count": engine.num_players,
+					},
+				},
+			)
 
 	async def on_dealt(self, match_id: str) -> None:
 		"""配牌完了時の処理"""
@@ -646,6 +699,19 @@ class GameSession:
 				},
 			},
 		)
+
+		if engine is not None and engine.state.round_state.status == RoundStatus.ROUND_END_WAITING:
+			await self._broadcast_match_members(
+				match_id,
+				{
+					"type": "next_round_waiting",
+					"data": {
+						"ready_players": engine.get_next_round_ready_players(),
+						"ready_count": 0,
+						"required_count": engine.num_players,
+					},
+				},
+			)
 
 	async def on_special_victory_won(self, match_id: str, player_id: str) -> None:
 		"""特殊勝利（3回目使用）による勝利時の処理"""
