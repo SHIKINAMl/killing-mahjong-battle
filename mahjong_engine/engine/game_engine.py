@@ -29,6 +29,7 @@ class GameEngine:
         self.max_rounds = max_rounds
         self._carry_over_bets = False
         self._last_liquidation_result: Optional[dict] = None
+        self._next_round_ready_players: set[str] = set()
 
         # 各種コールバック
         # 準備フェーズ
@@ -371,23 +372,50 @@ class GameEngine:
         if wall_index < 0 or wall_index >= len(discarding_player.wall):
             return False
 
-        # 手牌 index は wall を基準にしているため、pop 前に牌 ID に変換して保持する
-        hand_tiles: list[int] | None = None
-        try:
-            hand_tiles = [discarding_player.wall[idx] for idx in discarding_player.hand]
-        except (IndexError, TypeError) as exc:
-            logger.error("手牌 index 変換失敗: player=%s  hand=%s  wall_len=%d  error=%s",
-                         player_id, discarding_player.hand, len(discarding_player.wall), exc)
+        if wall_index in discarding_player.discarded_wall_indexes:
+            logger.warning("既に打牌済みの wall_index が指定された: player=%s wall_index=%d", player_id, wall_index)
+            return False
 
-        discarded_tile = discarding_player.wall.pop(wall_index)
+        winning_player = next(
+            (player for player in self.state.players if player.player_id != player_id),
+            None,
+        )
+
+        # ロン判定用に、相手の手牌を wall 基準 index から牌 ID に変換して保持する
+        winning_hand_tiles: list[int] | None = None
+        if winning_player is not None:
+            try:
+                winning_hand_tiles = [winning_player.wall[idx] for idx in winning_player.hand]
+            except (IndexError, TypeError) as exc:
+                logger.error(
+                    "相手手牌 index 変換失敗: winner_candidate=%s hand=%s wall_len=%d error=%s",
+                    winning_player.player_id,
+                    winning_player.hand,
+                    len(winning_player.wall),
+                    exc,
+                )
+
+        discarded_tile = discarding_player.wall[wall_index]
         discarding_player.discards.append(discarded_tile)
+        discarding_player.discarded_wall_indexes.add(wall_index)
 
         self._invoke_callback(self.on_discarded, player_id, discarded_tile)
 
-        # 打牌後、出した牌が上がり牌なら即座に上がり判定
-        if hand_tiles is not None and discarded_tile in discarding_player.waits:
-            logger.info("上がり判定: player=%s  tile=%d", player_id, discarded_tile)
-            if self.liquidation(player_id, hand_tiles + [discarded_tile]):
+        # 打牌後、相手の待ち牌なら即座にロン判定
+        discarded_tile_base = discarded_tile & 0b11111
+        winning_waits = []
+        if winning_player is not None:
+            winning_waits = [tile & 0b11111 for tile in winning_player.waits]
+
+        if winning_player is not None and winning_hand_tiles is not None and discarded_tile_base in winning_waits:
+            logger.info(
+                "ロン判定: discarder=%s winner=%s tile=%d tile_base=%d",
+                player_id,
+                winning_player.player_id,
+                discarded_tile,
+                discarded_tile_base,
+            )
+            if self.liquidation(winning_player.player_id, winning_hand_tiles + [discarded_tile]):
                 return True
 
         if len(discarding_player.discards) >= 13:  # 13枚以上捨てたら流局
@@ -507,28 +535,9 @@ class GameEngine:
         self.end_round()
         return True
 
-    def end_round(self, is_draw: bool = False) -> None:
-        """局を終了"""
-        logger.info("局終了: is_draw=%s  round=%d", is_draw, self.state.round_state.round_number)
-        if self.on_round_end:
-            self.on_round_end(is_draw)
-
+    def _prepare_next_round(self) -> None:
+        """次局開始に必要な状態を準備する。"""
         self.state.round_state.round_number += 1
-
-        if self.state.round_state.round_number > self.max_rounds:
-            logger.info("最大ラウンド到達によるゲーム終了: round=%d", self.state.round_state.round_number)
-            self._on_game_end()
-            return
-
-        # 精算後に HP が 0 以下のプレイヤーがいればゲーム終了
-        if any(p.health <= 0 for p in self.state.players):
-            dead = [p.player_id for p in self.state.players if p.health <= 0]
-            logger.info("HPゼロによるゲーム終了: players=%s", dead)
-            self._on_game_end()
-            return
-
-        self._carry_over_bets = is_draw
-
         self.state.players = [
             PlayerState(
                 player_id=p.player_id,
@@ -537,7 +546,8 @@ class GameEngine:
                 wall=[],
                 waits=[],
                 discards=[],
-                bet=p.bet if is_draw else 0,
+                discarded_wall_indexes=set(),
+                bet=p.bet if self._carry_over_bets else 0,
                 special_victory_count=p.special_victory_count,
                 boost_hand_bonus=p.boost_hand_bonus.copy(),
                 exposed_hand_indexes=p.exposed_hand_indexes.copy(),
@@ -546,7 +556,60 @@ class GameEngine:
             for p in self.state.players
         ]
 
+    def get_next_round_ready_players(self) -> list[str]:
+        """次局進行承認済みプレイヤー一覧を返す。"""
+        return sorted(self._next_round_ready_players)
+
+    def confirm_next_round(self, player_id: str) -> bool:
+        """プレイヤーが次局進行を承認する。全員承認で次局開始。"""
+        if self.state.round_state.status != RoundStatus.ROUND_END_WAITING:
+            return False
+
+        player = self.get_player_by_id(player_id)
+        if player is None:
+            return False
+
+        self._next_round_ready_players.add(player_id)
+        logger.info(
+            "次局承認: player=%s ready=%s/%s",
+            player_id,
+            len(self._next_round_ready_players),
+            self.num_players,
+        )
+
+        if len(self._next_round_ready_players) < self.num_players:
+            return True
+
+        self._next_round_ready_players.clear()
+        self._prepare_next_round()
         self._start_round()
+        return True
+
+    def end_round(self, is_draw: bool = False) -> None:
+        """局を終了"""
+        logger.info("局終了: is_draw=%s  round=%d", is_draw, self.state.round_state.round_number)
+        if self.state.round_state.round_number >= self.max_rounds:
+            logger.info("最大ラウンド到達によるゲーム終了: round=%d", self.state.round_state.round_number)
+            if self.on_round_end:
+                self.on_round_end(is_draw)
+            self._on_game_end()
+            return
+
+        # 精算後に HP が 0 以下のプレイヤーがいればゲーム終了
+        if any(p.health <= 0 for p in self.state.players):
+            dead = [p.player_id for p in self.state.players if p.health <= 0]
+            logger.info("HPゼロによるゲーム終了: players=%s", dead)
+            if self.on_round_end:
+                self.on_round_end(is_draw)
+            self._on_game_end()
+            return
+
+        self._carry_over_bets = is_draw
+        self._next_round_ready_players.clear()
+        self._set_phase(RoundStatus.ROUND_END_WAITING)
+
+        if self.on_round_end:
+            self.on_round_end(is_draw)
 
     def _on_game_end(self) -> None:
         """ゲーム終了時の処理"""
