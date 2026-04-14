@@ -35,7 +35,7 @@ namespace KillingMahjong.UI
             TileVisual visual = rt.GetComponent<TileVisual>();
             if (visual != null && tileResourceManager != null)
             {
-                visual.SetTile(tileId, tileResourceManager.GetDiscardTileSprite(tileId));
+                visual.SetTile(tileId, tileResourceManager.GetDiscardTileSprite(tileId, isEnemyRiver));
             }
 
             discardedTiles.Add(rt);
@@ -56,7 +56,7 @@ namespace KillingMahjong.UI
             TileVisual visual = obj.GetComponent<TileVisual>();
             if (visual != null && tileResourceManager != null)
             {
-                visual.SetTile(tileId, tileResourceManager.GetDiscardTileSprite(tileId));
+                visual.SetTile(tileId, tileResourceManager.GetDiscardTileSprite(tileId, isEnemyRiver));
             }
 
             discardedTiles.Add(obj.transform);
@@ -89,14 +89,7 @@ namespace KillingMahjong.UI
                 rt.anchoredPosition = new Vector2(targetX, targetY);
                 rt.localScale = Vector3.one;
 
-                if (isEnemyRiver)
-                {
-                    rt.localRotation = Quaternion.Euler(0, 0, 180f);
-                }
-                else
-                {
-                    rt.localRotation = Quaternion.identity;
-                }
+                rt.localRotation = Quaternion.identity;
             }
         }
 

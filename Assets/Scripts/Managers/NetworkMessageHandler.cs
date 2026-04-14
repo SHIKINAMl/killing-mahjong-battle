@@ -223,9 +223,8 @@ namespace KillingMahjong.Network
                         if (daMsg != null && daMsg.data != null)
                         {
                             if (daMsg.data.is_win) {
-                                Managers.BoardStateManager.Instance.LastIsLocalWin = true;
-                                OnPhaseStatusChanged?.Invoke(RoundStatus.Agari);
-                                OnAgari?.Invoke(true);
+                                // サーバーからの誤った和了通知を無視する
+                                // (ダミーロン機能がローカルで正しく処理するため)
                             }
                         }
                         break;
