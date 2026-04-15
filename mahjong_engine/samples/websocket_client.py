@@ -50,6 +50,7 @@ def build_action_message(command: str) -> dict[str, Any] | None:
         select 0,1,2,...            # wall index を指定して手牌を確定
         bet <amount>                # 掛け金を設定
         discard <wall_index>        # 指定 wall index の牌を打牌
+        next_round                  # 次局進行を承認
         skill mulligan <hand_idx>   # 手牌の hand 内インデックスを交換
         skill boost_hand <役名>     # 役の翻数を +1
         skill perspective           # 相手の手牌 3 枚を公開
@@ -119,6 +120,13 @@ def build_action_message(command: str) -> dict[str, Any] | None:
             "data": {"wall_index": wall_index},
         }
 
+    if name == "next_round":
+        return {
+            "type": "action",
+            "action": "next_round",
+            "data": {},
+        }
+
     if name == "skill":
         skill_type = arg1.lower()
         if not skill_type:
@@ -167,6 +175,7 @@ def print_help() -> None:
     print("  select 0,1,2,...            手牌確定 (wall index)")
     print("  bet <amount>                掛け金設定")
     print("  discard <wall_index>        打牌")
+    print("  next_round                  次局進行を承認")
     print("  skill mulligan <idx>        手牌交換 (hand 内 index)")
     print("  skill boost_hand <役名>     役翻数 +1")
     print("  skill perspective           相手手牌 3 枚を公開")

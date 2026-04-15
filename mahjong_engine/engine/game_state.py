@@ -13,6 +13,7 @@ class RoundStatus(Enum):
     BETTING = "betting"  # 掛け金設定フェーズ
     DISCARD = "discard"  # 打牌フェーズ
     LIQUIDATION = "liquidation"  # 清算フェーズ
+    ROUND_END_WAITING = "round_end_waiting"  # 次局進行待ち
 
 
 class SkillType(Enum):
@@ -101,6 +102,7 @@ class PlayerState:
     wall: list[int] = field(default_factory=list)  # この局で配られた牌山（全 34 枚）
     waits: list[int] = field(default_factory=list)  # テンパイ時の待ち牌リスト
     discards: list[int] = field(default_factory=list)  # この局で捨てた牌のリスト
+    discarded_wall_indexes: set[int] = field(default_factory=set)  # 打牌済みの wall index
     health: int = 20000  # 現在の HP
     bet: int = 0  # この局の掛け金
     special_victory_count: int = 0  # SPECIAL_VICTORY 累計使用回数（対局を通じて持続）
