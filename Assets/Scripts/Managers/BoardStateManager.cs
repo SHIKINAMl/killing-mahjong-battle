@@ -24,6 +24,7 @@ namespace KillingMahjong.Managers
         
         public List<int> SelectedTileIds { get; private set; } = new List<int>();
         public List<int[]> CurrentTenpaiExamples { get; private set; } = new List<int[]>();
+        public HashSet<int> DiscardedWallIndexes { get; private set; } = new HashSet<int>();
         
         public bool LastIsLocalWin { get; set; } = true; // Agari処理時の一時ステート
         public bool IsLocalTurn { get; private set; } = false;
@@ -59,6 +60,7 @@ namespace KillingMahjong.Managers
             CurrentEnemyWallTiles.Clear();
             SelectedTileIds.Clear();
             CurrentWaitTiles.Clear();
+            DiscardedWallIndexes.Clear();
             LocalPlayerHp = 20000;
             EnemyPlayerHp = 20000;
             OnBoardStateRebuilt?.Invoke();
@@ -74,6 +76,7 @@ namespace KillingMahjong.Managers
                 if (OriginalWallTiles.Count == 0 || OriginalWallTiles.Count != wall.Count) 
                 {
                     OriginalWallTiles = new List<int>(wall);
+                    DiscardedWallIndexes.Clear();
                 }
                 
                 List<int> displayWall = new List<int>(wall);
@@ -128,6 +131,29 @@ namespace KillingMahjong.Managers
         public void FireRebuildEvent()
         {
             OnBoardStateRebuilt?.Invoke();
+        }
+
+        /// <summary>
+        /// 打牌済みwall_indexを除外して、指定の牌IDに対応するwall_indexを検索する
+        /// </summary>
+        public int FindAvailableWallIndex(int tileId)
+        {
+            for (int i = 0; i < OriginalWallTiles.Count; i++)
+            {
+                if (OriginalWallTiles[i] == tileId && !DiscardedWallIndexes.Contains(i))
+                {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        /// <summary>
+        /// wall_indexを打牌済みとして記録する
+        /// </summary>
+        public void MarkWallIndexAsDiscarded(int wallIndex)
+        {
+            DiscardedWallIndexes.Add(wallIndex);
         }
 
         // --- 牌の操作ロジック ---

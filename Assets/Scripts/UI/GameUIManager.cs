@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections;
 using System.Collections.Generic;
 using KillingMahjong.EngineData;
 using KillingMahjong.Managers;
@@ -75,6 +76,7 @@ namespace KillingMahjong.UI
             net.OnBettingComplete += OnBettingCompleteFromServer;
             net.OnTileDiscarded += HandleDiscardEvent;
             net.OnAgari += HandleAgari;
+            net.OnDraw += HandleDraw;
             net.OnHandSelectionAccepted += OnHandSelectionAccepted;
         }
 
@@ -182,9 +184,10 @@ namespace KillingMahjong.UI
 
             BoardStateManager.Instance.SetLocalTurn(false);
 
-            int wallIndex = BoardStateManager.Instance.OriginalWallTiles.IndexOf(tileToDiscard);
+            int wallIndex = BoardStateManager.Instance.FindAvailableWallIndex(tileToDiscard);
             if (wallIndex < 0) wallIndex = tileToDiscard; // フォールバック
 
+            BoardStateManager.Instance.MarkWallIndexAsDiscarded(wallIndex);
             SendActionToServer("discard", new ActionPayload { wall_index = wallIndex, tile = tileToDiscard });
             ClearSelection();
         }
@@ -557,6 +560,24 @@ namespace KillingMahjong.UI
                         ronAnimationUI.PlayRonSequence(winningHand, dummyRonTile, dummyYaku, dummyFormula, dummyRank, isLocalWin, () => OnRonAnimationComplete(isLocalWin));
                     }
                     break;
+                case RoundStatus.Draw:
+                    // 流局演出
+                    if (riverUI != null) riverUI.gameObject.SetActive(false);
+                    if (enemyRiverUI != null) enemyRiverUI.gameObject.SetActive(false);
+                    if (enemyHandUI != null) enemyHandUI.gameObject.SetActive(false);
+                    if (waitUI != null) waitUI.gameObject.SetActive(false);
+                    if (abilityUI != null) abilityUI.gameObject.SetActive(false);
+                    SetMatchUIVisibility(false);
+                    
+                    if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(true);
+                    if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(true);
+                    
+                    if (dialogueUI != null)
+                    {
+                        dialogueUI.gameObject.SetActive(true);
+                        dialogueUI.ShowText("流局…次の対局へ");
+                    }
+                    break;
             }
         }
 
@@ -642,6 +663,30 @@ namespace KillingMahjong.UI
         private void HandleAgari(bool isLocalWin)
         {
             // UpdatePhaseStatus is handled via Network message event routing
+        }
+
+        private void HandleDraw()
+        {
+            Debug.Log("[GameUIManager] 流局処理開始");
+            StartCoroutine(DrawSequence());
+        }
+
+        private IEnumerator DrawSequence()
+        {
+            // 流局メッセージを3秒間表示
+            yield return new WaitForSeconds(3.0f);
+
+            // 流局表示を消してUIをクリア（次ラウンドの配牌待ちに備える）
+            if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
+            
+            // ReactionController のキューをクリア
+            if (ReactionController.Instance != null)
+            {
+                // キューに残っているリアクションをクリア
+                ReactionController.Instance.Setup(dialogueUI, enemyInfoUI, playerInfoUI);
+            }
+
+            Debug.Log("[GameUIManager] 流局演出完了 - 次ラウンド待ち");
         }
 
         private void OnRonAnimationComplete(bool isLocalWin)

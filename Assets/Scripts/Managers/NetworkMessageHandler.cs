@@ -55,6 +55,7 @@ namespace KillingMahjong.Network
         public event Action<RoundStatus> OnPhaseStatusChanged;
         public event Action<int, bool> OnTileDiscarded; // tileId, isLocalPlayer
         public event Action<bool> OnAgari; // isLocalWin
+        public event Action OnDraw; // 流局
         public event Action<int, int> OnGameEnded; // localScore, enemyScore
         
         // ハンド選択のフェーズに関するイベント（UI制御用）
@@ -65,6 +66,7 @@ namespace KillingMahjong.Network
         public event Action OnDealingCompleted;
 
         private string localPlayerId = ""; // GameManager等からセットされる想定
+        private bool agariProcessed = false; // ロン二重発火防止フラグ
 
         private void Awake()
         {
@@ -134,6 +136,7 @@ namespace KillingMahjong.Network
                         if (pMsg != null) {
                             if (pMsg.new_status == "dealing") 
                             {
+                                agariProcessed = false; // 新ラウンドでリセット
                                 OnPhaseStatusChanged?.Invoke(RoundStatus.Dealing);
                                 OnDealingStarted?.Invoke();
                             }
@@ -222,29 +225,81 @@ namespace KillingMahjong.Network
                         DiscardAcceptedMessage daMsg = JsonUtility.FromJson<DiscardAcceptedMessage>(jsonString);
                         if (daMsg != null && daMsg.data != null)
                         {
-                            if (daMsg.data.is_win) {
-                                // サーバーからの誤った和了通知を無視する
-                                // (ダミーロン機能がローカルで正しく処理するため)
+                            if (daMsg.data.is_win && !agariProcessed) {
+                                agariProcessed = true;
+                                Debug.Log($"[Network] discard_accepted: ロン成立 (is_win=true)");
+                                // discard_accepted にも liquidation が含まれている場合はここで処理
+                                LiquidationData daLiq = daMsg.data.liquidation;
+                                if (daLiq == null || string.IsNullOrEmpty(daLiq.winner_id))
+                                {
+                                    daLiq = ParseLiquidationFromJson(jsonString);
+                                }
+                                if (daLiq != null && !string.IsNullOrEmpty(daLiq.winner_id))
+                                {
+                                    Debug.Log($"[Network] discard_accepted ロン: winner={daLiq.winner_id}");
+                                    bool isLocalWinDa = (daLiq.winner_id == localPlayerId);
+                                    Managers.BoardStateManager.Instance.LastIsLocalWin = isLocalWinDa;
+
+                                    int newLocalHpDa = isLocalWinDa ? daLiq.winner_health : daLiq.loser_health;
+                                    int newEnemyHpDa = isLocalWinDa ? daLiq.loser_health : daLiq.winner_health;
+                                    Managers.BoardStateManager.Instance.UpdateHp(newLocalHpDa, newEnemyHpDa);
+
+                                    OnPhaseStatusChanged?.Invoke(RoundStatus.Agari);
+                                    OnAgari?.Invoke(isLocalWinDa);
+                                }
                             }
                         }
                         break;
 
                     case "round_end":
+                        Debug.Log($"[Network] round_end 受信: {jsonString}");
                         RoundEndMessage reMsg = JsonUtility.FromJson<RoundEndMessage>(jsonString);
                         if (reMsg != null && reMsg.data != null) {
-                            if (!reMsg.data.is_draw && reMsg.data.liquidation != null) {
-                                // 誰かがあがった
-                                bool isLocalWin = (reMsg.data.liquidation.winner_id == localPlayerId);
-                                Managers.BoardStateManager.Instance.LastIsLocalWin = isLocalWin;
-                                
-                                int newLocalHp = isLocalWin ? reMsg.data.liquidation.winner_health : reMsg.data.liquidation.loser_health;
-                                int newEnemyHp = isLocalWin ? reMsg.data.liquidation.loser_health : reMsg.data.liquidation.winner_health;
-                                Managers.BoardStateManager.Instance.UpdateHp(newLocalHp, newEnemyHp);
+                            Debug.Log($"[Network] round_end パース結果: is_draw={reMsg.data.is_draw}, liquidation={reMsg.data.liquidation != null}");
+                            if (reMsg.data.is_draw) {
+                                // 流局
+                                Debug.Log("[Network] 流局が発生しました");
+                                OnPhaseStatusChanged?.Invoke(RoundStatus.Draw);
+                                OnDraw?.Invoke();
+                            }
+                            else if (!agariProcessed) {
+                                agariProcessed = true;
+                                // ロン判定 - JsonUtility がネストした liquidation をパースできない場合に手動パースする
+                                LiquidationData liq = reMsg.data.liquidation;
+                                if (liq == null || string.IsNullOrEmpty(liq.winner_id))
+                                {
+                                    liq = ParseLiquidationFromJson(jsonString);
+                                }
 
-                                OnPhaseStatusChanged?.Invoke(RoundStatus.Agari);
-                                OnAgari?.Invoke(isLocalWin);
+                                if (liq != null && !string.IsNullOrEmpty(liq.winner_id))
+                                {
+                                    Debug.Log($"[Network] ロン成立: winner={liq.winner_id}, loser={liq.loser_id}, winner_health={liq.winner_health}, loser_health={liq.loser_health}");
+                                    bool isLocalWin = (liq.winner_id == localPlayerId);
+                                    Managers.BoardStateManager.Instance.LastIsLocalWin = isLocalWin;
+                                    
+                                    int newLocalHp = isLocalWin ? liq.winner_health : liq.loser_health;
+                                    int newEnemyHp = isLocalWin ? liq.loser_health : liq.winner_health;
+                                    Managers.BoardStateManager.Instance.UpdateHp(newLocalHp, newEnemyHp);
+
+                                    OnPhaseStatusChanged?.Invoke(RoundStatus.Agari);
+                                    OnAgari?.Invoke(isLocalWin);
+                                }
+                                else
+                                {
+                                    Debug.LogWarning("[Network] round_end: is_draw=false だが liquidation データが取得できませんでした");
+                                }
                             }
                         }
+                        break;
+
+                    case "next_round_waiting":
+                        // サーバーが次局待ちに入ったので、自動的に承認を送る
+                        Debug.Log("[Network] 次局進行待ち - 自動承認を送信");
+                        SendActionToServer("next_round", new ActionPayload());
+                        break;
+
+                    case "next_round_accepted":
+                        Debug.Log("[Network] 次局進行承認済み");
                         break;
 
                     case "game_end":
@@ -495,6 +550,50 @@ namespace KillingMahjong.Network
                     }
                     OnGameEnded?.Invoke(localScore, enemyScore);
                 }
+            }
+        }
+
+        /// <summary>
+        /// round_end JSON から liquidation データを手動パースする（JsonUtility のフォールバック）
+        /// </summary>
+        private LiquidationData ParseLiquidationFromJson(string jsonString)
+        {
+            try
+            {
+                int liqStart = jsonString.IndexOf("\"liquidation\"");
+                if (liqStart < 0) return null;
+
+                int objStart = jsonString.IndexOf('{', liqStart);
+                if (objStart < 0) return null;
+
+                // ネストされた {} を考慮して末尾を見つける
+                int depth = 0;
+                int objEnd = -1;
+                for (int i = objStart; i < jsonString.Length; i++)
+                {
+                    if (jsonString[i] == '{') depth++;
+                    else if (jsonString[i] == '}')
+                    {
+                        depth--;
+                        if (depth == 0)
+                        {
+                            objEnd = i;
+                            break;
+                        }
+                    }
+                }
+                if (objEnd < 0) return null;
+
+                string liqJson = jsonString.Substring(objStart, objEnd - objStart + 1);
+                Debug.Log($"[Network] liquidation 手動パース: {liqJson}");
+
+                LiquidationData liq = JsonUtility.FromJson<LiquidationData>(liqJson);
+                return liq;
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"[Network] liquidation 手動パース失敗: {e.Message}");
+                return null;
             }
         }
     }
