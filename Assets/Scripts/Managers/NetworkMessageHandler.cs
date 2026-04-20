@@ -183,7 +183,16 @@ namespace KillingMahjong.Network
                         if (tenpaiMsg != null && tenpaiMsg.data != null && tenpaiMsg.data.waits != null)
                         {
                             var waits = new List<int>();
-                            foreach (var w in tenpaiMsg.data.waits) waits.Add(w.tile);
+                            var nonManganList = new List<int>();
+                            foreach (var w in tenpaiMsg.data.waits) 
+                            {
+                                waits.Add(w.tile);
+                                if (!w.mangan_or_more) 
+                                {
+                                    nonManganList.Add(w.tile);
+                                }
+                            }
+                            Managers.BoardStateManager.Instance.SetNonManganWaits(nonManganList);
                             Managers.BoardStateManager.Instance.SetLocalState(null, null, waits);
                             Managers.BoardStateManager.Instance.FireRebuildEvent();
                         }
@@ -239,6 +248,7 @@ namespace KillingMahjong.Network
                                     Debug.Log($"[Network] discard_accepted ロン: winner={daLiq.winner_id}");
                                     bool isLocalWinDa = (daLiq.winner_id == localPlayerId);
                                     Managers.BoardStateManager.Instance.LastIsLocalWin = isLocalWinDa;
+                                    Managers.BoardStateManager.Instance.LastLiquidationData = daLiq;
 
                                     int newLocalHpDa = isLocalWinDa ? daLiq.winner_health : daLiq.loser_health;
                                     int newEnemyHpDa = isLocalWinDa ? daLiq.loser_health : daLiq.winner_health;
@@ -276,6 +286,7 @@ namespace KillingMahjong.Network
                                     Debug.Log($"[Network] ロン成立: winner={liq.winner_id}, loser={liq.loser_id}, winner_health={liq.winner_health}, loser_health={liq.loser_health}");
                                     bool isLocalWin = (liq.winner_id == localPlayerId);
                                     Managers.BoardStateManager.Instance.LastIsLocalWin = isLocalWin;
+                                    Managers.BoardStateManager.Instance.LastLiquidationData = liq;
                                     
                                     int newLocalHp = isLocalWin ? liq.winner_health : liq.loser_health;
                                     int newEnemyHp = isLocalWin ? liq.loser_health : liq.winner_health;
@@ -293,9 +304,8 @@ namespace KillingMahjong.Network
                         break;
 
                     case "next_round_waiting":
-                        // サーバーが次局待ちに入ったので、自動的に承認を送る
-                        Debug.Log("[Network] 次局進行待ち - 自動承認を送信");
-                        SendActionToServer("next_round", new ActionPayload());
+                        // サーバーが次局待ちに入った。アニメーションの完了を待ってから GameUIManager 経由で承認を送るため、ここでは何もしない。
+                        Debug.Log("[Network] 次局進行待ち - 演出完了後に承認を送信します");
                         break;
 
                     case "next_round_accepted":

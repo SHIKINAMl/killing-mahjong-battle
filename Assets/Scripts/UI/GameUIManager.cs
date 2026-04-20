@@ -439,6 +439,32 @@ namespace KillingMahjong.UI
             ReactionController.Instance.EnqueueDiscardReaction(discardedTileId, isLocalPlayer, tileName);
         }
 
+        public void ClearAllTiles()
+        {
+            if (handUI != null)
+            {
+                foreach (RectTransform t in handUI.GetHandSlots().ToArray()) if (t != null) Destroy(t.gameObject);
+                handUI.GetHandSlots().Clear();
+            }
+            if (wallUI != null)
+            {
+                foreach (Transform t in wallUI.GetWallSlots().ToArray()) if (t != null) Destroy(t.gameObject);
+                wallUI.GetWallSlots().Clear();
+            }
+            if (enemyHandUI != null) enemyHandUI.ClearHand();
+            if (enemyWallUI != null)
+            {
+                foreach (Transform t in enemyWallUI.GetEnemyWallSlots().ToArray()) if (t != null) Destroy(t.gameObject);
+                enemyWallUI.GetEnemyWallSlots().Clear();
+            }
+            if (riverUI != null) riverUI.Clear();
+            if (enemyRiverUI != null) enemyRiverUI.Clear();
+            
+            if (waitUI != null) waitUI.gameObject.SetActive(false);
+            
+            Managers.BoardStateManager.Instance.ClearAllBoardData();
+        }
+
         // --- Phase and Visibility Handlers ---
         
         public void ShowMatchmakingWaiting()
@@ -506,6 +532,13 @@ namespace KillingMahjong.UI
                     StartBettingPhase(20000);
                     break;
                 case RoundStatus.Dealing:
+                    ClearAllTiles();
+                    SetMatchUIVisibility(false);
+                    if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(true);
+                    if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(true);
+                    if (waitUI != null) waitUI.gameObject.SetActive(false);
+                    if (abilityUI != null) abilityUI.gameObject.SetActive(false);
+                    break;
                 case RoundStatus.HandSelection:
                     SetMatchUIVisibility(true);
                     if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(true);
@@ -536,38 +569,47 @@ namespace KillingMahjong.UI
                 case RoundStatus.Agari:
                 case RoundStatus.Ron:
                 case RoundStatus.Result:
-                    if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(true);
-                    if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(true);
-                    
                     if (ronAnimationUI != null)
                     {
                         bool isLocalWin = BoardStateManager.Instance.LastIsLocalWin;
                         List<int> winningHand = isLocalWin ? new List<int>(BoardStateManager.Instance.CurrentHandTiles) : new List<int>(BoardStateManager.Instance.CurrentEnemyHandTiles);
                         
-                        List<string> dummyYaku = new List<string> { "立直 (1飜)", "一発 (1飜)" };
-                        string dummyFormula = "30符 2飜";
-                        string dummyRank = "満貫";
+                        var liq = BoardStateManager.Instance.LastLiquidationData;
+                        
+                        List<string> actualYaku = new List<string>();
+                        string actualFormula = "0飜";
+                        string actualRank = "満貫";
+                        
+                        if (liq != null)
+                        {
+                            if (liq.yaku != null)
+                            {
+                                actualYaku = new List<string>(liq.yaku);
+                            }
+                            else
+                            {
+                                actualYaku.Add("不明な役");
+                            }
+                            
+                            actualFormula = $"{liq.han}飜";
+                            
+                            if (liq.multiplier >= 4.0f) actualRank = "役満";
+                            else if (liq.multiplier >= 3.0f) actualRank = "三倍満";
+                            else if (liq.multiplier >= 2.0f) actualRank = "倍満";
+                            else if (liq.multiplier >= 1.5f) actualRank = "跳満";
+                            else actualRank = "満貫";
+                        }
+                        
                         int dummyRonTile = winningHand.Count > 0 ? winningHand[winningHand.Count - 1] : 0;
                         
-                        if (riverUI != null) riverUI.gameObject.SetActive(false);
-                        if (enemyRiverUI != null) enemyRiverUI.gameObject.SetActive(false);
-                        if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
-                        SetMatchUIVisibility(false);
-
-                        if (abilityUI != null) abilityUI.gameObject.SetActive(false);
-
-                        ronAnimationUI.gameObject.SetActive(true);
-                        ronAnimationUI.PlayRonSequence(winningHand, dummyRonTile, dummyYaku, dummyFormula, dummyRank, isLocalWin, () => OnRonAnimationComplete(isLocalWin));
+                        StartCoroutine(PlayRonWithPreDialogue(isLocalWin, winningHand, dummyRonTile, actualYaku, actualFormula, actualRank));
                     }
                     break;
                 case RoundStatus.Draw:
                     // 流局演出
-                    if (riverUI != null) riverUI.gameObject.SetActive(false);
-                    if (enemyRiverUI != null) enemyRiverUI.gameObject.SetActive(false);
-                    if (enemyHandUI != null) enemyHandUI.gameObject.SetActive(false);
                     if (waitUI != null) waitUI.gameObject.SetActive(false);
                     if (abilityUI != null) abilityUI.gameObject.SetActive(false);
-                    SetMatchUIVisibility(false);
+                    // SetMatchUIVisibility(false) などの牌を隠す処理を削除（演出中も盤面を表示したままにするため）
                     
                     if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(true);
                     if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(true);
@@ -679,14 +721,47 @@ namespace KillingMahjong.UI
             // 流局表示を消してUIをクリア（次ラウンドの配牌待ちに備える）
             if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
             
-            // ReactionController のキューをクリア
+            // キューに残っているリアクションをクリア
             if (ReactionController.Instance != null)
             {
-                // キューに残っているリアクションをクリア
                 ReactionController.Instance.Setup(dialogueUI, enemyInfoUI, playerInfoUI);
             }
 
-            Debug.Log("[GameUIManager] 流局演出完了 - 次ラウンド待ち");
+            Debug.Log("[GameUIManager] 流局演出完了 - 次ラウンド待ち承認送信");
+            NetworkMessageHandler.Instance.SendActionToServer("next_round", new ActionPayload());
+        }
+
+        private IEnumerator PlayRonWithPreDialogue(bool isLocalWin, List<int> winningHand, int ronTile, List<string> yaku, string formula, string rank)
+        {
+            if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(true);
+            if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(true);
+
+            if (dialogueUI != null)
+            {
+                dialogueUI.gameObject.SetActive(true);
+                if (isLocalWin)
+                {
+                    dialogueUI.ShowText("「ロン！」");
+                }
+                else
+                {
+                    dialogueUI.ShowText("「ロンよ！」");
+                }
+            }
+
+            if (isLocalWin && playerInfoUI != null) playerInfoUI.PlayBounceAnimation(1.5f);
+            if (!isLocalWin && enemyInfoUI != null) enemyInfoUI.PlayBounceAnimation(1.5f);
+
+            yield return new WaitForSeconds(1.5f);
+
+            if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
+            if (abilityUI != null) abilityUI.gameObject.SetActive(false);
+
+            if (ronAnimationUI != null)
+            {
+                ronAnimationUI.gameObject.SetActive(true);
+                ronAnimationUI.PlayRonSequence(winningHand, ronTile, yaku, formula, rank, isLocalWin, () => OnRonAnimationComplete(isLocalWin));
+            }
         }
 
         private void OnRonAnimationComplete(bool isLocalWin)
@@ -705,6 +780,16 @@ namespace KillingMahjong.UI
                 if (damageEffectPrefab != null && playerInfoUI != null) 
                     Instantiate(damageEffectPrefab, playerInfoUI.transform.position, Quaternion.identity);
             }
+
+            // 余韻を残すために3秒待ってから次局へ進行する
+            StartCoroutine(WaitAndSendNextRound(3.0f));
+        }
+
+        private IEnumerator WaitAndSendNextRound(float delay)
+        {
+            yield return new WaitForSeconds(delay);
+            Debug.Log("[GameUIManager] ロン演出完了 - 次ラウンド進行用の承認を送信");
+            NetworkMessageHandler.Instance.SendActionToServer("next_round", new ActionPayload());
         }
     }
 }

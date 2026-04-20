@@ -34,6 +34,7 @@ namespace KillingMahjong.EngineData
         public int loser_loss;
         public int winner_health;
         public int loser_health;
+        public string[] yaku;
     }
 
     // JsonUtilityはネストした配列をデシリアライズできないためラッパークラスを使用する

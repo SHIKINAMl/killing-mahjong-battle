@@ -18,6 +18,7 @@ namespace KillingMahjong.Managers
         public List<int> CurrentWallTiles { get; private set; } = new List<int>();
         public List<int> OriginalWallTiles { get; private set; } = new List<int>();
         public List<int> CurrentWaitTiles { get; private set; } = new List<int>();
+        public List<int> NonManganWaitTiles { get; private set; } = new List<int>();
         
         public List<int> CurrentEnemyHandTiles { get; private set; } = new List<int>();
         public List<int> CurrentEnemyWallTiles { get; private set; } = new List<int>();
@@ -26,7 +27,8 @@ namespace KillingMahjong.Managers
         public List<int[]> CurrentTenpaiExamples { get; private set; } = new List<int[]>();
         public HashSet<int> DiscardedWallIndexes { get; private set; } = new HashSet<int>();
         
-        public bool LastIsLocalWin { get; set; } = true; // Agari処理時の一時ステート
+        public bool LastIsLocalWin { get; set; } = true; 
+        public LiquidationData LastLiquidationData { get; set; } = null;
         public bool IsLocalTurn { get; private set; } = false;
         
         public int LocalPlayerHp { get; private set; } = 20000;
@@ -55,15 +57,22 @@ namespace KillingMahjong.Managers
         public void InitializeGame(List<int> initialWall)
         {
             CurrentWallTiles = new List<int>(initialWall);
+            ClearAllBoardData();
+            LocalPlayerHp = 20000;
+            EnemyPlayerHp = 20000;
+            OnBoardStateRebuilt?.Invoke();
+        }
+
+        public void ClearAllBoardData()
+        {
             CurrentHandTiles.Clear();
             CurrentEnemyHandTiles.Clear();
             CurrentEnemyWallTiles.Clear();
             SelectedTileIds.Clear();
             CurrentWaitTiles.Clear();
+            NonManganWaitTiles.Clear();
             DiscardedWallIndexes.Clear();
-            LocalPlayerHp = 20000;
-            EnemyPlayerHp = 20000;
-            OnBoardStateRebuilt?.Invoke();
+            OriginalWallTiles.Clear();
         }
 
         /// <summary>
@@ -108,6 +117,11 @@ namespace KillingMahjong.Managers
                 CurrentEnemyWallTiles = displayEnemyWall;
             }
             if (hand != null) CurrentEnemyHandTiles = new List<int>(hand);
+        }
+
+        public void SetNonManganWaits(List<int> nonManganTiles)
+        {
+            NonManganWaitTiles = new List<int>(nonManganTiles ?? new List<int>());
         }
 
         public void SetTenpaiExamples(List<int[]> tenpaiExamples)
