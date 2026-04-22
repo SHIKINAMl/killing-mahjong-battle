@@ -32,6 +32,7 @@ class GameSession:
 		self._available_match_numbers = available_match_numbers
 		self._send_to_client = send_to_client
 		self._broadcast_match_members = broadcast_match_members
+		self._pending_low_hand_confirmations: Dict[str, List[int]] = {}
 
 	async def _send_error(self, client_id: str, message: str) -> None:
 		"""クライアントへのエラー通知"""
@@ -49,22 +50,40 @@ class GameSession:
 			await self._send_error(client_id, "Failed to deliver response")
 			return False
 
-	def _extract_hand_from_wall_indexes(self, wall: List[int], wall_indexes: List[Any]) -> Optional[List[int]]:
-		"""壁牌リストの index 配列から手牌リストを組み立てる。"""
-		if not isinstance(wall_indexes, list) or not wall_indexes:
-			return None
+	async def _ensure_phase(
+		self,
+		engine: GameEngine,
+		client_id: str,
+		required_status: RoundStatus,
+		action_name: str,
+	) -> bool:
+		"""現在フェーズが required_status かを検証し、違えば統一エラーを返す。"""
+		if engine.state.round_state.status == required_status:
+			return True
 
-		if not all(isinstance(index, int) for index in wall_indexes):
-			return None
+		cur = engine.state.round_state.status.value if engine.state.round_state.status else None
+		await self._send_error(
+			client_id,
+			f"{action_name} は {required_status.value.upper()} フェーズでのみ実行可能 (current={cur})",
+		)
+		return False
+
+	def _validate_hand_indexes(self, wall: List[int], wall_indexes: Any) -> Optional[str]:
+		"""hand_indexes の形式・範囲を検証し、エラー文言を返す。正常時は None。"""
+		if not isinstance(wall_indexes, list) or not wall_indexes:
+			return "hand_indexes は空でない整数配列が必要です"
+
+		if not all(isinstance(idx, int) for idx in wall_indexes):
+			return "hand_indexes の各要素は整数でなければなりません"
 
 		if len(set(wall_indexes)) != len(wall_indexes):
-			return None
+			return "hand_indexes に重複値が含まれています"
 
-		for index in wall_indexes:
-			if index < 0 or index >= len(wall):
-				return None
+		for idx in wall_indexes:
+			if idx < 0 or idx >= len(wall):
+				return f"hand_indexes[値={idx}] が wall 範囲外です (wall長={len(wall)})"
 
-		return [wall[index] for index in wall_indexes]
+		return None
 
 	def _convert_tiles_to_wall_indexes(self, wall: List[int], tiles: List[int]) -> Optional[List[int]]:
 		"""牌IDの並びを、対応する wall index の並びへ変換する（重複牌対応）。"""
@@ -227,6 +246,7 @@ class GameSession:
 			"is_tenpai": self._is_tenpai,
 			"skill": self._skill,
 			"select": self._select,
+			"select_confirm": self._select_confirm,
 			"bet": self._bet,
 			"discard": self._discard,
 			"next_round": self._next_round,
@@ -247,9 +267,7 @@ class GameSession:
 	async def _is_tenpai(self, engine: GameEngine, client_id: str, action_data: Dict[str, Any]) -> None:
 		"""手牌の聴牌判定の処理"""
 
-		if engine.state.round_state.status != RoundStatus.HAND_SELECTION:
-			cur = engine.state.round_state.status.value if engine.state.round_state.status else None
-			await self._send_error(client_id, f"is_tenpai は HAND_SELECTION フェーズでのみ実行可能 (current={cur})")
+		if not await self._ensure_phase(engine, client_id, RoundStatus.HAND_SELECTION, "is_tenpai"):
 			return
 
 		wall_indexes = action_data.get("wall_indexes")
@@ -259,9 +277,9 @@ class GameSession:
 			await self._send_error(client_id, "Player not found")
 			return
 
-		hand = self._extract_hand_from_wall_indexes(player.wall, wall_indexes)
-		if hand is None:
-			await self._send_error(client_id, "Invalid wall_indexes")
+		validation_error = self._validate_hand_indexes(player.wall, wall_indexes)
+		if validation_error is not None:
+			await self._send_error(client_id, validation_error.replace("hand_indexes", "wall_indexes"))
 			return
 
 		waits = engine.get_waits(wall_indexes, player)
@@ -287,9 +305,7 @@ class GameSession:
 
 	async def _skill(self, engine: GameEngine, client_id: str, action_data: Dict[str, Any]) -> None:
 		"""スキルアクションの処理"""
-		if engine.state.round_state.status != RoundStatus.HAND_SELECTION:
-			cur = engine.state.round_state.status.value if engine.state.round_state.status else None
-			await self._send_error(client_id, f"skill は HAND_SELECTION フェーズでのみ実行可能 (current={cur})")
+		if not await self._ensure_phase(engine, client_id, RoundStatus.HAND_SELECTION, "skill"):
 			return
 
 		# スキル種別の検証
@@ -310,9 +326,7 @@ class GameSession:
 			await self._send_error(client_id, "Player not found")
 			return
 
-		# スキル実行（入力値は options に詰める）
-		options = {}
-		cost = await self._execute_skill(engine, player, skill_type, action_data, options)
+		cost = await self._execute_skill(engine, player, skill_type, action_data)
 
 		if cost is None:
 			try:
@@ -334,7 +348,7 @@ class GameSession:
 			},
 		})
 
-	async def _execute_skill(self, engine: GameEngine, user: PlayerState, skill_type: SkillType, action_data: Dict[str, Any], options: dict) -> Optional[int]:
+	async def _execute_skill(self, engine: GameEngine, user: PlayerState, skill_type: SkillType, action_data: Dict[str, Any]) -> Optional[int]:
 		"""
 		スキルを実行（種別ごとの入力検証 + engine 呼び出し）
 
@@ -346,7 +360,6 @@ class GameSession:
 			yaku_name = action_data.get("yaku_name")
 			if not isinstance(yaku_name, str) or Yaku.get_han_by_name(yaku_name) == -1:
 				return None
-			options["yaku_name"] = yaku_name
 			return engine.use_skill(user, skill_type, yaku_name)
 
 		elif skill_type == SkillType.SPECIAL_VICTORY:
@@ -364,16 +377,13 @@ class GameSession:
 			target_index = action_data.get("target_hand_index")
 			if not isinstance(target_index, int) or target_index < 0 or target_index >= len(user.hand):
 				return None
-			options["target_hand_index"] = target_index
 			return engine.use_mulligan(user, target_index)
 
 		return None
 
 	async def _select(self, engine: GameEngine, client_id: str, action_data: Dict[str, Any]) -> None:
 		"""手牌選択アクションの処理"""
-		if engine.state.round_state.status != RoundStatus.HAND_SELECTION:
-			cur = engine.state.round_state.status.value if engine.state.round_state.status else None
-			await self._send_error(client_id, f"select は HAND_SELECTION フェーズでのみ実行可能 (current={cur})")
+		if not await self._ensure_phase(engine, client_id, RoundStatus.HAND_SELECTION, "select"):
 			return
 
 		player = engine.get_player_by_id(client_id)
@@ -382,26 +392,31 @@ class GameSession:
 			return
 
 		wall_indexes = action_data.get("hand_indexes", action_data.get("hand"))
-	
-		if not isinstance(wall_indexes, list) or not wall_indexes:
-			await self._send_error(client_id, "hand_indexes は空でない整数配列が必要です")
+
+		validation_error = self._validate_hand_indexes(player.wall, wall_indexes)
+		if validation_error is not None:
+			await self._send_error(client_id, validation_error)
 			return
-	
-		# wall_indexesのバリデーション (複数チェック、範囲チェック)
-		if not all(isinstance(idx, int) for idx in wall_indexes):
-			await self._send_error(client_id, "hand_indexes の各要素は整数でなければなりません")
+
+		waits = engine.get_waits(wall_indexes, player)
+		is_tenpai = waits is not None
+		is_mangan_or_more = bool(waits and any(w[1] for w in waits))
+
+		if not is_mangan_or_more:
+			reason = "not_tenpai" if not is_tenpai else "below_mangan"
+			self._pending_low_hand_confirmations[client_id] = wall_indexes.copy()
+			await self._respond_to_client(client_id, {
+				"type": "hand_selection_confirmation_required",
+				"data": {
+					"reason": reason,
+					"message": "満貫以上ではありません。確定する場合は select_confirm を送信してください。",
+					"hand_indexes": wall_indexes,
+				},
+			})
 			return
-	
-		if len(set(wall_indexes)) != len(wall_indexes):
-			await self._send_error(client_id, "hand_indexes に重複値が含まれています")
-			return
-	
-		for idx in wall_indexes:
-			if idx < 0 or idx >= len(player.wall):
-				await self._send_error(client_id, f"hand_indexes[値={idx}] が wall 範囲外です (wall長={len(player.wall)})")
-				return
 
 		if engine.select_hand(wall_indexes, player):
+			self._pending_low_hand_confirmations.pop(client_id, None)
 			# player.hand は wall 内 index を保持するため、クライアントへは牌 ID に変換して送信する
 			hand_tiles = [player.wall[idx] for idx in player.hand]
 
@@ -420,11 +435,54 @@ class GameSession:
 		else:
 			await self._send_error(client_id, "手牌が聴牌であるか、満貫以上の役の可能性が必要です")
 
+	async def _select_confirm(self, engine: GameEngine, client_id: str, action_data: Dict[str, Any]) -> None:
+		"""二段階目の手牌確定アクション（満貫以下・非聴牌でも確定可能）"""
+		if not await self._ensure_phase(engine, client_id, RoundStatus.HAND_SELECTION, "select_confirm"):
+			return
+
+		player = engine.get_player_by_id(client_id)
+		if player is None:
+			await self._send_error(client_id, "Player not found")
+			return
+
+		wall_indexes = action_data.get("hand_indexes", action_data.get("hand"))
+		validation_error = self._validate_hand_indexes(player.wall, wall_indexes)
+		if validation_error is not None:
+			await self._send_error(client_id, validation_error)
+			return
+
+		pending = self._pending_low_hand_confirmations.get(client_id)
+		if pending is None:
+			await self._send_error(client_id, "select を先に実行してください")
+			return
+
+		if pending != wall_indexes:
+			await self._send_error(client_id, "select_confirm の hand_indexes が直前の select と一致しません")
+			return
+
+		if not engine.select_hand(wall_indexes, player, force=True):
+			await self._send_error(client_id, "手牌の確定に失敗しました")
+			return
+
+		self._pending_low_hand_confirmations.pop(client_id, None)
+		hand_tiles = [player.wall[idx] for idx in player.hand]
+
+		await self._respond_to_client(client_id, {
+			"type": "hand_selection_accepted",
+			"data": {
+				"hand": hand_tiles,
+				"waits": player.waits,
+				"wall": player.wall,
+				"forced": True,
+			},
+		})
+
+		if all(p.hand for p in engine.state.players):
+			engine.selected_hand()
+
 	async def _bet(self, engine: GameEngine, client_id: str, action_data: Dict[str, Any]) -> None:
 		"""掛け金設定アクションの処理"""
-		if engine.state.round_state.status != RoundStatus.BETTING:
-			cur = engine.state.round_state.status.value if engine.state.round_state.status else None
-			await self._send_error(client_id, f"bet は BETTING フェーズでのみ実行可能 (current={cur})")
+		if not await self._ensure_phase(engine, client_id, RoundStatus.BETTING, "bet"):
 			return
 
 		player = engine.get_player_by_id(client_id)
@@ -459,9 +517,7 @@ class GameSession:
 
 	async def _discard(self, engine: GameEngine, client_id: str, action_data: Dict[str, Any]) -> None:
 		"""打牌アクションの処理"""
-		if engine.state.round_state.status != RoundStatus.DISCARD:
-			cur = engine.state.round_state.status.value if engine.state.round_state.status else None
-			await self._send_error(client_id, f"discard は DISCARD フェーズでのみ実行可能 (current={cur})")
+		if not await self._ensure_phase(engine, client_id, RoundStatus.DISCARD, "discard"):
 			return
 
 		player = engine.get_current_player()
@@ -500,16 +556,14 @@ class GameSession:
 			},
 		})
 
-	async def _next_round(self, engine: GameEngine, client_id: str, action_data: Dict[str, Any]) -> None:
+	async def _next_round(self, engine: GameEngine, client_id: str, _action_data: Dict[str, Any]) -> None:
 		"""次局進行承認アクションの処理"""
 		match_id = self._active_match_by_client.get(client_id)
 		if not match_id:
 			await self._send_error(client_id, "Not in game")
 			return
 
-		if engine.state.round_state.status != RoundStatus.ROUND_END_WAITING:
-			cur = engine.state.round_state.status.value if engine.state.round_state.status else None
-			await self._send_error(client_id, f"next_round は ROUND_END_WAITING フェーズでのみ実行可能 (current={cur})")
+		if not await self._ensure_phase(engine, client_id, RoundStatus.ROUND_END_WAITING, "next_round"):
 			return
 
 		if engine.get_player_by_id(client_id) is None:
@@ -550,6 +604,11 @@ class GameSession:
 
 	async def on_dealt(self, match_id: str) -> None:
 		"""配牌完了時の処理"""
+		engine = self._game_engines.get(match_id)
+		if engine is not None:
+			for p in engine.state.players:
+				self._pending_low_hand_confirmations.pop(p.player_id, None)
+
 		wall = [(p.wall, p.hand) for p in self._game_engines[match_id].state.players]
 		dora = self._game_engines[match_id].state.round_state.dora_id
 
@@ -738,6 +797,9 @@ class GameSession:
 		logger.info("ゲーム終了: match_id=%s", match_id)
 		engine = self._game_engines.get(match_id)
 		if engine:
+			for p in engine.state.players:
+				self._pending_low_hand_confirmations.pop(p.player_id, None)
+
 			final_scores = {}
 			for p in engine.state.players:
 				resolved_client_id = await self.resolve_client_id(match_id, p.player_id)
