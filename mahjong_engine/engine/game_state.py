@@ -108,7 +108,6 @@ class PlayerState:
     special_victory_count: int = 0  # SPECIAL_VICTORY 累計使用回数（対局を通じて持続）
     boost_hand_bonus: dict = field(default_factory=dict)  # BOOST_HAND によるボーナス {役名: 追加翻数}（対局を通じて持続）
     exposed_hand_indexes: set = field(default_factory=set)  # PERSPECTIVE で公開された手牌インデックス（対局を通じて持続）
-    protected_hand_indexes: set = field(default_factory=set)  # MULLIGAN で交換不可の手牌インデックス（各局で更新）
 
 
 @dataclass

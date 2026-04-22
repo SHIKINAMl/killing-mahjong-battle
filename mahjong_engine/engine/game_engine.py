@@ -2,6 +2,7 @@
 麻雀ゲームエンジン
 """
 import logging
+from collections import Counter
 from typing import Callable, Optional
 import random
 
@@ -75,6 +76,10 @@ class GameEngine:
 
     def _deal_tiles(self):
         """各プレイヤーに牌を配る"""
+        # 局ごとに牌山を再生成しないと、2局目以降で牌不足になる。
+        self.tile_wall.reset()
+        self.tile_wall.shuffle()
+
         hands = [self.tile_wall.deal() for _ in range(self.num_players)]
 
         # MULLIGAN 交換用の reserved_tiles を計算
@@ -87,10 +92,6 @@ class GameEngine:
         for player, (wall, hand) in zip(self.state.players, hands):
             player.wall = wall  # 配られた牌
             player.hand = hand  # 手牌の例
-            # protected_hand_indexes を初期化（手牌を index で保持）
-            # hand_indexes は手牌内の index なので、wall 内では手牌の最初の index
-            hand_indexes = list(range(len(hand)))
-            player.protected_hand_indexes = self._find_protected_hand_indexes(hand_indexes, wall)
 
         self.state.round_state.dora_id = self.tile_wall.dora_id
 
@@ -171,25 +172,27 @@ class GameEngine:
                 return False
         return True
 
-    def select_hand(self, hand_indexes: list[int], player: PlayerState) -> bool:
+    def select_hand(self, hand_indexes: list[int], player: PlayerState, force: bool = False) -> bool:
         """
         プレイヤーが手牌を選択したときの処理
 
         Args:
             hand_indexes: 選択された手牌の山牌内 index リスト
             player: プレイヤーの状態
+            force: True の場合、非聴牌形でも確定を許可する
 
         Returns:
             手牌が有効であれば True、そうでなければ False
         """
         # index から牌 ID に変換してテンパイ判定
         hand_tiles = [player.wall[idx] for idx in hand_indexes]
+        is_tenpai = HandAnalyzer.is_tenpai(hand_tiles, player.wall)
 
-        if not HandAnalyzer.is_tenpai(hand_tiles, player.wall):
+        if not force and not is_tenpai:
             return False
 
         player.hand = hand_indexes  # 手牌を index で保持
-        player.waits = HandAnalyzer.get_tenpai_waiting_tiles(hand_tiles, player.wall)
+        player.waits = HandAnalyzer.get_tenpai_waiting_tiles(hand_tiles, player.wall) if is_tenpai else []
 
         return True
 
@@ -258,9 +261,6 @@ class GameEngine:
         elif skill_type == SkillType.MULLIGAN:
             target_index = options.get("target_hand_index")
             if not isinstance(target_index, int) or target_index < 0 or target_index >= len(user.hand):
-                return True
-            # 保護与公开牌チェック
-            if target_index in user.protected_hand_indexes or target_index in user.exposed_hand_indexes:
                 return True
             # 予備牌チェック
             if not self.state.round_state.reserved_tiles:
@@ -415,7 +415,11 @@ class GameEngine:
                 discarded_tile,
                 discarded_tile_base,
             )
-            if self.liquidation(winning_player.player_id, winning_hand_tiles + [discarded_tile]):
+            if self.liquidation(
+                winning_player.player_id,
+                winning_hand_tiles + [discarded_tile],
+                winning_tile=discarded_tile,
+            ):
                 return True
 
         if len(discarding_player.discards) >= 13:  # 13枚以上捨てたら流局
@@ -425,47 +429,6 @@ class GameEngine:
 
         self._advance_player()
         return False
-
-    def _find_protected_hand_indexes(self, hand_indexes: list[int], wall: list[int]) -> set[int]:
-        """
-        満貫以上を保証する必須牌を手牌の index で返す
-
-        Args:
-            hand_indexes: 手牌の wall 内 index のリスト
-            wall: 牌山
-        Returns:
-            保護すべき手牌の wall 内 index のセット
-        """
-        if not hand_indexes or not wall:
-            return set()
-
-        # 手牌の index をタイルに変換
-        hand_tiles = [wall[idx] for idx in hand_indexes]
-
-        # テンパイの手を全て列挙
-        tenpai_hands = HandAnalyzer.search_tenpai(wall)
-
-        if not tenpai_hands:
-            return set()
-
-        # 満貫以上の手のみをフィルタリング
-        mangan_hands = [h for h in tenpai_hands if HandAnalyzer.check_mangan(h)]
-
-        if not mangan_hands:
-            return set()
-
-        # 全ての満貫手に共通する牌を找す（set の交集合）
-        common_tiles = set(mangan_hands[0])
-        for hand in mangan_hands[1:]:
-            common_tiles &= set(hand)
-
-        # 共通の牌を手牌の index に変換して返す
-        protected_indexes = set()
-        for idx, tile in zip(hand_indexes, hand_tiles):
-            if tile in common_tiles:
-                protected_indexes.add(idx)
-
-        return protected_indexes
 
     def _get_liquidation_multiplier(self, han: int) -> float:
         """翻数から精算倍率を返す。"""
@@ -479,7 +442,27 @@ class GameEngine:
             return 1.5
         return 1.0
 
-    def liquidation(self, player_id: str, hand: list[int]) -> bool:
+    def _is_tanki_wait_agari(self, hand: list[int], winning_tile: int, winner_waits: list[int]) -> bool:
+        """単騎待ちでの和了かどうかを判定する。"""
+        if winning_tile is None or not winner_waits:
+            return False
+
+        winning_base = winning_tile & 0b11111
+        wait_bases = [wait & 0b11111 for wait in winner_waits]
+
+        # 単騎待ちは待ち牌が1種類で、その牌で和了している必要がある。
+        if len(set(wait_bases)) != 1 or wait_bases[0] != winning_base:
+            return False
+
+        counter = Counter(tile & 0b11111 for tile in hand)
+        if counter[winning_base] < 2:
+            return False
+
+        temp_counter = counter.copy()
+        temp_counter[winning_base] -= 2
+        return any(len(melds) == 4 for melds in HandAnalyzer._generate_melds(temp_counter))
+
+    def liquidation(self, player_id: str, hand: list[int], winning_tile: Optional[int] = None) -> bool:
         """
         清算処理
 
@@ -489,9 +472,10 @@ class GameEngine:
         Returns:
             上がりが成立していれば True、そうでなければ False
         """
-        if not HandAnalyzer.is_win(hand) or not HandAnalyzer.check_mangan(hand):
-            logger.debug("上がり条件不成立: player=%s  is_win=%s  check_mangan=%s",
-                         player_id, HandAnalyzer.is_win(hand), HandAnalyzer.check_mangan(hand))
+        is_win = HandAnalyzer.is_win(hand)
+        is_mangan = HandAnalyzer.check_mangan(hand)
+        if not is_win or not is_mangan:
+            logger.debug("上がり条件不成立: player=%s  is_win=%s  check_mangan=%s", player_id, is_win, is_mangan)
             return False
 
         winner = self.get_player_by_id(player_id)
@@ -501,6 +485,8 @@ class GameEngine:
         loser = next((player for player in self.state.players if player.player_id != player_id), None)
         if loser is None:
             return False
+
+        is_tanki_wait = self._is_tanki_wait_agari(hand, winning_tile, winner.waits)
 
         # 役倍率（跳満 1.5倍 / 倍満 2倍 / 三倍満 3倍 / 役満 4倍）
         yaku_list = HandAnalyzer.enum_yaku(hand)
@@ -515,8 +501,9 @@ class GameEngine:
         winner_gain = int(winner.bet * multiplier)
         winner.health += winner_gain
 
-        # 敗者: 自身の賭け金 × 相手（勝者）の役倍率分を失う
-        loser_loss = int(loser.bet * multiplier)
+        # 敗者: 単騎待ち和了時のみ支払いを倍化（勝者獲得量は据え置き）
+        loser_loss_multiplier = 2 if is_tanki_wait else 1
+        loser_loss = int(loser.bet * multiplier * loser_loss_multiplier)
         loser.health = max(0, loser.health - loser_loss)
 
         self._last_liquidation_result = {
@@ -528,6 +515,8 @@ class GameEngine:
             "loser_bet": loser.bet,
             "winner_gain": winner_gain,
             "loser_loss": loser_loss,
+            "loser_loss_multiplier": loser_loss_multiplier,
+            "is_tanki_wait": is_tanki_wait,
             "winner_health": winner.health,
             "loser_health": loser.health,
         }
@@ -551,7 +540,6 @@ class GameEngine:
                 special_victory_count=p.special_victory_count,
                 boost_hand_bonus=p.boost_hand_bonus.copy(),
                 exposed_hand_indexes=p.exposed_hand_indexes.copy(),
-                protected_hand_indexes=p.protected_hand_indexes.copy(),
             )
             for p in self.state.players
         ]
@@ -590,8 +578,7 @@ class GameEngine:
         logger.info("局終了: is_draw=%s  round=%d", is_draw, self.state.round_state.round_number)
         if self.state.round_state.round_number >= self.max_rounds:
             logger.info("最大ラウンド到達によるゲーム終了: round=%d", self.state.round_state.round_number)
-            if self.on_round_end:
-                self.on_round_end(is_draw)
+            self._invoke_callback(self.on_round_end, is_draw)
             self._on_game_end()
             return
 
@@ -599,17 +586,14 @@ class GameEngine:
         if any(p.health <= 0 for p in self.state.players):
             dead = [p.player_id for p in self.state.players if p.health <= 0]
             logger.info("HPゼロによるゲーム終了: players=%s", dead)
-            if self.on_round_end:
-                self.on_round_end(is_draw)
+            self._invoke_callback(self.on_round_end, is_draw)
             self._on_game_end()
             return
 
         self._carry_over_bets = is_draw
         self._next_round_ready_players.clear()
         self._set_phase(RoundStatus.ROUND_END_WAITING)
-
-        if self.on_round_end:
-            self.on_round_end(is_draw)
+        self._invoke_callback(self.on_round_end, is_draw)
 
     def _on_game_end(self) -> None:
         """ゲーム終了時の処理"""
