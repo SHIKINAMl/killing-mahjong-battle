@@ -281,7 +281,8 @@ namespace KillingMahjong.UI
 
             if (centerText != null)
             {
-                centerText.text = "先攻"; // 仮判定
+                bool isFirst = KillingMahjong.Managers.BoardStateManager.Instance.IsLocalTurn;
+                centerText.text = isFirst ? "先攻" : "後攻";
                 centerText.gameObject.SetActive(true);
             }
             

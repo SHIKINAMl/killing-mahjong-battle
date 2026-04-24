@@ -9,7 +9,7 @@ namespace KillingMahjong.UI
         [SerializeField] private TextMeshProUGUI hpText;
         
         [Header("Character Portrait")]
-        [SerializeField] private UnityEngine.UI.Image characterImage;
+        [SerializeField] private SpriteRenderer characterRenderer;
         [SerializeField] private CharacterData characterData; // キャラクター管理データ
 
         [Header("Enemy Panel Settings")]
@@ -17,6 +17,9 @@ namespace KillingMahjong.UI
 
         private Sprite normalSprite;
         private Sprite discardSprite;
+        
+        private Coroutine bounceCoroutine;
+        private Vector3 originalPosition;
 
         private void Awake()
         {
@@ -25,14 +28,22 @@ namespace KillingMahjong.UI
                 normalSprite = characterData.normalSprite;
                 discardSprite = characterData.discardSprite;
                 
-                if (characterImage != null && normalSprite != null)
+                if (characterRenderer != null && normalSprite != null)
                 {
-                    characterImage.sprite = normalSprite;
+                    characterRenderer.sprite = normalSprite;
                 }
             }
-            else if (characterImage != null)
+            else if (characterRenderer != null)
             {
-                normalSprite = characterImage.sprite;
+                normalSprite = characterRenderer.sprite;
+            }
+        }
+
+        private void Start()
+        {
+            if (characterRenderer != null)
+            {
+                originalPosition = characterRenderer.transform.localPosition;
             }
         }
 
@@ -55,9 +66,9 @@ namespace KillingMahjong.UI
 
         public void SetCharacterSprite(Sprite sprite)
         {
-            if (characterImage != null && sprite != null)
+            if (characterRenderer != null && sprite != null)
             {
-                characterImage.sprite = sprite;
+                characterRenderer.sprite = sprite;
             }
         }
 
@@ -66,17 +77,42 @@ namespace KillingMahjong.UI
         /// </summary>
         public void SetDiscardingState(bool isDiscarding)
         {
-            if (characterImage != null)
+            if (characterRenderer != null)
             {
                 if (isDiscarding && discardSprite != null)
                 {
-                    characterImage.sprite = discardSprite;
+                    characterRenderer.sprite = discardSprite;
                 }
                 else if (!isDiscarding && normalSprite != null)
                 {
-                    characterImage.sprite = normalSprite;
+                    characterRenderer.sprite = normalSprite;
                 }
             }
+        }
+
+        public void PlayBounceAnimation(float duration)
+        {
+            if (characterRenderer == null) return;
+            if (bounceCoroutine != null) StopCoroutine(bounceCoroutine);
+            bounceCoroutine = StartCoroutine(BounceRoutine(duration));
+        }
+
+        private System.Collections.IEnumerator BounceRoutine(float duration)
+        {
+            float elapsed = 0f;
+            float bounceSpeed = 15f;
+            float bounceHeight = 0.5f; // SpriteRenderer用に調整（必要に応じてインスペクターで調整可能にすることもできます）
+            
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float yOffset = Mathf.Abs(Mathf.Sin(elapsed * bounceSpeed)) * bounceHeight;
+                characterRenderer.transform.localPosition = originalPosition + new Vector3(0, yOffset, 0);
+                yield return null;
+            }
+            
+            characterRenderer.transform.localPosition = originalPosition;
+            bounceCoroutine = null;
         }
     }
 }

@@ -78,5 +78,21 @@ namespace KillingMahjong.UI
                 else spriteRenderer.color = Color.white;
             }
         }
+
+        public void SetAlpha(float alpha)
+        {
+            if (uiImage != null)
+            {
+                var c = uiImage.color;
+                c.a = alpha;
+                uiImage.color = c;
+            }
+            else if (spriteRenderer != null)
+            {
+                var c = spriteRenderer.color;
+                c.a = alpha;
+                spriteRenderer.color = c;
+            }
+        }
     }
 }

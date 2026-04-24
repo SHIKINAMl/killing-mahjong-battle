@@ -18,15 +18,21 @@ namespace KillingMahjong.Managers
         public List<int> CurrentWallTiles { get; private set; } = new List<int>();
         public List<int> OriginalWallTiles { get; private set; } = new List<int>();
         public List<int> CurrentWaitTiles { get; private set; } = new List<int>();
+        public List<int> NonManganWaitTiles { get; private set; } = new List<int>();
         
         public List<int> CurrentEnemyHandTiles { get; private set; } = new List<int>();
         public List<int> CurrentEnemyWallTiles { get; private set; } = new List<int>();
         
         public List<int> SelectedTileIds { get; private set; } = new List<int>();
         public List<int[]> CurrentTenpaiExamples { get; private set; } = new List<int[]>();
+        public HashSet<int> DiscardedWallIndexes { get; private set; } = new HashSet<int>();
         
-        public bool LastIsLocalWin { get; set; } = true; // Agari処理時の一時ステート
+        public bool LastIsLocalWin { get; set; } = true; 
+        public LiquidationData LastLiquidationData { get; set; } = null;
         public bool IsLocalTurn { get; private set; } = false;
+        
+        public int LocalPlayerHp { get; private set; } = 20000;
+        public int EnemyPlayerHp { get; private set; } = 20000;
 
         public void SetLocalTurn(bool isLocalTurn)
         {
@@ -51,12 +57,22 @@ namespace KillingMahjong.Managers
         public void InitializeGame(List<int> initialWall)
         {
             CurrentWallTiles = new List<int>(initialWall);
+            ClearAllBoardData();
+            LocalPlayerHp = 20000;
+            EnemyPlayerHp = 20000;
+            OnBoardStateRebuilt?.Invoke();
+        }
+
+        public void ClearAllBoardData()
+        {
             CurrentHandTiles.Clear();
             CurrentEnemyHandTiles.Clear();
             CurrentEnemyWallTiles.Clear();
             SelectedTileIds.Clear();
             CurrentWaitTiles.Clear();
-            OnBoardStateRebuilt?.Invoke();
+            NonManganWaitTiles.Clear();
+            DiscardedWallIndexes.Clear();
+            OriginalWallTiles.Clear();
         }
 
         /// <summary>
@@ -69,6 +85,7 @@ namespace KillingMahjong.Managers
                 if (OriginalWallTiles.Count == 0 || OriginalWallTiles.Count != wall.Count) 
                 {
                     OriginalWallTiles = new List<int>(wall);
+                    DiscardedWallIndexes.Clear();
                 }
                 
                 List<int> displayWall = new List<int>(wall);
@@ -102,6 +119,11 @@ namespace KillingMahjong.Managers
             if (hand != null) CurrentEnemyHandTiles = new List<int>(hand);
         }
 
+        public void SetNonManganWaits(List<int> nonManganTiles)
+        {
+            NonManganWaitTiles = new List<int>(nonManganTiles ?? new List<int>());
+        }
+
         public void SetTenpaiExamples(List<int[]> tenpaiExamples)
         {
             if (tenpaiExamples != null)
@@ -114,9 +136,38 @@ namespace KillingMahjong.Managers
             }
         }
 
+        public void UpdateHp(int localHp, int enemyHp)
+        {
+            LocalPlayerHp = localHp;
+            EnemyPlayerHp = enemyHp;
+        }
+
         public void FireRebuildEvent()
         {
             OnBoardStateRebuilt?.Invoke();
+        }
+
+        /// <summary>
+        /// 打牌済みwall_indexを除外して、指定の牌IDに対応するwall_indexを検索する
+        /// </summary>
+        public int FindAvailableWallIndex(int tileId)
+        {
+            for (int i = 0; i < OriginalWallTiles.Count; i++)
+            {
+                if (OriginalWallTiles[i] == tileId && !DiscardedWallIndexes.Contains(i))
+                {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        /// <summary>
+        /// wall_indexを打牌済みとして記録する
+        /// </summary>
+        public void MarkWallIndexAsDiscarded(int wallIndex)
+        {
+            DiscardedWallIndexes.Add(wallIndex);
         }
 
         // --- 牌の操作ロジック ---

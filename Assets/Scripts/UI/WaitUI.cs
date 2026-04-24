@@ -36,6 +36,15 @@ namespace KillingMahjong.UI
                 if (visual != null && tileResourceManager != null)
                 {
                     visual.SetTile(id, tileResourceManager.GetTileSprite(id));
+                    
+                    if (KillingMahjong.Managers.BoardStateManager.Instance.NonManganWaitTiles.Contains(id))
+                    {
+                        visual.SetAlpha(0.6f);
+                    }
+                    else 
+                    {
+                        visual.SetAlpha(1.0f);
+                    }
                 }
 
                 // 待ち牌表示用なので、クリック判定などはオフにする

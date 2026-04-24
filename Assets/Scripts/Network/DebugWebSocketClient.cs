@@ -31,6 +31,9 @@ namespace KillingMahjong.Network
         private List<int> mockEnemyWall = new List<int>();
         private List<int> mockEnemyDiscards = new List<int>();
 
+        private int mockTurnCount = 0; // 巻数カウント（両プレイヤーが1回ずつ打牌で1巻）
+        private const int MAX_TURNS = 17; // 流局までの最大巻数
+
         private void Start()
         {
             if (gameUIManager == null)
@@ -49,6 +52,7 @@ namespace KillingMahjong.Network
             mockEnemyWall = new List<int> { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34 };
             mockEnemyHand.Clear();
             mockEnemyDiscards.Clear();
+            mockTurnCount = 0;
 
             StartCoroutine(MockConnectionSequence());
         }
@@ -194,6 +198,26 @@ namespace KillingMahjong.Network
                         }
                     }
 
+                    // 巻数カウントを進める（両者が1回ずつ打牌で1巻）
+                    mockTurnCount++;
+                    Debug.Log($"[Debug Client] 巻数: {mockTurnCount}/{MAX_TURNS}");
+
+                    // 17巻到達で流局
+                    if (mockTurnCount >= MAX_TURNS)
+                    {
+                        Debug.Log("[Debug Client] 17巻到達 - 流局");
+                        SendMockMessage(new RoundEndMessage { 
+                            type = "round_end", 
+                            data = new RoundEndData { is_draw = true } 
+                        });
+                        
+                        yield return new WaitForSeconds(3.5f);
+
+                        // 流局後、次のラウンドを開始
+                        StartCoroutine(StartNextRoundAfterDraw());
+                        yield break;
+                    }
+
                     SendMockMessage(new DiscardPhaseStartedMessage { type = "discard_phase_started", data = new DiscardPhaseStartedData { first_player = localPlayerId } });
                     break;
             }
@@ -262,6 +286,31 @@ namespace KillingMahjong.Network
         [ContextMenu("Test Ron (Enemy Win)")]
         private void TriggerEnemyRon()
         {
+        }
+
+        private IEnumerator StartNextRoundAfterDraw()
+        {
+            // 流局演出後、新しいラウンドを開始
+            mockTurnCount = 0;
+
+            // 新しい山牌を配牌
+            mockLocalWall = new List<int> { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34 };
+            mockLocalHand.Clear();
+            mockLocalDiscards.Clear();
+
+            mockEnemyWall = new List<int> { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34 };
+            mockEnemyHand.Clear();
+            mockEnemyDiscards.Clear();
+
+            yield return new WaitForSeconds(0.5f);
+
+            SendMockMessage(new PhaseChangeMessage { type = "phase_change", new_status = "dealing" });
+            yield return new WaitForSeconds(0.1f);
+
+            SendMockWallDealt();
+
+            yield return new WaitForSeconds(0.1f);
+            SendMockMessage(new PhaseChangeMessage { type = "phase_change", new_status = "hand_selection" });
         }
     }
 }
