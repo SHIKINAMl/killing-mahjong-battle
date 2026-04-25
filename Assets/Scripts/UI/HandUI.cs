@@ -134,5 +134,19 @@ namespace KillingMahjong.UI
             }
             return RectTransformUtility.RectangleContainsScreenPoint(handAreaRect, screenPoint);
         }
+
+        public override void UpdateLayout(RoundStatus phaseStatus)
+        {
+            base.UpdateLayout(phaseStatus);
+
+            if (decideButton != null)
+            {
+                decideButton.gameObject.SetActive(phaseStatus == RoundStatus.HandSelection);
+            }
+            if (autoManganButton != null)
+            {
+                autoManganButton.gameObject.SetActive(phaseStatus == RoundStatus.HandSelection);
+            }
+        }
     }
 }

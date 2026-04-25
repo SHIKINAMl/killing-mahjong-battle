@@ -83,8 +83,17 @@ namespace KillingMahjong.UI
         public virtual void UpdateLayout(RoundStatus phaseStatus)
         {
             if (handSlotContainer == null) return;
+
+            bool isGameEndPhase = phaseStatus == RoundStatus.Agari || 
+                                  phaseStatus == RoundStatus.Ron || 
+                                  phaseStatus == RoundStatus.Result || 
+                                  phaseStatus == RoundStatus.Draw;
+            if (isGameEndPhase) return;
+
+            bool isBoardActivePhase = phaseStatus == RoundStatus.Discard;
+
             var layoutGroup = handSlotContainer.GetComponent<UnityEngine.UI.LayoutGroup>();
-            Transform activeContainer = (phaseStatus == RoundStatus.Discard && discardPhaseContainer != null) 
+            Transform activeContainer = (isBoardActivePhase && discardPhaseContainer != null) 
                                         ? discardPhaseContainer : handSlotContainer;
             
             if (discardPhaseContainer != null)
@@ -96,7 +105,7 @@ namespace KillingMahjong.UI
                 handSlotContainer.gameObject.SetActive(activeContainer == handSlotContainer);
             }
 
-            if (phaseStatus != RoundStatus.Discard)
+            if (!isBoardActivePhase)
             {
                 if (layoutGroup != null) layoutGroup.enabled = true;
                 

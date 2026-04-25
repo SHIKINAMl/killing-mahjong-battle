@@ -197,6 +197,11 @@ namespace KillingMahjong.UI
             if (currentPhaseStatus != RoundStatus.HandSelection) return;
             if (dialogueUI != null && dialogueUI.IsLogOpen) return;
             
+            if (phaseTransitionUI != null)
+            {
+                phaseTransitionUI.PlayCenterTextAnim("手牌決定！", 2.0f);
+            }
+
             List<int> handIndexes = new List<int>();
             HashSet<int> usedIndexes = new HashSet<int>();
             foreach(int tileId in BoardStateManager.Instance.CurrentHandTiles) {
@@ -235,6 +240,13 @@ namespace KillingMahjong.UI
         private void RebuildAllTilesFromState()
         {
             if (tilePrefab == null) return;
+            
+            bool isGameEndPhase = currentPhaseStatus == RoundStatus.Agari || 
+                                  currentPhaseStatus == RoundStatus.Ron || 
+                                  currentPhaseStatus == RoundStatus.Result || 
+                                  currentPhaseStatus == RoundStatus.Draw;
+            if (isGameEndPhase) return;
+
             var board = BoardStateManager.Instance;
 
             // 1. HandUI
@@ -321,9 +333,13 @@ namespace KillingMahjong.UI
                 enemyWallUI.LayoutEnemyWallTiles(enemyWallGenerated, board.CurrentEnemyWallTiles, currentPhaseStatus == RoundStatus.Discard);
             }
 
-            if (waitUI != null && currentPhaseStatus == RoundStatus.Discard)
+            if (waitUI != null && (currentPhaseStatus == RoundStatus.Discard || currentPhaseStatus == RoundStatus.HandSelection))
             {
-                waitUI.DisplayWaits(board.CurrentWaitTiles);
+                if (board.CurrentWaitTiles != null && board.CurrentWaitTiles.Count > 0)
+                {
+                    waitUI.gameObject.SetActive(true);
+                    waitUI.DisplayWaits(board.CurrentWaitTiles);
+                }
             }
         }
 
@@ -502,13 +518,22 @@ namespace KillingMahjong.UI
         {
             currentPhaseStatus = newStatus;
             if (PhaseManager.Instance != null) PhaseManager.Instance.ChangeRoundStatus(newStatus);
-            if (handUI != null) handUI.UpdateLayout(currentPhaseStatus);
 
-            if (wallUI != null)
+            bool isGameEndPhase = newStatus == RoundStatus.Agari || 
+                                  newStatus == RoundStatus.Ron || 
+                                  newStatus == RoundStatus.Result || 
+                                  newStatus == RoundStatus.Draw;
+
+            if (!isGameEndPhase)
             {
-                List<RectTransform> remainingTiles = new List<RectTransform>();
-                foreach (var st in wallUI.GetWallSlots()) if (st != null) remainingTiles.Add(st);
-                wallUI.LayoutWallTiles(remainingTiles, BoardStateManager.Instance.CurrentWallTiles, BoardStateManager.Instance.CurrentWaitTiles, currentPhaseStatus == RoundStatus.Discard);
+                if (handUI != null) handUI.UpdateLayout(currentPhaseStatus);
+
+                if (wallUI != null)
+                {
+                    List<RectTransform> remainingTiles = new List<RectTransform>();
+                    foreach (var st in wallUI.GetWallSlots()) if (st != null) remainingTiles.Add(st);
+                    wallUI.LayoutWallTiles(remainingTiles, BoardStateManager.Instance.CurrentWallTiles, BoardStateManager.Instance.CurrentWaitTiles, currentPhaseStatus == RoundStatus.Discard);
+                }
             }
             
             HandlePhaseVisibility(newStatus);
@@ -518,9 +543,15 @@ namespace KillingMahjong.UI
         {
             if (isTransitioning) return;
 
-            if (riverUI != null) riverUI.gameObject.SetActive(status == RoundStatus.Discard);
-            if (enemyRiverUI != null) enemyRiverUI.gameObject.SetActive(status == RoundStatus.Discard);
-            if (enemyHandUI != null) enemyHandUI.gameObject.SetActive(status == RoundStatus.Discard);
+            bool showBoardElements = status == RoundStatus.Discard || 
+                                     status == RoundStatus.Agari || 
+                                     status == RoundStatus.Ron || 
+                                     status == RoundStatus.Result || 
+                                     status == RoundStatus.Draw;
+
+            if (riverUI != null) riverUI.gameObject.SetActive(showBoardElements);
+            if (enemyRiverUI != null) enemyRiverUI.gameObject.SetActive(showBoardElements);
+            if (enemyHandUI != null) enemyHandUI.gameObject.SetActive(showBoardElements);
 
             switch (status)
             {
@@ -569,6 +600,8 @@ namespace KillingMahjong.UI
                 case RoundStatus.Agari:
                 case RoundStatus.Ron:
                 case RoundStatus.Result:
+                    if (waitUI != null) waitUI.gameObject.SetActive(false);
+                    if (abilityUI != null) abilityUI.gameObject.SetActive(false);
                     if (ronAnimationUI != null)
                     {
                         bool isLocalWin = BoardStateManager.Instance.LastIsLocalWin;
