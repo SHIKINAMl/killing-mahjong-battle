@@ -122,6 +122,21 @@ namespace KillingMahjong.EngineData
     }
 
     [Serializable]
+    public class HandSelectionConfirmationMessage
+    {
+        public string type;
+        public HandSelectionConfirmationData data;
+    }
+    
+    [Serializable]
+    public class HandSelectionConfirmationData
+    {
+        public string reason;
+        public string message;
+        public List<int> hand_indexes;
+    }
+
+    [Serializable]
     public class BetCompletedMessage
     {
         public string type;

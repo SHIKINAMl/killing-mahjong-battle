@@ -58,6 +58,8 @@ namespace KillingMahjong.Network
         public event Action OnDraw; // 流局
         public event Action<int, int> OnGameEnded; // localScore, enemyScore
         
+        public event Action<string> OnError;
+        public event Action<HandSelectionConfirmationData> OnHandSelectionConfirmation;
         // ハンド選択のフェーズに関するイベント（UI制御用）
         public event Action OnHandSelectionAccepted; 
         
@@ -206,6 +208,7 @@ namespace KillingMahjong.Network
                     case "error":
                         ErrorMessage errorMsg = JsonUtility.FromJson<ErrorMessage>(jsonString);
                         Debug.LogError($"[Server Error] {errorMsg?.message}");
+                        OnError?.Invoke(errorMsg?.message);
                         break;
 
                     case "discard_completed":
@@ -228,6 +231,14 @@ namespace KillingMahjong.Network
                     case "hand_selection_accepted":
                         HandSelectionAcceptedMessage hsaMsg = JsonUtility.FromJson<HandSelectionAcceptedMessage>(jsonString);
                         OnHandSelectionAccepted?.Invoke();
+                        break;
+
+                    case "hand_selection_confirmation_required":
+                        HandSelectionConfirmationMessage confirmMsg = JsonUtility.FromJson<HandSelectionConfirmationMessage>(jsonString);
+                        if (confirmMsg != null && confirmMsg.data != null)
+                        {
+                            OnHandSelectionConfirmation?.Invoke(confirmMsg.data);
+                        }
                         break;
 
                     case "discard_accepted":

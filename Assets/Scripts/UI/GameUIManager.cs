@@ -24,6 +24,7 @@ namespace KillingMahjong.UI
         [SerializeField] private YakuListUI yakuListUI;
         [SerializeField] private BettingUI bettingUI;
         [SerializeField] private PhaseTransitionUI phaseTransitionUI;
+        [SerializeField] private ConfirmationDialogUI confirmationDialogUI;
         [SerializeField] private RonAnimationUI ronAnimationUI;
         [SerializeField] private MatchmakingUI matchmakingUI;
 
@@ -78,6 +79,34 @@ namespace KillingMahjong.UI
             net.OnAgari += HandleAgari;
             net.OnDraw += HandleDraw;
             net.OnHandSelectionAccepted += OnHandSelectionAccepted;
+            net.OnError += HandleError;
+            net.OnHandSelectionConfirmation += HandleHandSelectionConfirmation;
+        }
+
+        private void HandleHandSelectionConfirmation(KillingMahjong.EngineData.HandSelectionConfirmationData data)
+        {
+            if (confirmationDialogUI != null)
+            {
+                confirmationDialogUI.ShowDialog(
+                    data.message,
+                    () => {
+                        SendActionToServer("select_confirm", new ActionPayload { hand_indexes = data.hand_indexes });
+                    },
+                    () => {
+                        if (handUI != null) handUI.SetSubmittedState(false);
+                    }
+                );
+            }
+            else
+            {
+                // Fallback auto-confirm if UI is not assigned
+                SendActionToServer("select_confirm", new ActionPayload { hand_indexes = data.hand_indexes });
+            }
+        }
+
+        private void HandleError(string errorMsg)
+        {
+            if (handUI != null) handUI.SetSubmittedState(false);
         }
 
         private void SetupUI()
@@ -197,6 +226,8 @@ namespace KillingMahjong.UI
             if (currentPhaseStatus != RoundStatus.HandSelection) return;
             if (dialogueUI != null && dialogueUI.IsLogOpen) return;
             
+            if (handUI != null) handUI.SetSubmittedState(true);
+
             if (phaseTransitionUI != null)
             {
                 phaseTransitionUI.PlayCenterTextAnim("手牌決定！", 2.0f);
@@ -413,6 +444,13 @@ namespace KillingMahjong.UI
 
         public void HandleDiscardEvent(int discardedTileId, bool isLocalPlayer)
         {
+            // ゲーム終了フェーズ中は打牌イベントを無視（盤面を動かさない）
+            bool isGameEndPhase = currentPhaseStatus == RoundStatus.Agari || 
+                                  currentPhaseStatus == RoundStatus.Ron || 
+                                  currentPhaseStatus == RoundStatus.Result || 
+                                  currentPhaseStatus == RoundStatus.Draw;
+            if (isGameEndPhase) return;
+
             if (playerInfoUI != null) playerInfoUI.SetDiscardingState(false);
             if (enemyInfoUI != null) enemyInfoUI.SetDiscardingState(false);
 
@@ -519,6 +557,11 @@ namespace KillingMahjong.UI
             currentPhaseStatus = newStatus;
             if (PhaseManager.Instance != null) PhaseManager.Instance.ChangeRoundStatus(newStatus);
 
+            if (newStatus == RoundStatus.HandSelection && handUI != null)
+            {
+                handUI.SetSubmittedState(false);
+            }
+
             bool isGameEndPhase = newStatus == RoundStatus.Agari || 
                                   newStatus == RoundStatus.Ron || 
                                   newStatus == RoundStatus.Result || 
@@ -549,9 +592,32 @@ namespace KillingMahjong.UI
                                      status == RoundStatus.Result || 
                                      status == RoundStatus.Draw;
 
+            bool isGameEndPhase = status == RoundStatus.Agari || 
+                                  status == RoundStatus.Ron || 
+                                  status == RoundStatus.Result || 
+                                  status == RoundStatus.Draw;
+
             if (riverUI != null) riverUI.gameObject.SetActive(showBoardElements);
             if (enemyRiverUI != null) enemyRiverUI.gameObject.SetActive(showBoardElements);
-            if (enemyHandUI != null) enemyHandUI.gameObject.SetActive(showBoardElements);
+            if (enemyHandUI != null)
+            {
+                // ゲーム終了フェーズでは LayoutGroup を無効化して牌の位置を固定する
+                if (isGameEndPhase)
+                {
+                    var layoutGroup = enemyHandUI.GetComponentInChildren<UnityEngine.UI.LayoutGroup>();
+                    if (layoutGroup != null) layoutGroup.enabled = false;
+                }
+                enemyHandUI.gameObject.SetActive(showBoardElements);
+            }
+            if (enemyWallUI != null)
+            {
+                if (isGameEndPhase)
+                {
+                    var layoutGroup = enemyWallUI.GetComponentInChildren<UnityEngine.UI.LayoutGroup>();
+                    if (layoutGroup != null) layoutGroup.enabled = false;
+                }
+                enemyWallUI.gameObject.SetActive(showBoardElements);
+            }
 
             switch (status)
             {
