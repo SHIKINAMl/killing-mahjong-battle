@@ -2,12 +2,11 @@ import asyncio
 import heapq
 import logging
 import traceback
-from typing import Any, Awaitable, Callable, Dict, List, Optional
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Set
 
 from ..engine.game_engine import GameEngine
 from ..engine.game_state import RoundStatus, SkillType, PlayerState
 from ..engine.hand_analyzer import HandAnalyzer
-from ..engine.yaku import Yaku
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +32,7 @@ class GameSession:
 		self._send_to_client = send_to_client
 		self._broadcast_match_members = broadcast_match_members
 		self._pending_low_hand_confirmations: Dict[str, List[int]] = {}
+		self._confirmed_hand_players_by_match: Dict[str, Set[str]] = {}
 
 	async def _send_error(self, client_id: str, message: str) -> None:
 		"""クライアントへのエラー通知"""
@@ -126,6 +126,39 @@ class GameSession:
 
 		return None
 
+	def _create_task_callback(
+		self,
+		handler: Callable[..., Awaitable[None]],
+		*fixed_args,
+	) -> Callable[..., None]:
+		"""コールバックから非同期ハンドラを fire-and-forget で起動する。"""
+		def _callback(*args) -> None:
+			asyncio.create_task(handler(*fixed_args, *args))
+
+		return _callback
+
+	def _clear_pending_confirmations_for_engine(self, engine: GameEngine) -> None:
+		for p in engine.state.players:
+			self._pending_low_hand_confirmations.pop(p.player_id, None)
+
+	def _mark_hand_selection_confirmed(self, match_id: str, client_id: str) -> None:
+		self._confirmed_hand_players_by_match.setdefault(match_id, set()).add(client_id)
+
+	def _unmark_hand_selection_confirmed(self, match_id: str, client_id: str) -> None:
+		confirmed = self._confirmed_hand_players_by_match.get(match_id)
+		if confirmed is None:
+			return
+		confirmed.discard(client_id)
+		if not confirmed:
+			self._confirmed_hand_players_by_match.pop(match_id, None)
+
+	def _clear_hand_selection_confirmations(self, match_id: str) -> None:
+		self._confirmed_hand_players_by_match.pop(match_id, None)
+
+	def _are_all_hand_selections_confirmed(self, match_id: str, engine: GameEngine) -> bool:
+		confirmed = self._confirmed_hand_players_by_match.get(match_id, set())
+		return len(confirmed) >= engine.num_players
+
 	async def start_match(self, match: Any) -> None:
 		try:
 			await self._start_match_inner(match)
@@ -140,25 +173,13 @@ class GameSession:
 		round_start_done = asyncio.Event()
 		dealing_phase_done = asyncio.Event()
 
-		engine.on_dealt = lambda: asyncio.create_task(
-			self.on_dealt(match.match_id)
-		)
-		engine.on_selected = lambda: asyncio.create_task(
-			self.on_selected(match.match_id)
-		)
-		engine.on_bet = lambda: asyncio.create_task(
-			self.on_bet(match.match_id)
-		)
+		engine.on_dealt = self._create_task_callback(self.on_dealt, match.match_id)
+		engine.on_selected = self._create_task_callback(self.on_selected, match.match_id)
+		engine.on_bet = self._create_task_callback(self.on_bet, match.match_id)
 
-		engine.on_discard_started = lambda: asyncio.create_task(
-			self.on_discard_started(match.match_id)
-		)
-		engine.on_discarded = lambda player_id, tile_id: asyncio.create_task(
-			self.on_discarded(match.match_id, player_id, tile_id)
-		)
-		engine.on_skill_casted = lambda player_id, skill_type, cost, exposed_indexes: asyncio.create_task(
-			self.on_skill_casted(match.match_id, player_id, skill_type, cost, exposed_indexes)
-		)
+		engine.on_discard_started = self._create_task_callback(self.on_discard_started, match.match_id)
+		engine.on_discarded = self._create_task_callback(self.on_discarded, match.match_id)
+		engine.on_skill_casted = self._create_task_callback(self.on_skill_casted, match.match_id)
 
 		def _on_round_start() -> None:
 			round_start_done.clear()
@@ -179,15 +200,9 @@ class GameSession:
 			asyncio.create_task(_wait_and_start_deal())
 
 		engine.on_round_start = _on_round_start
-		engine.on_round_end = lambda is_draw: asyncio.create_task(
-			self.on_round_end(match.match_id, is_draw)
-		)
-		engine.on_game_end = lambda: asyncio.create_task(
-			self.on_game_end(match.match_id)
-		)
-		engine.on_special_victory_won = lambda player_id: asyncio.create_task(
-			self.on_special_victory_won(match.match_id, player_id)
-		)
+		engine.on_round_end = self._create_task_callback(self.on_round_end, match.match_id)
+		engine.on_game_end = self._create_task_callback(self.on_game_end, match.match_id)
+		engine.on_special_victory_won = self._create_task_callback(self.on_special_victory_won, match.match_id)
 
 		def _on_phase_change(new_status: RoundStatus) -> None:
 			async def _notify_phase_change() -> None:
@@ -358,9 +373,10 @@ class GameSession:
 		if skill_type == SkillType.BOOST_HAND:
 			# 対象役名を検証
 			yaku_name = action_data.get("yaku_name")
-			if not isinstance(yaku_name, str) or Yaku.get_han_by_name(yaku_name) == -1:
+			normalized_yaku_name = GameEngine.normalize_boost_target_yaku_name(yaku_name)
+			if normalized_yaku_name is None:
 				return None
-			return engine.use_skill(user, skill_type, yaku_name)
+			return engine.use_skill(user, skill_type, normalized_yaku_name)
 
 		elif skill_type == SkillType.SPECIAL_VICTORY:
 			return engine.use_skill(user, skill_type)
@@ -386,6 +402,11 @@ class GameSession:
 		if not await self._ensure_phase(engine, client_id, RoundStatus.HAND_SELECTION, "select"):
 			return
 
+		match_id = self._active_match_by_client.get(client_id)
+		if not match_id:
+			await self._send_error(client_id, "Not in game")
+			return
+
 		player = engine.get_player_by_id(client_id)
 		if player is None:
 			await self._send_error(client_id, "Player not found")
@@ -405,6 +426,7 @@ class GameSession:
 		if not is_mangan_or_more:
 			reason = "not_tenpai" if not is_tenpai else "below_mangan"
 			self._pending_low_hand_confirmations[client_id] = wall_indexes.copy()
+			self._unmark_hand_selection_confirmed(match_id, client_id)
 			await self._respond_to_client(client_id, {
 				"type": "hand_selection_confirmation_required",
 				"data": {
@@ -417,6 +439,7 @@ class GameSession:
 
 		if engine.select_hand(wall_indexes, player):
 			self._pending_low_hand_confirmations.pop(client_id, None)
+			self._mark_hand_selection_confirmed(match_id, client_id)
 			# player.hand は wall 内 index を保持するため、クライアントへは牌 ID に変換して送信する
 			hand_tiles = [player.wall[idx] for idx in player.hand]
 
@@ -429,7 +452,8 @@ class GameSession:
 				},
 			})
 
-			if all(p.waits for p in engine.state.players):
+			if self._are_all_hand_selections_confirmed(match_id, engine):
+				self._clear_hand_selection_confirmations(match_id)
 				engine.selected_hand()
 
 		else:
@@ -438,6 +462,11 @@ class GameSession:
 	async def _select_confirm(self, engine: GameEngine, client_id: str, action_data: Dict[str, Any]) -> None:
 		"""二段階目の手牌確定アクション（満貫以下・非聴牌でも確定可能）"""
 		if not await self._ensure_phase(engine, client_id, RoundStatus.HAND_SELECTION, "select_confirm"):
+			return
+
+		match_id = self._active_match_by_client.get(client_id)
+		if not match_id:
+			await self._send_error(client_id, "Not in game")
 			return
 
 		player = engine.get_player_by_id(client_id)
@@ -465,6 +494,7 @@ class GameSession:
 			return
 
 		self._pending_low_hand_confirmations.pop(client_id, None)
+		self._mark_hand_selection_confirmed(match_id, client_id)
 		hand_tiles = [player.wall[idx] for idx in player.hand]
 
 		await self._respond_to_client(client_id, {
@@ -477,7 +507,8 @@ class GameSession:
 			},
 		})
 
-		if all(p.hand for p in engine.state.players):
+		if self._are_all_hand_selections_confirmed(match_id, engine):
+			self._clear_hand_selection_confirmations(match_id)
 			engine.selected_hand()
 
 	async def _bet(self, engine: GameEngine, client_id: str, action_data: Dict[str, Any]) -> None:
@@ -605,9 +636,9 @@ class GameSession:
 	async def on_dealt(self, match_id: str) -> None:
 		"""配牌完了時の処理"""
 		engine = self._game_engines.get(match_id)
+		self._clear_hand_selection_confirmations(match_id)
 		if engine is not None:
-			for p in engine.state.players:
-				self._pending_low_hand_confirmations.pop(p.player_id, None)
+			self._clear_pending_confirmations_for_engine(engine)
 
 		wall = [(p.wall, p.hand) for p in self._game_engines[match_id].state.players]
 		dora = self._game_engines[match_id].state.round_state.dora_id
@@ -746,6 +777,7 @@ class GameSession:
 	async def on_round_end(self, match_id: str, is_draw: bool = False) -> None:
 		"""ラウンド終了時の処理"""
 		engine = self._game_engines.get(match_id)
+		self._clear_hand_selection_confirmations(match_id)
 		liquidation = engine.get_last_liquidation_result() if engine and not is_draw else None
 
 		await self._broadcast_match_members(
@@ -796,9 +828,9 @@ class GameSession:
 		"""ゲーム終了時の処理"""
 		logger.info("ゲーム終了: match_id=%s", match_id)
 		engine = self._game_engines.get(match_id)
+		self._clear_hand_selection_confirmations(match_id)
 		if engine:
-			for p in engine.state.players:
-				self._pending_low_hand_confirmations.pop(p.player_id, None)
+			self._clear_pending_confirmations_for_engine(engine)
 
 			final_scores = {}
 			for p in engine.state.players:
