@@ -134,5 +134,28 @@ namespace KillingMahjong.UI
             }
             return RectTransformUtility.RectangleContainsScreenPoint(handAreaRect, screenPoint);
         }
+        private bool isSubmitted = false;
+
+        public void SetSubmittedState(bool submitted)
+        {
+            isSubmitted = submitted;
+            if (gameUIManager != null) UpdateLayout(gameUIManager.CurrentPhaseStatus);
+        }
+
+        public override void UpdateLayout(RoundStatus phaseStatus)
+        {
+            base.UpdateLayout(phaseStatus);
+
+            bool showButtons = (phaseStatus == RoundStatus.HandSelection) && !isSubmitted;
+
+            if (decideButton != null)
+            {
+                decideButton.gameObject.SetActive(showButtons);
+            }
+            if (autoManganButton != null)
+            {
+                autoManganButton.gameObject.SetActive(showButtons);
+            }
+        }
     }
 }

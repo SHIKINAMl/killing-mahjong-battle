@@ -98,8 +98,7 @@ namespace KillingMahjong.EngineData
     {
         public string client_id;
         public int[] wall;
-        // string(JSON)で独自パースする場合はここでは定義しなくても良いが、一応
-        // List<IntArray>等でパースするためには手動対応が必要 (NetworkMessageHandler側で行う)
+        public int[] tenpai_examples;
     }
 
     [Serializable]
@@ -120,6 +119,21 @@ namespace KillingMahjong.EngineData
         public int[] hand;
         public int[] waits;
         public int[] wall;
+    }
+
+    [Serializable]
+    public class HandSelectionConfirmationMessage
+    {
+        public string type;
+        public HandSelectionConfirmationData data;
+    }
+    
+    [Serializable]
+    public class HandSelectionConfirmationData
+    {
+        public string reason;
+        public string message;
+        public List<int> hand_indexes;
     }
 
     [Serializable]

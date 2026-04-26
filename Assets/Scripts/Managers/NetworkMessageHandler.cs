@@ -58,6 +58,8 @@ namespace KillingMahjong.Network
         public event Action OnDraw; // 流局
         public event Action<int, int> OnGameEnded; // localScore, enemyScore
         
+        public event Action<string> OnError;
+        public event Action<HandSelectionConfirmationData> OnHandSelectionConfirmation;
         // ハンド選択のフェーズに関するイベント（UI制御用）
         public event Action OnHandSelectionAccepted; 
         
@@ -206,6 +208,7 @@ namespace KillingMahjong.Network
                     case "error":
                         ErrorMessage errorMsg = JsonUtility.FromJson<ErrorMessage>(jsonString);
                         Debug.LogError($"[Server Error] {errorMsg?.message}");
+                        OnError?.Invoke(errorMsg?.message);
                         break;
 
                     case "discard_completed":
@@ -227,7 +230,21 @@ namespace KillingMahjong.Network
 
                     case "hand_selection_accepted":
                         HandSelectionAcceptedMessage hsaMsg = JsonUtility.FromJson<HandSelectionAcceptedMessage>(jsonString);
+                        if (hsaMsg != null && hsaMsg.data != null && hsaMsg.data.waits != null && hsaMsg.data.waits.Length > 0)
+                        {
+                            var acceptedWaits = new List<int>(hsaMsg.data.waits);
+                            Managers.BoardStateManager.Instance.SetLocalState(null, null, acceptedWaits);
+                            Managers.BoardStateManager.Instance.FireRebuildEvent();
+                        }
                         OnHandSelectionAccepted?.Invoke();
+                        break;
+
+                    case "hand_selection_confirmation_required":
+                        HandSelectionConfirmationMessage confirmMsg = JsonUtility.FromJson<HandSelectionConfirmationMessage>(jsonString);
+                        if (confirmMsg != null && confirmMsg.data != null)
+                        {
+                            OnHandSelectionConfirmation?.Invoke(confirmMsg.data);
+                        }
                         break;
 
                     case "discard_accepted":
@@ -328,10 +345,18 @@ namespace KillingMahjong.Network
             DealingCompletedMessage msg = JsonUtility.FromJson<DealingCompletedMessage>(jsonString);
             if (msg.hands == null) return;
             
-            var tenpaiExamples = ParseTenpaiExamplesFromJson(jsonString, localPlayerId);
-            
             // --- デバッグログ追加 ---
             Debug.Log($"[Network] サーバーからのJSON: {jsonString}");
+
+            var tenpaiExamples = new System.Collections.Generic.List<int[]>();
+            foreach (var h in msg.hands)
+            {
+                if (h.client_id == localPlayerId && h.tenpai_examples != null && h.tenpai_examples.Length > 0)
+                {
+                    tenpaiExamples.Add(h.tenpai_examples);
+                }
+            }
+
             Debug.Log($"[Network] 抽出されたお手本の数: {tenpaiExamples.Count}");
             for (int i = 0; i < tenpaiExamples.Count; i++)
             {
@@ -339,8 +364,7 @@ namespace KillingMahjong.Network
             }
             // ------------------------
 
-            var convertedExamples = tenpaiExamples.ConvertAll(e => e.ToArray());
-            Managers.BoardStateManager.Instance.SetTenpaiExamples(convertedExamples);
+            Managers.BoardStateManager.Instance.SetTenpaiExamples(tenpaiExamples);
 
             // 手動独自パースで wall 配列を抽出 (JsonUtilityが int[] を上手くさばけない場合のフェールセーフ)
             var wallDict = ParseIntArrays(jsonString, "wall");
@@ -438,96 +462,7 @@ namespace KillingMahjong.Network
             return result;
         }
 
-        private List<List<int>> ParseTenpaiExamplesFromJson(string jsonString, string targetClientId)
-        {
-            var result = new List<List<int>>();
-            try
-            {
-                int handsStart = jsonString.IndexOf("\"hands\"");
-                if (handsStart < 0) return result;
 
-                int searchFrom = handsStart;
-                while (true)
-                {
-                    int cidStart = jsonString.IndexOf("\"client_id\"", searchFrom);
-                    if (cidStart < 0) break;
-
-                    int valStart = jsonString.IndexOf('"', cidStart + 11) + 1;
-                    int valEnd = jsonString.IndexOf('"', valStart);
-                    if (valStart < 0 || valEnd < 0) break;
-                    string cid = jsonString.Substring(valStart, valEnd - valStart);
-
-                    if (cid == targetClientId)
-                    {
-                        int tenpaiKey = jsonString.IndexOf("\"tenpai_examples\"", valEnd);
-                        int keyLength = 17;
-                        if (tenpaiKey < 0)
-                        {
-                            tenpaiKey = jsonString.IndexOf("\"tenpai_example\"", valEnd);
-                            keyLength = 16;
-                        }
-                        if (tenpaiKey < 0) break;
-
-                        int arrStart = jsonString.IndexOf('[', tenpaiKey + keyLength);
-                        if (arrStart < 0) break;
-
-                        int peek = arrStart + 1;
-                        while (peek < jsonString.Length && jsonString[peek] == ' ') peek++;
-
-                        if (peek < jsonString.Length && jsonString[peek] == '[')
-                        {
-                            int depth = 0;
-                            int innerStart = -1;
-                            for (int i = arrStart; i < jsonString.Length; i++)
-                            {
-                                if (jsonString[i] == '[')
-                                {
-                                    depth++;
-                                    if (depth == 2) innerStart = i;
-                                }
-                                else if (jsonString[i] == ']')
-                                {
-                                    if (depth == 2 && innerStart >= 0)
-                                    {
-                                        string inner = jsonString.Substring(innerStart + 1, i - innerStart - 1);
-                                        var hand = new List<int>();
-                                        foreach (var token in inner.Split(','))
-                                        {
-                                            if (int.TryParse(token.Trim(), out int val)) hand.Add(val);
-                                        }
-                                        if (hand.Count > 0) result.Add(hand);
-                                        innerStart = -1;
-                                    }
-                                    depth--;
-                                    if (depth == 0) break;
-                                }
-                            }
-                        }
-                        else
-                        {
-                            int arrEnd = jsonString.IndexOf(']', arrStart);
-                            if (arrEnd > arrStart)
-                            {
-                                string inner = jsonString.Substring(arrStart + 1, arrEnd - arrStart - 1);
-                                var hand = new List<int>();
-                                foreach (var token in inner.Split(','))
-                                {
-                                    if (int.TryParse(token.Trim(), out int val)) hand.Add(val);
-                                }
-                                if (hand.Count > 0) result.Add(hand);
-                            }
-                        }
-                        break;
-                    }
-                    searchFrom = valEnd + 1;
-                }
-            }
-            catch (System.Exception e)
-            {
-                Debug.LogError($"[ParseTenpaiExamples] Error: {e.Message}");
-            }
-            return result;
-        }
 
         private void ParseGameEnd(string jsonString)
         {

@@ -43,9 +43,9 @@ MonoBehaviour:
   - {fileID: 21300000, guid: aaa275d386a73f84f8adb323e8cb51e9, type: 3}
   - {fileID: 21300000, guid: 81b498faae33d6a498fffcbcf1e09f46, type: 3}
   redDoraSprites:
-  - {fileID: 21300000, guid: ae12c990f8739e14d840883bb74f88b4, type: 3}
+  - {fileID: 21300000, guid: 48fa2e7a9f492074cb6161b4bd7cadcc, type: 3}
   - {fileID: 21300000, guid: 5f8ac3a98cb3d2044983178cbb71290b, type: 3}
-  - {fileID: 21300000, guid: ba18159b956c02d489159174e79becfc, type: 3}
+  - {fileID: 21300000, guid: 43dab11f0b3001341adf65a4bf362387, type: 3}
   discardTileSprites:
   - {fileID: 21300000, guid: 1a8e4a63a96837e43b7532f310a5dd61, type: 3}
   - {fileID: 21300000, guid: 65e7312bb11d06b48b994b94450a7bbb, type: 3}

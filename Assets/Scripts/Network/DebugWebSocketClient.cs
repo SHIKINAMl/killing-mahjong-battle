@@ -211,14 +211,15 @@ namespace KillingMahjong.Network
                             data = new RoundEndData { is_draw = true } 
                         });
                         
-                        yield return new WaitForSeconds(3.5f);
-
-                        // 流局後、次のラウンドを開始
-                        StartCoroutine(StartNextRoundAfterDraw());
                         yield break;
                     }
 
                     SendMockMessage(new DiscardPhaseStartedMessage { type = "discard_phase_started", data = new DiscardPhaseStartedData { first_player = localPlayerId } });
+                    break;
+
+                case "next_round":
+                    Debug.Log("[Debug Client] Received next_round action. Starting next round...");
+                    StartCoroutine(StartNextRoundAfterDraw());
                     break;
             }
         }

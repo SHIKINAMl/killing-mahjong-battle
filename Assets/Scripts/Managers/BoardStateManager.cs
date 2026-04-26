@@ -30,6 +30,7 @@ namespace KillingMahjong.Managers
         public bool LastIsLocalWin { get; set; } = true; 
         public LiquidationData LastLiquidationData { get; set; } = null;
         public bool IsLocalTurn { get; private set; } = false;
+        public int LastDiscardedTileId { get; set; } = -1;
         
         public int LocalPlayerHp { get; private set; } = 20000;
         public int EnemyPlayerHp { get; private set; } = 20000;
