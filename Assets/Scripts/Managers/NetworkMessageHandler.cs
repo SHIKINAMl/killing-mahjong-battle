@@ -230,6 +230,12 @@ namespace KillingMahjong.Network
 
                     case "hand_selection_accepted":
                         HandSelectionAcceptedMessage hsaMsg = JsonUtility.FromJson<HandSelectionAcceptedMessage>(jsonString);
+                        if (hsaMsg != null && hsaMsg.data != null && hsaMsg.data.waits != null && hsaMsg.data.waits.Length > 0)
+                        {
+                            var acceptedWaits = new List<int>(hsaMsg.data.waits);
+                            Managers.BoardStateManager.Instance.SetLocalState(null, null, acceptedWaits);
+                            Managers.BoardStateManager.Instance.FireRebuildEvent();
+                        }
                         OnHandSelectionAccepted?.Invoke();
                         break;
 

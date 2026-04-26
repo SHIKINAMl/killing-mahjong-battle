@@ -303,12 +303,12 @@ namespace KillingMahjong.UI
             Debug.Log("PhaseTransition: Complete Callback invoked");
             onComplete?.Invoke();
         }
-        public void PlayCenterTextAnim(string text, float duration = 1.5f)
+        public void PlayCenterTextAnim(string text, float duration = 1.5f, Action onComplete = null)
         {
-            StartCoroutine(CenterTextAnimRoutine(text, duration));
+            StartCoroutine(CenterTextAnimRoutine(text, duration, onComplete));
         }
 
-        private IEnumerator CenterTextAnimRoutine(string text, float duration)
+        private IEnumerator CenterTextAnimRoutine(string text, float duration, Action onComplete = null)
         {
             if (horizontalLineRt != null)
             {
@@ -349,6 +349,8 @@ namespace KillingMahjong.UI
                 yield return null;
             }
             if (horizontalLineRt != null) horizontalLineRt.gameObject.SetActive(false);
+
+            onComplete?.Invoke();
         }
     }
 }

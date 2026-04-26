@@ -85,22 +85,25 @@ namespace KillingMahjong.UI
 
         private void HandleHandSelectionConfirmation(KillingMahjong.EngineData.HandSelectionConfirmationData data)
         {
+            // 確認ダイアログを表示（演出の前に表示される）
             if (confirmationDialogUI != null)
             {
                 confirmationDialogUI.ShowDialog(
                     data.message,
                     () => {
-                        SendActionToServer("select_confirm", new ActionPayload { hand_indexes = data.hand_indexes });
+                        // OK → 「手牌決定！」演出を出してから select_confirm を送信
+                        PlayHandDecidedAnimThenSend("select_confirm", data.hand_indexes);
                     },
                     () => {
+                        // キャンセル → 決定ボタンを押す前の状態に戻す
                         if (handUI != null) handUI.SetSubmittedState(false);
                     }
                 );
             }
             else
             {
-                // Fallback auto-confirm if UI is not assigned
-                SendActionToServer("select_confirm", new ActionPayload { hand_indexes = data.hand_indexes });
+                // ConfirmationDialogUI が未設定の場合は演出付きで自動確認
+                PlayHandDecidedAnimThenSend("select_confirm", data.hand_indexes);
             }
         }
 
@@ -221,19 +224,20 @@ namespace KillingMahjong.UI
             ClearSelection();
         }
 
+        // 手牌決定フローで使用するキャッシュ
+        private List<int> _pendingHandIndexes;
+        private List<int> _pendingHandTiles;
+
         public void CompleteHandSelection()
         {
             if (currentPhaseStatus != RoundStatus.HandSelection) return;
             if (dialogueUI != null && dialogueUI.IsLogOpen) return;
             
+            // 二重押し防止
             if (handUI != null) handUI.SetSubmittedState(true);
 
-            if (phaseTransitionUI != null)
-            {
-                phaseTransitionUI.PlayCenterTextAnim("手牌決定！", 2.0f);
-            }
-
-            List<int> handIndexes = new List<int>();
+            // hand_indexes を事前計算してキャッシュ
+            _pendingHandIndexes = new List<int>();
             HashSet<int> usedIndexes = new HashSet<int>();
             foreach(int tileId in BoardStateManager.Instance.CurrentHandTiles) {
                  var wallTiles = BoardStateManager.Instance.OriginalWallTiles;
@@ -247,12 +251,37 @@ namespace KillingMahjong.UI
                      }
                  }
                  if (idx >= 0) {
-                     handIndexes.Add(idx);
+                     _pendingHandIndexes.Add(idx);
                      usedIndexes.Add(idx);
                  }
             }
-            
-            SendActionToServer("select", new ActionPayload { hand_indexes = handIndexes, hand = BoardStateManager.Instance.CurrentHandTiles });
+            _pendingHandTiles = new List<int>(BoardStateManager.Instance.CurrentHandTiles);
+
+            // まずサーバーに select を送信して満貫判定を問い合わせる
+            // (演出はまだ出さない。レスポンスで分岐する)
+            SendActionToServer("select", new ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
+        }
+
+        /// <summary>
+        /// 「手牌決定！」演出を再生し、完了後に指定アクションをサーバーへ送信する。
+        /// autoManganボタンと決定ボタンは演出開始時に非表示になる。
+        /// </summary>
+        private void PlayHandDecidedAnimThenSend(string actionType, List<int> handIndexes)
+        {
+            // 決定・autoManganボタンを非表示
+            if (handUI != null) handUI.SetSubmittedState(true);
+
+            if (phaseTransitionUI != null)
+            {
+                phaseTransitionUI.PlayCenterTextAnim("手牌決定！", 2.0f, () =>
+                {
+                    SendActionToServer(actionType, new ActionPayload { hand_indexes = handIndexes, hand = _pendingHandTiles });
+                });
+            }
+            else
+            {
+                SendActionToServer(actionType, new ActionPayload { hand_indexes = handIndexes, hand = _pendingHandTiles });
+            }
         }
 
         public void DeselectAbility()
@@ -453,6 +482,9 @@ namespace KillingMahjong.UI
 
             if (playerInfoUI != null) playerInfoUI.SetDiscardingState(false);
             if (enemyInfoUI != null) enemyInfoUI.SetDiscardingState(false);
+
+            // ロン演出用に最後の打牌を記録
+            BoardStateManager.Instance.LastDiscardedTileId = discardedTileId;
 
             if (isLocalPlayer)
             {
@@ -699,9 +731,11 @@ namespace KillingMahjong.UI
                             else actualRank = "満貫";
                         }
                         
-                        int dummyRonTile = winningHand.Count > 0 ? winningHand[winningHand.Count - 1] : 0;
+                        int ronTile = BoardStateManager.Instance.LastDiscardedTileId >= 0
+                            ? BoardStateManager.Instance.LastDiscardedTileId
+                            : (winningHand.Count > 0 ? winningHand[winningHand.Count - 1] : 0);
                         
-                        StartCoroutine(PlayRonWithPreDialogue(isLocalWin, winningHand, dummyRonTile, actualYaku, actualFormula, actualRank));
+                        StartCoroutine(PlayRonWithPreDialogue(isLocalWin, winningHand, ronTile, actualYaku, actualFormula, actualRank));
                     }
                     break;
                 case RoundStatus.Draw:
@@ -798,7 +832,19 @@ namespace KillingMahjong.UI
 
         private void OnHandSelectionAccepted()
         {
-            if (dialogueUI != null) dialogueUI.ShowText("相手の手牌選択を待っています...");
+            // 満貫以上の場合はサーバーが直接 hand_selection_accepted を返すため、
+            // 確認ダイアログを飛ばして「手牌決定！」演出を再生する
+            if (phaseTransitionUI != null)
+            {
+                phaseTransitionUI.PlayCenterTextAnim("手牌決定！", 2.0f, () =>
+                {
+                    if (dialogueUI != null) dialogueUI.ShowText("相手の手牌選択を待っています...");
+                });
+            }
+            else
+            {
+                if (dialogueUI != null) dialogueUI.ShowText("相手の手牌選択を待っています...");
+            }
         }
 
         private void HandleAgari(bool isLocalWin)
