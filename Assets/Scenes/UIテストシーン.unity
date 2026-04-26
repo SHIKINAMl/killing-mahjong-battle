@@ -6080,6 +6080,64 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 943859597}
   m_CullTransparentMesh: 1
+--- !u!1 &952856417
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 952856419}
+  - component: {fileID: 952856418}
+  m_Layer: 0
+  m_Name: "\u30B3\u30E1\u30F3\u30C8\u76DB\u308A\u4E0A\u3052\u6628\u65E5"
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &952856418
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 952856417}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d207c46f03915c04286c6347c43e9084, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.CommentaryFlowUI
+  flowSpeed: 300
+  commentLifetime: 8
+  maxLanes: 5
+  laneHeight: 50
+  minCommentInterval: 0.5
+  customFont: {fileID: 11400000, guid: 8731516b186aba2479743502d9d59bfa, type: 2}
+  fontSize: 36
+  normalColor: {r: 1, g: 1, b: 1, a: 1}
+  excitedColor: {r: 1, g: 0.85, b: 0.2, a: 1}
+  dangerColor: {r: 1, g: 0.3, b: 0.3, a: 1}
+  cheerColor: {r: 0.4, g: 1, b: 0.6, a: 1}
+  topMarginRatio: 0.05
+  bottomMarginRatio: 0.4
+  enableDebugLog: 1
+--- !u!4 &952856419
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 952856417}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 18809.283, y: 0, z: 122987.06}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &953889641
 GameObject:
   m_ObjectHideFlags: 0
@@ -12615,3 +12673,4 @@ SceneRoots:
   - {fileID: 592429296}
   - {fileID: 300672384}
   - {fileID: 1644618190}
+  - {fileID: 952856419}
