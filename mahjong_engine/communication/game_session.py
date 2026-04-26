@@ -307,6 +307,7 @@ class GameSession:
 							"tile" : w[0],
 							"mangan_or_more" : w[1],
 							"yaku" : w[2],
+							"base_yaku": w[3],
 						} for w in waits
 					]
 				},
