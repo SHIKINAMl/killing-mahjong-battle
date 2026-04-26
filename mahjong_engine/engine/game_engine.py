@@ -2,6 +2,7 @@
 麻雀ゲームエンジン
 """
 import logging
+import re
 from collections import Counter
 from typing import Callable, Optional
 import random
@@ -198,6 +199,48 @@ class GameEngine:
 
     # ========== スキル処理 ==========
 
+    @staticmethod
+    def normalize_boost_target_yaku_name(yaku_name: str) -> Optional[str]:
+        """BOOST_HAND の入力役名を正規化する。`役名` / `役名+N` / `(役名)+N` を許可。"""
+        if not isinstance(yaku_name, str):
+            return None
+
+        raw = yaku_name.strip()
+        if not raw:
+            return None
+
+        # 表示形式 `役名+N` または `(役名)+N` が渡ってきた場合、基底の役名へ戻す。
+        m = re.fullmatch(r"(.+?)\+(\d+)", raw)
+        base_name = m.group(1).strip() if m else raw
+
+        if base_name.startswith("(") and base_name.endswith(")") and len(base_name) > 2:
+            base_name = base_name[1:-1].strip()
+
+        if Yaku.get_han_by_name(base_name) == -1:
+            return None
+
+        return base_name
+
+    def _normalized_boost_bonus_map(self, player: PlayerState) -> dict[str, int]:
+        """プレイヤーの BOOST_HAND ボーナス辞書を正規化して返す。"""
+        normalized: dict[str, int] = {}
+        for raw_name, count in player.boost_hand_bonus.items():
+            if not isinstance(count, int) or count <= 0:
+                continue
+            base_name = self.normalize_boost_target_yaku_name(str(raw_name))
+            if base_name is None:
+                continue
+            normalized[base_name] = normalized.get(base_name, 0) + count
+        return normalized
+
+    def _build_display_yaku_list(self, yaku_list: list[str], bonus_map: dict[str, int]) -> list[str]:
+        """表示用役名を `役名+回数` 形式で組み立てる。"""
+        display: list[str] = []
+        for name in yaku_list:
+            bonus_count = bonus_map.get(name, 0)
+            display.append(f"{name}+{bonus_count}" if bonus_count > 0 else name)
+        return display
+
     def cast_skill(self, user: PlayerState, skill_type: SkillType, target: PlayerState | None = None, **options) -> Optional[int]:
         """
         スキルを発動する（統一インターフェース）
@@ -255,8 +298,10 @@ class GameEngine:
         if skill_type == SkillType.BOOST_HAND:
             if "yaku_name" not in options or not options["yaku_name"]:
                 return True
-            if Yaku.get_han_by_name(options["yaku_name"]) == -1:
+            normalized_yaku_name = self.normalize_boost_target_yaku_name(options["yaku_name"])
+            if normalized_yaku_name is None:
                 return True
+            options["yaku_name"] = normalized_yaku_name
 
         elif skill_type == SkillType.MULLIGAN:
             target_index = options.get("target_hand_index")
@@ -489,13 +534,16 @@ class GameEngine:
         is_tanki_wait = self._is_tanki_wait_agari(hand, winning_tile, winner.waits)
 
         # 役倍率（跳満 1.5倍 / 倍満 2倍 / 三倍満 3倍 / 役満 4倍）
-        yaku_list = HandAnalyzer.enum_yaku(hand)
-        base_han = sum(Yaku.get_han_by_name(name) for name in yaku_list)
-        bonus_han = sum(winner.boost_hand_bonus.get(name, 0) for name in yaku_list)
+        base_yaku_list = HandAnalyzer.enum_yaku(hand)
+        boost_bonus_map = self._normalized_boost_bonus_map(winner)
+        base_han = sum(Yaku.get_han_by_name(name) for name in base_yaku_list)
+        bonus_han = sum(boost_bonus_map.get(name, 0) for name in base_yaku_list)
+        display_yaku_list = self._build_display_yaku_list(base_yaku_list, boost_bonus_map)
+
         han = base_han + bonus_han
         multiplier = self._get_liquidation_multiplier(han)
         logger.info("精算: winner=%s  yaku=%s  base_han=%d  bonus_han=%d  multiplier=%.1f",
-                    winner.player_id, yaku_list, base_han, bonus_han, multiplier)
+                    winner.player_id, display_yaku_list, base_han, bonus_han, multiplier)
 
         # 勝者: 自身の賭け金 × 自身の役倍率分を獲得
         winner_gain = int(winner.bet * multiplier)
@@ -509,6 +557,11 @@ class GameEngine:
         self._last_liquidation_result = {
             "winner_id": winner.player_id,
             "loser_id": loser.player_id,
+            "yaku": display_yaku_list,
+            "base_yaku": base_yaku_list,
+            "display_yaku": display_yaku_list,
+            "base_han": base_han,
+            "bonus_han": bonus_han,
             "han": han,
             "multiplier": multiplier,
             "winner_bet": winner.bet,
@@ -636,7 +689,7 @@ class GameEngine:
             if key in player.__dataclass_fields__:
                 setattr(player, key, value)
 
-    def get_waits(self, hand_indexes: list[int], player: PlayerState) -> list[tuple[int, bool, list[str]]]:
+    def get_waits(self, hand_indexes: list[int], player: PlayerState) -> list[tuple[int, bool, list[str], list[str]]]:
         """
         手牌から待ち牌を取得
 
@@ -648,7 +701,8 @@ class GameEngine:
             待ち牌のリスト
                 - 待ち牌のID
                 - 満貫以上の待ちかどうか
-                - 役のリスト
+                - 表示用役のリスト（役名+強化回数）
+                - 生の役のリスト
         """
         # index から牌 ID に変換
         hand_tiles = [player.wall[idx] for idx in hand_indexes]
@@ -660,11 +714,13 @@ class GameEngine:
         waits = [w+32 if w == self.state.round_state.dora_id else w for w in waits]
 
         result = []
+        boost_bonus_map = self._normalized_boost_bonus_map(player)
         for w in waits:
-            yaku_list = HandAnalyzer.enum_yaku(hand_tiles + [w])
-            base_han = sum(Yaku.get_han_by_name(y) for y in yaku_list)
-            bonus = sum(player.boost_hand_bonus.get(y, 0) for y in yaku_list)
-            result.append((w, base_han + bonus >= 4, yaku_list))
+            base_yaku_list = HandAnalyzer.enum_yaku(hand_tiles + [w])
+            base_han = sum(Yaku.get_han_by_name(y) for y in base_yaku_list)
+            bonus = sum(boost_bonus_map.get(y, 0) for y in base_yaku_list)
+            display_yaku_list = self._build_display_yaku_list(base_yaku_list, boost_bonus_map)
+            result.append((w, base_han + bonus >= 4, display_yaku_list, base_yaku_list))
         return result
 
 
