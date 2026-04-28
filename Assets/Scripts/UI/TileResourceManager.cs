@@ -6,6 +6,10 @@ namespace KillingMahjong.UI
     [CreateAssetMenu(fileName = "TileResourceManager", menuName = "Mahjong/TileResourceManager")]
     public class TileResourceManager : ScriptableObject
     {
+        [Header("Back Tile Sprite (裏牌)")]
+        [Tooltip("伏せ牌（ID: 0）として表示される画像")]
+        [SerializeField] private Sprite backTileSprite;
+
         [Header("Tile Sprites (Order: Manzu 1-9, Pinzu 1-9, Souzu 1-9, Honors: East, West)")]
         [Tooltip("Ensure exactly 29 sprites are assigned in standard order.")]
         [SerializeField] private List<Sprite> tileSprites;
@@ -39,6 +43,12 @@ namespace KillingMahjong.UI
         /// </summary>
         public Sprite GetTileSprite(int encodedId)
         {
+            // IDが -1 の場合は専用の裏牌画像を返す
+            if (encodedId == -1 && backTileSprite != null)
+            {
+                return backTileSprite;
+            }
+
             var tile = new TileData(encodedId);
             int baseId = encodedId & 0x1F;
 
@@ -65,6 +75,11 @@ namespace KillingMahjong.UI
         /// </summary>
         public Sprite GetDiscardTileSprite(int encodedId, bool isEnemy = false)
         {
+            if (encodedId == -1 && backTileSprite != null)
+            {
+                return backTileSprite;
+            }
+
             List<Sprite> targetSprites = isEnemy ? enemyDiscardTileSprites : discardTileSprites;
             List<Sprite> targetRedDoraSprites = isEnemy ? enemyDiscardRedDoraSprites : discardRedDoraSprites;
 

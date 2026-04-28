@@ -12,6 +12,10 @@ namespace KillingMahjong.UI
         [SerializeField] private GameObject ronPanel; // The full-screen/modal panel for Ron
         [SerializeField] private GameObject yakuBackgroundPanel; // The panel containing hand/yaku info (役パネル)
         
+        [Header("Player Ron Bubble (Pre-Animation)")]
+        [Tooltip("自分がロンした瞬間に盤面上に出す吹き出し")]
+        [SerializeField] private GameObject playerRonBubbleContainer;
+        
         [Header("Step 1: Cut-in")]
         [SerializeField] private GameObject cutInContainer;
         [SerializeField] private Image cutInImage;
@@ -26,7 +30,7 @@ namespace KillingMahjong.UI
 
         [Header("Hand Display Layout")]
         [Tooltip("The horizontal gap between each tile in the hand")]
-        [SerializeField] private float tileSpacing = 68f;
+        [SerializeField] private float tileSpacing = 95f;
         [Tooltip("The visual scale of each tile in the hand")]
         [SerializeField] private float tileScale = 1.5f;
         
@@ -49,7 +53,27 @@ namespace KillingMahjong.UI
 
         private void Start()
         {
+            PrepareForPreDialogue();
+        }
+
+        public void PrepareForPreDialogue()
+        {
+            ResetVisuals();
             if (ronPanel != null) ronPanel.SetActive(false);
+            if (playerRonBubbleContainer != null) playerRonBubbleContainer.SetActive(false);
+        }
+
+        public bool HasPlayerRonBubble()
+        {
+            return playerRonBubbleContainer != null;
+        }
+
+        public void ShowPlayerRonBubble(bool show)
+        {
+            if (playerRonBubbleContainer != null)
+            {
+                playerRonBubbleContainer.SetActive(show);
+            }
         }
 
         public void PlayRonSequence(List<int> handTiles, int ronTile, List<string> yakuList, string formula, string rankName, bool isLocalPlayerWin, System.Action onComplete)
@@ -108,8 +132,6 @@ namespace KillingMahjong.UI
             if (cutInContainer != null)
             {
                 cutInContainer.SetActive(true);
-                // 実際はここでキャラクター画像を isLocalPlayerWin に応じて切り替えたりアニメーションしたりします
-                // 現在はプレースホルダー待機
                 yield return new WaitForSeconds(cutInDuration);
                 cutInContainer.SetActive(false);
             }

@@ -39,7 +39,7 @@ namespace KillingMahjong.UI
                     
                     if (KillingMahjong.Managers.BoardStateManager.Instance.NonManganWaitTiles.Contains(id))
                     {
-                        visual.SetAlpha(0.6f);
+                        visual.SetAlpha(0.3f); // 透明度をさらに薄くして強調
                     }
                     else 
                     {

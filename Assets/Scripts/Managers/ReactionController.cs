@@ -42,6 +42,13 @@ namespace KillingMahjong.Managers
             isProcessingReactions = false;
         }
 
+        public void ClearReactions()
+        {
+            reactionQueue.Clear();
+            isProcessingReactions = false;
+            StopAllCoroutines();
+        }
+
         /// <summary>
         /// 打牌時のリアクション（会話・画像変更）をキューに登録して実行する
         /// </summary>

@@ -37,7 +37,8 @@ namespace KillingMahjong.UI
         [SerializeField] private TileResourceManager tileResourceManager;
 
         [Header("Debug Client")]
-        [SerializeField] private bool showEnemyHandDebug = true;
+        // Inspector value ignored, enemy tiles are always hidden in actual gameplay
+        [SerializeField] private bool showEnemyHandDebug = false;
 
         private RoundStatus currentPhaseStatus = RoundStatus.None;
         public RoundStatus CurrentPhaseStatus => currentPhaseStatus;
@@ -91,8 +92,9 @@ namespace KillingMahjong.UI
                 confirmationDialogUI.ShowDialog(
                     data.message,
                     () => {
-                        // OK → 「手牌決定！」演出を出してから select_confirm を送信
-                        PlayHandDecidedAnimThenSend("select_confirm", data.hand_indexes);
+                        // OK → すぐに select_confirm を送信。演出は OnHandSelectionAccepted で行われる
+                        if (handUI != null) handUI.SetSubmittedState(true);
+                        SendActionToServer("select_confirm", new ActionPayload { hand_indexes = data.hand_indexes, hand = _pendingHandTiles });
                     },
                     () => {
                         // キャンセル → 決定ボタンを押す前の状態に戻す
@@ -102,8 +104,9 @@ namespace KillingMahjong.UI
             }
             else
             {
-                // ConfirmationDialogUI が未設定の場合は演出付きで自動確認
-                PlayHandDecidedAnimThenSend("select_confirm", data.hand_indexes);
+                // ConfirmationDialogUI が未設定の場合は自動確認
+                if (handUI != null) handUI.SetSubmittedState(true);
+                SendActionToServer("select_confirm", new ActionPayload { hand_indexes = data.hand_indexes, hand = _pendingHandTiles });
             }
         }
 
@@ -262,27 +265,7 @@ namespace KillingMahjong.UI
             SendActionToServer("select", new ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
         }
 
-        /// <summary>
-        /// 「手牌決定！」演出を再生し、完了後に指定アクションをサーバーへ送信する。
-        /// autoManganボタンと決定ボタンは演出開始時に非表示になる。
-        /// </summary>
-        private void PlayHandDecidedAnimThenSend(string actionType, List<int> handIndexes)
-        {
-            // 決定・autoManganボタンを非表示
-            if (handUI != null) handUI.SetSubmittedState(true);
 
-            if (phaseTransitionUI != null)
-            {
-                phaseTransitionUI.PlayCenterTextAnim("手牌決定！", 2.0f, () =>
-                {
-                    SendActionToServer(actionType, new ActionPayload { hand_indexes = handIndexes, hand = _pendingHandTiles });
-                });
-            }
-            else
-            {
-                SendActionToServer(actionType, new ActionPayload { hand_indexes = handIndexes, hand = _pendingHandTiles });
-            }
-        }
 
         public void DeselectAbility()
         {
@@ -362,7 +345,7 @@ namespace KillingMahjong.UI
                     GameObject obj = Instantiate(tilePrefab, transform); 
                     RectTransform rt = obj.GetComponent<RectTransform>() ?? obj.transform as RectTransform;
                     if (rt != null) {
-                        int visualId = showEnemyHandDebug ? id : 0;
+                        int visualId = -1; // Force hidden (-1)
                         InitializeTileComponent(rt, visualId, false);
                         enemyHandUI.AddEnemyTile(rt, visualId, id);
                     }
@@ -385,7 +368,7 @@ namespace KillingMahjong.UI
                     GameObject obj = Instantiate(tilePrefab, transform);
                     RectTransform rt = obj.GetComponent<RectTransform>() ?? obj.transform as RectTransform;
                     if (rt != null) {
-                        int visualId = showEnemyHandDebug ? id : 0;
+                        int visualId = -1; // Force hidden (-1)
                         InitializeTileComponent(rt, visualId, false);
                         enemyWallGenerated.Add(rt);
                     }
@@ -473,6 +456,9 @@ namespace KillingMahjong.UI
 
         public void HandleDiscardEvent(int discardedTileId, bool isLocalPlayer)
         {
+            // ロン演出用に最後の打牌を記録（フェーズチェック前に実行して確実に記録する）
+            BoardStateManager.Instance.LastDiscardedTileId = discardedTileId;
+
             // ゲーム終了フェーズ中は打牌イベントを無視（盤面を動かさない）
             bool isGameEndPhase = currentPhaseStatus == RoundStatus.Agari || 
                                   currentPhaseStatus == RoundStatus.Ron || 
@@ -482,9 +468,6 @@ namespace KillingMahjong.UI
 
             if (playerInfoUI != null) playerInfoUI.SetDiscardingState(false);
             if (enemyInfoUI != null) enemyInfoUI.SetDiscardingState(false);
-
-            // ロン演出用に最後の打牌を記録
-            BoardStateManager.Instance.LastDiscardedTileId = discardedTileId;
 
             if (isLocalPlayer)
             {
@@ -658,7 +641,7 @@ namespace KillingMahjong.UI
                     if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(true);
                     if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(false);
                     if (waitUI != null) waitUI.gameObject.SetActive(false);
-                    StartBettingPhase(20000);
+                    StartBettingPhase(Managers.BoardStateManager.Instance.LocalPlayerHp);
                     break;
                 case RoundStatus.Dealing:
                     ClearAllTiles();
@@ -878,18 +861,44 @@ namespace KillingMahjong.UI
 
         private IEnumerator PlayRonWithPreDialogue(bool isLocalWin, List<int> winningHand, int ronTile, List<string> yaku, string formula, string rank)
         {
+            // 打牌時の不要なリアクション（セリフ）をキャンセルしてロン演出を即座に最優先にする
+            if (ReactionController.Instance != null)
+            {
+                ReactionController.Instance.ClearReactions();
+            }
+
             if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(true);
             if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(true);
 
-            if (dialogueUI != null)
+            // 吹き出しを表示するためにCanvas(RonAnimationUI)を先にONにする
+            // 黒背景のロン演出(ronPanel)は、後でPlayRonSequenceが呼ばれた時にONになる
+            if (ronAnimationUI != null)
             {
-                dialogueUI.gameObject.SetActive(true);
-                if (isLocalWin)
+                ronAnimationUI.PrepareForPreDialogue(); // 前回の演出が残らないように黒背景を消し、吹き出しも初期化する
+                ronAnimationUI.gameObject.SetActive(true);
+                ronAnimationUI.ShowPlayerRonBubble(isLocalWin); // 自分がロンした時だけ吹き出しを表示
+            }
+
+            bool useBubble = isLocalWin && ronAnimationUI != null && ronAnimationUI.HasPlayerRonBubble();
+
+            if (useBubble)
+            {
+                // 吹き出しが表示されているので従来のダイアログは出さない
+            }
+            else if (isLocalWin)
+            {
+                if (dialogueUI != null)
                 {
+                    dialogueUI.gameObject.SetActive(true);
                     dialogueUI.ShowText("「ロン！」");
                 }
-                else
+            }
+            else
+            {
+                // 敵がロンした場合は相手のダイアログを出す
+                if (dialogueUI != null)
                 {
+                    dialogueUI.gameObject.SetActive(true);
                     dialogueUI.ShowText("「ロンよ！」");
                 }
             }
@@ -899,18 +908,24 @@ namespace KillingMahjong.UI
 
             yield return new WaitForSeconds(1.5f);
 
+            if (ronAnimationUI != null) ronAnimationUI.ShowPlayerRonBubble(false);
             if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
             if (abilityUI != null) abilityUI.gameObject.SetActive(false);
 
             if (ronAnimationUI != null)
             {
-                ronAnimationUI.gameObject.SetActive(true);
                 ronAnimationUI.PlayRonSequence(winningHand, ronTile, yaku, formula, rank, isLocalWin, () => OnRonAnimationComplete(isLocalWin));
             }
         }
 
         private void OnRonAnimationComplete(bool isLocalWin)
         {
+            // ロン演出完了時に最新のHP（お金）情報をUIに反映する
+            if (playerInfoUI != null) 
+                playerInfoUI.SetHP(Managers.BoardStateManager.Instance.LocalPlayerHp);
+            if (enemyInfoUI != null) 
+                enemyInfoUI.SetHP(Managers.BoardStateManager.Instance.EnemyPlayerHp);
+
             if (isLocalWin)
             {
                 if (victoryEffectPrefab != null && playerInfoUI != null) 

@@ -252,6 +252,11 @@ namespace KillingMahjong.Network
                         if (daMsg != null && daMsg.data != null)
                         {
                             if (daMsg.data.is_win && !agariProcessed) {
+                                // ロン判定時のみ、フェーズがAgariに変わる前に打牌を反映させる
+                                if (daMsg.data.tile > 0)
+                                {
+                                    OnTileDiscarded?.Invoke(daMsg.data.tile, true);
+                                }
                                 agariProcessed = true;
                                 Debug.Log($"[Network] discard_accepted: ロン成立 (is_win=true)");
                                 // discard_accepted にも liquidation が含まれている場合はここで処理
