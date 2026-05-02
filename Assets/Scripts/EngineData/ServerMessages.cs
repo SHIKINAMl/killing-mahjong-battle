@@ -134,6 +134,7 @@ namespace KillingMahjong.EngineData
         public string reason;
         public string message;
         public List<int> hand_indexes;
+        public WaitData[] waits;
     }
 
     [Serializable]
@@ -211,6 +212,13 @@ namespace KillingMahjong.EngineData
         public int tile;
         public bool mangan_or_more;
         public string[] yaku;
+    }
+
+    [Serializable]
+    public class NotTenpaiMessage
+    {
+        public string type;
+        public string message;
     }
 
     [Serializable]

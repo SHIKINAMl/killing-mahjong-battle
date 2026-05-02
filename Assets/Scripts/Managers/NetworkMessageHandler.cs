@@ -60,6 +60,8 @@ namespace KillingMahjong.Network
         
         public event Action<string> OnError;
         public event Action<HandSelectionConfirmationData> OnHandSelectionConfirmation;
+        public event Action<IsTenpaiData> OnIsTenpaiReceived;
+        public event Action<string> OnNotTenpaiReceived;
         // ハンド選択のフェーズに関するイベント（UI制御用）
         public event Action OnHandSelectionAccepted; 
         
@@ -197,12 +199,17 @@ namespace KillingMahjong.Network
                             Managers.BoardStateManager.Instance.SetNonManganWaits(nonManganList);
                             Managers.BoardStateManager.Instance.SetLocalState(null, null, waits);
                             Managers.BoardStateManager.Instance.FireRebuildEvent();
+
+                            OnIsTenpaiReceived?.Invoke(tenpaiMsg.data);
                         }
                         break;
 
                     case "not_tenpai":
                         Managers.BoardStateManager.Instance.SetLocalState(null, null, new List<int>());
                         Managers.BoardStateManager.Instance.FireRebuildEvent();
+
+                        NotTenpaiMessage notTenpaiMsg = JsonUtility.FromJson<NotTenpaiMessage>(jsonString);
+                        OnNotTenpaiReceived?.Invoke(notTenpaiMsg?.message ?? "Hand is not in tenpai");
                         break;
 
                     case "error":

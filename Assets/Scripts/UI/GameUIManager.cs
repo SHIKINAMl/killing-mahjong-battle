@@ -44,6 +44,7 @@ namespace KillingMahjong.UI
         public RoundStatus CurrentPhaseStatus => currentPhaseStatus;
         
         private bool isTransitioning = false;
+        private bool _autoConfirmNextHandSelection = false;
 
         private void Start()
         {
@@ -82,10 +83,21 @@ namespace KillingMahjong.UI
             net.OnHandSelectionAccepted += OnHandSelectionAccepted;
             net.OnError += HandleError;
             net.OnHandSelectionConfirmation += HandleHandSelectionConfirmation;
+            net.OnIsTenpaiReceived += HandleIsTenpaiReceived;
+            net.OnNotTenpaiReceived += HandleNotTenpaiReceived;
         }
 
         private void HandleHandSelectionConfirmation(KillingMahjong.EngineData.HandSelectionConfirmationData data)
         {
+            if (_autoConfirmNextHandSelection)
+            {
+                // すでに予想点数ダイアログでOKを押しているので自動的に select_confirm を送る
+                _autoConfirmNextHandSelection = false;
+                if (handUI != null) handUI.SetSubmittedState(true);
+                SendActionToServer("select_confirm", new ActionPayload { hand_indexes = data.hand_indexes, hand = _pendingHandTiles });
+                return;
+            }
+
             // 確認ダイアログを表示（演出の前に表示される）
             if (confirmationDialogUI != null)
             {
@@ -107,6 +119,76 @@ namespace KillingMahjong.UI
                 // ConfirmationDialogUI が未設定の場合は自動確認
                 if (handUI != null) handUI.SetSubmittedState(true);
                 SendActionToServer("select_confirm", new ActionPayload { hand_indexes = data.hand_indexes, hand = _pendingHandTiles });
+            }
+        }
+
+        private void HandleIsTenpaiReceived(KillingMahjong.EngineData.IsTenpaiData data)
+        {
+            if (currentPhaseStatus != RoundStatus.HandSelection) return;
+
+            string message = "【予想役・点数】\n";
+            bool hasMangan = false;
+            if (data.waits != null)
+            {
+                foreach (var wait in data.waits)
+                {
+                    string tileName = new TileData(wait.tile).GetTileName();
+                    string yakuText = (wait.yaku != null && wait.yaku.Length > 0) ? string.Join(" / ", wait.yaku) : "役なし";
+                    string manganText = wait.mangan_or_more ? "満貫以上" : "満貫未満";
+                    message += $"待ち牌: {tileName} -> {yakuText} ({manganText})\n";
+                    if (wait.mangan_or_more) hasMangan = true;
+                }
+            }
+            message += "\nこの手牌で決定しますか？";
+
+            if (confirmationDialogUI != null)
+            {
+                confirmationDialogUI.ShowDialog(
+                    message,
+                    () => {
+                        _autoConfirmNextHandSelection = true;
+                        if (handUI != null) handUI.SetSubmittedState(true);
+                        SendActionToServer("select", new ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
+                    },
+                    () => {
+                        _autoConfirmNextHandSelection = false;
+                        if (handUI != null) handUI.SetSubmittedState(false);
+                    }
+                );
+            }
+            else
+            {
+                _autoConfirmNextHandSelection = true;
+                if (handUI != null) handUI.SetSubmittedState(true);
+                SendActionToServer("select", new ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
+            }
+        }
+
+        private void HandleNotTenpaiReceived(string reason)
+        {
+            if (currentPhaseStatus != RoundStatus.HandSelection) return;
+
+            string message = $"ノーテン（聴牌していません）\n\nこのまま決定しますか？";
+            if (confirmationDialogUI != null)
+            {
+                confirmationDialogUI.ShowDialog(
+                    message,
+                    () => {
+                        _autoConfirmNextHandSelection = true;
+                        if (handUI != null) handUI.SetSubmittedState(true);
+                        SendActionToServer("select", new ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
+                    },
+                    () => {
+                        _autoConfirmNextHandSelection = false;
+                        if (handUI != null) handUI.SetSubmittedState(false);
+                    }
+                );
+            }
+            else
+            {
+                _autoConfirmNextHandSelection = true;
+                if (handUI != null) handUI.SetSubmittedState(true);
+                SendActionToServer("select", new ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
             }
         }
 
@@ -260,9 +342,9 @@ namespace KillingMahjong.UI
             }
             _pendingHandTiles = new List<int>(BoardStateManager.Instance.CurrentHandTiles);
 
-            // まずサーバーに select を送信して満貫判定を問い合わせる
-            // (演出はまだ出さない。レスポンスで分岐する)
-            SendActionToServer("select", new ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
+            // まずサーバーに is_tenpai を送信して予想点数情報を取得する
+            // ユーザーがOKを押してから select を送信する
+            SendActionToServer("is_tenpai", new ActionPayload { wall_indexes = _pendingHandIndexes });
         }
 
 
@@ -815,6 +897,7 @@ namespace KillingMahjong.UI
 
         private void OnHandSelectionAccepted()
         {
+            _autoConfirmNextHandSelection = false;
             // 満貫以上の場合はサーバーが直接 hand_selection_accepted を返すため、
             // 確認ダイアログを飛ばして「手牌決定！」演出を再生する
             if (phaseTransitionUI != null)
