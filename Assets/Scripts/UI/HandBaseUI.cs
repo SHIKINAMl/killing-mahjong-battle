@@ -155,13 +155,14 @@ namespace KillingMahjong.UI
                 return intA.TileId.CompareTo(intB.TileId);
             });
 
-            for (int i = 0; i < handSlots.Count; i++)
-            {
-                handSlots[i].SetSiblingIndex(i);
-            }
-
             if (handSlots.Count == 0) return;
             
+            // 位置を先に計算してから、行ごとにSiblingIndexを設定する
+            // 2段目（row 1）が1段目（row 0）より前面に来るように、
+            // 1段目を先に配置し、2段目を後に配置する
+            List<RectTransform> row0 = new List<RectTransform>();
+            List<RectTransform> row1 = new List<RectTransform>();
+
             for (int i = 0; i < handSlots.Count; i++)
             {
                 int rowIndex = i / 7; 
@@ -181,6 +182,21 @@ namespace KillingMahjong.UI
                     rt.pivot = new Vector2(0, 1);
                     rt.anchoredPosition = new Vector2(targetX, targetY);
                 }
+
+                if (rowIndex == 0) row0.Add(handSlots[i]);
+                else row1.Add(handSlots[i]);
+            }
+
+            // 1段目を先にSiblingIndex設定（奥側）
+            int sibIdx = 0;
+            for (int i = 0; i < row0.Count; i++)
+            {
+                row0[i].SetSiblingIndex(sibIdx++);
+            }
+            // 2段目を後にSiblingIndex設定（手前側＝前面）
+            for (int i = 0; i < row1.Count; i++)
+            {
+                row1[i].SetSiblingIndex(sibIdx++);
             }
         }
     }

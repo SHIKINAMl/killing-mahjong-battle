@@ -3032,8 +3032,8 @@ MonoBehaviour:
   tilePrefab: {fileID: 3470249716998659876, guid: 665b2ddf3e8ccac4aa366c094061ee09, type: 3}
   tileResourceManager: {fileID: 11400000, guid: 26e956d32b644284b942ac0044639558, type: 2}
   turnText: {fileID: 0}
-  tileWidth: 25
-  tileHeight: 30
+  tileWidth: 23
+  tileHeight: 23
   maxPerRow: 6
   isEnemyRiver: 1
   enemyOffsetX: 160
@@ -9458,7 +9458,7 @@ MonoBehaviour:
   tileResourceManager: {fileID: 11400000, guid: 26e956d32b644284b942ac0044639558, type: 2}
   turnText: {fileID: 1630428527}
   tileWidth: 25
-  tileHeight: 30
+  tileHeight: 23
   maxPerRow: 6
   isEnemyRiver: 0
   enemyOffsetX: 350
