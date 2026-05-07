@@ -23,12 +23,37 @@ namespace KillingMahjong.UI
 
         private int currentSelectionIndex = 0;
 
+        private Button reselectButton;
+
         private void Start()
         {
             panelRect = GetComponent<RectTransform>();
             decideButton.onClick.AddListener(OnDecideClicked);
             autoManganButton.onClick.AddListener(OnAutoManganClicked);
             UpdateCursorPosition();
+
+            if (decideButton != null)
+            {
+                reselectButton = Instantiate(decideButton, decideButton.transform.parent);
+                reselectButton.name = "ReselectButton";
+                reselectButton.onClick.RemoveAllListeners();
+                reselectButton.onClick.AddListener(OnReselectClicked);
+                
+                var tmp = reselectButton.GetComponentInChildren<TMPro.TextMeshProUGUI>();
+                if (tmp != null) tmp.text = "選び直す";
+                var txt = reselectButton.GetComponentInChildren<UnityEngine.UI.Text>();
+                if (txt != null) txt.text = "選び直す";
+
+                reselectButton.gameObject.SetActive(false);
+            }
+        }
+
+        private void OnReselectClicked()
+        {
+            if (gameUIManager != null && gameUIManager.CurrentPhaseStatus == RoundStatus.HandSelection)
+            {
+                gameUIManager.CancelHandSelection();
+            }
         }
 
         // --- Drag Panel Implementation ---
@@ -135,6 +160,7 @@ namespace KillingMahjong.UI
             return RectTransformUtility.RectangleContainsScreenPoint(handAreaRect, screenPoint);
         }
         private bool isSubmitted = false;
+        public bool IsSubmitted => isSubmitted;
 
         public void SetSubmittedState(bool submitted)
         {
@@ -155,6 +181,11 @@ namespace KillingMahjong.UI
             if (autoManganButton != null)
             {
                 autoManganButton.gameObject.SetActive(showButtons);
+            }
+            if (reselectButton != null)
+            {
+                bool canReselect = (phaseStatus == RoundStatus.HandSelection) && isSubmitted && (gameUIManager != null && !gameUIManager.IsTransitioning);
+                reselectButton.gameObject.SetActive(canReselect);
             }
         }
     }

@@ -360,13 +360,12 @@ namespace KillingMahjong.Network
             // --- デバッグログ追加 ---
             Debug.Log($"[Network] サーバーからのJSON: {jsonString}");
 
+            var tenpaiDict = ParseTenpaiExamples(jsonString);
             var tenpaiExamples = new System.Collections.Generic.List<int[]>();
-            foreach (var h in msg.hands)
+            
+            if (tenpaiDict.ContainsKey(localPlayerId))
             {
-                if (h.client_id == localPlayerId && h.tenpai_examples != null && h.tenpai_examples.Length > 0)
-                {
-                    tenpaiExamples.Add(h.tenpai_examples);
-                }
+                tenpaiExamples = tenpaiDict[localPlayerId];
             }
 
             Debug.Log($"[Network] 抽出されたお手本の数: {tenpaiExamples.Count}");
@@ -474,7 +473,72 @@ namespace KillingMahjong.Network
             return result;
         }
 
+        private Dictionary<string, List<int[]>> ParseTenpaiExamples(string jsonString)
+        {
+            var result = new Dictionary<string, List<int[]>>();
+            int searchFrom = 0;
+            while (true)
+            {
+                int cidStart = jsonString.IndexOf("\"client_id\"", searchFrom);
+                if (cidStart < 0) break;
 
+                int valStart = jsonString.IndexOf('"', cidStart + 11) + 1;
+                int valEnd = jsonString.IndexOf('"', valStart);
+                if (valStart < 0 || valEnd < 0) break;
+                string cid = jsonString.Substring(valStart, valEnd - valStart);
+
+                int keyStart = jsonString.IndexOf("\"tenpai_examples\"", valEnd);
+                if (keyStart > 0 && keyStart < cidStart + 300) 
+                {
+                    int arrStart = jsonString.IndexOf('[', keyStart);
+                    if (arrStart > 0)
+                    {
+                        int outerArrEnd = FindMatchingBracket(jsonString, arrStart);
+                        if (outerArrEnd > arrStart)
+                        {
+                            string inner = jsonString.Substring(arrStart + 1, outerArrEnd - arrStart - 1);
+                            var examplesList = new List<int[]>();
+                            
+                            int innerSearchFrom = 0;
+                            while (true)
+                            {
+                                int innerArrStart = inner.IndexOf('[', innerSearchFrom);
+                                if (innerArrStart < 0) break;
+                                int innerArrEnd = inner.IndexOf(']', innerArrStart);
+                                if (innerArrEnd < 0) break;
+                                
+                                string arrayStr = inner.Substring(innerArrStart + 1, innerArrEnd - innerArrStart - 1);
+                                var list = new List<int>();
+                                foreach (var token in arrayStr.Split(','))
+                                {
+                                    if (int.TryParse(token.Trim(), out int val)) list.Add(val);
+                                }
+                                examplesList.Add(list.ToArray());
+                                innerSearchFrom = innerArrEnd + 1;
+                            }
+                            result[cid] = examplesList;
+                        }
+                    }
+                }
+                searchFrom = valEnd + 1;
+            }
+            return result;
+        }
+
+        private int FindMatchingBracket(string s, int startIndex)
+        {
+            int depth = 0;
+            for (int i = startIndex; i < s.Length; i++)
+            {
+                if (s[i] == '[') depth++;
+                else if (s[i] == ']')
+                {
+                    depth--;
+                    if (depth == 0) return i;
+                }
+            }
+            return -1;
+        }
 
         private void ParseGameEnd(string jsonString)
         {

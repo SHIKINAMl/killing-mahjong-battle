@@ -119,6 +119,11 @@ namespace KillingMahjong.UI
                     var interactionA = a.GetComponent<TileInteraction>();
                     var interactionB = b.GetComponent<TileInteraction>();
                     if (interactionA == null || interactionB == null) return 0;
+                    
+                    int baseA = interactionA.TileId & 0x1F;
+                    int baseB = interactionB.TileId & 0x1F;
+                    if (baseA != baseB) return baseA.CompareTo(baseB);
+                    
                     return interactionA.TileId.CompareTo(interactionB.TileId);
                 });
 
@@ -143,20 +148,11 @@ namespace KillingMahjong.UI
                 var intB = b.GetComponent<TileInteraction>();
                 if (intA == null || intB == null) return 0;
 
-                TileData dataA = new TileData(intA.TileId);
-                TileData dataB = new TileData(intB.TileId);
-
-                if (dataA.Category != dataB.Category)
-                {
-                    return dataA.Category.CompareTo(dataB.Category);
-                }
+                int baseA = intA.TileId & 0x1F;
+                int baseB = intB.TileId & 0x1F;
+                if (baseA != baseB) return baseA.CompareTo(baseB);
                 
-                if (dataA.Id != dataB.Id)
-                {
-                    return dataA.Id.CompareTo(dataB.Id);
-                }
-                
-                return 0;
+                return intA.TileId.CompareTo(intB.TileId);
             });
 
             for (int i = 0; i < handSlots.Count; i++)

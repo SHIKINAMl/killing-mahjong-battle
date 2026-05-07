@@ -71,8 +71,8 @@ namespace KillingMahjong.UI
                     textRt.anchorMax = new Vector2(1, 1);
                     // Left, Bottomの設定 (Bottomはボタンと被らないよう適度に空ける)
                     textRt.offsetMin = new Vector2(20, 200);
-                    // Right, Topの設定 (Topを250にする)
-                    textRt.offsetMax = new Vector2(-20, -250);
+                    // Right, Topの設定 (Topを55にする)
+                    textRt.offsetMax = new Vector2(-20, -55);
                 }
             }
 

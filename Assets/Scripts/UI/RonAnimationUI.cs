@@ -30,7 +30,7 @@ namespace KillingMahjong.UI
 
         [Header("Hand Display Layout")]
         [Tooltip("The horizontal gap between each tile in the hand")]
-        [SerializeField] private float tileSpacing = 95f;
+        [SerializeField] private float tileSpacing = 115f; // 重なり解消のため95から115に広げる
         [Tooltip("The visual scale of each tile in the hand")]
         [SerializeField] private float tileScale = 1.5f;
         

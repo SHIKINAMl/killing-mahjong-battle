@@ -44,6 +44,7 @@ namespace KillingMahjong.UI
         public RoundStatus CurrentPhaseStatus => currentPhaseStatus;
         
         private bool isTransitioning = false;
+        public bool IsTransitioning => isTransitioning;
         private bool _autoConfirmNextHandSelection = false;
 
         private void Start()
@@ -128,18 +129,21 @@ namespace KillingMahjong.UI
 
             string message = "【予想役・点数】\n";
             bool hasMangan = false;
-            if (data.waits != null)
+            
+            if (data.waits != null && data.waits.Length > 0)
             {
+                message += "待ち牌:\n\n\n\n";
                 foreach (var wait in data.waits)
                 {
-                    string tileName = new TileData(wait.tile).GetTileName();
                     string yakuText = (wait.yaku != null && wait.yaku.Length > 0) ? string.Join(" / ", wait.yaku) : "役なし";
                     string manganText = wait.mangan_or_more ? "満貫以上" : "満貫未満";
-                    message += $"待ち牌: {tileName} -> {yakuText} ({manganText})\n";
+                    message += $"-> {yakuText} ({manganText})\n";
                     if (wait.mangan_or_more) hasMangan = true;
                 }
             }
             message += "\nこの手牌で決定しますか？";
+
+            if (waitUI != null) waitUI.MoveToCenter();
 
             if (confirmationDialogUI != null)
             {
@@ -148,16 +152,23 @@ namespace KillingMahjong.UI
                     () => {
                         _autoConfirmNextHandSelection = true;
                         if (handUI != null) handUI.SetSubmittedState(true);
+                        if (waitUI != null) waitUI.MoveToOriginalPosition();
                         SendActionToServer("select", new ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
                     },
                     () => {
                         _autoConfirmNextHandSelection = false;
                         if (handUI != null) handUI.SetSubmittedState(false);
+                        if (waitUI != null) 
+                        {
+                            waitUI.MoveToOriginalPosition();
+                            waitUI.Hide();
+                        }
                     }
                 );
             }
             else
             {
+                if (waitUI != null) waitUI.MoveToOriginalPosition();
                 _autoConfirmNextHandSelection = true;
                 if (handUI != null) handUI.SetSubmittedState(true);
                 SendActionToServer("select", new ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
@@ -195,6 +206,16 @@ namespace KillingMahjong.UI
         private void HandleError(string errorMsg)
         {
             if (handUI != null) handUI.SetSubmittedState(false);
+        }
+
+        public void CancelHandSelection()
+        {
+            if (currentPhaseStatus != RoundStatus.HandSelection) return;
+            if (isTransitioning) return; // 演出中はキャンセル不可
+
+            if (handUI != null) handUI.SetSubmittedState(false);
+            if (waitUI != null) waitUI.gameObject.SetActive(false);
+            if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
         }
 
         private void SetupUI()
@@ -902,9 +923,17 @@ namespace KillingMahjong.UI
             // 確認ダイアログを飛ばして「手牌決定！」演出を再生する
             if (phaseTransitionUI != null)
             {
+                isTransitioning = true;
                 phaseTransitionUI.PlayCenterTextAnim("手牌決定！", 2.0f, () =>
                 {
-                    if (dialogueUI != null) dialogueUI.ShowText("相手の手牌選択を待っています...");
+                    isTransitioning = false;
+                    // キャンセルされていなければ待機テキストを出す
+                    if (handUI != null && handUI.IsSubmitted) 
+                    {
+                        if (dialogueUI != null) dialogueUI.ShowText("相手の手牌選択を待っています...");
+                    }
+                    HandlePhaseVisibility(currentPhaseStatus);
+                    if (handUI != null) handUI.UpdateLayout(currentPhaseStatus);
                 });
             }
             else

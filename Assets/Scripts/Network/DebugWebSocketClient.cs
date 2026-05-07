@@ -343,8 +343,16 @@ namespace KillingMahjong.Network
             // 敵の打牌
             if (mockEnemyHand.Count > 0)
             {
-                int enemyDiscard = mockEnemyHand[0];
-                mockEnemyHand.RemoveAt(0);
+                // デバッグ用: 必ずローカルプレイヤーの待ち牌を切ってロンさせる
+                int enemyDiscard = LOCAL_WAIT_TILE;
+                if (mockEnemyHand.Contains(LOCAL_WAIT_TILE))
+                {
+                    mockEnemyHand.Remove(LOCAL_WAIT_TILE);
+                }
+                else
+                {
+                    mockEnemyHand.RemoveAt(0);
+                }
                 mockEnemyDiscards.Add(enemyDiscard);
 
                 string tileName = new TileData(enemyDiscard).GetTileName();
