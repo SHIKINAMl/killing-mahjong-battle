@@ -499,22 +499,40 @@ namespace KillingMahjong.Network
                             string inner = jsonString.Substring(arrStart + 1, outerArrEnd - arrStart - 1);
                             var examplesList = new List<int[]>();
                             
-                            int innerSearchFrom = 0;
-                            while (true)
+                            int innerArrStartCheck = inner.IndexOf('[');
+                            if (innerArrStartCheck < 0)
                             {
-                                int innerArrStart = inner.IndexOf('[', innerSearchFrom);
-                                if (innerArrStart < 0) break;
-                                int innerArrEnd = inner.IndexOf(']', innerArrStart);
-                                if (innerArrEnd < 0) break;
-                                
-                                string arrayStr = inner.Substring(innerArrStart + 1, innerArrEnd - innerArrStart - 1);
+                                // Pythonサーバーからの実データ (フラットな配列) に対応: [0, 1, 2, ...]
                                 var list = new List<int>();
-                                foreach (var token in arrayStr.Split(','))
+                                foreach (var token in inner.Split(','))
                                 {
                                     if (int.TryParse(token.Trim(), out int val)) list.Add(val);
                                 }
-                                examplesList.Add(list.ToArray());
-                                innerSearchFrom = innerArrEnd + 1;
+                                if (list.Count > 0)
+                                {
+                                    examplesList.Add(list.ToArray());
+                                }
+                            }
+                            else
+                            {
+                                // ネストされた配列 (モッククライアント等) に対応: [[0, 1, ...], [2, 3, ...]]
+                                int innerSearchFrom = 0;
+                                while (true)
+                                {
+                                    int innerArrStart = inner.IndexOf('[', innerSearchFrom);
+                                    if (innerArrStart < 0) break;
+                                    int innerArrEnd = inner.IndexOf(']', innerArrStart);
+                                    if (innerArrEnd < 0) break;
+                                    
+                                    string arrayStr = inner.Substring(innerArrStart + 1, innerArrEnd - innerArrStart - 1);
+                                    var list = new List<int>();
+                                    foreach (var token in arrayStr.Split(','))
+                                    {
+                                        if (int.TryParse(token.Trim(), out int val)) list.Add(val);
+                                    }
+                                    examplesList.Add(list.ToArray());
+                                    innerSearchFrom = innerArrEnd + 1;
+                                }
                             }
                             result[cid] = examplesList;
                         }

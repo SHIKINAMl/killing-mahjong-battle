@@ -112,6 +112,8 @@ namespace KillingMahjong.UI
                     () => {
                         // キャンセル → 決定ボタンを押す前の状態に戻す
                         if (handUI != null) handUI.SetSubmittedState(false);
+                        BoardStateManager.Instance.ClearWaitTiles();
+                        if (waitUI != null) waitUI.Hide();
                     }
                 );
             }
@@ -158,6 +160,7 @@ namespace KillingMahjong.UI
                     () => {
                         _autoConfirmNextHandSelection = false;
                         if (handUI != null) handUI.SetSubmittedState(false);
+                        BoardStateManager.Instance.ClearWaitTiles();
                         if (waitUI != null) 
                         {
                             waitUI.MoveToOriginalPosition();
@@ -395,7 +398,7 @@ namespace KillingMahjong.UI
 
             var board = BoardStateManager.Instance;
 
-            // 1. HandUI
+            // 1. HandUI / WallUI を一括クリア
             if (handUI != null)
             {
                 for (int i = handUI.GetHandSlots().Count - 1; i >= 0; i--)
@@ -404,19 +407,7 @@ namespace KillingMahjong.UI
                     if (t != null) Destroy(t.gameObject);
                 }
                 handUI.GetHandSlots().Clear();
-
-                foreach (var id in board.CurrentHandTiles)
-                {
-                    GameObject obj = Instantiate(tilePrefab, transform);
-                    RectTransform rt = obj.GetComponent<RectTransform>() ?? obj.transform as RectTransform;
-                    if (rt != null) {
-                        InitializeTileComponent(rt, id, true);
-                        handUI.AddTileToHand(rt, id);
-                    }
-                }
             }
-
-            // 2. WallUI
             if (wallUI != null)
             {
                 for (int i = wallUI.GetWallSlots().Count - 1; i >= 0; i--)
@@ -425,18 +416,46 @@ namespace KillingMahjong.UI
                     if (t != null) Destroy(t.gameObject);
                 }
                 wallUI.GetWallSlots().Clear();
+            }
 
-                List<RectTransform> wallGenerated = new List<RectTransform>();
-                foreach (var id in board.CurrentWallTiles)
+            // 2. 壁牌＋手牌を合算してレイアウトし、全牌に OriginalWallPosition を設定する
+            //    これにより「手牌として生成された牌」も正しい壁座標を持ち、
+            //    壁に戻す際に元の位置へ戻れるようになる
+            if (wallUI != null)
+            {
+                // 壁+手牌の合算IDリスト・RectTransformリストを作成
+                List<int> combinedIds = new List<int>(board.CurrentWallTiles);
+                combinedIds.AddRange(board.CurrentHandTiles);
+
+                List<RectTransform> combinedGenerated = new List<RectTransform>();
+                foreach (var id in combinedIds)
                 {
                     GameObject obj = Instantiate(tilePrefab, transform);
                     RectTransform rt = obj.GetComponent<RectTransform>() ?? obj.transform as RectTransform;
-                    if (rt != null) {
+                    if (rt != null)
+                    {
                         InitializeTileComponent(rt, id, false);
-                        wallGenerated.Add(rt);
+                        combinedGenerated.Add(rt);
                     }
                 }
-                wallUI.LayoutWallTiles(wallGenerated, board.CurrentWallTiles, board.CurrentWaitTiles, currentPhaseStatus == RoundStatus.Discard);
+
+                // 合算リストをレイアウト → 全牌の OriginalWallPosition が設定される
+                wallUI.LayoutWallTiles(combinedGenerated, combinedIds, board.CurrentWaitTiles, currentPhaseStatus == RoundStatus.Discard);
+
+                // 手牌IDの牌を wallSlots から取り出して handUI へ移動する
+                // (OriginalWallPosition は保持されたまま)
+                if (handUI != null)
+                {
+                    foreach (var id in board.CurrentHandTiles)
+                    {
+                        RectTransform rt = wallUI.GrabTileById(id);
+                        if (rt != null)
+                        {
+                            InitializeTileComponent(rt, id, true);
+                            handUI.AddTileToHand(rt, id);
+                        }
+                    }
+                }
             }
 
             // 3. Enemy HandUI
@@ -536,24 +555,25 @@ namespace KillingMahjong.UI
 
         private void HandleTileMovedToWall(int tileId)
         {
-            if (handUI != null && wallUI != null)
-            {
-                RectTransform movedTile = null;
-                foreach (RectTransform t in handUI.GetHandSlots())
-                {
-                    var interaction = t.GetComponent<TileInteraction>();
-                    if (interaction != null && interaction.TileId == tileId)
-                    {
-                        movedTile = t;
-                        break;
-                    }
-                }
+            if (handUI == null || wallUI == null) return;
 
-                if (movedTile != null)
+            RectTransform movedTile = null;
+            foreach (RectTransform t in handUI.GetHandSlots())
+            {
+                var interaction = t.GetComponent<TileInteraction>();
+                if (interaction != null && interaction.TileId == tileId)
                 {
-                    handUI.RemoveTileFromHand(movedTile, tileId);
-                    wallUI.ReturnTileToWall(movedTile, tileId);
+                    movedTile = t;
+                    break;
                 }
+            }
+
+            if (movedTile != null)
+            {
+                handUI.RemoveTileFromHand(movedTile, tileId);
+                // OriginalWallPosition は RebuildAllTilesFromState で全牌に設定済みのため
+                // ReturnTileToWall で元の位置へ正しく戻せる（再ソートなし）
+                wallUI.ReturnTileToWall(movedTile, tileId);
             }
         }
 

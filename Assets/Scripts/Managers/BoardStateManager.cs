@@ -120,6 +120,12 @@ namespace KillingMahjong.Managers
             if (hand != null) CurrentEnemyHandTiles = new List<int>(hand);
         }
 
+        public void ClearWaitTiles()
+        {
+            CurrentWaitTiles.Clear();
+            NonManganWaitTiles.Clear();
+        }
+
         public void SetNonManganWaits(List<int> nonManganTiles)
         {
             NonManganWaitTiles = new List<int>(nonManganTiles ?? new List<int>());

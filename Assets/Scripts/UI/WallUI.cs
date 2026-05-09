@@ -27,6 +27,26 @@ namespace KillingMahjong.UI
         private List<RectTransform> wallSlots = new List<RectTransform>();
         public List<RectTransform> GetWallSlots() => wallSlots;
 
+        /// <summary>
+        /// wallSlotsからtileIdが一致するRectTransformを取り出し、スロットから削除して返す
+        /// </summary>
+        public RectTransform GrabTileById(int tileId)
+        {
+            for (int i = 0; i < wallSlots.Count; i++)
+            {
+                if (wallSlots[i] == null) continue;
+                var interaction = wallSlots[i].GetComponent<TileInteraction>();
+                if (interaction != null && interaction.TileId == tileId)
+                {
+                    RectTransform t = wallSlots[i];
+                    wallSlots.RemoveAt(i);
+                    return t;
+                }
+            }
+            return null;
+        }
+
+
         public void LayoutWallTiles(List<RectTransform> generatedTiles, List<int> tileIds, List<int> waitTiles, bool isDiscardPhase)
         {
             // Clear existing tracking list (but DO NOT destroy, GameUIManager manages their lifecycle)
@@ -180,14 +200,15 @@ namespace KillingMahjong.UI
                             targetY = currentY;
                         }
 
-                        Vector3 finalPos = new Vector3(targetX, targetY, 0);
-                        slot.localPosition = finalPos;
+                        Vector2 anchoredPos = new Vector2(targetX, targetY);
+                        slot.anchoredPosition = anchoredPos;
                         slot.localRotation = Quaternion.identity;
 
                         var interaction = slot.GetComponent<TileInteraction>();
                         if (interaction != null)
                         {
-                            interaction.OriginalWallPosition = finalPos;
+                            // anchoredPosition（アンカー基準座標）で保存する
+                            interaction.OriginalWallPosition = new Vector3(anchoredPos.x, anchoredPos.y, 0);
                         }
                         
                         var visual = slot.GetComponent<TileVisual>();
@@ -295,8 +316,18 @@ namespace KillingMahjong.UI
                     interaction.Initialize(tileId, false, gameUIManager, canvas);
                 }
                 
-                // 本来の壁の座標に戻す
-                tileTransform.localPosition = interaction.OriginalWallPosition;
+                // アンカーとピボットをLayoutWallTilesと同じ基準（中心 0.5）に戻す
+                tileTransform.anchorMin = new Vector2(0.5f, 0.5f);
+                tileTransform.anchorMax = new Vector2(0.5f, 0.5f);
+                tileTransform.pivot = new Vector2(0.5f, 0.5f);
+                tileTransform.localScale = Vector3.one;
+                tileTransform.localRotation = Quaternion.identity;
+                
+                // OriginalWallPositionはanchoredPosition基準で保存されているため、anchoredPositionで復元する
+                tileTransform.anchoredPosition = new Vector2(
+                    interaction.OriginalWallPosition.x,
+                    interaction.OriginalWallPosition.y
+                );
             }
         }
     }
