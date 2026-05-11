@@ -377,6 +377,9 @@ namespace KillingMahjong.Network
 
             Managers.BoardStateManager.Instance.SetTenpaiExamples(tenpaiExamples);
 
+            // ドラ表示牌を保存
+            Managers.BoardStateManager.Instance.CurrentDoraId = msg.dora_id;
+
             // 手動独自パースで wall 配列を抽出 (JsonUtilityが int[] を上手くさばけない場合のフェールセーフ)
             var wallDict = ParseIntArrays(jsonString, "wall");
 

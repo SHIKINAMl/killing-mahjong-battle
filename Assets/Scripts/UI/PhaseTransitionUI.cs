@@ -368,5 +368,166 @@ namespace KillingMahjong.UI
 
             onComplete?.Invoke();
         }
+
+        /// <summary>
+        /// ロン後の点数精算演出を再生する。
+        /// 掛け金フェイズのHP減少演出と対になる形で、勝者のHPが増加し敗者のHPが減少するアニメーション。
+        /// </summary>
+        /// <param name="isLocalWin">ローカルプレイヤーが勝者かどうか</param>
+        /// <param name="winnerGain">勝者の獲得点数</param>
+        /// <param name="loserLoss">敗者の喪失点数</param>
+        /// <param name="prevLocalHp">演出開始時のローカルプレイヤーHP（精算前）</param>
+        /// <param name="prevEnemyHp">演出開始時の敵プレイヤーHP（精算前）</param>
+        /// <param name="newLocalHp">精算後のローカルプレイヤーHP</param>
+        /// <param name="newEnemyHp">精算後の敵プレイヤーHP</param>
+        /// <param name="resultLabel">表示する精算ラベル（例: "満貫"）</param>
+        /// <param name="onComplete">演出完了コールバック</param>
+        public void PlayScoreSettlementAnimation(
+            bool isLocalWin,
+            int winnerGain,
+            int loserLoss,
+            int prevLocalHp,
+            int prevEnemyHp,
+            int newLocalHp,
+            int newEnemyHp,
+            string resultLabel,
+            Action onComplete)
+        {
+            StartCoroutine(ScoreSettlementRoutine(
+                isLocalWin, winnerGain, loserLoss,
+                prevLocalHp, prevEnemyHp,
+                newLocalHp, newEnemyHp,
+                resultLabel, onComplete));
+        }
+
+        private IEnumerator ScoreSettlementRoutine(
+            bool isLocalWin,
+            int winnerGain,
+            int loserLoss,
+            int prevLocalHp,
+            int prevEnemyHp,
+            int newLocalHp,
+            int newEnemyHp,
+            string resultLabel,
+            Action onComplete)
+        {
+            ResetVisuals();
+
+            // === 1. 一本線イン + 精算ラベルテキスト ===
+            Debug.Log("[ScoreSettlement] Step 1 - Line In");
+            if (horizontalLineRt != null)
+            {
+                horizontalLineRt.gameObject.SetActive(true);
+                horizontalLineRt.localScale = new Vector3(0, 2f, 1f);
+            }
+
+            float t = 0;
+            while (t < lineInDuration)
+            {
+                if (horizontalLineRt != null)
+                {
+                    horizontalLineRt.localScale = new Vector3(Mathf.Lerp(0, 10f, t / lineInDuration), 2f, 1f);
+                }
+                t += Time.deltaTime;
+                yield return null;
+            }
+            if (horizontalLineRt != null) horizontalLineRt.localScale = new Vector3(10f, 2f, 1f);
+
+            if (centerText != null)
+            {
+                centerText.text = resultLabel;
+                centerText.gameObject.SetActive(true);
+            }
+            yield return new WaitForSeconds(textWaitDuration);
+
+            // === 2. 市松模様フェードイン ===
+            Debug.Log("[ScoreSettlement] Step 2 - Checker Fade In");
+            if (fullScreenCheckerImage != null) fullScreenCheckerImage.gameObject.SetActive(true);
+            if (checkerMaterial != null)
+            {
+                checkerMaterial.SetFloat("_AspectRatio", (float)Screen.width / Screen.height);
+                checkerMaterial.SetFloat("_Progress", 0f);
+            }
+
+            t = 0;
+            while (t < checkerFadeDuration)
+            {
+                if (checkerMaterial != null) checkerMaterial.SetFloat("_Progress", t / checkerFadeDuration);
+                t += Time.deltaTime;
+                yield return null;
+            }
+            if (checkerMaterial != null) checkerMaterial.SetFloat("_Progress", 1f);
+
+            // 線を隠す
+            if (horizontalLineRt != null)
+            {
+                horizontalLineRt.gameObject.SetActive(false);
+                horizontalLineRt.localScale = new Vector3(1, 0.15f, 1f);
+            }
+
+            // === 3. HP精算アニメーション ===
+            Debug.Log("[ScoreSettlement] Step 3 - HP Settlement Animation");
+            if (centerText != null) centerText.gameObject.SetActive(false);
+
+            if (hpBetContainer != null)
+            {
+                hpBetContainer.SetActive(true);
+
+                // 掛け金テキストを精算情報として使用
+                if (isLocalWin)
+                {
+                    if (playerBetObj != null) playerBetObj.text = $"獲得: +{winnerGain}";
+                    if (enemyBetObj != null) enemyBetObj.text = $"喪失: -{loserLoss}";
+                }
+                else
+                {
+                    if (playerBetObj != null) playerBetObj.text = $"喪失: -{loserLoss}";
+                    if (enemyBetObj != null) enemyBetObj.text = $"獲得: +{winnerGain}";
+                }
+
+                // HPカウントアニメーション（掛け金フェイズの逆パターン）
+                t = 0;
+                while (t < hpDeductionDuration)
+                {
+                    float progress = t / hpDeductionDuration;
+                    // EaseOutCubic で演出に勢いをつける
+                    float eased = 1f - Mathf.Pow(1f - progress, 3f);
+
+                    int currentPlayerAnimHp = Mathf.RoundToInt(Mathf.Lerp(prevLocalHp, newLocalHp, eased));
+                    int currentEnemyAnimHp = Mathf.RoundToInt(Mathf.Lerp(prevEnemyHp, newEnemyHp, eased));
+
+                    if (playerHpObj != null) playerHpObj.text = "Your HP: " + currentPlayerAnimHp;
+                    if (enemyHpObj != null) enemyHpObj.text = "Enemy HP: " + currentEnemyAnimHp;
+
+                    t += Time.deltaTime;
+                    yield return null;
+                }
+                // 最終値を確実にセット
+                if (playerHpObj != null) playerHpObj.text = "Your HP: " + newLocalHp;
+                if (enemyHpObj != null) enemyHpObj.text = "Enemy HP: " + newEnemyHp;
+
+                yield return new WaitForSeconds(1.5f);
+                hpBetContainer.SetActive(false);
+            }
+            else
+            {
+                yield return new WaitForSeconds(1.5f);
+            }
+
+            // === 4. 市松模様フェードアウト ===
+            Debug.Log("[ScoreSettlement] Step 4 - Checker Fade Out");
+            t = 0;
+            while (t < checkerFadeDuration)
+            {
+                if (checkerMaterial != null) checkerMaterial.SetFloat("_Progress", 1f - (t / checkerFadeDuration));
+                t += Time.deltaTime;
+                yield return null;
+            }
+            if (checkerMaterial != null) checkerMaterial.SetFloat("_Progress", 0f);
+            if (fullScreenCheckerImage != null) fullScreenCheckerImage.gameObject.SetActive(false);
+
+            Debug.Log("[ScoreSettlement] Complete");
+            onComplete?.Invoke();
+        }
     }
 }

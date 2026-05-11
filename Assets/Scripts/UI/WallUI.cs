@@ -90,18 +90,8 @@ namespace KillingMahjong.UI
                 }
             }
 
-            // 3. Sort Categories logic (Count DESC -> Souzu > Manzu > Pinzu > Honor)
-            var categoryLists = new List<List<TileData>> { souzu, manzu, pinzu, honors };
-            
-            categoryLists.Sort((a, b) =>
-            {
-                int countCompare = b.Count.CompareTo(a.Count);
-                if (countCompare != 0) return countCompare;
-
-                int priorityA = GetCategoryPriority(a);
-                int priorityB = GetCategoryPriority(b);
-                return priorityA.CompareTo(priorityB);
-            });
+            // 3. 固定順で並べる: 萬子→ピンズ→索子→字牌
+            var categoryLists = new List<List<TileData>> { manzu, pinzu, souzu, honors };
 
             // 4. Layout
             float currentY = startPosition.y;
@@ -116,8 +106,12 @@ namespace KillingMahjong.UI
                 var list = categoryLists[i];
                 if (list.Count == 0) continue;
 
-                // Sort inside category
-                list.Sort((a, b) => a.Id.CompareTo(b.Id));
+                // Sort inside category (Number順でソート。赤ドラも正しい位置に並ぶように)
+                list.Sort((a, b) =>
+                {
+                    if (a.Number != b.Number) return a.Number.CompareTo(b.Number);
+                    return a.Id.CompareTo(b.Id); // 同じNumberならencodedIdでタイブレーク
+                });
 
                 int j = 0;
                 while (j < list.Count)

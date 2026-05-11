@@ -31,6 +31,7 @@ namespace KillingMahjong.Managers
         public LiquidationData LastLiquidationData { get; set; } = null;
         public bool IsLocalTurn { get; private set; } = false;
         public int LastDiscardedTileId { get; set; } = -1;
+        public int CurrentDoraId { get; set; } = -1;
         
         public int LocalPlayerHp { get; private set; } = 20000;
         public int EnemyPlayerHp { get; private set; } = 20000;
@@ -74,6 +75,7 @@ namespace KillingMahjong.Managers
             NonManganWaitTiles.Clear();
             DiscardedWallIndexes.Clear();
             OriginalWallTiles.Clear();
+            CurrentDoraId = -1;
         }
 
         /// <summary>

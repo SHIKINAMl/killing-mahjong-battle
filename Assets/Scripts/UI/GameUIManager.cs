@@ -27,6 +27,7 @@ namespace KillingMahjong.UI
         [SerializeField] private ConfirmationDialogUI confirmationDialogUI;
         [SerializeField] private RonAnimationUI ronAnimationUI;
         [SerializeField] private MatchmakingUI matchmakingUI;
+        [SerializeField] private DoraDisplayUI doraDisplayUI;
 
         [Header("Effects")]
         [SerializeField] private GameObject victoryEffectPrefab;
@@ -237,6 +238,7 @@ namespace KillingMahjong.UI
             if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(false);
             if (abilityUI != null) abilityUI.gameObject.SetActive(false);
             if (bettingUI != null) bettingUI.HideBettingPhase();
+            if (doraDisplayUI != null) doraDisplayUI.Hide();
         }
 
         // --- Component accessors ---
@@ -676,6 +678,7 @@ namespace KillingMahjong.UI
             if (abilityUI != null) abilityUI.gameObject.SetActive(false);
             if (ronAnimationUI != null) ronAnimationUI.gameObject.SetActive(false);
             if (bettingUI != null) bettingUI.HideBettingPhase();
+            if (doraDisplayUI != null) doraDisplayUI.Hide();
         }
 
         public void OnGameStarted()
@@ -780,6 +783,7 @@ namespace KillingMahjong.UI
                     if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(true);
                     if (waitUI != null) waitUI.gameObject.SetActive(false);
                     if (abilityUI != null) abilityUI.gameObject.SetActive(true);
+                    UpdateDoraDisplay();
                     break;
                 case RoundStatus.TurnDecision:
                     if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(false);
@@ -800,12 +804,14 @@ namespace KillingMahjong.UI
                         waitUI.DisplayWaits(BoardStateManager.Instance.CurrentWaitTiles);
                     }
                     if (abilityUI != null) abilityUI.gameObject.SetActive(true);
+                    UpdateDoraDisplay();
                     break;
                 case RoundStatus.Agari:
                 case RoundStatus.Ron:
                 case RoundStatus.Result:
                     if (waitUI != null) waitUI.gameObject.SetActive(false);
                     if (abilityUI != null) abilityUI.gameObject.SetActive(false);
+                    if (doraDisplayUI != null) doraDisplayUI.Hide();
                     if (ronAnimationUI != null)
                     {
                         bool isLocalWin = BoardStateManager.Instance.LastIsLocalWin;
@@ -847,6 +853,7 @@ namespace KillingMahjong.UI
                 case RoundStatus.Draw:
                     // 流局演出
                     if (waitUI != null) waitUI.gameObject.SetActive(false);
+                    if (doraDisplayUI != null) doraDisplayUI.Hide();
                     if (abilityUI != null) abilityUI.gameObject.SetActive(false);
                     // SetMatchUIVisibility(false) などの牌を隠す処理を削除（演出中も盤面を表示したままにするため）
                     
@@ -859,6 +866,25 @@ namespace KillingMahjong.UI
                         dialogueUI.ShowText("流局…次の対局へ");
                     }
                     break;
+            }
+        }
+
+        /// <summary>
+        /// BoardStateManager のドラIDに基づいてドラ表示UIを更新する
+        /// </summary>
+        private void UpdateDoraDisplay()
+        {
+            if (doraDisplayUI != null)
+            {
+                int doraId = Managers.BoardStateManager.Instance.CurrentDoraId;
+                if (doraId >= 0)
+                {
+                    doraDisplayUI.ShowDora(doraId);
+                }
+                else
+                {
+                    doraDisplayUI.Hide();
+                }
             }
         }
 
@@ -1052,12 +1078,66 @@ namespace KillingMahjong.UI
 
         private void OnRonAnimationComplete(bool isLocalWin)
         {
-            // ロン演出完了時に最新のHP（お金）情報をUIに反映する
-            if (playerInfoUI != null) 
-                playerInfoUI.SetHP(Managers.BoardStateManager.Instance.LocalPlayerHp);
-            if (enemyInfoUI != null) 
-                enemyInfoUI.SetHP(Managers.BoardStateManager.Instance.EnemyPlayerHp);
+            // ロン演出の黒背景を閉じた後、点数精算演出を開始する
+            var liq = Managers.BoardStateManager.Instance.LastLiquidationData;
+            int newLocalHp = Managers.BoardStateManager.Instance.LocalPlayerHp;
+            int newEnemyHp = Managers.BoardStateManager.Instance.EnemyPlayerHp;
 
+            // 精算前のHPを逆算する（NetworkMessageHandlerで既にUpdateHp済みのため）
+            int winnerGain = liq != null ? liq.winner_gain : 0;
+            int loserLoss = liq != null ? liq.loser_loss : 0;
+            int prevLocalHp = isLocalWin ? (newLocalHp - winnerGain) : (newLocalHp + loserLoss);
+            int prevEnemyHp = isLocalWin ? (newEnemyHp + loserLoss) : (newEnemyHp - winnerGain);
+
+            // 精算ラベル（ランク表示）
+            string rankLabel = "精算";
+            if (liq != null)
+            {
+                if (liq.multiplier >= 4.0f) rankLabel = "役満";
+                else if (liq.multiplier >= 3.0f) rankLabel = "三倍満";
+                else if (liq.multiplier >= 2.0f) rankLabel = "倍満";
+                else if (liq.multiplier >= 1.5f) rankLabel = "跳満";
+                else rankLabel = "満貫";
+            }
+
+            if (phaseTransitionUI != null)
+            {
+                // 盤面UIを非表示にして精算演出に集中させる
+                if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(false);
+                if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(false);
+
+                phaseTransitionUI.PlayScoreSettlementAnimation(
+                    isLocalWin, winnerGain, loserLoss,
+                    prevLocalHp, prevEnemyHp,
+                    newLocalHp, newEnemyHp,
+                    rankLabel,
+                    () => OnScoreSettlementComplete(isLocalWin)
+                );
+            }
+            else
+            {
+                // PhaseTransitionUI が未設定の場合は従来通り即時反映
+                if (playerInfoUI != null) playerInfoUI.SetHP(newLocalHp);
+                if (enemyInfoUI != null) enemyInfoUI.SetHP(newEnemyHp);
+                OnScoreSettlementComplete(isLocalWin);
+            }
+        }
+
+        private void OnScoreSettlementComplete(bool isLocalWin)
+        {
+            // 精算演出完了後にHPをUIに最終反映する
+            if (playerInfoUI != null)
+            {
+                playerInfoUI.gameObject.SetActive(true);
+                playerInfoUI.SetHP(Managers.BoardStateManager.Instance.LocalPlayerHp);
+            }
+            if (enemyInfoUI != null)
+            {
+                enemyInfoUI.SetPanelVisible(true);
+                enemyInfoUI.SetHP(Managers.BoardStateManager.Instance.EnemyPlayerHp);
+            }
+
+            // 勝利/ダメージエフェクト
             if (isLocalWin)
             {
                 if (victoryEffectPrefab != null && playerInfoUI != null) 
