@@ -156,7 +156,20 @@ namespace KillingMahjong.UI
                         _autoConfirmNextHandSelection = true;
                         if (handUI != null) handUI.SetSubmittedState(true);
                         if (waitUI != null) waitUI.MoveToOriginalPosition();
-                        SendActionToServer("select", new ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
+
+                        if (phaseTransitionUI != null)
+                        {
+                            isTransitioning = true;
+                            phaseTransitionUI.PlayCenterTextAnim("手牌決定！", 2.0f, () =>
+                            {
+                                isTransitioning = false;
+                                SendActionToServer("select", new ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
+                            });
+                        }
+                        else
+                        {
+                            SendActionToServer("select", new ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
+                        }
                     },
                     () => {
                         _autoConfirmNextHandSelection = false;
@@ -175,7 +188,20 @@ namespace KillingMahjong.UI
                 if (waitUI != null) waitUI.MoveToOriginalPosition();
                 _autoConfirmNextHandSelection = true;
                 if (handUI != null) handUI.SetSubmittedState(true);
-                SendActionToServer("select", new ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
+
+                if (phaseTransitionUI != null)
+                {
+                    isTransitioning = true;
+                    phaseTransitionUI.PlayCenterTextAnim("手牌決定！", 2.0f, () =>
+                    {
+                        isTransitioning = false;
+                        SendActionToServer("select", new ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
+                    });
+                }
+                else
+                {
+                    SendActionToServer("select", new ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
+                }
             }
         }
 
@@ -191,7 +217,20 @@ namespace KillingMahjong.UI
                     () => {
                         _autoConfirmNextHandSelection = true;
                         if (handUI != null) handUI.SetSubmittedState(true);
-                        SendActionToServer("select", new ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
+
+                        if (phaseTransitionUI != null)
+                        {
+                            isTransitioning = true;
+                            phaseTransitionUI.PlayCenterTextAnim("手牌決定！", 2.0f, () =>
+                            {
+                                isTransitioning = false;
+                                SendActionToServer("select", new ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
+                            });
+                        }
+                        else
+                        {
+                            SendActionToServer("select", new ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
+                        }
                     },
                     () => {
                         _autoConfirmNextHandSelection = false;
@@ -203,7 +242,20 @@ namespace KillingMahjong.UI
             {
                 _autoConfirmNextHandSelection = true;
                 if (handUI != null) handUI.SetSubmittedState(true);
-                SendActionToServer("select", new ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
+
+                if (phaseTransitionUI != null)
+                {
+                    isTransitioning = true;
+                    phaseTransitionUI.PlayCenterTextAnim("手牌決定！", 2.0f, () =>
+                    {
+                        isTransitioning = false;
+                        SendActionToServer("select", new ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
+                    });
+                }
+                else
+                {
+                    SendActionToServer("select", new ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
+                }
             }
         }
 
@@ -917,13 +969,15 @@ namespace KillingMahjong.UI
 
         public void OnBettingCompleteFromServer(int playerBet, int enemyBet, int playerHp, int enemyHp)
         {
-            TriggerBettingAnimationPhase($"Round 1", playerBet, enemyBet, playerHp, enemyHp); 
+            string roundTitle = _isCarryOverNextRound ? "流局持ち越し\n自動ベット" : "Round Start";
+            TriggerBettingAnimationPhase(roundTitle, playerBet, enemyBet, playerHp, enemyHp); 
+            _isCarryOverNextRound = false;
         }
 
         public void TriggerBettingAnimationPhase(string roundString, int playerBet, int enemyBet, int playerHp, int enemyHp)
         {
              if (isTransitioning) return;
-             if (currentPhaseStatus != RoundStatus.Betting) return;
+             // if (currentPhaseStatus != RoundStatus.Betting) return; // 流局後の自動ベット時も許可するためコメントアウト
 
              if (phaseTransitionUI != null)
              {
@@ -965,27 +1019,14 @@ namespace KillingMahjong.UI
         private void OnHandSelectionAccepted()
         {
             _autoConfirmNextHandSelection = false;
-            // 満貫以上の場合はサーバーが直接 hand_selection_accepted を返すため、
-            // 確認ダイアログを飛ばして「手牌決定！」演出を再生する
-            if (phaseTransitionUI != null)
-            {
-                isTransitioning = true;
-                phaseTransitionUI.PlayCenterTextAnim("手牌決定！", 2.0f, () =>
-                {
-                    isTransitioning = false;
-                    // キャンセルされていなければ待機テキストを出す
-                    if (handUI != null && handUI.IsSubmitted) 
-                    {
-                        if (dialogueUI != null) dialogueUI.ShowText("相手の手牌選択を待っています...");
-                    }
-                    HandlePhaseVisibility(currentPhaseStatus);
-                    if (handUI != null) handUI.UpdateLayout(currentPhaseStatus);
-                });
-            }
-            else
+            // 演出はすでにサーバーへの決定通信（select等）を送信する直前に
+            // ローカルで再生済みのため、ここでは待機テキストの表示のみ行う
+            if (handUI != null && handUI.IsSubmitted) 
             {
                 if (dialogueUI != null) dialogueUI.ShowText("相手の手牌選択を待っています...");
             }
+            HandlePhaseVisibility(currentPhaseStatus);
+            if (handUI != null) handUI.UpdateLayout(currentPhaseStatus);
         }
 
         private void HandleAgari(bool isLocalWin)
@@ -993,10 +1034,37 @@ namespace KillingMahjong.UI
             // UpdatePhaseStatus is handled via Network message event routing
         }
 
+        private bool _isCarryOverNextRound = false;
+
         private void HandleDraw()
         {
             Debug.Log("[GameUIManager] 流局処理開始");
-            StartCoroutine(DrawSequence());
+            _isCarryOverNextRound = true;
+
+            if (phaseTransitionUI != null)
+            {
+                isTransitioning = true;
+                phaseTransitionUI.PlayDrawTransition(
+                    onMidpoint: () => {
+                        // 暗転中に流局表示を消してUIをクリア
+                        if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
+                        
+                        if (ReactionController.Instance != null)
+                        {
+                            ReactionController.Instance.Setup(dialogueUI, enemyInfoUI, playerInfoUI);
+                        }
+                    },
+                    onComplete: () => {
+                        isTransitioning = false;
+                        Debug.Log("[GameUIManager] 流局演出完了 - 次ラウンド待ち承認送信");
+                        NetworkMessageHandler.Instance.SendActionToServer("next_round", new ActionPayload());
+                    }
+                );
+            }
+            else
+            {
+                StartCoroutine(DrawSequence());
+            }
         }
 
         private IEnumerator DrawSequence()
