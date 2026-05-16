@@ -450,13 +450,16 @@ namespace KillingMahjong.Network
                 int cidStart = jsonString.IndexOf("\"client_id\"", searchFrom);
                 if (cidStart < 0) break;
 
+                int nextCidStart = jsonString.IndexOf("\"client_id\"", cidStart + 11);
+                if (nextCidStart < 0) nextCidStart = jsonString.Length;
+
                 int valStart = jsonString.IndexOf('"', cidStart + 11) + 1;
                 int valEnd = jsonString.IndexOf('"', valStart);
                 if (valStart < 0 || valEnd < 0) break;
                 string cid = jsonString.Substring(valStart, valEnd - valStart);
 
                 int keyStart = jsonString.IndexOf($"\"{arrayKeyName}\"", valEnd);
-                if (keyStart > 0 && keyStart < cidStart + 200) // 次のデータに飛びすぎないよう簡易チェック
+                if (keyStart > 0 && keyStart < nextCidStart) // 次のデータに飛びすぎないようチェック
                 {
                     int arrStart = jsonString.IndexOf('[', keyStart);
                     int arrEnd = jsonString.IndexOf(']', arrStart);
@@ -485,13 +488,16 @@ namespace KillingMahjong.Network
                 int cidStart = jsonString.IndexOf("\"client_id\"", searchFrom);
                 if (cidStart < 0) break;
 
+                int nextCidStart = jsonString.IndexOf("\"client_id\"", cidStart + 11);
+                if (nextCidStart < 0) nextCidStart = jsonString.Length;
+
                 int valStart = jsonString.IndexOf('"', cidStart + 11) + 1;
                 int valEnd = jsonString.IndexOf('"', valStart);
                 if (valStart < 0 || valEnd < 0) break;
                 string cid = jsonString.Substring(valStart, valEnd - valStart);
 
                 int keyStart = jsonString.IndexOf("\"tenpai_examples\"", valEnd);
-                if (keyStart > 0 && keyStart < cidStart + 300) 
+                if (keyStart > 0 && keyStart < nextCidStart) 
                 {
                     int arrStart = jsonString.IndexOf('[', keyStart);
                     if (arrStart > 0)

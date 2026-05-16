@@ -26,6 +26,7 @@ namespace KillingMahjong.Managers
         public List<int> SelectedTileIds { get; private set; } = new List<int>();
         public List<int[]> CurrentTenpaiExamples { get; private set; } = new List<int[]>();
         public HashSet<int> DiscardedWallIndexes { get; private set; } = new HashSet<int>();
+        public List<int> TargetHandIndexes { get; set; } = null;
         
         public bool LastIsLocalWin { get; set; } = true; 
         public LiquidationData LastLiquidationData { get; set; } = null;
@@ -76,6 +77,7 @@ namespace KillingMahjong.Managers
             DiscardedWallIndexes.Clear();
             OriginalWallTiles.Clear();
             CurrentDoraId = -1;
+            TargetHandIndexes = null;
         }
 
         /// <summary>
@@ -223,6 +225,45 @@ namespace KillingMahjong.Managers
 
         // --- 選択・デモ支援ロジック ---
 
+        private int[] OptimizeHandIndicesForDora(int[] originalIndexes)
+        {
+            List<int> upgraded = new List<int>(originalIndexes);
+            List<int> wall = OriginalWallTiles;
+            
+            for (int i = 0; i < upgraded.Count; i++)
+            {
+                int currentIndex = upgraded[i];
+                if (currentIndex < 0 || currentIndex >= wall.Count) continue;
+                
+                int currentTile = wall[currentIndex];
+                int baseId = currentTile & 0x1F;
+                int currentDoraFlag = currentTile >> 5;
+                
+                int bestIndex = currentIndex;
+                int bestDoraFlag = currentDoraFlag;
+                
+                for (int w = 0; w < wall.Count; w++)
+                {
+                    if (upgraded.Contains(w)) continue;
+                    
+                    int wTile = wall[w];
+                    if ((wTile & 0x1F) == baseId)
+                    {
+                        int wDoraFlag = wTile >> 5;
+                        if (wDoraFlag > bestDoraFlag)
+                        {
+                            bestDoraFlag = wDoraFlag;
+                            bestIndex = w;
+                        }
+                    }
+                }
+                
+                upgraded[i] = bestIndex;
+            }
+            
+            return upgraded.ToArray();
+        }
+
         public void SelectManganHand()
         {
             Debug.Log($"[SelectManganHand] CurrentTenpaiExamples count: {CurrentTenpaiExamples?.Count ?? -1}, OriginalWallTiles count: {OriginalWallTiles.Count}, CurrentWallTiles count: {CurrentWallTiles.Count}");
@@ -237,8 +278,11 @@ namespace KillingMahjong.Managers
             ResetHandToWall();
 
             int exampleIndex = UnityEngine.Random.Range(0, CurrentTenpaiExamples.Count);
-            int[] targetHand = CurrentTenpaiExamples[exampleIndex];
-            Debug.Log($"[SelectManganHand] Using example {exampleIndex}, indexes: [{string.Join(", ", targetHand)}]");
+            int[] rawTargetHand = CurrentTenpaiExamples[exampleIndex];
+            int[] targetHand = OptimizeHandIndicesForDora(rawTargetHand);
+            
+            Debug.Log($"[SelectManganHand] Using example {exampleIndex}, optimized indexes: [{string.Join(", ", targetHand)}]");
+            TargetHandIndexes = new List<int>(targetHand);
             
             foreach (int index in targetHand)
             {

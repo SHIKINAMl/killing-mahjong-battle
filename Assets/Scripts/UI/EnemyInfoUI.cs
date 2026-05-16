@@ -12,6 +12,10 @@ namespace KillingMahjong.UI
         [SerializeField] private SpriteRenderer characterRenderer;
         [SerializeField] private CharacterData characterData; // キャラクター管理データ
 
+        [Header("Available Enemies")]
+        [SerializeField] private CharacterData[] availableEnemies; // インスペクターで登録する敵キャラクターリスト
+        private int currentEnemyIndex = -1; // -1 = デフォルトの characterData を使用中
+
         [Header("Enemy Panel Settings")]
         [SerializeField] private GameObject enemyPanel; // 敵パネルの参照
 
@@ -20,6 +24,11 @@ namespace KillingMahjong.UI
         
         private Coroutine bounceCoroutine;
         private Vector3 originalPosition;
+
+        /// <summary>
+        /// 現在選択されている CharacterData を取得する
+        /// </summary>
+        public CharacterData CurrentCharacterData => characterData;
 
         private void Awake()
         {
@@ -45,6 +54,47 @@ namespace KillingMahjong.UI
             {
                 originalPosition = characterRenderer.transform.localPosition;
             }
+        }
+
+        /// <summary>
+        /// 次の敵キャラクターに切り替える。
+        /// availableEnemies リストの中を順番にループする。
+        /// </summary>
+        public void CycleEnemy()
+        {
+            if (availableEnemies == null || availableEnemies.Length == 0) return;
+
+            currentEnemyIndex = (currentEnemyIndex + 1) % availableEnemies.Length;
+            ApplyCharacterData(availableEnemies[currentEnemyIndex]);
+        }
+
+        /// <summary>
+        /// 指定した CharacterData を適用して画像を切り替える
+        /// </summary>
+        private void ApplyCharacterData(CharacterData data)
+        {
+            if (data == null) return;
+
+            characterData = data;
+            normalSprite = data.normalSprite;
+            discardSprite = data.discardSprite;
+
+            if (characterRenderer != null && normalSprite != null)
+            {
+                characterRenderer.sprite = normalSprite;
+            }
+        }
+
+        /// <summary>
+        /// クリックされた時のリアクションセリフを取得する
+        /// </summary>
+        public string GetClickDialogue()
+        {
+            if (characterData != null && !string.IsNullOrEmpty(characterData.clickDialogue))
+            {
+                return $"「{characterData.clickDialogue}」";
+            }
+            return null;
         }
 
         public void SetHP(int hp)

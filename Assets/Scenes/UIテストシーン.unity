@@ -4570,7 +4570,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.EnemyInfoUI
   hpText: {fileID: 252598135}
   characterRenderer: {fileID: 1355573764}
-  characterData: {fileID: 11400000, guid: e27b2b7a25ff9eb4fa991e7ba62a93d7, type: 2}
+  characterData: {fileID: 11400000, guid: b54cb2f20fc68214096f52c562338108, type: 2}
+  availableEnemies:
+  - {fileID: 11400000, guid: b54cb2f20fc68214096f52c562338108, type: 2}
   enemyPanel: {fileID: 385541335}
 --- !u!1 &604324882
 GameObject:
@@ -8753,6 +8755,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1355573765}
   - component: {fileID: 1355573764}
+  - component: {fileID: 1355573766}
   m_Layer: 0
   m_Name: "\u30AD\u30E3\u30E9"
   m_TagString: Untagged
@@ -8807,7 +8810,7 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
-  m_Sprite: {fileID: 21300000, guid: b0652cd1c1fe41045a13c5e70e5d35da, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 34ce26344f6b30c4ca9493273ba73ef6, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
@@ -8833,6 +8836,23 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1355573766
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1355573763}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c8fc5e722018a8b4b90ad7344babd9e8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.ClickableCharacter
+  enemyInfoUI: {fileID: 603402878}
+  clickAreaSize: {x: 7, y: 6}
+  clickAreaOffset: {x: 0, y: 3}
+  showDebugArea: 1
+  debugAreaColor: {r: 0, g: 1, b: 0, a: 0.25}
 --- !u!1 &1376948187
 GameObject:
   m_ObjectHideFlags: 0

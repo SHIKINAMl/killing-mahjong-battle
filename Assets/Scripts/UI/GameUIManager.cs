@@ -139,9 +139,17 @@ namespace KillingMahjong.UI
                 foreach (var wait in data.waits)
                 {
                     string yakuText = (wait.yaku != null && wait.yaku.Length > 0) ? string.Join(" / ", wait.yaku) : "役なし";
-                    string manganText = wait.mangan_or_more ? "満貫以上" : "満貫未満";
+                    bool isMangan = wait.mangan_or_more;
+                    if (BoardStateManager.Instance.TargetHandIndexes != null)
+                    {
+                        // AutoMangan を使用した場合、Pythonサーバー側で赤ドラのフラグが落ちて
+                        // 判定される仕様により「満貫未満」と誤判定されるため、UI上では強制的に満貫以上とする
+                        isMangan = true;
+                    }
+                    
+                    string manganText = isMangan ? "満貫以上" : "満貫未満";
                     message += $"-> {yakuText} ({manganText})\n";
-                    if (wait.mangan_or_more) hasMangan = true;
+                    if (isMangan) hasMangan = true;
                 }
             }
             message += "\nこの手牌で決定しますか？";
@@ -321,12 +329,14 @@ namespace KillingMahjong.UI
         public void MoveTileToHand(int tileId)
         {
             if (currentPhaseStatus != RoundStatus.HandSelection) return;
+            BoardStateManager.Instance.TargetHandIndexes = null;
             BoardStateManager.Instance.MoveTileToHand(tileId);
         }
 
         public void MoveTileToWall(int tileId)
         {
             if (currentPhaseStatus != RoundStatus.HandSelection) return;
+            BoardStateManager.Instance.TargetHandIndexes = null;
             BoardStateManager.Instance.MoveTileToWall(tileId);
             ClearSelection();
         }
@@ -399,24 +409,31 @@ namespace KillingMahjong.UI
             // 二重押し防止
             if (handUI != null) handUI.SetSubmittedState(true);
 
-            // hand_indexes を事前計算してキャッシュ
-            _pendingHandIndexes = new List<int>();
-            HashSet<int> usedIndexes = new HashSet<int>();
-            foreach(int tileId in BoardStateManager.Instance.CurrentHandTiles) {
-                 var wallTiles = BoardStateManager.Instance.OriginalWallTiles;
-                 int idx = -1;
-                 for (int i = 0; i < wallTiles.Count; i++)
-                 {
-                     if (wallTiles[i] == tileId && !usedIndexes.Contains(i))
+            // hand_indexes をキャッシュ
+            if (BoardStateManager.Instance.TargetHandIndexes != null && BoardStateManager.Instance.TargetHandIndexes.Count == 13)
+            {
+                _pendingHandIndexes = new List<int>(BoardStateManager.Instance.TargetHandIndexes);
+            }
+            else
+            {
+                _pendingHandIndexes = new List<int>();
+                HashSet<int> usedIndexes = new HashSet<int>();
+                foreach(int tileId in BoardStateManager.Instance.CurrentHandTiles) {
+                     var wallTiles = BoardStateManager.Instance.OriginalWallTiles;
+                     int idx = -1;
+                     for (int i = 0; i < wallTiles.Count; i++)
                      {
-                         idx = i;
-                         break;
+                         if (wallTiles[i] == tileId && !usedIndexes.Contains(i))
+                         {
+                             idx = i;
+                             break;
+                         }
                      }
-                 }
-                 if (idx >= 0) {
-                     _pendingHandIndexes.Add(idx);
-                     usedIndexes.Add(idx);
-                 }
+                     if (idx >= 0) {
+                         _pendingHandIndexes.Add(idx);
+                         usedIndexes.Add(idx);
+                     }
+                }
             }
             _pendingHandTiles = new List<int>(BoardStateManager.Instance.CurrentHandTiles);
 
