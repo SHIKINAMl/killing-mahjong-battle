@@ -23,6 +23,7 @@ namespace KillingMahjong.UI
         private Sprite discardSprite;
         
         private Coroutine bounceCoroutine;
+        private Coroutine reactionCoroutine;
         private Vector3 originalPosition;
 
         /// <summary>
@@ -85,14 +86,38 @@ namespace KillingMahjong.UI
             }
         }
 
-        /// <summary>
-        /// クリックされた時のリアクションセリフを取得する
-        /// </summary>
         public string GetClickDialogue()
         {
             if (characterData != null && !string.IsNullOrEmpty(characterData.clickDialogue))
             {
                 return $"「{characterData.clickDialogue}」";
+            }
+            return null;
+        }
+
+        public string GetIntroductionDialogue()
+        {
+            if (characterData != null && !string.IsNullOrEmpty(characterData.introductionDialogue))
+            {
+                return $"「{characterData.introductionDialogue}」";
+            }
+            return null;
+        }
+
+        public string GetWinDialogue()
+        {
+            if (characterData != null && !string.IsNullOrEmpty(characterData.winDialogue))
+            {
+                return $"「{characterData.winDialogue}」";
+            }
+            return null;
+        }
+
+        public string GetLoseDialogue()
+        {
+            if (characterData != null && !string.IsNullOrEmpty(characterData.loseDialogue))
+            {
+                return $"「{characterData.loseDialogue}」";
             }
             return null;
         }
@@ -122,22 +147,55 @@ namespace KillingMahjong.UI
             }
         }
 
-        /// <summary>
-        /// 打牌する時の画像（あるいは元の画像）に切り替える
-        /// </summary>
         public void SetDiscardingState(bool isDiscarding)
         {
             if (characterRenderer != null)
             {
-                if (isDiscarding && discardSprite != null)
+                // インスペクターで実行中に変更された場合も反映されるように、characterDataから直接読み取る
+                Sprite targetDiscardSprite = (characterData != null && characterData.discardSprite != null) ? characterData.discardSprite : discardSprite;
+                Sprite targetNormalSprite = (characterData != null && characterData.normalSprite != null) ? characterData.normalSprite : normalSprite;
+
+                if (isDiscarding && targetDiscardSprite != null)
                 {
-                    characterRenderer.sprite = discardSprite;
+                    characterRenderer.sprite = targetDiscardSprite;
                 }
-                else if (!isDiscarding && normalSprite != null)
+                else if (!isDiscarding && targetNormalSprite != null)
                 {
-                    characterRenderer.sprite = normalSprite;
+                    characterRenderer.sprite = targetNormalSprite;
                 }
             }
+        }
+
+        /// <summary>
+        /// びっくりした顔に変更し、指定時間後に元に戻す
+        /// </summary>
+        public void PlaySurprisedReaction(float duration)
+        {
+            if (characterData == null) return;
+            
+            if (reactionCoroutine != null)
+            {
+                StopCoroutine(reactionCoroutine);
+            }
+            
+            reactionCoroutine = StartCoroutine(SurprisedRoutine(duration));
+        }
+
+        private System.Collections.IEnumerator SurprisedRoutine(float duration)
+        {
+            if (characterRenderer != null && characterData.surprisedSprite != null)
+            {
+                characterRenderer.sprite = characterData.surprisedSprite;
+            }
+
+            yield return new WaitForSeconds(duration);
+
+            if (characterRenderer != null && normalSprite != null)
+            {
+                characterRenderer.sprite = normalSprite;
+            }
+            
+            reactionCoroutine = null;
         }
 
         public void PlayBounceAnimation(float duration)
@@ -150,13 +208,14 @@ namespace KillingMahjong.UI
         private System.Collections.IEnumerator BounceRoutine(float duration)
         {
             float elapsed = 0f;
-            float bounceSpeed = 15f;
+            // duration の時間内で Sin(0) から Sin(PI) まで推移するように速度を計算 (1回跳ねる)
+            float bounceSpeed = Mathf.PI / duration;
             float bounceHeight = 0.5f; // SpriteRenderer用に調整（必要に応じてインスペクターで調整可能にすることもできます）
             
             while (elapsed < duration)
             {
                 elapsed += Time.deltaTime;
-                float yOffset = Mathf.Abs(Mathf.Sin(elapsed * bounceSpeed)) * bounceHeight;
+                float yOffset = Mathf.Sin(elapsed * bounceSpeed) * bounceHeight;
                 characterRenderer.transform.localPosition = originalPosition + new Vector3(0, yOffset, 0);
                 yield return null;
             }

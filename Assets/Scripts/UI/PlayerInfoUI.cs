@@ -76,13 +76,17 @@ namespace KillingMahjong.UI
         {
             if (characterRenderer != null)
             {
-                if (isDiscarding && discardSprite != null)
+                // 実行中に変更された場合も反映されるように、characterDataから直接読み取る
+                Sprite targetDiscardSprite = (characterData != null && characterData.discardSprite != null) ? characterData.discardSprite : discardSprite;
+                Sprite targetNormalSprite = (characterData != null && characterData.normalSprite != null) ? characterData.normalSprite : normalSprite;
+
+                if (isDiscarding && targetDiscardSprite != null)
                 {
-                    characterRenderer.sprite = discardSprite;
+                    characterRenderer.sprite = targetDiscardSprite;
                 }
-                else if (!isDiscarding && normalSprite != null)
+                else if (!isDiscarding && targetNormalSprite != null)
                 {
-                    characterRenderer.sprite = normalSprite;
+                    characterRenderer.sprite = targetNormalSprite;
                 }
             }
         }

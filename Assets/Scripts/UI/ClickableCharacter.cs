@@ -162,9 +162,11 @@ namespace KillingMahjong.UI
                 return;
             }
 
-            // キャラクターを切り替える
-            enemyInfoUI.CycleEnemy();
-            Debug.Log($"[ClickableCharacter] CycleEnemy 実行完了。現在のキャラ: {enemyInfoUI.CurrentCharacterData?.characterName}");
+            // びっくりリアクションを実行（3〜5秒後に元に戻る）
+            enemyInfoUI.PlaySurprisedReaction(Random.Range(3.0f, 5.0f));
+            
+            // 1回上に跳ねるアニメーション（0.3秒間）
+            enemyInfoUI.PlayBounceAnimation(0.3f);
 
             // クリック時のリアクションセリフを表示する
             string clickDialogue = enemyInfoUI.GetClickDialogue();

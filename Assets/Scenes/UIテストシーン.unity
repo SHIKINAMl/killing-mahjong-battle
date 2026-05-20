@@ -4571,8 +4571,7 @@ MonoBehaviour:
   hpText: {fileID: 252598135}
   characterRenderer: {fileID: 1355573764}
   characterData: {fileID: 11400000, guid: b54cb2f20fc68214096f52c562338108, type: 2}
-  availableEnemies:
-  - {fileID: 11400000, guid: b54cb2f20fc68214096f52c562338108, type: 2}
+  availableEnemies: []
   enemyPanel: {fileID: 385541335}
 --- !u!1 &604324882
 GameObject:

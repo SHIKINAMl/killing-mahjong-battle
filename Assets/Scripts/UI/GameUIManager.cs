@@ -756,7 +756,10 @@ namespace KillingMahjong.UI
             if (dialogueUI != null) 
             {
                 dialogueUI.gameObject.SetActive(true);
-                dialogueUI.ShowText("Match Found! Game Starting...");
+                string introText = (enemyInfoUI != null && enemyInfoUI.GetIntroductionDialogue() != null) 
+                                   ? enemyInfoUI.GetIntroductionDialogue() 
+                                   : "Match Found! Game Starting...";
+                dialogueUI.ShowText(introText);
             }
             if (playerInfoUI != null) playerInfoUI.SetHP(20000);
             if (enemyInfoUI != null) enemyInfoUI.SetHP(20000);
@@ -1130,19 +1133,26 @@ namespace KillingMahjong.UI
             }
             else if (isLocalWin)
             {
+                // プレイヤーのロン（＝敵の敗北）なので敵の敗北セリフを出す
                 if (dialogueUI != null)
                 {
                     dialogueUI.gameObject.SetActive(true);
-                    dialogueUI.ShowText("「ロン！」");
+                    string loseText = (enemyInfoUI != null && enemyInfoUI.GetLoseDialogue() != null) 
+                                       ? enemyInfoUI.GetLoseDialogue() 
+                                       : "「ロン！」";
+                    dialogueUI.ShowText(loseText);
                 }
             }
             else
             {
-                // 敵がロンした場合は相手のダイアログを出す
+                // 敵がロンした場合は相手の勝利セリフを出す
                 if (dialogueUI != null)
                 {
                     dialogueUI.gameObject.SetActive(true);
-                    dialogueUI.ShowText("「ロンよ！」");
+                    string winText = (enemyInfoUI != null && enemyInfoUI.GetWinDialogue() != null) 
+                                      ? enemyInfoUI.GetWinDialogue() 
+                                      : "「ロンよ！」";
+                    dialogueUI.ShowText(winText);
                 }
             }
 

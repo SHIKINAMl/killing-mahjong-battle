@@ -18,6 +18,7 @@ namespace KillingMahjong.UI
 
         [Header("Reaction Sprites (Optional)")]
         public Sprite reactionSprite;   // 相手が打牌した時の反応画像など
+        public Sprite surprisedSprite;  // クリックでびっくりした時の画像
         public Sprite winSprite;        // ロン・ツモ時の画像
         public Sprite damageSprite;     // ダメージを受けた時の画像
 
@@ -26,7 +27,7 @@ namespace KillingMahjong.UI
         public string introductionDialogue = "よろしくお願いします！"; // 登場時（初期表示時）のセリフ
         
         [TextArea(2, 4)]
-        public string clickDialogue = "えっ、なになに？"; // クリックされた時のリアクションセリフ
+        public string clickDialogue = "びっくりしたー"; // クリックされた時のリアクションセリフ
         
         [TextArea(2, 4)]
         public string winDialogue = "私の勝ちですね！"; // 勝利時のセリフ

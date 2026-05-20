@@ -108,10 +108,11 @@ namespace KillingMahjong.Managers
                     dialogueUI.ShowText("「プレイヤーが何かを捨てたな…」");
                 }
                 
-                if (playerInfoUI != null) 
-                {
-                    playerInfoUI.SetDiscardingState(true);
-                }
+                // プレイヤーは画面に出ないため、打牌時の画像変更処理を行わないようにする
+                // if (playerInfoUI != null) 
+                // {
+                //     playerInfoUI.SetDiscardingState(true);
+                // }
                 
                 // 喋っているのは敵なので敵を跳ねさせる
                 if (enemyInfoUI != null)
@@ -137,7 +138,7 @@ namespace KillingMahjong.Managers
             // ログが開かれている間は時間のカウントを一時停止して待つ
             yield return StartCoroutine(WaitWhileLogIsOpen(reactionDisplayDuration));
 
-            if (playerInfoUI != null) playerInfoUI.SetDiscardingState(false);
+            // プレイヤーの顔変更処理は無効化したため敵のみ戻す
             if (enemyInfoUI != null) enemyInfoUI.SetDiscardingState(false);
 
             ProcessNextReaction();
