@@ -454,7 +454,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 45, y: -10}
+  m_AnchoredPosition: {x: 30, y: -10}
   m_SizeDelta: {x: 200, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &48854593
@@ -2236,7 +2236,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 25, y: -15}
+  m_AnchoredPosition: {x: 40, y: -15}
   m_SizeDelta: {x: 20, y: 20}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &306529788
@@ -2841,6 +2841,7 @@ GameObject:
   - component: {fileID: 385541338}
   - component: {fileID: 385541337}
   - component: {fileID: 385541339}
+  - component: {fileID: 385541340}
   m_Layer: 0
   m_Name: EnemyPanel
   m_TagString: Untagged
@@ -2921,6 +2922,23 @@ MonoBehaviour:
   m_EffectColor: {r: 0, g: 0, b: 0, a: 1}
   m_EffectDistance: {x: 3, y: -3}
   m_UseGraphicAlpha: 1
+--- !u!114 &385541340
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 385541335}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c7427f7e051460d4880a35e49b296ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.FloatingAnimator
+  floatSpeed: 1
+  floatAmplitudeY: 5
+  floatAmplitudeX: 3
+  rotationSpeed: 1
+  rotationAmplitude: 2
 --- !u!1 &411695502
 GameObject:
   m_ObjectHideFlags: 0
@@ -6983,7 +7001,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 25, y: -35}
+  m_AnchoredPosition: {x: 40, y: -35}
   m_SizeDelta: {x: 20, y: 20}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1042621546
@@ -7135,6 +7153,8 @@ MonoBehaviour:
   hpDeductionDuration: 1.5
   loadingTextPosition: {x: -235, y: 50}
   loadingTextColor: {r: 1, g: 1, b: 1, a: 1}
+  bloodSplatterSprite: {fileID: 21300000, guid: ad1bb6e518a432f45944c8b8506f56c7, type: 3}
+  dimmerColor: {r: 0, g: 0, b: 0, a: 0.7}
 --- !u!114 &1075082341
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -10715,6 +10735,7 @@ GameObject:
   - component: {fileID: 1680596212}
   - component: {fileID: 1680596211}
   - component: {fileID: 1680596213}
+  - component: {fileID: 1680596214}
   m_Layer: 5
   m_Name: HPPanel
   m_TagString: Untagged
@@ -10795,6 +10816,23 @@ MonoBehaviour:
   m_EffectColor: {r: 0, g: 0, b: 0, a: 1}
   m_EffectDistance: {x: 3, y: -3}
   m_UseGraphicAlpha: 1
+--- !u!114 &1680596214
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1680596209}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c7427f7e051460d4880a35e49b296ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.FloatingAnimator
+  floatSpeed: 1
+  floatAmplitudeY: 5
+  floatAmplitudeX: 3
+  rotationSpeed: 1
+  rotationAmplitude: 2
 --- !u!1 &1708963800
 GameObject:
   m_ObjectHideFlags: 0
@@ -11922,6 +11960,7 @@ GameObject:
   - component: {fileID: 1895046175}
   - component: {fileID: 1895046174}
   - component: {fileID: 1895046176}
+  - component: {fileID: 1895046177}
   m_Layer: 5
   m_Name: DialoguePanel
   m_TagString: Untagged
@@ -12003,6 +12042,23 @@ MonoBehaviour:
   m_EffectColor: {r: 0, g: 0, b: 0, a: 1}
   m_EffectDistance: {x: 3, y: -3}
   m_UseGraphicAlpha: 1
+--- !u!114 &1895046177
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1895046172}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c7427f7e051460d4880a35e49b296ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.FloatingAnimator
+  floatSpeed: 1
+  floatAmplitudeY: 5
+  floatAmplitudeX: 3
+  rotationSpeed: 0.5
+  rotationAmplitude: 2
 --- !u!1 &1941748800
 GameObject:
   m_ObjectHideFlags: 0

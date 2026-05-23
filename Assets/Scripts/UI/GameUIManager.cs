@@ -329,6 +329,7 @@ namespace KillingMahjong.UI
         public void MoveTileToHand(int tileId)
         {
             if (currentPhaseStatus != RoundStatus.HandSelection) return;
+            if (handUI != null && handUI.IsSubmitted) return;
             BoardStateManager.Instance.TargetHandIndexes = null;
             BoardStateManager.Instance.MoveTileToHand(tileId);
         }
@@ -336,6 +337,7 @@ namespace KillingMahjong.UI
         public void MoveTileToWall(int tileId)
         {
             if (currentPhaseStatus != RoundStatus.HandSelection) return;
+            if (handUI != null && handUI.IsSubmitted) return;
             BoardStateManager.Instance.TargetHandIndexes = null;
             BoardStateManager.Instance.MoveTileToWall(tileId);
             ClearSelection();
@@ -344,12 +346,14 @@ namespace KillingMahjong.UI
         public void SelectManganHand()
         {
             if (currentPhaseStatus != RoundStatus.HandSelection) return;
+            if (handUI != null && handUI.IsSubmitted) return;
             BoardStateManager.Instance.SelectManganHand();
         }
 
         public void SelectRandomHand()
         {
             if (currentPhaseStatus != RoundStatus.HandSelection) return;
+            if (handUI != null && handUI.IsSubmitted) return;
             BoardStateManager.Instance.SelectRandomHand();
         }
 
@@ -857,7 +861,11 @@ namespace KillingMahjong.UI
 
         public void OnGameStarted()
         {
-            if (matchmakingUI != null) matchmakingUI.Hide();
+            _currentRoundIndex = 1;
+            if (matchmakingUI != null)
+            {
+                matchmakingUI.Hide();
+            }
             if (dialogueUI != null) 
             {
                 dialogueUI.gameObject.SetActive(true);
@@ -1091,9 +1099,16 @@ namespace KillingMahjong.UI
             SendActionToServer("bet", new ActionPayload { bet_amount = betAmount, amount = betAmount });
         }
 
+        private int _currentRoundIndex = 1;
+
         public void OnBettingCompleteFromServer(int playerBet, int enemyBet, int playerHp, int enemyHp)
         {
-            string roundTitle = _isCarryOverNextRound ? "流局持ち越し\n自動ベット" : "Round Start";
+            string roundTitle = $"第{_currentRoundIndex}局目";
+            if (_isCarryOverNextRound) 
+            {
+                roundTitle += "\n自動ベット";
+            }
+            
             TriggerBettingAnimationPhase(roundTitle, playerBet, enemyBet, playerHp, enemyHp); 
             _isCarryOverNextRound = false;
         }
@@ -1178,6 +1193,7 @@ namespace KillingMahjong.UI
         {
             Debug.Log("[GameUIManager] 流局処理開始");
             _isCarryOverNextRound = true;
+            _currentRoundIndex++;
 
             if (phaseTransitionUI != null)
             {
@@ -1186,6 +1202,10 @@ namespace KillingMahjong.UI
                     onMidpoint: () => {
                         // 暗転中に流局表示を消してUIをクリア
                         if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
+                        
+                        // 牌を暗転中に消去する
+                        BoardStateManager.Instance.ClearAllBoardData();
+                        ClearAllTiles();
                         
                         if (ReactionController.Instance != null)
                         {
@@ -1289,6 +1309,7 @@ namespace KillingMahjong.UI
 
         private void OnRonAnimationComplete(bool isLocalWin)
         {
+            _currentRoundIndex++;
             // ロン演出の黒背景を閉じた後、点数精算演出を開始する
             var liq = Managers.BoardStateManager.Instance.LastLiquidationData;
             int newLocalHp = Managers.BoardStateManager.Instance.LocalPlayerHp;

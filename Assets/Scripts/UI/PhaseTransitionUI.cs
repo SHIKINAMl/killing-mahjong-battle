@@ -382,6 +382,10 @@ namespace KillingMahjong.UI
         /// <param name="newEnemyHp">精算後の敵プレイヤーHP</param>
         /// <param name="resultLabel">表示する精算ラベル（例: "満貫"）</param>
         /// <param name="onComplete">演出完了コールバック</param>
+        [Header("Effects Settings")]
+        [SerializeField] private Sprite bloodSplatterSprite;
+        [SerializeField] private Color dimmerColor = new Color(0, 0, 0, 0.7f);
+
         public void PlayScoreSettlementAnimation(
             bool isLocalWin,
             int winnerGain,
@@ -400,6 +404,24 @@ namespace KillingMahjong.UI
                 resultLabel, onComplete));
         }
 
+        private IEnumerator ScreenShakeRoutine(float duration, float magnitude)
+        {
+            Vector3 originalPos = transform.localPosition;
+            float elapsed = 0.0f;
+            
+            while (elapsed < duration)
+            {
+                float x = UnityEngine.Random.Range(-1f, 1f) * magnitude;
+                float y = UnityEngine.Random.Range(-1f, 1f) * magnitude;
+                
+                transform.localPosition = new Vector3(originalPos.x + x, originalPos.y + y, originalPos.z);
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+            
+            transform.localPosition = originalPos;
+        }
+
         private IEnumerator ScoreSettlementRoutine(
             bool isLocalWin,
             int winnerGain,
@@ -413,67 +435,63 @@ namespace KillingMahjong.UI
         {
             ResetVisuals();
 
-            // === 1. 一本線イン + 精算ラベルテキスト ===
-            Debug.Log("[ScoreSettlement] Step 1 - Line In");
-            if (horizontalLineRt != null)
-            {
-                horizontalLineRt.gameObject.SetActive(true);
-                horizontalLineRt.localScale = new Vector3(0, 2f, 1f);
-            }
+            // 1. 半透明の暗転（ディマー）を作成・表示
+            GameObject dimmerObj = new GameObject("DimmerOverlay");
+            dimmerObj.transform.SetParent(transform, false);
+            dimmerObj.transform.SetAsFirstSibling();
+            var dimmerImage = dimmerObj.AddComponent<Image>();
+            dimmerImage.color = new Color(0, 0, 0, 0); // 初期は透明
+            var dimmerRt = dimmerObj.GetComponent<RectTransform>();
+            dimmerRt.anchorMin = Vector2.zero;
+            dimmerRt.anchorMax = Vector2.one;
+            dimmerRt.sizeDelta = Vector2.zero;
 
+            // フェードイン
             float t = 0;
-            while (t < lineInDuration)
+            while (t < 0.3f)
             {
-                if (horizontalLineRt != null)
-                {
-                    horizontalLineRt.localScale = new Vector3(Mathf.Lerp(0, 10f, t / lineInDuration), 2f, 1f);
-                }
+                dimmerImage.color = Color.Lerp(new Color(0, 0, 0, 0), dimmerColor, t / 0.3f);
                 t += Time.deltaTime;
                 yield return null;
             }
-            if (horizontalLineRt != null) horizontalLineRt.localScale = new Vector3(10f, 2f, 1f);
+            dimmerImage.color = dimmerColor;
 
+            // 2. 役名のバウンド表示
             if (centerText != null)
             {
                 centerText.text = resultLabel;
                 centerText.gameObject.SetActive(true);
+                centerText.color = Color.red;
+                
+                // ドンッ！とスタンプのように出現するアニメーション
+                t = 0;
+                float duration = 0.4f;
+                Vector3 initialScale = new Vector3(3f, 3f, 1f);
+                Vector3 targetScale = Vector3.one;
+                
+                while (t < duration)
+                {
+                    float progress = t / duration;
+                    // EaseInCubic または Overshoot っぽい動き
+                    float scaleProgress = 1f - Mathf.Pow(1f - progress, 4f); 
+                    centerText.transform.localScale = Vector3.LerpUnclamped(initialScale, targetScale, scaleProgress);
+                    t += Time.deltaTime;
+                    yield return null;
+                }
+                centerText.transform.localScale = targetScale;
+                
+                // 画面揺れ（着弾の衝撃）
+                StartCoroutine(ScreenShakeRoutine(0.2f, 20f));
             }
-            yield return new WaitForSeconds(textWaitDuration);
-
-            // === 2. 市松模様フェードイン ===
-            Debug.Log("[ScoreSettlement] Step 2 - Checker Fade In");
-            if (fullScreenCheckerImage != null) fullScreenCheckerImage.gameObject.SetActive(true);
-            if (checkerMaterial != null)
-            {
-                checkerMaterial.SetFloat("_AspectRatio", (float)Screen.width / Screen.height);
-                checkerMaterial.SetFloat("_Progress", 0f);
-            }
-
-            t = 0;
-            while (t < checkerFadeDuration)
-            {
-                if (checkerMaterial != null) checkerMaterial.SetFloat("_Progress", t / checkerFadeDuration);
-                t += Time.deltaTime;
-                yield return null;
-            }
-            if (checkerMaterial != null) checkerMaterial.SetFloat("_Progress", 1f);
-
-            // 線を隠す
-            if (horizontalLineRt != null)
-            {
-                horizontalLineRt.gameObject.SetActive(false);
-                horizontalLineRt.localScale = new Vector3(1, 0.15f, 1f);
-            }
-
-            // === 3. HP精算アニメーション ===
-            Debug.Log("[ScoreSettlement] Step 3 - HP Settlement Animation");
+            
+            yield return new WaitForSeconds(1.0f);
             if (centerText != null) centerText.gameObject.SetActive(false);
 
+            // 3. HP表示と血飛沫＆画面揺れ
             if (hpBetContainer != null)
             {
                 hpBetContainer.SetActive(true);
 
-                // 掛け金テキストを精算情報として使用
                 if (isLocalWin)
                 {
                     if (playerBetObj != null) playerBetObj.text = $"獲得: +{winnerGain}";
@@ -485,12 +503,39 @@ namespace KillingMahjong.UI
                     if (enemyBetObj != null) enemyBetObj.text = $"獲得: +{winnerGain}";
                 }
 
-                // HPカウントアニメーション（掛け金フェイズの逆パターン）
+                // 血飛沫画像の生成
+                GameObject splatterObj = null;
+                Image splatterImage = null;
+                if (bloodSplatterSprite != null)
+                {
+                    splatterObj = new GameObject("BloodSplatter");
+                    splatterObj.transform.SetParent(transform, false);
+                    splatterImage = splatterObj.AddComponent<Image>();
+                    splatterImage.sprite = bloodSplatterSprite;
+                    splatterImage.preserveAspect = true;
+                    
+                    RectTransform srt = splatterObj.GetComponent<RectTransform>();
+                    srt.sizeDelta = new Vector2(800, 800);
+                    
+                    // 敗者側に血飛沫を配置（簡易的に上下で位置を分ける）
+                    srt.anchoredPosition = isLocalWin ? new Vector2(0, 300) : new Vector2(0, -300);
+                    srt.localRotation = Quaternion.Euler(0, 0, UnityEngine.Random.Range(0, 360));
+                    splatterImage.color = new Color(1, 1, 1, 0); // 初期透明
+                }
+
+                // 激しい画面揺れと血飛沫表示
+                StartCoroutine(ScreenShakeRoutine(0.5f, 30f));
+                
+                if (splatterImage != null)
+                {
+                    splatterImage.color = new Color(1, 1, 1, 0.8f);
+                }
+
+                // HPカウントアニメーション
                 t = 0;
                 while (t < hpDeductionDuration)
                 {
                     float progress = t / hpDeductionDuration;
-                    // EaseOutCubic で演出に勢いをつける
                     float eased = 1f - Mathf.Pow(1f - progress, 3f);
 
                     int currentPlayerAnimHp = Mathf.RoundToInt(Mathf.Lerp(prevLocalHp, newLocalHp, eased));
@@ -499,12 +544,21 @@ namespace KillingMahjong.UI
                     if (playerHpObj != null) playerHpObj.text = "Your HP: " + currentPlayerAnimHp;
                     if (enemyHpObj != null) enemyHpObj.text = "Enemy HP: " + currentEnemyAnimHp;
 
+                    // 血飛沫のフェードアウト
+                    if (splatterImage != null && progress > 0.5f)
+                    {
+                        float fadeOutProgress = (progress - 0.5f) * 2f;
+                        splatterImage.color = new Color(1, 1, 1, 0.8f * (1f - fadeOutProgress));
+                    }
+
                     t += Time.deltaTime;
                     yield return null;
                 }
-                // 最終値を確実にセット
+                
                 if (playerHpObj != null) playerHpObj.text = "Your HP: " + newLocalHp;
                 if (enemyHpObj != null) enemyHpObj.text = "Enemy HP: " + newEnemyHp;
+                
+                if (splatterObj != null) Destroy(splatterObj);
 
                 yield return new WaitForSeconds(1.5f);
                 hpBetContainer.SetActive(false);
@@ -514,17 +568,15 @@ namespace KillingMahjong.UI
                 yield return new WaitForSeconds(1.5f);
             }
 
-            // === 4. 市松模様フェードアウト ===
-            Debug.Log("[ScoreSettlement] Step 4 - Checker Fade Out");
+            // ディマーフェードアウト
             t = 0;
-            while (t < checkerFadeDuration)
+            while (t < 0.3f)
             {
-                if (checkerMaterial != null) checkerMaterial.SetFloat("_Progress", 1f - (t / checkerFadeDuration));
+                dimmerImage.color = Color.Lerp(dimmerColor, new Color(0, 0, 0, 0), t / 0.3f);
                 t += Time.deltaTime;
                 yield return null;
             }
-            if (checkerMaterial != null) checkerMaterial.SetFloat("_Progress", 0f);
-            if (fullScreenCheckerImage != null) fullScreenCheckerImage.gameObject.SetActive(false);
+            Destroy(dimmerObj);
 
             Debug.Log("[ScoreSettlement] Complete");
             onComplete?.Invoke();
