@@ -33,8 +33,8 @@ namespace KillingMahjong.UI
         {
             spriteRenderer = GetComponent<SpriteRenderer>();
 
-            // DialogueUI の参照を自動取得する
-            dialogueUI = FindFirstObjectByType<DialogueUI>();
+            // DialogueUI の参照を自動取得する（非アクティブ時も取得できるように修正）
+            dialogueUI = FindFirstObjectByType<DialogueUI>(FindObjectsInactive.Include);
 
             // EnemyInfoUI が未設定の場合、親階層から自動取得を試みる
             if (enemyInfoUI == null)
@@ -162,14 +162,13 @@ namespace KillingMahjong.UI
                 return;
             }
 
-            // びっくりリアクションを実行（3〜5秒後に元に戻る）
-            enemyInfoUI.PlaySurprisedReaction(Random.Range(3.0f, 5.0f));
+            // クリック時のリアクションを実行（顔変更とセリフ取得を同時に行う）
+            string clickDialogue = enemyInfoUI.PlayReaction(ReactionTrigger.Click, Random.Range(3.0f, 5.0f));
             
             // 1回上に跳ねるアニメーション（0.3秒間）
             enemyInfoUI.PlayBounceAnimation(0.3f);
 
-            // クリック時のリアクションセリフを表示する
-            string clickDialogue = enemyInfoUI.GetClickDialogue();
+            // 取得したセリフを表示する
             if (dialogueUI != null && clickDialogue != null)
             {
                 dialogueUI.ShowText(clickDialogue);

@@ -105,7 +105,9 @@ namespace KillingMahjong.Managers
                 // プレイヤーの打牌に対する敵の反応
                 if (dialogueUI != null)
                 {
-                    dialogueUI.ShowText("「プレイヤーが何かを捨てたな…」");
+                    string text = enemyInfoUI != null ? enemyInfoUI.PlayReaction(ReactionTrigger.PlayerDiscard, reactionDisplayDuration) : null;
+                    if (string.IsNullOrEmpty(text)) text = "「プレイヤーが何かを捨てたな…」";
+                    dialogueUI.ShowText(text);
                 }
                 
                 // プレイヤーは画面に出ないため、打牌時の画像変更処理を行わないようにする
@@ -125,7 +127,9 @@ namespace KillingMahjong.Managers
                 // 敵の打牌宣言
                 if (dialogueUI != null)
                 {
-                    dialogueUI.ShowText($"「{tileName}を切るわ！」");
+                    string text = enemyInfoUI != null ? enemyInfoUI.PlayReaction(ReactionTrigger.EnemyDiscard, reactionDisplayDuration, tileName) : null;
+                    if (string.IsNullOrEmpty(text)) text = $"「{tileName}を切るわ！」";
+                    dialogueUI.ShowText(text);
                 }
                 
                 if (enemyInfoUI != null) 

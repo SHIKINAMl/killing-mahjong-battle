@@ -619,7 +619,14 @@ namespace KillingMahjong.UI
                 RectTransform movedTile = wallUI.GrabTile(tileId);
                 if (movedTile != null)
                 {
+                    Vector3 startPos = movedTile.position;
                     handUI.AddTileToHand(movedTile, tileId);
+                    
+                    // アニメーションを再生
+                    if (this.gameObject.activeInHierarchy)
+                    {
+                        StartCoroutine(AnimateTileMovementRoutine(movedTile, startPos, 0.15f));
+                    }
                 }
             }
         }
@@ -641,11 +648,111 @@ namespace KillingMahjong.UI
 
             if (movedTile != null)
             {
+                Vector3 startPos = movedTile.position;
                 handUI.RemoveTileFromHand(movedTile, tileId);
                 // OriginalWallPosition は RebuildAllTilesFromState で全牌に設定済みのため
                 // ReturnTileToWall で元の位置へ正しく戻せる（再ソートなし）
                 wallUI.ReturnTileToWall(movedTile, tileId);
+
+                // アニメーションを再生
+                if (this.gameObject.activeInHierarchy)
+                {
+                    StartCoroutine(AnimateTileMovementRoutine(movedTile, startPos, 0.15f));
+                }
             }
+        }
+
+        /// <summary>
+        /// LayoutGroupの自動配置を邪魔せずに、一瞬だけダミーを飛ばすアニメーション
+        /// </summary>
+        private System.Collections.IEnumerator AnimateTileMovementRoutine(RectTransform realTile, Vector3 startWorldPos, float duration)
+        {
+            if (realTile == null) yield break;
+
+            // ダミー（ゴースト）を生成するCanvas
+            Canvas parentCanvas = GetComponentInParent<Canvas>();
+            if (parentCanvas == null) parentCanvas = FindFirstObjectByType<Canvas>();
+
+            // 移動元（startWorldPos）が3D空間座標だった場合の補正
+            // ※ startWorldPos は移動「前」の座標ですが、便宜上現在のメインカメラで変換します
+            if (parentCanvas.renderMode == RenderMode.ScreenSpaceOverlay)
+            {
+                Camera mainCam = Camera.main;
+                if (mainCam != null && startWorldPos.z != 0) // Z座標がある＝恐らく3D空間の座標
+                {
+                    Vector3 screenPos = mainCam.WorldToScreenPoint(startWorldPos);
+                    RectTransformUtility.ScreenPointToWorldPointInRectangle(
+                        parentCanvas.transform as RectTransform, 
+                        screenPos, 
+                        null, 
+                        out startWorldPos
+                    );
+                }
+            }
+
+            // 移動直後の1フレームだけ変な位置に表示されるのを防ぐため、即座に透明にする
+            var canvasGroup = realTile.GetComponent<CanvasGroup>();
+            if (canvasGroup == null) canvasGroup = realTile.gameObject.AddComponent<CanvasGroup>();
+            canvasGroup.alpha = 0f;
+
+            // UnityのCanvasが自然にレイアウト計算を完了するまでフレーム末まで待つ（これで確実な targetWorldPos が取れる）
+            yield return new WaitForEndOfFrame();
+            
+            if (realTile == null) yield break;
+
+            Vector3 targetWorldPos = realTile.position;
+            Canvas targetCanvas = realTile.GetComponentInParent<Canvas>();
+
+            // 牌がUI(Overlay)ではなく、WorldSpace(3D空間)にある場合の座標ズレ（左下に行く現象）を修正
+            if (targetCanvas == null || targetCanvas.renderMode != RenderMode.ScreenSpaceOverlay)
+            {
+                Camera cam = Camera.main;
+                if (targetCanvas != null && targetCanvas.worldCamera != null) cam = targetCanvas.worldCamera;
+
+                if (cam != null)
+                {
+                    // 3D空間の座標を一旦スクリーン（画面）の2Dピクセル座標に変換
+                    Vector3 screenPos = cam.WorldToScreenPoint(realTile.position);
+                    
+                    // スクリーン座標から、ダミーアニメーションを再生するCanvas上の座標に再変換
+                    RectTransformUtility.ScreenPointToWorldPointInRectangle(
+                        parentCanvas.transform as RectTransform, 
+                        screenPos, 
+                        parentCanvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : parentCanvas.worldCamera, 
+                        out targetWorldPos
+                    );
+                }
+            }
+
+            GameObject ghost = Instantiate(realTile.gameObject, parentCanvas.transform);
+            
+            // ゴーストから不要な当たり判定やスクリプトを削除
+            Destroy(ghost.GetComponent<TileInteraction>());
+            Destroy(ghost.GetComponent<UnityEngine.EventSystems.EventTrigger>());
+
+            var ghostCanvasGroup = ghost.GetComponent<CanvasGroup>();
+            if (ghostCanvasGroup != null) ghostCanvasGroup.alpha = 1f;
+
+            ghost.transform.SetAsLastSibling();
+
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+                // イーズアウト（徐々に減速）
+                t = 1f - (1f - t) * (1f - t);
+
+                ghost.transform.position = Vector3.Lerp(startWorldPos, targetWorldPos, t);
+                yield return null;
+            }
+
+            // 終了処理
+            if (realTile != null)
+            {
+                canvasGroup.alpha = 1f;
+            }
+            Destroy(ghost);
         }
 
         public void HandleDiscardEvent(int discardedTileId, bool isLocalPlayer)
@@ -672,10 +779,8 @@ namespace KillingMahjong.UI
                     RectTransform tileRt = wallUI.GrabTile(discardedTileId);
                     if (tileRt != null) Destroy(tileRt.gameObject);
                     
-                    List<RectTransform> remainingTiles = new List<RectTransform>();
-                    foreach (var st in wallUI.GetWallSlots()) if (st != null) remainingTiles.Add(st);
-                    
-                    wallUI.LayoutWallTiles(remainingTiles, BoardStateManager.Instance.CurrentWallTiles, BoardStateManager.Instance.CurrentWaitTiles, currentPhaseStatus == RoundStatus.Discard);
+                    // 打牌ごとに整列し直すと、牌が詰まってしまい元の位置からズレるため、ハイライト更新のみ行う
+                    wallUI.UpdateWallHighlights(BoardStateManager.Instance.CurrentWaitTiles, currentPhaseStatus == RoundStatus.Discard);
                 }
 
                 if (riverUI != null) riverUI.AddTile(discardedTileId);
@@ -756,9 +861,8 @@ namespace KillingMahjong.UI
             if (dialogueUI != null) 
             {
                 dialogueUI.gameObject.SetActive(true);
-                string introText = (enemyInfoUI != null && enemyInfoUI.GetIntroductionDialogue() != null) 
-                                   ? enemyInfoUI.GetIntroductionDialogue() 
-                                   : "Match Found! Game Starting...";
+                string introText = (enemyInfoUI != null) ? enemyInfoUI.PlayReaction(ReactionTrigger.GameStart) : null;
+                if (string.IsNullOrEmpty(introText)) introText = "Match Found! Game Starting...";
                 dialogueUI.ShowText(introText);
             }
             if (playerInfoUI != null) playerInfoUI.SetHP(20000);
@@ -1010,10 +1114,11 @@ namespace KillingMahjong.UI
                  if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
 
                  phaseTransitionUI.PlayTransition(roundString, playerInfoUI, playerBet, enemyBet, playerHp, enemyHp,
-                    onMidpoint: () => {},
-                    onComplete: () => {
-                         isTransitioning = false;
+                    onMidpoint: () => {
                          SetMatchUIVisibility(true); 
+                         
+                         // 一時的に isTransitioning を false にして HandlePhaseVisibility が実行されるようにする
+                         isTransitioning = false;
                          
                          if (currentPhaseStatus == RoundStatus.Betting)
                          {
@@ -1022,8 +1127,16 @@ namespace KillingMahjong.UI
 
                          HandlePhaseVisibility(currentPhaseStatus);
                          
+                         // すぐに isTransitioning を true に戻す
+                         isTransitioning = true;
+                         
                          if (playerInfoUI != null) playerInfoUI.SetHP(Managers.BoardStateManager.Instance.LocalPlayerHp);
                          if (enemyInfoUI != null) enemyInfoUI.SetHP(Managers.BoardStateManager.Instance.EnemyPlayerHp);
+                    },
+                    onComplete: () => {
+                         isTransitioning = false;
+                         
+                         HandlePhaseVisibility(currentPhaseStatus);
                          
                          if (dialogueUI != null) dialogueUI.gameObject.SetActive(true);
                     }
@@ -1043,7 +1156,12 @@ namespace KillingMahjong.UI
             // ローカルで再生済みのため、ここでは待機テキストの表示のみ行う
             if (handUI != null && handUI.IsSubmitted) 
             {
-                if (dialogueUI != null) dialogueUI.ShowText("相手の手牌選択を待っています...");
+                if (dialogueUI != null) 
+                {
+                    string text = (enemyInfoUI != null) ? enemyInfoUI.PlayReaction(ReactionTrigger.HandSelection) : null;
+                    if (string.IsNullOrEmpty(text)) text = "相手の手牌選択を待っています...";
+                    dialogueUI.ShowText(text);
+                }
             }
             HandlePhaseVisibility(currentPhaseStatus);
             if (handUI != null) handUI.UpdateLayout(currentPhaseStatus);
@@ -1137,9 +1255,8 @@ namespace KillingMahjong.UI
                 if (dialogueUI != null)
                 {
                     dialogueUI.gameObject.SetActive(true);
-                    string loseText = (enemyInfoUI != null && enemyInfoUI.GetLoseDialogue() != null) 
-                                       ? enemyInfoUI.GetLoseDialogue() 
-                                       : "「ロン！」";
+                    string loseText = (enemyInfoUI != null) ? enemyInfoUI.PlayReaction(ReactionTrigger.Lose) : null;
+                    if (string.IsNullOrEmpty(loseText)) loseText = "「ロン！」";
                     dialogueUI.ShowText(loseText);
                 }
             }
@@ -1149,9 +1266,8 @@ namespace KillingMahjong.UI
                 if (dialogueUI != null)
                 {
                     dialogueUI.gameObject.SetActive(true);
-                    string winText = (enemyInfoUI != null && enemyInfoUI.GetWinDialogue() != null) 
-                                      ? enemyInfoUI.GetWinDialogue() 
-                                      : "「ロンよ！」";
+                    string winText = (enemyInfoUI != null) ? enemyInfoUI.PlayReaction(ReactionTrigger.Win) : null;
+                    if (string.IsNullOrEmpty(winText)) winText = "「ロンよ！」";
                     dialogueUI.ShowText(winText);
                 }
             }

@@ -86,40 +86,51 @@ namespace KillingMahjong.UI
             }
         }
 
-        public string GetClickDialogue()
+        public string PlayReaction(ReactionTrigger trigger, float duration = 3.0f, string formatArg = "")
         {
-            if (characterData != null && !string.IsNullOrEmpty(characterData.clickDialogue))
+            if (characterData == null || characterData.reactions == null || characterData.reactions.Count == 0)
+                return null;
+
+            // 条件に合うリアクションを全て抽出
+            var matches = characterData.reactions.FindAll(r => r.trigger == trigger);
+            if (matches.Count == 0) return null;
+
+            // ランダムに1つ選ぶ
+            var reaction = matches[Random.Range(0, matches.Count)];
+
+            // 画像が設定されていれば一時的に変更
+            if (reaction.faceSprite != null)
             {
-                return $"「{characterData.clickDialogue}」";
+                if (reactionCoroutine != null) StopCoroutine(reactionCoroutine);
+                reactionCoroutine = StartCoroutine(TemporaryFaceRoutine(reaction.faceSprite, duration));
             }
-            return null;
+
+            string text = reaction.dialogueText;
+            Debug.Log($"[EnemyInfoUI] PlayReaction: trigger={trigger}, matchFound=true, dialogueText='{text}'");
+            
+            if (!string.IsNullOrEmpty(formatArg) && !string.IsNullOrEmpty(text))
+            {
+                text = string.Format(text, formatArg);
+            }
+
+            return string.IsNullOrEmpty(text) ? null : $"「{text}」";
         }
 
-        public string GetIntroductionDialogue()
+        private System.Collections.IEnumerator TemporaryFaceRoutine(Sprite newSprite, float duration)
         {
-            if (characterData != null && !string.IsNullOrEmpty(characterData.introductionDialogue))
+            if (characterRenderer != null && newSprite != null)
             {
-                return $"「{characterData.introductionDialogue}」";
+                characterRenderer.sprite = newSprite;
             }
-            return null;
-        }
 
-        public string GetWinDialogue()
-        {
-            if (characterData != null && !string.IsNullOrEmpty(characterData.winDialogue))
-            {
-                return $"「{characterData.winDialogue}」";
-            }
-            return null;
-        }
+            yield return new WaitForSeconds(duration);
 
-        public string GetLoseDialogue()
-        {
-            if (characterData != null && !string.IsNullOrEmpty(characterData.loseDialogue))
+            if (characterRenderer != null && normalSprite != null)
             {
-                return $"「{characterData.loseDialogue}」";
+                characterRenderer.sprite = normalSprite;
             }
-            return null;
+            
+            reactionCoroutine = null;
         }
 
         public void SetHP(int hp)
@@ -164,38 +175,6 @@ namespace KillingMahjong.UI
                     characterRenderer.sprite = targetNormalSprite;
                 }
             }
-        }
-
-        /// <summary>
-        /// びっくりした顔に変更し、指定時間後に元に戻す
-        /// </summary>
-        public void PlaySurprisedReaction(float duration)
-        {
-            if (characterData == null) return;
-            
-            if (reactionCoroutine != null)
-            {
-                StopCoroutine(reactionCoroutine);
-            }
-            
-            reactionCoroutine = StartCoroutine(SurprisedRoutine(duration));
-        }
-
-        private System.Collections.IEnumerator SurprisedRoutine(float duration)
-        {
-            if (characterRenderer != null && characterData.surprisedSprite != null)
-            {
-                characterRenderer.sprite = characterData.surprisedSprite;
-            }
-
-            yield return new WaitForSeconds(duration);
-
-            if (characterRenderer != null && normalSprite != null)
-            {
-                characterRenderer.sprite = normalSprite;
-            }
-            
-            reactionCoroutine = null;
         }
 
         public void PlayBounceAnimation(float duration)

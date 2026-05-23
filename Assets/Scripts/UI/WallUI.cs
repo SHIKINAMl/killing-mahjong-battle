@@ -324,5 +324,19 @@ namespace KillingMahjong.UI
                 );
             }
         }
+
+        public void UpdateWallHighlights(List<int> waitTiles, bool isDiscardPhase)
+        {
+            foreach (var slot in wallSlots)
+            {
+                if (slot == null) continue;
+                var visual = slot.GetComponent<TileVisual>();
+                var interaction = slot.GetComponent<TileInteraction>();
+                if (visual != null && interaction != null && waitTiles != null)
+                {
+                    visual.SetFuritenHighlight(isDiscardPhase && waitTiles.Contains(interaction.TileId));
+                }
+            }
+        }
     }
 }
