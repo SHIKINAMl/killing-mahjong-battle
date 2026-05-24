@@ -64,6 +64,7 @@ namespace KillingMahjong.UI
                 reaction.Setup(dialogueUI, enemyInfoUI, playerInfoUI);
             }
             if (NetworkMessageHandler.Instance == null) gameObject.AddComponent<NetworkMessageHandler>();
+            if (Managers.DialogueManager.Instance == null) gameObject.AddComponent<Managers.DialogueManager>();
         }
 
         private void SubscribeEvents()
@@ -161,6 +162,7 @@ namespace KillingMahjong.UI
                 confirmationDialogUI.ShowDialog(
                     message,
                     () => {
+                        if (ReactionController.Instance != null) ReactionController.Instance.StopHandSelectionTimer(true);
                         _autoConfirmNextHandSelection = true;
                         if (handUI != null) handUI.SetSubmittedState(true);
                         if (waitUI != null) waitUI.MoveToOriginalPosition();
@@ -194,6 +196,7 @@ namespace KillingMahjong.UI
             else
             {
                 if (waitUI != null) waitUI.MoveToOriginalPosition();
+                if (ReactionController.Instance != null) ReactionController.Instance.StopHandSelectionTimer(true);
                 _autoConfirmNextHandSelection = true;
                 if (handUI != null) handUI.SetSubmittedState(true);
 
@@ -223,6 +226,7 @@ namespace KillingMahjong.UI
                 confirmationDialogUI.ShowDialog(
                     message,
                     () => {
+                        if (ReactionController.Instance != null) ReactionController.Instance.StopHandSelectionTimer(true);
                         _autoConfirmNextHandSelection = true;
                         if (handUI != null) handUI.SetSubmittedState(true);
 
@@ -248,6 +252,7 @@ namespace KillingMahjong.UI
             }
             else
             {
+                if (ReactionController.Instance != null) ReactionController.Instance.StopHandSelectionTimer(true);
                 _autoConfirmNextHandSelection = true;
                 if (handUI != null) handUI.SetSubmittedState(true);
 
@@ -279,7 +284,8 @@ namespace KillingMahjong.UI
 
             if (handUI != null) handUI.SetSubmittedState(false);
             if (waitUI != null) waitUI.gameObject.SetActive(false);
-            if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
+            // 常に表示させるためコメントアウト
+            // if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
         }
 
         private void SetupUI()
@@ -288,7 +294,8 @@ namespace KillingMahjong.UI
             if (wallUI != null) wallUI.Setup(this);
             if (enemyWallUI != null) enemyWallUI.Setup(this);
             if (waitUI != null) waitUI.gameObject.SetActive(false);
-            if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
+            // 常に表示させるためコメントアウト
+            // if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
             
             SetMatchUIVisibility(false);
             if (riverUI != null) riverUI.gameObject.SetActive(false);
@@ -807,8 +814,7 @@ namespace KillingMahjong.UI
                 }
             }
 
-            string tileName = new TileData(discardedTileId).GetTileName();
-            ReactionController.Instance.EnqueueDiscardReaction(discardedTileId, isLocalPlayer, tileName);
+            ReactionController.Instance.CheckDiscardConditions(discardedTileId, isLocalPlayer);
         }
 
         public void ClearAllTiles()
@@ -848,7 +854,8 @@ namespace KillingMahjong.UI
             if (enemyRiverUI != null) enemyRiverUI.gameObject.SetActive(false);
             if (enemyHandUI != null) enemyHandUI.gameObject.SetActive(false);
             if (waitUI != null) waitUI.gameObject.SetActive(false);
-            if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
+            // 常に表示させるためコメントアウト
+            // if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
             
             if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(false);
             if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(false);
@@ -862,6 +869,13 @@ namespace KillingMahjong.UI
         public void OnGameStarted()
         {
             _currentRoundIndex = 1;
+            if (ReactionController.Instance != null)
+            {
+                ReactionController.Instance.ResetStateForNewGame();
+                ReactionController.Instance.SetPlayerHp(20000);
+                ReactionController.Instance.SetEnemyHp(20000);
+                ReactionController.Instance.HandleRoundStart(1);
+            }
             if (matchmakingUI != null)
             {
                 matchmakingUI.Hide();
@@ -960,6 +974,11 @@ namespace KillingMahjong.UI
                     if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(true);
                     if (waitUI != null) waitUI.gameObject.SetActive(false);
                     if (abilityUI != null) abilityUI.gameObject.SetActive(false);
+                    
+                    if (ReactionController.Instance != null)
+                    {
+                        ReactionController.Instance.PlayDealingReaction();
+                    }
                     break;
                 case RoundStatus.HandSelection:
                     SetMatchUIVisibility(true);
@@ -968,6 +987,10 @@ namespace KillingMahjong.UI
                     if (waitUI != null) waitUI.gameObject.SetActive(false);
                     if (abilityUI != null) abilityUI.gameObject.SetActive(true);
                     UpdateDoraDisplay();
+                    if (ReactionController.Instance != null)
+                    {
+                        ReactionController.Instance.StartHandSelectionTimer();
+                    }
                     break;
                 case RoundStatus.TurnDecision:
                     if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(false);
@@ -1090,12 +1113,20 @@ namespace KillingMahjong.UI
             if (bettingUI != null)
             {
                 bettingUI.ShowBettingPhase(20000, currentHealth, OnBetConfirmed);
+                if (ReactionController.Instance != null)
+                {
+                    ReactionController.Instance.StartBetPhaseTimer();
+                }
             }
         }
 
         private void OnBetConfirmed(int betAmount)
         {
             bettingUI.HideBettingPhase();
+            if (ReactionController.Instance != null)
+            {
+                ReactionController.Instance.CheckAndPlayBetReaction(betAmount, Managers.BoardStateManager.Instance.LocalPlayerHp, true);
+            }
             SendActionToServer("bet", new ActionPayload { bet_amount = betAmount, amount = betAmount });
         }
 
@@ -1107,6 +1138,13 @@ namespace KillingMahjong.UI
             if (_isCarryOverNextRound) 
             {
                 roundTitle += "\n自動ベット";
+            }
+
+            if (ReactionController.Instance != null)
+            {
+                ReactionController.Instance.CheckAndPlayBetReaction(enemyBet, enemyHp, false);
+                ReactionController.Instance.SetPlayerHp(playerHp);
+                ReactionController.Instance.SetEnemyHp(enemyHp);
             }
             
             TriggerBettingAnimationPhase(roundTitle, playerBet, enemyBet, playerHp, enemyHp); 
@@ -1194,6 +1232,12 @@ namespace KillingMahjong.UI
             Debug.Log("[GameUIManager] 流局処理開始");
             _isCarryOverNextRound = true;
             _currentRoundIndex++;
+            if (ReactionController.Instance != null)
+            {
+                ReactionController.Instance.SetCurrentRound(_currentRoundIndex);
+                ReactionController.Instance.CheckAndPlayDrawReaction();
+                ReactionController.Instance.HandleRoundStart(_currentRoundIndex);
+            }
 
             if (phaseTransitionUI != null)
             {
@@ -1249,6 +1293,14 @@ namespace KillingMahjong.UI
             if (ReactionController.Instance != null)
             {
                 ReactionController.Instance.ClearReactions();
+                
+                bool isYakuman = rank == "役満";
+                bool isDoraBaku = false;
+                foreach (var y in yaku) if (y.Contains("ドラ") && y.Contains("3") || y.Contains("4") || y.Contains("5")) isDoraBaku = true; // 簡易ドラ判定
+                bool isCheap = formula == "1飜" || formula == "2飜";
+                
+                ReactionController.Instance.HandleAgari(isLocalWin, isYakuman, isDoraBaku, isCheap);
+                ReactionController.Instance.SetPlayerLostLastRound(!isLocalWin);
             }
 
             if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(true);
@@ -1310,6 +1362,12 @@ namespace KillingMahjong.UI
         private void OnRonAnimationComplete(bool isLocalWin)
         {
             _currentRoundIndex++;
+            if (ReactionController.Instance != null)
+            {
+                ReactionController.Instance.SetCurrentRound(_currentRoundIndex);
+                ReactionController.Instance.HandleGameEnd(isLocalWin);
+                ReactionController.Instance.HandleRoundStart(_currentRoundIndex);
+            }
             // ロン演出の黒背景を閉じた後、点数精算演出を開始する
             var liq = Managers.BoardStateManager.Instance.LastLiquidationData;
             int newLocalHp = Managers.BoardStateManager.Instance.LocalPlayerHp;

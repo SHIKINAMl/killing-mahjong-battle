@@ -162,16 +162,36 @@ namespace KillingMahjong.UI
                 return;
             }
 
-            // クリック時のリアクションを実行（顔変更とセリフ取得を同時に行う）
-            string clickDialogue = enemyInfoUI.PlayReaction(ReactionTrigger.Click, Random.Range(3.0f, 5.0f));
+            int randomIdx = Random.Range(1, 21); // 1〜20
+            string condition = $"クリックされた時{randomIdx}";
+            var entry = Managers.DialogueManager.Instance.GetDialogueEntry(condition);
             
-            // 1回上に跳ねるアニメーション（0.3秒間）
-            enemyInfoUI.PlayBounceAnimation(0.3f);
-
-            // 取得したセリフを表示する
-            if (dialogueUI != null && clickDialogue != null)
+            if (entry != null)
             {
-                dialogueUI.ShowText(clickDialogue);
+                if (dialogueUI != null && !string.IsNullOrEmpty(entry.Dialogue1))
+                {
+                    dialogueUI.ShowText(entry.Dialogue1.Contains("「") ? entry.Dialogue1 : $"「{entry.Dialogue1}」");
+                }
+                
+                Sprite faceSprite = Managers.DialogueManager.Instance.GetExpressionSprite(entry.Expression);
+                if (faceSprite != null) 
+                {
+                    enemyInfoUI.PlayReactionWithFace(faceSprite, Random.Range(3.0f, 5.0f));
+                }
+                else 
+                {
+                    enemyInfoUI.PlayBounceAnimation(0.3f);
+                }
+            }
+            else
+            {
+                // フォールバック
+                string clickDialogue = enemyInfoUI.PlayReaction(ReactionTrigger.Click, Random.Range(3.0f, 5.0f));
+                enemyInfoUI.PlayBounceAnimation(0.3f);
+                if (dialogueUI != null && clickDialogue != null)
+                {
+                    dialogueUI.ShowText(clickDialogue);
+                }
             }
         }
 

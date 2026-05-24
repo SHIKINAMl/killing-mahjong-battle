@@ -133,6 +133,13 @@ namespace KillingMahjong.UI
             reactionCoroutine = null;
         }
 
+        public void PlayReactionWithFace(Sprite faceSprite, float duration)
+        {
+            if (reactionCoroutine != null) StopCoroutine(reactionCoroutine);
+            reactionCoroutine = StartCoroutine(TemporaryFaceRoutine(faceSprite, duration));
+            PlayBounceAnimation(duration);
+        }
+
         public void SetHP(int hp)
         {
             if (hpText != null)
