@@ -467,7 +467,7 @@ class GameEngine:
             ):
                 return True
 
-        if len(discarding_player.discards) >= 13:  # 13枚以上捨てたら流局
+        if len(discarding_player.discards) >= 16:  # 16枚以上捨てたら流局
             logger.info("流局: player=%s  discards=%d", player_id, len(discarding_player.discards))
             self.end_round(is_draw=True)
             return False
