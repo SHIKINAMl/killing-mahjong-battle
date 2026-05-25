@@ -18,6 +18,8 @@ namespace KillingMahjong.UI
         private Vector3 _originalPosition;
         private Transform _originalParent;
 
+        private TileVisual _tileVisual;
+
         public void Initialize(int tileId, bool isInHand, GameUIManager manager, Canvas canvas)
         {
             TileId = tileId;
@@ -27,6 +29,7 @@ namespace KillingMahjong.UI
             _rectTransform = GetComponent<RectTransform>();
             _canvasGroup = GetComponent<CanvasGroup>();
             if (_canvasGroup == null) _canvasGroup = gameObject.AddComponent<CanvasGroup>();
+            _tileVisual = GetComponent<TileVisual>();
         }
 
         public void OnPointerClick(PointerEventData eventData)
@@ -76,14 +79,6 @@ namespace KillingMahjong.UI
             _originalParent = transform.parent;
             
             _canvasGroup.blocksRaycasts = false;
-            
-            // Lift up visually?
-            // If World Object, this might behave differently than UI.
-            // Assuming UI because user mentioned "HandUI...HorizontalLayout".
-            // But WallUI is 3D world?
-            // "Transform" slots imply mixed usage or World usage.
-            // If World Object, IDragHandler requires PhysicsRaycaster on Camera.
-            // Let's assume standard EventSystem setup handles it if Colliders/Images present.
         }
 
         public void OnDrag(PointerEventData eventData)
@@ -117,33 +112,27 @@ namespace KillingMahjong.UI
             _canvasGroup.blocksRaycasts = true;
 
             // Hit Detection
-            // We need to check if dropped on Hand Area.
             bool droppedInHand = _gameUIManager.IsPointerInHandArea(eventData.position);
 
             if (IsInHand)
             {
                 if (!droppedInHand)
                 {
-                    // Dragged OUT of Hand -> Move to Wall
                     _gameUIManager.MoveTileToWall(TileId);
                 }
                 else
                 {
-                    // Dropped inside Hand -> Just reorder? Or reset.
-                    // For now, reset position (LayoutGroup will handle it)
                     ReturnToOriginal();
                 }
             }
-            else // In Wall
+            else
             {
                 if (droppedInHand)
                 {
-                    // Dragged INTO Hand -> Move to Hand
                     _gameUIManager.MoveTileToHand(TileId);
                 }
                 else
                 {
-                    // Dropped elsewhere -> Return
                     ReturnToOriginal();
                 }
             }
@@ -158,11 +147,13 @@ namespace KillingMahjong.UI
         public void OnPointerEnter(PointerEventData eventData)
         {
             IsHovered = true;
+            if (_tileVisual != null) _tileVisual.SetHoverHighlight(true);
         }
 
         public void OnPointerExit(PointerEventData eventData)
         {
             IsHovered = false;
+            if (_tileVisual != null) _tileVisual.SetHoverHighlight(false);
         }
     }
 }

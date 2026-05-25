@@ -40,6 +40,7 @@ namespace KillingMahjong.UI
 
             discardedTiles.Add(rt);
             UpdateTurnText();
+            UpdateSiblingOrder();
         }
 
         public void AddTile(int tileId)
@@ -61,6 +62,7 @@ namespace KillingMahjong.UI
 
             discardedTiles.Add(obj.transform);
             UpdateTurnText();
+            UpdateSiblingOrder();
         }
 
         private void ApplyRiverLayout(RectTransform rt)
@@ -90,6 +92,40 @@ namespace KillingMahjong.UI
                 rt.localScale = Vector3.one;
 
                 rt.localRotation = Quaternion.identity;
+            }
+        }
+
+        /// <summary>
+        /// 行ごとのSiblingIndex（描画順）を再設定する。
+        /// 手前（自分）: 2列目が1列目より前面（上レイヤー）
+        /// 奥（敵）: 2列目が1列目より背面（下レイヤー）
+        /// </summary>
+        private void UpdateSiblingOrder()
+        {
+            if (discardedTiles.Count == 0) return;
+
+            List<Transform> row0 = new List<Transform>();
+            List<Transform> row1 = new List<Transform>();
+
+            for (int i = 0; i < discardedTiles.Count; i++)
+            {
+                int row = i / maxPerRow;
+                if (row == 0) row0.Add(discardedTiles[i]);
+                else row1.Add(discardedTiles[i]);
+            }
+
+            int sibIdx = 0;
+            if (isEnemyRiver)
+            {
+                // 敵の河: 2列目を先（奥＝背面）、1列目を後（手前＝前面）
+                foreach (var t in row1) t.SetSiblingIndex(sibIdx++);
+                foreach (var t in row0) t.SetSiblingIndex(sibIdx++);
+            }
+            else
+            {
+                // 自分の河: 1列目を先（奥＝背面）、2列目を後（手前＝前面）
+                foreach (var t in row0) t.SetSiblingIndex(sibIdx++);
+                foreach (var t in row1) t.SetSiblingIndex(sibIdx++);
             }
         }
 

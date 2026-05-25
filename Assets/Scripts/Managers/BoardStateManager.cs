@@ -324,7 +324,13 @@ namespace KillingMahjong.Managers
 
         private List<int> SortTileIds(List<int> ids)
         {
-            ids.Sort();
+            ids.Sort((a, b) =>
+            {
+                int baseA = a & 0x1F;
+                int baseB = b & 0x1F;
+                if (baseA != baseB) return baseA.CompareTo(baseB);
+                return a.CompareTo(b);
+            });
             return ids;
         }
     }

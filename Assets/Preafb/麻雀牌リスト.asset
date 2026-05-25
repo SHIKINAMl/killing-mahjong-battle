@@ -12,6 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6ae873ee100317c489ad3c05c35ca401, type: 3}
   m_Name: "\u9EBB\u96C0\u724C\u30EA\u30B9\u30C8"
   m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.TileResourceManager
+  backTileSprite: {fileID: 21300000, guid: 2661b7486685a03469c65bb20069e952, type: 3}
   tileSprites:
   - {fileID: 21300000, guid: 661140b19eec38a4e8bfc9a72dbdbbc2, type: 3}
   - {fileID: 21300000, guid: bc31fe9e168e2d5448961816ed428bbb, type: 3}

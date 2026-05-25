@@ -71,8 +71,10 @@ namespace KillingMahjong.UI
             this.initialMoney = initialHp;
             this.currentMoney = currentHp;
             this.maxBet = Mathf.FloorToInt(initialHp * maxBetRatio);
-            this.currentBet = 0; // Reset bet
+            this.currentBet = bettingUnit; // Reset bet to minimum (200)
             this.onConfirmAction = onConfirm;
+            
+            if (confirmButton != null) confirmButton.interactable = true;
 
             gameObject.SetActive(true);
             UpdateUI();
@@ -131,7 +133,7 @@ namespace KillingMahjong.UI
 
         private void DecreaseBet()
         {
-            if (currentBet - bettingUnit >= 0)
+            if (currentBet - bettingUnit >= bettingUnit)
             {
                 currentBet -= bettingUnit;
                 UpdateUI();
@@ -155,7 +157,7 @@ namespace KillingMahjong.UI
             
             // Disable buttons appropriately
             increaseBetButton.interactable = (currentBet + bettingUnit <= maxBet && currentBet + bettingUnit <= currentMoney);
-            decreaseBetButton.interactable = (currentBet - bettingUnit >= 0);
+            decreaseBetButton.interactable = (currentBet - bettingUnit >= bettingUnit);
         }
 
         private void ConfirmBet()
