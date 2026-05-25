@@ -19,6 +19,7 @@ namespace KillingMahjong.Managers
         // UIの参照（シーン上でセットアップするか自動取得する）
         public DialogueUI dialogueUI;
         public EnemyInfoUI enemyInfoUI;
+        public PlayerInfoUI playerInfoUI;
 
         private Queue<Action> reactionQueue = new Queue<Action>();
         private bool isProcessingReactions = false;
@@ -32,12 +33,20 @@ namespace KillingMahjong.Managers
             }
         }
 
-        public void Setup(DialogueUI dialogueUI, EnemyInfoUI enemyInfoUI)
+        public void Setup(DialogueUI dialogueUI, EnemyInfoUI enemyInfoUI, PlayerInfoUI playerInfoUI)
         {
             this.dialogueUI = dialogueUI;
             this.enemyInfoUI = enemyInfoUI;
+            this.playerInfoUI = playerInfoUI;
             reactionQueue.Clear();
             isProcessingReactions = false;
+        }
+
+        public void ClearReactions()
+        {
+            reactionQueue.Clear();
+            isProcessingReactions = false;
+            StopAllCoroutines();
         }
 
         /// <summary>
@@ -91,8 +100,6 @@ namespace KillingMahjong.Managers
 
         private IEnumerator ProcessDiscardEvent(int tileId, bool isLocalPlayer, string tileName)
         {
-            Sprite reactionSprite = null; // 本来はResources等から取得すべき画像
-
             if (isLocalPlayer)
             {
                 // プレイヤーの打牌に対する敵の反応
@@ -101,9 +108,15 @@ namespace KillingMahjong.Managers
                     dialogueUI.ShowText("「プレイヤーが何かを捨てたな…」");
                 }
                 
-                if (enemyInfoUI != null && reactionSprite != null) 
+                if (playerInfoUI != null) 
                 {
-                    enemyInfoUI.SetCharacterSprite(reactionSprite);
+                    playerInfoUI.SetDiscardingState(true);
+                }
+                
+                // 喋っているのは敵なので敵を跳ねさせる
+                if (enemyInfoUI != null)
+                {
+                    enemyInfoUI.PlayBounceAnimation(reactionDisplayDuration);
                 }
             }
             else
@@ -114,14 +127,18 @@ namespace KillingMahjong.Managers
                     dialogueUI.ShowText($"「{tileName}を切るわ！」");
                 }
                 
-                if (enemyInfoUI != null && reactionSprite != null) 
+                if (enemyInfoUI != null) 
                 {
-                    enemyInfoUI.SetCharacterSprite(reactionSprite);
+                    enemyInfoUI.SetDiscardingState(true);
+                    enemyInfoUI.PlayBounceAnimation(reactionDisplayDuration);
                 }
             }
 
             // ログが開かれている間は時間のカウントを一時停止して待つ
             yield return StartCoroutine(WaitWhileLogIsOpen(reactionDisplayDuration));
+
+            if (playerInfoUI != null) playerInfoUI.SetDiscardingState(false);
+            if (enemyInfoUI != null) enemyInfoUI.SetDiscardingState(false);
 
             ProcessNextReaction();
         }

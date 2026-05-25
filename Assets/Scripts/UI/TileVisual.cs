@@ -52,19 +52,40 @@ namespace KillingMahjong.UI
         
         public int GetId() => _currentId;
 
+        private bool _isFuriten = false;
+        private bool _isHovered = false;
+
         public void SetFuritenHighlight(bool isFuriten)
+        {
+            _isFuriten = isFuriten;
+            UpdateOutline();
+            
+            if (spriteRenderer != null)
+            {
+                if (_isFuriten) spriteRenderer.color = Color.red;
+                else spriteRenderer.color = Color.white;
+            }
+        }
+
+        public void SetHoverHighlight(bool isHovered)
+        {
+            _isHovered = isHovered;
+            UpdateOutline();
+        }
+
+        private void UpdateOutline()
         {
             if (uiImage != null)
             {
                 var outline = uiImage.GetComponent<UnityEngine.UI.Outline>();
-                if (isFuriten)
+                if (_isFuriten || _isHovered)
                 {
                     if (outline == null)
                     {
                         outline = uiImage.gameObject.AddComponent<UnityEngine.UI.Outline>();
                         outline.effectDistance = new Vector2(3, 3);
                     }
-                    outline.effectColor = Color.red;
+                    outline.effectColor = _isHovered ? Color.yellow : Color.red;
                     outline.enabled = true;
                 }
                 else
@@ -72,10 +93,21 @@ namespace KillingMahjong.UI
                     if (outline != null) outline.enabled = false;
                 }
             }
+        }
+
+        public void SetAlpha(float alpha)
+        {
+            if (uiImage != null)
+            {
+                var c = uiImage.color;
+                c.a = alpha;
+                uiImage.color = c;
+            }
             else if (spriteRenderer != null)
             {
-                if (isFuriten) spriteRenderer.color = Color.red;
-                else spriteRenderer.color = Color.white;
+                var c = spriteRenderer.color;
+                c.a = alpha;
+                spriteRenderer.color = c;
             }
         }
     }

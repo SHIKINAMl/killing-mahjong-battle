@@ -20,6 +20,7 @@ namespace KillingMahjong.EngineData
         Liquidation,
         Agari,
         Ron,
+        Draw,
         Result
     }
 
@@ -47,6 +48,8 @@ namespace KillingMahjong.EngineData
                 case "agari": return RoundStatus.Agari;
                 case "ron": return RoundStatus.Ron;
                 case "result": return RoundStatus.Result;
+                case "draw": return RoundStatus.Draw;
+                case "round_end_waiting": return RoundStatus.Result;
                 default: return RoundStatus.None;
             }
         }
@@ -64,6 +67,7 @@ namespace KillingMahjong.EngineData
                 case RoundStatus.Agari: return "agari";
                 case RoundStatus.Ron: return "ron";
                 case RoundStatus.Result: return "result";
+                case RoundStatus.Draw: return "draw";
                 default: return "none";
             }
         }

@@ -3,6 +3,7 @@ using UnityEngine.UI;
 using TMPro;
 using System.Collections;
 using System;
+using KillingMahjong.Network;
 
 namespace KillingMahjong.UI
 {
@@ -29,9 +30,96 @@ namespace KillingMahjong.UI
         [SerializeField] private float checkerFadeDuration = 1.0f;
         [SerializeField] private float hpDeductionDuration = 1.5f;
 
+        [Header("Loading UI Settings")]
+        [SerializeField] private Vector2 loadingTextPosition = new Vector2(-50, 50);
+        [SerializeField] private Color loadingTextColor = Color.white;
+
+        private bool isWaitingForDeal = false;
+        private float dealWaitTimer = 0f;
+        private TextMeshProUGUI loadingText;
+
         private void Start()
         {
+            // UIの被り対策: トランジション演出を最前面に表示するためCanvasを追加してSortingOrderを高く設定
+            Canvas canvas = GetComponent<Canvas>();
+            if (canvas == null)
+            {
+                canvas = gameObject.AddComponent<Canvas>();
+            }
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = 10000; // 最前面に設定
+            
+            // レイキャストを有効にする場合（必要に応じて）
+            UnityEngine.UI.GraphicRaycaster raycaster = GetComponent<UnityEngine.UI.GraphicRaycaster>();
+            if (raycaster == null)
+            {
+                gameObject.AddComponent<UnityEngine.UI.GraphicRaycaster>();
+            }
+
             ResetVisuals();
+
+            if (centerText != null && loadingText == null)
+            {
+                loadingText = Instantiate(centerText, centerText.transform.parent);
+                loadingText.gameObject.name = "LoadingText";
+                RectTransform rt = loadingText.GetComponent<RectTransform>();
+                
+                // 右下に配置 (Inspectorから位置調整可能)
+                rt.anchorMin = new Vector2(1, 0);
+                rt.anchorMax = new Vector2(1, 0);
+                rt.pivot = new Vector2(1, 0);
+                rt.anchoredPosition = loadingTextPosition; // 変更点
+                
+                loadingText.enableAutoSizing = false;
+                loadingText.fontSize = 60;
+                loadingText.color = loadingTextColor; // 変更点
+                loadingText.alignment = TextAlignmentOptions.BottomRight;
+                loadingText.gameObject.SetActive(false);
+            }
+
+            if (NetworkMessageHandler.Instance != null)
+            {
+                NetworkMessageHandler.Instance.OnDealingStarted += HandleDealingStarted;
+                NetworkMessageHandler.Instance.OnDealingCompleted += HandleDealingCompleted;
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (NetworkMessageHandler.Instance != null)
+            {
+                NetworkMessageHandler.Instance.OnDealingStarted -= HandleDealingStarted;
+                NetworkMessageHandler.Instance.OnDealingCompleted -= HandleDealingCompleted;
+            }
+        }
+
+        private void HandleDealingStarted()
+        {
+            isWaitingForDeal = true;
+            dealWaitTimer = 0f;
+            if (loadingText != null)
+            {
+                loadingText.text = "山牌構築中... 0.0s";
+                loadingText.gameObject.SetActive(true);
+            }
+        }
+
+        private void HandleDealingCompleted()
+        {
+            isWaitingForDeal = false;
+            if (loadingText != null)
+            {
+                loadingText.gameObject.SetActive(false);
+            }
+        }
+
+        private void Update()
+        {
+            if (isWaitingForDeal && loadingText != null)
+            {
+                dealWaitTimer += Time.deltaTime;
+                loadingText.text = $"山牌構築中... {dealWaitTimer:F1}s";
+            }
         }
 
         private void ResetVisuals()
@@ -209,7 +297,8 @@ namespace KillingMahjong.UI
 
             if (centerText != null)
             {
-                centerText.text = "先攻"; // 仮判定
+                bool isFirst = KillingMahjong.Managers.BoardStateManager.Instance.IsLocalTurn;
+                centerText.text = isFirst ? "先攻" : "後攻";
                 centerText.gameObject.SetActive(true);
             }
             
@@ -228,6 +317,55 @@ namespace KillingMahjong.UI
             horizontalLineRt.gameObject.SetActive(false);
 
             Debug.Log("PhaseTransition: Complete Callback invoked");
+            onComplete?.Invoke();
+        }
+        public void PlayCenterTextAnim(string text, float duration = 1.5f, Action onComplete = null)
+        {
+            StartCoroutine(CenterTextAnimRoutine(text, duration, onComplete));
+        }
+
+        private IEnumerator CenterTextAnimRoutine(string text, float duration, Action onComplete = null)
+        {
+            if (horizontalLineRt != null)
+            {
+                horizontalLineRt.gameObject.SetActive(true);
+                horizontalLineRt.localScale = new Vector3(0, 2f, 1f); 
+            }
+
+            float t = 0;
+            while (t < lineInDuration)
+            {
+                if (horizontalLineRt != null)
+                {
+                    horizontalLineRt.localScale = new Vector3(Mathf.Lerp(0, 10f, t / lineInDuration), 2f, 1f);
+                }
+                t += Time.deltaTime;
+                yield return null;
+            }
+            if (horizontalLineRt != null) horizontalLineRt.localScale = new Vector3(10f, 2f, 1f);
+
+            if (centerText != null)
+            {
+                centerText.text = text;
+                centerText.gameObject.SetActive(true);
+            }
+            
+            yield return new WaitForSeconds(duration);
+            
+            if (centerText != null) centerText.gameObject.SetActive(false);
+            
+            t = 0;
+            while (t < lineInDuration)
+            {
+                if (horizontalLineRt != null)
+                {
+                    horizontalLineRt.localScale = new Vector3(Mathf.Lerp(10f, 0, t / lineInDuration), 2f, 1f);
+                }
+                t += Time.deltaTime;
+                yield return null;
+            }
+            if (horizontalLineRt != null) horizontalLineRt.gameObject.SetActive(false);
+
             onComplete?.Invoke();
         }
     }

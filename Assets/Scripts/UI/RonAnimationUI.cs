@@ -12,6 +12,10 @@ namespace KillingMahjong.UI
         [SerializeField] private GameObject ronPanel; // The full-screen/modal panel for Ron
         [SerializeField] private GameObject yakuBackgroundPanel; // The panel containing hand/yaku info (役パネル)
         
+        [Header("Player Ron Bubble (Pre-Animation)")]
+        [Tooltip("自分がロンした瞬間に盤面上に出す吹き出し")]
+        [SerializeField] private GameObject playerRonBubbleContainer;
+        
         [Header("Step 1: Cut-in")]
         [SerializeField] private GameObject cutInContainer;
         [SerializeField] private Image cutInImage;
@@ -24,16 +28,11 @@ namespace KillingMahjong.UI
         [SerializeField] private GameObject tilePrefab;
         [SerializeField] private TileResourceManager tileResourceManager;
 
-        [Header("Hand Display Positions & Scales")]
-        [SerializeField] private Vector2 playerHandPosition = new Vector2(0, -200f);
-        [SerializeField] private Vector3 playerHandScale = new Vector3(1.5f, 1.5f, 1f);
-        [SerializeField] private Vector2 playerRonTilePosition = new Vector2(400f, -200f);
-        [SerializeField] private Vector3 playerRonTileScale = new Vector3(1.5f, 1.5f, 1f);
-        
-        [SerializeField] private Vector2 enemyHandPosition = new Vector2(0, 200f);
-        [SerializeField] private Vector3 enemyHandScale = new Vector3(1.5f, 1.5f, 1f);
-        [SerializeField] private Vector2 enemyRonTilePosition = new Vector2(-400f, 200f);
-        [SerializeField] private Vector3 enemyRonTileScale = new Vector3(1.5f, 1.5f, 1f);
+        [Header("Hand Display Layout")]
+        [Tooltip("The horizontal gap between each tile in the hand")]
+        [SerializeField] private float tileSpacing = 115f; // 重なり解消のため95から115に広げる
+        [Tooltip("The visual scale of each tile in the hand")]
+        [SerializeField] private float tileScale = 1.5f;
         
         [Header("Step 3: Yaku Display")]
         [SerializeField] private GameObject yakuContainer;
@@ -54,7 +53,27 @@ namespace KillingMahjong.UI
 
         private void Start()
         {
+            PrepareForPreDialogue();
+        }
+
+        public void PrepareForPreDialogue()
+        {
+            ResetVisuals();
             if (ronPanel != null) ronPanel.SetActive(false);
+            if (playerRonBubbleContainer != null) playerRonBubbleContainer.SetActive(false);
+        }
+
+        public bool HasPlayerRonBubble()
+        {
+            return playerRonBubbleContainer != null;
+        }
+
+        public void ShowPlayerRonBubble(bool show)
+        {
+            if (playerRonBubbleContainer != null)
+            {
+                playerRonBubbleContainer.SetActive(show);
+            }
         }
 
         public void PlayRonSequence(List<int> handTiles, int ronTile, List<string> yakuList, string formula, string rankName, bool isLocalPlayerWin, System.Action onComplete)
@@ -113,8 +132,6 @@ namespace KillingMahjong.UI
             if (cutInContainer != null)
             {
                 cutInContainer.SetActive(true);
-                // 実際はここでキャラクター画像を isLocalPlayerWin に応じて切り替えたりアニメーションしたりします
-                // 現在はプレースホルダー待機
                 yield return new WaitForSeconds(cutInDuration);
                 cutInContainer.SetActive(false);
             }
@@ -129,15 +146,6 @@ namespace KillingMahjong.UI
             {
                 handDisplayContainer.SetActive(true);
                 
-                // 選択された基準位置・スケールを取得
-                Vector2 baseHandPos = isLocalPlayerWin ? playerHandPosition : enemyHandPosition;
-                Vector3 baseHandScale = isLocalPlayerWin ? playerHandScale : enemyHandScale;
-                Vector2 ronPos = isLocalPlayerWin ? playerRonTilePosition : enemyRonTilePosition;
-                Vector3 ronScale = isLocalPlayerWin ? playerRonTileScale : enemyRonTileScale;
-                
-                // 横並び配置のためのベース変数 (例: 中心位置からタイル幅*スケール分ずらして並べる)
-                float tileWidth = 50f; // RiverUI等から持ってきたり適宜設定
-                
                 // 手牌の生成
                 if (tilePrefab != null && tileResourceManager != null)
                 {
@@ -149,18 +157,22 @@ namespace KillingMahjong.UI
                         InitializeTileVisual(obj, handTiles[i]);
                         
                         RectTransform rt = obj.GetComponent<RectTransform>();
-                        ApplyTileRectSettings(rt, baseHandScale);
+                        ApplyTileRectSettings(rt);
+                        
+                        // 横に並べるためにX座標を計算 (要素がすべて中心に揃うようにハンド全体の幅から算出)
+                        float offset_x = (i - (handCount - 1) / 2f) * tileSpacing;
+                        rt.anchoredPosition3D = new Vector3(offset_x, 0, 0);
                     }
                     
                     // アガリ牌（ロン牌）の生成
-                    // HorizontalLayoutGroupの影響を避けるため、専用の ronTileSlot に生成します
                     if (ronTile > 0 && ronTileSlot != null)
                     {
                         GameObject obj = Instantiate(tilePrefab, ronTileSlot);
                         InitializeTileVisual(obj, ronTile);
                         
                         RectTransform rt = obj.GetComponent<RectTransform>();
-                        ApplyTileRectSettings(rt, baseHandScale);
+                        ApplyTileRectSettings(rt);
+                        rt.anchoredPosition3D = Vector3.zero;
                     }
                 }
                 
@@ -227,16 +239,16 @@ namespace KillingMahjong.UI
             if (interaction != null) Destroy(interaction);
         }
 
-        private void ApplyTileRectSettings(RectTransform rt, Vector3 scale)
+        private void ApplyTileRectSettings(RectTransform rt)
         {
             if (rt == null) return;
             rt.anchorMin = new Vector2(0.5f, 0.5f);
             rt.anchorMax = new Vector2(0.5f, 0.5f);
             rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.sizeDelta = new Vector2(45f, 40f);
+            
             rt.anchoredPosition3D = Vector3.zero;
             rt.localRotation = Quaternion.identity;
-            rt.localScale = scale;
+            rt.localScale = new Vector3(tileScale, tileScale, 1f);
         }
 
         // --- Tester Context Menu ---

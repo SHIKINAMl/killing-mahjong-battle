@@ -9,6 +9,7 @@ namespace KillingMahjong.UI
         public int TileId { get; private set; }
         public bool IsInHand { get; private set; }
         public Vector3 OriginalWallPosition { get; set; } // ★ 壁の本来の座標を記憶するプロパティ追加
+        public bool IsHovered { get; private set; }
 
         private GameUIManager _gameUIManager;
         private Canvas _canvas;
@@ -16,6 +17,8 @@ namespace KillingMahjong.UI
         private CanvasGroup _canvasGroup;
         private Vector3 _originalPosition;
         private Transform _originalParent;
+
+        private TileVisual _tileVisual;
 
         public void Initialize(int tileId, bool isInHand, GameUIManager manager, Canvas canvas)
         {
@@ -26,6 +29,7 @@ namespace KillingMahjong.UI
             _rectTransform = GetComponent<RectTransform>();
             _canvasGroup = GetComponent<CanvasGroup>();
             if (_canvasGroup == null) _canvasGroup = gameObject.AddComponent<CanvasGroup>();
+            _tileVisual = GetComponent<TileVisual>();
         }
 
         public void OnPointerClick(PointerEventData eventData)
@@ -75,14 +79,6 @@ namespace KillingMahjong.UI
             _originalParent = transform.parent;
             
             _canvasGroup.blocksRaycasts = false;
-            
-            // Lift up visually?
-            // If World Object, this might behave differently than UI.
-            // Assuming UI because user mentioned "HandUI...HorizontalLayout".
-            // But WallUI is 3D world?
-            // "Transform" slots imply mixed usage or World usage.
-            // If World Object, IDragHandler requires PhysicsRaycaster on Camera.
-            // Let's assume standard EventSystem setup handles it if Colliders/Images present.
         }
 
         public void OnDrag(PointerEventData eventData)
@@ -116,33 +112,27 @@ namespace KillingMahjong.UI
             _canvasGroup.blocksRaycasts = true;
 
             // Hit Detection
-            // We need to check if dropped on Hand Area.
             bool droppedInHand = _gameUIManager.IsPointerInHandArea(eventData.position);
 
             if (IsInHand)
             {
                 if (!droppedInHand)
                 {
-                    // Dragged OUT of Hand -> Move to Wall
                     _gameUIManager.MoveTileToWall(TileId);
                 }
                 else
                 {
-                    // Dropped inside Hand -> Just reorder? Or reset.
-                    // For now, reset position (LayoutGroup will handle it)
                     ReturnToOriginal();
                 }
             }
-            else // In Wall
+            else
             {
                 if (droppedInHand)
                 {
-                    // Dragged INTO Hand -> Move to Hand
                     _gameUIManager.MoveTileToHand(TileId);
                 }
                 else
                 {
-                    // Dropped elsewhere -> Return
                     ReturnToOriginal();
                 }
             }
@@ -156,33 +146,14 @@ namespace KillingMahjong.UI
 
         public void OnPointerEnter(PointerEventData eventData)
         {
-            if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard && !IsInHand)
-            {
-                // Wallにある牌をホバーしたときに少し浮かせる（選択時よりは低め）
-                // ただし、既に選択されている場合はその高さを維持する
-                if (!_gameUIManager.IsTileSelected(TileId))
-                {
-                    if (_rectTransform != null)
-                    {
-                        _rectTransform.localPosition = OriginalWallPosition + new Vector3(0, 10f, 0);
-                    }
-                }
-            }
+            IsHovered = true;
+            if (_tileVisual != null) _tileVisual.SetHoverHighlight(true);
         }
 
         public void OnPointerExit(PointerEventData eventData)
         {
-            if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard && !IsInHand)
-            {
-                // ホバーが外れたら元の位置に戻す
-                if (!_gameUIManager.IsTileSelected(TileId))
-                {
-                    if (_rectTransform != null)
-                    {
-                        _rectTransform.localPosition = OriginalWallPosition;
-                    }
-                }
-            }
+            IsHovered = false;
+            if (_tileVisual != null) _tileVisual.SetHoverHighlight(false);
         }
     }
 }
