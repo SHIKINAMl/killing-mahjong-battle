@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.InputSystem; // 追加: 新しいInputSystem用
 using KillingMahjong.UI;
 
 namespace KillingMahjong.Managers
@@ -14,7 +15,7 @@ namespace KillingMahjong.Managers
         public static ReactionController Instance { get; private set; }
 
         [Header("Settings")]
-        [SerializeField] private float reactionDisplayDuration = 2.0f; // リアクションを表示したまま待つ時間
+        [SerializeField] private float reactionDisplayDuration = 5.0f; // リアクションを表示したまま待つ時間
 
         // UIの参照（シーン上でセットアップするか自動取得する）
         public DialogueUI dialogueUI;
@@ -73,12 +74,25 @@ namespace KillingMahjong.Managers
         private IEnumerator WaitWhileLogIsOpen(float duration)
         {
             float elapsed = 0f;
+            yield return null; // 最初のフレームでのクリック誤爆を防ぐ
+
             while (elapsed < duration)
             {
                 if (dialogueUI != null && dialogueUI.IsLogOpen)
                 {
                     yield return null;
                     continue;
+                }
+
+                // クリック（タップ）されたら待機をスキップして次へ
+                // 旧Inputクラスではなく、新しいInput Systemを使用します
+                bool isClicked = false;
+                if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame) isClicked = true;
+                if (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.wasPressedThisFrame) isClicked = true;
+
+                if (isClicked)
+                {
+                    break;
                 }
 
                 elapsed += Time.deltaTime;

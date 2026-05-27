@@ -13,6 +13,21 @@ namespace KillingMahjong.Network
     }
 
     [System.Serializable]
+    public class NextRoundWaitingData
+    {
+        public List<string> ready_players;
+        public int ready_count;
+        public int required_count;
+    }
+
+    [System.Serializable]
+    public class NextRoundWaitingMessage
+    {
+        public string type;
+        public NextRoundWaitingData data;
+    }
+
+    [System.Serializable]
     public class ActionMessage
     {
         public string type = "action";
@@ -57,6 +72,7 @@ namespace KillingMahjong.Network
         public event Action<bool> OnAgari; // isLocalWin
         public event Action OnDraw; // 流局
         public event Action<int, int> OnGameEnded; // localScore, enemyScore
+        public event Action OnNextRoundWaitingReceived; // 相手からの次局待機（ロンボタン押下の合図として利用）
         
         public event Action<string> OnError;
         public event Action<HandSelectionConfirmationData> OnHandSelectionConfirmation;
@@ -333,8 +349,24 @@ namespace KillingMahjong.Network
                         break;
 
                     case "next_round_waiting":
-                        // サーバーが次局待ちに入った。アニメーションの完了を待ってから GameUIManager 経由で承認を送るため、ここでは何もしない。
-                        Debug.Log("[Network] 次局進行待ち - 演出完了後に承認を送信します");
+                        var nrwMsg = JsonUtility.FromJson<NextRoundWaitingMessage>(jsonString);
+                        if (nrwMsg != null && nrwMsg.data != null)
+                        {
+                            if (nrwMsg.data.ready_count > 0)
+                            {
+                                Debug.Log("[Network] 次局進行待ち (ready_count > 0) - 相手が演出を進行させた合図として処理します");
+                                OnNextRoundWaitingReceived?.Invoke();
+                            }
+                            else
+                            {
+                                Debug.Log("[Network] 次局進行待ち (ready_count == 0) - ラウンド終了直後の通知のため無視します");
+                            }
+                        }
+                        else
+                        {
+                            // パース失敗時等のフォールバック
+                            OnNextRoundWaitingReceived?.Invoke();
+                        }
                         break;
 
                     case "next_round_accepted":

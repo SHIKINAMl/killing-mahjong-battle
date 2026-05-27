@@ -7,6 +7,8 @@ namespace KillingMahjong.UI
     {
         [Header("HP Display")]
         [SerializeField] private TextMeshProUGUI hpText;
+        [SerializeField] private UnityEngine.UI.Image hpFillImage; // 追加: 人型のHPメーター用画像
+        private int maxHp = 20000; // 最大HP（割合計算用）
 
         [Header("Character Portrait")]
         [SerializeField] private SpriteRenderer characterRenderer;
@@ -50,8 +52,14 @@ namespace KillingMahjong.UI
             currentHp = hp;
             if (hpText != null)
             {
-                // MaxHPの概念は一旦表示せず、現在HPのみそのまま表示します
-                hpText.text = $"HP: {currentHp}";
+                // 数字のみ表示する
+                hpText.text = currentHp.ToString();
+            }
+            
+            // 人型メーターの割合を更新する
+            if (hpFillImage != null)
+            {
+                hpFillImage.fillAmount = (float)hp / maxHp;
             }
         }
         

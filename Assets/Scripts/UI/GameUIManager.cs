@@ -28,6 +28,7 @@ namespace KillingMahjong.UI
         [SerializeField] private RonAnimationUI ronAnimationUI;
         [SerializeField] private MatchmakingUI matchmakingUI;
         [SerializeField] private DoraDisplayUI doraDisplayUI;
+        [SerializeField] private GameObject ronWaitPanel; // 追加: ロン待機パネル
 
         [Header("Effects")]
         [SerializeField] private GameObject victoryEffectPrefab;
@@ -47,6 +48,8 @@ namespace KillingMahjong.UI
         private bool isTransitioning = false;
         public bool IsTransitioning => isTransitioning;
         private bool _autoConfirmNextHandSelection = false;
+        private bool _isWaitingForEnemyRon = false; // 敵のロンボタン押下待機用フラグ
+        private bool _hasSentNextRoundForCurrentPhase = false; // 重複送信防止フラグ
 
         private void Start()
         {
@@ -88,6 +91,7 @@ namespace KillingMahjong.UI
             net.OnHandSelectionConfirmation += HandleHandSelectionConfirmation;
             net.OnIsTenpaiReceived += HandleIsTenpaiReceived;
             net.OnNotTenpaiReceived += HandleNotTenpaiReceived;
+            net.OnNextRoundWaitingReceived += HandleNextRoundWaitingReceived;
         }
 
         private void HandleHandSelectionConfirmation(KillingMahjong.EngineData.HandSelectionConfirmationData data)
@@ -306,6 +310,7 @@ namespace KillingMahjong.UI
             if (abilityUI != null) abilityUI.gameObject.SetActive(false);
             if (bettingUI != null) bettingUI.HideBettingPhase();
             if (doraDisplayUI != null) doraDisplayUI.Hide();
+            if (ronWaitPanel != null) ronWaitPanel.SetActive(false); // 追加: ロン待機パネルを初期状態で非表示にする
         }
 
         // --- Component accessors ---
@@ -893,6 +898,11 @@ namespace KillingMahjong.UI
 
         private void UpdatePhaseStatus(RoundStatus newStatus)
         {
+            if (currentPhaseStatus == newStatus) return;
+
+            // 新フェーズ移行時にフラグをリセット
+            _hasSentNextRoundForCurrentPhase = false;
+
             currentPhaseStatus = newStatus;
             if (PhaseManager.Instance != null) PhaseManager.Instance.ChangeRoundStatus(newStatus);
 
@@ -1054,7 +1064,16 @@ namespace KillingMahjong.UI
                             ? BoardStateManager.Instance.LastDiscardedTileId
                             : (winningHand.Count > 0 ? winningHand[winningHand.Count - 1] : 0);
                         
-                        StartCoroutine(PlayRonWithPreDialogue(isLocalWin, winningHand, ronTile, actualYaku, actualFormula, actualRank));
+                        if (isLocalWin)
+                        {
+                            // 自分がロンした場合は、即座に演出に入らずにロン待機パネルを表示する
+                            if (ronWaitPanel != null) ronWaitPanel.SetActive(true);
+                        }
+                        else
+                        {
+                            // 敵がロンした場合は、相手がボタンを押す(next_round_waitingが来る)まで待機
+                            _isWaitingForEnemyRon = true;
+                        }
                     }
                     break;
                 case RoundStatus.Draw:
@@ -1073,6 +1092,82 @@ namespace KillingMahjong.UI
                         dialogueUI.ShowText("流局…次の対局へ");
                     }
                     break;
+            }
+        }
+
+        /// <summary>
+        /// ロン待機パネルのロンボタンが押された時に呼ばれる（インスペクターのOnClickから設定）
+        /// </summary>
+        public void ExecuteRonAction()
+        {
+            if (ronWaitPanel != null) ronWaitPanel.SetActive(false);
+
+            // サーバーを変更できないため、ボタンを押した合図として next_round を送る
+            SendNextRoundAction();
+
+            bool isLocalWin = true;
+            List<int> winningHand = new List<int>(BoardStateManager.Instance.CurrentHandTiles);
+            var liq = BoardStateManager.Instance.LastLiquidationData;
+            
+            List<string> actualYaku = new List<string>();
+            string actualFormula = "0飜";
+            string actualRank = "満貫";
+            
+            if (liq != null)
+            {
+                if (liq.yaku != null) actualYaku = new List<string>(liq.yaku);
+                else actualYaku.Add("不明な役");
+                
+                actualFormula = $"{liq.han}飜";
+                
+                if (liq.multiplier >= 4.0f) actualRank = "役満";
+                else if (liq.multiplier >= 3.0f) actualRank = "三倍満";
+                else if (liq.multiplier >= 2.0f) actualRank = "倍満";
+                else if (liq.multiplier >= 1.5f) actualRank = "跳満";
+                else actualRank = "満貫";
+            }
+            
+            int ronTile = BoardStateManager.Instance.LastDiscardedTileId >= 0
+                ? BoardStateManager.Instance.LastDiscardedTileId
+                : (winningHand.Count > 0 ? winningHand[winningHand.Count - 1] : 0);
+            
+            StartCoroutine(PlayRonWithPreDialogue(isLocalWin, winningHand, ronTile, actualYaku, actualFormula, actualRank));
+        }
+
+        private void HandleNextRoundWaitingReceived()
+        {
+            // 敵がロンして、且つ敵がロンボタンを押した合図として next_round_waiting が送られてきたら演出開始
+            if (_isWaitingForEnemyRon)
+            {
+                _isWaitingForEnemyRon = false;
+                
+                bool isLocalWin = false;
+                List<int> winningHand = new List<int>(BoardStateManager.Instance.CurrentEnemyHandTiles);
+                var liq = BoardStateManager.Instance.LastLiquidationData;
+                
+                List<string> actualYaku = new List<string>();
+                string actualFormula = "0飜";
+                string actualRank = "満貫";
+                
+                if (liq != null)
+                {
+                    if (liq.yaku != null) actualYaku = new List<string>(liq.yaku);
+                    else actualYaku.Add("不明な役");
+                    
+                    actualFormula = $"{liq.han}飜";
+                    
+                    if (liq.multiplier >= 4.0f) actualRank = "役満";
+                    else if (liq.multiplier >= 3.0f) actualRank = "三倍満";
+                    else if (liq.multiplier >= 2.0f) actualRank = "倍満";
+                    else if (liq.multiplier >= 1.5f) actualRank = "跳満";
+                    else actualRank = "満貫";
+                }
+                
+                int ronTile = BoardStateManager.Instance.LastDiscardedTileId >= 0
+                    ? BoardStateManager.Instance.LastDiscardedTileId
+                    : (winningHand.Count > 0 ? winningHand[winningHand.Count - 1] : 0);
+                
+                StartCoroutine(PlayRonWithPreDialogue(isLocalWin, winningHand, ronTile, actualYaku, actualFormula, actualRank));
             }
         }
 
@@ -1245,7 +1340,7 @@ namespace KillingMahjong.UI
                 phaseTransitionUI.PlayDrawTransition(
                     onMidpoint: () => {
                         // 暗転中に流局表示を消してUIをクリア
-                        if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
+                        // if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
                         
                         // 牌を暗転中に消去する
                         BoardStateManager.Instance.ClearAllBoardData();
@@ -1259,7 +1354,7 @@ namespace KillingMahjong.UI
                     onComplete: () => {
                         isTransitioning = false;
                         Debug.Log("[GameUIManager] 流局演出完了 - 次ラウンド待ち承認送信");
-                        NetworkMessageHandler.Instance.SendActionToServer("next_round", new ActionPayload());
+                        SendNextRoundAction();
                     }
                 );
             }
@@ -1275,7 +1370,7 @@ namespace KillingMahjong.UI
             yield return new WaitForSeconds(3.0f);
 
             // 流局表示を消してUIをクリア（次ラウンドの配牌待ちに備える）
-            if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
+            // if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
             
             // キューに残っているリアクションをクリア
             if (ReactionController.Instance != null)
@@ -1284,7 +1379,7 @@ namespace KillingMahjong.UI
             }
 
             Debug.Log("[GameUIManager] 流局演出完了 - 次ラウンド待ち承認送信");
-            NetworkMessageHandler.Instance.SendActionToServer("next_round", new ActionPayload());
+            SendNextRoundAction();
         }
 
         private IEnumerator PlayRonWithPreDialogue(bool isLocalWin, List<int> winningHand, int ronTile, List<string> yaku, string formula, string rank)
@@ -1451,7 +1546,16 @@ namespace KillingMahjong.UI
         {
             yield return new WaitForSeconds(delay);
             Debug.Log("[GameUIManager] ロン演出完了 - 次ラウンド進行用の承認を送信");
-            NetworkMessageHandler.Instance.SendActionToServer("next_round", new ActionPayload());
+            SendNextRoundAction();
+        }
+
+        private void SendNextRoundAction()
+        {
+            if (!_hasSentNextRoundForCurrentPhase)
+            {
+                _hasSentNextRoundForCurrentPhase = true;
+                NetworkMessageHandler.Instance.SendActionToServer("next_round", new ActionPayload());
+            }
         }
     }
 }
