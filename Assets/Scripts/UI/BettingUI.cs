@@ -91,7 +91,7 @@ namespace KillingMahjong.UI
             }
         }
 
-        public void HideBettingPhase()
+        public void HideBettingPhase(bool immediate = false)
         {
             if (autoDialogueCoroutine != null)
             {
@@ -99,13 +99,14 @@ namespace KillingMahjong.UI
                 autoDialogueCoroutine = null;
             }
 
-            if (!gameObject.activeInHierarchy)
+            if (immediate || !gameObject.activeInHierarchy)
             {
-                // すでに非アクティブなら、コルーチンを回さずにそのまま終了
+                // すでに非アクティブ、または即時非表示指定なら、コルーチンを回さずにそのまま終了
                 if (hpBarPanel != null)
                 {
                     hpBarPanel.anchoredPosition = hiddenPos;
                 }
+                gameObject.SetActive(false);
                 return;
             }
 

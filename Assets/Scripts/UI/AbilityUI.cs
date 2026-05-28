@@ -12,6 +12,11 @@ namespace KillingMahjong.UI
         [SerializeField] private Vector2 showPosition = new Vector2(100, 100); // On-screen
         [SerializeField] private float animationDuration = 0.5f;
 
+        [Header("Button Sprites")]
+        [SerializeField] private Sprite normalSprite;
+        [SerializeField] private Sprite pressedSprite;
+        private Image triggerButtonImage;
+
         [Header("Window Components")]
         [SerializeField] private AbilityItemUI itemPrefab;
         [SerializeField] private Transform contentContainer;
@@ -43,7 +48,14 @@ namespace KillingMahjong.UI
         private void Start()
         {
             if (triggerButton != null)
+            {
                 triggerButton.onClick.AddListener(OnTriggerClicked);
+                triggerButtonImage = triggerButton.GetComponent<Image>();
+                if (triggerButtonImage != null && normalSprite != null)
+                {
+                    triggerButtonImage.sprite = normalSprite;
+                }
+            }
             
             if (closeButton != null)
                 closeButton.onClick.AddListener(CloseWindow);
@@ -122,7 +134,7 @@ namespace KillingMahjong.UI
             if (!isWindowVisible) DeselectAll(); // Deselect on close
 
             if (currentAnimationCoroutine != null) StopCoroutine(currentAnimationCoroutine);
-            currentAnimationCoroutine = StartCoroutine(AnimateWindow(isWindowVisible ? showPosition : hiddenPosition));
+            currentAnimationCoroutine = StartCoroutine(AnimateWindow(isWindowVisible ? showPosition : hiddenPosition, isWindowVisible));
         }
 
         public void OnAbilitySelected(AbilityItemUI item)
@@ -180,9 +192,15 @@ namespace KillingMahjong.UI
             }
         }
 
-        private System.Collections.IEnumerator AnimateWindow(Vector2 targetPos)
+        private System.Collections.IEnumerator AnimateWindow(Vector2 targetPos, bool isOpening)
         {
             if (abilityWindow == null) yield break;
+
+            // 開き始めるときに押下画像にする
+            if (isOpening && triggerButtonImage != null && pressedSprite != null)
+            {
+                triggerButtonImage.sprite = pressedSprite;
+            }
 
             Vector2 startPos = abilityWindow.anchoredPosition;
             float elapsed = 0f;
@@ -197,6 +215,12 @@ namespace KillingMahjong.UI
                 yield return null;
             }
             abilityWindow.anchoredPosition = targetPos;
+
+            // 閉まりきった（左に戻った）ときに通常画像に戻す
+            if (!isOpening && triggerButtonImage != null && normalSprite != null)
+            {
+                triggerButtonImage.sprite = normalSprite;
+            }
         }
 
         private void CancelOpponentReady()

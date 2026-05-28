@@ -120,6 +120,7 @@ namespace KillingMahjong.UI
                         if (handUI != null) handUI.SetSubmittedState(false);
                         BoardStateManager.Instance.ClearWaitTiles();
                         if (waitUI != null) waitUI.Hide();
+                        SetMatchUIVisibility(true);
                     }
                 );
             }
@@ -194,6 +195,7 @@ namespace KillingMahjong.UI
                             waitUI.MoveToOriginalPosition();
                             waitUI.Hide();
                         }
+                        SetMatchUIVisibility(true);
                     }
                 );
             }
@@ -251,6 +253,7 @@ namespace KillingMahjong.UI
                     () => {
                         _autoConfirmNextHandSelection = false;
                         if (handUI != null) handUI.SetSubmittedState(false);
+                        SetMatchUIVisibility(true);
                     }
                 );
             }
@@ -288,6 +291,7 @@ namespace KillingMahjong.UI
 
             if (handUI != null) handUI.SetSubmittedState(false);
             if (waitUI != null) waitUI.gameObject.SetActive(false);
+            SetMatchUIVisibility(true);
             // 常に表示させるためコメントアウト
             // if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
         }
@@ -308,7 +312,7 @@ namespace KillingMahjong.UI
             if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(false);
             if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(false);
             if (abilityUI != null) abilityUI.gameObject.SetActive(false);
-            if (bettingUI != null) bettingUI.HideBettingPhase();
+            if (bettingUI != null) bettingUI.HideBettingPhase(true);
             if (doraDisplayUI != null) doraDisplayUI.Hide();
             if (ronWaitPanel != null) ronWaitPanel.SetActive(false); // 追加: ロン待機パネルを初期状態で非表示にする
         }
@@ -593,6 +597,13 @@ namespace KillingMahjong.UI
                     waitUI.DisplayWaits(board.CurrentWaitTiles);
                 }
             }
+
+            // 手牌決定後、暗転前に相手の牌等が見えてしまうのを防ぐ
+            // _autoConfirmNextHandSelection は最終確認（OK）後に true になるため、ダイアログ表示中（未確定時）は隠さない
+            if (handUI != null && handUI.IsSubmitted && _autoConfirmNextHandSelection && currentPhaseStatus == RoundStatus.HandSelection)
+            {
+                SetMatchUIVisibility(false);
+            }
         }
 
         private void InitializeTileComponent(RectTransform rt, int id, bool inHand)
@@ -867,7 +878,7 @@ namespace KillingMahjong.UI
             
             if (abilityUI != null) abilityUI.gameObject.SetActive(false);
             if (ronAnimationUI != null) ronAnimationUI.gameObject.SetActive(false);
-            if (bettingUI != null) bettingUI.HideBettingPhase();
+            if (bettingUI != null) bettingUI.HideBettingPhase(true);
             if (doraDisplayUI != null) doraDisplayUI.Hide();
         }
 
@@ -1255,6 +1266,9 @@ namespace KillingMahjong.UI
              {
                  isTransitioning = true;
                  
+                 // 対局開始の暗転（トランジション）前に盤面の牌を隠す
+                 SetMatchUIVisibility(false);
+                 
                  if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(false);
                  if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(false);
                  if (abilityUI != null) abilityUI.gameObject.SetActive(false);
@@ -1345,6 +1359,9 @@ namespace KillingMahjong.UI
                         // 牌を暗転中に消去する
                         BoardStateManager.Instance.ClearAllBoardData();
                         ClearAllTiles();
+                        
+                        // コンテナUI（手牌の枠など）も非表示にする
+                        SetMatchUIVisibility(false);
                         
                         if (ReactionController.Instance != null)
                         {

@@ -135,15 +135,19 @@ namespace KillingMahjong.Managers
             NonManganWaitTiles = new List<int>(nonManganTiles ?? new List<int>());
         }
 
+        private int _fixedManganExampleIndex = 0;
+
         public void SetTenpaiExamples(List<int[]> tenpaiExamples)
         {
-            if (tenpaiExamples != null)
+            if (tenpaiExamples != null && tenpaiExamples.Count > 0)
             {
                 CurrentTenpaiExamples = tenpaiExamples;
+                _fixedManganExampleIndex = UnityEngine.Random.Range(0, CurrentTenpaiExamples.Count);
             }
             else
             {
                 CurrentTenpaiExamples.Clear();
+                _fixedManganExampleIndex = 0;
             }
         }
 
@@ -275,28 +279,48 @@ namespace KillingMahjong.Managers
                 return;
             }
 
-            ResetHandToWall();
+            int exampleIndex = _fixedManganExampleIndex;
+            if (exampleIndex < 0 || exampleIndex >= CurrentTenpaiExamples.Count) exampleIndex = 0;
 
-            int exampleIndex = UnityEngine.Random.Range(0, CurrentTenpaiExamples.Count);
             int[] rawTargetHand = CurrentTenpaiExamples[exampleIndex];
             int[] targetHand = OptimizeHandIndicesForDora(rawTargetHand);
             
             Debug.Log($"[SelectManganHand] Using example {exampleIndex}, optimized indexes: [{string.Join(", ", targetHand)}]");
             TargetHandIndexes = new List<int>(targetHand);
             
+            // 目標の手牌IDリストを作成
+            List<int> targetTileIds = new List<int>();
             foreach (int index in targetHand)
             {
                 if (index >= 0 && index < OriginalWallTiles.Count)
                 {
-                    int tileId = OriginalWallTiles[index];
-                    bool moved = MoveTileToHand(tileId);
-                    if (!moved) Debug.LogWarning($"[SelectManganHand] Failed to move tile {tileId} (index={index}) to hand!");
+                    targetTileIds.Add(OriginalWallTiles[index]);
+                }
+            }
+
+            // 現在の手牌から、目標に含まれない牌だけを壁に戻す
+            List<int> currentHandCopy = new List<int>(CurrentHandTiles);
+            foreach (int id in currentHandCopy)
+            {
+                if (targetTileIds.Contains(id))
+                {
+                    // 目標にも含まれているので手牌に残す
+                    targetTileIds.Remove(id); // 同一IDが複数ある場合のために1つ消費する
                 }
                 else
                 {
-                    Debug.LogWarning($"[SelectManganHand] Index {index} is out of range! OriginalWallTiles.Count={OriginalWallTiles.Count}");
+                    // 目標に含まれていないので壁に戻す
+                    MoveTileToWall(id);
                 }
             }
+
+            // まだ手牌に足りていない牌を壁から取る
+            foreach (int id in targetTileIds)
+            {
+                bool moved = MoveTileToHand(id);
+                if (!moved) Debug.LogWarning($"[SelectManganHand] Failed to move tile {id} to hand!");
+            }
+            
             Debug.Log($"[SelectManganHand] Result: hand has {CurrentHandTiles.Count} tiles: [{string.Join(", ", CurrentHandTiles)}]");
         }
 
