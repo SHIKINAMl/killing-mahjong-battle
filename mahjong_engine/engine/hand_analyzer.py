@@ -221,9 +221,9 @@ class HandAnalyzer:
 
             waiting_tiles = HandAnalyzer.get_tenpai_waiting_tiles(hand, wall)
 
-            hands = [hand + [tile_id] for tile_id in waiting_tiles]
+            hands = [(hand + [tile_id], tile_id) for tile_id in waiting_tiles]
 
-            for h in hands:
+            for h, winning_tile in hands:
 
                 temp_aka_list = aka_list.copy()
 
@@ -235,7 +235,7 @@ class HandAnalyzer:
                     if t == dora:
                         h[i] |= (1 << 5)
 
-                han = HandAnalyzer.calc_yaku(h)
+                han = HandAnalyzer.calc_yaku(h, winning_tile=winning_tile)
                 if han >= 4:
                     for i, t in enumerate(hand):
                         if t in temp_aka_list:
@@ -249,40 +249,43 @@ class HandAnalyzer:
         return mangan_hands
 
     @staticmethod
-    def check_mangan(hand: List[int]) -> bool:
+    def check_mangan(hand: List[int], winning_tile: int | None = None) -> bool:
         """
         満貫以上かどうかの判定
 
         Args:
             hand: 手牌（14枚を想定）
+            winning_tile: 上がり牌の牌ID。ロン時の暗刻判定補正に利用する
 
         Returns:
             満貫（４翻）以上かどうか
         """
-        return HandAnalyzer.calc_yaku(hand) >= 4
+        return HandAnalyzer.calc_yaku(hand, winning_tile=winning_tile) >= 4
 
     @staticmethod
-    def calc_yaku(hand: List[int]) -> int:
+    def calc_yaku(hand: List[int], winning_tile: int | None = None) -> int:
         """
         役の計算
 
         Args:
             hand: 手牌（14枚を想定）
+            winning_tile: 上がり牌の牌ID。ロン時の暗刻判定補正に利用する
 
         Returns:
             役の合計翻数
         """
-        yaku = HandAnalyzer.enum_yaku(hand)
+        yaku = HandAnalyzer.enum_yaku(hand, winning_tile=winning_tile)
         return sum(Yaku.get_han_by_name(name) for name in yaku)
 
 
     @staticmethod
-    def enum_yaku(hand: List[int]) -> List[str]:
+    def enum_yaku(hand: List[int], winning_tile: int | None = None) -> List[str]:
         """
         役の列挙
 
         Args:
             hand: 手牌（14枚を想定）
+            winning_tile: 上がり牌の牌ID。ロン時の暗刻判定補正に利用する
 
         Returns:
             役名のリスト
@@ -331,7 +334,7 @@ class HandAnalyzer:
                 if len(melds) != 4:
                     continue
 
-                yaku, han = HandAnalyzer._evaluate_melds(counter, melds, head_tile)
+                yaku, han = HandAnalyzer._evaluate_melds(counter, melds, head_tile, winning_tile)
                 yaku += dora_yaku
                 han += dora_han
 
@@ -342,7 +345,12 @@ class HandAnalyzer:
         return best_yaku
 
     @staticmethod
-    def _evaluate_melds(counter: Counter, melds: List[Tuple[str, int]], head: int) -> Tuple[List[str], int]:
+    def _evaluate_melds(
+        counter: Counter,
+        melds: List[Tuple[str, int]],
+        head: int,
+        winning_tile: int | None = None,
+    ) -> Tuple[List[str], int]:
         """面子と雀頭から役を判定する"""
         yaku: List[str] = []
         han = 0
@@ -354,7 +362,7 @@ class HandAnalyzer:
             return ["緑一色"], 13
         elif HandAnalyzer._is_chinroutou(counter):
             return ["清老頭"], 13
-        elif HandAnalyzer._is_suuankou(melds):
+        elif HandAnalyzer._is_suuankou(melds, winning_tile):
             return ["四暗刻"], 13
 
         if HandAnalyzer._is_tanyao(counter):
@@ -389,7 +397,7 @@ class HandAnalyzer:
         if HandAnalyzer._is_sanshoku_doukou(melds):
             yaku.append("三色同刻")
             han += 2
-        if HandAnalyzer._is_sanankou(melds):
+        if HandAnalyzer._is_sanankou(melds, winning_tile):
             yaku.append("三暗刻")
             han += 2
 
@@ -569,14 +577,27 @@ class HandAnalyzer:
     # ========== 役判定（面子単位） ==========
 
     @staticmethod
-    def _is_suuankou(melds: List[Tuple[str, int]]) -> bool:
+    def _is_suuankou(melds: List[Tuple[str, int]], winning_tile: int | None = None) -> bool:
         """四暗刻かどうかの判定"""
-        return all(kind == "triplet" for kind, _ in melds)
+        return HandAnalyzer._count_concealed_triplets(melds, winning_tile) == 4
 
     @staticmethod
-    def _is_sanankou(melds: List[Tuple[str, int]]) -> bool:
+    def _is_sanankou(melds: List[Tuple[str, int]], winning_tile: int | None = None) -> bool:
         """三暗刻かどうかの判定"""
-        return sum(1 for kind, _ in melds if kind == "triplet") == 3
+        return HandAnalyzer._count_concealed_triplets(melds, winning_tile) == 3
+
+    @staticmethod
+    def _count_concealed_triplets(melds: List[Tuple[str, int]], winning_tile: int | None = None) -> int:
+        """上がり牌で完成した刻子を除いた暗刻数を返す"""
+        concealed_triplets = sum(1 for kind, _ in melds if kind == "triplet")
+        if winning_tile is None:
+            return concealed_triplets
+
+        winning_tile_id = winning_tile & 0b11111
+        if any(kind == "triplet" and tile_id == winning_tile_id for kind, tile_id in melds):
+            concealed_triplets -= 1
+
+        return concealed_triplets
 
     @staticmethod
     def _is_ikkitsuukan(melds: List[Tuple[str, int]]) -> bool:

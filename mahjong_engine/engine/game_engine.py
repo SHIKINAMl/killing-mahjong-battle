@@ -521,7 +521,7 @@ class GameEngine:
             上がりが成立していれば True、そうでなければ False
         """
         is_win = HandAnalyzer.is_win(hand)
-        is_mangan = HandAnalyzer.check_mangan(hand)
+        is_mangan = HandAnalyzer.check_mangan(hand, winning_tile=winning_tile)
         if not is_win or not is_mangan:
             logger.debug("上がり条件不成立: player=%s  is_win=%s  check_mangan=%s", player_id, is_win, is_mangan)
             return False
@@ -537,7 +537,7 @@ class GameEngine:
         is_tanki_wait = self._is_tanki_wait_agari(hand, winning_tile, winner.waits)
 
         # 役倍率（跳満 1.5倍 / 倍満 2倍 / 三倍満 3倍 / 役満 4倍）
-        base_yaku_list = HandAnalyzer.enum_yaku(hand)
+        base_yaku_list = HandAnalyzer.enum_yaku(hand, winning_tile=winning_tile)
         boost_bonus_map = self._normalized_boost_bonus_map(winner)
         base_han = sum(Yaku.get_han_by_name(name) for name in base_yaku_list)
         bonus_han = sum(boost_bonus_map.get(name, 0) for name in base_yaku_list)
@@ -719,7 +719,7 @@ class GameEngine:
         result = []
         boost_bonus_map = self._normalized_boost_bonus_map(player)
         for w in waits:
-            base_yaku_list = HandAnalyzer.enum_yaku(hand_tiles + [w])
+            base_yaku_list = HandAnalyzer.enum_yaku(hand_tiles + [w], winning_tile=w)
             base_han = sum(Yaku.get_han_by_name(y) for y in base_yaku_list)
             bonus = sum(boost_bonus_map.get(y, 0) for y in base_yaku_list)
             display_yaku_list = self._build_display_yaku_list(base_yaku_list, boost_bonus_map)
