@@ -27,6 +27,8 @@ namespace KillingMahjong.UI
         [SerializeField] private ConfirmationDialogUI confirmationDialogUI;
         [SerializeField] private RonAnimationUI ronAnimationUI;
         [SerializeField] private MatchmakingUI matchmakingUI;
+        [SerializeField] private DoraDisplayUI doraDisplayUI;
+        [SerializeField] private GameObject ronWaitPanel; // 追加: ロン待機パネル
 
         [Header("Effects")]
         [SerializeField] private GameObject victoryEffectPrefab;
@@ -46,6 +48,8 @@ namespace KillingMahjong.UI
         private bool isTransitioning = false;
         public bool IsTransitioning => isTransitioning;
         private bool _autoConfirmNextHandSelection = false;
+        private bool _isWaitingForEnemyRon = false; // 敵のロンボタン押下待機用フラグ
+        private bool _hasSentNextRoundForCurrentPhase = false; // 重複送信防止フラグ
 
         private void Start()
         {
@@ -63,6 +67,7 @@ namespace KillingMahjong.UI
                 reaction.Setup(dialogueUI, enemyInfoUI, playerInfoUI);
             }
             if (NetworkMessageHandler.Instance == null) gameObject.AddComponent<NetworkMessageHandler>();
+            if (Managers.DialogueManager.Instance == null) gameObject.AddComponent<Managers.DialogueManager>();
         }
 
         private void SubscribeEvents()
@@ -86,6 +91,7 @@ namespace KillingMahjong.UI
             net.OnHandSelectionConfirmation += HandleHandSelectionConfirmation;
             net.OnIsTenpaiReceived += HandleIsTenpaiReceived;
             net.OnNotTenpaiReceived += HandleNotTenpaiReceived;
+            net.OnNextRoundWaitingReceived += HandleNextRoundWaitingReceived;
         }
 
         private void HandleHandSelectionConfirmation(KillingMahjong.EngineData.HandSelectionConfirmationData data)
@@ -112,6 +118,9 @@ namespace KillingMahjong.UI
                     () => {
                         // キャンセル → 決定ボタンを押す前の状態に戻す
                         if (handUI != null) handUI.SetSubmittedState(false);
+                        BoardStateManager.Instance.ClearWaitTiles();
+                        if (waitUI != null) waitUI.Hide();
+                        SetMatchUIVisibility(true);
                     }
                 );
             }
@@ -136,9 +145,17 @@ namespace KillingMahjong.UI
                 foreach (var wait in data.waits)
                 {
                     string yakuText = (wait.yaku != null && wait.yaku.Length > 0) ? string.Join(" / ", wait.yaku) : "役なし";
-                    string manganText = wait.mangan_or_more ? "満貫以上" : "満貫未満";
+                    bool isMangan = wait.mangan_or_more;
+                    if (BoardStateManager.Instance.TargetHandIndexes != null)
+                    {
+                        // AutoMangan を使用した場合、Pythonサーバー側で赤ドラのフラグが落ちて
+                        // 判定される仕様により「満貫未満」と誤判定されるため、UI上では強制的に満貫以上とする
+                        isMangan = true;
+                    }
+                    
+                    string manganText = isMangan ? "満貫以上" : "満貫未満";
                     message += $"-> {yakuText} ({manganText})\n";
-                    if (wait.mangan_or_more) hasMangan = true;
+                    if (isMangan) hasMangan = true;
                 }
             }
             message += "\nこの手牌で決定しますか？";
@@ -150,28 +167,58 @@ namespace KillingMahjong.UI
                 confirmationDialogUI.ShowDialog(
                     message,
                     () => {
+                        if (ReactionController.Instance != null) ReactionController.Instance.StopHandSelectionTimer(true);
                         _autoConfirmNextHandSelection = true;
                         if (handUI != null) handUI.SetSubmittedState(true);
                         if (waitUI != null) waitUI.MoveToOriginalPosition();
-                        SendActionToServer("select", new ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
+
+                        if (phaseTransitionUI != null)
+                        {
+                            isTransitioning = true;
+                            phaseTransitionUI.PlayCenterTextAnim("手牌決定！", 2.0f, () =>
+                            {
+                                isTransitioning = false;
+                                SendActionToServer("select", new ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
+                            });
+                        }
+                        else
+                        {
+                            SendActionToServer("select", new ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
+                        }
                     },
                     () => {
                         _autoConfirmNextHandSelection = false;
                         if (handUI != null) handUI.SetSubmittedState(false);
+                        BoardStateManager.Instance.ClearWaitTiles();
                         if (waitUI != null) 
                         {
                             waitUI.MoveToOriginalPosition();
                             waitUI.Hide();
                         }
+                        SetMatchUIVisibility(true);
                     }
                 );
             }
             else
             {
                 if (waitUI != null) waitUI.MoveToOriginalPosition();
+                if (ReactionController.Instance != null) ReactionController.Instance.StopHandSelectionTimer(true);
                 _autoConfirmNextHandSelection = true;
                 if (handUI != null) handUI.SetSubmittedState(true);
-                SendActionToServer("select", new ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
+
+                if (phaseTransitionUI != null)
+                {
+                    isTransitioning = true;
+                    phaseTransitionUI.PlayCenterTextAnim("手牌決定！", 2.0f, () =>
+                    {
+                        isTransitioning = false;
+                        SendActionToServer("select", new ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
+                    });
+                }
+                else
+                {
+                    SendActionToServer("select", new ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
+                }
             }
         }
 
@@ -185,21 +232,50 @@ namespace KillingMahjong.UI
                 confirmationDialogUI.ShowDialog(
                     message,
                     () => {
+                        if (ReactionController.Instance != null) ReactionController.Instance.StopHandSelectionTimer(true);
                         _autoConfirmNextHandSelection = true;
                         if (handUI != null) handUI.SetSubmittedState(true);
-                        SendActionToServer("select", new ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
+
+                        if (phaseTransitionUI != null)
+                        {
+                            isTransitioning = true;
+                            phaseTransitionUI.PlayCenterTextAnim("手牌決定！", 2.0f, () =>
+                            {
+                                isTransitioning = false;
+                                SendActionToServer("select", new ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
+                            });
+                        }
+                        else
+                        {
+                            SendActionToServer("select", new ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
+                        }
                     },
                     () => {
                         _autoConfirmNextHandSelection = false;
                         if (handUI != null) handUI.SetSubmittedState(false);
+                        SetMatchUIVisibility(true);
                     }
                 );
             }
             else
             {
+                if (ReactionController.Instance != null) ReactionController.Instance.StopHandSelectionTimer(true);
                 _autoConfirmNextHandSelection = true;
                 if (handUI != null) handUI.SetSubmittedState(true);
-                SendActionToServer("select", new ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
+
+                if (phaseTransitionUI != null)
+                {
+                    isTransitioning = true;
+                    phaseTransitionUI.PlayCenterTextAnim("手牌決定！", 2.0f, () =>
+                    {
+                        isTransitioning = false;
+                        SendActionToServer("select", new ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
+                    });
+                }
+                else
+                {
+                    SendActionToServer("select", new ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
+                }
             }
         }
 
@@ -215,7 +291,9 @@ namespace KillingMahjong.UI
 
             if (handUI != null) handUI.SetSubmittedState(false);
             if (waitUI != null) waitUI.gameObject.SetActive(false);
-            if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
+            SetMatchUIVisibility(true);
+            // 常に表示させるためコメントアウト
+            // if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
         }
 
         private void SetupUI()
@@ -224,7 +302,8 @@ namespace KillingMahjong.UI
             if (wallUI != null) wallUI.Setup(this);
             if (enemyWallUI != null) enemyWallUI.Setup(this);
             if (waitUI != null) waitUI.gameObject.SetActive(false);
-            if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
+            // 常に表示させるためコメントアウト
+            // if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
             
             SetMatchUIVisibility(false);
             if (riverUI != null) riverUI.gameObject.SetActive(false);
@@ -233,7 +312,9 @@ namespace KillingMahjong.UI
             if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(false);
             if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(false);
             if (abilityUI != null) abilityUI.gameObject.SetActive(false);
-            if (bettingUI != null) bettingUI.HideBettingPhase();
+            if (bettingUI != null) bettingUI.HideBettingPhase(true);
+            if (doraDisplayUI != null) doraDisplayUI.Hide();
+            if (ronWaitPanel != null) ronWaitPanel.SetActive(false); // 追加: ロン待機パネルを初期状態で非表示にする
         }
 
         // --- Component accessors ---
@@ -264,12 +345,16 @@ namespace KillingMahjong.UI
         public void MoveTileToHand(int tileId)
         {
             if (currentPhaseStatus != RoundStatus.HandSelection) return;
+            if (handUI != null && handUI.IsSubmitted) return;
+            BoardStateManager.Instance.TargetHandIndexes = null;
             BoardStateManager.Instance.MoveTileToHand(tileId);
         }
 
         public void MoveTileToWall(int tileId)
         {
             if (currentPhaseStatus != RoundStatus.HandSelection) return;
+            if (handUI != null && handUI.IsSubmitted) return;
+            BoardStateManager.Instance.TargetHandIndexes = null;
             BoardStateManager.Instance.MoveTileToWall(tileId);
             ClearSelection();
         }
@@ -277,12 +362,14 @@ namespace KillingMahjong.UI
         public void SelectManganHand()
         {
             if (currentPhaseStatus != RoundStatus.HandSelection) return;
+            if (handUI != null && handUI.IsSubmitted) return;
             BoardStateManager.Instance.SelectManganHand();
         }
 
         public void SelectRandomHand()
         {
             if (currentPhaseStatus != RoundStatus.HandSelection) return;
+            if (handUI != null && handUI.IsSubmitted) return;
             BoardStateManager.Instance.SelectRandomHand();
         }
 
@@ -342,24 +429,31 @@ namespace KillingMahjong.UI
             // 二重押し防止
             if (handUI != null) handUI.SetSubmittedState(true);
 
-            // hand_indexes を事前計算してキャッシュ
-            _pendingHandIndexes = new List<int>();
-            HashSet<int> usedIndexes = new HashSet<int>();
-            foreach(int tileId in BoardStateManager.Instance.CurrentHandTiles) {
-                 var wallTiles = BoardStateManager.Instance.OriginalWallTiles;
-                 int idx = -1;
-                 for (int i = 0; i < wallTiles.Count; i++)
-                 {
-                     if (wallTiles[i] == tileId && !usedIndexes.Contains(i))
+            // hand_indexes をキャッシュ
+            if (BoardStateManager.Instance.TargetHandIndexes != null && BoardStateManager.Instance.TargetHandIndexes.Count == 13)
+            {
+                _pendingHandIndexes = new List<int>(BoardStateManager.Instance.TargetHandIndexes);
+            }
+            else
+            {
+                _pendingHandIndexes = new List<int>();
+                HashSet<int> usedIndexes = new HashSet<int>();
+                foreach(int tileId in BoardStateManager.Instance.CurrentHandTiles) {
+                     var wallTiles = BoardStateManager.Instance.OriginalWallTiles;
+                     int idx = -1;
+                     for (int i = 0; i < wallTiles.Count; i++)
                      {
-                         idx = i;
-                         break;
+                         if (wallTiles[i] == tileId && !usedIndexes.Contains(i))
+                         {
+                             idx = i;
+                             break;
+                         }
                      }
-                 }
-                 if (idx >= 0) {
-                     _pendingHandIndexes.Add(idx);
-                     usedIndexes.Add(idx);
-                 }
+                     if (idx >= 0) {
+                         _pendingHandIndexes.Add(idx);
+                         usedIndexes.Add(idx);
+                     }
+                }
             }
             _pendingHandTiles = new List<int>(BoardStateManager.Instance.CurrentHandTiles);
 
@@ -395,7 +489,7 @@ namespace KillingMahjong.UI
 
             var board = BoardStateManager.Instance;
 
-            // 1. HandUI
+            // 1. HandUI / WallUI を一括クリア
             if (handUI != null)
             {
                 for (int i = handUI.GetHandSlots().Count - 1; i >= 0; i--)
@@ -404,19 +498,7 @@ namespace KillingMahjong.UI
                     if (t != null) Destroy(t.gameObject);
                 }
                 handUI.GetHandSlots().Clear();
-
-                foreach (var id in board.CurrentHandTiles)
-                {
-                    GameObject obj = Instantiate(tilePrefab, transform);
-                    RectTransform rt = obj.GetComponent<RectTransform>() ?? obj.transform as RectTransform;
-                    if (rt != null) {
-                        InitializeTileComponent(rt, id, true);
-                        handUI.AddTileToHand(rt, id);
-                    }
-                }
             }
-
-            // 2. WallUI
             if (wallUI != null)
             {
                 for (int i = wallUI.GetWallSlots().Count - 1; i >= 0; i--)
@@ -425,18 +507,46 @@ namespace KillingMahjong.UI
                     if (t != null) Destroy(t.gameObject);
                 }
                 wallUI.GetWallSlots().Clear();
+            }
 
-                List<RectTransform> wallGenerated = new List<RectTransform>();
-                foreach (var id in board.CurrentWallTiles)
+            // 2. 壁牌＋手牌を合算してレイアウトし、全牌に OriginalWallPosition を設定する
+            //    これにより「手牌として生成された牌」も正しい壁座標を持ち、
+            //    壁に戻す際に元の位置へ戻れるようになる
+            if (wallUI != null)
+            {
+                // 壁+手牌の合算IDリスト・RectTransformリストを作成
+                List<int> combinedIds = new List<int>(board.CurrentWallTiles);
+                combinedIds.AddRange(board.CurrentHandTiles);
+
+                List<RectTransform> combinedGenerated = new List<RectTransform>();
+                foreach (var id in combinedIds)
                 {
                     GameObject obj = Instantiate(tilePrefab, transform);
                     RectTransform rt = obj.GetComponent<RectTransform>() ?? obj.transform as RectTransform;
-                    if (rt != null) {
+                    if (rt != null)
+                    {
                         InitializeTileComponent(rt, id, false);
-                        wallGenerated.Add(rt);
+                        combinedGenerated.Add(rt);
                     }
                 }
-                wallUI.LayoutWallTiles(wallGenerated, board.CurrentWallTiles, board.CurrentWaitTiles, currentPhaseStatus == RoundStatus.Discard);
+
+                // 合算リストをレイアウト → 全牌の OriginalWallPosition が設定される
+                wallUI.LayoutWallTiles(combinedGenerated, combinedIds, board.CurrentWaitTiles, currentPhaseStatus == RoundStatus.Discard);
+
+                // 手牌IDの牌を wallSlots から取り出して handUI へ移動する
+                // (OriginalWallPosition は保持されたまま)
+                if (handUI != null)
+                {
+                    foreach (var id in board.CurrentHandTiles)
+                    {
+                        RectTransform rt = wallUI.GrabTileById(id);
+                        if (rt != null)
+                        {
+                            InitializeTileComponent(rt, id, true);
+                            handUI.AddTileToHand(rt, id);
+                        }
+                    }
+                }
             }
 
             // 3. Enemy HandUI
@@ -487,6 +597,13 @@ namespace KillingMahjong.UI
                     waitUI.DisplayWaits(board.CurrentWaitTiles);
                 }
             }
+
+            // 手牌決定後、暗転前に相手の牌等が見えてしまうのを防ぐ
+            // _autoConfirmNextHandSelection は最終確認（OK）後に true になるため、ダイアログ表示中（未確定時）は隠さない
+            if (handUI != null && handUI.IsSubmitted && _autoConfirmNextHandSelection && currentPhaseStatus == RoundStatus.HandSelection)
+            {
+                SetMatchUIVisibility(false);
+            }
         }
 
         private void InitializeTileComponent(RectTransform rt, int id, bool inHand)
@@ -529,32 +646,140 @@ namespace KillingMahjong.UI
                 RectTransform movedTile = wallUI.GrabTile(tileId);
                 if (movedTile != null)
                 {
+                    Vector3 startPos = movedTile.position;
                     handUI.AddTileToHand(movedTile, tileId);
+                    
+                    // アニメーションを再生
+                    if (this.gameObject.activeInHierarchy)
+                    {
+                        StartCoroutine(AnimateTileMovementRoutine(movedTile, startPos, 0.15f));
+                    }
                 }
             }
         }
 
         private void HandleTileMovedToWall(int tileId)
         {
-            if (handUI != null && wallUI != null)
-            {
-                RectTransform movedTile = null;
-                foreach (RectTransform t in handUI.GetHandSlots())
-                {
-                    var interaction = t.GetComponent<TileInteraction>();
-                    if (interaction != null && interaction.TileId == tileId)
-                    {
-                        movedTile = t;
-                        break;
-                    }
-                }
+            if (handUI == null || wallUI == null) return;
 
-                if (movedTile != null)
+            RectTransform movedTile = null;
+            foreach (RectTransform t in handUI.GetHandSlots())
+            {
+                var interaction = t.GetComponent<TileInteraction>();
+                if (interaction != null && interaction.TileId == tileId)
                 {
-                    handUI.RemoveTileFromHand(movedTile, tileId);
-                    wallUI.ReturnTileToWall(movedTile, tileId);
+                    movedTile = t;
+                    break;
                 }
             }
+
+            if (movedTile != null)
+            {
+                Vector3 startPos = movedTile.position;
+                handUI.RemoveTileFromHand(movedTile, tileId);
+                // OriginalWallPosition は RebuildAllTilesFromState で全牌に設定済みのため
+                // ReturnTileToWall で元の位置へ正しく戻せる（再ソートなし）
+                wallUI.ReturnTileToWall(movedTile, tileId);
+
+                // アニメーションを再生
+                if (this.gameObject.activeInHierarchy)
+                {
+                    StartCoroutine(AnimateTileMovementRoutine(movedTile, startPos, 0.15f));
+                }
+            }
+        }
+
+        /// <summary>
+        /// LayoutGroupの自動配置を邪魔せずに、一瞬だけダミーを飛ばすアニメーション
+        /// </summary>
+        private System.Collections.IEnumerator AnimateTileMovementRoutine(RectTransform realTile, Vector3 startWorldPos, float duration)
+        {
+            if (realTile == null) yield break;
+
+            // ダミー（ゴースト）を生成するCanvas
+            Canvas parentCanvas = GetComponentInParent<Canvas>();
+            if (parentCanvas == null) parentCanvas = FindFirstObjectByType<Canvas>();
+
+            // 移動元（startWorldPos）が3D空間座標だった場合の補正
+            // ※ startWorldPos は移動「前」の座標ですが、便宜上現在のメインカメラで変換します
+            if (parentCanvas.renderMode == RenderMode.ScreenSpaceOverlay)
+            {
+                Camera mainCam = Camera.main;
+                if (mainCam != null && startWorldPos.z != 0) // Z座標がある＝恐らく3D空間の座標
+                {
+                    Vector3 screenPos = mainCam.WorldToScreenPoint(startWorldPos);
+                    RectTransformUtility.ScreenPointToWorldPointInRectangle(
+                        parentCanvas.transform as RectTransform, 
+                        screenPos, 
+                        null, 
+                        out startWorldPos
+                    );
+                }
+            }
+
+            // 移動直後の1フレームだけ変な位置に表示されるのを防ぐため、即座に透明にする
+            var canvasGroup = realTile.GetComponent<CanvasGroup>();
+            if (canvasGroup == null) canvasGroup = realTile.gameObject.AddComponent<CanvasGroup>();
+            canvasGroup.alpha = 0f;
+
+            // UnityのCanvasが自然にレイアウト計算を完了するまでフレーム末まで待つ（これで確実な targetWorldPos が取れる）
+            yield return new WaitForEndOfFrame();
+            
+            if (realTile == null) yield break;
+
+            Vector3 targetWorldPos = realTile.position;
+            Canvas targetCanvas = realTile.GetComponentInParent<Canvas>();
+
+            // 牌がUI(Overlay)ではなく、WorldSpace(3D空間)にある場合の座標ズレ（左下に行く現象）を修正
+            if (targetCanvas == null || targetCanvas.renderMode != RenderMode.ScreenSpaceOverlay)
+            {
+                Camera cam = Camera.main;
+                if (targetCanvas != null && targetCanvas.worldCamera != null) cam = targetCanvas.worldCamera;
+
+                if (cam != null)
+                {
+                    // 3D空間の座標を一旦スクリーン（画面）の2Dピクセル座標に変換
+                    Vector3 screenPos = cam.WorldToScreenPoint(realTile.position);
+                    
+                    // スクリーン座標から、ダミーアニメーションを再生するCanvas上の座標に再変換
+                    RectTransformUtility.ScreenPointToWorldPointInRectangle(
+                        parentCanvas.transform as RectTransform, 
+                        screenPos, 
+                        parentCanvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : parentCanvas.worldCamera, 
+                        out targetWorldPos
+                    );
+                }
+            }
+
+            GameObject ghost = Instantiate(realTile.gameObject, parentCanvas.transform);
+            
+            // ゴーストから不要な当たり判定やスクリプトを削除
+            Destroy(ghost.GetComponent<TileInteraction>());
+            Destroy(ghost.GetComponent<UnityEngine.EventSystems.EventTrigger>());
+
+            var ghostCanvasGroup = ghost.GetComponent<CanvasGroup>();
+            if (ghostCanvasGroup != null) ghostCanvasGroup.alpha = 1f;
+
+            ghost.transform.SetAsLastSibling();
+
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+                // イーズアウト（徐々に減速）
+                t = 1f - (1f - t) * (1f - t);
+
+                ghost.transform.position = Vector3.Lerp(startWorldPos, targetWorldPos, t);
+                yield return null;
+            }
+
+            // 終了処理
+            if (realTile != null)
+            {
+                canvasGroup.alpha = 1f;
+            }
+            Destroy(ghost);
         }
 
         public void HandleDiscardEvent(int discardedTileId, bool isLocalPlayer)
@@ -581,10 +806,8 @@ namespace KillingMahjong.UI
                     RectTransform tileRt = wallUI.GrabTile(discardedTileId);
                     if (tileRt != null) Destroy(tileRt.gameObject);
                     
-                    List<RectTransform> remainingTiles = new List<RectTransform>();
-                    foreach (var st in wallUI.GetWallSlots()) if (st != null) remainingTiles.Add(st);
-                    
-                    wallUI.LayoutWallTiles(remainingTiles, BoardStateManager.Instance.CurrentWallTiles, BoardStateManager.Instance.CurrentWaitTiles, currentPhaseStatus == RoundStatus.Discard);
+                    // 打牌ごとに整列し直すと、牌が詰まってしまい元の位置からズレるため、ハイライト更新のみ行う
+                    wallUI.UpdateWallHighlights(BoardStateManager.Instance.CurrentWaitTiles, currentPhaseStatus == RoundStatus.Discard);
                 }
 
                 if (riverUI != null) riverUI.AddTile(discardedTileId);
@@ -607,8 +830,7 @@ namespace KillingMahjong.UI
                 }
             }
 
-            string tileName = new TileData(discardedTileId).GetTileName();
-            ReactionController.Instance.EnqueueDiscardReaction(discardedTileId, isLocalPlayer, tileName);
+            ReactionController.Instance.CheckDiscardConditions(discardedTileId, isLocalPlayer);
         }
 
         public void ClearAllTiles()
@@ -648,23 +870,38 @@ namespace KillingMahjong.UI
             if (enemyRiverUI != null) enemyRiverUI.gameObject.SetActive(false);
             if (enemyHandUI != null) enemyHandUI.gameObject.SetActive(false);
             if (waitUI != null) waitUI.gameObject.SetActive(false);
-            if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
+            // 常に表示させるためコメントアウト
+            // if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
             
             if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(false);
             if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(false);
             
             if (abilityUI != null) abilityUI.gameObject.SetActive(false);
             if (ronAnimationUI != null) ronAnimationUI.gameObject.SetActive(false);
-            if (bettingUI != null) bettingUI.HideBettingPhase();
+            if (bettingUI != null) bettingUI.HideBettingPhase(true);
+            if (doraDisplayUI != null) doraDisplayUI.Hide();
         }
 
         public void OnGameStarted()
         {
-            if (matchmakingUI != null) matchmakingUI.Hide();
+            _currentRoundIndex = 1;
+            if (ReactionController.Instance != null)
+            {
+                ReactionController.Instance.ResetStateForNewGame();
+                ReactionController.Instance.SetPlayerHp(20000);
+                ReactionController.Instance.SetEnemyHp(20000);
+                ReactionController.Instance.HandleRoundStart(1);
+            }
+            if (matchmakingUI != null)
+            {
+                matchmakingUI.Hide();
+            }
             if (dialogueUI != null) 
             {
                 dialogueUI.gameObject.SetActive(true);
-                dialogueUI.ShowText("Match Found! Game Starting...");
+                string introText = (enemyInfoUI != null) ? enemyInfoUI.PlayReaction(ReactionTrigger.GameStart) : null;
+                if (string.IsNullOrEmpty(introText)) introText = "Match Found! Game Starting...";
+                dialogueUI.ShowText(introText);
             }
             if (playerInfoUI != null) playerInfoUI.SetHP(20000);
             if (enemyInfoUI != null) enemyInfoUI.SetHP(20000);
@@ -672,6 +909,11 @@ namespace KillingMahjong.UI
 
         private void UpdatePhaseStatus(RoundStatus newStatus)
         {
+            if (currentPhaseStatus == newStatus) return;
+
+            // 新フェーズ移行時にフラグをリセット
+            _hasSentNextRoundForCurrentPhase = false;
+
             currentPhaseStatus = newStatus;
             if (PhaseManager.Instance != null) PhaseManager.Instance.ChangeRoundStatus(newStatus);
 
@@ -753,6 +995,11 @@ namespace KillingMahjong.UI
                     if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(true);
                     if (waitUI != null) waitUI.gameObject.SetActive(false);
                     if (abilityUI != null) abilityUI.gameObject.SetActive(false);
+                    
+                    if (ReactionController.Instance != null)
+                    {
+                        ReactionController.Instance.PlayDealingReaction();
+                    }
                     break;
                 case RoundStatus.HandSelection:
                     SetMatchUIVisibility(true);
@@ -760,6 +1007,11 @@ namespace KillingMahjong.UI
                     if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(true);
                     if (waitUI != null) waitUI.gameObject.SetActive(false);
                     if (abilityUI != null) abilityUI.gameObject.SetActive(true);
+                    UpdateDoraDisplay();
+                    if (ReactionController.Instance != null)
+                    {
+                        ReactionController.Instance.StartHandSelectionTimer();
+                    }
                     break;
                 case RoundStatus.TurnDecision:
                     if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(false);
@@ -780,12 +1032,14 @@ namespace KillingMahjong.UI
                         waitUI.DisplayWaits(BoardStateManager.Instance.CurrentWaitTiles);
                     }
                     if (abilityUI != null) abilityUI.gameObject.SetActive(true);
+                    UpdateDoraDisplay();
                     break;
                 case RoundStatus.Agari:
                 case RoundStatus.Ron:
                 case RoundStatus.Result:
                     if (waitUI != null) waitUI.gameObject.SetActive(false);
                     if (abilityUI != null) abilityUI.gameObject.SetActive(false);
+                    if (doraDisplayUI != null) doraDisplayUI.Hide();
                     if (ronAnimationUI != null)
                     {
                         bool isLocalWin = BoardStateManager.Instance.LastIsLocalWin;
@@ -821,12 +1075,22 @@ namespace KillingMahjong.UI
                             ? BoardStateManager.Instance.LastDiscardedTileId
                             : (winningHand.Count > 0 ? winningHand[winningHand.Count - 1] : 0);
                         
-                        StartCoroutine(PlayRonWithPreDialogue(isLocalWin, winningHand, ronTile, actualYaku, actualFormula, actualRank));
+                        if (isLocalWin)
+                        {
+                            // 自分がロンした場合は、即座に演出に入らずにロン待機パネルを表示する
+                            if (ronWaitPanel != null) ronWaitPanel.SetActive(true);
+                        }
+                        else
+                        {
+                            // 敵がロンした場合は、相手がボタンを押す(next_round_waitingが来る)まで待機
+                            _isWaitingForEnemyRon = true;
+                        }
                     }
                     break;
                 case RoundStatus.Draw:
                     // 流局演出
                     if (waitUI != null) waitUI.gameObject.SetActive(false);
+                    if (doraDisplayUI != null) doraDisplayUI.Hide();
                     if (abilityUI != null) abilityUI.gameObject.SetActive(false);
                     // SetMatchUIVisibility(false) などの牌を隠す処理を削除（演出中も盤面を表示したままにするため）
                     
@@ -839,6 +1103,101 @@ namespace KillingMahjong.UI
                         dialogueUI.ShowText("流局…次の対局へ");
                     }
                     break;
+            }
+        }
+
+        /// <summary>
+        /// ロン待機パネルのロンボタンが押された時に呼ばれる（インスペクターのOnClickから設定）
+        /// </summary>
+        public void ExecuteRonAction()
+        {
+            if (ronWaitPanel != null) ronWaitPanel.SetActive(false);
+
+            // サーバーを変更できないため、ボタンを押した合図として next_round を送る
+            SendNextRoundAction();
+
+            bool isLocalWin = true;
+            List<int> winningHand = new List<int>(BoardStateManager.Instance.CurrentHandTiles);
+            var liq = BoardStateManager.Instance.LastLiquidationData;
+            
+            List<string> actualYaku = new List<string>();
+            string actualFormula = "0飜";
+            string actualRank = "満貫";
+            
+            if (liq != null)
+            {
+                if (liq.yaku != null) actualYaku = new List<string>(liq.yaku);
+                else actualYaku.Add("不明な役");
+                
+                actualFormula = $"{liq.han}飜";
+                
+                if (liq.multiplier >= 4.0f) actualRank = "役満";
+                else if (liq.multiplier >= 3.0f) actualRank = "三倍満";
+                else if (liq.multiplier >= 2.0f) actualRank = "倍満";
+                else if (liq.multiplier >= 1.5f) actualRank = "跳満";
+                else actualRank = "満貫";
+            }
+            
+            int ronTile = BoardStateManager.Instance.LastDiscardedTileId >= 0
+                ? BoardStateManager.Instance.LastDiscardedTileId
+                : (winningHand.Count > 0 ? winningHand[winningHand.Count - 1] : 0);
+            
+            StartCoroutine(PlayRonWithPreDialogue(isLocalWin, winningHand, ronTile, actualYaku, actualFormula, actualRank));
+        }
+
+        private void HandleNextRoundWaitingReceived()
+        {
+            // 敵がロンして、且つ敵がロンボタンを押した合図として next_round_waiting が送られてきたら演出開始
+            if (_isWaitingForEnemyRon)
+            {
+                _isWaitingForEnemyRon = false;
+                
+                bool isLocalWin = false;
+                List<int> winningHand = new List<int>(BoardStateManager.Instance.CurrentEnemyHandTiles);
+                var liq = BoardStateManager.Instance.LastLiquidationData;
+                
+                List<string> actualYaku = new List<string>();
+                string actualFormula = "0飜";
+                string actualRank = "満貫";
+                
+                if (liq != null)
+                {
+                    if (liq.yaku != null) actualYaku = new List<string>(liq.yaku);
+                    else actualYaku.Add("不明な役");
+                    
+                    actualFormula = $"{liq.han}飜";
+                    
+                    if (liq.multiplier >= 4.0f) actualRank = "役満";
+                    else if (liq.multiplier >= 3.0f) actualRank = "三倍満";
+                    else if (liq.multiplier >= 2.0f) actualRank = "倍満";
+                    else if (liq.multiplier >= 1.5f) actualRank = "跳満";
+                    else actualRank = "満貫";
+                }
+                
+                int ronTile = BoardStateManager.Instance.LastDiscardedTileId >= 0
+                    ? BoardStateManager.Instance.LastDiscardedTileId
+                    : (winningHand.Count > 0 ? winningHand[winningHand.Count - 1] : 0);
+                
+                StartCoroutine(PlayRonWithPreDialogue(isLocalWin, winningHand, ronTile, actualYaku, actualFormula, actualRank));
+            }
+        }
+
+        /// <summary>
+        /// BoardStateManager のドラIDに基づいてドラ表示UIを更新する
+        /// </summary>
+        private void UpdateDoraDisplay()
+        {
+            if (doraDisplayUI != null)
+            {
+                int doraId = Managers.BoardStateManager.Instance.CurrentDoraId;
+                if (doraId >= 0)
+                {
+                    doraDisplayUI.ShowDora(doraId);
+                }
+                else
+                {
+                    doraDisplayUI.Hide();
+                }
             }
         }
 
@@ -860,28 +1219,55 @@ namespace KillingMahjong.UI
             if (bettingUI != null)
             {
                 bettingUI.ShowBettingPhase(20000, currentHealth, OnBetConfirmed);
+                if (ReactionController.Instance != null)
+                {
+                    ReactionController.Instance.StartBetPhaseTimer();
+                }
             }
         }
 
         private void OnBetConfirmed(int betAmount)
         {
             bettingUI.HideBettingPhase();
+            if (ReactionController.Instance != null)
+            {
+                ReactionController.Instance.CheckAndPlayBetReaction(betAmount, Managers.BoardStateManager.Instance.LocalPlayerHp, true);
+            }
             SendActionToServer("bet", new ActionPayload { bet_amount = betAmount, amount = betAmount });
         }
 
+        private int _currentRoundIndex = 1;
+
         public void OnBettingCompleteFromServer(int playerBet, int enemyBet, int playerHp, int enemyHp)
         {
-            TriggerBettingAnimationPhase($"Round 1", playerBet, enemyBet, playerHp, enemyHp); 
+            string roundTitle = $"第{_currentRoundIndex}局目";
+            if (_isCarryOverNextRound) 
+            {
+                roundTitle += "\n自動ベット";
+            }
+
+            if (ReactionController.Instance != null)
+            {
+                ReactionController.Instance.CheckAndPlayBetReaction(enemyBet, enemyHp, false);
+                ReactionController.Instance.SetPlayerHp(playerHp);
+                ReactionController.Instance.SetEnemyHp(enemyHp);
+            }
+            
+            TriggerBettingAnimationPhase(roundTitle, playerBet, enemyBet, playerHp, enemyHp); 
+            _isCarryOverNextRound = false;
         }
 
         public void TriggerBettingAnimationPhase(string roundString, int playerBet, int enemyBet, int playerHp, int enemyHp)
         {
              if (isTransitioning) return;
-             if (currentPhaseStatus != RoundStatus.Betting) return;
+             // if (currentPhaseStatus != RoundStatus.Betting) return; // 流局後の自動ベット時も許可するためコメントアウト
 
              if (phaseTransitionUI != null)
              {
                  isTransitioning = true;
+                 
+                 // 対局開始の暗転（トランジション）前に盤面の牌を隠す
+                 SetMatchUIVisibility(false);
                  
                  if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(false);
                  if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(false);
@@ -890,10 +1276,11 @@ namespace KillingMahjong.UI
                  if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
 
                  phaseTransitionUI.PlayTransition(roundString, playerInfoUI, playerBet, enemyBet, playerHp, enemyHp,
-                    onMidpoint: () => {},
-                    onComplete: () => {
-                         isTransitioning = false;
+                    onMidpoint: () => {
                          SetMatchUIVisibility(true); 
+                         
+                         // 一時的に isTransitioning を false にして HandlePhaseVisibility が実行されるようにする
+                         isTransitioning = false;
                          
                          if (currentPhaseStatus == RoundStatus.Betting)
                          {
@@ -902,8 +1289,16 @@ namespace KillingMahjong.UI
 
                          HandlePhaseVisibility(currentPhaseStatus);
                          
+                         // すぐに isTransitioning を true に戻す
+                         isTransitioning = true;
+                         
                          if (playerInfoUI != null) playerInfoUI.SetHP(Managers.BoardStateManager.Instance.LocalPlayerHp);
                          if (enemyInfoUI != null) enemyInfoUI.SetHP(Managers.BoardStateManager.Instance.EnemyPlayerHp);
+                    },
+                    onComplete: () => {
+                         isTransitioning = false;
+                         
+                         HandlePhaseVisibility(currentPhaseStatus);
                          
                          if (dialogueUI != null) dialogueUI.gameObject.SetActive(true);
                     }
@@ -919,27 +1314,19 @@ namespace KillingMahjong.UI
         private void OnHandSelectionAccepted()
         {
             _autoConfirmNextHandSelection = false;
-            // 満貫以上の場合はサーバーが直接 hand_selection_accepted を返すため、
-            // 確認ダイアログを飛ばして「手牌決定！」演出を再生する
-            if (phaseTransitionUI != null)
+            // 演出はすでにサーバーへの決定通信（select等）を送信する直前に
+            // ローカルで再生済みのため、ここでは待機テキストの表示のみ行う
+            if (handUI != null && handUI.IsSubmitted) 
             {
-                isTransitioning = true;
-                phaseTransitionUI.PlayCenterTextAnim("手牌決定！", 2.0f, () =>
+                if (dialogueUI != null) 
                 {
-                    isTransitioning = false;
-                    // キャンセルされていなければ待機テキストを出す
-                    if (handUI != null && handUI.IsSubmitted) 
-                    {
-                        if (dialogueUI != null) dialogueUI.ShowText("相手の手牌選択を待っています...");
-                    }
-                    HandlePhaseVisibility(currentPhaseStatus);
-                    if (handUI != null) handUI.UpdateLayout(currentPhaseStatus);
-                });
+                    string text = (enemyInfoUI != null) ? enemyInfoUI.PlayReaction(ReactionTrigger.HandSelection) : null;
+                    if (string.IsNullOrEmpty(text)) text = "相手の手牌選択を待っています...";
+                    dialogueUI.ShowText(text);
+                }
             }
-            else
-            {
-                if (dialogueUI != null) dialogueUI.ShowText("相手の手牌選択を待っています...");
-            }
+            HandlePhaseVisibility(currentPhaseStatus);
+            if (handUI != null) handUI.UpdateLayout(currentPhaseStatus);
         }
 
         private void HandleAgari(bool isLocalWin)
@@ -947,10 +1334,51 @@ namespace KillingMahjong.UI
             // UpdatePhaseStatus is handled via Network message event routing
         }
 
+        private bool _isCarryOverNextRound = false;
+
         private void HandleDraw()
         {
             Debug.Log("[GameUIManager] 流局処理開始");
-            StartCoroutine(DrawSequence());
+            _isCarryOverNextRound = true;
+            _currentRoundIndex++;
+            if (ReactionController.Instance != null)
+            {
+                ReactionController.Instance.SetCurrentRound(_currentRoundIndex);
+                ReactionController.Instance.CheckAndPlayDrawReaction();
+                ReactionController.Instance.HandleRoundStart(_currentRoundIndex);
+            }
+
+            if (phaseTransitionUI != null)
+            {
+                isTransitioning = true;
+                phaseTransitionUI.PlayDrawTransition(
+                    onMidpoint: () => {
+                        // 暗転中に流局表示を消してUIをクリア
+                        // if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
+                        
+                        // 牌を暗転中に消去する
+                        BoardStateManager.Instance.ClearAllBoardData();
+                        ClearAllTiles();
+                        
+                        // コンテナUI（手牌の枠など）も非表示にする
+                        SetMatchUIVisibility(false);
+                        
+                        if (ReactionController.Instance != null)
+                        {
+                            ReactionController.Instance.Setup(dialogueUI, enemyInfoUI, playerInfoUI);
+                        }
+                    },
+                    onComplete: () => {
+                        isTransitioning = false;
+                        Debug.Log("[GameUIManager] 流局演出完了 - 次ラウンド待ち承認送信");
+                        SendNextRoundAction();
+                    }
+                );
+            }
+            else
+            {
+                StartCoroutine(DrawSequence());
+            }
         }
 
         private IEnumerator DrawSequence()
@@ -959,7 +1387,7 @@ namespace KillingMahjong.UI
             yield return new WaitForSeconds(3.0f);
 
             // 流局表示を消してUIをクリア（次ラウンドの配牌待ちに備える）
-            if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
+            // if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
             
             // キューに残っているリアクションをクリア
             if (ReactionController.Instance != null)
@@ -968,7 +1396,7 @@ namespace KillingMahjong.UI
             }
 
             Debug.Log("[GameUIManager] 流局演出完了 - 次ラウンド待ち承認送信");
-            NetworkMessageHandler.Instance.SendActionToServer("next_round", new ActionPayload());
+            SendNextRoundAction();
         }
 
         private IEnumerator PlayRonWithPreDialogue(bool isLocalWin, List<int> winningHand, int ronTile, List<string> yaku, string formula, string rank)
@@ -977,6 +1405,14 @@ namespace KillingMahjong.UI
             if (ReactionController.Instance != null)
             {
                 ReactionController.Instance.ClearReactions();
+                
+                bool isYakuman = rank == "役満";
+                bool isDoraBaku = false;
+                foreach (var y in yaku) if (y.Contains("ドラ") && y.Contains("3") || y.Contains("4") || y.Contains("5")) isDoraBaku = true; // 簡易ドラ判定
+                bool isCheap = formula == "1飜" || formula == "2飜";
+                
+                ReactionController.Instance.HandleAgari(isLocalWin, isYakuman, isDoraBaku, isCheap);
+                ReactionController.Instance.SetPlayerLostLastRound(!isLocalWin);
             }
 
             if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(true);
@@ -999,19 +1435,24 @@ namespace KillingMahjong.UI
             }
             else if (isLocalWin)
             {
+                // プレイヤーのロン（＝敵の敗北）なので敵の敗北セリフを出す
                 if (dialogueUI != null)
                 {
                     dialogueUI.gameObject.SetActive(true);
-                    dialogueUI.ShowText("「ロン！」");
+                    string loseText = (enemyInfoUI != null) ? enemyInfoUI.PlayReaction(ReactionTrigger.Lose) : null;
+                    if (string.IsNullOrEmpty(loseText)) loseText = "「ロン！」";
+                    dialogueUI.ShowText(loseText);
                 }
             }
             else
             {
-                // 敵がロンした場合は相手のダイアログを出す
+                // 敵がロンした場合は相手の勝利セリフを出す
                 if (dialogueUI != null)
                 {
                     dialogueUI.gameObject.SetActive(true);
-                    dialogueUI.ShowText("「ロンよ！」");
+                    string winText = (enemyInfoUI != null) ? enemyInfoUI.PlayReaction(ReactionTrigger.Win) : null;
+                    if (string.IsNullOrEmpty(winText)) winText = "「ロンよ！」";
+                    dialogueUI.ShowText(winText);
                 }
             }
 
@@ -1032,12 +1473,73 @@ namespace KillingMahjong.UI
 
         private void OnRonAnimationComplete(bool isLocalWin)
         {
-            // ロン演出完了時に最新のHP（お金）情報をUIに反映する
-            if (playerInfoUI != null) 
-                playerInfoUI.SetHP(Managers.BoardStateManager.Instance.LocalPlayerHp);
-            if (enemyInfoUI != null) 
-                enemyInfoUI.SetHP(Managers.BoardStateManager.Instance.EnemyPlayerHp);
+            _currentRoundIndex++;
+            if (ReactionController.Instance != null)
+            {
+                ReactionController.Instance.SetCurrentRound(_currentRoundIndex);
+                ReactionController.Instance.HandleGameEnd(isLocalWin);
+                ReactionController.Instance.HandleRoundStart(_currentRoundIndex);
+            }
+            // ロン演出の黒背景を閉じた後、点数精算演出を開始する
+            var liq = Managers.BoardStateManager.Instance.LastLiquidationData;
+            int newLocalHp = Managers.BoardStateManager.Instance.LocalPlayerHp;
+            int newEnemyHp = Managers.BoardStateManager.Instance.EnemyPlayerHp;
 
+            // 精算前のHPを逆算する（NetworkMessageHandlerで既にUpdateHp済みのため）
+            int winnerGain = liq != null ? liq.winner_gain : 0;
+            int loserLoss = liq != null ? liq.loser_loss : 0;
+            int prevLocalHp = isLocalWin ? (newLocalHp - winnerGain) : (newLocalHp + loserLoss);
+            int prevEnemyHp = isLocalWin ? (newEnemyHp + loserLoss) : (newEnemyHp - winnerGain);
+
+            // 精算ラベル（ランク表示）
+            string rankLabel = "精算";
+            if (liq != null)
+            {
+                if (liq.multiplier >= 4.0f) rankLabel = "役満";
+                else if (liq.multiplier >= 3.0f) rankLabel = "三倍満";
+                else if (liq.multiplier >= 2.0f) rankLabel = "倍満";
+                else if (liq.multiplier >= 1.5f) rankLabel = "跳満";
+                else rankLabel = "満貫";
+            }
+
+            if (phaseTransitionUI != null)
+            {
+                // 盤面UIを非表示にして精算演出に集中させる
+                if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(false);
+                if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(false);
+
+                phaseTransitionUI.PlayScoreSettlementAnimation(
+                    isLocalWin, winnerGain, loserLoss,
+                    prevLocalHp, prevEnemyHp,
+                    newLocalHp, newEnemyHp,
+                    rankLabel,
+                    () => OnScoreSettlementComplete(isLocalWin)
+                );
+            }
+            else
+            {
+                // PhaseTransitionUI が未設定の場合は従来通り即時反映
+                if (playerInfoUI != null) playerInfoUI.SetHP(newLocalHp);
+                if (enemyInfoUI != null) enemyInfoUI.SetHP(newEnemyHp);
+                OnScoreSettlementComplete(isLocalWin);
+            }
+        }
+
+        private void OnScoreSettlementComplete(bool isLocalWin)
+        {
+            // 精算演出完了後にHPをUIに最終反映する
+            if (playerInfoUI != null)
+            {
+                playerInfoUI.gameObject.SetActive(true);
+                playerInfoUI.SetHP(Managers.BoardStateManager.Instance.LocalPlayerHp);
+            }
+            if (enemyInfoUI != null)
+            {
+                enemyInfoUI.SetPanelVisible(true);
+                enemyInfoUI.SetHP(Managers.BoardStateManager.Instance.EnemyPlayerHp);
+            }
+
+            // 勝利/ダメージエフェクト
             if (isLocalWin)
             {
                 if (victoryEffectPrefab != null && playerInfoUI != null) 
@@ -1061,7 +1563,16 @@ namespace KillingMahjong.UI
         {
             yield return new WaitForSeconds(delay);
             Debug.Log("[GameUIManager] ロン演出完了 - 次ラウンド進行用の承認を送信");
-            NetworkMessageHandler.Instance.SendActionToServer("next_round", new ActionPayload());
+            SendNextRoundAction();
+        }
+
+        private void SendNextRoundAction()
+        {
+            if (!_hasSentNextRoundForCurrentPhase)
+            {
+                _hasSentNextRoundForCurrentPhase = true;
+                NetworkMessageHandler.Instance.SendActionToServer("next_round", new ActionPayload());
+            }
         }
     }
 }

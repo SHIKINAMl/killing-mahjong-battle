@@ -27,6 +27,26 @@ namespace KillingMahjong.UI
         private List<RectTransform> wallSlots = new List<RectTransform>();
         public List<RectTransform> GetWallSlots() => wallSlots;
 
+        /// <summary>
+        /// wallSlotsからtileIdが一致するRectTransformを取り出し、スロットから削除して返す
+        /// </summary>
+        public RectTransform GrabTileById(int tileId)
+        {
+            for (int i = 0; i < wallSlots.Count; i++)
+            {
+                if (wallSlots[i] == null) continue;
+                var interaction = wallSlots[i].GetComponent<TileInteraction>();
+                if (interaction != null && interaction.TileId == tileId)
+                {
+                    RectTransform t = wallSlots[i];
+                    wallSlots.RemoveAt(i);
+                    return t;
+                }
+            }
+            return null;
+        }
+
+
         public void LayoutWallTiles(List<RectTransform> generatedTiles, List<int> tileIds, List<int> waitTiles, bool isDiscardPhase)
         {
             // Clear existing tracking list (but DO NOT destroy, GameUIManager manages their lifecycle)
@@ -70,18 +90,8 @@ namespace KillingMahjong.UI
                 }
             }
 
-            // 3. Sort Categories logic (Count DESC -> Souzu > Manzu > Pinzu > Honor)
-            var categoryLists = new List<List<TileData>> { souzu, manzu, pinzu, honors };
-            
-            categoryLists.Sort((a, b) =>
-            {
-                int countCompare = b.Count.CompareTo(a.Count);
-                if (countCompare != 0) return countCompare;
-
-                int priorityA = GetCategoryPriority(a);
-                int priorityB = GetCategoryPriority(b);
-                return priorityA.CompareTo(priorityB);
-            });
+            // 3. 固定順で並べる: 萬子→ピンズ→索子→字牌
+            var categoryLists = new List<List<TileData>> { manzu, pinzu, souzu, honors };
 
             // 4. Layout
             float currentY = startPosition.y;
@@ -96,8 +106,12 @@ namespace KillingMahjong.UI
                 var list = categoryLists[i];
                 if (list.Count == 0) continue;
 
-                // Sort inside category
-                list.Sort((a, b) => a.Id.CompareTo(b.Id));
+                // Sort inside category (Number順でソート。赤ドラも正しい位置に並ぶように)
+                list.Sort((a, b) =>
+                {
+                    if (a.Number != b.Number) return a.Number.CompareTo(b.Number);
+                    return a.Id.CompareTo(b.Id); // 同じNumberならencodedIdでタイブレーク
+                });
 
                 int j = 0;
                 while (j < list.Count)
@@ -180,14 +194,15 @@ namespace KillingMahjong.UI
                             targetY = currentY;
                         }
 
-                        Vector3 finalPos = new Vector3(targetX, targetY, 0);
-                        slot.localPosition = finalPos;
+                        Vector2 anchoredPos = new Vector2(targetX, targetY);
+                        slot.anchoredPosition = anchoredPos;
                         slot.localRotation = Quaternion.identity;
 
                         var interaction = slot.GetComponent<TileInteraction>();
                         if (interaction != null)
                         {
-                            interaction.OriginalWallPosition = finalPos;
+                            // anchoredPosition（アンカー基準座標）で保存する
+                            interaction.OriginalWallPosition = new Vector3(anchoredPos.x, anchoredPos.y, 0);
                         }
                         
                         var visual = slot.GetComponent<TileVisual>();
@@ -295,8 +310,32 @@ namespace KillingMahjong.UI
                     interaction.Initialize(tileId, false, gameUIManager, canvas);
                 }
                 
-                // 本来の壁の座標に戻す
-                tileTransform.localPosition = interaction.OriginalWallPosition;
+                // アンカーとピボットをLayoutWallTilesと同じ基準（中心 0.5）に戻す
+                tileTransform.anchorMin = new Vector2(0.5f, 0.5f);
+                tileTransform.anchorMax = new Vector2(0.5f, 0.5f);
+                tileTransform.pivot = new Vector2(0.5f, 0.5f);
+                tileTransform.localScale = Vector3.one;
+                tileTransform.localRotation = Quaternion.identity;
+                
+                // OriginalWallPositionはanchoredPosition基準で保存されているため、anchoredPositionで復元する
+                tileTransform.anchoredPosition = new Vector2(
+                    interaction.OriginalWallPosition.x,
+                    interaction.OriginalWallPosition.y
+                );
+            }
+        }
+
+        public void UpdateWallHighlights(List<int> waitTiles, bool isDiscardPhase)
+        {
+            foreach (var slot in wallSlots)
+            {
+                if (slot == null) continue;
+                var visual = slot.GetComponent<TileVisual>();
+                var interaction = slot.GetComponent<TileInteraction>();
+                if (visual != null && interaction != null && waitTiles != null)
+                {
+                    visual.SetFuritenHighlight(isDiscardPhase && waitTiles.Contains(interaction.TileId));
+                }
             }
         }
     }

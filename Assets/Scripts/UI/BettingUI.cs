@@ -46,7 +46,7 @@ namespace KillingMahjong.UI
         
         private Action<int> onConfirmAction;
 
-        private void Start()
+        private void Awake()
         {
             // Setup positions for sliding animation
             if (hpBarPanel != null)
@@ -59,11 +59,9 @@ namespace KillingMahjong.UI
             // Get DialogueUI reference
             dialogueUI = FindFirstObjectByType<DialogueUI>();
 
-            increaseBetButton.onClick.AddListener(IncreaseBet);
-            decreaseBetButton.onClick.AddListener(DecreaseBet);
-            confirmButton.onClick.AddListener(ConfirmBet);
-            
-            gameObject.SetActive(false); // Hidden by default
+            if (increaseBetButton != null) increaseBetButton.onClick.AddListener(IncreaseBet);
+            if (decreaseBetButton != null) decreaseBetButton.onClick.AddListener(DecreaseBet);
+            if (confirmButton != null) confirmButton.onClick.AddListener(ConfirmBet);
         }
 
         public void ShowBettingPhase(int initialHp, int currentHp, Action<int> onConfirm)
@@ -93,7 +91,7 @@ namespace KillingMahjong.UI
             }
         }
 
-        public void HideBettingPhase()
+        public void HideBettingPhase(bool immediate = false)
         {
             if (autoDialogueCoroutine != null)
             {
@@ -101,13 +99,14 @@ namespace KillingMahjong.UI
                 autoDialogueCoroutine = null;
             }
 
-            if (!gameObject.activeInHierarchy)
+            if (immediate || !gameObject.activeInHierarchy)
             {
-                // すでに非アクティブなら、コルーチンを回さずにそのまま終了
+                // すでに非アクティブ、または即時非表示指定なら、コルーチンを回さずにそのまま終了
                 if (hpBarPanel != null)
                 {
                     hpBarPanel.anchoredPosition = hiddenPos;
                 }
+                gameObject.SetActive(false);
                 return;
             }
 
@@ -124,19 +123,29 @@ namespace KillingMahjong.UI
 
         private void IncreaseBet()
         {
+            Debug.Log($"[BettingUI] IncreaseBet Called. currentBet: {currentBet}, maxBet: {maxBet}, currentMoney: {currentMoney}");
             if (currentBet + bettingUnit <= maxBet && currentBet + bettingUnit <= currentMoney)
             {
                 currentBet += bettingUnit;
                 UpdateUI();
             }
+            else
+            {
+                Debug.LogWarning("[BettingUI] Cannot increase bet (Limit reached).");
+            }
         }
 
         private void DecreaseBet()
         {
+            Debug.Log($"[BettingUI] DecreaseBet Called. currentBet: {currentBet}");
             if (currentBet - bettingUnit >= bettingUnit)
             {
                 currentBet -= bettingUnit;
                 UpdateUI();
+            }
+            else
+            {
+                Debug.LogWarning("[BettingUI] Cannot decrease bet (Minimum limit).");
             }
         }
 

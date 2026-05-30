@@ -13,6 +13,21 @@ namespace KillingMahjong.Network
     }
 
     [System.Serializable]
+    public class NextRoundWaitingData
+    {
+        public List<string> ready_players;
+        public int ready_count;
+        public int required_count;
+    }
+
+    [System.Serializable]
+    public class NextRoundWaitingMessage
+    {
+        public string type;
+        public NextRoundWaitingData data;
+    }
+
+    [System.Serializable]
     public class ActionMessage
     {
         public string type = "action";
@@ -57,6 +72,7 @@ namespace KillingMahjong.Network
         public event Action<bool> OnAgari; // isLocalWin
         public event Action OnDraw; // 流局
         public event Action<int, int> OnGameEnded; // localScore, enemyScore
+        public event Action OnNextRoundWaitingReceived; // 相手からの次局待機（ロンボタン押下の合図として利用）
         
         public event Action<string> OnError;
         public event Action<HandSelectionConfirmationData> OnHandSelectionConfirmation;
@@ -333,8 +349,24 @@ namespace KillingMahjong.Network
                         break;
 
                     case "next_round_waiting":
-                        // サーバーが次局待ちに入った。アニメーションの完了を待ってから GameUIManager 経由で承認を送るため、ここでは何もしない。
-                        Debug.Log("[Network] 次局進行待ち - 演出完了後に承認を送信します");
+                        var nrwMsg = JsonUtility.FromJson<NextRoundWaitingMessage>(jsonString);
+                        if (nrwMsg != null && nrwMsg.data != null)
+                        {
+                            if (nrwMsg.data.ready_count > 0)
+                            {
+                                Debug.Log("[Network] 次局進行待ち (ready_count > 0) - 相手が演出を進行させた合図として処理します");
+                                OnNextRoundWaitingReceived?.Invoke();
+                            }
+                            else
+                            {
+                                Debug.Log("[Network] 次局進行待ち (ready_count == 0) - ラウンド終了直後の通知のため無視します");
+                            }
+                        }
+                        else
+                        {
+                            // パース失敗時等のフォールバック
+                            OnNextRoundWaitingReceived?.Invoke();
+                        }
                         break;
 
                     case "next_round_accepted":
@@ -376,6 +408,9 @@ namespace KillingMahjong.Network
             // ------------------------
 
             Managers.BoardStateManager.Instance.SetTenpaiExamples(tenpaiExamples);
+
+            // ドラ表示牌を保存
+            Managers.BoardStateManager.Instance.CurrentDoraId = msg.dora_id;
 
             // 手動独自パースで wall 配列を抽出 (JsonUtilityが int[] を上手くさばけない場合のフェールセーフ)
             var wallDict = ParseIntArrays(jsonString, "wall");
@@ -447,13 +482,16 @@ namespace KillingMahjong.Network
                 int cidStart = jsonString.IndexOf("\"client_id\"", searchFrom);
                 if (cidStart < 0) break;
 
+                int nextCidStart = jsonString.IndexOf("\"client_id\"", cidStart + 11);
+                if (nextCidStart < 0) nextCidStart = jsonString.Length;
+
                 int valStart = jsonString.IndexOf('"', cidStart + 11) + 1;
                 int valEnd = jsonString.IndexOf('"', valStart);
                 if (valStart < 0 || valEnd < 0) break;
                 string cid = jsonString.Substring(valStart, valEnd - valStart);
 
                 int keyStart = jsonString.IndexOf($"\"{arrayKeyName}\"", valEnd);
-                if (keyStart > 0 && keyStart < cidStart + 200) // 次のデータに飛びすぎないよう簡易チェック
+                if (keyStart > 0 && keyStart < nextCidStart) // 次のデータに飛びすぎないようチェック
                 {
                     int arrStart = jsonString.IndexOf('[', keyStart);
                     int arrEnd = jsonString.IndexOf(']', arrStart);
@@ -482,13 +520,16 @@ namespace KillingMahjong.Network
                 int cidStart = jsonString.IndexOf("\"client_id\"", searchFrom);
                 if (cidStart < 0) break;
 
+                int nextCidStart = jsonString.IndexOf("\"client_id\"", cidStart + 11);
+                if (nextCidStart < 0) nextCidStart = jsonString.Length;
+
                 int valStart = jsonString.IndexOf('"', cidStart + 11) + 1;
                 int valEnd = jsonString.IndexOf('"', valStart);
                 if (valStart < 0 || valEnd < 0) break;
                 string cid = jsonString.Substring(valStart, valEnd - valStart);
 
                 int keyStart = jsonString.IndexOf("\"tenpai_examples\"", valEnd);
-                if (keyStart > 0 && keyStart < cidStart + 300) 
+                if (keyStart > 0 && keyStart < nextCidStart) 
                 {
                     int arrStart = jsonString.IndexOf('[', keyStart);
                     if (arrStart > 0)
@@ -499,22 +540,40 @@ namespace KillingMahjong.Network
                             string inner = jsonString.Substring(arrStart + 1, outerArrEnd - arrStart - 1);
                             var examplesList = new List<int[]>();
                             
-                            int innerSearchFrom = 0;
-                            while (true)
+                            int innerArrStartCheck = inner.IndexOf('[');
+                            if (innerArrStartCheck < 0)
                             {
-                                int innerArrStart = inner.IndexOf('[', innerSearchFrom);
-                                if (innerArrStart < 0) break;
-                                int innerArrEnd = inner.IndexOf(']', innerArrStart);
-                                if (innerArrEnd < 0) break;
-                                
-                                string arrayStr = inner.Substring(innerArrStart + 1, innerArrEnd - innerArrStart - 1);
+                                // Pythonサーバーからの実データ (フラットな配列) に対応: [0, 1, 2, ...]
                                 var list = new List<int>();
-                                foreach (var token in arrayStr.Split(','))
+                                foreach (var token in inner.Split(','))
                                 {
                                     if (int.TryParse(token.Trim(), out int val)) list.Add(val);
                                 }
-                                examplesList.Add(list.ToArray());
-                                innerSearchFrom = innerArrEnd + 1;
+                                if (list.Count > 0)
+                                {
+                                    examplesList.Add(list.ToArray());
+                                }
+                            }
+                            else
+                            {
+                                // ネストされた配列 (モッククライアント等) に対応: [[0, 1, ...], [2, 3, ...]]
+                                int innerSearchFrom = 0;
+                                while (true)
+                                {
+                                    int innerArrStart = inner.IndexOf('[', innerSearchFrom);
+                                    if (innerArrStart < 0) break;
+                                    int innerArrEnd = inner.IndexOf(']', innerArrStart);
+                                    if (innerArrEnd < 0) break;
+                                    
+                                    string arrayStr = inner.Substring(innerArrStart + 1, innerArrEnd - innerArrStart - 1);
+                                    var list = new List<int>();
+                                    foreach (var token in arrayStr.Split(','))
+                                    {
+                                        if (int.TryParse(token.Trim(), out int val)) list.Add(val);
+                                    }
+                                    examplesList.Add(list.ToArray());
+                                    innerSearchFrom = innerArrEnd + 1;
+                                }
                             }
                             result[cid] = examplesList;
                         }

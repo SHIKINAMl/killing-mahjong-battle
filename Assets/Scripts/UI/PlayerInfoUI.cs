@@ -7,6 +7,8 @@ namespace KillingMahjong.UI
     {
         [Header("HP Display")]
         [SerializeField] private TextMeshProUGUI hpText;
+        [SerializeField] private UnityEngine.UI.Image hpFillImage; // 追加: 人型のHPメーター用画像
+        private int maxHp = 20000; // 最大HP（割合計算用）
 
         [Header("Character Portrait")]
         [SerializeField] private SpriteRenderer characterRenderer;
@@ -50,8 +52,14 @@ namespace KillingMahjong.UI
             currentHp = hp;
             if (hpText != null)
             {
-                // MaxHPの概念は一旦表示せず、現在HPのみそのまま表示します
-                hpText.text = $"HP: {currentHp}";
+                // 数字のみ表示する
+                hpText.text = currentHp.ToString();
+            }
+            
+            // 人型メーターの割合を更新する
+            if (hpFillImage != null)
+            {
+                hpFillImage.fillAmount = (float)hp / maxHp;
             }
         }
         
@@ -76,13 +84,17 @@ namespace KillingMahjong.UI
         {
             if (characterRenderer != null)
             {
-                if (isDiscarding && discardSprite != null)
+                // 実行中に変更された場合も反映されるように、characterDataから直接読み取る
+                Sprite targetDiscardSprite = (characterData != null && characterData.discardSprite != null) ? characterData.discardSprite : discardSprite;
+                Sprite targetNormalSprite = (characterData != null && characterData.normalSprite != null) ? characterData.normalSprite : normalSprite;
+
+                if (isDiscarding && targetDiscardSprite != null)
                 {
-                    characterRenderer.sprite = discardSprite;
+                    characterRenderer.sprite = targetDiscardSprite;
                 }
-                else if (!isDiscarding && normalSprite != null)
+                else if (!isDiscarding && targetNormalSprite != null)
                 {
-                    characterRenderer.sprite = normalSprite;
+                    characterRenderer.sprite = targetNormalSprite;
                 }
             }
         }

@@ -121,6 +121,7 @@ namespace KillingMahjong.UI
         private void OnDecideClicked()
         {
             if (gameUIManager == null) return;
+            if (isSubmitted || gameUIManager.IsTransitioning) return;
 
             if (gameUIManager.CurrentPhaseStatus == RoundStatus.Discard)
             {
@@ -143,7 +144,10 @@ namespace KillingMahjong.UI
         private void OnAutoManganClicked()
         {
             Debug.Log("Auto Mangan Hand Clicked");
-            if (gameUIManager != null && gameUIManager.CurrentPhaseStatus == RoundStatus.HandSelection)
+            if (gameUIManager == null) return;
+            if (isSubmitted || gameUIManager.IsTransitioning) return;
+
+            if (gameUIManager.CurrentPhaseStatus == RoundStatus.HandSelection)
             {
                 gameUIManager.SelectManganHand();
             }
