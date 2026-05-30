@@ -14,7 +14,7 @@ class Yaku(Enum):
     DORA = ("ドラ", 1)
     AKA_DORA = ("赤ドラ", 1)
     IPPATSU = ("一発", 1)
-    KAWA_ZO = ("河底", 1)
+    KAWA_ZO = ("河底撈魚", 1)
 
     # ========== 2翻役 ==========
     SANSHOKU_DOUJUN = ("三色同順", 2)
@@ -71,6 +71,9 @@ class Yaku(Enum):
             >>> Yaku.get_han_by_name("存在しない役")
             -1
         """
+        if name == "河底":
+            name = cls.KAWA_ZO.japanese_name
+
         for member in cls:
             if member.japanese_name == name:
                 return member.han
