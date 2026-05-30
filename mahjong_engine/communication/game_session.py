@@ -232,7 +232,7 @@ class GameSession:
 
 		self._game_engines[match.match_id] = engine
 		logger.info("マッチ開始: match_id=%s  players=%s", match.match_id, match.players)
-		engine.start_game(4)
+		engine.start_game(1000)
 
 	async def handle_game_action(self, client_id: str, data: Dict[str, Any]) -> None:
 		"""
