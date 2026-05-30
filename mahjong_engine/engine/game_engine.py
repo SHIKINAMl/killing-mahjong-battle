@@ -126,6 +126,7 @@ class GameEngine:
         self._invoke_callback(self.on_bet)
         self._set_phase(RoundStatus.DISCARD)
         self.state.round_state.current_player_index = random.randrange(0, self.num_players)
+        self.state.round_state.first_player_index = self.state.round_state.current_player_index
         self._invoke_callback(self.on_discard_started)
 
     def get_bet_rule(self, player: PlayerState) -> tuple[int, int]:
@@ -467,8 +468,11 @@ class GameEngine:
             ):
                 return True
 
-        if len(discarding_player.discards) >= 16:  # 16枚以上捨てたら流局
-            logger.info("流局: player=%s  discards=%d", player_id, len(discarding_player.discards))
+        if all(len(player.discards) >= 16 for player in self.state.players):
+            logger.info(
+                "流局: all players reached 16 discards (%s)",
+                {player.player_id: len(player.discards) for player in self.state.players},
+            )
             self.end_round(is_draw=True)
             return False
 
@@ -507,6 +511,42 @@ class GameEngine:
         temp_counter[winning_base] -= 2
         return any(len(melds) == 4 for melds in HandAnalyzer._generate_melds(temp_counter))
 
+    def _is_ippatsu_agari(self, winner: PlayerState, loser: PlayerState, base_yaku_list: list[str]) -> bool:
+        """一発成立かどうかを返す。両者の一打目までを一発圏とする。"""
+        if Yaku.RICHI.japanese_name not in base_yaku_list:
+            return False
+
+        return len(winner.discards) <= 1 and len(loser.discards) == 1
+
+    def _is_houtei_raoyui(self, loser: PlayerState, winning_tile: Optional[int]) -> bool:
+        """河底撈魚成立かどうかを返す。後手側の16打目を最後の捨て牌とみなす。"""
+        if winning_tile is None or len(loser.discards) != 16:
+            return False
+
+        first_player = self.state.players[self.state.round_state.first_player_index]
+        return loser.player_id != first_player.player_id
+
+    def _get_win_context_yaku(
+        self,
+        winner: PlayerState,
+        loser: PlayerState,
+        winning_tile: Optional[int],
+        base_yaku_list: list[str],
+    ) -> list[str]:
+        """和了時の状況役を返す。初期の手牌評価には使わない。"""
+        context_yaku: list[str] = []
+
+        if winning_tile is None:
+            return context_yaku
+
+        if self._is_ippatsu_agari(winner, loser, base_yaku_list):
+            context_yaku.append(Yaku.IPPATSU.japanese_name)
+
+        if self._is_houtei_raoyui(loser, winning_tile):
+            context_yaku.append(Yaku.KAWA_ZO.japanese_name)
+
+        return context_yaku
+
     def liquidation(self, player_id: str, hand: list[int], winning_tile: Optional[int] = None) -> bool:
         """
         清算処理
@@ -517,12 +557,6 @@ class GameEngine:
         Returns:
             上がりが成立していれば True、そうでなければ False
         """
-        is_win = HandAnalyzer.is_win(hand)
-        is_mangan = HandAnalyzer.check_mangan(hand)
-        if not is_win or not is_mangan:
-            logger.debug("上がり条件不成立: player=%s  is_win=%s  check_mangan=%s", player_id, is_win, is_mangan)
-            return False
-
         winner = self.get_player_by_id(player_id)
         if winner is None:
             return False
@@ -531,10 +565,17 @@ class GameEngine:
         if loser is None:
             return False
 
+        is_win = HandAnalyzer.is_win(hand)
+        base_yaku_list = HandAnalyzer.enum_yaku(hand, winning_tile=winning_tile)
+        base_yaku_list += self._get_win_context_yaku(winner, loser, winning_tile, base_yaku_list)
+        is_mangan = sum(Yaku.get_han_by_name(name) for name in base_yaku_list) >= 4
+        if not is_win or not is_mangan:
+            logger.debug("上がり条件不成立: player=%s  is_win=%s  check_mangan=%s", player_id, is_win, is_mangan)
+            return False
+
         is_tanki_wait = self._is_tanki_wait_agari(hand, winning_tile, winner.waits)
 
         # 役倍率（跳満 1.5倍 / 倍満 2倍 / 三倍満 3倍 / 役満 4倍）
-        base_yaku_list = HandAnalyzer.enum_yaku(hand)
         boost_bonus_map = self._normalized_boost_bonus_map(winner)
         base_han = sum(Yaku.get_han_by_name(name) for name in base_yaku_list)
         bonus_han = sum(boost_bonus_map.get(name, 0) for name in base_yaku_list)
@@ -716,7 +757,7 @@ class GameEngine:
         result = []
         boost_bonus_map = self._normalized_boost_bonus_map(player)
         for w in waits:
-            base_yaku_list = HandAnalyzer.enum_yaku(hand_tiles + [w])
+            base_yaku_list = HandAnalyzer.enum_yaku(hand_tiles + [w], winning_tile=w)
             base_han = sum(Yaku.get_han_by_name(y) for y in base_yaku_list)
             bonus = sum(boost_bonus_map.get(y, 0) for y in base_yaku_list)
             display_yaku_list = self._build_display_yaku_list(base_yaku_list, boost_bonus_map)

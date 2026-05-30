@@ -115,6 +115,7 @@ class RoundState:
     """1 局の状態を管理"""
     round_number: int  # 現在の局番号
     current_player_index: int  # 現在のプレイヤーインデックス（0 または 1）
+    first_player_index: int = 0  # 打牌フェーズの先手プレイヤーインデックス
     status: Optional[RoundStatus] = None  # 局内のステータス
     dora_id: Optional[int] = None  # ドラのタイル ID
     reserved_tiles: list = field(default_factory=list)  # 手牌交換用の予備牌（全 47 枚）
