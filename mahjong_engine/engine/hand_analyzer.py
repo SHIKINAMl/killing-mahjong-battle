@@ -397,6 +397,9 @@ class HandAnalyzer:
         if HandAnalyzer._is_sanshoku_doukou(melds):
             yaku.append("三色同刻")
             han += 2
+        if HandAnalyzer._is_toitoi(melds):
+            yaku.append("対々和")
+            han += 2
         if HandAnalyzer._is_sanankou(melds, winning_tile):
             yaku.append("三暗刻")
             han += 2
@@ -587,6 +590,11 @@ class HandAnalyzer:
         return HandAnalyzer._count_concealed_triplets(melds, winning_tile) == 3
 
     @staticmethod
+    def _is_toitoi(melds: List[Tuple[str, int]]) -> bool:
+        """対々和かどうかの判定"""
+        return all(kind == "triplet" for kind, _ in melds)
+
+    @staticmethod
     def _count_concealed_triplets(melds: List[Tuple[str, int]], winning_tile: int | None = None) -> int:
         """上がり牌で完成した刻子を除いた暗刻数を返す"""
         concealed_triplets = sum(1 for kind, _ in melds if kind == "triplet")
@@ -594,6 +602,7 @@ class HandAnalyzer:
             return concealed_triplets
 
         winning_tile_id = winning_tile & 0b11111
+        # シャンポン待ちのロンでは、和了牌で完成した刻子だけを暗刻から外す。
         if any(kind == "triplet" and tile_id == winning_tile_id for kind, tile_id in melds):
             concealed_triplets -= 1
 

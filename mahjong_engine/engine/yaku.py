@@ -20,6 +20,7 @@ class Yaku(Enum):
     SANSHOKU_DOUJUN = ("三色同順", 2)
     SANSHOKU_DOUKOU = ("三色同刻", 2)
     SANANKOU = ("三暗刻", 2)
+    TOITOI = ("対々和", 2)
     HONROUTOU = ("混老頭", 2)
     CHANTA = ("混全帯么九", 2)
     CHIITOI = ("七対子", 2)
