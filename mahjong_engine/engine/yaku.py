@@ -39,6 +39,9 @@ class Yaku(Enum):
     CHINROUTOU = ("清老頭", 13)
     SUUANKOU = ("四暗刻", 13)
 
+    #========= 二倍役満（26翻） ==========
+    JUNSEI_CHUREN_POUTOU = ("純正九蓮宝燈", 26)
+
     @property
     def japanese_name(self) -> str:
         """役の日本語名"""

@@ -481,6 +481,8 @@ class GameEngine:
 
     def _get_liquidation_multiplier(self, han: int) -> float:
         """翻数から精算倍率を返す。"""
+        if han >= 26:
+            return 8.0
         if han >= 13:
             return 4.0
         if han >= 11:

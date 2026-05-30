@@ -356,7 +356,9 @@ class HandAnalyzer:
         han = 0
 
         # 役満
-        if HandAnalyzer._is_churen_poutou(counter):
+        if HandAnalyzer._is_junsei_churen_poutou(counter, winning_tile):
+            return ["純正九蓮宝燈"], 26
+        elif HandAnalyzer._is_churen_poutou(counter):
             return ["九蓮宝燈"], 13
         elif HandAnalyzer._is_ryuuisou(counter):
             return ["緑一色"], 13
@@ -576,6 +578,30 @@ class HandAnalyzer:
             if all(counter[suit_base + i] >= (3 if i in (0, 8) else 1) for i in range(9)):
                 return True
         return False
+
+    @staticmethod
+    def _is_junsei_churen_poutou(counter: Counter, winning_tile: int | None = None) -> bool:
+        """純正九蓮宝燈かどうかの判定"""
+        if winning_tile is None:
+            return False
+
+        winning_tile_id = winning_tile & 0b11111
+        suit_base = (winning_tile_id // 9) * 9
+
+        if suit_base >= 27:
+            return False
+
+        if any(counter[tile_id] > 0 for tile_id in range(27, 29)):
+            return False
+
+        if any(counter[tile_id] > 0 for tile_id in range(27) if tile_id < suit_base or tile_id >= suit_base + 9):
+            return False
+
+        base_pattern = [3, 1, 1, 1, 1, 1, 1, 1, 3]
+        suit_counts = [counter[suit_base + i] for i in range(9)]
+        suit_counts[winning_tile_id - suit_base] -= 1
+
+        return suit_counts == base_pattern
 
     # ========== 役判定（面子単位） ==========
 
