@@ -10434,7 +10434,7 @@ MonoBehaviour:
   enemyInfoUI: {fileID: 603402878}
   clickAreaSize: {x: 7, y: 6}
   clickAreaOffset: {x: 0, y: 3}
-  showDebugArea: 1
+  showDebugArea: 0
   debugAreaColor: {r: 0, g: 1, b: 0, a: 0.25}
 --- !u!1 &1376948187
 GameObject:
@@ -11545,7 +11545,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -470, y: 350}
+  m_AnchoredPosition: {x: -470, y: 240}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &1535654844
