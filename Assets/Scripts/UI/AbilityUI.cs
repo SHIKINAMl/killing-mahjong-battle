@@ -110,24 +110,40 @@ namespace KillingMahjong.UI
                 RectTransform rt = itemObj.GetComponent<RectTransform>();
                 if (rt != null)
                 {
-                    // Force Top-Stretch Layout
+                    // はみ出した子要素（巨大な背景やテキスト枠など）が他のボタンのクリック判定を奪うのを防ぐため、
+                    // RectMask2Dを追加して、指定サイズ（itemHeight）外の描画とクリック判定を完全にカットします。
+                    if (itemObj.GetComponent<RectMask2D>() == null)
+                    {
+                        itemObj.gameObject.AddComponent<RectMask2D>();
+                    }
+
+                    // Force Top-Stretch Layout horizontally
                     rt.localRotation = Quaternion.identity;
                     rt.localScale = Vector3.one;
 
-                    // Set Anchors to Top-Stretch (Min: 0,1 | Max: 1,1)
+                    // Set Anchors to Top-Stretch
                     rt.anchorMin = new Vector2(0, 1);
                     rt.anchorMax = new Vector2(1, 1);
-                    rt.pivot = new Vector2(0.5f, 1);
+                    
+                    // 以前は pivot を (0.5, 1) に強制変更していましたが、
+                    // これによりPrefab内の子要素（背景など）がズレてはみ出し、クリック判定が重なる原因になっていました。
+                    // pivot はPrefabの設定をそのまま維持し、位置計算で補正します。
 
                     // Set SizeDelta (X=0 means stretch to fill width, Y=Height)
                     rt.sizeDelta = new Vector2(0, itemHeight);
 
-                    // Set Position (Top goes down). Use 3D to ensure Z is 0.
-                    rt.anchoredPosition3D = new Vector3(itemOffsetX, -currentY, 0);
+                    // Set Position based on the existing pivot
+                    float posY = -currentY - (1f - rt.pivot.y) * itemHeight;
+                    rt.anchoredPosition3D = new Vector3(itemOffsetX, posY, 0);
+
+                    currentY += itemHeight + itemSpacing;
+                }
+                else
+                {
+                    currentY += itemHeight + itemSpacing;
                 }
 
                 instantiatedItems.Add(itemObj);
-                currentY += itemHeight + itemSpacing;
             }
 
             // Resize Container
@@ -178,15 +194,14 @@ namespace KillingMahjong.UI
 
         public void OnAbilitySelected(AbilityItemUI item)
         {
-            if (currentSelection != null) currentSelection.Deselect();
-            
             if (currentSelection == item)
             {
-                currentSelection = item;
-                currentSelection.Select();
+                // すでに選択されているものをもう一度クリックしたら発動とする
+                OnActivateClicked();
             }
             else
             {
+                if (currentSelection != null) currentSelection.Deselect();
                 currentSelection = item;
                 currentSelection.Select();
             }
@@ -214,14 +229,18 @@ namespace KillingMahjong.UI
                     var uiMgr = FindFirstObjectByType<GameUIManager>();
                     if (uiMgr != null)
                     {
-                        // サーバーへスキル発動リクエストを送信
-                        uiMgr.SendActionToServer("skill", new Network.ActionPayload { skill_type = data.skillType });
-                        
-                        // Client-side visual deduction (仮反映。後でサーバーからの応答で正確に更新するのが理想)
-                        if (uiMgr.PlayerInfoUI != null)
+                        if (data.skillType == "mulligan")
                         {
-                            uiMgr.PlayerInfoUI.ReduceHp(data.cost);
-                            uiMgr.ShowDialogue($"アビリティ「{data.name}」を発動！");
+                            uiMgr.StartMulliganSelection();
+                        }
+                        else if (data.skillType == "boost_hand")
+                        {
+                            uiMgr.StartBoostHandSelection();
+                        }
+                        else
+                        {
+                            // サーバーへスキル発動リクエストを直接送信
+                            uiMgr.SendActionToServer("skill", new Network.ActionPayload { skill_type = data.skillType });
                         }
                     }
                 }

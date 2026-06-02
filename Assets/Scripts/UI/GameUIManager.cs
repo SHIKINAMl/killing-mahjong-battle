@@ -94,6 +94,8 @@ namespace KillingMahjong.UI
             net.OnIsTenpaiReceived += HandleIsTenpaiReceived;
             net.OnNotTenpaiReceived += HandleNotTenpaiReceived;
             net.OnNextRoundWaitingReceived += HandleNextRoundWaitingReceived;
+            net.OnSkillCasted += HandleSkillCasted;
+            net.OnSpecialVictoryWon += HandleSpecialVictoryWon;
         }
 
         private void HandleTurnChanged(bool isLocalTurn)
@@ -1234,6 +1236,136 @@ namespace KillingMahjong.UI
                 
                 StartCoroutine(PlayRonWithPreDialogue(isLocalWin, winningHand, ronTile, actualYaku, actualFormula, actualRank));
             }
+        }
+
+        private string GetSkillName(string skillType)
+        {
+            switch (skillType)
+            {
+                case "mulligan": return "手牌交換";
+                case "perspective": return "透視";
+                case "boost_hand": return "役強化";
+                case "special_victory": return "特殊勝利";
+                default: return skillType;
+            }
+        }
+
+        private void HandleSkillCasted(SkillCastedData data)
+        {
+            bool isLocalPlayer = (data.player_id == NetworkMessageHandler.Instance.LocalPlayerId);
+            string skillName = GetSkillName(data.skillType);
+            string castMessage = isLocalPlayer ? $"アビリティ発動！\n「{skillName}」" : $"相手がアビリティを発動！\n「{skillName}」";
+
+            if (phaseTransitionUI != null)
+            {
+                phaseTransitionUI.PlayCenterTextAnim(castMessage, 2.0f, null);
+            }
+            else if (dialogueUI != null)
+            {
+                dialogueUI.ShowText(castMessage);
+            }
+
+            // Hp更新はコストに応じてローカルで演出として行う
+            if (isLocalPlayer)
+            {
+                int currentLocalHp = Managers.BoardStateManager.Instance.LocalPlayerHp;
+                int currentEnemyHp = Managers.BoardStateManager.Instance.EnemyPlayerHp;
+                Managers.BoardStateManager.Instance.UpdateHp(currentLocalHp - data.cost, currentEnemyHp);
+                if (playerInfoUI != null) playerInfoUI.SetHP(Managers.BoardStateManager.Instance.LocalPlayerHp);
+            }
+            else
+            {
+                int currentLocalHp = Managers.BoardStateManager.Instance.LocalPlayerHp;
+                int currentEnemyHp = Managers.BoardStateManager.Instance.EnemyPlayerHp;
+                Managers.BoardStateManager.Instance.UpdateHp(currentLocalHp, currentEnemyHp - data.cost);
+                if (enemyInfoUI != null) enemyInfoUI.SetHP(Managers.BoardStateManager.Instance.EnemyPlayerHp);
+            }
+
+            // スキルごとの固有演出
+            if (data.skillType == "perspective")
+            {
+                if (data.exposedHandIndexes != null && data.exposedHandIndexes.Count > 0)
+                {
+                    if (isLocalPlayer && enemyHandUI != null)
+                    {
+                        foreach (int idx in data.exposedHandIndexes)
+                        {
+                            enemyHandUI.RevealTileByIndex(idx);
+                        }
+                    }
+                }
+            }
+            else if (data.skillType == "mulligan")
+            {
+                if (isLocalPlayer)
+                {
+                    // 交換した牌は確定するまで見えないようにする（裏向きの牌ID 0などを想定、またはダミー表示）
+                    // ひとまず視覚的に「何かに変わった」ことを示すために選択を解除するだけにする
+                    ClearSelection();
+                }
+            }
+        }
+
+        private void HandleSpecialVictoryWon(string playerId)
+        {
+            bool isLocalPlayer = (playerId == NetworkMessageHandler.Instance.LocalPlayerId);
+            string msg = isLocalPlayer ? "特殊勝利条件を達成しました！" : "相手が特殊勝利条件を達成しました...";
+            if (phaseTransitionUI != null)
+            {
+                phaseTransitionUI.PlayCenterTextAnim(msg, 3.0f, null);
+            }
+        }
+
+        // --- Skill UI Flows ---
+        public bool IsMulliganSelection { get; private set; }
+
+        public void StartMulliganSelection()
+        {
+            IsMulliganSelection = true;
+            if (phaseTransitionUI != null)
+            {
+                phaseTransitionUI.PlayCenterTextAnim("交換する牌を選んでください", 1.5f, null);
+            }
+            else if (dialogueUI != null)
+            {
+                dialogueUI.ShowText("交換する牌を選んでください");
+            }
+        }
+
+        public void OnMulliganTileSelected(int tileId)
+        {
+            IsMulliganSelection = false;
+            if (_pendingHandTiles != null)
+            {
+                int targetIndex = _pendingHandTiles.IndexOf(tileId);
+                if (targetIndex != -1)
+                {
+                    SendActionToServer("skill", new Network.ActionPayload { skill_type = "mulligan", target_hand_index = targetIndex });
+                }
+                else
+                {
+                    Debug.LogWarning("Mulligan failed: Selected tile not found in current hand.");
+                }
+            }
+        }
+
+        private YakuSelectionUI yakuSelectionUI;
+
+        public void StartBoostHandSelection()
+        {
+            if (yakuSelectionUI == null)
+            {
+                yakuSelectionUI = gameObject.AddComponent<YakuSelectionUI>();
+            }
+
+            yakuSelectionUI.Show(
+                onSelected: (yakuName) => {
+                    SendActionToServer("skill", new Network.ActionPayload { skill_type = "boost_hand", yaku_name = yakuName });
+                },
+                onCanceled: () => {
+                    Debug.Log("Boost hand cancelled");
+                }
+            );
         }
 
         /// <summary>

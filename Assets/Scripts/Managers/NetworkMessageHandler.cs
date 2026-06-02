@@ -28,6 +28,35 @@ namespace KillingMahjong.Network
     }
 
     [System.Serializable]
+    public class SkillCastedData
+    {
+        public string player_id;
+        public string skillType;
+        public int cost;
+        public List<int> exposedHandIndexes;
+    }
+
+    [System.Serializable]
+    public class SpecialVictoryWonData
+    {
+        public string player_id;
+    }
+
+    [System.Serializable]
+    public class SpecialVictoryWonMessage
+    {
+        public string type;
+        public SpecialVictoryWonData data;
+    }
+
+    [System.Serializable]
+    public class SkillCastedMessage
+    {
+        public string type;
+        public SkillCastedData data;
+    }
+
+    [System.Serializable]
     public class ActionMessage
     {
         public string type = "action";
@@ -42,6 +71,8 @@ namespace KillingMahjong.Network
         public List<int> wall_indexes;
         public int wall_index;
         public string skill_type;
+        public int target_hand_index;
+        public string yaku_name;
         
         // --- 互換性維持 ---
         public int amount;
@@ -86,7 +117,11 @@ namespace KillingMahjong.Network
         public event Action OnDealingStarted;
         public event Action OnDealingCompleted;
 
+        public event Action<SkillCastedData> OnSkillCasted;
+        public event Action<string> OnSpecialVictoryWon;
+
         private string localPlayerId = ""; // GameManager等からセットされる想定
+        public string LocalPlayerId => localPlayerId;
         private bool agariProcessed = false; // ロン二重発火防止フラグ
 
         private void Awake()
@@ -160,6 +195,22 @@ namespace KillingMahjong.Network
 
                     case "game_started":
                         OnGameStarted?.Invoke();
+                        break;
+
+                    case "skill_casted":
+                        SkillCastedMessage scMsg = JsonUtility.FromJson<SkillCastedMessage>(jsonString);
+                        if (scMsg != null && scMsg.data != null)
+                        {
+                            OnSkillCasted?.Invoke(scMsg.data);
+                        }
+                        break;
+
+                    case "special_victory_won":
+                        SpecialVictoryWonMessage svwMsg = JsonUtility.FromJson<SpecialVictoryWonMessage>(jsonString);
+                        if (svwMsg != null && svwMsg.data != null)
+                        {
+                            OnSpecialVictoryWon?.Invoke(svwMsg.data.player_id);
+                        }
                         break;
                         
                     case "phase_change":

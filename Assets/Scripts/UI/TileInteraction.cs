@@ -63,11 +63,25 @@ namespace KillingMahjong.UI
 
             if (eventData.button != PointerEventData.InputButton.Left) return;
 
-            // Any Click -> Move (Left or Right)
+            // Any Click -> Move (Left or Right) or Select for Mulligan
             if (IsInHand)
-                _gameUIManager.MoveTileToWall(TileId);
+            {
+                if (_gameUIManager != null && _gameUIManager.IsMulliganSelection)
+                {
+                    _gameUIManager.OnMulliganTileSelected(TileId);
+                }
+                else
+                {
+                    _gameUIManager.MoveTileToWall(TileId);
+                }
+            }
             else
-                _gameUIManager.MoveTileToHand(TileId);
+            {
+                if (_gameUIManager == null || !_gameUIManager.IsMulliganSelection)
+                {
+                    _gameUIManager.MoveTileToHand(TileId);
+                }
+            }
         }
 
         public void OnBeginDrag(PointerEventData eventData)
