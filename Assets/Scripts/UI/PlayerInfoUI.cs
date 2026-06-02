@@ -47,6 +47,11 @@ namespace KillingMahjong.UI
             }
         }
 
+        public void SetMaxHP(int max)
+        {
+            maxHp = max;
+        }
+
         public void SetHP(int hp)
         {
             currentHp = hp;

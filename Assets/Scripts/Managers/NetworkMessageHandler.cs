@@ -65,6 +65,7 @@ namespace KillingMahjong.Network
 
         // イベントルーティング
         public event Action OnMatchmakingWaiting;
+        public event Action<string> OnMatchCancelled;
         public event Action OnGameStarted;
         public event Action<int, int, int, int> OnBettingComplete;
         public event Action<RoundStatus> OnPhaseStatusChanged;
@@ -147,6 +148,16 @@ namespace KillingMahjong.Network
                         OnMatchmakingWaiting?.Invoke();
                         break;
 
+                    case "match_cancelled":
+                        MatchCancelledMessage cancelMsg = JsonUtility.FromJson<MatchCancelledMessage>(jsonString);
+                        string reasonMsg = "通信が切断されました。マッチング待機中です...";
+                        if (cancelMsg != null && cancelMsg.data != null && cancelMsg.data.reason == "player_disconnected")
+                        {
+                            reasonMsg = "対戦相手が切断しました。マッチング待機中です...";
+                        }
+                        OnMatchCancelled?.Invoke(reasonMsg);
+                        break;
+
                     case "game_started":
                         OnGameStarted?.Invoke();
                         break;
@@ -194,6 +205,7 @@ namespace KillingMahjong.Network
                     case "discard_phase_started":
                         DiscardPhaseStartedMessage dpsMsg = JsonUtility.FromJson<DiscardPhaseStartedMessage>(jsonString);
                         bool isLocalTurn = (dpsMsg != null && dpsMsg.data != null && dpsMsg.data.first_player == localPlayerId);
+                        Managers.BoardStateManager.Instance.SetLocalPlayerFirstRound(isLocalTurn);
                         Managers.BoardStateManager.Instance.SetLocalTurn(isLocalTurn);
                         OnPhaseStatusChanged?.Invoke(RoundStatus.Discard);
                         break;

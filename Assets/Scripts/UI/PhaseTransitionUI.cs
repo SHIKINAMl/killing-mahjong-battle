@@ -47,7 +47,7 @@ namespace KillingMahjong.UI
                 canvas = gameObject.AddComponent<Canvas>();
             }
             canvas.overrideSorting = true;
-            canvas.sortingOrder = 10000; // 最前面に設定
+            canvas.sortingOrder = 19; // 最前面に設定
             
             // レイキャストを有効にする場合（必要に応じて）
             UnityEngine.UI.GraphicRaycaster raycaster = GetComponent<UnityEngine.UI.GraphicRaycaster>();

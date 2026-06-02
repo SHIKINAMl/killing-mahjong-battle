@@ -77,9 +77,11 @@ namespace KillingMahjong.UI
             board.OnSelectionChanged += UpdateSelectedTileVisuals;
             board.OnTileMovedToHand += HandleTileMovedToHand;
             board.OnTileMovedToWall += HandleTileMovedToWall;
+            board.OnTurnChanged += HandleTurnChanged;
 
             var net = NetworkMessageHandler.Instance;
             net.OnMatchmakingWaiting += ShowMatchmakingWaiting;
+            net.OnMatchCancelled += ShowMatchCancelled;
             net.OnGameStarted += OnGameStarted;
             net.OnPhaseStatusChanged += UpdatePhaseStatus;
             net.OnBettingComplete += OnBettingCompleteFromServer;
@@ -92,6 +94,30 @@ namespace KillingMahjong.UI
             net.OnIsTenpaiReceived += HandleIsTenpaiReceived;
             net.OnNotTenpaiReceived += HandleNotTenpaiReceived;
             net.OnNextRoundWaitingReceived += HandleNextRoundWaitingReceived;
+        }
+
+        private void HandleTurnChanged(bool isLocalTurn)
+        {
+            if (wallUI != null)
+            {
+                wallUI.UpdateDiscardTurnIndicator(isLocalTurn, currentPhaseStatus == RoundStatus.Discard);
+            }
+        }
+
+        public void OnTileHoverEnter(TileInteraction interaction)
+        {
+            if (currentPhaseStatus == RoundStatus.Discard && BoardStateManager.Instance.IsLocalTurn && !interaction.IsInHand && interaction.TileId != -1)
+            {
+                if (wallUI != null) wallUI.SetActiveDiscardTile(interaction);
+            }
+        }
+
+        public void OnTileHoverExit(TileInteraction interaction)
+        {
+            if (currentPhaseStatus == RoundStatus.Discard && BoardStateManager.Instance.IsLocalTurn && !interaction.IsInHand)
+            {
+                // マウスが離れても最後に乗っていた牌の矢印と位置を維持するため、ここではリセットしない
+            }
         }
 
         private void HandleHandSelectionConfirmation(KillingMahjong.EngineData.HandSelectionConfirmationData data)
@@ -146,13 +172,6 @@ namespace KillingMahjong.UI
                 {
                     string yakuText = (wait.yaku != null && wait.yaku.Length > 0) ? string.Join(" / ", wait.yaku) : "役なし";
                     bool isMangan = wait.mangan_or_more;
-                    if (BoardStateManager.Instance.TargetHandIndexes != null)
-                    {
-                        // AutoMangan を使用した場合、Pythonサーバー側で赤ドラのフラグが落ちて
-                        // 判定される仕様により「満貫未満」と誤判定されるため、UI上では強制的に満貫以上とする
-                        isMangan = true;
-                    }
-                    
                     string manganText = isMangan ? "満貫以上" : "満貫未満";
                     message += $"-> {yakuText} ({manganText})\n";
                     if (isMangan) hasMangan = true;
@@ -882,6 +901,37 @@ namespace KillingMahjong.UI
             if (doraDisplayUI != null) doraDisplayUI.Hide();
         }
 
+        public void ShowMatchCancelled(string reason)
+        {
+            // 盤面データ・UIをリセット
+            ClearAllTiles();
+            Managers.BoardStateManager.Instance.ClearAllBoardData();
+            currentPhaseStatus = RoundStatus.None;
+
+            if (matchmakingUI != null) matchmakingUI.ShowWaiting(reason);
+            SetMatchUIVisibility(false);
+            
+            if (riverUI != null) riverUI.gameObject.SetActive(false);
+            if (enemyRiverUI != null) enemyRiverUI.gameObject.SetActive(false);
+            if (enemyHandUI != null) enemyHandUI.gameObject.SetActive(false);
+            if (waitUI != null) waitUI.gameObject.SetActive(false);
+            
+            // 切断された旨をダイアログに表示
+            if (dialogueUI != null) 
+            {
+                dialogueUI.gameObject.SetActive(true);
+                dialogueUI.ShowText(reason);
+            }
+            
+            if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(false);
+            if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(false);
+            
+            if (abilityUI != null) abilityUI.gameObject.SetActive(false);
+            if (ronAnimationUI != null) ronAnimationUI.gameObject.SetActive(false);
+            if (bettingUI != null) bettingUI.HideBettingPhase(true);
+            if (doraDisplayUI != null) doraDisplayUI.Hide();
+        }
+
         public void OnGameStarted()
         {
             _currentRoundIndex = 1;
@@ -933,9 +983,10 @@ namespace KillingMahjong.UI
 
                 if (wallUI != null)
                 {
-                    List<RectTransform> remainingTiles = new List<RectTransform>();
-                    foreach (var st in wallUI.GetWallSlots()) if (st != null) remainingTiles.Add(st);
-                    wallUI.LayoutWallTiles(remainingTiles, BoardStateManager.Instance.CurrentWallTiles, BoardStateManager.Instance.CurrentWaitTiles, currentPhaseStatus == RoundStatus.Discard);
+                    // フェイズ移行時に壁牌を再整列（左詰め）させず、元の位置（隙間がある状態）を維持する
+                    wallUI.UpdateContainerPosition(currentPhaseStatus == RoundStatus.Discard);
+                    wallUI.UpdateWallHighlights(BoardStateManager.Instance.CurrentWaitTiles, currentPhaseStatus == RoundStatus.Discard);
+                    wallUI.UpdateDiscardTurnIndicator(BoardStateManager.Instance.IsLocalTurn, currentPhaseStatus == RoundStatus.Discard);
                 }
             }
             
@@ -1023,6 +1074,9 @@ namespace KillingMahjong.UI
                     if (wallUI != null) wallUI.gameObject.SetActive(true);
                     if (enemyWallUI != null) enemyWallUI.gameObject.SetActive(true);
                     
+                    if (riverUI != null) riverUI.UpdateTurnText();
+                    if (enemyRiverUI != null) enemyRiverUI.UpdateTurnText();
+                    
                     if (playerInfoUI != null) playerInfoUI.gameObject.SetActive(true);
                     if (enemyInfoUI != null) enemyInfoUI.SetPanelVisible(true);
                     
@@ -1031,7 +1085,7 @@ namespace KillingMahjong.UI
                         waitUI.gameObject.SetActive(true);
                         waitUI.DisplayWaits(BoardStateManager.Instance.CurrentWaitTiles);
                     }
-                    if (abilityUI != null) abilityUI.gameObject.SetActive(true);
+                    if (abilityUI != null) abilityUI.gameObject.SetActive(false);
                     UpdateDoraDisplay();
                     break;
                 case RoundStatus.Agari:

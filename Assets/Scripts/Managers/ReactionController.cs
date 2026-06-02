@@ -15,7 +15,12 @@ namespace KillingMahjong.Managers
         public static ReactionController Instance { get; private set; }
 
         [Header("Settings")]
-        [SerializeField] private float reactionDisplayDuration = 5.0f; // リアクションを表示したまま待つ時間
+        [Tooltip("リアクションを表示したまま待つ最大時間")]
+        [SerializeField] private float reactionDisplayDuration = 5.0f;
+        [Tooltip("セリフが表示されてからクリックでスキップできるようになるまでの最低待機時間（誤爆防止）")]
+        [SerializeField] private float minWaitBeforeSkip = 0.5f;
+        [Tooltip("クリック（タップ）でセリフをスキップできるかどうか")]
+        [SerializeField] private bool allowClickSkip = true;
 
         // UIの参照（シーン上でセットアップするか自動取得する）
         public DialogueUI dialogueUI;
@@ -84,18 +89,21 @@ namespace KillingMahjong.Managers
                     continue;
                 }
 
-                // クリック（タップ）されたら待機をスキップして次へ
-                // 旧Inputクラスではなく、新しいInput Systemを使用します
-                bool isClicked = false;
-                if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame) isClicked = true;
-                if (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.wasPressedThisFrame) isClicked = true;
+                elapsed += Time.deltaTime;
 
-                if (isClicked)
+                // 指定時間経過後、かつスキップが許可されている場合のみクリック判定を行う
+                if (allowClickSkip && elapsed >= minWaitBeforeSkip)
                 {
-                    break;
+                    bool isClicked = false;
+                    if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame) isClicked = true;
+                    if (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.wasPressedThisFrame) isClicked = true;
+
+                    if (isClicked)
+                    {
+                        break;
+                    }
                 }
 
-                elapsed += Time.deltaTime;
                 yield return null;
             }
         }

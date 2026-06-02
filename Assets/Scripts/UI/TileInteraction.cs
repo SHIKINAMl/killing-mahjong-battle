@@ -147,13 +147,25 @@ namespace KillingMahjong.UI
         public void OnPointerEnter(PointerEventData eventData)
         {
             IsHovered = true;
-            if (_tileVisual != null) _tileVisual.SetHoverHighlight(true);
+            
+            bool canHighlight = false;
+            if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard)
+            {
+                if (KillingMahjong.Managers.BoardStateManager.Instance.IsLocalTurn && !IsInHand && TileId != -1)
+                {
+                    canHighlight = true;
+                }
+            }
+
+            if (canHighlight && _tileVisual != null) _tileVisual.SetHoverHighlight(true);
+            if (_gameUIManager != null) _gameUIManager.OnTileHoverEnter(this);
         }
 
         public void OnPointerExit(PointerEventData eventData)
         {
             IsHovered = false;
             if (_tileVisual != null) _tileVisual.SetHoverHighlight(false);
+            if (_gameUIManager != null) _gameUIManager.OnTileHoverExit(this);
         }
     }
 }

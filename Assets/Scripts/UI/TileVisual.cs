@@ -27,6 +27,10 @@ namespace KillingMahjong.UI
             if (spriteRenderer == null) spriteRenderer = GetComponent<SpriteRenderer>();
             if (uiImage == null) uiImage = GetComponent<Image>();
             if (meshRenderer == null) meshRenderer = GetComponent<MeshRenderer>();
+            
+            // デフォルトでアウトラインはオフにする（Prefab設定漏れ対策）
+            SetFuritenHighlight(false);
+            SetHoverHighlight(false);
         }
 
         private int _currentId = -1;
@@ -85,7 +89,7 @@ namespace KillingMahjong.UI
                         outline = uiImage.gameObject.AddComponent<UnityEngine.UI.Outline>();
                         outline.effectDistance = new Vector2(3, 3);
                     }
-                    outline.effectColor = _isHovered ? Color.yellow : Color.red;
+                    outline.effectColor = Color.red; // ホバー時もフリテン時も赤
                     outline.enabled = true;
                 }
                 else

@@ -8,12 +8,12 @@ namespace KillingMahjong.UI
         [SerializeField] private TMP_Text statusText;
         [SerializeField] private GameObject loadingIcon; // Optional spinner
 
-        public void ShowWaiting()
+        public void ShowWaiting(string message = "Waiting for Opponent\n対戦相手を待っています...")
         {
             gameObject.SetActive(true);
             if (statusText != null)
             {
-                statusText.text = "Waiting for Opponent\n対戦相手を待っています...";
+                statusText.text = message;
             }
             if (loadingIcon != null) loadingIcon.SetActive(true);
         }
