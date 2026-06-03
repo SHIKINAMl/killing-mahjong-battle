@@ -9,10 +9,10 @@ namespace KillingMahjong.UI
         [SerializeField] private Transform enemyWallContainer;
         
         [Header("Layout Settings")]
-        [SerializeField] private Vector2 startPosition = new Vector2(-40, -150); // Optional positioning tweak
-        [SerializeField] private float tileIntervalX = 55f;
-        [SerializeField] private float rowIntervalY = 95f;
-        [SerializeField] private int maxSlotsPerRow = 20;
+        [SerializeField] private Vector2 startPosition = new Vector2(0, -150);
+        [SerializeField] private float tileIntervalX = 35f; // Inspectorで調整可能
+        [SerializeField] private float rowIntervalY = 60f; // Inspectorで調整可能
+        [SerializeField] private int maxSlotsPerRow = 11; // 21 tiles max, so 11 + 10
 
         private GameUIManager gameUIManager;
 
@@ -28,9 +28,22 @@ namespace KillingMahjong.UI
         {
             enemyWallSlots.Clear();
 
-            // Simple layout for enemy wall tiles
             int currentSlot = 0;
             int tileIndex = 0;
+
+            float blockWidth = (Mathf.Min(tileIds.Count, maxSlotsPerRow) - 1) * tileIntervalX;
+            float startX = startPosition.x - (blockWidth / 2f);
+            
+            // LayoutGroup がどこにアタッチされていても強制的に無効化・削除して座標計算の衝突を防ぐ
+            var layoutGroups = GetComponentsInChildren<UnityEngine.UI.LayoutGroup>(true);
+            foreach (var lg in layoutGroups)
+            {
+                lg.enabled = false;
+                Destroy(lg);
+            }
+
+            // startY を大幅に上に上げる（敵の壁牌らしく相手キャラの近くに配置）
+            float actualStartY = 150f;
 
             foreach(var id in tileIds)
             {
@@ -39,7 +52,7 @@ namespace KillingMahjong.UI
                 RectTransform slot = generatedTiles[tileIndex++];
                 slot.SetParent(enemyWallContainer, false);
                 
-                slot.localScale = Vector3.one;
+                slot.localScale = new Vector3(0.7f, 0.7f, 0.7f); // Scale down to 70%
                 slot.anchorMin = new Vector2(0.5f, 0.5f);
                 slot.anchorMax = new Vector2(0.5f, 0.5f);
                 slot.pivot = new Vector2(0.5f, 0.5f);
@@ -47,11 +60,10 @@ namespace KillingMahjong.UI
                 int r = currentSlot / maxSlotsPerRow;
                 int c = currentSlot % maxSlotsPerRow;
                 
-                float targetX = startPosition.x - c * tileIntervalX; // going left for enemy
-                float targetY = startPosition.y + r * rowIntervalY; // going up or down depending on visual preference
+                float targetX = startX + c * tileIntervalX; // going right
+                float targetY = actualStartY - r * rowIntervalY; // going down
                 
-                Vector3 finalPos = new Vector3(targetX, targetY, 0);
-                slot.localPosition = finalPos;
+                slot.anchoredPosition = new Vector2(targetX, targetY);
                 
                 // Keep it facedown
                 slot.localRotation = Quaternion.identity;

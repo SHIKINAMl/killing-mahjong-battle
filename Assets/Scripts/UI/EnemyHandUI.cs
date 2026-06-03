@@ -64,11 +64,15 @@ namespace KillingMahjong.UI
             int realId = realTileIds[index];
             RectTransform targetTile = handSlots[index];
 
+            Debug.Log($"Revealing enemy tile at index {index}. Real ID: {realId}");
+
             if (targetTile != null && tileResourceManager != null)
             {
                 var visual = targetTile.GetComponent<TileVisual>();
                 if (visual != null)
                 {
+                    // For EnemyHandUI, SetTile needs to know we want to show the real tile, so we pass realId.
+                    // Also pass the resource manager so it can fetch the correct sprite.
                     visual.SetTile(realId, tileResourceManager.GetTileSprite(realId));
                 }
             }

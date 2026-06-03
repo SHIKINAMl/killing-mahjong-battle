@@ -34,6 +34,8 @@ namespace KillingMahjong.UI
         [SerializeField] private GameObject victoryEffectPrefab;
         [SerializeField] private GameObject damageEffectPrefab;
 
+        public bool IsOpponentSkillProcessing { get; private set; } = false;
+
         [Header("Tile Prefab")]
         [SerializeField] private GameObject tilePrefab;
         [SerializeField] private TileResourceManager tileResourceManager;
@@ -574,14 +576,62 @@ namespace KillingMahjong.UI
             if (enemyHandUI != null)
             {
                 enemyHandUI.ClearHand();
-                foreach (var id in board.CurrentEnemyHandTiles)
+
+                bool isDummyHand = board.CurrentEnemyHandTiles.Count > 1 && 
+                                   board.CurrentEnemyHandTiles.TrueForAll(x => x == 0);
+
+                List<int> exposedActualIds = new List<int>();
+                if (isDummyHand)
                 {
-                    GameObject obj = Instantiate(tilePrefab, transform); 
+                    foreach (int exposedIdx in board.ExposedEnemyHandWallIndexes)
+                    {
+                        if (exposedIdx >= 0 && exposedIdx < board.OriginalEnemyWallTiles.Count)
+                        {
+                            exposedActualIds.Add(board.OriginalEnemyWallTiles[exposedIdx]);
+                        }
+                    }
+                }
+
+                int exposedAssigned = 0;
+
+                for (int i = 0; i < board.CurrentEnemyHandTiles.Count; i++)
+                {
+                    int wallIdx = board.CurrentEnemyHandTiles[i];
+                    GameObject obj = Instantiate(tilePrefab, transform);
                     RectTransform rt = obj.GetComponent<RectTransform>() ?? obj.transform as RectTransform;
                     if (rt != null) {
                         int visualId = -1; // Force hidden (-1)
+                        int actualTileId = visualId;
+                        if (wallIdx >= 0 && wallIdx < board.OriginalEnemyWallTiles.Count) {
+                            actualTileId = board.OriginalEnemyWallTiles[wallIdx];
+                        }
+
+                        bool revealThis = false;
+
+                        if (isDummyHand)
+                        {
+                            if (exposedAssigned < exposedActualIds.Count)
+                            {
+                                actualTileId = exposedActualIds[exposedAssigned];
+                                revealThis = true;
+                                exposedAssigned++;
+                            }
+                        }
+                        else
+                        {
+                            if (board.ExposedEnemyHandWallIndexes.Contains(wallIdx))
+                            {
+                                revealThis = true;
+                            }
+                        }
+
                         InitializeTileComponent(rt, visualId, false);
-                        enemyHandUI.AddEnemyTile(rt, visualId, id);
+                        enemyHandUI.AddEnemyTile(rt, visualId, actualTileId);
+
+                        if (revealThis)
+                        {
+                            enemyHandUI.RevealTileByIndex(i);
+                        }
                     }
                 }
             }
@@ -596,18 +646,39 @@ namespace KillingMahjong.UI
                 }
                 enemyWallUI.GetEnemyWallSlots().Clear();
 
-                List<RectTransform> enemyWallGenerated = new List<RectTransform>();
-                foreach (var id in board.CurrentEnemyWallTiles)
+                if (currentPhaseStatus == RoundStatus.Discard)
                 {
-                    GameObject obj = Instantiate(tilePrefab, transform);
-                    RectTransform rt = obj.GetComponent<RectTransform>() ?? obj.transform as RectTransform;
-                    if (rt != null) {
-                        int visualId = -1; // Force hidden (-1)
-                        InitializeTileComponent(rt, visualId, false);
-                        enemyWallGenerated.Add(rt);
-                    }
+                    // 打牌フェイズ中はEnemyWallを非表示にする
+                    enemyWallUI.gameObject.SetActive(false);
                 }
-                enemyWallUI.LayoutEnemyWallTiles(enemyWallGenerated, board.CurrentEnemyWallTiles, currentPhaseStatus == RoundStatus.Discard);
+                else
+                {
+                    enemyWallUI.gameObject.SetActive(true);
+                    List<RectTransform> enemyWallGenerated = new List<RectTransform>();
+                    List<int> displayIdsForWall = new List<int>();
+
+                    for (int i = 0; i < board.OriginalEnemyWallTiles.Count; i++)
+                    {
+                        if (board.CurrentEnemyHandTiles != null && board.CurrentEnemyHandTiles.Contains(i))
+                            continue; // This tile is already in the hand, skip it
+
+                        int actualTileId = board.OriginalEnemyWallTiles[i];
+                        displayIdsForWall.Add(actualTileId);
+
+                        GameObject obj = Instantiate(tilePrefab, transform);
+                        RectTransform rt = obj.GetComponent<RectTransform>() ?? obj.transform as RectTransform;
+                        if (rt != null) {
+                            int visualId = -1; // Force hidden (-1)
+                            if (board.ExposedEnemyHandWallIndexes.Contains(i))
+                            {
+                                visualId = actualTileId; // Reveal exposed tiles even in the wall
+                            }
+                            InitializeTileComponent(rt, visualId, false);
+                            enemyWallGenerated.Add(rt);
+                        }
+                    }
+                    enemyWallUI.LayoutEnemyWallTiles(enemyWallGenerated, displayIdsForWall, currentPhaseStatus == RoundStatus.Discard);
+                }
             }
 
             if (waitUI != null && (currentPhaseStatus == RoundStatus.Discard || currentPhaseStatus == RoundStatus.HandSelection))
@@ -1286,12 +1357,21 @@ namespace KillingMahjong.UI
             {
                 if (data.exposedHandIndexes != null && data.exposedHandIndexes.Count > 0)
                 {
-                    if (isLocalPlayer && enemyHandUI != null)
+                    if (isLocalPlayer)
                     {
-                        foreach (int idx in data.exposedHandIndexes)
+                        foreach (int wallIdx in data.exposedHandIndexes)
                         {
-                            enemyHandUI.RevealTileByIndex(idx);
+                            Managers.BoardStateManager.Instance.ExposedEnemyHandWallIndexes.Add(wallIdx);
                         }
+                        RebuildAllTilesFromState(); // Update wall and hand UI
+                    }
+                    else
+                    {
+                        foreach (int wallIdx in data.exposedHandIndexes)
+                        {
+                            Managers.BoardStateManager.Instance.ExposedLocalHandWallIndexes.Add(wallIdx);
+                        }
+                        RebuildAllTilesFromState(); // Update player wall UI if needed
                     }
                 }
             }
@@ -1317,6 +1397,11 @@ namespace KillingMahjong.UI
         }
 
         // --- Skill UI Flows ---
+        public void CancelSkillSelection()
+        {
+            IsMulliganSelection = false;
+        }
+
         public bool IsMulliganSelection { get; private set; }
 
         public void StartMulliganSelection()

@@ -176,7 +176,7 @@ namespace KillingMahjong.UI
         {
             base.UpdateLayout(phaseStatus);
 
-            bool showButtons = (phaseStatus == RoundStatus.HandSelection) && !isSubmitted;
+            bool showButtons = (phaseStatus == RoundStatus.HandSelection) && !isSubmitted && (gameUIManager == null || (!gameUIManager.IsMulliganSelection && !gameUIManager.IsOpponentSkillProcessing));
 
             if (decideButton != null)
             {
@@ -188,7 +188,7 @@ namespace KillingMahjong.UI
             }
             if (reselectButton != null)
             {
-                bool canReselect = (phaseStatus == RoundStatus.HandSelection) && isSubmitted && (gameUIManager != null && !gameUIManager.IsTransitioning);
+                bool canReselect = (phaseStatus == RoundStatus.HandSelection) && isSubmitted && (gameUIManager != null && !gameUIManager.IsTransitioning && !gameUIManager.IsMulliganSelection);
                 reselectButton.gameObject.SetActive(canReselect);
             }
         }

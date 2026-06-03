@@ -70,7 +70,7 @@ namespace KillingMahjong.UI
             }
             
             if (closeButton != null)
-                closeButton.onClick.AddListener(CloseWindow);
+                closeButton.onClick.AddListener(() => CloseWindow());
 
             if (activateButton != null)
                 activateButton.onClick.AddListener(OnActivateClicked);
@@ -178,15 +178,20 @@ namespace KillingMahjong.UI
             }
         }
 
-        public void CloseWindow()
+        public void CloseWindow(bool cancelSkill = true)
         {
-            if (isWindowVisible) ToggleAbilityWindow();
+            if (isWindowVisible) ToggleAbilityWindow(cancelSkill);
         }
 
-        public void ToggleAbilityWindow()
+        public void ToggleAbilityWindow(bool cancelSkill = true)
         {
             isWindowVisible = !isWindowVisible;
-            if (!isWindowVisible) DeselectAll(); // Deselect on close
+            if (!isWindowVisible)
+            {
+                DeselectAll(); // Deselect on close
+                var uiMgr = FindFirstObjectByType<GameUIManager>();
+                if (uiMgr != null && cancelSkill) uiMgr.CancelSkillSelection();
+            }
 
             if (currentAnimationCoroutine != null) StopCoroutine(currentAnimationCoroutine);
             currentAnimationCoroutine = StartCoroutine(AnimateWindow(isWindowVisible ? showPosition : hiddenPosition, isWindowVisible));
@@ -229,8 +234,33 @@ namespace KillingMahjong.UI
                     var uiMgr = FindFirstObjectByType<GameUIManager>();
                     if (uiMgr != null)
                     {
+                        if (uiMgr.CurrentPhaseStatus != KillingMahjong.EngineData.RoundStatus.HandSelection)
+                        {
+                            if (uiMgr.DialogueUI != null) uiMgr.DialogueUI.ShowText("「今はスキルを使えないわ！」");
+                            DeselectAll();
+                            ToggleAbilityWindow(false);
+                            return;
+                        }
+
+                        var handUI = FindFirstObjectByType<HandUI>();
+                        if (handUI != null && !handUI.IsSubmitted && data.skillType != "perspective")
+                        {
+                            if (uiMgr.DialogueUI != null) uiMgr.DialogueUI.ShowText("「手牌を確定してから使ってね！」");
+                            DeselectAll();
+                            ToggleAbilityWindow(false);
+                            return;
+                        }
+
                         if (data.skillType == "mulligan")
                         {
+                            var currentHand = KillingMahjong.Managers.BoardStateManager.Instance.CurrentHandTiles;
+                            if (currentHand == null || currentHand.Count == 0)
+                            {
+                                if (uiMgr.DialogueUI != null) uiMgr.DialogueUI.ShowText("「交換する手牌がないわ！」");
+                                DeselectAll();
+                                ToggleAbilityWindow(false);
+                                return;
+                            }
                             uiMgr.StartMulliganSelection();
                         }
                         else if (data.skillType == "boost_hand")
@@ -240,12 +270,12 @@ namespace KillingMahjong.UI
                         else
                         {
                             // サーバーへスキル発動リクエストを直接送信
-                            uiMgr.SendActionToServer("skill", new Network.ActionPayload { skill_type = data.skillType });
+                            uiMgr.SendActionToServer("skill", new KillingMahjong.Network.ActionPayload { skill_type = data.skillType });
                         }
                     }
                 }
                 DeselectAll();
-                ToggleAbilityWindow(); // 発動後にウィンドウを閉じる
+                ToggleAbilityWindow(false); // 発動後にウィンドウを閉じる (キャンセルはしない)
             }
             else
             {

@@ -62,6 +62,7 @@ namespace KillingMahjong.UI
             }
 
             if (eventData.button != PointerEventData.InputButton.Left) return;
+            if (_gameUIManager != null && _gameUIManager.IsOpponentSkillProcessing) return;
 
             // Any Click -> Move (Left or Right) or Select for Mulligan
             if (IsInHand)
@@ -87,6 +88,7 @@ namespace KillingMahjong.UI
         public void OnBeginDrag(PointerEventData eventData)
         {
             if (eventData.button != PointerEventData.InputButton.Left) return;
+            if (_gameUIManager != null && _gameUIManager.IsOpponentSkillProcessing) return;
             if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard) return;
             
             _originalPosition = transform.position;
@@ -98,6 +100,7 @@ namespace KillingMahjong.UI
         public void OnDrag(PointerEventData eventData)
         {
             if (eventData.button != PointerEventData.InputButton.Left) return;
+            if (_gameUIManager != null && _gameUIManager.IsOpponentSkillProcessing) return;
             if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard) return;
 
             // If Screen Space Overlay/Camera
@@ -121,6 +124,7 @@ namespace KillingMahjong.UI
         public void OnEndDrag(PointerEventData eventData)
         {
             if (eventData.button != PointerEventData.InputButton.Left) return;
+            if (_gameUIManager != null && _gameUIManager.IsOpponentSkillProcessing) return;
             if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard) return;
 
             _canvasGroup.blocksRaycasts = true;
@@ -163,7 +167,14 @@ namespace KillingMahjong.UI
             IsHovered = true;
             
             bool canHighlight = false;
-            if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard)
+            if (_gameUIManager != null && _gameUIManager.IsMulliganSelection)
+            {
+                if (IsInHand && TileId != -1)
+                {
+                    canHighlight = true;
+                }
+            }
+            else if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard)
             {
                 if (KillingMahjong.Managers.BoardStateManager.Instance.IsLocalTurn && !IsInHand && TileId != -1)
                 {

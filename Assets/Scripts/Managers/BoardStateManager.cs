@@ -22,11 +22,15 @@ namespace KillingMahjong.Managers
         
         public List<int> CurrentEnemyHandTiles { get; private set; } = new List<int>();
         public List<int> CurrentEnemyWallTiles { get; private set; } = new List<int>();
+        public List<int> OriginalEnemyWallTiles { get; private set; } = new List<int>();
+        public HashSet<int> ExposedEnemyHandWallIndexes { get; private set; } = new HashSet<int>();
+        public HashSet<int> ExposedLocalHandWallIndexes { get; private set; } = new HashSet<int>();
         
         public List<int> SelectedTileIds { get; private set; } = new List<int>();
         public List<int[]> CurrentTenpaiExamples { get; private set; } = new List<int[]>();
         public HashSet<int> DiscardedWallIndexes { get; private set; } = new HashSet<int>();
         public List<int> TargetHandIndexes { get; set; } = null;
+        public HashSet<int> HiddenTiles { get; private set; } = new HashSet<int>();
         
         public bool LastIsLocalWin { get; set; } = true; 
         public LiquidationData LastLiquidationData { get; set; } = null;
@@ -89,6 +93,7 @@ namespace KillingMahjong.Managers
             OriginalWallTiles.Clear();
             CurrentDoraId = -1;
             TargetHandIndexes = null;
+            HiddenTiles.Clear();
         }
 
         /// <summary>
@@ -114,20 +119,25 @@ namespace KillingMahjong.Managers
                 }
                 CurrentWallTiles = SortTileIds(displayWall);
             }
-            if (hand != null) CurrentHandTiles = SortTileIds(new List<int>(hand));
+            if (hand != null) 
+            {
+                CurrentHandTiles = SortTileIds(new List<int>(hand));
+                HiddenTiles.Clear();
+            }
             if (wait != null) CurrentWaitTiles = new List<int>(wait);
         }
 
         public void SetEnemyState(List<int> wall, List<int> hand)
         {
-            if (wall != null) 
+            if (wall != null)
             {
-                List<int> displayEnemyWall = new List<int>(wall);
-                if (hand != null)
+                OriginalEnemyWallTiles = new List<int>(wall);
+                List<int> displayEnemyWall = new List<int>();
+                for (int i = 0; i < wall.Count; i++)
                 {
-                    foreach (int hTile in hand)
+                    if (hand == null || !hand.Contains(i))
                     {
-                        displayEnemyWall.Remove(hTile);
+                        displayEnemyWall.Add(wall[i]);
                     }
                 }
                 CurrentEnemyWallTiles = displayEnemyWall;
