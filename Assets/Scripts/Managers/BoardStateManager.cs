@@ -210,6 +210,7 @@ namespace KillingMahjong.Managers
 
         public bool MoveTileToHand(int tileId)
         {
+            Debug.Log($"[BoardStateManager] MoveTileToHand called with tileId: {tileId}");
             int actualId = tileId;
             if (!CurrentWallTiles.Contains(tileId))
             {
@@ -218,6 +219,7 @@ namespace KillingMahjong.Managers
                 if (foundIndex != -1)
                 {
                     actualId = CurrentWallTiles[foundIndex];
+                    Debug.Log($"[BoardStateManager] tileId {tileId} not in Wall, mapped to actualId {actualId} using baseId {baseId}");
                 }
                 else
                 {
@@ -226,13 +228,16 @@ namespace KillingMahjong.Managers
                 }
             }
 
+            Debug.Log($"[BoardStateManager] CurrentHandTiles count: {CurrentHandTiles.Count}");
             if (CurrentHandTiles.Count < 13)
             {
                 CurrentWallTiles.Remove(actualId);
                 CurrentHandTiles.Add(actualId);
+                Debug.Log($"[BoardStateManager] Moved actualId {actualId} to hand. Invoking OnTileMovedToHand.");
                 OnTileMovedToHand?.Invoke(actualId);
                 return true;
             }
+            Debug.LogWarning($"[BoardStateManager] Hand is full (13 tiles). Cannot move {actualId} to hand.");
             return false;
         }
 

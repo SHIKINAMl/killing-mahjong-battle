@@ -24,6 +24,15 @@ namespace KillingMahjong.UI
         private List<RectTransform> enemyWallSlots = new List<RectTransform>();
         public List<RectTransform> GetEnemyWallSlots() => enemyWallSlots;
 
+        private void Start()
+        {
+            var graphics = GetComponentsInChildren<UnityEngine.UI.Graphic>(true);
+            foreach (var g in graphics)
+            {
+                g.raycastTarget = false;
+            }
+        }
+
         public void LayoutEnemyWallTiles(List<RectTransform> generatedTiles, List<int> tileIds, bool isDiscardPhase)
         {
             enemyWallSlots.Clear();

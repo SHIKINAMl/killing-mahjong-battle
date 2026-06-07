@@ -287,6 +287,8 @@ namespace KillingMahjong.UI
         {
             if (abilityWindow == null) yield break;
 
+            if (isOpening) abilityWindow.gameObject.SetActive(true);
+
             Vector2 startPos = abilityWindow.anchoredPosition;
             float elapsed = 0f;
 
@@ -299,7 +301,10 @@ namespace KillingMahjong.UI
                 abilityWindow.anchoredPosition = Vector2.Lerp(startPos, targetPos, t);
                 yield return null;
             }
+            
             abilityWindow.anchoredPosition = targetPos;
+            
+            if (!isOpening) abilityWindow.gameObject.SetActive(false);
         }
 
         private void CancelOpponentReady()

@@ -324,6 +324,11 @@ namespace KillingMahjong.UI
             StartCoroutine(CenterTextAnimRoutine(text, duration, onComplete));
         }
 
+        public IEnumerator PlayCenterTextAnimRoutine(string text, float duration = 1.5f, Action onComplete = null)
+        {
+            yield return StartCoroutine(CenterTextAnimRoutine(text, duration, onComplete));
+        }
+
         private IEnumerator CenterTextAnimRoutine(string text, float duration, Action onComplete = null)
         {
             if (horizontalLineRt != null)

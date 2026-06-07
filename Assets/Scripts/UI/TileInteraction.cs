@@ -34,6 +34,8 @@ namespace KillingMahjong.UI
 
         public void OnPointerClick(PointerEventData eventData)
         {
+            Debug.Log($"[TileInteraction] OnPointerClick called. TileId: {TileId}, IsInHand: {IsInHand}, Button: {eventData.button}, Phase: {(_gameUIManager != null ? _gameUIManager.CurrentPhaseStatus.ToString() : "null")}");
+            
             if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard)
             {
                 if (!IsInHand)
@@ -61,8 +63,16 @@ namespace KillingMahjong.UI
                 return;
             }
 
-            if (eventData.button != PointerEventData.InputButton.Left) return;
-            if (_gameUIManager != null && _gameUIManager.IsOpponentSkillProcessing) return;
+            if (eventData.button != PointerEventData.InputButton.Left)
+            {
+                Debug.Log("[TileInteraction] Ignored because not Left Click.");
+                return;
+            }
+            if (_gameUIManager != null && _gameUIManager.IsOpponentSkillProcessing)
+            {
+                Debug.Log("[TileInteraction] Ignored because IsOpponentSkillProcessing is true.");
+                return;
+            }
 
             // Any Click -> Move (Left or Right) or Select for Mulligan
             if (IsInHand)
@@ -80,7 +90,12 @@ namespace KillingMahjong.UI
             {
                 if (_gameUIManager == null || !_gameUIManager.IsMulliganSelection)
                 {
+                    Debug.Log($"[TileInteraction] Calling MoveTileToHand for TileId: {TileId}");
                     _gameUIManager.MoveTileToHand(TileId);
+                }
+                else
+                {
+                    Debug.Log("[TileInteraction] Ignored because IsMulliganSelection is true.");
                 }
             }
         }
@@ -170,6 +185,13 @@ namespace KillingMahjong.UI
             if (_gameUIManager != null && _gameUIManager.IsMulliganSelection)
             {
                 if (IsInHand && TileId != -1)
+                {
+                    canHighlight = true;
+                }
+            }
+            else if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.HandSelection)
+            {
+                if (TileId != -1)
                 {
                     canHighlight = true;
                 }

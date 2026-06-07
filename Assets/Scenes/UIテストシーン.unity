@@ -8259,6 +8259,11 @@ GameObject:
   - component: {fileID: 536350430}
   - component: {fileID: 536350431}
   - component: {fileID: 536350432}
+  - component: {fileID: 536350437}
+  - component: {fileID: 536350436}
+  - component: {fileID: 536350435}
+  - component: {fileID: 536350434}
+  - component: {fileID: 536350433}
   m_Layer: 0
   m_Name: GameUIManager
   m_TagString: Untagged
@@ -8350,6 +8355,66 @@ MonoBehaviour:
   dialogueUI: {fileID: 1566128114}
   enemyInfoUI: {fileID: 603402878}
   playerInfoUI: {fileID: 74800415}
+--- !u!114 &536350433
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 536350428}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5497738681fe744ea9f4427fdc968b6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.GameUISkillController
+--- !u!114 &536350434
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 536350428}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 399408e867de7224c96cef273bd779dc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.GameUINetworkHandler
+--- !u!114 &536350435
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 536350428}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3aecdfce4ed87df4e8026374d60a2b10, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.GameUIPhaseController
+--- !u!114 &536350436
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 536350428}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b53afd344c22d3544934a81e14f20e13, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.GameUIHandSelectionController
+--- !u!114 &536350437
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 536350428}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ea9ec192dfc99e645bdd832eb1c36e6f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.GameUIVisualController
 --- !u!1 &555291001
 GameObject:
   m_ObjectHideFlags: 0
@@ -8986,6 +9051,7 @@ GameObject:
   m_Component:
   - component: {fileID: 592429296}
   - component: {fileID: 592429297}
+  - component: {fileID: 592429298}
   m_Layer: 0
   m_Name: Debug
   m_TagString: Untagged
@@ -9023,6 +9089,18 @@ MonoBehaviour:
   gameUIManager: {fileID: 536350430}
   debugBettingToggle: {fileID: 0}
   triggerBettingButton: {fileID: 0}
+--- !u!114 &592429298
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 592429295}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 67a4ceec6bc0ccd44abbbf2c6dbfcd6a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.UIRaycastDebugger
 --- !u!1 &603402873
 GameObject:
   m_ObjectHideFlags: 0

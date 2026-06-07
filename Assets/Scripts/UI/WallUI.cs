@@ -149,12 +149,12 @@ namespace KillingMahjong.UI
 
                     int groupSize = (isKoutsu || isShuntsu) ? 3 : 1;
                     
-                    // 旧レイアウト: 描画する前に、このグループを描画したら maxWidthX を超えるかチェック
+                    // 描画する前に、このグループを描画したら maxWidthX を超えるかチェック
                     float expectedWidth = (groupSize - 1) * tileIntervalX;
                     if (currentX + expectedWidth > startPosition.x + maxWidthX)
                     {
                         currentX = startPosition.x;
-                        currentY -= rowIntervalY;
+                        currentY -= rowIntervalY; // 元の下の段に切り返す設定に戻す
                     }
 
                     // Render current group
