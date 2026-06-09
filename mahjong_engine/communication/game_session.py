@@ -112,10 +112,10 @@ class GameSession:
 
 		return result
 
-	def _find_any_tenpai_example_indexes(self, wall: List[int]) -> Optional[List[int]]:
-		"""wall から聴牌形を再探索して、最初に index 変換できる例を返す。"""
+	def _find_any_tenpai_example_indexes(self, wall: List[int], dora_id: int) -> Optional[List[int]]:
+		"""wall から満貫以上の聴牌形を再探索して、最初に index 変換できる例を返す。"""
 		try:
-			candidates = HandAnalyzer.search_tenpai(wall)
+			candidates = HandAnalyzer.search_tenpai(wall, wall, dora_id)
 		except Exception:
 			return None
 
@@ -647,15 +647,24 @@ class GameSession:
 		hand_payload = []
 		for i, h in enumerate(wall):
 			wall_tiles = h[0]
-			tenpai_example_tiles = h[1]
-			tenpai_example_indexes = self._convert_tiles_to_wall_indexes(
-				wall_tiles,
-				tenpai_example_tiles,
-			)
+			tenpai_example = h[1]
+
+			# 現在は GameEngine 側で wall index を保持する。
+			if (
+				isinstance(tenpai_example, list)
+				and all(isinstance(idx, int) for idx in tenpai_example)
+				and all(0 <= idx < len(wall_tiles) for idx in tenpai_example)
+			):
+				tenpai_example_indexes = tenpai_example
+			else:
+				tenpai_example_indexes = self._convert_tiles_to_wall_indexes(
+					wall_tiles,
+					tenpai_example,
+				)
 
 			if tenpai_example_indexes is None:
 				# 稀に牌IDの差異で変換できないケースがあるため、wallから再探索して補完
-				tenpai_example_indexes = self._find_any_tenpai_example_indexes(wall_tiles)
+				tenpai_example_indexes = self._find_any_tenpai_example_indexes(wall_tiles, dora)
 				if tenpai_example_indexes is None:
 					logger.warning("tenpai_example の index 変換に失敗: match_id=%s player_index=%s", match_id, i)
 					tenpai_example_indexes = []

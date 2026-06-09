@@ -2,6 +2,7 @@
 手牌の聴牌判定と役計算
 """
 from collections import Counter
+from functools import lru_cache
 from typing import List, Tuple, Generator
 from itertools import combinations
 
@@ -11,10 +12,17 @@ from .yaku import Yaku
 class HandAnalyzer:
     """手牌の分析・判定を行うクラス"""
 
+    TILE_KIND_COUNT = 29
+    TILE_MAX_COUNT = 4
+
     # ========== 聴牌判定 ==========
 
     @staticmethod
-    def search_tenpai(wall: List[int]) -> List[list[int]]:
+    def search_tenpai(
+        wall: List[int],
+        agari_wall: List[int] | None = None,
+        dora: int | None = None,
+    ) -> List[list[int]]:
         """
         34枚の山牌から聴牌形を検索する
 
@@ -23,29 +31,333 @@ class HandAnalyzer:
 
         Args:
             wall: 山牌のリスト（34枚を想定）
+            agari_wall: 和了判定に使う残り牌のリスト。指定時は満貫以上の聴牌形のみ返す
+            dora: ドラの牌ID。agari_wall 指定時に利用する
 
         Returns:
             聴牌形のリスト
         """
-        base_tiles = [t & 0b11111 for t in wall]
-        wall_counter = Counter(base_tiles)
+        wall_counter = HandAnalyzer._tiles_to_counter_tuple(wall)
+        source_tile_index = HandAnalyzer._build_source_tile_index(wall)
+        skip_tiles = tuple(sorted(HandAnalyzer.skip_tenpai_tiles(wall)))
+        skip_tile_set = set(skip_tiles)
         results: List[list[int]] = []
+        seen: set[Tuple[int, ...]] = set()
+        require_mangan = agari_wall is not None and dora is not None
+        residual_catalog = HandAnalyzer._tenpai_residual_catalog()
 
         # 34枚から順番に面子候補を抽出
-        mentsu = list(HandAnalyzer._extract_mentsu(wall_counter, 0, 0))
+        mentsu = HandAnalyzer._extract_mentsu_dp(wall_counter, 0, 0)
 
-        removed_wall_counter = wall_counter.copy()
-        for pattarn in mentsu:
-            for tile_id in pattarn:
-                removed_wall_counter[tile_id] -= 1
-            for rests in set(combinations(removed_wall_counter.elements(), 4)):
+        for pattern in mentsu:
+            removed_wall_counter = HandAnalyzer._subtract_tiles(wall_counter, pattern)
+            for rests, waits_all, sparse_counts in residual_catalog:
+                if any(removed_wall_counter[tile_id] < need for tile_id, need in sparse_counts):
+                    continue
 
-                comp_mentsu = pattarn + list(rests)
+                waiting_tiles = tuple(tile_id for tile_id in waits_all if tile_id not in skip_tile_set)
+                if not waiting_tiles:
+                    continue
 
-                if HandAnalyzer.is_tenpai(comp_mentsu, wall):
-                    results.append(comp_mentsu)
+                candidate = tuple(sorted(pattern + rests))
+                if candidate in seen:
+                    continue
+
+                if require_mangan and not HandAnalyzer._has_mangan_wait(
+                    candidate,
+                    waiting_tiles,
+                    source_tile_index,
+                ):
+                    continue
+
+                results.append(HandAnalyzer._decorate_hand_from_index(candidate, source_tile_index))
+                seen.add(candidate)
 
         return results
+
+    @staticmethod
+    @lru_cache(maxsize=1)
+    def _tenpai_residual_catalog() -> Tuple[Tuple[Tuple[int, ...], Tuple[int, ...], Tuple[Tuple[int, int], ...]], ...]:
+        """4枚残り形のうち聴牌になり得るものを前計算したカタログを返す。"""
+        full_counter = tuple([HandAnalyzer.TILE_MAX_COUNT] * HandAnalyzer.TILE_KIND_COUNT)
+        residuals = HandAnalyzer._select_tiles_dp(full_counter, 4, 0)
+        catalog: list[Tuple[Tuple[int, ...], Tuple[int, ...], Tuple[Tuple[int, int], ...]]] = []
+
+        for rests in residuals:
+            residual_counter = HandAnalyzer._tiles_to_counter_tuple(rests)
+            waits_all = HandAnalyzer._get_waiting_tiles_for_residual(residual_counter, ())
+            if not waits_all:
+                continue
+
+            sparse_counts = tuple((tile_id, count) for tile_id, count in enumerate(residual_counter) if count > 0)
+            catalog.append((rests, waits_all, sparse_counts))
+
+        return tuple(catalog)
+
+    @staticmethod
+    def _tiles_to_counter_tuple(tiles: List[int] | Tuple[int, ...]) -> Tuple[int, ...]:
+        """牌列を牌種カウントのタプルへ変換する。"""
+        counts = [0] * HandAnalyzer.TILE_KIND_COUNT
+        for tile in tiles:
+            counts[tile & 0b11111] += 1
+        return tuple(counts)
+
+    @staticmethod
+    def _build_source_tile_index(source_tiles: List[int]) -> Tuple[Tuple[int, ...], ...]:
+        """牌種ごとの実牌候補（ドラ/赤ドラ優先）を構築する。"""
+        buckets: list[list[int]] = [[] for _ in range(HandAnalyzer.TILE_KIND_COUNT)]
+        for tile in source_tiles:
+            buckets[tile & 0b11111].append(tile)
+
+        for bucket in buckets:
+            bucket.sort(key=lambda t: (((t >> 5) & 0b1) + ((t >> 6) & 0b1)), reverse=True)
+
+        return tuple(tuple(bucket) for bucket in buckets)
+
+    @staticmethod
+    def _decorate_hand_from_index(hand: Tuple[int, ...], source_tile_index: Tuple[Tuple[int, ...], ...]) -> List[int]:
+        """ベース牌の手牌を、事前計算済み実牌候補から復元する。"""
+        selected_counter = Counter(hand)
+        decorated: list[int] = []
+
+        for tile_id, count in selected_counter.items():
+            decorated.extend(source_tile_index[tile_id][:count])
+
+        return decorated
+
+    @staticmethod
+    def _count_hand_bonus_han(hand: Tuple[int, ...], source_tile_index: Tuple[Tuple[int, ...], ...]) -> int:
+        """候補手牌に最初から含まれているドラ/赤ドラの翻数だけを返す。"""
+        bonus_han = 0
+
+        for tile in HandAnalyzer._decorate_hand_from_index(hand, source_tile_index):
+            bonus_han += (tile >> 5) & 0b1
+            bonus_han += (tile >> 6) & 0b1
+
+        return bonus_han
+
+    @staticmethod
+    def _has_mangan_wait(
+        hand: Tuple[int, ...],
+        waiting_tiles: Tuple[int, ...],
+        source_tile_index: Tuple[Tuple[int, ...], ...],
+    ) -> bool:
+        """待ち牌のいずれかで満貫以上になるかを返す。"""
+        hand_counter = Counter(hand)
+        bonus_han = HandAnalyzer._count_hand_bonus_han(hand, source_tile_index)
+
+        for winning_tile in waiting_tiles:
+            agari_counter = hand_counter.copy()
+            agari_counter[winning_tile] += 1
+
+            if HandAnalyzer._check_mangan_from_counter(agari_counter, winning_tile, bonus_han):
+                return True
+        return False
+
+    @staticmethod
+    def _subtract_tiles(counter_tuple: Tuple[int, ...], tiles: Tuple[int, ...]) -> Tuple[int, ...]:
+        """カウントタプルから牌列を減算した新しいタプルを返す。"""
+        counts = list(counter_tuple)
+        for tile in tiles:
+            counts[tile] -= 1
+        return tuple(counts)
+
+    @staticmethod
+    @lru_cache(maxsize=None)
+    def _extract_mentsu_dp(
+        counter_tuple: Tuple[int, ...],
+        start_tile: int = 0,
+        depth: int = 0,
+    ) -> Tuple[Tuple[int, ...], ...]:
+        """面子3つ分の候補を DP で列挙する。"""
+        if depth == 3:
+            return ((),)
+
+        results: list[Tuple[int, ...]] = []
+        for tile_id in range(start_tile + 1, HandAnalyzer.TILE_KIND_COUNT):
+            if counter_tuple[tile_id] <= 0:
+                continue
+
+            if counter_tuple[tile_id] >= 3:
+                next_counter = list(counter_tuple)
+                next_counter[tile_id] -= 3
+                for melds in HandAnalyzer._extract_mentsu_dp(tuple(next_counter), tile_id, depth + 1):
+                    results.append((tile_id, tile_id, tile_id) + melds)
+
+            elif HandAnalyzer._can_form_run_from_tuple(counter_tuple, tile_id):
+                next_counter = list(counter_tuple)
+                next_counter[tile_id] -= 1
+                next_counter[tile_id + 1] -= 1
+                next_counter[tile_id + 2] -= 1
+                for melds in HandAnalyzer._extract_mentsu_dp(tuple(next_counter), tile_id, depth + 1):
+                    results.append((tile_id, tile_id + 1, tile_id + 2) + melds)
+
+        return tuple(results)
+
+    @staticmethod
+    @lru_cache(maxsize=None)
+    def _select_tiles_dp(
+        counter_tuple: Tuple[int, ...],
+        pick_count: int,
+        start_tile: int = 0,
+    ) -> Tuple[Tuple[int, ...], ...]:
+        """カウントタプルから重複なしの牌 multiset を DP で列挙する。"""
+        if pick_count == 0:
+            return ((),)
+
+        results: list[Tuple[int, ...]] = []
+        for tile_id in range(start_tile, HandAnalyzer.TILE_KIND_COUNT):
+            max_use = min(counter_tuple[tile_id], pick_count)
+            if max_use <= 0:
+                continue
+
+            for use_count in range(1, max_use + 1):
+                next_counter = list(counter_tuple)
+                next_counter[tile_id] -= use_count
+                for rests in HandAnalyzer._select_tiles_dp(tuple(next_counter), pick_count - use_count, tile_id):
+                    results.append((tile_id,) * use_count + rests)
+
+        return tuple(results)
+
+    @staticmethod
+    @lru_cache(maxsize=None)
+    def _get_waiting_tiles_from_counter(
+        hand_counter: Tuple[int, ...],
+        skip_tiles: Tuple[int, ...],
+    ) -> Tuple[int, ...]:
+        """13枚手牌カウントから待ち牌を返す。"""
+        skip_tile_set = set(skip_tiles)
+        waiting_tiles: list[int] = []
+        for tile_id in range(HandAnalyzer.TILE_KIND_COUNT):
+            if tile_id in skip_tile_set:
+                continue
+
+            augmented = list(hand_counter)
+            augmented[tile_id] += 1
+            if HandAnalyzer._is_win_tuple(tuple(augmented)):
+                waiting_tiles.append(tile_id)
+
+        return tuple(waiting_tiles)
+
+    @staticmethod
+    @lru_cache(maxsize=None)
+    def _get_waiting_tiles_for_residual(
+        residual_counter: Tuple[int, ...],
+        skip_tiles: Tuple[int, ...],
+    ) -> Tuple[int, ...]:
+        """3面子を除いた4枚残りから待ち牌を返す。"""
+        skip_tile_set = set(skip_tiles)
+        waiting_tiles: list[int] = []
+        for tile_id in range(HandAnalyzer.TILE_KIND_COUNT):
+            if tile_id in skip_tile_set:
+                continue
+
+            augmented = list(residual_counter)
+            augmented[tile_id] += 1
+            if HandAnalyzer._is_meld_plus_head(tuple(augmented)):
+                waiting_tiles.append(tile_id)
+
+        return tuple(waiting_tiles)
+
+    @staticmethod
+    @lru_cache(maxsize=None)
+    def _is_win_tuple(counter_tuple: Tuple[int, ...]) -> bool:
+        """牌種カウントタプルから和了形かどうかを判定する。"""
+        if HandAnalyzer._is_titoitsu_tuple(counter_tuple):
+            return True
+
+        for tile_id, count in enumerate(counter_tuple):
+            if count < 2:
+                continue
+
+            next_counter = list(counter_tuple)
+            next_counter[tile_id] -= 2
+            if HandAnalyzer._can_form_all_melds(tuple(next_counter)):
+                return True
+
+        return False
+
+    @staticmethod
+    @lru_cache(maxsize=None)
+    def _is_meld_plus_head(counter_tuple: Tuple[int, ...]) -> bool:
+        """5枚が 1 面子 + 1 雀頭へ分解できるかを判定する。"""
+        for tile_id, count in enumerate(counter_tuple):
+            if count < 2:
+                continue
+
+            next_counter = list(counter_tuple)
+            next_counter[tile_id] -= 2
+            if HandAnalyzer._is_single_meld(tuple(next_counter)):
+                return True
+
+        return False
+
+    @staticmethod
+    @lru_cache(maxsize=None)
+    def _is_single_meld(counter_tuple: Tuple[int, ...]) -> bool:
+        """3枚がちょうど1面子かどうかを判定する。"""
+        tile_id = None
+        total = 0
+        for tid, count in enumerate(counter_tuple):
+            total += count
+            if tile_id is None and count > 0:
+                tile_id = tid
+
+        if total != 3 or tile_id is None:
+            return False
+
+        if counter_tuple[tile_id] == 3:
+            return True
+
+        return (
+            HandAnalyzer._can_form_run_from_tuple(counter_tuple, tile_id)
+            and counter_tuple[tile_id] == 1
+            and counter_tuple[tile_id + 1] == 1
+            and counter_tuple[tile_id + 2] == 1
+        )
+
+    @staticmethod
+    @lru_cache(maxsize=None)
+    def _can_form_all_melds(counter_tuple: Tuple[int, ...]) -> bool:
+        """残り牌がすべて面子へ分解できるかを DP で判定する。"""
+        tile_id = None
+        for tid, count in enumerate(counter_tuple):
+            if count > 0:
+                tile_id = tid
+                break
+
+        if tile_id is None:
+            return True
+
+        if counter_tuple[tile_id] >= 3:
+            next_counter = list(counter_tuple)
+            next_counter[tile_id] -= 3
+            if HandAnalyzer._can_form_all_melds(tuple(next_counter)):
+                return True
+
+        if HandAnalyzer._can_form_run_from_tuple(counter_tuple, tile_id):
+            next_counter = list(counter_tuple)
+            next_counter[tile_id] -= 1
+            next_counter[tile_id + 1] -= 1
+            next_counter[tile_id + 2] -= 1
+            if HandAnalyzer._can_form_all_melds(tuple(next_counter)):
+                return True
+
+        return False
+
+    @staticmethod
+    def _can_form_run_from_tuple(counter_tuple: Tuple[int, ...], tile_id: int) -> bool:
+        """カウントタプル上で順子を作れるかどうかの判定。"""
+        if not HandAnalyzer._is_suited(tile_id):
+            return False
+        if tile_id % 9 >= 7:
+            return False
+        return counter_tuple[tile_id + 1] > 0 and counter_tuple[tile_id + 2] > 0
+
+    @staticmethod
+    def _is_titoitsu_tuple(counter_tuple: Tuple[int, ...]) -> bool:
+        """牌種カウントタプルから七対子を判定する。"""
+        return all(count == 2 for count in counter_tuple if count > 0)
 
     @staticmethod
     def _extract_mentsu(wall_counter: Counter, start_tile: int = 0, depth: int = 0) -> Generator[list[int], None, None]:
@@ -96,18 +408,9 @@ class HandAnalyzer:
         Returns:
             聴牌かどうか
         """
-        skip_tiles = HandAnalyzer.skip_tenpai_tiles(wall)
-        hand_counter = Counter(t & 0b11111 for t in hand)
-
-        for tile_id in range(29):
-            if tile_id in skip_tiles:
-                continue
-            sup_counter = hand_counter.copy()
-            sup_counter[tile_id] += 1
-            if HandAnalyzer._is_win(sup_counter):
-                return True
-
-        return False
+        skip_tiles = tuple(sorted(HandAnalyzer.skip_tenpai_tiles(wall)))
+        hand_counter = HandAnalyzer._tiles_to_counter_tuple(hand)
+        return bool(HandAnalyzer._get_waiting_tiles_from_counter(hand_counter, skip_tiles))
 
     @staticmethod
     def get_tenpai_waiting_tiles(hand: List[int], wall: List[int]) -> List[int]:
@@ -121,20 +424,9 @@ class HandAnalyzer:
         Returns:
             待ち牌のリスト
         """
-        skip_tiles = HandAnalyzer.skip_tenpai_tiles(wall)
-        hand_counter = Counter(t & 0b11111 for t in hand)
-        waiting_tiles = []
-
-        for tile_id in range(29):
-            if tile_id in skip_tiles:
-                continue
-
-            sup_counter = hand_counter.copy()
-            sup_counter[tile_id] += 1
-
-            if HandAnalyzer._is_win(sup_counter):
-                waiting_tiles.append(tile_id)
-        return waiting_tiles
+        skip_tiles = tuple(sorted(HandAnalyzer.skip_tenpai_tiles(wall)))
+        hand_counter = HandAnalyzer._tiles_to_counter_tuple(hand)
+        return list(HandAnalyzer._get_waiting_tiles_from_counter(hand_counter, skip_tiles))
 
     @staticmethod
     def without_hand(hand: List[int], wall: List[int]) -> List[int]:
@@ -200,6 +492,7 @@ class HandAnalyzer:
 
     # ========== 役計算 ==========
 
+    
     @staticmethod
     def filter_mangan_hands(hands: list[list[int]], wall: List[int], dora: int) -> List[list[int]]:
         """
@@ -214,37 +507,11 @@ class HandAnalyzer:
             満貫以上の聴牌形の手牌リスト
         """
 
-        aka_list = [t & 0b11111 for t in wall if (t >> 6) & 0b1 == 1]
-
         mangan_hands = []
         for hand in hands:
-
-            waiting_tiles = HandAnalyzer.get_tenpai_waiting_tiles(hand, wall)
-
-            hands = [(hand + [tile_id], tile_id) for tile_id in waiting_tiles]
-
-            for h, winning_tile in hands:
-
-                temp_aka_list = aka_list.copy()
-
-                for i, t in enumerate(h):
-                    if t in temp_aka_list:
-                        h[i] = t | (1 << 6)
-                        temp_aka_list.remove(t)
-
-                    if t == dora:
-                        h[i] |= (1 << 5)
-
-                han = HandAnalyzer.calc_yaku(h, winning_tile=winning_tile)
-                if han >= 4:
-                    for i, t in enumerate(hand):
-                        if t in temp_aka_list:
-                            hand[i] = t | (1 << 6)
-                            temp_aka_list.remove(t)
-                        if t == dora:
-                            hand[i] |= (1 << 5)
-
-                    mangan_hands.append(hand)
+            waiting_tiles = tuple(HandAnalyzer.get_tenpai_waiting_tiles(hand, wall))
+            if HandAnalyzer._has_mangan_wait(tuple(t & 0b11111 for t in hand), waiting_tiles, wall, dora):
+                mangan_hands.append(hand)
 
         return mangan_hands
 
@@ -260,7 +527,136 @@ class HandAnalyzer:
         Returns:
             満貫（４翻）以上かどうか
         """
-        return HandAnalyzer.calc_yaku(hand, winning_tile=winning_tile) >= 4
+        base_tiles = [t & 0b11111 for t in hand]
+        counter = Counter(base_tiles)
+        bonus_han = sum(1 for t in hand if ((t >> 5) & 0b1 == 1) or ((t >> 6) & 0b1 == 1))
+        resolved_winning_tile = (winning_tile & 0b11111) if winning_tile is not None else None
+        return HandAnalyzer._check_mangan_from_counter(counter, resolved_winning_tile, bonus_han)
+
+    @staticmethod
+    def _check_mangan_from_counter(
+        counter: Counter,
+        winning_tile: int | None,
+        bonus_han: int,
+    ) -> bool:
+        """基底カウントとボーナス翻数から満貫以上かを判定する。"""
+        counter_tuple = tuple(counter.get(i, 0) for i in range(HandAnalyzer.TILE_KIND_COUNT))
+        return HandAnalyzer._check_mangan_from_counter_tuple(counter_tuple, winning_tile, bonus_han)
+
+    @staticmethod
+    @lru_cache(maxsize=None)
+    def _check_mangan_from_counter_tuple(
+        counter_tuple: Tuple[int, ...],
+        winning_tile: int | None,
+        bonus_han: int,
+    ) -> bool:
+        """基底カウントとボーナス翻数から満貫以上かを判定する（キャッシュ版）。"""
+        target = 4 - bonus_han
+
+        if target <= 0:
+            return True
+
+        return HandAnalyzer._max_han_from_counter_tuple(counter_tuple, winning_tile) >= target
+
+    @staticmethod
+    @lru_cache(maxsize=None)
+    def _max_han_from_counter_tuple(
+        counter_tuple: Tuple[int, ...],
+        winning_tile: int | None,
+    ) -> int:
+        """ボーナス抜きの最大翻数を返す（キャッシュ版）。"""
+        counter = Counter({i: c for i, c in enumerate(counter_tuple) if c > 0})
+        best_han = 0
+
+        # 七対子判定
+        if HandAnalyzer._is_titoitsu(counter):
+            han = 3  # 七対子 + 立直
+            if HandAnalyzer._is_tanyao(counter):
+                han += 1
+            if HandAnalyzer._is_chinitsu(counter):
+                han += 6
+            elif HandAnalyzer._is_honitsu(counter):
+                han += 3
+            if HandAnalyzer._is_honroutou(counter):
+                han += 2
+            if han > best_han:
+                best_han = han
+
+        # 通常手（4面子1雀頭）の全分解を探索
+        for head_tile in HandAnalyzer._head_candidates(counter):
+            temp_counter = counter.copy()
+            temp_counter[head_tile] -= 2
+
+            for melds in HandAnalyzer._generate_melds(temp_counter):
+                if len(melds) != 4:
+                    continue
+                han = HandAnalyzer._evaluate_melds_han(counter, melds, head_tile, winning_tile)
+                if han > best_han:
+                    best_han = han
+
+        return best_han
+
+    @staticmethod
+    def _evaluate_melds_han(
+        counter: Counter,
+        melds: List[Tuple[str, int]],
+        head: int,
+        winning_tile: int | None = None,
+    ) -> int:
+        """面子と雀頭から役の合計翻数だけを返す。"""
+        # 役満
+        if HandAnalyzer._is_junsei_churen_poutou(counter, winning_tile):
+            return 26
+        if HandAnalyzer._is_churen_poutou(counter):
+            return 13
+        if HandAnalyzer._is_ryuuisou(counter):
+            return 13
+        if HandAnalyzer._is_chinroutou(counter):
+            return 13
+        if HandAnalyzer._is_suuankou(melds, winning_tile):
+            return 13
+
+        han = 1  # 立直
+
+        if HandAnalyzer._is_tanyao(counter):
+            han += 1
+        if HandAnalyzer._is_pinfu(melds, head):
+            han += 1
+        if HandAnalyzer._is_chinitsu(counter):
+            han += 6
+        elif HandAnalyzer._is_honitsu(counter):
+            han += 3
+        if HandAnalyzer._is_honroutou(counter):
+            han += 2
+
+        if HandAnalyzer._is_junchan(melds, head):
+            han += 3
+        elif HandAnalyzer._is_chanta(melds, head):
+            han += 2
+
+        # NOTE:
+        # `一気通貫` は現在の Yaku テーブルに未登録のため、
+        # 高速判定側で加点すると本採点と乖離して偽陽性になる。
+        if HandAnalyzer._is_sanshoku_doujun(melds):
+            han += 2
+        if HandAnalyzer._is_sanshoku_doukou(melds):
+            han += 2
+        if HandAnalyzer._is_toitoi(melds):
+            han += 2
+        if HandAnalyzer._is_sanankou(melds, winning_tile):
+            han += 2
+
+        if HandAnalyzer._is_ryanpeikou(melds):
+            han += 3
+        elif HandAnalyzer._is_ipeikou(melds):
+            han += 1
+
+        if HandAnalyzer._is_ton(melds):
+            han += 1
+        if HandAnalyzer._is_sha(melds):
+            han += 1
+
+        return han
 
     @staticmethod
     def calc_yaku(hand: List[int], winning_tile: int | None = None) -> int:

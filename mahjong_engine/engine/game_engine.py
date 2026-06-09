@@ -85,14 +85,32 @@ class GameEngine:
 
         # MULLIGAN 交換用の reserved_tiles を計算
         # 全 116 牌 - (配られた 68 牌 + ドラの 1 牌) = 47 牌
-        dealt_tiles = [tile for _, hand in hands for tile in hand] + [self.tile_wall.dora_id]
+        dealt_tiles = [tile for wall, _ in hands for tile in wall] + [self.tile_wall.dora_id]
         used_set = set(dealt_tiles)
         reserved = [t for t in range(116) if t not in used_set]
         self.state.round_state.reserved_tiles = reserved
 
-        for player, (wall, hand) in zip(self.state.players, hands):
+        def _to_wall_indexes(wall_tiles: list[int], hand_tiles: list[int]) -> list[int]:
+            used = [False] * len(wall_tiles)
+            indexes: list[int] = []
+            for tile in hand_tiles:
+                tile_base = tile & 0b11111
+                found_idx = None
+                for idx, wall_tile in enumerate(wall_tiles):
+                    if used[idx]:
+                        continue
+                    if (wall_tile & 0b11111) == tile_base:
+                        found_idx = idx
+                        break
+                if found_idx is None:
+                    raise ValueError("deal が返した聴牌例を wall index へ変換できませんでした")
+                used[found_idx] = True
+                indexes.append(found_idx)
+            return indexes
+
+        for player, (wall, hand_tiles) in zip(self.state.players, hands):
             player.wall = wall  # 配られた牌
-            player.hand = hand  # 手牌の例
+            player.hand = _to_wall_indexes(wall, hand_tiles)  # 手牌例を wall index で保持
 
         self.state.round_state.dora_id = self.tile_wall.dora_id
 

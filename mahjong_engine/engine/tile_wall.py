@@ -3,7 +3,6 @@
 """
 import random
 from typing import List
-import itertools
 
 from .hand_analyzer import HandAnalyzer
 
@@ -54,7 +53,7 @@ class TileWall:
         """牌山をシャッフル"""
         random.shuffle(self.tiles)
 
-    def deal(self, count: int = 34, max_size: int = 3) -> tuple[List[int], List[int]]: #, List[List[int]]]:
+    def deal(self, count: int = 34) -> tuple[List[int], List[int]]: #, List[List[int]]]:
         """
         牌山から指定枚数を配る
 
@@ -64,28 +63,26 @@ class TileWall:
         Returns:
             配った牌のリスト
             聴牌形の例
-            交換不可な牌の組み合わせのリスト
         """
 
-        dealt_tiles = self.tiles[:count]
-        rest_tiles = self.tiles[count:]
+        if count <= 0:
+            raise ValueError("count は 1 以上で指定してください。")
 
-        hands = HandAnalyzer.search_tenpai(dealt_tiles)
-        hands = HandAnalyzer.filter_mangan_hands(hands, rest_tiles, self.dora_id)
-        if not hands:
-            return self.deal(count)
+        if len(self.tiles) < count:
+            raise ValueError(f"牌山の残り枚数が不足しています (need={count}, remain={len(self.tiles)})")
 
-        sample = random.choice(hands)
+        while True:
+            dealt_tiles = self.tiles[:count]
+            rest_tiles = self.tiles[count:]
 
-        combs = []
-        comb = itertools.combinations(dealt_tiles, max_size)
-        for c in comb:
-            if all(any(t in hand for t in c) for hand in hands):
-                combs.append(list(c))
+            # 配った 34 枚から満貫以上の聴牌形を探索
+            hands = HandAnalyzer.search_tenpai(dealt_tiles, rest_tiles, self.dora_id)
+            if hands:
+                self.tiles = rest_tiles
+                return dealt_tiles, random.choice(hands)
 
-        self.tiles = rest_tiles
-
-        return dealt_tiles, sample#, combs
+            # 見つからなければ同じ牌山を再シャッフルして再探索
+            self.shuffle()
 
     def reset(self):
         """牌山をリセット"""
