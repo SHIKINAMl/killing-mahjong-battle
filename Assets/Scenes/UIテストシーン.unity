@@ -1427,7 +1427,7 @@ Light:
   m_GameObject: {fileID: 70017020}
   m_Enabled: 1
   serializedVersion: 11
-  m_Type: 2
+  m_Type: 0
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Intensity: 2.7852113
   m_Range: 5
@@ -3210,7 +3210,7 @@ Light:
   m_GameObject: {fileID: 232685932}
   m_Enabled: 1
   serializedVersion: 11
-  m_Type: 2
+  m_Type: 0
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Intensity: 7.161972
   m_Range: 10
@@ -8321,7 +8321,6 @@ MonoBehaviour:
   damageEffectPrefab: {fileID: 0}
   tilePrefab: {fileID: 3470249716998659876, guid: 665b2ddf3e8ccac4aa366c094061ee09, type: 3}
   tileResourceManager: {fileID: 11400000, guid: 26e956d32b644284b942ac0044639558, type: 2}
-  showEnemyHandDebug: 1
 --- !u!114 &536350431
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -10819,7 +10818,7 @@ Light:
   m_GameObject: {fileID: 668553888}
   m_Enabled: 1
   serializedVersion: 11
-  m_Type: 2
+  m_Type: 0
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Intensity: 30
   m_Range: 2
@@ -12963,7 +12962,7 @@ Light:
   m_GameObject: {fileID: 846575031}
   m_Enabled: 1
   serializedVersion: 11
-  m_Type: 2
+  m_Type: 0
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Intensity: 7.161972
   m_Range: 10
@@ -14698,7 +14697,7 @@ Light:
   m_GameObject: {fileID: 941527065}
   m_Enabled: 1
   serializedVersion: 11
-  m_Type: 2
+  m_Type: 0
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Intensity: 5.1725354
   m_Range: 30
@@ -14875,7 +14874,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.CommentaryFlowUI
   flowSpeed: 300
-  commentLifetime: 8
   maxLanes: 5
   laneHeight: 50
   minCommentInterval: 0.5
@@ -22021,7 +22019,7 @@ Light:
   m_GameObject: {fileID: 1421919084}
   m_Enabled: 1
   serializedVersion: 11
-  m_Type: 2
+  m_Type: 0
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Intensity: 6.3661976
   m_Range: 10
@@ -23371,7 +23369,7 @@ Light:
   m_GameObject: {fileID: 1471346571}
   m_Enabled: 1
   serializedVersion: 11
-  m_Type: 2
+  m_Type: 0
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Intensity: 7.161972
   m_Range: 10
@@ -24941,7 +24939,7 @@ Light:
   m_GameObject: {fileID: 1551647639}
   m_Enabled: 1
   serializedVersion: 11
-  m_Type: 2
+  m_Type: 0
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Intensity: 1.5915494
   m_Range: 5
@@ -28447,7 +28445,7 @@ Light:
   m_GameObject: {fileID: 1779950996}
   m_Enabled: 1
   serializedVersion: 11
-  m_Type: 2
+  m_Type: 0
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Intensity: 3.9788735
   m_Range: 20
@@ -28717,7 +28715,7 @@ Light:
   m_GameObject: {fileID: 1780372803}
   m_Enabled: 1
   serializedVersion: 11
-  m_Type: 2
+  m_Type: 0
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Intensity: 7.161972
   m_Range: 10
@@ -30045,7 +30043,7 @@ Light:
   m_GameObject: {fileID: 1916469981}
   m_Enabled: 1
   serializedVersion: 11
-  m_Type: 2
+  m_Type: 0
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Intensity: 2.7852113
   m_Range: 5

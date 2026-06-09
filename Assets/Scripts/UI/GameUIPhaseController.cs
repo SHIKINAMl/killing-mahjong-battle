@@ -12,7 +12,6 @@ namespace KillingMahjong.UI
     {
         private GameUIManager uiManager;
         
-        private bool _isWaitingForEnemyRon = false;
         private bool _hasSentNextRoundForCurrentPhase = false;
         private int _currentRoundIndex = 1;
         private bool _isCarryOverNextRound = false;
@@ -172,10 +171,11 @@ namespace KillingMahjong.UI
             switch (status)
             {
                 case RoundStatus.Betting:
-                    SetMatchUIVisibility(false); 
+                    SetMatchUIVisibility(true); 
                     if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetPanelVisible(true);
                     if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.gameObject.SetActive(false);
                     if (uiManager.WaitUI != null) uiManager.WaitUI.gameObject.SetActive(false);
+                    if (uiManager.AbilityUI != null) uiManager.AbilityUI.gameObject.SetActive(false);
                     StartBettingPhase(Managers.BoardStateManager.Instance.LocalPlayerHp);
                     break;
                 case RoundStatus.Dealing:
@@ -242,10 +242,6 @@ namespace KillingMahjong.UI
                         if (isLocalWin)
                         {
                             if (uiManager.RonWaitPanel != null) uiManager.RonWaitPanel.SetActive(true);
-                        }
-                        else
-                        {
-                            _isWaitingForEnemyRon = true;
                         }
                     }
                     break;
@@ -463,13 +459,11 @@ namespace KillingMahjong.UI
             StartCoroutine(PlayRonWithPreDialogue(isLocalWin, winningHand, ronTile, actualYaku, actualFormula, actualRank));
         }
 
-        public void HandleNextRoundWaitingReceived()
+        public void HandleAgari(bool isLocalWin)
         {
-            if (_isWaitingForEnemyRon)
+            if (!isLocalWin)
             {
-                _isWaitingForEnemyRon = false;
                 
-                bool isLocalWin = false;
                 List<int> winningHand = new List<int>(BoardStateManager.Instance.CurrentEnemyHandTiles);
                 var liq = BoardStateManager.Instance.LastLiquidationData;
                 
@@ -497,6 +491,14 @@ namespace KillingMahjong.UI
                 
                 StartCoroutine(PlayRonWithPreDialogue(isLocalWin, winningHand, ronTile, actualYaku, actualFormula, actualRank));
             }
+        }
+
+        public void HandleNextRoundWaitingReceived()
+        {
+            // 以前はここで敵のロン演出をトリガーしていましたが、
+            // サーバーから game_end が送られた時にこれが呼ばれないため、
+            // HandleAgari で即座にロン演出をトリガーするように変更しました。
+            Debug.Log("[GameUIPhaseController] HandleNextRoundWaitingReceived: 相手が次ラウンド準備完了しました。");
         }
 
         private IEnumerator PlayRonWithPreDialogue(bool isLocalWin, List<int> winningHand, int ronTile, List<string> yaku, string formula, string rank)
@@ -648,11 +650,19 @@ namespace KillingMahjong.UI
         private IEnumerator WaitAndSendNextRound(float delay)
         {
             yield return new WaitForSeconds(delay);
-            SendNextRoundAction();
+            if (uiManager.IsGameOver)
+            {
+                uiManager.ShowGameResult();
+            }
+            else
+            {
+                SendNextRoundAction();
+            }
         }
 
         private void SendNextRoundAction()
         {
+            if (uiManager.IsGameOver) return;
             if (!_hasSentNextRoundForCurrentPhase)
             {
                 _hasSentNextRoundForCurrentPhase = true;

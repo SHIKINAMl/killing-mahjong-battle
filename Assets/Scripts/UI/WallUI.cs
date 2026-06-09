@@ -104,8 +104,6 @@ namespace KillingMahjong.UI
             float currentY = startPosition.y;
             float currentX = startPosition.x;
 
-            int currentSlot = 0;
-            int maxSlotsPerRow = 20;
 
             // generatedTiles を消費していくためのリスト
             List<RectTransform> remainingGeneratedTiles = new List<RectTransform>(generatedTiles);
@@ -351,7 +349,7 @@ namespace KillingMahjong.UI
                 var newSlot = currentActiveInteraction.GetComponent<RectTransform>();
                 if (newSlot != null)
                 {
-                    newSlot.anchoredPosition = new Vector2(currentActiveInteraction.OriginalWallPosition.x, currentActiveInteraction.OriginalWallPosition.y + 20f);
+                    newSlot.anchoredPosition = new Vector2(currentActiveInteraction.OriginalWallPosition.x, currentActiveInteraction.OriginalWallPosition.y + 8f);
                     
                     if (arrowIndicator == null) CreateArrowIndicator();
                     arrowIndicator.gameObject.SetActive(true);

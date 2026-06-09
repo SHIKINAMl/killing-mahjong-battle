@@ -73,7 +73,6 @@ namespace KillingMahjong.UI
             if (uiManager.CurrentPhaseStatus != RoundStatus.HandSelection) return;
 
             string message = "【予想役・点数】\n";
-            bool hasMangan = false;
             
             if (data.waits != null && data.waits.Length > 0)
             {
@@ -84,7 +83,6 @@ namespace KillingMahjong.UI
                     bool isMangan = wait.mangan_or_more;
                     string manganText = isMangan ? "満貫以上" : "満貫未満";
                     message += $"-> {yakuText} ({manganText})\n";
-                    if (isMangan) hasMangan = true;
                 }
             }
             message += "\nこの手牌で決定しますか？";

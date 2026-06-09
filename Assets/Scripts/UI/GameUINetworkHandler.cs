@@ -107,7 +107,7 @@ namespace KillingMahjong.UI
 
         private void HandleAgari(bool isLocalWin)
         {
-            // The phase change handles the UI logic, this was empty in GameUIManager too
+            uiManager.PhaseController?.HandleAgari(isLocalWin);
         }
 
         private void HandleDraw()

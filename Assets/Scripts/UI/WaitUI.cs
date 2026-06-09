@@ -22,6 +22,25 @@ namespace KillingMahjong.UI
         private Vector3 originalWorldPosition;
         private bool isOriginalSaved = false;
 
+        private void Awake()
+        {
+            if (waitContainer != null)
+            {
+                Canvas canvas = waitContainer.GetComponent<Canvas>();
+                if (canvas == null)
+                {
+                    canvas = waitContainer.gameObject.AddComponent<Canvas>();
+                }
+                canvas.overrideSorting = false;
+
+                UnityEngine.UI.GraphicRaycaster raycaster = waitContainer.GetComponent<UnityEngine.UI.GraphicRaycaster>();
+                if (raycaster == null)
+                {
+                    waitContainer.gameObject.AddComponent<UnityEngine.UI.GraphicRaycaster>();
+                }
+            }
+        }
+
         private void SaveOriginalRect()
         {
             if (isOriginalSaved || waitContainer == null) return;
@@ -35,39 +54,58 @@ namespace KillingMahjong.UI
 
         public void MoveToCenter()
         {
+            gameObject.SetActive(true);
             SaveOriginalRect();
             if (waitContainer != null)
             {
-                Canvas canvas = waitContainer.GetComponent<Canvas>();
-                if (canvas == null) canvas = waitContainer.gameObject.AddComponent<Canvas>();
-                canvas.overrideSorting = true;
-                canvas.sortingOrder = 10000;
+                CanvasGroup cg = waitContainer.GetComponent<CanvasGroup>();
+                if (cg == null) cg = waitContainer.gameObject.AddComponent<CanvasGroup>();
+                cg.alpha = 0f;
 
-                UnityEngine.UI.GraphicRaycaster raycaster = waitContainer.GetComponent<UnityEngine.UI.GraphicRaycaster>();
-                if (raycaster == null) raycaster = waitContainer.gameObject.AddComponent<UnityEngine.UI.GraphicRaycaster>();
+                StartCoroutine(MoveToCenterCoroutine(cg));
+            }
+        }
+
+        private System.Collections.IEnumerator MoveToCenterCoroutine(CanvasGroup cg)
+        {
+            yield return new WaitForEndOfFrame();
+
+            if (waitContainer != null)
+            {
+                Canvas canvas = waitContainer.GetComponent<Canvas>();
+                if (canvas != null)
+                {
+                    canvas.overrideSorting = true;
+                    canvas.sortingOrder = 10000;
+                }
+
+                UnityEngine.UI.LayoutElement layoutElement = waitContainer.GetComponent<UnityEngine.UI.LayoutElement>();
+                if (layoutElement == null) layoutElement = waitContainer.gameObject.AddComponent<UnityEngine.UI.LayoutElement>();
+                layoutElement.ignoreLayout = true;
 
                 waitContainer.anchorMin = new Vector2(0.5f, 0.5f);
                 waitContainer.anchorMax = new Vector2(0.5f, 0.5f);
                 waitContainer.pivot = new Vector2(0.5f, 0.5f);
                 waitContainer.anchoredPosition = dialogCenterPosition;
             }
+
+            if (cg != null) cg.alpha = 1f;
         }
 
         public void MoveToOriginalPosition()
         {
             if (!isOriginalSaved || waitContainer == null) return;
             
-            UnityEngine.UI.GraphicRaycaster raycaster = waitContainer.GetComponent<UnityEngine.UI.GraphicRaycaster>();
-            if (raycaster != null)
-            {
-                Destroy(raycaster);
-            }
-
             Canvas canvas = waitContainer.GetComponent<Canvas>();
             if (canvas != null)
             {
                 canvas.overrideSorting = false;
-                Destroy(canvas);
+            }
+
+            UnityEngine.UI.LayoutElement layoutElement = waitContainer.GetComponent<UnityEngine.UI.LayoutElement>();
+            if (layoutElement != null)
+            {
+                layoutElement.ignoreLayout = false;
             }
 
             waitContainer.anchorMin = originalAnchorMin;

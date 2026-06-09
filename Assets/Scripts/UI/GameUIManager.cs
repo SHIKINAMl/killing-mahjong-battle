@@ -34,13 +34,13 @@ namespace KillingMahjong.UI
         [SerializeField] private GameObject damageEffectPrefab;
 
         public bool IsOpponentSkillProcessing { get; private set; } = false;
+        public bool IsGameOver { get; private set; } = false;
+        public int LocalFinalScore { get; private set; } = 0;
+        public int EnemyFinalScore { get; private set; } = 0;
 
         [Header("Tile Prefab")]
         [SerializeField] private GameObject tilePrefab;
         [SerializeField] private TileResourceManager tileResourceManager;
-
-        [Header("Debug Client")]
-        [SerializeField] private bool showEnemyHandDebug = false;
 
         private RoundStatus currentPhaseStatus = RoundStatus.None;
         public RoundStatus CurrentPhaseStatus => currentPhaseStatus;
@@ -98,6 +98,7 @@ namespace KillingMahjong.UI
             if (NetworkMessageHandler.Instance != null)
             {
                 NetworkMessageHandler.Instance.OnTileDiscarded += HandleDiscardEvent;
+                NetworkMessageHandler.Instance.OnGameEnded += HandleGameEnded;
             }
         }
 
@@ -110,11 +111,22 @@ namespace KillingMahjong.UI
             if (NetworkMessageHandler.Instance != null)
             {
                 NetworkMessageHandler.Instance.OnTileDiscarded -= HandleDiscardEvent;
+                NetworkMessageHandler.Instance.OnGameEnded -= HandleGameEnded;
             }
         }
 
         private void SetupUI()
         {
+            if (confirmationDialogUI == null)
+            {
+                confirmationDialogUI = FindFirstObjectByType<ConfirmationDialogUI>(FindObjectsInactive.Include);
+                if (confirmationDialogUI == null)
+                {
+                    Debug.LogError("[GameUIManager] ConfirmationDialogUI is not assigned and not found in the scene! This will cause hand confirmation to be skipped.");
+                    if (dialogueUI != null) dialogueUI.ShowText("「警告：ConfirmationDialogUIがシーンに見つかりません！決定が即座に確定されます。」");
+                }
+            }
+
             if (handUI != null) handUI.Setup(this);
             if (wallUI != null) wallUI.Setup(this);
             if (enemyWallUI != null) enemyWallUI.Setup(this);
@@ -134,6 +146,20 @@ namespace KillingMahjong.UI
             if (bettingUI != null) bettingUI.HideBettingPhase(true);
             if (doraDisplayUI != null) doraDisplayUI.Hide();
             if (ronWaitPanel != null) ronWaitPanel.SetActive(false);
+        }
+
+        private void HandleGameEnded(int localScore, int enemyScore)
+        {
+            IsGameOver = true;
+            LocalFinalScore = localScore;
+            EnemyFinalScore = enemyScore;
+        }
+
+        public void ShowGameResult()
+        {
+            var resultUI = gameObject.AddComponent<GameResultUI>();
+            bool isWin = LocalFinalScore > 0 && EnemyFinalScore <= 0;
+            resultUI.Show(isWin);
         }
 
         // --- Component accessors ---

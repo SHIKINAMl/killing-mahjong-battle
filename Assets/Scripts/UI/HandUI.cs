@@ -71,11 +71,15 @@ namespace KillingMahjong.UI
         {
             if (panelRect != null)
             {
-                Vector2 localPointerPosition;
-                if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                    panelRect.parent as RectTransform, eventData.position, eventData.pressEventCamera, out localPointerPosition))
+                RectTransform parentRect = panelRect.parent as RectTransform;
+                if (parentRect != null)
                 {
-                    panelRect.localPosition = localPointerPosition - dragOffset;
+                    Vector2 localPointerPosition;
+                    if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                        parentRect, eventData.position, eventData.pressEventCamera, out localPointerPosition))
+                    {
+                        panelRect.localPosition = localPointerPosition - dragOffset;
+                    }
                 }
             }
         }

@@ -249,8 +249,6 @@ namespace KillingMahjong.Managers
 
         // --- New State Tracking Variables ---
         private int _drawCount = 0;
-        private int _enemyConsecutiveTsumogiriCount = 0;
-        private int _playerConsecutiveTsumogiriCount = 0;
         private int _playerConsecutiveHonorCount = 0;
         private float _handSelectionStartTime = 0f;
         private bool _handSelectionTimerActive = false;
@@ -285,8 +283,6 @@ namespace KillingMahjong.Managers
             _currentRound = 1;
 
             _drawCount = 0;
-            _enemyConsecutiveTsumogiriCount = 0;
-            _playerConsecutiveTsumogiriCount = 0;
             _playerConsecutiveHonorCount = 0;
             _handSelectionTimerActive = false;
             _betPhaseTimerActive = false;

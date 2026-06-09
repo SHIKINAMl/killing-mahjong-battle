@@ -242,15 +242,6 @@ namespace KillingMahjong.UI
                             return;
                         }
 
-                        var handUI = FindFirstObjectByType<HandUI>();
-                        if (handUI != null && !handUI.IsSubmitted && data.skillType != "perspective")
-                        {
-                            if (uiMgr.DialogueUI != null) uiMgr.DialogueUI.ShowText("「手牌を確定してから使ってね！」");
-                            DeselectAll();
-                            ToggleAbilityWindow(false);
-                            return;
-                        }
-
                         if (data.skillType == "mulligan")
                         {
                             var currentHand = KillingMahjong.Managers.BoardStateManager.Instance.CurrentHandTiles;
