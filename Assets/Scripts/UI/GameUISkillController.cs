@@ -101,18 +101,20 @@ namespace KillingMahjong.UI
         {
             bool isLocalPlayer = (data.player_id == NetworkMessageHandler.Instance.LocalPlayerId);
             string skillName = GetSkillName(data.skillType);
-            string castMessage = isLocalPlayer ? $"アビリティ発動！\n「{skillName}」" : $"相手がアビリティを発動！\n「{skillName}」";
 
+            // 1. 以前の大迫力カットイン演出（血飛沫＋立ち絵＋巨大テキスト）を再生する
             if (uiManager.PhaseTransitionUI != null)
             {
-                yield return uiManager.PhaseTransitionUI.PlayCenterTextAnimRoutine(castMessage, 2.0f, null);
+                yield return uiManager.PhaseTransitionUI.PlaySkillCutinAnimationRoutine(skillName, isLocalPlayer, 2.0f, null);
             }
             else if (uiManager.DialogueUI != null)
             {
+                string castMessage = isLocalPlayer ? $"【あなた】がアビリティを発動！\n「{skillName}」" : $"【相手】がアビリティを発動！\n「{skillName}」";
                 uiManager.DialogueUI.ShowText(castMessage);
                 yield return new WaitForSeconds(2.0f);
             }
 
+            // 2. HP（コスト）の支払い演出
             if (isLocalPlayer)
             {
                 int currentLocalHp = Managers.BoardStateManager.Instance.LocalPlayerHp;
@@ -127,6 +129,11 @@ namespace KillingMahjong.UI
                 Managers.BoardStateManager.Instance.UpdateHp(currentLocalHp, currentEnemyHp - data.cost);
                 if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetHP(Managers.BoardStateManager.Instance.EnemyPlayerHp);
             }
+
+            // 体力が減る様子をしっかり見せるためのタメ（待機）
+            yield return new WaitForSeconds(1.0f);
+
+            // --- 以降、実際のアビリティ効果（透視など）を実行 ---
 
             if (data.skillType == "perspective")
             {

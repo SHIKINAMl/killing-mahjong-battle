@@ -449,5 +449,78 @@ namespace KillingMahjong.UI
         {
             HandSelectionController?.CancelHandSelection();
         }
+
+        // --- ダイエジェティック演出用（全体のスライド＆フェードアウト） ---
+        public System.Collections.IEnumerator SlideUIRoutine(float duration, float uiXOffset, float worldXOffset, bool isLocalPlayer)
+        {
+            Transform[] elements = new Transform[] { 
+                handUI?.transform, wallUI?.transform, riverUI?.transform,
+                enemyHandUI?.transform, enemyWallUI?.transform, enemyRiverUI?.transform,
+                dialogueUI?.transform, abilityUI?.transform, yakuListUI?.transform, bettingUI?.transform,
+                isLocalPlayer ? enemyInfoUI?.transform : playerInfoUI?.transform // 相手のHPも消す
+            };
+
+            List<Transform> validElements = new List<Transform>();
+            List<Vector3> startPositions = new List<Vector3>();
+            List<Vector3> targetPositions = new List<Vector3>();
+            List<CanvasGroup> canvasGroups = new List<CanvasGroup>();
+
+            foreach (var t in elements)
+            {
+                if (t != null)
+                {
+                    validElements.Add(t);
+                    startPositions.Add(t.localPosition);
+                    
+                    bool isUI = t.GetComponent<RectTransform>() != null;
+                    targetPositions.Add(t.localPosition + new Vector3(isUI ? uiXOffset : worldXOffset, 0, 0));
+
+                    if (isUI)
+                    {
+                        CanvasGroup cg = t.GetComponent<CanvasGroup>();
+                        if (cg == null) cg = t.gameObject.AddComponent<CanvasGroup>();
+                        canvasGroups.Add(cg);
+                    }
+                    else
+                    {
+                        canvasGroups.Add(null);
+                    }
+                }
+            }
+
+            float time = 0;
+            // 往復の方向を判定（スライドアウトならフェードアウト、スライドインならフェードイン）
+            bool isSlideOut = (uiXOffset < 0);
+            float startAlpha = isSlideOut ? 1f : 0f;
+            float targetAlpha = isSlideOut ? 0f : 1f;
+
+            while (time < duration)
+            {
+                float progress = time / duration;
+                float eased = progress * progress * (3f - 2f * progress);
+
+                for (int i = 0; i < validElements.Count; i++)
+                {
+                    validElements[i].localPosition = Vector3.Lerp(startPositions[i], targetPositions[i], eased);
+                    
+                    if (canvasGroups[i] != null)
+                    {
+                        canvasGroups[i].alpha = Mathf.Lerp(startAlpha, targetAlpha, eased);
+                    }
+                }
+
+                time += Time.deltaTime;
+                yield return null;
+            }
+
+            for (int i = 0; i < validElements.Count; i++)
+            {
+                validElements[i].localPosition = targetPositions[i];
+                if (canvasGroups[i] != null)
+                {
+                    canvasGroups[i].alpha = targetAlpha;
+                }
+            }
+        }
     }
 }

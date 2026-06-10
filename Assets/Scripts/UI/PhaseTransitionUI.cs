@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System.Collections;
+using System.Collections.Generic;
 using System;
 using KillingMahjong.Network;
 
@@ -390,6 +391,8 @@ namespace KillingMahjong.UI
         [Header("Effects Settings")]
         [SerializeField] private Sprite bloodSplatterSprite;
         [SerializeField] private Color dimmerColor = new Color(0, 0, 0, 0.7f);
+        [SerializeField] private Sprite playerCutinSprite;
+        [SerializeField] private Sprite enemyCutinSprite;
 
         public void PlayScoreSettlementAnimation(
             bool isLocalWin,
@@ -669,6 +672,224 @@ namespace KillingMahjong.UI
             if (fullScreenCheckerImage != null) fullScreenCheckerImage.gameObject.SetActive(false);
 
             Debug.Log("[DrawTransition] Complete");
+            onComplete?.Invoke();
+        }
+
+        public void PlaySkillCutinAnimation(string skillName, bool isLocalPlayer, float duration = 2.0f, Action onComplete = null)
+        {
+            StartCoroutine(PlaySkillCutinAnimationRoutine(skillName, isLocalPlayer, duration, onComplete));
+        }
+
+        public IEnumerator PlaySkillCutinAnimationRoutine(string skillName, bool isLocalPlayer, float duration = 2.0f, Action onComplete = null)
+        {
+            ResetVisuals();
+
+            // 1. コンテナ作成
+            GameObject container = new GameObject("DeathGameCutinContainer");
+            container.transform.SetParent(transform, false);
+            container.transform.SetAsLastSibling();
+            RectTransform containerRt = container.AddComponent<RectTransform>();
+            containerRt.anchorMin = Vector2.zero;
+            containerRt.anchorMax = Vector2.one;
+            containerRt.sizeDelta = Vector2.zero;
+
+            // 2. 即時ディマー（真っ暗に近い）
+            GameObject dimmer = new GameObject("Dimmer");
+            dimmer.transform.SetParent(containerRt, false);
+            Image dimmerImg = dimmer.AddComponent<Image>();
+            dimmerImg.color = new Color(0, 0, 0, 0.85f);
+            RectTransform dimmerRt = dimmer.GetComponent<RectTransform>();
+            dimmerRt.anchorMin = Vector2.zero;
+            dimmerRt.anchorMax = Vector2.one;
+            dimmerRt.sizeDelta = Vector2.zero;
+
+            // 3. ランダムな血飛沫と図形（背景）を生成（量を抑える）
+            int splatterCount = 2; // 5から2に減らしてスッキリさせる
+            List<RectTransform> bgElements = new List<RectTransform>();
+            List<Vector2> bgTargetPos = new List<Vector2>();
+            List<Vector2> bgStartPos = new List<Vector2>();
+
+            for (int i = 0; i < splatterCount; i++)
+            {
+                GameObject bgObj = new GameObject($"BgElement_{i}");
+                bgObj.transform.SetParent(containerRt, false);
+                Image img = bgObj.AddComponent<Image>();
+                
+                // 血飛沫か長方形のスラッシュかランダム
+                bool isSplatter = bloodSplatterSprite != null && UnityEngine.Random.value > 0.4f;
+                if (isSplatter)
+                {
+                    img.sprite = bloodSplatterSprite;
+                    img.preserveAspect = true;
+                }
+
+                // プレイヤーと敵でテーマカラーを完全に分ける
+                float colorRand = UnityEngine.Random.value;
+                if (isLocalPlayer)
+                {
+                    // 自分のターン：冷静なブルーテーマ
+                    if (colorRand > 0.7f) img.color = new Color32(10, 80, 200, 255); // 鮮やかな青
+                    else if (colorRand > 0.2f) img.color = new Color32(5, 15, 40, 255); // 深いネイビー（黒の代わり）
+                    else img.color = new Color32(200, 200, 255, 180); // 白（青み）
+                }
+                else
+                {
+                    // 相手のターン：狂気のレッドテーマ
+                    if (colorRand > 0.7f) img.color = new Color32(180, 10, 10, 255); // 赤
+                    else if (colorRand > 0.2f) img.color = new Color32(15, 15, 15, 255); // 黒
+                    else img.color = new Color32(200, 200, 200, 180); // 白
+                }
+
+                RectTransform rt = bgObj.GetComponent<RectTransform>();
+                float size = isSplatter ? UnityEngine.Random.Range(600, 1000) : UnityEngine.Random.Range(400, 1000);
+                rt.sizeDelta = isSplatter ? new Vector2(size, size) : new Vector2(Screen.width * 2.5f, size / 4f);
+                
+                // 回転（少しマイルドに）
+                rt.localRotation = Quaternion.Euler(0, 0, UnityEngine.Random.Range(-20f, 20f));
+
+                // 位置（画面中心付近から散らす）
+                Vector2 targetPos = new Vector2(UnityEngine.Random.Range(-400f, 400f), UnityEngine.Random.Range(-300f, 300f));
+                Vector2 startPos = targetPos + new Vector2(UnityEngine.Random.Range(-800f, 800f), UnityEngine.Random.Range(-800f, 800f)); // バラバラの方向から飛んでくる
+                
+                rt.anchoredPosition = startPos;
+                
+                bgElements.Add(rt);
+                bgStartPos.Add(startPos);
+                bgTargetPos.Add(targetPos);
+            }
+
+            // 4. キャラクター立ち絵
+            Sprite cutinSprite = isLocalPlayer ? playerCutinSprite : enemyCutinSprite;
+            GameObject portraitObj = null;
+            RectTransform portraitRt = null;
+            Vector2 portraitTargetPos = Vector2.zero;
+            Vector2 portraitStartPos = Vector2.zero;
+
+            if (cutinSprite != null)
+            {
+                portraitObj = new GameObject("Portrait");
+                portraitObj.transform.SetParent(containerRt, false);
+                Image portraitImg = portraitObj.AddComponent<Image>();
+                portraitImg.sprite = cutinSprite;
+                portraitImg.preserveAspect = true;
+
+                portraitRt = portraitObj.GetComponent<RectTransform>();
+                portraitRt.pivot = new Vector2(0.5f, 0f); // 下端中央
+                portraitRt.sizeDelta = new Vector2(700, 900);
+                
+                if (isLocalPlayer)
+                {
+                    // 自分の場合は左下に配置
+                    portraitRt.anchorMin = new Vector2(0f, 0f);
+                    portraitRt.anchorMax = new Vector2(0f, 0f);
+                    portraitTargetPos = new Vector2(350, -50); 
+                }
+                else
+                {
+                    // 相手の場合は右下に配置し、画像を左右反転（敵側から向かってくる感）
+                    portraitRt.anchorMin = new Vector2(1f, 0f);
+                    portraitRt.anchorMax = new Vector2(1f, 0f);
+                    portraitTargetPos = new Vector2(-350, -50);
+                    portraitRt.localScale = new Vector3(-1f, 1f, 1f);
+                }
+
+                portraitRt.anchoredPosition = portraitTargetPos; 
+                
+                // 立ち絵にテーマカラーのドロップシャドウ
+                Shadow pShadow = portraitObj.AddComponent<Shadow>();
+                pShadow.effectColor = isLocalPlayer ? new Color32(0, 100, 255, 150) : new Color32(200, 0, 0, 150);
+                pShadow.effectDistance = new Vector2(20, -20);
+            }
+
+            // 5. メインテキスト（少し傾ける）
+            GameObject mainTextObj = new GameObject("MainText");
+            mainTextObj.transform.SetParent(containerRt, false);
+            TextMeshProUGUI mainText = mainTextObj.AddComponent<TextMeshProUGUI>();
+            mainText.text = skillName;
+            mainText.fontSize = 180; // 250から少し小さく
+            mainText.color = new Color32(255, 255, 255, 0); // 白字
+            mainText.fontStyle = FontStyles.Bold;
+            mainText.alignment = TextAlignmentOptions.Center;
+            if (centerText != null) mainText.font = centerText.font;
+
+            // 黒い影
+            Shadow txtShadow1 = mainTextObj.AddComponent<Shadow>();
+            txtShadow1.effectColor = new Color(0, 0, 0, 1f);
+            txtShadow1.effectDistance = new Vector2(10, -10);
+            
+            // テーマカラーの影（ズレ）
+            Shadow txtShadow2 = mainTextObj.AddComponent<Shadow>();
+            txtShadow2.effectColor = isLocalPlayer ? new Color32(0, 100, 255, 150) : new Color32(200, 0, 0, 150);
+            txtShadow2.effectDistance = new Vector2(-10, 8);
+
+            RectTransform mainRt = mainText.GetComponent<RectTransform>();
+            mainRt.sizeDelta = new Vector2(2000, 800);
+            mainRt.anchoredPosition = new Vector2(0, 50);
+            mainRt.localRotation = Quaternion.Euler(0, 0, -8f); // -15度から-8度に緩和
+            mainRt.localScale = new Vector3(3.5f, 3.5f, 1f); // 5fから3.5fに緩和
+
+            // --- 暴力的なアニメーション開始 ---
+            float t = 0;
+            float impactDuration = 0.15f; 
+
+            // スライドを廃止し、背景要素は最初から定位置に「ばっ！」と表示する
+            for (int i = 0; i < bgElements.Count; i++) bgElements[i].anchoredPosition = bgTargetPos[i];
+
+            // 画面揺れ
+            StartCoroutine(ScreenShakeRoutine(0.2f, 15f));
+
+            while (t < impactDuration)
+            {
+                float progress = t / impactDuration;
+                float easeIn = Mathf.Pow(progress, 3f);
+
+                // 文字が叩きつけられる演出だけは残す（勢いが出るため）
+                mainRt.localScale = Vector3.LerpUnclamped(new Vector3(3.5f, 3.5f, 1f), Vector3.one, easeIn);
+                mainText.color = new Color32(255, 255, 255, (byte)(255 * progress));
+                
+                t += Time.deltaTime;
+                yield return null;
+            }
+            
+            mainRt.localScale = Vector3.one;
+            mainText.color = Color.white;
+
+            // 着弾の瞬間に揺れ（ダメ押し）
+            StartCoroutine(ScreenShakeRoutine(0.15f, 20f));
+
+            // 少し待機（文字を見せる時間）
+            float waitTime = Mathf.Max(0, duration - impactDuration - 0.2f);
+            yield return new WaitForSeconds(waitTime);
+
+            // 退出アニメーション（一瞬でガラスが割れるように消える、または画面外へ吹き飛ぶ）
+            t = 0;
+            float outDuration = 0.2f;
+            while (t < outDuration)
+            {
+                float progress = t / outDuration;
+                float easeIn = progress * progress * progress;
+
+                dimmerImg.color = new Color(0, 0, 0, 0.85f * (1f - progress));
+
+                // 外側に吹き飛ぶ
+                for (int i = 0; i < bgElements.Count; i++)
+                {
+                    bgElements[i].anchoredPosition = Vector2.Lerp(bgTargetPos[i], bgStartPos[i], easeIn);
+                }
+                if (portraitRt != null)
+                {
+                    portraitRt.anchoredPosition = Vector2.Lerp(portraitTargetPos, portraitStartPos, easeIn);
+                }
+                
+                // メインテキストはさらに傾きながら下へ落ちる
+                mainRt.anchoredPosition = new Vector2(0, 50 - (1000 * easeIn));
+                mainRt.localRotation = Quaternion.Euler(0, 0, -15f - (30f * easeIn));
+                
+                t += Time.deltaTime;
+                yield return null;
+            }
+
+            Destroy(container);
             onComplete?.Invoke();
         }
     }

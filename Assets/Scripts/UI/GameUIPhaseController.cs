@@ -14,6 +14,7 @@ namespace KillingMahjong.UI
         
         private bool _hasSentNextRoundForCurrentPhase = false;
         private int _currentRoundIndex = 1;
+        private bool _waitingForOpponentRonAnimation = false;
         private bool _isCarryOverNextRound = false;
 
         public void Setup(GameUIManager manager)
@@ -241,7 +242,24 @@ namespace KillingMahjong.UI
                         
                         if (isLocalWin)
                         {
-                            if (uiManager.RonWaitPanel != null) uiManager.RonWaitPanel.SetActive(true);
+                            if (uiManager.RonWaitPanel != null)
+                            {
+                                uiManager.RonWaitPanel.SetActive(true);
+                                
+                                // 背景が子オブジェクトにある可能性も考慮し、全Imageをチェック
+                                var images = uiManager.RonWaitPanel.GetComponentsInChildren<UnityEngine.UI.Image>();
+                                foreach (var img in images)
+                                {
+                                    // ボタン自身（または名前にButtonを含む）は除外して、背景のみを薄くする
+                                    if (img.GetComponent<UnityEngine.UI.Button>() == null && 
+                                        !img.gameObject.name.ToLower().Contains("button"))
+                                    {
+                                        var c = img.color;
+                                        c.a = 0.1f; // ほぼ完全に盤面が見えるように透過（アルファ0.1）
+                                        img.color = c;
+                                    }
+                                }
+                            }
                         }
                     }
                     break;
@@ -463,7 +481,21 @@ namespace KillingMahjong.UI
         {
             if (!isLocalWin)
             {
-                
+                _waitingForOpponentRonAnimation = true;
+                Debug.Log("[GameUIPhaseController] 相手のロン成立。相手がロンボタンを押すのを待機します。");
+            }
+        }
+
+        public void HandleNextRoundWaitingReceived()
+        {
+            Debug.Log("[GameUIPhaseController] HandleNextRoundWaitingReceived: 相手が次ラウンド準備完了（またはロンボタン押下）しました。");
+
+            if (_waitingForOpponentRonAnimation)
+            {
+                _waitingForOpponentRonAnimation = false;
+                Debug.Log("[GameUIPhaseController] 相手のロン演出を開始します。");
+
+                bool isLocalWin = false;
                 List<int> winningHand = new List<int>(BoardStateManager.Instance.CurrentEnemyHandTiles);
                 var liq = BoardStateManager.Instance.LastLiquidationData;
                 
@@ -491,14 +523,6 @@ namespace KillingMahjong.UI
                 
                 StartCoroutine(PlayRonWithPreDialogue(isLocalWin, winningHand, ronTile, actualYaku, actualFormula, actualRank));
             }
-        }
-
-        public void HandleNextRoundWaitingReceived()
-        {
-            // 以前はここで敵のロン演出をトリガーしていましたが、
-            // サーバーから game_end が送られた時にこれが呼ばれないため、
-            // HandleAgari で即座にロン演出をトリガーするように変更しました。
-            Debug.Log("[GameUIPhaseController] HandleNextRoundWaitingReceived: 相手が次ラウンド準備完了しました。");
         }
 
         private IEnumerator PlayRonWithPreDialogue(bool isLocalWin, List<int> winningHand, int ronTile, List<string> yaku, string formula, string rank)
@@ -563,7 +587,18 @@ namespace KillingMahjong.UI
 
             if (uiManager.RonAnimationUI != null)
             {
-                uiManager.RonAnimationUI.PlayRonSequence(winningHand, ronTile, yaku, formula, rank, isLocalWin, () => OnRonAnimationComplete(isLocalWin));
+                var liq = BoardStateManager.Instance.LastLiquidationData;
+                int score = liq != null ? liq.winner_gain : 0;
+                
+                int newLocalHp = Managers.BoardStateManager.Instance.LocalPlayerHp;
+                int newEnemyHp = Managers.BoardStateManager.Instance.EnemyPlayerHp;
+                int loserLoss = liq != null ? liq.loser_loss : 0;
+                int prevLocalHp = isLocalWin ? (newLocalHp - score) : (newLocalHp + loserLoss);
+                int prevEnemyHp = isLocalWin ? (newEnemyHp + loserLoss) : (newEnemyHp - score);
+
+                uiManager.RonAnimationUI.PlayRonSequence(winningHand, ronTile, yaku, formula, rank, score, isLocalWin, 
+                    uiManager.PlayerInfoUI, uiManager.EnemyInfoUI, prevLocalHp, newLocalHp, prevEnemyHp, newEnemyHp,
+                    () => OnRonAnimationComplete(isLocalWin));
             }
         }
 
@@ -576,44 +611,10 @@ namespace KillingMahjong.UI
                 ReactionController.Instance.HandleGameEnd(isLocalWin);
                 ReactionController.Instance.HandleRoundStart(_currentRoundIndex);
             }
-            var liq = Managers.BoardStateManager.Instance.LastLiquidationData;
-            int newLocalHp = Managers.BoardStateManager.Instance.LocalPlayerHp;
-            int newEnemyHp = Managers.BoardStateManager.Instance.EnemyPlayerHp;
 
-            int winnerGain = liq != null ? liq.winner_gain : 0;
-            int loserLoss = liq != null ? liq.loser_loss : 0;
-            int prevLocalHp = isLocalWin ? (newLocalHp - winnerGain) : (newLocalHp + loserLoss);
-            int prevEnemyHp = isLocalWin ? (newEnemyHp + loserLoss) : (newEnemyHp - winnerGain);
-
-            string rankLabel = "精算";
-            if (liq != null)
-            {
-                if (liq.multiplier >= 4.0f) rankLabel = "役満";
-                else if (liq.multiplier >= 3.0f) rankLabel = "三倍満";
-                else if (liq.multiplier >= 2.0f) rankLabel = "倍満";
-                else if (liq.multiplier >= 1.5f) rankLabel = "跳満";
-                else rankLabel = "満貫";
-            }
-
-            if (uiManager.PhaseTransitionUI != null)
-            {
-                if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.gameObject.SetActive(false);
-                if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetPanelVisible(false);
-
-                uiManager.PhaseTransitionUI.PlayScoreSettlementAnimation(
-                    isLocalWin, winnerGain, loserLoss,
-                    prevLocalHp, prevEnemyHp,
-                    newLocalHp, newEnemyHp,
-                    rankLabel,
-                    () => OnScoreSettlementComplete(isLocalWin)
-                );
-            }
-            else
-            {
-                if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.SetHP(newLocalHp);
-                if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetHP(newEnemyHp);
-                OnScoreSettlementComplete(isLocalWin);
-            }
+            // HPのアニメーションはRonAnimationUIで完了しているため、
+            // そのまま結果エフェクトを表示して次局へ進む
+            OnScoreSettlementComplete(isLocalWin);
         }
 
         private void OnScoreSettlementComplete(bool isLocalWin)

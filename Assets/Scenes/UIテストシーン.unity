@@ -1796,6 +1796,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.PlayerInfoUI
   hpText: {fileID: 485330929}
   hpFillImage: {fileID: 85183954}
+  zoomTarget: {fileID: 1680596210}
+  zoomOffsetUI: {x: -1200, y: 100}
+  zoomOffsetWorld: {x: -4, y: 1, z: -2}
   characterRenderer: {fileID: 1355573764}
   characterData: {fileID: 11400000, guid: e27b2b7a25ff9eb4fa991e7ba62a93d7, type: 2}
 --- !u!1 &85183952
@@ -7587,30 +7590,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5b4e2b0f70f16184bbb7e8104ae4148d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.RonAnimationUI
-  ronPanel: {fileID: 411695502}
-  yakuBackgroundPanel: {fileID: 1376948187}
+  bloodSplatterSprite: {fileID: 21300000, guid: ad1bb6e518a432f45944c8b8506f56c7, type: 3}
+  customFont: {fileID: 11400000, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
   playerRonBubbleContainer: {fileID: 1541971913}
-  cutInContainer: {fileID: 265857586}
-  cutInImage: {fileID: 69400768}
-  cutInDuration: 1.5
-  handDisplayContainer: {fileID: 1107872627}
-  handTilesParent: {fileID: 933502020}
-  ronTileSlot: {fileID: 1219001132}
   tilePrefab: {fileID: 3470249716998659876, guid: 665b2ddf3e8ccac4aa366c094061ee09, type: 3}
   tileResourceManager: {fileID: 11400000, guid: 26e956d32b644284b942ac0044639558, type: 2}
   tileSpacing: 40
   tileScale: 1.5
-  yakuContainer: {fileID: 903232556}
-  yakuTextTemplate: {fileID: 2048484995458514547, guid: a76b1de240cde3f4fbfbee734e235550, type: 3}
-  formulaContainer: {fileID: 245328076}
-  formulaText: {fileID: 530320882}
-  rankContainer: {fileID: 668446460}
-  rankText: {fileID: 758005733}
-  delayAfterHandDisplay: 1
-  delayBetweenYakus: 0.3
-  delayBeforeFormula: 1.5
-  delayBeforeRank: 1.5
-  durationBeforeClosing: 3
 --- !u!114 &484371138
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -9782,6 +9768,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.EnemyInfoUI
   hpText: {fileID: 252598135}
   hpFillImage: {fileID: 1930189041}
+  zoomTarget: {fileID: 0}
+  zoomOffsetUI: {x: -1200, y: 100}
+  zoomOffsetWorld: {x: -4, y: 1, z: -2}
   characterRenderer: {fileID: 1355573764}
   characterData: {fileID: 11400000, guid: b54cb2f20fc68214096f52c562338108, type: 2}
   bounceDuration: 0.3
@@ -17622,6 +17611,8 @@ MonoBehaviour:
   loadingTextColor: {r: 1, g: 1, b: 1, a: 1}
   bloodSplatterSprite: {fileID: 21300000, guid: ad1bb6e518a432f45944c8b8506f56c7, type: 3}
   dimmerColor: {r: 0, g: 0, b: 0, a: 0.7}
+  playerCutinSprite: {fileID: 21300000, guid: be41e9041388c584eb273a059116c378, type: 3}
+  enemyCutinSprite: {fileID: 21300000, guid: 09e2862a4135c044ab24dd19fe1b9f02, type: 3}
 --- !u!114 &1075082341
 MonoBehaviour:
   m_ObjectHideFlags: 0

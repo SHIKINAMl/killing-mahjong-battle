@@ -8,48 +8,19 @@ namespace KillingMahjong.UI
 {
     public class RonAnimationUI : MonoBehaviour
     {
-        [Header("UI Containers")]
-        [SerializeField] private GameObject ronPanel; // The full-screen/modal panel for Ron
-        [SerializeField] private GameObject yakuBackgroundPanel; // The panel containing hand/yaku info (役パネル)
-        
+        [Header("Cinematic Assets")]
+        [SerializeField] private Sprite bloodSplatterSprite;
+        [SerializeField] private TMP_FontAsset customFont;
+
         [Header("Player Ron Bubble (Pre-Animation)")]
         [Tooltip("自分がロンした瞬間に盤面上に出す吹き出し")]
         [SerializeField] private GameObject playerRonBubbleContainer;
         
-        [Header("Step 1: Cut-in")]
-        [SerializeField] private GameObject cutInContainer;
-        [SerializeField] private Image cutInImage;
-        [SerializeField] private float cutInDuration = 1.5f;
-
-        [Header("Step 2: Hand Display")]
-        [SerializeField] private GameObject handDisplayContainer;
-        [SerializeField] private RectTransform handTilesParent;
-        [SerializeField] private RectTransform ronTileSlot; // Separate slot visually decoupled but conceptually part of hand
+        [Header("Hand Display Layout")]
         [SerializeField] private GameObject tilePrefab;
         [SerializeField] private TileResourceManager tileResourceManager;
-
-        [Header("Hand Display Layout")]
-        [Tooltip("The horizontal gap between each tile in the hand")]
-        [SerializeField] private float tileSpacing = 115f; // 重なり解消のため95から115に広げる
-        [Tooltip("The visual scale of each tile in the hand")]
+        [SerializeField] private float tileSpacing = 115f;
         [SerializeField] private float tileScale = 1.5f;
-        
-        [Header("Step 3: Yaku Display")]
-        [SerializeField] private GameObject yakuContainer;
-        [SerializeField] private TextMeshProUGUI yakuTextTemplate; // Copy this for multiple yaku
-
-        [Header("Step 4: Formula & Rank Display")]
-        [SerializeField] private GameObject formulaContainer;
-        [SerializeField] private TextMeshProUGUI formulaText;
-        [SerializeField] private GameObject rankContainer;
-        [SerializeField] private TextMeshProUGUI rankText; // e.g., "跳満"
-        
-        [Header("Timing Adjustments")]
-        [SerializeField] private float delayAfterHandDisplay = 1.0f;
-        [SerializeField] private float delayBetweenYakus = 0.3f;
-        [SerializeField] private float delayBeforeFormula = 1.5f;
-        [SerializeField] private float delayBeforeRank = 1.5f;
-        [SerializeField] private float durationBeforeClosing = 3.0f;
 
         private void Start()
         {
@@ -58,8 +29,6 @@ namespace KillingMahjong.UI
 
         public void PrepareForPreDialogue()
         {
-            ResetVisuals();
-            if (ronPanel != null) ronPanel.SetActive(false);
             if (playerRonBubbleContainer != null) playerRonBubbleContainer.SetActive(false);
         }
 
@@ -76,153 +45,197 @@ namespace KillingMahjong.UI
             }
         }
 
-        public void PlayRonSequence(List<int> handTiles, int ronTile, List<string> yakuList, string formula, string rankName, bool isLocalPlayerWin, System.Action onComplete)
+        public void PlayRonSequence(List<int> handTiles, int ronTile, List<string> yakuList, string formula, string rankName, int score, bool isLocalPlayerWin, 
+            PlayerInfoUI playerInfo, EnemyInfoUI enemyInfo, int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp, System.Action onComplete)
         {
-            if (ronPanel != null) ronPanel.SetActive(true);
-            
-            // Clean up old visuals
-            ResetVisuals();
-
-            StartCoroutine(SequenceRoutine(handTiles, ronTile, yakuList, formula, rankName, isLocalPlayerWin, onComplete));
+            StartCoroutine(SequenceRoutine(handTiles, ronTile, yakuList, formula, rankName, score, isLocalPlayerWin, playerInfo, enemyInfo, prevLocalHp, newLocalHp, prevEnemyHp, newEnemyHp, onComplete));
         }
 
-        private void ResetVisuals()
+        private IEnumerator SequenceRoutine(List<int> handTiles, int ronTile, List<string> yakuList, string formula, string rankName, int score, bool isLocalPlayerWin, 
+            PlayerInfoUI playerInfo, EnemyInfoUI enemyInfo, int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp, System.Action onComplete)
         {
-            if (yakuBackgroundPanel != null) yakuBackgroundPanel.SetActive(false);
-            if (cutInContainer != null) cutInContainer.SetActive(false);
-            if (handDisplayContainer != null) handDisplayContainer.SetActive(false);
-            if (yakuContainer != null) yakuContainer.SetActive(false);
-            if (formulaContainer != null) formulaContainer.SetActive(false);
-            if (rankContainer != null) rankContainer.SetActive(false);
+            // 1. 大枠コンテナの生成（すべてを包括する最前面キャンバス）
+            GameObject container = new GameObject("RonCinematicContainer");
+            container.transform.SetParent(transform, false);
+            container.transform.SetAsLastSibling();
+            RectTransform containerRt = container.AddComponent<RectTransform>();
+            containerRt.anchorMin = Vector2.zero;
+            containerRt.anchorMax = Vector2.one;
+            containerRt.sizeDelta = Vector2.zero;
 
-            // Clean up instantiated hand tiles
-            if (handTilesParent != null)
-            {
-                foreach (Transform child in handTilesParent)
-                {
-                    Destroy(child.gameObject);
-                }
-            }
-            if (ronTileSlot != null)
-            {
-                foreach (Transform child in ronTileSlot)
-                {
-                    Destroy(child.gameObject);
-                }
-            }
+            // 2. 暗転ディマー（背景のスマホ等が見えるように少し薄めに）
+            GameObject dimmer = new GameObject("Dimmer");
+            dimmer.transform.SetParent(containerRt, false);
+            Image dimmerImg = dimmer.AddComponent<Image>();
+            dimmerImg.color = new Color(0, 0, 0, 0.65f);
+            RectTransform dimmerRt = dimmer.GetComponent<RectTransform>();
+            dimmerRt.anchorMin = Vector2.zero;
+            dimmerRt.anchorMax = Vector2.one;
+            dimmerRt.sizeDelta = Vector2.zero;
 
-            // Clean up instantiated yaku text
-            if (yakuContainer != null)
-            {
-                foreach (Transform child in yakuContainer.transform)
-                {
-                    if (child.gameObject != yakuTextTemplate.gameObject)
-                    {
-                        Destroy(child.gameObject);
-                    }
-                }
-                if (yakuTextTemplate != null) yakuTextTemplate.gameObject.SetActive(false);
-            }
-        }
-
-        private IEnumerator SequenceRoutine(List<int> handTiles, int ronTile, List<string> yakuList, string formula, string rankName, bool isLocalPlayerWin, System.Action onComplete)
-        {
-            // --- Step 1: Cut-in ---
-            Debug.Log("[RonAnimation] Step 1: Cut-in");
-            if (cutInContainer != null)
-            {
-                cutInContainer.SetActive(true);
-                yield return new WaitForSeconds(cutInDuration);
-                cutInContainer.SetActive(false);
-            }
-
-            // --- Step 2: Hand and Ron Tile Display ---
-            Debug.Log("[RonAnimation] Step 2: Hand Display");
+            // 3. 役と飜数を示すリボン（帯）
+            GameObject ribbonObj = new GameObject("YakuRibbon");
+            ribbonObj.transform.SetParent(containerRt, false);
+            Image ribbonImg = ribbonObj.AddComponent<Image>();
+            ribbonImg.color = new Color(0.05f, 0.05f, 0.05f, 0.95f); // 黒い帯
             
-            // Cut-in演出が終わったので、役パネル（背景等）を表示する
-            if (yakuBackgroundPanel != null) yakuBackgroundPanel.SetActive(true);
+            // 少し斜めにするスタイリッシュな表現
+            ribbonObj.transform.localRotation = Quaternion.Euler(0, 0, 2f);
 
-            if (handDisplayContainer != null)
+            RectTransform ribbonRt = ribbonObj.GetComponent<RectTransform>();
+            ribbonRt.anchorMin = new Vector2(0, 0.40f);
+            ribbonRt.anchorMax = new Vector2(1, 0.40f);
+            ribbonRt.sizeDelta = new Vector2(200, 100); // 画面幅＋余白、高さ100
+            ribbonRt.anchoredPosition = Vector2.zero;
+
+            GameObject yakuTextObj = new GameObject("YakuText");
+            yakuTextObj.transform.SetParent(ribbonObj.transform, false);
+            TextMeshProUGUI yakuText = yakuTextObj.AddComponent<TextMeshProUGUI>();
+            if (customFont != null) yakuText.font = customFont;
+            
+            // 役を一行にまとめる
+            string yakuJoined = string.Join("・", yakuList);
+            
+            yakuText.text = $"{yakuJoined}   <color=#FFFF00>×{formula}</color>"; // 黄色で倍率を強調
+            yakuText.color = new Color(1f, 1f, 1f); 
+            yakuText.enableAutoSizing = true;
+            yakuText.fontSizeMin = 20;
+            yakuText.fontSizeMax = 50;
+            yakuText.alignment = TextAlignmentOptions.Center;
+            yakuText.enableWordWrapping = false;
+            
+            RectTransform yakuTextRt = yakuTextObj.GetComponent<RectTransform>();
+            yakuTextRt.anchorMin = Vector2.zero;
+            yakuTextRt.anchorMax = Vector2.one;
+            yakuTextRt.sizeDelta = new Vector2(-100, 0); // 左右に50pxずつの余白を設ける
+            yakuTextRt.anchoredPosition = Vector2.zero;
+
+            // 4. 手牌の生成と配置（帯の下）
+            GameObject handContainer = new GameObject("HandContainer");
+            handContainer.transform.SetParent(containerRt, false);
+            RectTransform handContainerRt = handContainer.AddComponent<RectTransform>();
+            handContainerRt.anchorMin = new Vector2(0.5f, 0.20f); // 下部20%の位置
+            handContainerRt.anchorMax = new Vector2(0.5f, 0.20f);
+            handContainerRt.sizeDelta = Vector2.zero;
+            handContainerRt.anchoredPosition = Vector2.zero;
+
+            if (tilePrefab != null && tileResourceManager != null)
             {
-                handDisplayContainer.SetActive(true);
-                
-                // 手牌の生成
-                if (tilePrefab != null && tileResourceManager != null)
+                int handCount = handTiles.Count;
+                for (int i = 0; i < handCount; i++)
                 {
-                    int handCount = handTiles.Count;
-
-                    for (int i = 0; i < handCount; i++)
-                    {
-                        GameObject obj = Instantiate(tilePrefab, handTilesParent);
-                        InitializeTileVisual(obj, handTiles[i]);
-                        
-                        RectTransform rt = obj.GetComponent<RectTransform>();
-                        ApplyTileRectSettings(rt);
-                        
-                        // 横に並べるためにX座標を計算 (要素がすべて中心に揃うようにハンド全体の幅から算出)
-                        float offset_x = (i - (handCount - 1) / 2f) * tileSpacing;
-                        rt.anchoredPosition3D = new Vector3(offset_x, 0, 0);
-                    }
-                    
-                    // アガリ牌（ロン牌）の生成
-                    if (ronTile > 0 && ronTileSlot != null)
-                    {
-                        GameObject obj = Instantiate(tilePrefab, ronTileSlot);
-                        InitializeTileVisual(obj, ronTile);
-                        
-                        RectTransform rt = obj.GetComponent<RectTransform>();
-                        ApplyTileRectSettings(rt);
-                        rt.anchoredPosition3D = Vector3.zero;
-                    }
+                    GameObject obj = Instantiate(tilePrefab, handContainerRt);
+                    InitializeTileVisual(obj, handTiles[i]);
+                    RectTransform rt = obj.GetComponent<RectTransform>();
+                    ApplyTileRectSettings(rt);
+                    float offset_x = (i - (handCount - 1) / 2f) * tileSpacing - 30f; // 少し左に詰める
+                    rt.anchoredPosition3D = new Vector3(offset_x, 0, 0);
                 }
                 
-                yield return new WaitForSeconds(delayAfterHandDisplay);
-            }
-
-            // --- Step 3: Yaku Display ---
-            Debug.Log("[RonAnimation] Step 3: Yaku Display");
-            if (yakuContainer != null && yakuList != null && yakuList.Count > 0)
-            {
-                yakuContainer.SetActive(true);
-                
-                for (int i = 0; i < yakuList.Count; i++)
+                // アガリ牌（ロン牌）を少し離して配置
+                if (ronTile > 0)
                 {
-                    GameObject yakuObj = Instantiate(yakuTextTemplate.gameObject, yakuContainer.transform);
-                    yakuObj.SetActive(true);
-                    TextMeshProUGUI tmp = yakuObj.GetComponent<TextMeshProUGUI>();
-                    if (tmp != null) tmp.text = yakuList[i];
-                    
-                    yield return new WaitForSeconds(delayBetweenYakus);
+                    GameObject obj = Instantiate(tilePrefab, handContainerRt);
+                    InitializeTileVisual(obj, ronTile);
+                    RectTransform rt = obj.GetComponent<RectTransform>();
+                    ApplyTileRectSettings(rt);
+                    float offset_x = ((handCount) - (handCount - 1) / 2f) * tileSpacing + 20f; 
+                    rt.anchoredPosition3D = new Vector3(offset_x, 0, 0);
                 }
-                
-                yield return new WaitForSeconds(delayBeforeFormula);
             }
 
-            // --- Step 4: Formula Display ---
-            Debug.Log("[RonAnimation] Step 4: Formula Display");
-            if (formulaContainer != null)
+            // --- 0.5秒のタメ（ここでカットインと手牌が見える） ---
+            yield return new WaitForSeconds(0.5f);
+
+            // 5. 血飛沫と巨大スコアのバウンド表示（ドンッ！）
+            GameObject splatterObj = null;
+            if (bloodSplatterSprite != null)
             {
-                formulaContainer.SetActive(true);
-                if (formulaText != null) formulaText.text = formula;
-                yield return new WaitForSeconds(delayBeforeRank);
+                splatterObj = new GameObject("BloodSplatter");
+                splatterObj.transform.SetParent(containerRt, false);
+                Image splatterImg = splatterObj.AddComponent<Image>();
+                splatterImg.sprite = bloodSplatterSprite;
+                splatterImg.preserveAspect = true;
+                splatterImg.color = new Color(0.8f, 0f, 0f, 0.9f); // 濃い赤
+                RectTransform splatterRt = splatterObj.GetComponent<RectTransform>();
+                splatterRt.anchorMin = new Vector2(0.5f, 0.5f);
+                splatterRt.anchorMax = new Vector2(0.5f, 0.5f);
+                splatterRt.sizeDelta = new Vector2(1000, 1000);
+                splatterRt.anchoredPosition = new Vector2(0, 150);
             }
 
-            // --- Step 5: Final Rank Display ---
-            Debug.Log("[RonAnimation] Step 5: Rank Display");
-            if (rankContainer != null)
+            GameObject scoreTextObj = new GameObject("ScoreText");
+            scoreTextObj.transform.SetParent(containerRt, false);
+            TextMeshProUGUI scoreText = scoreTextObj.AddComponent<TextMeshProUGUI>();
+            if (customFont != null) scoreText.font = customFont;
+            
+            // スコアが0の時などは役満や満貫などのランク名をそのまま表示
+            scoreText.text = score > 0 ? score.ToString() : rankName;
+            scoreText.color = new Color(1f, 0.2f, 0.2f); // 真っ赤な文字
+            scoreText.fontSize = 250; // 巨大文字
+            scoreText.alignment = TextAlignmentOptions.Center;
+            scoreText.fontStyle = FontStyles.Bold;
+            
+            // 白いアウトラインで文字を際立たせる
+            scoreText.outlineWidth = 0.2f;
+            scoreText.outlineColor = new Color32(255, 255, 255, 255);
+            
+            RectTransform scoreTextRt = scoreTextObj.GetComponent<RectTransform>();
+            scoreTextRt.anchorMin = new Vector2(0.5f, 0.5f);
+            scoreTextRt.anchorMax = new Vector2(0.5f, 0.5f);
+            scoreTextRt.sizeDelta = new Vector2(1200, 300);
+            scoreTextRt.anchoredPosition = new Vector2(0, 150);
+
+            // スタンプのようにドンッ！と落ちてくるアニメーション
+            float t = 0;
+            float duration = 0.2f; // 高速で落下
+            Vector3 initialScale = new Vector3(5f, 5f, 1f);
+            Vector3 targetScale = Vector3.one;
+            while (t < duration)
             {
-                rankContainer.SetActive(true);
-                if (rankText != null) rankText.text = rankName;
-                
-                // 勝利側・敗北側のエフェクト再生はGameUIManagerのOnRonAnimationCompleteで行うためここは通過のみ
-                // NotifyEffectsTrigger(isLocalPlayerWin);
-                
-                yield return new WaitForSeconds(durationBeforeClosing);
+                float progress = t / duration;
+                float scaleProgress = 1f - Mathf.Pow(1f - progress, 4f); 
+                scoreTextRt.localScale = Vector3.LerpUnclamped(initialScale, targetScale, scaleProgress);
+                if (splatterObj != null) splatterObj.transform.localScale = scoreTextRt.localScale;
+                t += Time.deltaTime;
+                yield return null;
             }
+            scoreTextRt.localScale = targetScale;
+            if (splatterObj != null) splatterObj.transform.localScale = targetScale;
 
-            // --- Step 6: Cleanup and callback ---
-            Debug.Log("[RonAnimation] Sequence Complete.");
-            if (ronPanel != null) ronPanel.SetActive(false);
+            // 激しい画面揺れ
+            Vector3 originalPos = containerRt.localPosition;
+            float shakeElapsed = 0;
+            while (shakeElapsed < 0.3f)
+            {
+                float x = UnityEngine.Random.Range(-1f, 1f) * 30f;
+                float y = UnityEngine.Random.Range(-1f, 1f) * 30f;
+                containerRt.localPosition = new Vector3(originalPos.x + x, originalPos.y + y, originalPos.z);
+                shakeElapsed += Time.deltaTime;
+                yield return null;
+            }
+            containerRt.localPosition = originalPos;
+
+            // 画像のように、一枚絵としてプレイヤーにしばらく見せつけつつHPを増減させる
+            float holdTime = 3.5f;
+            float hpTimer = 0;
+            while (hpTimer < holdTime)
+            {
+                float progress = Mathf.Clamp01(hpTimer / 1.5f); // 1.5秒かけてHP増減
+                float eased = 1f - Mathf.Pow(1f - progress, 3f);
+                
+                if (playerInfo != null) playerInfo.SetHP(Mathf.RoundToInt(Mathf.Lerp(prevLocalHp, newLocalHp, eased)));
+                if (enemyInfo != null) enemyInfo.SetHP(Mathf.RoundToInt(Mathf.Lerp(prevEnemyHp, newEnemyHp, eased)));
+                
+                hpTimer += Time.deltaTime;
+                yield return null;
+            }
+            
+            if (playerInfo != null) playerInfo.SetHP(newLocalHp);
+            if (enemyInfo != null) enemyInfo.SetHP(newEnemyHp);
+
+            // 終了処理
+            Destroy(container);
             onComplete?.Invoke();
         }
 
@@ -256,20 +269,20 @@ namespace KillingMahjong.UI
         public void TestRonLocalWin()
         {
             List<int> dummyHand = new List<int> { 1, 2, 3, 5, 6, 7, 10, 11, 12, 19, 20, 21, 28 };
-            List<string> dummyYaku = new List<string> { "立直 (1飜)", "一発 (1飜)", "門前清自摸和 (1飜)" };
-            string dummyFormula = "30符 3飜";
-            string dummyRank = "満貫";
-            PlayRonSequence(dummyHand, 28, dummyYaku, dummyFormula, dummyRank, true, () => Debug.Log("Test Local Win complete"));
+            List<string> dummyYaku = new List<string> { "立直", "一発", "門前清自摸和", "ドラ3" };
+            string dummyFormula = "6飜";
+            string dummyRank = "跳満";
+            PlayRonSequence(dummyHand, 28, dummyYaku, dummyFormula, dummyRank, 12000, true, null, null, 20000, 26000, 20000, 14000, () => Debug.Log("Test Local Win complete"));
         }
         
         [ContextMenu("Test Ron Animation Enemy Win")]
         public void TestRonEnemyWin()
         {
             List<int> dummyHand = new List<int> { 9, 9, 9, 18, 18, 18, 27, 27, 27, 30, 30, 30, 33 };
-            List<string> dummyYaku = new List<string> { "大三元 (役満)", "字一色 (役満)" };
+            List<string> dummyYaku = new List<string> { "大三元", "字一色" };
             string dummyFormula = "ダブル役満";
             string dummyRank = "ダブル役満";
-            PlayRonSequence(dummyHand, 33, dummyYaku, dummyFormula, dummyRank, false, () => Debug.Log("Test Enemy Win complete"));
+            PlayRonSequence(dummyHand, 33, dummyYaku, dummyFormula, dummyRank, 64000, false, null, null, 20000, 20000, 20000, 84000, () => Debug.Log("Test Enemy Win complete"));
         }
     }
 }
