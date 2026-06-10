@@ -14,6 +14,7 @@ namespace KillingMahjong.UI
         [Header("Layout Settings")]
         [SerializeField] private float tileWidth = 50.0f;
         [SerializeField] private float tileHeight = 70.0f;
+        [SerializeField] private float tileScale = 0.9f;
         [SerializeField] private int maxPerRow = 6;
         [SerializeField] private bool isEnemyRiver = false; // 相手の河として扱う場合、180度回転させる
         [SerializeField] private float enemyOffsetX = 350f; // 敵の河の位置手前寄せ調整X（ユーザー要望: 350）
@@ -89,7 +90,7 @@ namespace KillingMahjong.UI
                 rt.anchorMax = new Vector2(0, 1);
                 rt.pivot = new Vector2(0, 1);
                 rt.anchoredPosition = new Vector2(targetX, targetY);
-                rt.localScale = Vector3.one;
+                rt.localScale = new Vector3(tileScale, tileScale, 1f);
 
                 rt.localRotation = Quaternion.identity;
             }

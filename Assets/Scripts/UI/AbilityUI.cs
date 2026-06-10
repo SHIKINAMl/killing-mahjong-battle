@@ -25,9 +25,9 @@ namespace KillingMahjong.UI
         [SerializeField] private Button activateButton; // The Activate button
         
         [Header("Layout Settings")]
-        [SerializeField] private float itemOffsetX = 0f; // ★インスペクターでX座標を調整可能に
-        [SerializeField] private float itemOffsetY = 0f; // ★インスペクターで1個目のY座標を調整可能に
-        [SerializeField] private float itemHeight = 100f;
+        [SerializeField] private float itemOffsetX = 0f; 
+        [SerializeField] private float itemOffsetY = 0f; 
+        [SerializeField] private float itemHeight = 70f; // デフォルト100から縮小
         [SerializeField] private float itemSpacing = 5f;
 
         // Internal State
@@ -186,7 +186,16 @@ namespace KillingMahjong.UI
         public void ToggleAbilityWindow(bool cancelSkill = true)
         {
             isWindowVisible = !isWindowVisible;
-            if (!isWindowVisible)
+
+            if (isWindowVisible)
+            {
+                // ウィンドウが開いた瞬間に説明文のスクロール位置を中央にリセットする
+                foreach (var item in instantiatedItems)
+                {
+                    item.ResetScrollPosition();
+                }
+            }
+            else
             {
                 DeselectAll(); // Deselect on close
                 var uiMgr = FindFirstObjectByType<GameUIManager>();

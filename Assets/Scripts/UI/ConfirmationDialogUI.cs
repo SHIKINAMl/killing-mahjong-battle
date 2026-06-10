@@ -42,8 +42,8 @@ namespace KillingMahjong.UI
             {
                 bg = gameObject.AddComponent<Image>();
             }
-            // ちょっと白っぽい半透明背景に変更
-            bg.color = new Color(0.9f, 0.9f, 0.9f, 0.95f);
+            // レトロポップテーマに合わせたネイビー（濃い青）に変更
+            bg.color = new Color32(42, 52, 87, 240);
 
             // 画面全体を覆うようにRectTransformを設定
             RectTransform rectTransform = GetComponent<RectTransform>();
@@ -59,7 +59,7 @@ namespace KillingMahjong.UI
             if (messageText != null)
             {
                 messageText.enableAutoSizing = false;
-                messageText.fontSize = 40; // テキストサイズを40に変更
+                messageText.fontSize = 32; // テキストかぶりを防ぐために少し小さく変更
                 messageText.alignment = TextAlignmentOptions.Center;
                 messageText.overflowMode = TextOverflowModes.Overflow; // 文字が潰れるのを防ぐ
 

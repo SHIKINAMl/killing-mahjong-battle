@@ -12,6 +12,9 @@ namespace KillingMahjong.UI
         private GameUIManager uiManager;
         private YakuSelectionUI yakuSelectionUI;
 
+        [Header("Yaku Selection")]
+        [SerializeField] private Font yakuSelectionFont;
+
         public bool IsMulliganSelection { get; private set; }
 
         public void Setup(GameUIManager manager)
@@ -61,6 +64,10 @@ namespace KillingMahjong.UI
             if (yakuSelectionUI == null)
             {
                 yakuSelectionUI = gameObject.AddComponent<YakuSelectionUI>();
+                if (yakuSelectionFont != null)
+                {
+                    yakuSelectionUI.customFont = yakuSelectionFont;
+                }
             }
 
             yakuSelectionUI.Show(

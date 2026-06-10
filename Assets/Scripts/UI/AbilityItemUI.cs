@@ -59,6 +59,16 @@ namespace KillingMahjong.UI
             }
         }
 
+        public void ResetScrollPosition()
+        {
+            if (descriptionText != null && containerWidth > 0)
+            {
+                // 1文字目が中央から始まるようにリセット
+                currentScrollX = containerWidth / 2f;
+                descriptionText.rectTransform.anchoredPosition = new Vector2(currentScrollX, descriptionText.rectTransform.anchoredPosition.y);
+            }
+        }
+
         public void OnPointerDown(PointerEventData eventData)
         {
             if (eventData.button != PointerEventData.InputButton.Left) return;

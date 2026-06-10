@@ -76,7 +76,7 @@ namespace KillingMahjong.UI
             
             if (data.waits != null && data.waits.Length > 0)
             {
-                message += "待ち牌:\n\n\n\n";
+                message += "待ち牌:\n\n\n\n\n\n"; // 麻雀牌と被らないように改行を増加
                 foreach (var wait in data.waits)
                 {
                     string yakuText = (wait.yaku != null && wait.yaku.Length > 0) ? string.Join(" / ", wait.yaku) : "役なし";

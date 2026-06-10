@@ -56,6 +56,25 @@ namespace KillingMahjong.UI
                 {
                     tmp.text = text;
                 }
+
+                // ログが追加されたら一番下まで自動スクロールさせる
+                StartCoroutine(ScrollToBottom());
+            }
+        }
+
+        private System.Collections.IEnumerator ScrollToBottom()
+        {
+            // UIのレイアウト更新を1フレーム待つ
+            yield return new WaitForEndOfFrame();
+            
+            if (logContainer != null)
+            {
+                ScrollRect scrollRect = logContainer.GetComponentInParent<ScrollRect>();
+                if (scrollRect != null)
+                {
+                    // 0が一番下、1が一番上
+                    scrollRect.verticalNormalizedPosition = 0f;
+                }
             }
         }
 

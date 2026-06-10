@@ -6,6 +6,7 @@ namespace KillingMahjong.UI
 {
     public class YakuSelectionUI : MonoBehaviour
     {
+        public Font customFont;
         private GameObject uiPanel;
 
         private Action<string> onSelectedAction;
@@ -44,13 +45,13 @@ namespace KillingMahjong.UI
             uiCanvas.sortingOrder = 10000;
             uiPanel.AddComponent<GraphicRaycaster>();
 
-            Font arial = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            Font fontToUse = customFont != null ? customFont : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
             GameObject titleObj = new GameObject("Title");
             titleObj.transform.SetParent(uiPanel.transform, false);
             var titleTxt = titleObj.AddComponent<Text>();
             titleTxt.text = "強化する役を選んでください";
-            titleTxt.font = arial;
+            titleTxt.font = fontToUse;
             titleTxt.fontSize = 40;
             titleTxt.color = Color.white;
             titleTxt.alignment = TextAnchor.MiddleCenter;
@@ -117,7 +118,7 @@ namespace KillingMahjong.UI
                 txtObj.transform.SetParent(btnObj.transform, false);
                 var txt = txtObj.AddComponent<Text>();
                 txt.text = y;
-                txt.font = arial;
+                txt.font = fontToUse;
                 txt.fontSize = 28;
                 txt.color = Color.black;
                 txt.alignment = TextAnchor.MiddleCenter;
@@ -147,7 +148,7 @@ namespace KillingMahjong.UI
             cTxtObj.transform.SetParent(cancelObj.transform, false);
             var cTxt = cTxtObj.AddComponent<Text>();
             cTxt.text = "キャンセル";
-            cTxt.font = arial;
+            cTxt.font = fontToUse;
             cTxt.fontSize = 28;
             cTxt.color = Color.white;
             cTxt.alignment = TextAnchor.MiddleCenter;
