@@ -65,6 +65,15 @@ namespace KillingMahjong.UI
             else OpenLog();
         }
 
+        public void SetBackgroundRaycast(bool block)
+        {
+            if (dialoguePanel != null)
+            {
+                var img = dialoguePanel.GetComponent<Image>();
+                if (img != null) img.raycastTarget = block;
+            }
+        }
+
         public void OpenLog()
         {
             logPanel.SetActive(true);

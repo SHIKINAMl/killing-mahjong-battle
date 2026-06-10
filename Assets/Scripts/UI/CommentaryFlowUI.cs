@@ -22,7 +22,6 @@ namespace KillingMahjong.UI
     {
         [Header("コメント流し設定")]
         [SerializeField] private float flowSpeed = 300f;
-        [SerializeField] private float commentLifetime = 8f;
         [SerializeField] private int maxLanes = 5;
         [SerializeField] private float laneHeight = 50f;
         [SerializeField] private float minCommentInterval = 0.5f;
@@ -403,7 +402,7 @@ namespace KillingMahjong.UI
             tmp.color = color;
             tmp.fontSize = fontSize * sizeMultiplier;
             tmp.alignment = TextAlignmentOptions.MidlineLeft;
-            tmp.enableWordWrapping = false;
+            tmp.textWrappingMode = TextWrappingModes.NoWrap;
             tmp.overflowMode = TextOverflowModes.Overflow;
             tmp.raycastTarget = false;
 

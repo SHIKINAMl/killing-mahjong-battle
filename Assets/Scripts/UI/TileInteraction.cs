@@ -34,6 +34,8 @@ namespace KillingMahjong.UI
 
         public void OnPointerClick(PointerEventData eventData)
         {
+            Debug.Log($"[TileInteraction] OnPointerClick called. TileId: {TileId}, IsInHand: {IsInHand}, Button: {eventData.button}, Phase: {(_gameUIManager != null ? _gameUIManager.CurrentPhaseStatus.ToString() : "null")}");
+            
             if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard)
             {
                 if (!IsInHand)
@@ -61,18 +63,47 @@ namespace KillingMahjong.UI
                 return;
             }
 
-            if (eventData.button != PointerEventData.InputButton.Left) return;
+            if (eventData.button != PointerEventData.InputButton.Left)
+            {
+                Debug.Log("[TileInteraction] Ignored because not Left Click.");
+                return;
+            }
+            if (_gameUIManager != null && _gameUIManager.IsOpponentSkillProcessing)
+            {
+                Debug.Log("[TileInteraction] Ignored because IsOpponentSkillProcessing is true.");
+                return;
+            }
 
-            // Any Click -> Move (Left or Right)
+            // Any Click -> Move (Left or Right) or Select for Mulligan
             if (IsInHand)
-                _gameUIManager.MoveTileToWall(TileId);
+            {
+                if (_gameUIManager != null && _gameUIManager.IsMulliganSelection)
+                {
+                    _gameUIManager.OnMulliganTileSelected(TileId);
+                }
+                else
+                {
+                    _gameUIManager.MoveTileToWall(TileId);
+                }
+            }
             else
-                _gameUIManager.MoveTileToHand(TileId);
+            {
+                if (_gameUIManager == null || !_gameUIManager.IsMulliganSelection)
+                {
+                    Debug.Log($"[TileInteraction] Calling MoveTileToHand for TileId: {TileId}");
+                    _gameUIManager.MoveTileToHand(TileId);
+                }
+                else
+                {
+                    Debug.Log("[TileInteraction] Ignored because IsMulliganSelection is true.");
+                }
+            }
         }
 
         public void OnBeginDrag(PointerEventData eventData)
         {
             if (eventData.button != PointerEventData.InputButton.Left) return;
+            if (_gameUIManager != null && _gameUIManager.IsOpponentSkillProcessing) return;
             if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard) return;
             
             _originalPosition = transform.position;
@@ -84,6 +115,7 @@ namespace KillingMahjong.UI
         public void OnDrag(PointerEventData eventData)
         {
             if (eventData.button != PointerEventData.InputButton.Left) return;
+            if (_gameUIManager != null && _gameUIManager.IsOpponentSkillProcessing) return;
             if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard) return;
 
             // If Screen Space Overlay/Camera
@@ -107,6 +139,7 @@ namespace KillingMahjong.UI
         public void OnEndDrag(PointerEventData eventData)
         {
             if (eventData.button != PointerEventData.InputButton.Left) return;
+            if (_gameUIManager != null && _gameUIManager.IsOpponentSkillProcessing) return;
             if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard) return;
 
             _canvasGroup.blocksRaycasts = true;
@@ -147,13 +180,39 @@ namespace KillingMahjong.UI
         public void OnPointerEnter(PointerEventData eventData)
         {
             IsHovered = true;
-            if (_tileVisual != null) _tileVisual.SetHoverHighlight(true);
+            
+            bool canHighlight = false;
+            if (_gameUIManager != null && _gameUIManager.IsMulliganSelection)
+            {
+                if (IsInHand && TileId != -1)
+                {
+                    canHighlight = true;
+                }
+            }
+            else if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.HandSelection)
+            {
+                if (TileId != -1)
+                {
+                    canHighlight = true;
+                }
+            }
+            else if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard)
+            {
+                if (KillingMahjong.Managers.BoardStateManager.Instance.IsLocalTurn && !IsInHand && TileId != -1)
+                {
+                    canHighlight = true;
+                }
+            }
+
+            if (canHighlight && _tileVisual != null) _tileVisual.SetHoverHighlight(true);
+            if (_gameUIManager != null) _gameUIManager.OnTileHoverEnter(this);
         }
 
         public void OnPointerExit(PointerEventData eventData)
         {
             IsHovered = false;
             if (_tileVisual != null) _tileVisual.SetHoverHighlight(false);
+            if (_gameUIManager != null) _gameUIManager.OnTileHoverExit(this);
         }
     }
 }

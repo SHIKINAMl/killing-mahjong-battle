@@ -15,6 +15,7 @@ namespace KillingMahjong.UI
         [Header("Button Sprites")]
         [SerializeField] private Sprite normalSprite;
         [SerializeField] private Sprite pressedSprite;
+        [SerializeField] private float buttonPressDuration = 0.2f; // インスペクターで時間を指定できるように追加
         private Image triggerButtonImage;
 
         [Header("Window Components")]
@@ -32,18 +33,29 @@ namespace KillingMahjong.UI
         // Internal State
         private bool isWindowVisible = false;
         private Coroutine currentAnimationCoroutine;
+        private Coroutine buttonPressCoroutine;
         private System.Collections.Generic.List<AbilityItemUI> instantiatedItems = new System.Collections.Generic.List<AbilityItemUI>();
         private AbilityItemUI currentSelection;
 
-        // Mock Data Class
+        // Real Data Class matching Python
         [System.Serializable]
         public class AbilityData
         {
+            public string skillType;
             public string name;
             public int cost;
             public string description;
+            
+            public AbilityData(string type, string n, int c, string d)
+            {
+                skillType = type;
+                name = n;
+                cost = c;
+                description = d;
+            }
         }
-        [SerializeField] private System.Collections.Generic.List<AbilityData> mockAbilities;
+        
+        private System.Collections.Generic.List<AbilityData> realAbilities;
 
         private void Start()
         {
@@ -58,13 +70,22 @@ namespace KillingMahjong.UI
             }
             
             if (closeButton != null)
-                closeButton.onClick.AddListener(CloseWindow);
+                closeButton.onClick.AddListener(() => CloseWindow());
 
             if (activateButton != null)
                 activateButton.onClick.AddListener(OnActivateClicked);
 
             if (abilityWindow != null)
                 abilityWindow.anchoredPosition = hiddenPosition;
+
+            // Pythonの設定に合わせたアビリティ一覧
+            realAbilities = new System.Collections.Generic.List<AbilityData>
+            {
+                new AbilityData("mulligan", "手牌交換", 1200, "不要な牌を山札と交換する。"),
+                new AbilityData("perspective", "透視", 1500, "相手の手牌をランダムに3枚公開する。"),
+                new AbilityData("boost_hand", "役強化", 10000, "指定した役の翻数を+1する。"),
+                new AbilityData("special_victory", "特殊勝利", 30000, "3回発動すると無条件で勝利する。")
+            };
 
             // Populate List
             PopulateList();
@@ -78,10 +99,10 @@ namespace KillingMahjong.UI
             foreach(Transform child in contentContainer) Destroy(child.gameObject);
             instantiatedItems.Clear();
 
-            float currentY = itemOffsetY; // ★初期値にitemOffsetYを指定する
-            for (int i = 0; i < mockAbilities.Count; i++)
+            float currentY = itemOffsetY;
+            for (int i = 0; i < realAbilities.Count; i++)
             {
-                var data = mockAbilities[i];
+                var data = realAbilities[i];
                 var itemObj = Instantiate(itemPrefab, contentContainer);
                 itemObj.Setup(this, i, data.name, data.cost, data.description);
                 
@@ -89,24 +110,40 @@ namespace KillingMahjong.UI
                 RectTransform rt = itemObj.GetComponent<RectTransform>();
                 if (rt != null)
                 {
-                    // Force Top-Stretch Layout
+                    // はみ出した子要素（巨大な背景やテキスト枠など）が他のボタンのクリック判定を奪うのを防ぐため、
+                    // RectMask2Dを追加して、指定サイズ（itemHeight）外の描画とクリック判定を完全にカットします。
+                    if (itemObj.GetComponent<RectMask2D>() == null)
+                    {
+                        itemObj.gameObject.AddComponent<RectMask2D>();
+                    }
+
+                    // Force Top-Stretch Layout horizontally
                     rt.localRotation = Quaternion.identity;
                     rt.localScale = Vector3.one;
 
-                    // Set Anchors to Top-Stretch (Min: 0,1 | Max: 1,1)
+                    // Set Anchors to Top-Stretch
                     rt.anchorMin = new Vector2(0, 1);
                     rt.anchorMax = new Vector2(1, 1);
-                    rt.pivot = new Vector2(0.5f, 1);
+                    
+                    // 以前は pivot を (0.5, 1) に強制変更していましたが、
+                    // これによりPrefab内の子要素（背景など）がズレてはみ出し、クリック判定が重なる原因になっていました。
+                    // pivot はPrefabの設定をそのまま維持し、位置計算で補正します。
 
                     // Set SizeDelta (X=0 means stretch to fill width, Y=Height)
                     rt.sizeDelta = new Vector2(0, itemHeight);
 
-                    // Set Position (Top goes down). Use 3D to ensure Z is 0.
-                    rt.anchoredPosition3D = new Vector3(itemOffsetX, -currentY, 0);
+                    // Set Position based on the existing pivot
+                    float posY = -currentY - (1f - rt.pivot.y) * itemHeight;
+                    rt.anchoredPosition3D = new Vector3(itemOffsetX, posY, 0);
+
+                    currentY += itemHeight + itemSpacing;
+                }
+                else
+                {
+                    currentY += itemHeight + itemSpacing;
                 }
 
                 instantiatedItems.Add(itemObj);
-                currentY += itemHeight + itemSpacing;
             }
 
             // Resize Container
@@ -121,17 +158,40 @@ namespace KillingMahjong.UI
         {
             ToggleAbilityWindow();
             CancelOpponentReady();
+            
+            if (buttonPressCoroutine != null) StopCoroutine(buttonPressCoroutine);
+            buttonPressCoroutine = StartCoroutine(ButtonPressRoutine());
         }
 
-        public void CloseWindow()
+        private System.Collections.IEnumerator ButtonPressRoutine()
         {
-            if (isWindowVisible) ToggleAbilityWindow();
+            if (triggerButtonImage != null && pressedSprite != null)
+            {
+                triggerButtonImage.sprite = pressedSprite;
+            }
+            
+            yield return new WaitForSeconds(buttonPressDuration);
+            
+            if (triggerButtonImage != null && normalSprite != null)
+            {
+                triggerButtonImage.sprite = normalSprite;
+            }
         }
 
-        public void ToggleAbilityWindow()
+        public void CloseWindow(bool cancelSkill = true)
+        {
+            if (isWindowVisible) ToggleAbilityWindow(cancelSkill);
+        }
+
+        public void ToggleAbilityWindow(bool cancelSkill = true)
         {
             isWindowVisible = !isWindowVisible;
-            if (!isWindowVisible) DeselectAll(); // Deselect on close
+            if (!isWindowVisible)
+            {
+                DeselectAll(); // Deselect on close
+                var uiMgr = FindFirstObjectByType<GameUIManager>();
+                if (uiMgr != null && cancelSkill) uiMgr.CancelSkillSelection();
+            }
 
             if (currentAnimationCoroutine != null) StopCoroutine(currentAnimationCoroutine);
             currentAnimationCoroutine = StartCoroutine(AnimateWindow(isWindowVisible ? showPosition : hiddenPosition, isWindowVisible));
@@ -139,17 +199,14 @@ namespace KillingMahjong.UI
 
         public void OnAbilitySelected(AbilityItemUI item)
         {
-            if (currentSelection != null) currentSelection.Deselect();
-            
             if (currentSelection == item)
             {
-                // Clicked same item -> Deselect?? Or keep? User said: "Other ability click... or tile click... or close... deselects"
-                // Usually clicking same keeps it selected.
-                currentSelection = item;
-                currentSelection.Select();
+                // すでに選択されているものをもう一度クリックしたら発動とする
+                OnActivateClicked();
             }
             else
             {
+                if (currentSelection != null) currentSelection.Deselect();
                 currentSelection = item;
                 currentSelection.Select();
             }
@@ -169,22 +226,47 @@ namespace KillingMahjong.UI
             if (currentSelection != null)
             {
                 int index = currentSelection.AbilityIndex;
-                if (index >= 0 && index < mockAbilities.Count)
+                if (index >= 0 && index < realAbilities.Count)
                 {
-                    var data = mockAbilities[index];
-                    Debug.Log($"Activting Ability: {data.name} (Cost: {data.cost})");
-                    // TODO: Send skill selection event to server using GameUIManager.SendActionToServer
+                    var data = realAbilities[index];
+                    Debug.Log($"Activting Ability: {data.name} (Cost: {data.cost}, Type: {data.skillType})");
                     
-                    // Client-side visual deduction
                     var uiMgr = FindFirstObjectByType<GameUIManager>();
-                    if (uiMgr != null && uiMgr.PlayerInfoUI != null)
+                    if (uiMgr != null)
                     {
-                        uiMgr.PlayerInfoUI.ReduceHp(data.cost);
-                        uiMgr.ShowDialogue($"アビリティ「{data.name}」を発動！");
+                        if (uiMgr.CurrentPhaseStatus != KillingMahjong.EngineData.RoundStatus.HandSelection)
+                        {
+                            if (uiMgr.DialogueUI != null) uiMgr.DialogueUI.ShowText("「今はスキルを使えないわ！」");
+                            DeselectAll();
+                            ToggleAbilityWindow(false);
+                            return;
+                        }
+
+                        if (data.skillType == "mulligan")
+                        {
+                            var currentHand = KillingMahjong.Managers.BoardStateManager.Instance.CurrentHandTiles;
+                            if (currentHand == null || currentHand.Count == 0)
+                            {
+                                if (uiMgr.DialogueUI != null) uiMgr.DialogueUI.ShowText("「交換する手牌がないわ！」");
+                                DeselectAll();
+                                ToggleAbilityWindow(false);
+                                return;
+                            }
+                            uiMgr.StartMulliganSelection();
+                        }
+                        else if (data.skillType == "boost_hand")
+                        {
+                            uiMgr.StartBoostHandSelection();
+                        }
+                        else
+                        {
+                            // サーバーへスキル発動リクエストを直接送信
+                            uiMgr.SendActionToServer("skill", new KillingMahjong.Network.ActionPayload { skill_type = data.skillType });
+                        }
                     }
                 }
                 DeselectAll();
-                // Optionally close window? User said "Activate and deselect". Didn't say close.
+                ToggleAbilityWindow(false); // 発動後にウィンドウを閉じる (キャンセルはしない)
             }
             else
             {
@@ -196,11 +278,7 @@ namespace KillingMahjong.UI
         {
             if (abilityWindow == null) yield break;
 
-            // 開き始めるときに押下画像にする
-            if (isOpening && triggerButtonImage != null && pressedSprite != null)
-            {
-                triggerButtonImage.sprite = pressedSprite;
-            }
+            if (isOpening) abilityWindow.gameObject.SetActive(true);
 
             Vector2 startPos = abilityWindow.anchoredPosition;
             float elapsed = 0f;
@@ -214,13 +292,10 @@ namespace KillingMahjong.UI
                 abilityWindow.anchoredPosition = Vector2.Lerp(startPos, targetPos, t);
                 yield return null;
             }
+            
             abilityWindow.anchoredPosition = targetPos;
-
-            // 閉まりきった（左に戻った）ときに通常画像に戻す
-            if (!isOpening && triggerButtonImage != null && normalSprite != null)
-            {
-                triggerButtonImage.sprite = normalSprite;
-            }
+            
+            if (!isOpening) abilityWindow.gameObject.SetActive(false);
         }
 
         private void CancelOpponentReady()

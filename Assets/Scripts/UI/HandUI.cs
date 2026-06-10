@@ -71,11 +71,15 @@ namespace KillingMahjong.UI
         {
             if (panelRect != null)
             {
-                Vector2 localPointerPosition;
-                if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                    panelRect.parent as RectTransform, eventData.position, eventData.pressEventCamera, out localPointerPosition))
+                RectTransform parentRect = panelRect.parent as RectTransform;
+                if (parentRect != null)
                 {
-                    panelRect.localPosition = localPointerPosition - dragOffset;
+                    Vector2 localPointerPosition;
+                    if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                        parentRect, eventData.position, eventData.pressEventCamera, out localPointerPosition))
+                    {
+                        panelRect.localPosition = localPointerPosition - dragOffset;
+                    }
                 }
             }
         }
@@ -176,7 +180,7 @@ namespace KillingMahjong.UI
         {
             base.UpdateLayout(phaseStatus);
 
-            bool showButtons = (phaseStatus == RoundStatus.HandSelection) && !isSubmitted;
+            bool showButtons = (phaseStatus == RoundStatus.HandSelection) && !isSubmitted && (gameUIManager == null || (!gameUIManager.IsMulliganSelection && !gameUIManager.IsOpponentSkillProcessing));
 
             if (decideButton != null)
             {
@@ -188,7 +192,7 @@ namespace KillingMahjong.UI
             }
             if (reselectButton != null)
             {
-                bool canReselect = (phaseStatus == RoundStatus.HandSelection) && isSubmitted && (gameUIManager != null && !gameUIManager.IsTransitioning);
+                bool canReselect = (phaseStatus == RoundStatus.HandSelection) && isSubmitted && (gameUIManager != null && !gameUIManager.IsTransitioning && !gameUIManager.IsMulliganSelection);
                 reselectButton.gameObject.SetActive(canReselect);
             }
         }

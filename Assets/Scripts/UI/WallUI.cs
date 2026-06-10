@@ -38,6 +38,7 @@ namespace KillingMahjong.UI
                 var interaction = wallSlots[i].GetComponent<TileInteraction>();
                 if (interaction != null && interaction.TileId == tileId)
                 {
+                    if (currentActiveInteraction == interaction) SetActiveDiscardTile(null);
                     RectTransform t = wallSlots[i];
                     wallSlots.RemoveAt(i);
                     return t;
@@ -47,12 +48,8 @@ namespace KillingMahjong.UI
         }
 
 
-        public void LayoutWallTiles(List<RectTransform> generatedTiles, List<int> tileIds, List<int> waitTiles, bool isDiscardPhase)
+        public void UpdateContainerPosition(bool isDiscardPhase)
         {
-            // Clear existing tracking list (but DO NOT destroy, GameUIManager manages their lifecycle)
-            wallSlots.Clear();
-
-            // コンテナ自体の位置をフェイズに応じて移動する
             if (wallContainer != null)
             {
                 if (wallContainer is RectTransform rectTransform)
@@ -65,6 +62,16 @@ namespace KillingMahjong.UI
                                                                  : new Vector3(normalContainerPos.x, normalContainerPos.y, 0);
                 }
             }
+        }
+
+
+        public void LayoutWallTiles(List<RectTransform> generatedTiles, List<int> tileIds, List<int> waitTiles, bool isDiscardPhase)
+        {
+            // Clear existing tracking list (but DO NOT destroy, GameUIManager manages their lifecycle)
+            wallSlots.Clear();
+
+            // コンテナ自体の位置をフェイズに応じて移動する
+            UpdateContainerPosition(isDiscardPhase);
 
             // 1. Convert to TileData
             List<TileData> allTiles = new List<TileData>();
@@ -97,9 +104,9 @@ namespace KillingMahjong.UI
             float currentY = startPosition.y;
             float currentX = startPosition.x;
 
-            int currentSlot = 0;
-            int maxSlotsPerRow = 20;
-            int tileIndex = 0; // generatedTilesを上から順に消費するためのインデックス
+
+            // generatedTiles を消費していくためのリスト
+            List<RectTransform> remainingGeneratedTiles = new List<RectTransform>(generatedTiles);
 
             for (int i = 0; i < categoryLists.Count; i++)
             {
@@ -140,36 +147,45 @@ namespace KillingMahjong.UI
 
                     int groupSize = (isKoutsu || isShuntsu) ? 3 : 1;
                     
-                    if (isDiscardPhase)
+                    // 描画する前に、このグループを描画したら maxWidthX を超えるかチェック
+                    float expectedWidth = (groupSize - 1) * tileIntervalX;
+                    if (currentX + expectedWidth > startPosition.x + maxWidthX)
                     {
-                        // 新レイアウト: 1列は空きスペース含めて最大20牌まで
-                        int currentRow = currentSlot / maxSlotsPerRow;
-                        if ((currentSlot % maxSlotsPerRow) + groupSize > maxSlotsPerRow)
-                        {
-                            currentSlot = (currentRow + 1) * maxSlotsPerRow; // 改行
-                        }
-                    }
-                    else
-                    {
-                        // 旧レイアウト: 描画する前に、このグループを描画したら maxWidthX を超えるかチェック
-                        float expectedWidth = (groupSize - 1) * tileIntervalX;
-                        if (currentX + expectedWidth > startPosition.x + maxWidthX)
-                        {
-                            currentX = startPosition.x;
-                            currentY -= rowIntervalY;
-                        }
+                        currentX = startPosition.x;
+                        currentY -= rowIntervalY; // 元の下の段に切り返す設定に戻す
                     }
 
                     // Render current group
                     for (int k = 0; k < groupSize; k++)
                     {
-                        if (tileIndex >= generatedTiles.Count)
+                        int targetId = list[j + k].Id;
+                        RectTransform slot = null;
+
+                        // 該当のTileIdを持つオブジェクトを探す
+                        for (int t = 0; t < remainingGeneratedTiles.Count; t++)
                         {
-                            Debug.LogWarning("WallUI: Not enough generated tiles provided for layout.");
-                            break;
+                            var tInteraction = remainingGeneratedTiles[t].GetComponent<TileInteraction>();
+                            if (tInteraction != null && tInteraction.TileId == targetId)
+                            {
+                                slot = remainingGeneratedTiles[t];
+                                remainingGeneratedTiles.RemoveAt(t);
+                                break;
+                            }
                         }
 
-                        RectTransform slot = generatedTiles[tileIndex++];
+                        if (slot == null)
+                        {
+                            Debug.LogWarning("WallUI: Could not find generated tile for TileId: " + targetId);
+                            if (remainingGeneratedTiles.Count > 0)
+                            {
+                                slot = remainingGeneratedTiles[0];
+                                remainingGeneratedTiles.RemoveAt(0);
+                            }
+                            else
+                            {
+                                break;
+                            }
+                        }
                         slot.SetParent(wallContainer, false);
                         
                         // Reset scaling and anchors properly to avoid overlap/squishing
@@ -178,21 +194,8 @@ namespace KillingMahjong.UI
                         slot.anchorMax = new Vector2(0.5f, 0.5f);
                         slot.pivot = new Vector2(0.5f, 0.5f);
                         
-                        float targetX = startPosition.x;
-                        float targetY = startPosition.y;
-
-                        if (isDiscardPhase)
-                        {
-                            int r = currentSlot / maxSlotsPerRow;
-                            int c = currentSlot % maxSlotsPerRow;
-                            targetX = startPosition.x + c * tileIntervalX;
-                            targetY = startPosition.y - r * rowIntervalY; // マイナスで下に配置する
-                        }
-                        else
-                        {
-                            targetX = currentX;
-                            targetY = currentY;
-                        }
+                        float targetX = currentX;
+                        float targetY = currentY;
 
                         Vector2 anchoredPos = new Vector2(targetX, targetY);
                         slot.anchoredPosition = anchoredPos;
@@ -206,23 +209,16 @@ namespace KillingMahjong.UI
                         }
                         
                         var visual = slot.GetComponent<TileVisual>();
-                        if (visual != null && waitTiles != null)
+                        if (visual != null)
                         {
-                            // 待ち牌リストに含まれていれば、振聴アラート（赤枠）を出す (Discard phaseのみ)
-                            visual.SetFuritenHighlight(isDiscardPhase && waitTiles.Contains(list[j + k].Id));
+                            // 待ち牌リストに含まれていても赤枠を出さないように修正（ホバー時のみ赤枠にする）
+                            visual.SetFuritenHighlight(false);
                         }
 
                         wallSlots.Add(slot);
                         slot.gameObject.SetActive(true);
 
-                        if (isDiscardPhase)
-                        {
-                            currentSlot++;
-                        }
-                        else
-                        {
-                            if (k < groupSize - 1) currentX += tileIntervalX;
-                        }
+                        if (k < groupSize - 1) currentX += tileIntervalX;
                     }
 
                     // グループ間やカテゴリ間のギャップ処理
@@ -238,22 +234,11 @@ namespace KillingMahjong.UI
                             if (nextTile.Number - lastTile.Number > 1) needGap = true;
                         }
 
-                        if (isDiscardPhase)
-                        {
-                            if (needGap) currentSlot++;
-                        }
-                        else
-                        {
-                            if (!isDiscardPhase) // currentX update is the last tile iteration above for intra-group
-                            {
-                                currentX += (needGap ? gapIntervalX : tileIntervalX);
-                            }
-                        }
+                        currentX += (needGap ? gapIntervalX : tileIntervalX);
                     }
                     else if (i < categoryLists.Count - 1)
                     {
-                        if (isDiscardPhase) currentSlot++;
-                        else currentX += gapIntervalX;
+                        currentX += gapIntervalX;
                     }
 
                     j += groupSize;
@@ -284,6 +269,7 @@ namespace KillingMahjong.UI
                 var interaction = wallSlots[i].GetComponent<TileInteraction>();
                 if (interaction != null && interaction.TileId == tileId)
                 {
+                    if (currentActiveInteraction == interaction) SetActiveDiscardTile(null);
                     RectTransform t = wallSlots[i];
                     wallSlots.RemoveAt(i);
                     return t; 
@@ -332,11 +318,97 @@ namespace KillingMahjong.UI
                 if (slot == null) continue;
                 var visual = slot.GetComponent<TileVisual>();
                 var interaction = slot.GetComponent<TileInteraction>();
-                if (visual != null && interaction != null && waitTiles != null)
+                if (visual != null && interaction != null)
                 {
-                    visual.SetFuritenHighlight(isDiscardPhase && waitTiles.Contains(interaction.TileId));
+                    // ここでも赤枠を更新しないようfalseで固定
+                    visual.SetFuritenHighlight(false);
                 }
             }
+        }
+
+        private RectTransform arrowIndicator;
+        private TileInteraction currentActiveInteraction = null;
+
+        public void SetActiveDiscardTile(TileInteraction interaction)
+        {
+            // 古いものを元に戻す
+            if (currentActiveInteraction != null)
+            {
+                var oldSlot = currentActiveInteraction.GetComponent<RectTransform>();
+                if (oldSlot != null)
+                {
+                    oldSlot.anchoredPosition = new Vector2(currentActiveInteraction.OriginalWallPosition.x, currentActiveInteraction.OriginalWallPosition.y);
+                }
+            }
+
+            currentActiveInteraction = interaction;
+
+            // 新しいものを持ち上げて矢印をつける
+            if (currentActiveInteraction != null)
+            {
+                var newSlot = currentActiveInteraction.GetComponent<RectTransform>();
+                if (newSlot != null)
+                {
+                    newSlot.anchoredPosition = new Vector2(currentActiveInteraction.OriginalWallPosition.x, currentActiveInteraction.OriginalWallPosition.y + 8f);
+                    
+                    if (arrowIndicator == null) CreateArrowIndicator();
+                    arrowIndicator.gameObject.SetActive(true);
+                    arrowIndicator.SetParent(newSlot, false);
+                    arrowIndicator.anchoredPosition = new Vector2(0, 45f);
+                }
+            }
+            else
+            {
+                if (arrowIndicator != null) arrowIndicator.gameObject.SetActive(false);
+            }
+        }
+
+        public void ClearActiveDiscardTile(TileInteraction interaction)
+        {
+            if (currentActiveInteraction == interaction)
+            {
+                SetActiveDiscardTile(null);
+            }
+        }
+
+        public void UpdateDiscardTurnIndicator(bool isLocalTurn, bool isDiscardPhase)
+        {
+            if (isDiscardPhase && isLocalTurn)
+            {
+                // 現在の有効な牌がなければ、壁の最初の牌をターゲットにする
+                if (currentActiveInteraction == null && wallSlots.Count > 0)
+                {
+                    var inter = wallSlots[0].GetComponent<TileInteraction>();
+                    if (inter != null) SetActiveDiscardTile(inter);
+                }
+                else if (currentActiveInteraction != null)
+                {
+                    // 既にセットされていれば再適用
+                    SetActiveDiscardTile(currentActiveInteraction);
+                }
+            }
+            else
+            {
+                SetActiveDiscardTile(null);
+            }
+        }
+
+        private void CreateArrowIndicator()
+        {
+            GameObject arrowObj = new GameObject("DiscardArrowIndicator");
+            arrowIndicator = arrowObj.AddComponent<RectTransform>();
+            arrowIndicator.sizeDelta = new Vector2(50, 50);
+            
+            var text = arrowObj.AddComponent<UnityEngine.UI.Text>();
+            text.text = "▼";
+            text.fontSize = 40;
+            text.color = Color.red;
+            text.alignment = TextAnchor.MiddleCenter;
+            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            
+            var outline = arrowObj.AddComponent<UnityEngine.UI.Outline>();
+            outline.effectColor = Color.black;
+            outline.effectDistance = new Vector2(2, -2);
         }
     }
 }

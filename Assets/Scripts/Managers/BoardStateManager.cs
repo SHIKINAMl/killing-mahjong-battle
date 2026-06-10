@@ -22,15 +22,20 @@ namespace KillingMahjong.Managers
         
         public List<int> CurrentEnemyHandTiles { get; private set; } = new List<int>();
         public List<int> CurrentEnemyWallTiles { get; private set; } = new List<int>();
+        public List<int> OriginalEnemyWallTiles { get; private set; } = new List<int>();
+        public HashSet<int> ExposedEnemyHandWallIndexes { get; private set; } = new HashSet<int>();
+        public HashSet<int> ExposedLocalHandWallIndexes { get; private set; } = new HashSet<int>();
         
         public List<int> SelectedTileIds { get; private set; } = new List<int>();
         public List<int[]> CurrentTenpaiExamples { get; private set; } = new List<int[]>();
         public HashSet<int> DiscardedWallIndexes { get; private set; } = new HashSet<int>();
         public List<int> TargetHandIndexes { get; set; } = null;
+        public HashSet<int> HiddenTiles { get; private set; } = new HashSet<int>();
         
         public bool LastIsLocalWin { get; set; } = true; 
         public LiquidationData LastLiquidationData { get; set; } = null;
         public bool IsLocalTurn { get; private set; } = false;
+        public bool IsLocalPlayerFirstRound { get; private set; } = false;
         public int LastDiscardedTileId { get; set; } = -1;
         public int CurrentDoraId { get; set; } = -1;
         
@@ -39,10 +44,20 @@ namespace KillingMahjong.Managers
 
         public void SetLocalTurn(bool isLocalTurn)
         {
-            IsLocalTurn = isLocalTurn;
+            if (IsLocalTurn != isLocalTurn)
+            {
+                IsLocalTurn = isLocalTurn;
+                OnTurnChanged?.Invoke(IsLocalTurn);
+            }
+        }
+        
+        public void SetLocalPlayerFirstRound(bool isFirst)
+        {
+            IsLocalPlayerFirstRound = isFirst;
         }
 
         // --- イベント ---
+        public event Action<bool> OnTurnChanged;
         public event Action<int> OnTileMovedToHand;
         public event Action<int> OnTileMovedToWall;
         public event Action OnSelectionChanged;
@@ -78,6 +93,7 @@ namespace KillingMahjong.Managers
             OriginalWallTiles.Clear();
             CurrentDoraId = -1;
             TargetHandIndexes = null;
+            HiddenTiles.Clear();
         }
 
         /// <summary>
@@ -103,20 +119,25 @@ namespace KillingMahjong.Managers
                 }
                 CurrentWallTiles = SortTileIds(displayWall);
             }
-            if (hand != null) CurrentHandTiles = SortTileIds(new List<int>(hand));
+            if (hand != null) 
+            {
+                CurrentHandTiles = SortTileIds(new List<int>(hand));
+                HiddenTiles.Clear();
+            }
             if (wait != null) CurrentWaitTiles = new List<int>(wait);
         }
 
         public void SetEnemyState(List<int> wall, List<int> hand)
         {
-            if (wall != null) 
+            if (wall != null)
             {
-                List<int> displayEnemyWall = new List<int>(wall);
-                if (hand != null)
+                OriginalEnemyWallTiles = new List<int>(wall);
+                List<int> displayEnemyWall = new List<int>();
+                for (int i = 0; i < wall.Count; i++)
                 {
-                    foreach (int hTile in hand)
+                    if (hand == null || !hand.Contains(i))
                     {
-                        displayEnemyWall.Remove(hTile);
+                        displayEnemyWall.Add(wall[i]);
                     }
                 }
                 CurrentEnemyWallTiles = displayEnemyWall;
@@ -189,6 +210,7 @@ namespace KillingMahjong.Managers
 
         public bool MoveTileToHand(int tileId)
         {
+            Debug.Log($"[BoardStateManager] MoveTileToHand called with tileId: {tileId}");
             int actualId = tileId;
             if (!CurrentWallTiles.Contains(tileId))
             {
@@ -197,6 +219,7 @@ namespace KillingMahjong.Managers
                 if (foundIndex != -1)
                 {
                     actualId = CurrentWallTiles[foundIndex];
+                    Debug.Log($"[BoardStateManager] tileId {tileId} not in Wall, mapped to actualId {actualId} using baseId {baseId}");
                 }
                 else
                 {
@@ -205,13 +228,16 @@ namespace KillingMahjong.Managers
                 }
             }
 
+            Debug.Log($"[BoardStateManager] CurrentHandTiles count: {CurrentHandTiles.Count}");
             if (CurrentHandTiles.Count < 13)
             {
                 CurrentWallTiles.Remove(actualId);
                 CurrentHandTiles.Add(actualId);
+                Debug.Log($"[BoardStateManager] Moved actualId {actualId} to hand. Invoking OnTileMovedToHand.");
                 OnTileMovedToHand?.Invoke(actualId);
                 return true;
             }
+            Debug.LogWarning($"[BoardStateManager] Hand is full (13 tiles). Cannot move {actualId} to hand.");
             return false;
         }
 
@@ -270,7 +296,7 @@ namespace KillingMahjong.Managers
 
         public void SelectManganHand()
         {
-            Debug.Log($"[SelectManganHand] CurrentTenpaiExamples count: {CurrentTenpaiExamples?.Count ?? -1}, OriginalWallTiles count: {OriginalWallTiles.Count}, CurrentWallTiles count: {CurrentWallTiles.Count}");
+            Debug.Log($"[SelectManganHand] CurrentTenpaiExamples count: {CurrentTenpaiExamples?.Count ?? -1}, OriginalWallTiles count: {OriginalWallTiles.Count}");
             
             if (CurrentTenpaiExamples == null || CurrentTenpaiExamples.Count == 0)
             {
@@ -283,20 +309,23 @@ namespace KillingMahjong.Managers
             if (exampleIndex < 0 || exampleIndex >= CurrentTenpaiExamples.Count) exampleIndex = 0;
 
             int[] rawTargetHand = CurrentTenpaiExamples[exampleIndex];
-            int[] targetHand = OptimizeHandIndicesForDora(rawTargetHand);
             
-            Debug.Log($"[SelectManganHand] Using example {exampleIndex}, optimized indexes: [{string.Join(", ", targetHand)}]");
-            TargetHandIndexes = new List<int>(targetHand);
-            
-            // 目標の手牌IDリストを作成
+            // Pythonサーバーから送られてきたインデックスをそのまま使用する
             List<int> targetTileIds = new List<int>();
-            foreach (int index in targetHand)
+            
+            foreach (int rawIdx in rawTargetHand)
             {
-                if (index >= 0 && index < OriginalWallTiles.Count)
+                if (rawIdx >= 0 && rawIdx < OriginalWallTiles.Count)
                 {
-                    targetTileIds.Add(OriginalWallTiles[index]);
+                    targetTileIds.Add(OriginalWallTiles[rawIdx]);
+                }
+                else
+                {
+                    Debug.LogWarning($"[SelectManganHand] 無効なインデックスを受け取りました: {rawIdx}");
                 }
             }
+
+            Debug.Log($"[SelectManganHand] targetTileIds (count: {targetTileIds.Count}): [{string.Join(", ", targetTileIds)}]");
 
             // 現在の手牌から、目標に含まれない牌だけを壁に戻す
             List<int> currentHandCopy = new List<int>(CurrentHandTiles);
@@ -321,7 +350,7 @@ namespace KillingMahjong.Managers
                 if (!moved) Debug.LogWarning($"[SelectManganHand] Failed to move tile {id} to hand!");
             }
             
-            Debug.Log($"[SelectManganHand] Result: hand has {CurrentHandTiles.Count} tiles: [{string.Join(", ", CurrentHandTiles)}]");
+            Debug.Log($"[SelectManganHand] Result: hand has {CurrentHandTiles.Count} tiles");
         }
 
         public void SelectRandomHand()

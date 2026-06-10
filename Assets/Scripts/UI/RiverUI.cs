@@ -104,45 +104,51 @@ namespace KillingMahjong.UI
         {
             if (discardedTiles.Count == 0) return;
 
-            List<Transform> row0 = new List<Transform>();
-            List<Transform> row1 = new List<Transform>();
+            List<List<Transform>> rows = new List<List<Transform>>();
 
             for (int i = 0; i < discardedTiles.Count; i++)
             {
-                int row = i / maxPerRow;
-                if (row == 0) row0.Add(discardedTiles[i]);
-                else row1.Add(discardedTiles[i]);
+                int rowIdx = i / maxPerRow;
+                while (rows.Count <= rowIdx)
+                {
+                    rows.Add(new List<Transform>());
+                }
+                rows[rowIdx].Add(discardedTiles[i]);
             }
 
             int sibIdx = 0;
             if (isEnemyRiver)
             {
-                // 敵の河: 2列目を先（奥＝背面）、1列目を後（手前＝前面）
-                foreach (var t in row1) t.SetSiblingIndex(sibIdx++);
-                foreach (var t in row0) t.SetSiblingIndex(sibIdx++);
+                // 敵の河: 奥の行（rowIdxが大きい方）から先に描画する（背面にいく）
+                // 3列目 -> 2列目 -> 1列目 の順で描画（1列目が一番上にくる）
+                for (int i = rows.Count - 1; i >= 0; i--)
+                {
+                    foreach (var t in rows[i]) t.SetSiblingIndex(sibIdx++);
+                }
             }
             else
             {
-                // 自分の河: 1列目を先（奥＝背面）、2列目を後（手前＝前面）
-                foreach (var t in row0) t.SetSiblingIndex(sibIdx++);
-                foreach (var t in row1) t.SetSiblingIndex(sibIdx++);
+                // 自分の河: 手前の行（rowIdxが小さい方）から先に描画する（背面にいく）
+                // 1列目 -> 2列目 -> 3列目 の順で描画（3列目が一番上にくる）
+                for (int i = 0; i < rows.Count; i++)
+                {
+                    foreach (var t in rows[i]) t.SetSiblingIndex(sibIdx++);
+                }
             }
         }
 
-        private void UpdateTurnText()
+        public void UpdateTurnText()
         {
             if (turnText != null)
             {
                 int turnCount = discardedTiles.Count;
-                if (turnCount > 0)
-                {
-                    turnText.text = $"{ToKanji(turnCount)}打目";
-                    turnText.gameObject.SetActive(true);
-                }
-                else
-                {
-                    turnText.gameObject.SetActive(false);
-                }
+                int displayTurn = turnCount + 1; // これから打つ牌が何巡目か
+                
+                bool isFirst = KillingMahjong.Managers.BoardStateManager.Instance.IsLocalPlayerFirstRound;
+                string prefix = isFirst ? "先：" : "後：";
+                
+                turnText.text = $"{prefix}{ToKanji(displayTurn)}打目";
+                turnText.gameObject.SetActive(true);
             }
         }
 

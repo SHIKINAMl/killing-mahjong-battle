@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
-
+using UnityEngine.Rendering.RenderGraphModule;
 namespace KillingMahjong.UISetUp
 {
     public class CRTRenderFeature : ScriptableRendererFeature
@@ -84,6 +84,57 @@ namespace KillingMahjong.UISetUp
 
                 context.ExecuteCommandBuffer(cmd);
                 CommandBufferPool.Release(cmd);
+            }
+
+            private class PassData
+            {
+                public TextureHandle sourceTexture;
+                public TextureHandle tempTexture;
+                public Material material;
+            }
+
+            public override void RecordRenderGraph(RenderGraph renderGraph, ContextContainer frameData)
+            {
+                if (m_Material == null) return;
+
+                var resourceData = frameData.Get<UniversalResourceData>();
+                var sourceTexture = resourceData.activeColorTexture;
+                if (!sourceTexture.IsValid()) return;
+
+                var cameraData = frameData.Get<UniversalCameraData>();
+                var desc = cameraData.cameraTargetDescriptor;
+                desc.depthBufferBits = 0;
+
+                TextureHandle tempTexture = UniversalRenderer.CreateRenderGraphTexture(renderGraph, desc, "_TempCRTColorTex", false);
+
+                using (var builder = renderGraph.AddRasterRenderPass<PassData>("CRT Filter Blit Pass", out var passData))
+                {
+                    passData.material = m_Material;
+                    passData.sourceTexture = sourceTexture;
+                    passData.tempTexture = tempTexture;
+
+                    builder.UseTexture(sourceTexture, AccessFlags.Read);
+                    builder.SetRenderAttachment(tempTexture, 0);
+
+                    builder.SetRenderFunc((PassData data, RasterGraphContext context) =>
+                    {
+                        Blitter.BlitTexture(context.cmd, data.sourceTexture, new Vector4(1, 1, 0, 0), data.material, 0);
+                    });
+                }
+
+                using (var builder = renderGraph.AddRasterRenderPass<PassData>("CRT Filter Blit Back", out var passData))
+                {
+                    passData.tempTexture = tempTexture;
+                    passData.sourceTexture = sourceTexture;
+
+                    builder.UseTexture(tempTexture, AccessFlags.Read);
+                    builder.SetRenderAttachment(sourceTexture, 0);
+
+                    builder.SetRenderFunc((PassData data, RasterGraphContext context) =>
+                    {
+                        Blitter.BlitTexture(context.cmd, data.tempTexture, new Vector4(1, 1, 0, 0), 0.0f, false);
+                    });
+                }
             }
 
             public override void OnCameraCleanup(CommandBuffer cmd)

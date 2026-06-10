@@ -45,6 +45,18 @@ namespace KillingMahjong.UI
             {
                 originalPosition = characterRenderer.transform.localPosition;
             }
+
+            // UI要素が前面に出て牌のクリック判定を吸い取るのを防ぐため、当たり判定を無効化する
+            var graphics = GetComponentsInChildren<UnityEngine.UI.Graphic>(true);
+            foreach (var g in graphics)
+            {
+                g.raycastTarget = false;
+            }
+        }
+
+        public void SetMaxHP(int max)
+        {
+            maxHp = max;
         }
 
         public void SetHP(int hp)

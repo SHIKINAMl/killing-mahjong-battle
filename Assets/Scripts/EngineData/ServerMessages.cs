@@ -60,6 +60,19 @@ namespace KillingMahjong.EngineData
     }
 
     [Serializable]
+    public class MatchCancelledMessage
+    {
+        public string type;
+        public MatchCancelledData data;
+    }
+    [Serializable]
+    public class MatchCancelledData
+    {
+        public string match_id;
+        public string reason;
+    }
+
+    [Serializable]
     public class GameStartedMessage
     {
         public string type;

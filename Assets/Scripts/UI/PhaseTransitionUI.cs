@@ -47,7 +47,7 @@ namespace KillingMahjong.UI
                 canvas = gameObject.AddComponent<Canvas>();
             }
             canvas.overrideSorting = true;
-            canvas.sortingOrder = 10000; // 最前面に設定
+            canvas.sortingOrder = 19; // 最前面に設定
             
             // レイキャストを有効にする場合（必要に応じて）
             UnityEngine.UI.GraphicRaycaster raycaster = GetComponent<UnityEngine.UI.GraphicRaycaster>();
@@ -322,6 +322,11 @@ namespace KillingMahjong.UI
         public void PlayCenterTextAnim(string text, float duration = 1.5f, Action onComplete = null)
         {
             StartCoroutine(CenterTextAnimRoutine(text, duration, onComplete));
+        }
+
+        public IEnumerator PlayCenterTextAnimRoutine(string text, float duration = 1.5f, Action onComplete = null)
+        {
+            yield return StartCoroutine(CenterTextAnimRoutine(text, duration, onComplete));
         }
 
         private IEnumerator CenterTextAnimRoutine(string text, float duration, Action onComplete = null)

@@ -5,7 +5,7 @@ using UnityEngine.EventSystems;
 
 namespace KillingMahjong.UI
 {
-    public class AbilityItemUI : MonoBehaviour, IPointerClickHandler
+    public class AbilityItemUI : MonoBehaviour, IPointerDownHandler
     {
         [Header("UI References")]
         [SerializeField] private TextMeshProUGUI nameText;
@@ -59,8 +59,9 @@ namespace KillingMahjong.UI
             }
         }
 
-        public void OnPointerClick(PointerEventData eventData)
+        public void OnPointerDown(PointerEventData eventData)
         {
+            if (eventData.button != PointerEventData.InputButton.Left) return;
             parentUI.OnAbilitySelected(this);
         }
 

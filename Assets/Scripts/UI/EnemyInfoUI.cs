@@ -13,6 +13,8 @@ namespace KillingMahjong.UI
         [Header("Character Portrait")]
         [SerializeField] private SpriteRenderer characterRenderer;
         [SerializeField] private CharacterData characterData; // キャラクター管理データ
+        [SerializeField] private float bounceDuration = 0.5f; // 上下する時間（インスペクターで設定可能）
+        [SerializeField] private float bounceHeight = 0.5f;   // 上下する高さ（インスペクターで設定可能）
 
         [Header("Available Enemies")]
         [SerializeField] private CharacterData[] availableEnemies; // インスペクターで登録する敵キャラクターリスト
@@ -56,6 +58,13 @@ namespace KillingMahjong.UI
             if (characterRenderer != null)
             {
                 originalPosition = characterRenderer.transform.localPosition;
+            }
+
+            // UI要素が前面に出て牌のクリック判定を吸い取るのを防ぐため、当たり判定を無効化する
+            var graphics = GetComponentsInChildren<UnityEngine.UI.Graphic>(true);
+            foreach (var g in graphics)
+            {
+                g.raycastTarget = false;
             }
         }
 
@@ -142,6 +151,11 @@ namespace KillingMahjong.UI
             PlayBounceAnimation(0.3f); // 0.3秒で一瞬跳ねる
         }
 
+        public void SetMaxHP(int max)
+        {
+            maxHp = max;
+        }
+
         public void SetHP(int hp)
         {
             if (hpText != null)
@@ -192,21 +206,21 @@ namespace KillingMahjong.UI
             }
         }
 
-        public void PlayBounceAnimation(float duration)
+        public void PlayBounceAnimation(float duration = 0.5f)
         {
             if (characterRenderer == null) return;
             if (bounceCoroutine != null) StopCoroutine(bounceCoroutine);
-            bounceCoroutine = StartCoroutine(BounceRoutine(duration));
+            // 引数で渡されたduration（例: 5秒）に関わらず、インスペクターで設定した時間で一瞬跳ねる
+            bounceCoroutine = StartCoroutine(BounceRoutine(bounceDuration));
         }
 
-        private System.Collections.IEnumerator BounceRoutine(float duration)
+        private System.Collections.IEnumerator BounceRoutine(float durationToBounce)
         {
             float elapsed = 0f;
-            // duration の時間内で Sin(0) から Sin(PI) まで推移するように速度を計算 (1回跳ねる)
-            float bounceSpeed = Mathf.PI / duration;
-            float bounceHeight = 0.5f; // SpriteRenderer用に調整（必要に応じてインスペクターで調整可能にすることもできます）
+            // durationToBounce の時間内で Sin(0) から Sin(PI) まで推移するように速度を計算 (1回跳ねる)
+            float bounceSpeed = Mathf.PI / durationToBounce;
             
-            while (elapsed < duration)
+            while (elapsed < durationToBounce)
             {
                 elapsed += Time.deltaTime;
                 float yOffset = Mathf.Sin(elapsed * bounceSpeed) * bounceHeight;

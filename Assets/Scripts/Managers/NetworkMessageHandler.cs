@@ -28,6 +28,35 @@ namespace KillingMahjong.Network
     }
 
     [System.Serializable]
+    public class SkillCastedData
+    {
+        public string player_id;
+        public string skillType;
+        public int cost;
+        public List<int> exposedHandIndexes;
+    }
+
+    [System.Serializable]
+    public class SpecialVictoryWonData
+    {
+        public string player_id;
+    }
+
+    [System.Serializable]
+    public class SpecialVictoryWonMessage
+    {
+        public string type;
+        public SpecialVictoryWonData data;
+    }
+
+    [System.Serializable]
+    public class SkillCastedMessage
+    {
+        public string type;
+        public SkillCastedData data;
+    }
+
+    [System.Serializable]
     public class ActionMessage
     {
         public string type = "action";
@@ -42,6 +71,8 @@ namespace KillingMahjong.Network
         public List<int> wall_indexes;
         public int wall_index;
         public string skill_type;
+        public int target_hand_index;
+        public string yaku_name;
         
         // --- 互換性維持 ---
         public int amount;
@@ -65,6 +96,7 @@ namespace KillingMahjong.Network
 
         // イベントルーティング
         public event Action OnMatchmakingWaiting;
+        public event Action<string> OnMatchCancelled;
         public event Action OnGameStarted;
         public event Action<int, int, int, int> OnBettingComplete;
         public event Action<RoundStatus> OnPhaseStatusChanged;
@@ -85,7 +117,11 @@ namespace KillingMahjong.Network
         public event Action OnDealingStarted;
         public event Action OnDealingCompleted;
 
+        public event Action<SkillCastedData> OnSkillCasted;
+        public event Action<string> OnSpecialVictoryWon;
+
         private string localPlayerId = ""; // GameManager等からセットされる想定
+        public string LocalPlayerId => localPlayerId;
         private bool agariProcessed = false; // ロン二重発火防止フラグ
 
         private void Awake()
@@ -147,8 +183,34 @@ namespace KillingMahjong.Network
                         OnMatchmakingWaiting?.Invoke();
                         break;
 
+                    case "match_cancelled":
+                        MatchCancelledMessage cancelMsg = JsonUtility.FromJson<MatchCancelledMessage>(jsonString);
+                        string reasonMsg = "通信が切断されました。マッチング待機中です...";
+                        if (cancelMsg != null && cancelMsg.data != null && cancelMsg.data.reason == "player_disconnected")
+                        {
+                            reasonMsg = "対戦相手が切断しました。マッチング待機中です...";
+                        }
+                        OnMatchCancelled?.Invoke(reasonMsg);
+                        break;
+
                     case "game_started":
                         OnGameStarted?.Invoke();
+                        break;
+
+                    case "skill_casted":
+                        SkillCastedMessage scMsg = JsonUtility.FromJson<SkillCastedMessage>(jsonString);
+                        if (scMsg != null && scMsg.data != null)
+                        {
+                            OnSkillCasted?.Invoke(scMsg.data);
+                        }
+                        break;
+
+                    case "special_victory_won":
+                        SpecialVictoryWonMessage svwMsg = JsonUtility.FromJson<SpecialVictoryWonMessage>(jsonString);
+                        if (svwMsg != null && svwMsg.data != null)
+                        {
+                            OnSpecialVictoryWon?.Invoke(svwMsg.data.player_id);
+                        }
                         break;
                         
                     case "phase_change":
@@ -194,6 +256,7 @@ namespace KillingMahjong.Network
                     case "discard_phase_started":
                         DiscardPhaseStartedMessage dpsMsg = JsonUtility.FromJson<DiscardPhaseStartedMessage>(jsonString);
                         bool isLocalTurn = (dpsMsg != null && dpsMsg.data != null && dpsMsg.data.first_player == localPlayerId);
+                        Managers.BoardStateManager.Instance.SetLocalPlayerFirstRound(isLocalTurn);
                         Managers.BoardStateManager.Instance.SetLocalTurn(isLocalTurn);
                         OnPhaseStatusChanged?.Invoke(RoundStatus.Discard);
                         break;

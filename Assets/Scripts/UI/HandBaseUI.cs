@@ -56,6 +56,12 @@ namespace KillingMahjong.UI
                 interaction.Initialize(tileId, true, gameUIManager, canvas);
             }
 
+            var visual = tileTransform.GetComponent<TileVisual>();
+            if (visual != null)
+            {
+                visual.SetFuritenHighlight(false);
+            }
+
             if (gameUIManager != null)
             {
                 UpdateLayout(gameUIManager.CurrentPhaseStatus);
