@@ -663,6 +663,19 @@ namespace KillingMahjong.UI
         private void SendNextRoundAction()
         {
             if (uiManager.IsGameOver) return;
+
+            // ゲームプレイ中のフェーズでは次局への進行リクエストを送らない
+            // （遅延コルーチンが新局開始後に発火して二重送信になるのを防ぐため）
+            if (uiManager.CurrentPhaseStatus == RoundStatus.Dealing ||
+                uiManager.CurrentPhaseStatus == RoundStatus.HandSelection ||
+                uiManager.CurrentPhaseStatus == RoundStatus.Betting ||
+                uiManager.CurrentPhaseStatus == RoundStatus.Discard ||
+                uiManager.CurrentPhaseStatus == RoundStatus.TurnDecision)
+            {
+                Debug.Log($"[GameUIPhaseController] SendNextRoundAction aborted. Current phase is {uiManager.CurrentPhaseStatus}");
+                return;
+            }
+
             if (!_hasSentNextRoundForCurrentPhase)
             {
                 _hasSentNextRoundForCurrentPhase = true;

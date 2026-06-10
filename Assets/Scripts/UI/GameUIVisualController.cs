@@ -292,13 +292,7 @@ namespace KillingMahjong.UI
                 RectTransform movedTile = uiManager.WallUI.GrabTile(tileId);
                 if (movedTile != null)
                 {
-                    Vector3 startPos = movedTile.position;
                     uiManager.HandUI.AddTileToHand(movedTile, tileId);
-                    
-                    if (this.gameObject.activeInHierarchy)
-                    {
-                        StartCoroutine(AnimateTileMovementRoutine(movedTile, startPos, 0.15f));
-                    }
                 }
             }
         }
@@ -320,14 +314,8 @@ namespace KillingMahjong.UI
 
             if (movedTile != null)
             {
-                Vector3 startPos = movedTile.position;
                 uiManager.HandUI.RemoveTileFromHand(movedTile, tileId);
                 uiManager.WallUI.ReturnTileToWall(movedTile, tileId);
-
-                if (this.gameObject.activeInHierarchy)
-                {
-                    StartCoroutine(AnimateTileMovementRoutine(movedTile, startPos, 0.15f));
-                }
             }
         }
 
@@ -381,13 +369,61 @@ namespace KillingMahjong.UI
                 }
             }
 
-            GameObject ghost = Instantiate(realTile.gameObject, parentCanvas.transform);
+            // 確実なアニメーションのために、綺麗なプレハブから生成
+            GameObject ghost = Instantiate(uiManager.TilePrefab, parentCanvas.transform);
             
+            // アンカーとピボットを中央(0.5)にリセット。
+            RectTransform ghostRT = ghost.GetComponent<RectTransform>();
+            RectTransform realRT = realTile.GetComponent<RectTransform>();
+            if (ghostRT != null && realRT != null)
+            {
+                ghostRT.anchorMin = new Vector2(0.5f, 0.5f);
+                ghostRT.anchorMax = new Vector2(0.5f, 0.5f);
+                ghostRT.pivot = new Vector2(0.5f, 0.5f);
+                
+                // 到達後の本来のサイズが 0 でない(Layout計算済み)なら大きさを合わせる
+                if (realRT.rect.width > 0 && realRT.rect.height > 0)
+                {
+                    ghostRT.sizeDelta = new Vector2(realRT.rect.width, realRT.rect.height);
+                }
+                
+                // 親キャンバスと手牌での「画面上の絶対的なスケール」の差を計算し、
+                // 移動中の牌(ghost)の見た目の大きさが手牌と完全に同じになるように調整する
+                Vector3 parentLossy = parentCanvas.transform.lossyScale;
+                Vector3 realLossy = realRT.lossyScale;
+                
+                if (parentLossy.x != 0 && parentLossy.y != 0 && parentLossy.z != 0)
+                {
+                    ghostRT.localScale = new Vector3(
+                        realLossy.x / parentLossy.x,
+                        realLossy.y / parentLossy.y,
+                        realLossy.z / parentLossy.z
+                    );
+                }
+                else
+                {
+                    ghostRT.localScale = Vector3.one;
+                }
+            }
+
+            // 見た目(スプライト)をコピー
+            var realVisual = realTile.GetComponent<TileVisual>();
+            var ghostVisual = ghost.GetComponent<TileVisual>();
+            if (realVisual != null && ghostVisual != null)
+            {
+                int tileId = realVisual.GetId();
+                Sprite sprite = uiManager.TileResourceManager != null ? uiManager.TileResourceManager.GetTileSprite(tileId) : null;
+                ghostVisual.SetTile(tileId, sprite, uiManager.TileResourceManager);
+            }
+            
+            // インタラクションを削除
             Destroy(ghost.GetComponent<TileInteraction>());
             Destroy(ghost.GetComponent<UnityEngine.EventSystems.EventTrigger>());
 
             var ghostCanvasGroup = ghost.GetComponent<CanvasGroup>();
-            if (ghostCanvasGroup != null) ghostCanvasGroup.alpha = 1f;
+            if (ghostCanvasGroup == null) ghostCanvasGroup = ghost.AddComponent<CanvasGroup>();
+            ghostCanvasGroup.alpha = 1f;
+            ghostCanvasGroup.blocksRaycasts = false; // クリック妨害防止
 
             ghost.transform.SetAsLastSibling();
 
