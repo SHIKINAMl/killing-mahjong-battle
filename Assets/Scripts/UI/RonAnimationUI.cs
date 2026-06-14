@@ -214,7 +214,86 @@ namespace KillingMahjong.UI
                 shakeElapsed += Time.deltaTime;
                 yield return null;
             }
-            containerRt.localPosition = originalPos;
+
+            // HP UIを最前面へ表示して見やすくする
+            // （SetParentは座標系が大きく変わりUIが画面外に消える原因になるため、CanvasのSortingOrderで前面に持ってくる手法に戻しつつ、子オブジェクトも全て対応する）
+            Canvas[] pCanvases = playerInfo != null ? playerInfo.GetComponentsInChildren<Canvas>(true) : new Canvas[0];
+            bool pAddedRootCanvas = false;
+            Canvas pRootCanvas = playerInfo != null ? playerInfo.GetComponent<Canvas>() : null;
+            if (playerInfo != null && pRootCanvas == null)
+            {
+                pRootCanvas = playerInfo.gameObject.AddComponent<Canvas>();
+                pAddedRootCanvas = true;
+                pCanvases = playerInfo.GetComponentsInChildren<Canvas>(true);
+            }
+
+            int[] pOrigSorts = new int[pCanvases.Length];
+            bool[] pOrigOverrides = new bool[pCanvases.Length];
+            string[] pOrigLayers = new string[pCanvases.Length];
+            for (int i = 0; i < pCanvases.Length; i++)
+            {
+                pOrigSorts[i] = pCanvases[i].sortingOrder;
+                pOrigOverrides[i] = pCanvases[i].overrideSorting;
+                pOrigLayers[i] = pCanvases[i].sortingLayerName;
+
+                pCanvases[i].overrideSorting = true;
+                pCanvases[i].sortingLayerName = "UI";
+                pCanvases[i].sortingOrder = 30000 + i;
+            }
+
+            Canvas[] eCanvases = enemyInfo != null ? enemyInfo.GetComponentsInChildren<Canvas>(true) : new Canvas[0];
+            bool eAddedRootCanvas = false;
+            Canvas eRootCanvas = enemyInfo != null ? enemyInfo.GetComponent<Canvas>() : null;
+            if (enemyInfo != null && eRootCanvas == null)
+            {
+                eRootCanvas = enemyInfo.gameObject.AddComponent<Canvas>();
+                eAddedRootCanvas = true;
+                eCanvases = enemyInfo.GetComponentsInChildren<Canvas>(true);
+            }
+
+            int[] eOrigSorts = new int[eCanvases.Length];
+            bool[] eOrigOverrides = new bool[eCanvases.Length];
+            string[] eOrigLayers = new string[eCanvases.Length];
+            for (int i = 0; i < eCanvases.Length; i++)
+            {
+                eOrigSorts[i] = eCanvases[i].sortingOrder;
+                eOrigOverrides[i] = eCanvases[i].overrideSorting;
+                eOrigLayers[i] = eCanvases[i].sortingLayerName;
+
+                eCanvases[i].overrideSorting = true;
+                eCanvases[i].sortingLayerName = "UI";
+                eCanvases[i].sortingOrder = 30000 + i;
+            }
+            
+            // SpriteRenderer用
+            SpriteRenderer[] pSprites = playerInfo != null ? playerInfo.GetComponentsInChildren<SpriteRenderer>(true) : new SpriteRenderer[0];
+            int[] pOrigSpriteSorts = new int[pSprites.Length];
+            string[] pOrigSpriteLayers = new string[pSprites.Length];
+            for (int i = 0; i < pSprites.Length; i++)
+            {
+                pOrigSpriteSorts[i] = pSprites[i].sortingOrder;
+                pOrigSpriteLayers[i] = pSprites[i].sortingLayerName;
+                pSprites[i].sortingLayerName = "UI";
+                pSprites[i].sortingOrder = 30000 + i;
+            }
+
+            SpriteRenderer[] eSprites = enemyInfo != null ? enemyInfo.GetComponentsInChildren<SpriteRenderer>(true) : new SpriteRenderer[0];
+            int[] eOrigSpriteSorts = new int[eSprites.Length];
+            string[] eOrigSpriteLayers = new string[eSprites.Length];
+            for (int i = 0; i < eSprites.Length; i++)
+            {
+                eOrigSpriteSorts[i] = eSprites[i].sortingOrder;
+                eOrigSpriteLayers[i] = eSprites[i].sortingLayerName;
+                eSprites[i].sortingLayerName = "UI";
+                eSprites[i].sortingOrder = 30000 + i;
+            }
+
+            // 勝者のHPゲージへパーティクルが吸い込まれる演出
+            Transform winnerTransform = isLocalPlayerWin ? playerInfo?.transform : enemyInfo?.transform;
+            if (winnerTransform != null)
+            {
+                StartCoroutine(SpawnAbsorbParticles(containerRt, scoreTextRt.position, winnerTransform.position));
+            }
 
             // 画像のように、一枚絵としてプレイヤーにしばらく見せつけつつHPを増減させる
             float holdTime = 3.5f;
@@ -233,6 +312,59 @@ namespace KillingMahjong.UI
             
             if (playerInfo != null) playerInfo.SetHP(newLocalHp);
             if (enemyInfo != null) enemyInfo.SetHP(newEnemyHp);
+
+            // HP UIの並び順を元に戻す
+            for (int i = 0; i < pCanvases.Length; i++)
+            {
+                if (pCanvases[i] != null)
+                {
+                    if (pCanvases[i] == pRootCanvas && pAddedRootCanvas)
+                    {
+                        Destroy(pCanvases[i]);
+                    }
+                    else
+                    {
+                        pCanvases[i].overrideSorting = pOrigOverrides[i];
+                        pCanvases[i].sortingLayerName = pOrigLayers[i];
+                        pCanvases[i].sortingOrder = pOrigSorts[i];
+                    }
+                }
+            }
+
+            for (int i = 0; i < eCanvases.Length; i++)
+            {
+                if (eCanvases[i] != null)
+                {
+                    if (eCanvases[i] == eRootCanvas && eAddedRootCanvas)
+                    {
+                        Destroy(eCanvases[i]);
+                    }
+                    else
+                    {
+                        eCanvases[i].overrideSorting = eOrigOverrides[i];
+                        eCanvases[i].sortingLayerName = eOrigLayers[i];
+                        eCanvases[i].sortingOrder = eOrigSorts[i];
+                    }
+                }
+            }
+
+            for (int i = 0; i < pSprites.Length; i++)
+            {
+                if (pSprites[i] != null)
+                {
+                    pSprites[i].sortingLayerName = pOrigSpriteLayers[i];
+                    pSprites[i].sortingOrder = pOrigSpriteSorts[i];
+                }
+            }
+
+            for (int i = 0; i < eSprites.Length; i++)
+            {
+                if (eSprites[i] != null)
+                {
+                    eSprites[i].sortingLayerName = eOrigSpriteLayers[i];
+                    eSprites[i].sortingOrder = eOrigSpriteSorts[i];
+                }
+            }
 
             // 終了処理
             Destroy(container);
@@ -262,6 +394,56 @@ namespace KillingMahjong.UI
             rt.anchoredPosition3D = Vector3.zero;
             rt.localRotation = Quaternion.identity;
             rt.localScale = new Vector3(tileScale, tileScale, 1f);
+        }
+
+        private IEnumerator SpawnAbsorbParticles(RectTransform containerRt, Vector3 startPos, Vector3 endPos)
+        {
+            int count = 15;
+            for (int i = 0; i < count; i++)
+            {
+                if (containerRt == null) break;
+                
+                GameObject p = new GameObject("AbsorbParticle");
+                p.transform.SetParent(containerRt, false);
+                Image img = p.AddComponent<Image>();
+                img.sprite = bloodSplatterSprite;
+                img.color = new Color(1f, 0.2f, 0.2f, 0.8f);
+                
+                RectTransform rt = p.GetComponent<RectTransform>();
+                rt.sizeDelta = new Vector2(80, 80);
+                rt.position = startPos;
+                
+                StartCoroutine(AnimateParticle(rt, startPos, endPos));
+                yield return new WaitForSeconds(0.08f);
+            }
+        }
+
+        private IEnumerator AnimateParticle(RectTransform rt, Vector3 startPos, Vector3 endPos)
+        {
+            float t = 0;
+            float duration = 0.6f;
+            
+            // 弧を描くように軌道を少し散らす
+            Vector3 midPoint = (startPos + endPos) / 2f;
+            midPoint.y += UnityEngine.Random.Range(50f, 250f);
+            midPoint.x += UnityEngine.Random.Range(-250f, 250f);
+            
+            while (t < duration)
+            {
+                if (rt == null) break;
+                float progress = t / duration;
+                
+                // ベジェ曲線
+                Vector3 m1 = Vector3.Lerp(startPos, midPoint, progress);
+                Vector3 m2 = Vector3.Lerp(midPoint, endPos, progress);
+                rt.position = Vector3.Lerp(m1, m2, progress);
+                
+                rt.localScale = Vector3.Lerp(Vector3.one, Vector3.one * 0.2f, progress);
+                
+                t += Time.deltaTime;
+                yield return null;
+            }
+            if (rt != null) Destroy(rt.gameObject);
         }
 
         // --- Tester Context Menu ---

@@ -16,6 +16,24 @@ namespace KillingMahjong.UI
         private int _currentRoundIndex = 1;
         private bool _waitingForOpponentRonAnimation = false;
         private bool _isCarryOverNextRound = false;
+        private float _fallbackTimer = 0f;
+
+        private void Update()
+        {
+            if (_waitingForOpponentRonAnimation)
+            {
+                _fallbackTimer += Time.deltaTime;
+                if (_fallbackTimer > 5f)
+                {
+                    Debug.LogWarning("[GameUIPhaseController] 相手のロン進行メッセージが届きませんでした。フォールバックで強制進行します。");
+                    HandleNextRoundWaitingReceived();
+                }
+            }
+            else
+            {
+                _fallbackTimer = 0f;
+            }
+        }
 
         public void Setup(GameUIManager manager)
         {
@@ -483,6 +501,15 @@ namespace KillingMahjong.UI
             {
                 _waitingForOpponentRonAnimation = true;
                 Debug.Log("[GameUIPhaseController] 相手のロン成立。相手がロンボタンを押すのを待機します。");
+            }
+        }
+
+        public void HandleGameEnded()
+        {
+            if (_waitingForOpponentRonAnimation)
+            {
+                Debug.Log("[GameUIPhaseController] ゲーム終了を受信しました。相手のロンアクション送信を待たずに即座にロン演出を開始します。");
+                HandleNextRoundWaitingReceived();
             }
         }
 

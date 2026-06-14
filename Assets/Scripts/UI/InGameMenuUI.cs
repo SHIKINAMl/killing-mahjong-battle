@@ -46,7 +46,10 @@ namespace KillingMahjong.UI
             var wsClient = FindFirstObjectByType<WebSocketGameClientSample>();
             if (wsClient != null && wsClient.IsConnected)
             {
-                // 明示的な切断メッセージを送信（Python側で必要な場合）
+                // PythonサーバーはWebSocketの切断を検知して自動で処理するため、
+                // 未定義の "leave" メッセージを送信すると Unknown type エラーになります。
+                // そのため明示的なメッセージ送信は行わず、切断のみを実行します。
+                /*
                 if (!string.IsNullOrEmpty(disconnectActionType))
                 {
                     string json = $"{{\"type\":\"{disconnectActionType}\"}}";
@@ -55,6 +58,7 @@ namespace KillingMahjong.UI
                     // 少し待機してメッセージの送信を確実にする
                     await Task.Delay(100);
                 }
+                */
                 
                 // WebSocketを閉じる
                 await wsClient.DisconnectAsync();

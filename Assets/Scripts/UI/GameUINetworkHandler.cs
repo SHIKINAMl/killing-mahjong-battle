@@ -33,6 +33,7 @@ namespace KillingMahjong.UI
                 NetworkMessageHandler.Instance.OnDraw += HandleDraw;
                 NetworkMessageHandler.Instance.OnBettingComplete += HandleBettingComplete;
                 NetworkMessageHandler.Instance.OnError += HandleError;
+                NetworkMessageHandler.Instance.OnGameEnded += HandleGameEnded;
                 NetworkMessageHandler.Instance.OnSpecialVictoryWon += HandleSpecialVictoryWon;
             }
         }
@@ -56,7 +57,16 @@ namespace KillingMahjong.UI
                 NetworkMessageHandler.Instance.OnDraw -= HandleDraw;
                 NetworkMessageHandler.Instance.OnBettingComplete -= HandleBettingComplete;
                 NetworkMessageHandler.Instance.OnError -= HandleError;
+                NetworkMessageHandler.Instance.OnGameEnded -= HandleGameEnded;
                 NetworkMessageHandler.Instance.OnSpecialVictoryWon -= HandleSpecialVictoryWon;
+            }
+        }
+
+        private void HandleGameEnded(int localScore, int enemyScore)
+        {
+            if (uiManager.PhaseController != null)
+            {
+                uiManager.PhaseController.HandleGameEnded();
             }
         }
 
