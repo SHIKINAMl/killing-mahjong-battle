@@ -1,6 +1,7 @@
 import asyncio
 import heapq
 import logging
+import random
 import traceback
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Set
 
@@ -159,6 +160,27 @@ class GameSession:
 		confirmed = self._confirmed_hand_players_by_match.get(match_id, set())
 		return len(confirmed) >= engine.num_players
 
+	def _apply_opening_boosts(self, engine: GameEngine) -> List[Dict[str, Any]]:
+		"""ゲーム開始時に各プレイヤーへ恒常強化を1つずつ付与する。"""
+		candidates = GameEngine.get_opening_boost_candidates()
+		if not candidates:
+			return []
+
+		assigned: List[Dict[str, Any]] = []
+		for player in engine.state.players:
+			yaku_name = random.choice(candidates)
+			if not engine.assign_opening_boost(player, yaku_name, bonus_han=1):
+				continue
+			assigned.append(
+				{
+					"client_id": player.player_id,
+					"yaku_name": yaku_name,
+					"bonus_han": 1,
+				}
+			)
+
+		return assigned
+
 	async def start_match(self, match: Any) -> None:
 		try:
 			await self._start_match_inner(match)
@@ -179,6 +201,7 @@ class GameSession:
 
 		engine.on_discard_started = self._create_task_callback(self.on_discard_started, match.match_id)
 		engine.on_discarded = self._create_task_callback(self.on_discarded, match.match_id)
+		engine.on_agari_pending = self._create_task_callback(self.on_agari_pending, match.match_id)
 		engine.on_skill_casted = self._create_task_callback(self.on_skill_casted, match.match_id)
 
 		def _on_round_start() -> None:
@@ -232,6 +255,19 @@ class GameSession:
 
 		self._game_engines[match.match_id] = engine
 		logger.info("マッチ開始: match_id=%s  players=%s", match.match_id, match.players)
+
+		opening_boosts = self._apply_opening_boosts(engine)
+		if opening_boosts:
+			await self._broadcast_match_members(
+				match.match_id,
+				{
+					"type": "opening_boost_assigned",
+					"data": {
+						"boosts": opening_boosts,
+					},
+				},
+			)
+
 		engine.start_game(1000)
 
 	async def handle_game_action(self, client_id: str, data: Dict[str, Any]) -> None:
@@ -253,17 +289,21 @@ class GameSession:
 		if not action_type:
 			await self._send_error(client_id, "No action type specified")
 			return
+		if action_data is None:
+			action_data = {}
 		if not isinstance(action_data, dict):
 			await self._send_error(client_id, "Invalid action data")
 			return
 
 		action_handlers = {
+			"status": self._status,
 			"is_tenpai": self._is_tenpai,
 			"skill": self._skill,
 			"select": self._select,
 			"select_confirm": self._select_confirm,
 			"bet": self._bet,
 			"discard": self._discard,
+			"agari": self._agari,
 			"next_round": self._next_round,
 		}
 		handler = action_handlers.get(action_type)
@@ -278,6 +318,56 @@ class GameSession:
 			logger.error("アクション処理中に例外: client=%s  action=%s\n%s",
 				client_id, action_type, tb)
 			await self._send_error(client_id, f"Internal error while processing '{action_type}'")
+
+	def _serialize_round_state(self, engine: GameEngine) -> Dict[str, Any]:
+		round_state = engine.state.round_state
+		return {
+			"round_number": round_state.round_number,
+			"current_player_index": round_state.current_player_index,
+			"first_player_index": round_state.first_player_index,
+			"status": round_state.status.value if round_state.status else None,
+			"dora_id": round_state.dora_id,
+			"reserved_tiles": list(round_state.reserved_tiles),
+		}
+
+	def _serialize_player_state(self, player: PlayerState) -> Dict[str, Any]:
+		return {
+			"player_id": player.player_id,
+			"hand": list(player.hand),
+			"wall": list(player.wall),
+			"waits": list(player.waits),
+			"discards": list(player.discards),
+			"discarded_wall_indexes": sorted(player.discarded_wall_indexes),
+			"health": player.health,
+			"bet": player.bet,
+			"special_victory_count": player.special_victory_count,
+			"boost_hand_bonus": dict(player.boost_hand_bonus),
+			"exposed_hand_indexes": sorted(player.exposed_hand_indexes),
+		}
+
+	async def _status(self, engine: GameEngine, client_id: str, _action_data: Dict[str, Any]) -> None:
+		"""状態取得アクションの処理"""
+		player = engine.get_player_by_id(client_id)
+		if player is None:
+			await self._send_error(client_id, "Player not found")
+			return
+
+		opponent = next((p for p in engine.state.players if p.player_id != client_id), None)
+		all_player_states = [self._serialize_player_state(p) for p in engine.state.players]
+
+		await self._respond_to_client(
+			client_id,
+			{
+				"type": "status",
+				"data": {
+					"game_state": engine.get_game_state(),
+					"round_state": self._serialize_round_state(engine),
+					"player_state": self._serialize_player_state(player),
+					"opponent_player_state": self._serialize_player_state(opponent) if opponent else None,
+					"player_states": all_player_states,
+				},
+			},
+		)
 
 	async def _is_tenpai(self, engine: GameEngine, client_id: str, action_data: Dict[str, Any]) -> None:
 		"""手牌の聴牌判定の処理"""
@@ -392,7 +482,7 @@ class GameSession:
 		elif skill_type == SkillType.MULLIGAN:
 			# 交換対象インデックスを検証
 			target_index = action_data.get("target_hand_index")
-			if not isinstance(target_index, int) or target_index < 0 or target_index >= len(user.hand):
+			if not isinstance(target_index, int) or target_index < 0 or target_index >= len(user.wall):
 				return None
 			return engine.use_mulligan(user, target_index)
 
@@ -552,6 +642,10 @@ class GameSession:
 		if not await self._ensure_phase(engine, client_id, RoundStatus.DISCARD, "discard"):
 			return
 
+		if engine.get_pending_agari() is not None:
+			await self._send_error(client_id, "和了入力待ち中のため打牌できません")
+			return
+
 		player = engine.get_current_player()
 		if player.player_id != client_id:
 			await self._send_error(client_id, f"現在の手番ではありません (current_player={player.player_id})")
@@ -587,6 +681,37 @@ class GameSession:
 				"liquidation": liquidation_result,
 			},
 		})
+
+	async def _agari(self, engine: GameEngine, client_id: str, action_data: Dict[str, Any]) -> None:
+		"""和了入力アクションの処理"""
+		if not await self._ensure_phase(engine, client_id, RoundStatus.DISCARD, "agari"):
+			return
+
+		if engine.get_player_by_id(client_id) is None:
+			await self._send_error(client_id, "Player not found")
+			return
+
+		accept = action_data.get("accept", True)
+		if not isinstance(accept, bool):
+			await self._send_error(client_id, f"accept は bool で必要です (got={type(accept).__name__})")
+			return
+
+		result = engine.resolve_pending_agari(client_id, accept)
+		if result is None:
+			await self._send_error(client_id, "和了入力待ちが存在しないか、操作権限がありません")
+			return
+
+		await self._respond_to_client(
+			client_id,
+			{
+				"type": "agari_accepted",
+				"data": {
+					"accepted": accept,
+					"is_win": bool(result),
+					"liquidation": engine.get_last_liquidation_result() if result else None,
+				},
+			},
+		)
 
 	async def _next_round(self, engine: GameEngine, client_id: str, _action_data: Dict[str, Any]) -> None:
 		"""次局進行承認アクションの処理"""
@@ -756,9 +881,40 @@ class GameSession:
 			},
 		)
 
-	async def on_skill_casted(self, match_id: str, player_id: str, skill_type: SkillType, cost: int, exposed_indexes: set) -> None:
+	async def on_agari_pending(self, match_id: str, winner_id: str, loser_id: str, tile_id: int) -> None:
+		"""和了入力待ち発生時の処理"""
+		await self._broadcast_match_members(
+			match_id,
+			{
+				"type": "agari_pending",
+				"data": {
+					"winner_id": winner_id,
+					"loser_id": loser_id,
+					"tile": tile_id,
+				},
+			},
+		)
+
+	async def on_skill_casted(self, match_id: str, player_id: str, skill_type: SkillType, cost: int, exposed_indexes: Any) -> None:
 		"""スキル使用時の処理"""
 		player = self._game_engines[match_id].get_player_by_id(player_id)
+
+		exposed_by_player: Dict[str, List[int]] = {}
+		exposed_flat: List[int] = []
+		if isinstance(exposed_indexes, dict):
+			for cid, indexes in exposed_indexes.items():
+				try:
+					normalized = sorted(int(i) for i in indexes)
+				except Exception:
+					normalized = []
+				exposed_by_player[str(cid)] = normalized
+				exposed_flat.extend(normalized)
+			exposed_flat = sorted(set(exposed_flat))
+		elif exposed_indexes:
+			try:
+				exposed_flat = sorted(int(i) for i in exposed_indexes)
+			except Exception:
+				exposed_flat = []
 
 		await self._broadcast_match_members(
 			match_id,
@@ -769,7 +925,8 @@ class GameSession:
 					"skillType": skill_type.value,
 					"cost": cost,
 					"health": player.health if player else None,
-					"exposedHandIndexes": list(exposed_indexes) if exposed_indexes else [],
+					"exposedHandIndexes": exposed_flat,
+					"exposedHandIndexesByPlayer": exposed_by_player,
 				},
 			},
 		)

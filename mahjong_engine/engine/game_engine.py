@@ -32,6 +32,7 @@ class GameEngine:
         self._carry_over_bets = False
         self._last_liquidation_result: Optional[dict] = None
         self._next_round_ready_players: set[str] = set()
+        self._pending_agari: Optional[dict] = None
 
         # 各種コールバック
         # 準備フェーズ
@@ -42,7 +43,8 @@ class GameEngine:
         # 打牌フェーズ
         self.on_discard_started: Optional[Callable[[], None]] = None
         self.on_discarded: Optional[Callable[[str, int], None]] = None
-        self.on_skill_casted: Optional[Callable[[str, SkillType, int, set], None]] = None
+        self.on_agari_pending: Optional[Callable[[str, str, int], None]] = None
+        self.on_skill_casted: Optional[Callable[[str, SkillType, int, dict], None]] = None
         self.on_special_victory_won: Optional[Callable[[str], None]] = None  # player_id
 
         self.on_round_start: Optional[Callable[[], None]] = None
@@ -113,6 +115,7 @@ class GameEngine:
             player.hand = _to_wall_indexes(wall, hand_tiles)  # 手牌例を wall index で保持
 
         self.state.round_state.dora_id = self.tile_wall.dora_id
+        self._pending_agari = None
 
         self._invoke_callback(self.on_dealt)
 
@@ -219,7 +222,7 @@ class GameEngine:
     # ========== スキル処理 ==========
 
     @staticmethod
-    def normalize_boost_target_yaku_name(yaku_name: str) -> Optional[str]:
+    def normalize_boost_target_yaku_name(yaku_name: str, allow_blocked: bool = False) -> Optional[str]:
         """BOOST_HAND の入力役名を正規化する。`役名` / `役名+N` / `(役名)+N` を許可。"""
         if not isinstance(yaku_name, str):
             return None
@@ -234,6 +237,15 @@ class GameEngine:
 
         if base_name.startswith("(") and base_name.endswith(")") and len(base_name) > 2:
             base_name = base_name[1:-1].strip()
+
+        # 立直・ドラ・赤ドラは BOOST_HAND の強化対象外
+        blocked_yaku_names = {
+            Yaku.RICHI.japanese_name,
+            Yaku.DORA.japanese_name,
+            Yaku.AKA_DORA.japanese_name,
+        }
+        if not allow_blocked and base_name in blocked_yaku_names:
+            return None
 
         if Yaku.get_han_by_name(base_name) == -1:
             return None
@@ -251,6 +263,36 @@ class GameEngine:
                 continue
             normalized[base_name] = normalized.get(base_name, 0) + count
         return normalized
+
+    def _effective_boost_bonus_map(self, player: PlayerState) -> dict[str, int]:
+        """役強化ボーナス辞書を返す。"""
+        return self._normalized_boost_bonus_map(player)
+
+    @staticmethod
+    def get_opening_boost_candidates() -> list[str]:
+        """開始時恒常強化の候補役（1翻/2翻）を返す。"""
+        blocked_yaku_names = {
+            Yaku.RICHI.japanese_name,
+            Yaku.DORA.japanese_name,
+            Yaku.AKA_DORA.japanese_name,
+        }
+        return [
+            yaku.japanese_name
+            for yaku in Yaku
+            if yaku.han in (1, 2) and yaku.japanese_name not in blocked_yaku_names
+        ]
+
+    def assign_opening_boost(self, player: PlayerState, yaku_name: str, bonus_han: int = 1) -> bool:
+        """プレイヤーに開始時恒常強化を付与する。"""
+        if not isinstance(bonus_han, int) or bonus_han <= 0:
+            return False
+
+        normalized_name = self.normalize_boost_target_yaku_name(yaku_name)
+        if normalized_name is None:
+            return False
+
+        player.boost_hand_bonus[normalized_name] = player.boost_hand_bonus.get(normalized_name, 0) + bonus_han
+        return True
 
     def _build_display_yaku_list(self, yaku_list: list[str], bonus_map: dict[str, int]) -> list[str]:
         """表示用役名を `役名+回数` 形式で組み立てる。"""
@@ -324,7 +366,9 @@ class GameEngine:
 
         elif skill_type == SkillType.MULLIGAN:
             target_index = options.get("target_hand_index")
-            if not isinstance(target_index, int) or target_index < 0 or target_index >= len(user.hand):
+            if not isinstance(target_index, int) or target_index < 0 or target_index >= len(user.wall):
+                return True
+            if target_index in user.discarded_wall_indexes:
                 return True
             # 予備牌チェック
             if not self.state.round_state.reserved_tiles:
@@ -333,17 +377,20 @@ class GameEngine:
         elif skill_type == SkillType.PERSPECTIVE:
             if target is None:
                 return True
+            unrevealed_indexes = [idx for idx in target.hand if idx not in target.exposed_hand_indexes]
+            if not unrevealed_indexes:
+                return True
 
         return False
 
-    def _apply_skill_effect(self, user: PlayerState, skill_type: SkillType, target: PlayerState | None, options: dict) -> set:
+    def _apply_skill_effect(self, user: PlayerState, skill_type: SkillType, target: PlayerState | None, options: dict) -> dict:
         """
         スキル効果を適用し、公開牌セットを返す
 
         Returns:
-            公開された牌のセット（PERSPECTIVE の場合）
+            公開された牌インデックス（PERSPECTIVE の場合は player_id ごとの辞書）
         """
-        exposed_tiles = set()
+        exposed_tiles: dict[str, set[int]] = {}
 
         if skill_type == SkillType.SPECIAL_VICTORY:
             user.special_victory_count += 1
@@ -355,20 +402,35 @@ class GameEngine:
             user.boost_hand_bonus[yaku_name] = user.boost_hand_bonus.get(yaku_name, 0) + 1
 
         elif skill_type == SkillType.PERSPECTIVE:
-            if target and target.hand:
-                exposed = random.sample(target.hand, min(3, len(target.hand)))
-                target.exposed_hand_indexes.update(exposed)
-                exposed_tiles = target.exposed_hand_indexes
+            participants = [user]
+            if target is not None and target.player_id != user.player_id:
+                participants.append(target)
+
+            for participant in participants:
+                if not participant.hand:
+                    continue
+
+                unrevealed_indexes = [
+                    idx for idx in participant.hand
+                    if idx not in participant.exposed_hand_indexes
+                ]
+                if not unrevealed_indexes:
+                    exposed_tiles[participant.player_id] = set(participant.exposed_hand_indexes)
+                    continue
+
+                exposed = random.sample(unrevealed_indexes, min(3, len(unrevealed_indexes)))
+                participant.exposed_hand_indexes.update(exposed)
+                exposed_tiles[participant.player_id] = set(participant.exposed_hand_indexes)
 
         elif skill_type == SkillType.MULLIGAN:
             target_index = options["target_hand_index"]
-            # user.hand は wall 内インデックスのリスト
-            wall_idx = user.hand[target_index]
+            # target_hand_index は wall 内インデックス(0-33)として扱う
+            wall_idx = target_index
             old_tile_id = user.wall[wall_idx]
             new_tile_id = random.choice(self.state.round_state.reserved_tiles)
             self.state.round_state.reserved_tiles.remove(new_tile_id)
             self.state.round_state.reserved_tiles.append(old_tile_id)
-            # wall 内の牌を差し替える（hand[target_index] が指す wall_idx は変わらない）
+            # wall 内の指定位置の牌を差し替える
             user.wall[wall_idx] = new_tile_id
 
         return exposed_tiles
@@ -407,7 +469,7 @@ class GameEngine:
 
         Args:
             player: プレイヤー
-            target_hand_index: 交換対象の手牌インデックス（0-12）
+            target_hand_index: 交換対象の wall 内インデックス（0-33）
 
         Returns:
             実際に支払ったHP コスト。失敗時は None
@@ -425,6 +487,10 @@ class GameEngine:
         Returns:
             捨てた牌で上がりが成立した場合は True、それ以外は False
         """
+        if self._pending_agari is not None:
+            logger.warning("和了入力待ち中のため打牌不可: pending=%s", self._pending_agari)
+            return False
+
         # 打牌開始時に直近の精算結果をクリア
         self._last_liquidation_result = None
 
@@ -445,50 +511,88 @@ class GameEngine:
             None,
         )
 
-        # ロン判定用に、相手の手牌を wall 基準 index から牌 ID に変換して保持する
-        winning_hand_tiles: list[int] | None = None
-        if winning_player is not None:
-            try:
-                winning_hand_tiles = [winning_player.wall[idx] for idx in winning_player.hand]
-            except (IndexError, TypeError) as exc:
-                logger.error(
-                    "相手手牌 index 変換失敗: winner_candidate=%s hand=%s wall_len=%d error=%s",
-                    winning_player.player_id,
-                    winning_player.hand,
-                    len(winning_player.wall),
-                    exc,
-                )
-
         discarded_tile = discarding_player.wall[wall_index]
         discarding_player.discards.append(discarded_tile)
         discarding_player.discarded_wall_indexes.add(wall_index)
 
         self._invoke_callback(self.on_discarded, player_id, discarded_tile)
 
-        # 打牌後、相手の待ち牌なら即座にロン判定
+        # 打牌後、相手の待ち牌なら和了入力待ちへ移行
         discarded_tile_base = discarded_tile & 0b11111
         winning_waits = []
         if winning_player is not None:
             winning_waits = [tile & 0b11111 for tile in winning_player.waits]
 
-        if winning_player is not None and winning_hand_tiles is not None and discarded_tile_base in winning_waits:
+        if winning_player is not None and discarded_tile_base in winning_waits:
             logger.info(
-                "ロン判定: discarder=%s winner=%s tile=%d tile_base=%d",
+                "和了入力待ち: discarder=%s winner=%s tile=%d tile_base=%d",
                 player_id,
                 winning_player.player_id,
                 discarded_tile,
                 discarded_tile_base,
             )
-            if self.liquidation(
+            self._pending_agari = {
+                "winner_id": winning_player.player_id,
+                "loser_id": player_id,
+                "winning_tile": discarded_tile,
+            }
+            self._invoke_callback(
+                self.on_agari_pending,
                 winning_player.player_id,
-                winning_hand_tiles + [discarded_tile],
-                winning_tile=discarded_tile,
-            ):
-                return True
+                player_id,
+                discarded_tile,
+            )
+            return False
 
         if all(len(player.discards) >= 16 for player in self.state.players):
             logger.info(
                 "流局: all players reached 16 discards (%s)",
+                {player.player_id: len(player.discards) for player in self.state.players},
+            )
+            self.end_round(is_draw=True)
+            return False
+
+        self._advance_player()
+        return False
+
+    def get_pending_agari(self) -> Optional[dict]:
+        """和了入力待ち情報を取得する。"""
+        return dict(self._pending_agari) if self._pending_agari is not None else None
+
+    def resolve_pending_agari(self, player_id: str, accept: bool) -> Optional[bool]:
+        """和了入力待ちを解決する。accept=True で精算、False で見送り。"""
+        pending = self._pending_agari
+        if pending is None:
+            return None
+
+        if pending.get("winner_id") != player_id:
+            return None
+
+        self._pending_agari = None
+        winning_tile = pending.get("winning_tile")
+
+        if accept:
+            winner = self.get_player_by_id(player_id)
+            if winner is None:
+                return False
+
+            try:
+                winning_hand_tiles = [winner.wall[idx] for idx in winner.hand]
+            except (IndexError, TypeError) as exc:
+                logger.error(
+                    "和了解決時の手牌 index 変換失敗: winner=%s hand=%s wall_len=%d error=%s",
+                    winner.player_id,
+                    winner.hand,
+                    len(winner.wall),
+                    exc,
+                )
+                return False
+
+            return self.liquidation(player_id, winning_hand_tiles + [winning_tile], winning_tile=winning_tile)
+
+        if all(len(player.discards) >= 16 for player in self.state.players):
+            logger.info(
+                "和了見送り後に流局: all players reached 16 discards (%s)",
                 {player.player_id: len(player.discards) for player in self.state.players},
             )
             self.end_round(is_draw=True)
@@ -588,7 +692,13 @@ class GameEngine:
         is_win = HandAnalyzer.is_win(hand)
         base_yaku_list = HandAnalyzer.enum_yaku(hand, winning_tile=winning_tile)
         base_yaku_list += self._get_win_context_yaku(winner, loser, winning_tile, base_yaku_list)
-        is_mangan = sum(Yaku.get_han_by_name(name) for name in base_yaku_list) >= 4
+
+        # 満貫判定にはスキルによる翻上昇分も含める
+        boost_bonus_map = self._effective_boost_bonus_map(winner)
+        base_han = sum(Yaku.get_han_by_name(name) for name in base_yaku_list)
+        bonus_han = sum(boost_bonus_map.get(name, 0) for name in base_yaku_list)
+        han = base_han + bonus_han
+        is_mangan = han >= 4
         if not is_win or not is_mangan:
             logger.debug("上がり条件不成立: player=%s  is_win=%s  check_mangan=%s", player_id, is_win, is_mangan)
             return False
@@ -596,12 +706,7 @@ class GameEngine:
         is_tanki_wait = self._is_tanki_wait_agari(hand, winning_tile, winner.waits)
 
         # 役倍率（跳満 1.5倍 / 倍満 2倍 / 三倍満 3倍 / 役満 4倍）
-        boost_bonus_map = self._normalized_boost_bonus_map(winner)
-        base_han = sum(Yaku.get_han_by_name(name) for name in base_yaku_list)
-        bonus_han = sum(boost_bonus_map.get(name, 0) for name in base_yaku_list)
         display_yaku_list = self._build_display_yaku_list(base_yaku_list, boost_bonus_map)
-
-        han = base_han + bonus_han
         multiplier = self._get_liquidation_multiplier(han)
         logger.info("精算: winner=%s  yaku=%s  base_han=%d  bonus_han=%d  multiplier=%.1f",
                     winner.player_id, display_yaku_list, base_han, bonus_han, multiplier)
@@ -641,6 +746,7 @@ class GameEngine:
     def _prepare_next_round(self) -> None:
         """次局開始に必要な状態を準備する。"""
         self.state.round_state.round_number += 1
+        self._pending_agari = None
         self.state.players = [
             PlayerState(
                 player_id=p.player_id,
@@ -775,7 +881,7 @@ class GameEngine:
         waits = [w+32 if w == self.state.round_state.dora_id else w for w in waits]
 
         result = []
-        boost_bonus_map = self._normalized_boost_bonus_map(player)
+        boost_bonus_map = self._effective_boost_bonus_map(player)
         for w in waits:
             base_yaku_list = HandAnalyzer.enum_yaku(hand_tiles + [w], winning_tile=w)
             base_han = sum(Yaku.get_han_by_name(y) for y in base_yaku_list)
