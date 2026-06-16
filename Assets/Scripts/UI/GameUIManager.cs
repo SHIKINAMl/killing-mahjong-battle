@@ -8,6 +8,13 @@ namespace KillingMahjong.UI
 {
     public class GameUIManager : MonoBehaviour
     {
+        [Header("Phase UI Containers")]
+        [SerializeField] private GameObject handSelectionPhaseContainer;
+        [SerializeField] private GameObject discardPhaseContainer;
+        [SerializeField] private GameObject gameEndContainer;
+
+        private AgariSelectionUI agariSelectionUI;
+
         [Header("UI Components")]
         [SerializeField] private HandUI handUI;
         [SerializeField] private WallUI wallUI;
@@ -99,6 +106,9 @@ namespace KillingMahjong.UI
             {
                 NetworkMessageHandler.Instance.OnTileDiscarded += HandleDiscardEvent;
                 NetworkMessageHandler.Instance.OnGameEnded += HandleGameEnded;
+                NetworkMessageHandler.Instance.OnStatusReceived += HandleStatusReceived;
+                NetworkMessageHandler.Instance.OnAgariPendingReceived += HandleAgariPendingReceived;
+                NetworkMessageHandler.Instance.OnOpeningBoostAssigned += HandleOpeningBoostAssigned;
             }
         }
 
@@ -112,6 +122,9 @@ namespace KillingMahjong.UI
             {
                 NetworkMessageHandler.Instance.OnTileDiscarded -= HandleDiscardEvent;
                 NetworkMessageHandler.Instance.OnGameEnded -= HandleGameEnded;
+                NetworkMessageHandler.Instance.OnStatusReceived -= HandleStatusReceived;
+                NetworkMessageHandler.Instance.OnAgariPendingReceived -= HandleAgariPendingReceived;
+                NetworkMessageHandler.Instance.OnOpeningBoostAssigned -= HandleOpeningBoostAssigned;
             }
         }
 
@@ -137,6 +150,18 @@ namespace KillingMahjong.UI
             }
             if (waitUI != null) waitUI.gameObject.SetActive(false);
             
+            if (agariSelectionUI == null)
+            {
+                var go = new GameObject("AgariSelectionUI");
+                go.transform.SetParent(transform, false);
+                var rt = go.AddComponent<RectTransform>();
+                rt.anchorMin = new Vector2(0.5f, 0.5f);
+                rt.anchorMax = new Vector2(0.5f, 0.5f);
+                rt.anchoredPosition = Vector2.zero;
+                agariSelectionUI = go.AddComponent<AgariSelectionUI>();
+                agariSelectionUI.Hide();
+            }
+
             if (PhaseController != null) PhaseController.SetMatchUIVisibility(false);
             if (riverUI != null) riverUI.gameObject.SetActive(false);
             if (enemyRiverUI != null) enemyRiverUI.gameObject.SetActive(false);
@@ -325,6 +350,41 @@ namespace KillingMahjong.UI
         public void OnTileHoverExit(TileInteraction interaction)
         {
             // Do nothing
+        }
+
+
+        private void HandleStatusReceived(KillingMahjong.EngineData.StatusData data)
+        {
+            if (yakuListUI != null)
+            {
+                yakuListUI.UpdateBoostData(BoardStateManager.Instance.LocalBoostHandBonus, BoardStateManager.Instance.EnemyBoostHandBonus);
+            }
+        }
+
+        private void HandleOpeningBoostAssigned()
+        {
+            if (yakuListUI != null)
+            {
+                yakuListUI.UpdateBoostData(BoardStateManager.Instance.LocalBoostHandBonus, BoardStateManager.Instance.EnemyBoostHandBonus);
+            }
+        }
+
+        private void HandleAgariPendingReceived(KillingMahjong.EngineData.AgariPendingData data)
+        {
+            if (data.winner_id == NetworkMessageHandler.Instance.LocalPlayerId)
+            {
+                if (agariSelectionUI != null)
+                {
+                    agariSelectionUI.Show(
+                        onRonCallback: () => {
+                            SendActionToServer("agari", new KillingMahjong.Network.ActionPayload { accept = true });
+                        },
+                        onSkipCallback: () => {
+                            SendActionToServer("agari", new KillingMahjong.Network.ActionPayload { accept = false });
+                        }
+                    );
+                }
+            }
         }
 
         private void HandleTurnChanged(bool isLocalTurn)

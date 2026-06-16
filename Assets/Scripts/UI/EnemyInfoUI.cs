@@ -9,6 +9,10 @@ namespace KillingMahjong.UI
         [SerializeField] private TextMeshProUGUI hpText;
         [SerializeField] private UnityEngine.UI.Image hpFillImage; 
         private int maxHp = 20000; 
+        private int currentHp = 20000;
+        
+        [Header("Boost Bonus")]
+        [SerializeField] private TextMeshProUGUI boostBonusText; // 動的生成も可
         
         [Header("Zoom Target")]
         [SerializeField] private Transform zoomTarget; // 追加：拡大させたい子オブジェクトを指定
@@ -168,11 +172,8 @@ namespace KillingMahjong.UI
 
         public void SetHP(int hp)
         {
-            if (hpText != null)
-            {
-                // 数字のみ表示する
-                hpText.text = hp.ToString();
-            }
+            currentHp = hp;
+            if (hpText != null) hpText.text = currentHp.ToString();
             
             // 人型メーターの割合を更新する
             if (hpFillImage != null)
@@ -180,6 +181,8 @@ namespace KillingMahjong.UI
                 hpFillImage.fillAmount = (float)hp / maxHp;
             }
         }
+
+
 
         public void SetPanelVisible(bool visible)
         {

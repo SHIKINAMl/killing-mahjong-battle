@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 5904102807452564955}
   - component: {fileID: 4453216582320955405}
   - component: {fileID: 2048484995458514547}
-  - component: {fileID: 5187130022813236292}
+  - component: {fileID: 517440152390055263}
   m_Layer: 0
   m_Name: "\u5F79TextPrefab"
   m_TagString: Untagged
@@ -137,7 +137,7 @@ MonoBehaviour:
   m_hasFontAssetChanged: 1
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
---- !u!114 &5187130022813236292
+--- !u!114 &517440152390055263
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}

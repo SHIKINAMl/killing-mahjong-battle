@@ -27,6 +27,7 @@ namespace KillingMahjong.UI
                 NetworkMessageHandler.Instance.OnNotTenpaiReceived += HandleNotTenpaiReceived;
                 NetworkMessageHandler.Instance.OnNextRoundWaitingReceived += HandleNextRoundWaitingReceived;
                 NetworkMessageHandler.Instance.OnHandSelectionConfirmation += HandleHandSelectionConfirmation;
+                NetworkMessageHandler.Instance.OnHandSelectionAccepted += HandleHandSelectionAccepted;
                 NetworkMessageHandler.Instance.OnSkillCasted += HandleSkillCasted;
 
                 NetworkMessageHandler.Instance.OnAgari += HandleAgari;
@@ -51,6 +52,7 @@ namespace KillingMahjong.UI
                 NetworkMessageHandler.Instance.OnNotTenpaiReceived -= HandleNotTenpaiReceived;
                 NetworkMessageHandler.Instance.OnNextRoundWaitingReceived -= HandleNextRoundWaitingReceived;
                 NetworkMessageHandler.Instance.OnHandSelectionConfirmation -= HandleHandSelectionConfirmation;
+                NetworkMessageHandler.Instance.OnHandSelectionAccepted -= HandleHandSelectionAccepted;
                 NetworkMessageHandler.Instance.OnSkillCasted -= HandleSkillCasted;
 
                 NetworkMessageHandler.Instance.OnAgari -= HandleAgari;
@@ -108,6 +110,11 @@ namespace KillingMahjong.UI
         private void HandleHandSelectionConfirmation(HandSelectionConfirmationData data)
         {
             uiManager.HandSelectionController?.HandleHandSelectionConfirmation(data);
+        }
+
+        private void HandleHandSelectionAccepted()
+        {
+            uiManager.HandSelectionController?.OnHandSelectionAccepted();
         }
 
         private void HandleSkillCasted(SkillCastedData data)

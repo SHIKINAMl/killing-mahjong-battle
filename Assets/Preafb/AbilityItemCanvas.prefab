@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 1573012070026248505}
   - component: {fileID: 7978832920935549407}
   - component: {fileID: 2332135064188550535}
-  - component: {fileID: -7138218476514398162}
+  - component: {fileID: -679034010285197692}
   m_Layer: 0
   m_Name: CostText
   m_TagString: Untagged
@@ -76,7 +76,7 @@ MonoBehaviour:
   m_fontColor32:
     serializedVersion: 2
     rgba: 4284499184
-  m_fontColor: {r: 0.93962264, g: 0.26770383, b: 0.37536708, a: 1}
+  m_fontColor: {r: 0.9607843, g: 0.9607843, b: 0.8627451, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -137,7 +137,7 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
---- !u!114 &-7138218476514398162
+--- !u!114 &-679034010285197692
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -286,8 +286,8 @@ GameObject:
   - component: {fileID: 1588085204824072820}
   - component: {fileID: 491548588720319635}
   - component: {fileID: 779215871322346392}
-  - component: {fileID: 3729197594857824882}
-  - component: {fileID: 1932973231509457238}
+  - component: {fileID: 5503959458858641449}
+  - component: {fileID: 3349800746108555503}
   m_Layer: 0
   m_Name: AbilityItemPanel
   m_TagString: Untagged
@@ -355,7 +355,7 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
---- !u!114 &3729197594857824882
+--- !u!114 &5503959458858641449
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -368,9 +368,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
   m_EffectColor: {r: 0.9607843, g: 0.9607843, b: 0.8627451, a: 1}
-  m_EffectDistance: {x: 1.8000001, y: -1.8000001}
+  m_EffectDistance: {x: 1.3499999, y: -1.3499999}
   m_UseGraphicAlpha: 1
---- !u!114 &1932973231509457238
+--- !u!114 &3349800746108555503
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -383,7 +383,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Shadow
   m_EffectColor: {r: 0.101960786, g: 0.101960786, b: 0.101960786, a: 0.78431374}
-  m_EffectDistance: {x: 3.6000001, y: -3.6000001}
+  m_EffectDistance: {x: 2.6999998, y: -2.6999998}
   m_UseGraphicAlpha: 1
 --- !u!1 &2053884820958779265
 GameObject:
@@ -447,7 +447,7 @@ GameObject:
   - component: {fileID: 3068429969954261269}
   - component: {fileID: 4231694451415442405}
   - component: {fileID: 6811777840320258303}
-  - component: {fileID: 2718188287395844125}
+  - component: {fileID: -4153846259299493601}
   m_Layer: 0
   m_Name: NameText
   m_TagString: Untagged
@@ -573,7 +573,7 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
---- !u!114 &2718188287395844125
+--- !u!114 &-4153846259299493601
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -599,7 +599,7 @@ GameObject:
   - component: {fileID: 4353053980911026930}
   - component: {fileID: 789926757444376191}
   - component: {fileID: 1525709346877530644}
-  - component: {fileID: 4447424052286772518}
+  - component: {fileID: -6998622111990879268}
   m_Layer: 0
   m_Name: DescriptionText
   m_TagString: Untagged
@@ -725,7 +725,7 @@ MonoBehaviour:
   m_hasFontAssetChanged: 0
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
---- !u!114 &4447424052286772518
+--- !u!114 &-6998622111990879268
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}

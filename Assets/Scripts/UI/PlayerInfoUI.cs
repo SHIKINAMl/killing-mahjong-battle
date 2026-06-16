@@ -10,6 +10,9 @@ namespace KillingMahjong.UI
         [SerializeField] private UnityEngine.UI.Image hpFillImage; // 追加: 人型のHPメーター用画像
         private int maxHp = 20000; // 最大HP（割合計算用）
 
+        [Header("Boost Bonus")]
+        [SerializeField] private TextMeshProUGUI boostBonusText; // 動的生成も可
+
         [Header("Zoom Target")]
         [SerializeField] private Transform zoomTarget; // 追加：拡大させたい子オブジェクトを指定
         [SerializeField] private Vector2 zoomOffsetUI = new Vector2(-1200f, 100f); // UI時の移動量

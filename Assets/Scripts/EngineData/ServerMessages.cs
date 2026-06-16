@@ -86,6 +86,27 @@ namespace KillingMahjong.EngineData
     }
 
     [Serializable]
+    public class OpeningBoostAssignedMessage
+    {
+        public string type;
+        public OpeningBoostData data;
+    }
+
+    [Serializable]
+    public class OpeningBoostData
+    {
+        public OpeningBoostItem[] boosts;
+    }
+
+    [Serializable]
+    public class OpeningBoostItem
+    {
+        public string client_id;
+        public string yaku_name;
+        public int bonus_han;
+    }
+
+    [Serializable]
     public class RoundStartMessage
     {
         public string type;
@@ -207,6 +228,41 @@ namespace KillingMahjong.EngineData
     }
 
     // --- アクション応答系 ---
+
+    [Serializable]
+    public class AgariPendingMessage
+    {
+        public string type;
+        public AgariPendingData data;
+    }
+    [Serializable]
+    public class AgariPendingData
+    {
+        public string winner_id;
+        public string loser_id;
+        public int tile_id;
+    }
+
+    [Serializable]
+    public class StatusMessage
+    {
+        public string type;
+        public StatusData data;
+    }
+    [Serializable]
+    public class StatusData
+    {
+        public GameStateData game_state;
+        public RoundStateData round_state;
+        public PlayerStateData player_state;
+        public PlayerStateData opponent_player_state;
+    }
+
+    [Serializable]
+    public class RoundStateData
+    {
+        public string status;
+    }
 
     [Serializable]
     public class IsTenpaiMessage

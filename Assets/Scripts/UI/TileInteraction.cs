@@ -88,14 +88,14 @@ namespace KillingMahjong.UI
             }
             else
             {
-                if (_gameUIManager == null || !_gameUIManager.IsMulliganSelection)
+                if (_gameUIManager != null && _gameUIManager.IsMulliganSelection)
                 {
-                    Debug.Log($"[TileInteraction] Calling MoveTileToHand for TileId: {TileId}");
-                    _gameUIManager.MoveTileToHand(TileId);
+                    _gameUIManager.OnMulliganTileSelected(TileId);
                 }
                 else
                 {
-                    Debug.Log("[TileInteraction] Ignored because IsMulliganSelection is true.");
+                    Debug.Log($"[TileInteraction] Calling MoveTileToHand for TileId: {TileId}");
+                    _gameUIManager.MoveTileToHand(TileId);
                 }
             }
         }
@@ -184,7 +184,7 @@ namespace KillingMahjong.UI
             bool canHighlight = false;
             if (_gameUIManager != null && _gameUIManager.IsMulliganSelection)
             {
-                if (IsInHand && TileId != -1)
+                if (TileId != -1)
                 {
                     canHighlight = true;
                 }

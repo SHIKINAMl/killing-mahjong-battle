@@ -28,6 +28,11 @@ namespace KillingMahjong.Managers
         
         public List<int> SelectedTileIds { get; private set; } = new List<int>();
         public List<int[]> CurrentTenpaiExamples { get; private set; } = new List<int[]>();
+        
+        // 追加: 強化された役の保持
+        public Dictionary<string, int> LocalBoostHandBonus { get; set; } = new Dictionary<string, int>();
+        public Dictionary<string, int> EnemyBoostHandBonus { get; set; } = new Dictionary<string, int>();
+
         public HashSet<int> DiscardedWallIndexes { get; private set; } = new HashSet<int>();
         public List<int> TargetHandIndexes { get; set; } = null;
         public HashSet<int> HiddenTiles { get; private set; } = new HashSet<int>();
@@ -94,6 +99,8 @@ namespace KillingMahjong.Managers
             CurrentDoraId = -1;
             TargetHandIndexes = null;
             HiddenTiles.Clear();
+            ExposedEnemyHandWallIndexes.Clear();
+            ExposedLocalHandWallIndexes.Clear();
         }
 
         /// <summary>
@@ -101,7 +108,7 @@ namespace KillingMahjong.Managers
         /// </summary>
         public void SetLocalState(List<int> wall, List<int> hand, List<int> wait = null)
         {
-            if (wall != null) 
+            if (wall != null && wall.Count > 0) 
             {
                 if (OriginalWallTiles.Count == 0 || OriginalWallTiles.Count != wall.Count) 
                 {
@@ -129,7 +136,7 @@ namespace KillingMahjong.Managers
 
         public void SetEnemyState(List<int> wall, List<int> hand)
         {
-            if (wall != null)
+            if (wall != null && wall.Count > 0)
             {
                 OriginalEnemyWallTiles = new List<int>(wall);
                 List<int> displayEnemyWall = new List<int>();

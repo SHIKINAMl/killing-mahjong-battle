@@ -58,6 +58,8 @@ namespace KillingMahjong.UI
             uiManager.SendActionToServer("is_tenpai", new KillingMahjong.Network.ActionPayload { wall_indexes = _pendingHandIndexes });
         }
 
+        private bool _isCanceling = false;
+
         public void CancelHandSelection()
         {
             if (uiManager.CurrentPhaseStatus != RoundStatus.HandSelection) return;
@@ -66,6 +68,11 @@ namespace KillingMahjong.UI
             if (uiManager.HandUI != null) uiManager.HandUI.SetSubmittedState(false);
             if (uiManager.WaitUI != null) uiManager.WaitUI.gameObject.SetActive(false);
             if (uiManager.PhaseController != null) uiManager.PhaseController.SetMatchUIVisibility(true);
+
+            // 裏技: Python側のキャンセルアクションがないため、意図的に1枚の牌(非テンパイ確定)を送り
+            // サーバー側の _unmark_hand_selection_confirmed を誘発して確定状態を解除させる
+            _isCanceling = true;
+            uiManager.SendActionToServer("select", new KillingMahjong.Network.ActionPayload { hand_indexes = new System.Collections.Generic.List<int> { 0 } });
         }
 
         public void HandleIsTenpaiReceived(IsTenpaiData data)
@@ -208,11 +215,17 @@ namespace KillingMahjong.UI
 
         public void HandleHandSelectionConfirmation(HandSelectionConfirmationData data)
         {
+            if (_isCanceling)
+            {
+                _isCanceling = false;
+                return;
+            }
+
             if (_autoConfirmNextHandSelection)
             {
                 _autoConfirmNextHandSelection = false;
                 if (uiManager.HandUI != null) uiManager.HandUI.SetSubmittedState(true);
-                uiManager.SendActionToServer("select_confirm", new KillingMahjong.Network.ActionPayload { hand_indexes = data.hand_indexes, hand = _pendingHandTiles });
+                uiManager.SendActionToServer("select", new KillingMahjong.Network.ActionPayload { hand_indexes = data.hand_indexes, hand = _pendingHandTiles });
                 return;
             }
 
@@ -222,7 +235,7 @@ namespace KillingMahjong.UI
                     data.message,
                     () => {
                         if (uiManager.HandUI != null) uiManager.HandUI.SetSubmittedState(true);
-                        uiManager.SendActionToServer("select_confirm", new KillingMahjong.Network.ActionPayload { hand_indexes = data.hand_indexes, hand = _pendingHandTiles });
+                        uiManager.SendActionToServer("select", new KillingMahjong.Network.ActionPayload { hand_indexes = data.hand_indexes, hand = _pendingHandTiles });
                     },
                     () => {
                         if (uiManager.HandUI != null) uiManager.HandUI.SetSubmittedState(false);
@@ -235,7 +248,7 @@ namespace KillingMahjong.UI
             else
             {
                 if (uiManager.HandUI != null) uiManager.HandUI.SetSubmittedState(true);
-                uiManager.SendActionToServer("select_confirm", new KillingMahjong.Network.ActionPayload { hand_indexes = data.hand_indexes, hand = _pendingHandTiles });
+                uiManager.SendActionToServer("select", new KillingMahjong.Network.ActionPayload { hand_indexes = data.hand_indexes, hand = _pendingHandTiles });
             }
         }
 

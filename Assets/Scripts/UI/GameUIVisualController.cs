@@ -93,6 +93,15 @@ namespace KillingMahjong.UI
 
                 if (uiManager.HandUI != null)
                 {
+                    List<int> localExposedActualIds = new List<int>();
+                    foreach (int exposedIdx in board.ExposedLocalHandWallIndexes)
+                    {
+                        if (exposedIdx >= 0 && exposedIdx < board.OriginalWallTiles.Count)
+                        {
+                            localExposedActualIds.Add(board.OriginalWallTiles[exposedIdx]);
+                        }
+                    }
+
                     foreach (var id in board.CurrentHandTiles)
                     {
                         RectTransform rt = uiManager.WallUI.GrabTileById(id);
@@ -100,6 +109,41 @@ namespace KillingMahjong.UI
                         {
                             InitializeTileComponent(rt, id, true);
                             uiManager.HandUI.AddTileToHand(rt, id);
+                            
+                            // 自分が透視されている牌のマーク表示
+                            var visual = rt.GetComponent<TileVisual>();
+                            if (visual != null)
+                            {
+                                bool isExposed = false;
+                                if (localExposedActualIds.Contains(id))
+                                {
+                                    isExposed = true;
+                                    localExposedActualIds.Remove(id);
+                                }
+                                visual.SetExposed(isExposed);
+                            }
+                        }
+                        else
+                        {
+                            Debug.LogWarning($"[Visual] Failed to grab tile by id: {id} for Local Hand!");
+                        }
+                    }
+
+                    // 残ったWallUIの牌（手牌選択フェーズなどで全牌がWallにある場合）についても透視判定を行う
+                    foreach (var rt in uiManager.WallUI.GetWallSlots())
+                    {
+                        var interaction = rt.GetComponent<TileInteraction>();
+                        var visual = rt.GetComponent<TileVisual>();
+                        if (interaction != null && visual != null)
+                        {
+                            bool isExposed = false;
+                            if (localExposedActualIds.Contains(interaction.TileId))
+                            {
+                                isExposed = true;
+                                localExposedActualIds.Remove(interaction.TileId);
+                            }
+                            // 既に SetExposed(true) されている可能性はないが、確実に反映させる
+                            visual.SetExposed(isExposed);
                         }
                     }
                 }
@@ -188,6 +232,7 @@ namespace KillingMahjong.UI
                         if (revealThis)
                         {
                             uiManager.EnemyHandUI.RevealTileByIndex(i);
+                            // 敵の牌には目のアイコンを表示しない要望のため SetExposed(true) は行わない
                         }
                     }
                 }
@@ -225,11 +270,14 @@ namespace KillingMahjong.UI
                         RectTransform rt = obj.GetComponent<RectTransform>() ?? obj.transform as RectTransform;
                         if (rt != null) {
                             int visualId = -1; // Force hidden (-1)
-                            if (board.ExposedEnemyHandWallIndexes.Contains(i))
+                            bool isExposedInWall = board.ExposedEnemyHandWallIndexes.Contains(i);
+                            if (isExposedInWall)
                             {
                                 visualId = actualTileId; // Reveal exposed tiles even in the wall
                             }
                             InitializeTileComponent(rt, visualId, false);
+                            
+                            // 敵の壁牌には目のアイコンを表示しない要望のため SetExposed(isExposedInWall) は行わない
                             enemyWallGenerated.Add(rt);
                         }
                     }
@@ -246,11 +294,7 @@ namespace KillingMahjong.UI
                 }
             }
 
-            if (uiManager.HandUI != null && uiManager.HandUI.IsSubmitted && uiManager.HandSelectionController != null && uiManager.HandSelectionController.AutoConfirmNextHandSelection && uiManager.CurrentPhaseStatus == RoundStatus.HandSelection)
-            {
-                uiManager.PhaseController?.SetMatchUIVisibility(false);
             }
-        }
 
         public void InitializeTileComponent(RectTransform rt, int id, bool inHand)
         {

@@ -33,7 +33,10 @@ namespace KillingMahjong.Network
         public string player_id;
         public string skillType;
         public int cost;
+        public string yaku_name;
         public List<int> exposedHandIndexes;
+        // manually populated
+        public System.Collections.Generic.Dictionary<string, System.Collections.Generic.List<int>> exposedHandIndexesByPlayer;
     }
 
     [System.Serializable]
@@ -78,6 +81,8 @@ namespace KillingMahjong.Network
         public int amount;
         public List<int> hand;
         public int tile; 
+        
+        public bool accept;
     }
 
     /// <summary>
@@ -106,6 +111,9 @@ namespace KillingMahjong.Network
         public event Action<int, int> OnGameEnded; // localScore, enemyScore
         public event Action OnNextRoundWaitingReceived; // 相手からの次局待機（ロンボタン押下の合図として利用）
         
+        public event Action<StatusData> OnStatusReceived;
+        public event Action<AgariPendingData> OnAgariPendingReceived;
+        
         public event Action<string> OnError;
         public event Action<HandSelectionConfirmationData> OnHandSelectionConfirmation;
         public event Action<IsTenpaiData> OnIsTenpaiReceived;
@@ -119,6 +127,7 @@ namespace KillingMahjong.Network
 
         public event Action<SkillCastedData> OnSkillCasted;
         public event Action<string> OnSpecialVictoryWon;
+        public event Action OnOpeningBoostAssigned;
 
         private string localPlayerId = ""; // GameManager等からセットされる想定
         public string LocalPlayerId => localPlayerId;
@@ -179,6 +188,40 @@ namespace KillingMahjong.Network
 
                 switch (baseMsg.type)
                 {
+                    case "status":
+                        StatusMessage statusMsg = JsonUtility.FromJson<StatusMessage>(jsonString);
+                        if (statusMsg != null && statusMsg.data != null)
+                        {
+                            // 文字列抽出による boost_hand_bonus の簡単な取得 (JsonUtility制約回避用)
+                            if (statusMsg.data.player_state != null)
+                            {
+                                var bonusDict = ParseBoostHandBonus(jsonString, localPlayerId);
+                                if (bonusDict != null) {
+                                    Managers.BoardStateManager.Instance.LocalBoostHandBonus = bonusDict;
+                                }
+                            }
+                            if (statusMsg.data.opponent_player_state != null)
+                            {
+                                var enemyId = statusMsg.data.opponent_player_state.id;
+                                var bonusDict = ParseBoostHandBonus(jsonString, enemyId);
+                                if (bonusDict != null) {
+                                    Managers.BoardStateManager.Instance.EnemyBoostHandBonus = bonusDict;
+                                }
+                            }
+
+                            // 恒常強化された役のパース等、後でUI表示用に利用
+                            OnStatusReceived?.Invoke(statusMsg.data);
+                        }
+                        break;
+
+                    case "agari_pending":
+                        AgariPendingMessage agariPendingMsg = JsonUtility.FromJson<AgariPendingMessage>(jsonString);
+                        if (agariPendingMsg != null && agariPendingMsg.data != null)
+                        {
+                            OnAgariPendingReceived?.Invoke(agariPendingMsg.data);
+                        }
+                        break;
+
                     case "matching_waiting":
                         OnMatchmakingWaiting?.Invoke();
                         break;
@@ -201,7 +244,11 @@ namespace KillingMahjong.Network
                         SkillCastedMessage scMsg = JsonUtility.FromJson<SkillCastedMessage>(jsonString);
                         if (scMsg != null && scMsg.data != null)
                         {
+                            scMsg.data.exposedHandIndexesByPlayer = ParseExposedHandIndexesByPlayer(jsonString);
                             OnSkillCasted?.Invoke(scMsg.data);
+                            
+                            // スキル使用直後に、役の強化状況や最新のHPを確実に取り寄せる
+                            SendActionToServer("status", null);
                         }
                         break;
 
@@ -210,6 +257,29 @@ namespace KillingMahjong.Network
                         if (svwMsg != null && svwMsg.data != null)
                         {
                             OnSpecialVictoryWon?.Invoke(svwMsg.data.player_id);
+                        }
+                        break;
+
+                    case "opening_boost_assigned":
+                        OpeningBoostAssignedMessage obMsg = JsonUtility.FromJson<OpeningBoostAssignedMessage>(jsonString);
+                        if (obMsg != null && obMsg.data != null && obMsg.data.boosts != null)
+                        {
+                            foreach (var boost in obMsg.data.boosts)
+                            {
+                                if (boost.client_id == localPlayerId)
+                                {
+                                    if (Managers.BoardStateManager.Instance.LocalBoostHandBonus == null)
+                                        Managers.BoardStateManager.Instance.LocalBoostHandBonus = new System.Collections.Generic.Dictionary<string, int>();
+                                    Managers.BoardStateManager.Instance.LocalBoostHandBonus[boost.yaku_name] = boost.bonus_han;
+                                }
+                                else
+                                {
+                                    if (Managers.BoardStateManager.Instance.EnemyBoostHandBonus == null)
+                                        Managers.BoardStateManager.Instance.EnemyBoostHandBonus = new System.Collections.Generic.Dictionary<string, int>();
+                                    Managers.BoardStateManager.Instance.EnemyBoostHandBonus[boost.yaku_name] = boost.bonus_han;
+                                }
+                            }
+                            OnOpeningBoostAssigned?.Invoke();
                         }
                         break;
                         
@@ -447,6 +517,40 @@ namespace KillingMahjong.Network
             }
         }
 
+        private Dictionary<string, int> ParseBoostHandBonus(string jsonString, string targetPlayerId)
+        {
+            try
+            {
+                string pattern = $"\"id\"\\s*:\\s*\"{targetPlayerId}\".*?\"boost_hand_bonus\"\\s*:\\s*{{([^}}]*?)}}";
+                var match = System.Text.RegularExpressions.Regex.Match(jsonString, pattern, System.Text.RegularExpressions.RegexOptions.Singleline);
+                if (!match.Success) return null;
+
+                string dictStr = match.Groups[1].Value.Trim();
+                var result = new Dictionary<string, int>();
+                if (string.IsNullOrEmpty(dictStr)) return result;
+
+                var pairs = dictStr.Split(',');
+                foreach (var pair in pairs)
+                {
+                    var kv = pair.Split(':');
+                    if (kv.Length == 2)
+                    {
+                        string key = kv[0].Trim().Trim('"');
+                        if (int.TryParse(kv[1].Trim(), out int val))
+                        {
+                            result[key] = val;
+                        }
+                    }
+                }
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning("ParseBoostHandBonus failed: " + ex.Message);
+                return null;
+            }
+        }
+
         private void HandleDealingCompleted(string jsonString)
         {
             DealingCompletedMessage msg = JsonUtility.FromJson<DealingCompletedMessage>(jsonString);
@@ -574,6 +678,48 @@ namespace KillingMahjong.Network
             return result;
         }
 
+        private Dictionary<string, List<int>> ParseExposedHandIndexesByPlayer(string jsonString)
+        {
+            var result = new Dictionary<string, List<int>>();
+            int startIdx = jsonString.IndexOf("\"exposedHandIndexesByPlayer\"");
+            if (startIdx < 0) return result;
+            
+            int objStart = jsonString.IndexOf('{', startIdx);
+            if (objStart < 0) return result;
+            
+            int objEnd = FindMatchingBracket(jsonString, objStart, '{', '}');
+            if (objEnd < 0) return result;
+            
+            string innerObj = jsonString.Substring(objStart + 1, objEnd - objStart - 1);
+            
+            int searchIdx = 0;
+            while (true)
+            {
+                int quote1 = innerObj.IndexOf('"', searchIdx);
+                if (quote1 < 0) break;
+                int quote2 = innerObj.IndexOf('"', quote1 + 1);
+                if (quote2 < 0) break;
+                
+                string clientId = innerObj.Substring(quote1 + 1, quote2 - quote1 - 1);
+                
+                int arrStart = innerObj.IndexOf('[', quote2);
+                if (arrStart < 0) break;
+                int arrEnd = innerObj.IndexOf(']', arrStart);
+                if (arrEnd < 0) break;
+                
+                string arrStr = innerObj.Substring(arrStart + 1, arrEnd - arrStart - 1);
+                var list = new List<int>();
+                foreach (var token in arrStr.Split(','))
+                {
+                    if (int.TryParse(token.Trim(), out int val)) list.Add(val);
+                }
+                
+                result[clientId] = list;
+                searchIdx = arrEnd + 1;
+            }
+            return result;
+        }
+
         private Dictionary<string, List<int[]>> ParseTenpaiExamples(string jsonString)
         {
             var result = new Dictionary<string, List<int[]>>();
@@ -647,13 +793,13 @@ namespace KillingMahjong.Network
             return result;
         }
 
-        private int FindMatchingBracket(string s, int startIndex)
+        private int FindMatchingBracket(string s, int startIndex, char openBracket = '[', char closeBracket = ']')
         {
             int depth = 0;
             for (int i = startIndex; i < s.Length; i++)
             {
-                if (s[i] == '[') depth++;
-                else if (s[i] == ']')
+                if (s[i] == openBracket) depth++;
+                else if (s[i] == closeBracket)
                 {
                     depth--;
                     if (depth == 0) return i;

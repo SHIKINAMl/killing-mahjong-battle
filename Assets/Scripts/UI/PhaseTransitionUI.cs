@@ -680,7 +680,7 @@ namespace KillingMahjong.UI
             StartCoroutine(PlaySkillCutinAnimationRoutine(skillName, isLocalPlayer, duration, onComplete));
         }
 
-        public IEnumerator PlaySkillCutinAnimationRoutine(string skillName, bool isLocalPlayer, float duration = 2.0f, Action onComplete = null)
+        public IEnumerator PlaySkillCutinAnimationRoutine(string skillName, bool isLocalPlayer, float duration = 2.0f, Action onComplete = null, string subText = null)
         {
             ResetVisuals();
 
@@ -806,7 +806,7 @@ namespace KillingMahjong.UI
             mainTextObj.transform.SetParent(containerRt, false);
             TextMeshProUGUI mainText = mainTextObj.AddComponent<TextMeshProUGUI>();
             mainText.text = skillName;
-            mainText.fontSize = 180; // 250から少し小さく
+            mainText.fontSize = 120; // かなり小さく変更
             mainText.color = new Color32(255, 255, 255, 0); // 白字
             mainText.fontStyle = FontStyles.Bold;
             mainText.alignment = TextAlignmentOptions.Center;
@@ -824,9 +824,41 @@ namespace KillingMahjong.UI
 
             RectTransform mainRt = mainText.GetComponent<RectTransform>();
             mainRt.sizeDelta = new Vector2(2000, 800);
-            mainRt.anchoredPosition = new Vector2(0, 50);
-            mainRt.localRotation = Quaternion.Euler(0, 0, -8f); // -15度から-8度に緩和
-            mainRt.localScale = new Vector3(3.5f, 3.5f, 1f); // 5fから3.5fに緩和
+            mainRt.anchoredPosition = new Vector2(0, string.IsNullOrEmpty(subText) ? 0 : 50); // より下に配置
+            mainRt.localRotation = Quaternion.Euler(0, 0, -15f); // 以前の傾きに戻す
+            mainRt.localScale = new Vector3(5f, 5f, 1f); // 以前のスケールに戻す
+
+            // 6. サブテキスト（役の名前など）
+            TextMeshProUGUI subTextUI = null;
+            CanvasGroup subCg = null;
+            if (!string.IsNullOrEmpty(subText))
+            {
+                GameObject subObj = new GameObject("SubText");
+                subObj.transform.SetParent(containerRt, false);
+                subCg = subObj.AddComponent<CanvasGroup>();
+                subCg.alpha = 0f;
+                subTextUI = subObj.AddComponent<TextMeshProUGUI>();
+                subTextUI.text = subText;
+                subTextUI.fontSize = 80; // かなり小さく変更
+                subTextUI.color = new Color32(255, 255, 255, 255);
+                subTextUI.fontStyle = FontStyles.Bold;
+                subTextUI.alignment = TextAlignmentOptions.Center;
+                if (centerText != null) subTextUI.font = centerText.font;
+
+                Shadow s1 = subObj.AddComponent<Shadow>();
+                s1.effectColor = new Color(0, 0, 0, 1f);
+                s1.effectDistance = new Vector2(10, -10);
+
+                Shadow s2 = subObj.AddComponent<Shadow>();
+                s2.effectColor = isLocalPlayer ? new Color32(0, 100, 255, 150) : new Color32(200, 0, 0, 150);
+                s2.effectDistance = new Vector2(-10, 8);
+
+                RectTransform subRt = subTextUI.GetComponent<RectTransform>();
+                subRt.sizeDelta = new Vector2(2000, 400);
+                subRt.anchoredPosition = new Vector2(0, -150); // メインテキストに合わせて下げる
+                subRt.localRotation = Quaternion.identity; // 水平
+                subRt.localScale = Vector3.one;
+            }
 
             // --- 暴力的なアニメーション開始 ---
             float t = 0;
@@ -844,8 +876,13 @@ namespace KillingMahjong.UI
                 float easeIn = Mathf.Pow(progress, 3f);
 
                 // 文字が叩きつけられる演出だけは残す（勢いが出るため）
-                mainRt.localScale = Vector3.LerpUnclamped(new Vector3(3.5f, 3.5f, 1f), Vector3.one, easeIn);
+                mainRt.localScale = Vector3.LerpUnclamped(new Vector3(5f, 5f, 1f), Vector3.one, easeIn);
                 mainText.color = new Color32(255, 255, 255, (byte)(255 * progress));
+
+                if (subCg != null)
+                {
+                    subCg.alpha = progress; // サブテキストはフェードインのみ（叩きつけない）
+                }
                 
                 t += Time.deltaTime;
                 yield return null;
@@ -882,8 +919,13 @@ namespace KillingMahjong.UI
                 }
                 
                 // メインテキストはさらに傾きながら下へ落ちる
-                mainRt.anchoredPosition = new Vector2(0, 50 - (1000 * easeIn));
+                mainRt.anchoredPosition = new Vector2(0, (string.IsNullOrEmpty(subText) ? 50 : 150) - (1000 * easeIn));
                 mainRt.localRotation = Quaternion.Euler(0, 0, -15f - (30f * easeIn));
+
+                if (subCg != null)
+                {
+                    subCg.alpha = 1f - progress;
+                }
                 
                 t += Time.deltaTime;
                 yield return null;

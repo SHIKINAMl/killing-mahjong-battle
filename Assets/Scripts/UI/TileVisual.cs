@@ -14,6 +14,10 @@ namespace KillingMahjong.UI
         [Tooltip("ドラ牌の時に表示するオーバーレイImage（子オブジェクトのImageを指定）")]
         [SerializeField] private Image doraOverlayImage;
 
+        [Header("Exposed Overlay")]
+        [Tooltip("透視されている時に表示するオーバーレイImage（子オブジェクトのImageを指定）")]
+        [SerializeField] private Image exposedOverlayImage;
+
         private void OnValidate()
         {
             if (spriteRenderer == null) spriteRenderer = GetComponent<SpriteRenderer>();
@@ -55,6 +59,33 @@ namespace KillingMahjong.UI
         }
         
         public int GetId() => _currentId;
+
+        public void SetExposed(bool isExposed)
+        {
+            if (isExposed)
+            {
+                Debug.Log($"[TileVisual] SetExposed true for Tile ID: {_currentId}");
+            }
+            if (exposedOverlayImage != null)
+            {
+                exposedOverlayImage.gameObject.SetActive(isExposed);
+                if (isExposed)
+                {
+                    exposedOverlayImage.transform.SetAsLastSibling();
+                    exposedOverlayImage.color = new Color(1f, 1f, 1f, 1f);
+                    var rt = exposedOverlayImage.GetComponent<RectTransform>();
+                    if (rt != null)
+                    {
+                        rt.localScale = Vector3.one;
+                        rt.anchoredPosition = Vector2.zero;
+                    }
+                }
+            }
+            else if (isExposed)
+            {
+                Debug.LogWarning($"[TileVisual] exposedOverlayImage is NULL for Tile ID: {_currentId}. Did you assign it in the Inspector?");
+            }
+        }
 
         private bool _isFuriten = false;
         private bool _isHovered = false;

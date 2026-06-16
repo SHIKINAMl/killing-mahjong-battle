@@ -44,17 +44,17 @@ namespace KillingMahjong.UI
         {
             IsMulliganSelection = false;
             
-            var handTiles = BoardStateManager.Instance.CurrentHandTiles;
-            if (handTiles != null)
+            var wallTiles = BoardStateManager.Instance.OriginalWallTiles;
+            if (wallTiles != null)
             {
-                int targetIndex = handTiles.IndexOf(tileId);
+                int targetIndex = wallTiles.IndexOf(tileId);
                 if (targetIndex != -1)
                 {
                     uiManager.SendActionToServer("skill", new Network.ActionPayload { skill_type = "mulligan", target_hand_index = targetIndex });
                 }
                 else
                 {
-                    Debug.LogWarning("Mulligan failed: Selected tile not found in current hand.");
+                    Debug.LogWarning("Mulligan failed: Selected tile not found in wall tiles.");
                 }
             }
         }
@@ -99,13 +99,56 @@ namespace KillingMahjong.UI
 
         private System.Collections.IEnumerator HandleSkillCastedRoutine(SkillCastedData data)
         {
-            bool isLocalPlayer = (data.player_id == NetworkMessageHandler.Instance.LocalPlayerId);
+            string localPlayerId = KillingMahjong.Network.NetworkMessageHandler.Instance.LocalPlayerId;
+            bool isLocalPlayer = (data.player_id == localPlayerId);
             string skillName = GetSkillName(data.skillType);
+            string subText = null;
+
+            if (data.skillType == "boost_hand")
+            {
+                var oldLocalBonus = Managers.BoardStateManager.Instance.LocalBoostHandBonus != null ? 
+                    new Dictionary<string, int>(Managers.BoardStateManager.Instance.LocalBoostHandBonus) : new Dictionary<string, int>();
+                var oldEnemyBonus = Managers.BoardStateManager.Instance.EnemyBoostHandBonus != null ? 
+                    new Dictionary<string, int>(Managers.BoardStateManager.Instance.EnemyBoostHandBonus) : new Dictionary<string, int>();
+
+                bool statusReceived = false;
+                System.Action<KillingMahjong.EngineData.StatusData> onStatus = (statusData) => { statusReceived = true; };
+                NetworkMessageHandler.Instance.OnStatusReceived += onStatus;
+
+                float timeout = 2.0f;
+                while (!statusReceived && timeout > 0)
+                {
+                    timeout -= Time.deltaTime;
+                    yield return null;
+                }
+                NetworkMessageHandler.Instance.OnStatusReceived -= onStatus;
+
+                var newLocalBonus = Managers.BoardStateManager.Instance.LocalBoostHandBonus ?? new Dictionary<string, int>();
+                var newEnemyBonus = Managers.BoardStateManager.Instance.EnemyBoostHandBonus ?? new Dictionary<string, int>();
+
+                var targetOldBonus = isLocalPlayer ? oldLocalBonus : oldEnemyBonus;
+                var targetNewBonus = isLocalPlayer ? newLocalBonus : newEnemyBonus;
+
+                string boostedYakuName = "";
+                foreach (var kvp in targetNewBonus)
+                {
+                    if (!targetOldBonus.ContainsKey(kvp.Key) || targetOldBonus[kvp.Key] < kvp.Value)
+                    {
+                        boostedYakuName = kvp.Key;
+                        break;
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(boostedYakuName))
+                {
+                    subText = $"<color=yellow>{boostedYakuName}</color>";
+                }
+            }
 
             // 1. 以前の大迫力カットイン演出（血飛沫＋立ち絵＋巨大テキスト）を再生する
             if (uiManager.PhaseTransitionUI != null)
             {
-                yield return uiManager.PhaseTransitionUI.PlaySkillCutinAnimationRoutine(skillName, isLocalPlayer, 2.0f, null);
+                yield return uiManager.PhaseTransitionUI.PlaySkillCutinAnimationRoutine(skillName, isLocalPlayer, 2.0f, null, subText);
             }
             else if (uiManager.DialogueUI != null)
             {
@@ -139,18 +182,37 @@ namespace KillingMahjong.UI
             {
                 if (data.exposedHandIndexes != null && data.exposedHandIndexes.Count > 0)
                 {
+                    // localPlayerId is already declared at the top of the method
+                    List<int> targetIndexes = data.exposedHandIndexes;
+                    
+                    if (data.exposedHandIndexesByPlayer != null)
+                    {
+                        if (isLocalPlayer)
+                        {
+                            foreach (var kvp in data.exposedHandIndexesByPlayer)
+                            {
+                                if (kvp.Key != localPlayerId)
+                                {
+                                    targetIndexes = kvp.Value;
+                                    break;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            if (data.exposedHandIndexesByPlayer.ContainsKey(localPlayerId))
+                            {
+                                targetIndexes = data.exposedHandIndexesByPlayer[localPlayerId];
+                            }
+                        }
+                    }
+
                     if (isLocalPlayer)
                     {
-                        var originalWall = Managers.BoardStateManager.Instance.OriginalEnemyWallTiles;
                         List<int> newlyExposed = new List<int>();
-                        foreach (int val in data.exposedHandIndexes)
+                        foreach (int val in targetIndexes)
                         {
-                            int wallIdx = originalWall.IndexOf(val);
-                            if (wallIdx == -1 && val >= 0 && val < 34)
-                            {
-                                // Fallback in case Python is actually sending wall indices instead of tile IDs
-                                wallIdx = val;
-                            }
+                            int wallIdx = val; // Python sends wall indices
                             
                             if (wallIdx >= 0 && wallIdx < 34)
                             {
@@ -161,6 +223,8 @@ namespace KillingMahjong.UI
                                 }
                             }
                         }
+                        
+                        Debug.Log($"[Skill] Local player cast perspective. targetIndexes: {string.Join(",", targetIndexes)}. newlyExposed: {string.Join(",", newlyExposed)}");
                         
                         if (newlyExposed.Count > 0)
                         {
@@ -176,14 +240,10 @@ namespace KillingMahjong.UI
                     }
                     else
                     {
-                        var originalWall = Managers.BoardStateManager.Instance.OriginalWallTiles;
-                        foreach (int val in data.exposedHandIndexes)
+                        Debug.Log($"[Skill] Enemy player cast perspective. targetIndexes for local player: {string.Join(",", targetIndexes)}");
+                        foreach (int val in targetIndexes)
                         {
-                            int wallIdx = originalWall.IndexOf(val);
-                            if (wallIdx == -1 && val >= 0 && val < 34)
-                            {
-                                wallIdx = val;
-                            }
+                            int wallIdx = val; // Python sends wall indices
                             
                             if (wallIdx >= 0 && wallIdx < 34)
                             {
