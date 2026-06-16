@@ -369,26 +369,39 @@ namespace KillingMahjong.UI
             }
         }
 
+        private bool _isAgariPending = false;
+
         private void HandleAgariPendingReceived(KillingMahjong.EngineData.AgariPendingData data)
         {
+            Debug.Log($"[GameUIManager] HandleAgariPendingReceived called. winner_id: {data.winner_id}, loser_id: {data.loser_id}, tile_id: {data.tile_id}");
+            
             if (data.winner_id == NetworkMessageHandler.Instance.LocalPlayerId)
             {
-                if (agariSelectionUI != null)
+                Debug.Log("[GameUIManager] I am the winner! Showing RonWaitPanel.");
+                _isAgariPending = true;
+                
+                if (RonWaitPanel != null)
                 {
-                    agariSelectionUI.Show(
-                        onRonCallback: () => {
-                            SendActionToServer("agari", new KillingMahjong.Network.ActionPayload { accept = true });
-                        },
-                        onSkipCallback: () => {
-                            SendActionToServer("agari", new KillingMahjong.Network.ActionPayload { accept = false });
+                    RonWaitPanel.SetActive(true);
+                    
+                    var images = RonWaitPanel.GetComponentsInChildren<UnityEngine.UI.Image>();
+                    foreach (var img in images)
+                    {
+                        if (img.GetComponent<UnityEngine.UI.Button>() == null && 
+                            !img.gameObject.name.ToLower().Contains("button"))
+                        {
+                            var c = img.color;
+                            c.a = 0.1f;
+                            img.color = c;
                         }
-                    );
+                    }
                 }
             }
         }
 
         private void HandleTurnChanged(bool isLocalTurn)
         {
+            if (IsTransitioning) return; // アニメーション演出中は矢印を出さない
             if (wallUI != null)
             {
                 wallUI.UpdateDiscardTurnIndicator(isLocalTurn, currentPhaseStatus == RoundStatus.Discard);
@@ -472,7 +485,16 @@ namespace KillingMahjong.UI
         // Methods invoked via Unity Events (e.g. Inspector Buttons)
         public void ExecuteRonAction()
         {
-            PhaseController?.ExecuteRonAction();
+            if (_isAgariPending)
+            {
+                _isAgariPending = false;
+                if (RonWaitPanel != null) RonWaitPanel.SetActive(false);
+                SendActionToServer("agari", new KillingMahjong.Network.ActionPayload { accept = true });
+            }
+            else
+            {
+                PhaseController?.ExecuteRonAction();
+            }
         }
 
         public void ShowMatchmakingWaiting()

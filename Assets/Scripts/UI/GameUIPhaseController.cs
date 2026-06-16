@@ -91,6 +91,12 @@ namespace KillingMahjong.UI
         public void OnGameStarted()
         {
             _currentRoundIndex = 1;
+            
+            if (uiManager.PhaseTransitionUI != null)
+            {
+                uiManager.PhaseTransitionUI.PlayRoundStartDarken("対局開始");
+            }
+
             if (ReactionController.Instance != null)
             {
                 ReactionController.Instance.ResetStateForNewGame();
@@ -132,7 +138,7 @@ namespace KillingMahjong.UI
                                   newStatus == RoundStatus.Result || 
                                   newStatus == RoundStatus.Draw;
 
-            if (!isGameEndPhase)
+            if (!isGameEndPhase && !uiManager.IsTransitioning)
             {
                 if (uiManager.HandUI != null) uiManager.HandUI.UpdateLayout(uiManager.CurrentPhaseStatus);
 
@@ -140,7 +146,6 @@ namespace KillingMahjong.UI
                 {
                     uiManager.WallUI.UpdateContainerPosition(uiManager.CurrentPhaseStatus == RoundStatus.Discard);
                     uiManager.WallUI.UpdateWallHighlights(BoardStateManager.Instance.CurrentWaitTiles, uiManager.CurrentPhaseStatus == RoundStatus.Discard);
-                    uiManager.WallUI.UpdateDiscardTurnIndicator(BoardStateManager.Instance.IsLocalTurn, uiManager.CurrentPhaseStatus == RoundStatus.Discard);
                 }
             }
             
@@ -260,24 +265,7 @@ namespace KillingMahjong.UI
                         
                         if (isLocalWin)
                         {
-                            if (uiManager.RonWaitPanel != null)
-                            {
-                                uiManager.RonWaitPanel.SetActive(true);
-                                
-                                // 背景が子オブジェクトにある可能性も考慮し、全Imageをチェック
-                                var images = uiManager.RonWaitPanel.GetComponentsInChildren<UnityEngine.UI.Image>();
-                                foreach (var img in images)
-                                {
-                                    // ボタン自身（または名前にButtonを含む）は除外して、背景のみを薄くする
-                                    if (img.GetComponent<UnityEngine.UI.Button>() == null && 
-                                        !img.gameObject.name.ToLower().Contains("button"))
-                                    {
-                                        var c = img.color;
-                                        c.a = 0.1f; // ほぼ完全に盤面が見えるように透過（アルファ0.1）
-                                        img.color = c;
-                                    }
-                                }
-                            }
+                            uiManager.ExecuteRonAction();
                         }
                     }
                     break;
@@ -375,7 +363,6 @@ namespace KillingMahjong.UI
              if (uiManager.PhaseTransitionUI != null)
              {
                  uiManager.SetIsTransitioning(true);
-                 SetMatchUIVisibility(false);
                  
                  if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetPanelVisible(false);
                  if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.gameObject.SetActive(false);
@@ -384,15 +371,30 @@ namespace KillingMahjong.UI
 
                  uiManager.PhaseTransitionUI.PlayTransition(roundString, uiManager.PlayerInfoUI, playerBet, enemyBet, playerHp, enemyHp,
                     onMidpoint: () => {
-                         SetMatchUIVisibility(true); 
-                         
                          uiManager.SetIsTransitioning(false);
                          
+                         // UIのみクリア（BoardStateManagerのデータを消さないようにする）
+                         if (uiManager.RiverUI != null) uiManager.RiverUI.Clear();
+                         if (uiManager.EnemyRiverUI != null) uiManager.EnemyRiverUI.Clear();
+                         if (uiManager.WaitUI != null) uiManager.WaitUI.gameObject.SetActive(false);
+                         
+                         // 牌を再構築する前にフェーズをDiscardへ進める
                          if (uiManager.CurrentPhaseStatus == RoundStatus.Betting)
                          {
                              UpdatePhaseStatus(RoundStatus.Discard);
                          }
-
+                         
+                         if (uiManager.VisualController != null) uiManager.VisualController.RebuildAllTilesFromState();
+                         
+                         if (uiManager.HandUI != null) uiManager.HandUI.UpdateLayout(uiManager.CurrentPhaseStatus);
+                         if (uiManager.EnemyHandUI != null) uiManager.EnemyHandUI.UpdateLayout(uiManager.CurrentPhaseStatus);
+                         if (uiManager.WallUI != null)
+                         {
+                             uiManager.WallUI.UpdateContainerPosition(uiManager.CurrentPhaseStatus == RoundStatus.Discard);
+                             uiManager.WallUI.UpdateWallHighlights(BoardStateManager.Instance.CurrentWaitTiles, uiManager.CurrentPhaseStatus == RoundStatus.Discard);
+                         }
+                         
+                         SetMatchUIVisibility(true); 
                          HandlePhaseVisibility(uiManager.CurrentPhaseStatus);
                          
                          uiManager.SetIsTransitioning(true);
@@ -402,8 +404,22 @@ namespace KillingMahjong.UI
                     },
                     onComplete: () => {
                          uiManager.SetIsTransitioning(false);
+                         
+                         // Catch any missed updates
+                         if (uiManager.VisualController != null) uiManager.VisualController.RebuildAllTilesFromState();
+                         
+                         if (uiManager.HandUI != null) uiManager.HandUI.UpdateLayout(uiManager.CurrentPhaseStatus);
+                         if (uiManager.WallUI != null)
+                         {
+                             uiManager.WallUI.UpdateContainerPosition(uiManager.CurrentPhaseStatus == RoundStatus.Discard);
+                             uiManager.WallUI.UpdateWallHighlights(BoardStateManager.Instance.CurrentWaitTiles, uiManager.CurrentPhaseStatus == RoundStatus.Discard);
+                             uiManager.WallUI.UpdateDiscardTurnIndicator(BoardStateManager.Instance.IsLocalTurn, uiManager.CurrentPhaseStatus == RoundStatus.Discard);
+                         }
+                         
                          HandlePhaseVisibility(uiManager.CurrentPhaseStatus);
                          if (uiManager.DialogueUI != null) uiManager.DialogueUI.gameObject.SetActive(true);
+                         if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.gameObject.SetActive(true);
+                         if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetPanelVisible(true);
                     }
                  );
              }
@@ -437,8 +453,18 @@ namespace KillingMahjong.UI
                     },
                     onComplete: () => {
                         uiManager.SetIsTransitioning(false);
-                        Debug.Log("[GameUIManager] 流局演出完了 - 次ラウンド待ち承認送信");
-                        SendNextRoundAction();
+                        if (uiManager.DialogueUI != null)
+                        {
+                            uiManager.DialogueUI.ShowNextRoundButton(() => {
+                                uiManager.PhaseTransitionUI.PlayRoundStartDarken($"第{_currentRoundIndex}局待機中...");
+                                SendNextRoundAction();
+                            });
+                        }
+                        else
+                        {
+                            uiManager.PhaseTransitionUI.PlayRoundStartDarken($"第{_currentRoundIndex}局待機中...");
+                            SendNextRoundAction();
+                        }
                     }
                 );
             }
@@ -672,19 +698,37 @@ namespace KillingMahjong.UI
                     Instantiate(uiManager.DamageEffectPrefab, uiManager.PlayerInfoUI.transform.position, Quaternion.identity);
             }
 
-            StartCoroutine(WaitAndSendNextRound(3.0f));
-        }
-
-        private IEnumerator WaitAndSendNextRound(float delay)
-        {
-            yield return new WaitForSeconds(delay);
-            if (uiManager.IsGameOver)
+            if (uiManager.DialogueUI != null)
             {
-                uiManager.ShowGameResult();
+                uiManager.DialogueUI.ShowNextRoundButton(() => {
+                    if (uiManager.IsGameOver)
+                    {
+                        uiManager.ShowGameResult();
+                    }
+                    else
+                    {
+                        if (uiManager.PhaseTransitionUI != null)
+                        {
+                            uiManager.PhaseTransitionUI.PlayRoundStartDarken($"第{_currentRoundIndex}局待機中...");
+                        }
+                        SendNextRoundAction();
+                    }
+                });
             }
             else
             {
-                SendNextRoundAction();
+                if (uiManager.IsGameOver)
+                {
+                    uiManager.ShowGameResult();
+                }
+                else
+                {
+                    if (uiManager.PhaseTransitionUI != null)
+                    {
+                        uiManager.PhaseTransitionUI.PlayRoundStartDarken($"第{_currentRoundIndex}局待機中...");
+                    }
+                    SendNextRoundAction();
+                }
             }
         }
 

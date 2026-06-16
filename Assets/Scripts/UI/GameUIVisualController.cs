@@ -41,6 +41,12 @@ namespace KillingMahjong.UI
 
         public void RebuildAllTilesFromState(List<int> suppressRevealWallIndexes)
         {
+            if (uiManager.IsTransitioning)
+            {
+                Debug.Log("[GameUIVisualController] IsTransitioning is true. Skipping RebuildAllTilesFromState to prevent visible tile movement.");
+                return;
+            }
+
             _lastSuppressedIndices.Clear();
             if (uiManager.TilePrefab == null) return;
             
@@ -331,6 +337,8 @@ namespace KillingMahjong.UI
 
         private void HandleTileMovedToHand(int tileId)
         {
+            if (uiManager.IsTransitioning) return;
+
             if (uiManager.WallUI != null && uiManager.HandUI != null)
             {
                 RectTransform movedTile = uiManager.WallUI.GrabTile(tileId);
@@ -343,6 +351,8 @@ namespace KillingMahjong.UI
 
         private void HandleTileMovedToWall(int tileId)
         {
+            if (uiManager.IsTransitioning) return;
+
             if (uiManager.HandUI == null || uiManager.WallUI == null) return;
 
             RectTransform movedTile = null;

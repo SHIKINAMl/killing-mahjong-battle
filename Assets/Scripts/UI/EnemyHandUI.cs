@@ -151,7 +151,7 @@ namespace KillingMahjong.UI
             // Do NOT sort enemy hand slots!
 
             int totalTiles = handSlots.Count;
-            int maxPerRow = 7;
+            int maxPerRow = 14; // 敵の手牌を1列で表示する
             float startX = - ((Mathf.Min(totalTiles, maxPerRow) - 1) * tileSpacingX) / 2f;
             
             for (int i = 0; i < totalTiles; i++)
@@ -167,6 +167,7 @@ namespace KillingMahjong.UI
 
                 var rt = handSlots[i];
                 rt.anchoredPosition3D = new Vector3(xPos, yPos, 0f);
+                
                 rt.SetSiblingIndex(i);
             }
         }

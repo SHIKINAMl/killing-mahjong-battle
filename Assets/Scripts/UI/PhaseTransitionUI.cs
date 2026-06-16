@@ -97,37 +97,30 @@ namespace KillingMahjong.UI
         private void HandleDealingStarted()
         {
             isWaitingForDeal = true;
-            dealWaitTimer = 0f;
-            if (loadingText != null)
-            {
-                loadingText.text = "山牌構築中... 0.0s";
-                loadingText.gameObject.SetActive(true);
-            }
+            // Removed: loadingText
         }
 
         private void HandleDealingCompleted()
         {
             isWaitingForDeal = false;
-            if (loadingText != null)
-            {
-                loadingText.gameObject.SetActive(false);
-            }
+            // 山牌構築完了後、画面が暗転していれば晴らす
+            PlayRoundStartFadeOut();
         }
 
         private void Update()
         {
-            if (isWaitingForDeal && loadingText != null)
-            {
-                dealWaitTimer += Time.deltaTime;
-                loadingText.text = $"山牌構築中... {dealWaitTimer:F1}s";
-            }
+            // Removed: loadingText timer
         }
 
         private void ResetVisuals()
         {
             if (fullScreenCheckerImage != null && checkerMaterial != null)
             {
-                checkerMaterial.SetFloat("_Progress", 0f);
+                if (!isDarkened)
+                {
+                    checkerMaterial.SetFloat("_Progress", 0f);
+                    fullScreenCheckerImage.gameObject.SetActive(false);
+                }
                 
                 // 確実に画面(親Canvas)全体を覆うようにアンカー設定を強制し、
                 // さらに万が一親コンテナが画面より小さい場合に備えて圧倒的なスケールをかける
@@ -140,9 +133,6 @@ namespace KillingMahjong.UI
                     rt.anchoredPosition = Vector2.zero;
                     rt.localScale = new Vector3(10f, 10f, 1f); // 画面を10倍で覆う
                 }
-
-                fullScreenCheckerImage.material = checkerMaterial;
-                fullScreenCheckerImage.gameObject.SetActive(false);
             }
             
             if (horizontalLineRt != null)
@@ -180,51 +170,54 @@ namespace KillingMahjong.UI
                 targetPlayerInfoUI.gameObject.SetActive(false);
             }
 
-            Debug.Log("PhaseTransition: Step 1 - Line In");
-            // === 1. 一本線が入る + 「対局開始」 ===
-            horizontalLineRt.gameObject.SetActive(true);
-            horizontalLineRt.localScale = new Vector3(0, 2f, 1f); // Increased line width
-
-            float t = 0;
-            while (t < lineInDuration)
+            if (!isDarkened)
             {
-                // 横幅を10倍(10f)にして確実に画面外まで届かせる
-                horizontalLineRt.localScale = new Vector3(Mathf.Lerp(0, 10f, t / lineInDuration), 2f, 1f);
-                t += Time.deltaTime;
-                yield return null;
-            }
-            horizontalLineRt.localScale = new Vector3(10f, 2f, 1f);
+                Debug.Log("PhaseTransition: Step 1 - Line In");
+                // === 1. 一本線が入る + 「対局開始」 ===
+                horizontalLineRt.gameObject.SetActive(true);
+                horizontalLineRt.localScale = new Vector3(0, 2f, 1f); // Increased line width
 
-            if (centerText != null)
-            {
-                centerText.text = "対局開始";
-                centerText.gameObject.SetActive(true);
-            }
-            yield return new WaitForSeconds(textWaitDuration);
+                float t = 0;
+                while (t < lineInDuration)
+                {
+                    // 横幅を10倍(10f)にして確実に画面外まで届かせる
+                    horizontalLineRt.localScale = new Vector3(Mathf.Lerp(0, 10f, t / lineInDuration), 2f, 1f);
+                    t += Time.deltaTime;
+                    yield return null;
+                }
+                horizontalLineRt.localScale = new Vector3(10f, 2f, 1f);
 
-            Debug.Log("PhaseTransition: Step 2 - Line Expand and Checker Fade In");
-            // === 2. 線を中心に、市松模様が上下に広がり画面を埋める ===
-            
-            // Enable fullscreen checker
-            if (fullScreenCheckerImage != null) fullScreenCheckerImage.gameObject.SetActive(true);
-            if (checkerMaterial != null)
-            {
-                checkerMaterial.SetFloat("_AspectRatio", (float)Screen.width / Screen.height);
-                checkerMaterial.SetFloat("_Progress", 0f);
-            }
+                if (centerText != null)
+                {
+                    centerText.text = "対局開始";
+                    centerText.gameObject.SetActive(true);
+                }
+                yield return new WaitForSeconds(textWaitDuration);
 
-            t = 0;
-            while (t < checkerFadeDuration)
-            {
-                if (checkerMaterial != null) checkerMaterial.SetFloat("_Progress", t / checkerFadeDuration);
-                t += Time.deltaTime;
-                yield return null;
+                Debug.Log("PhaseTransition: Step 2 - Line Expand and Checker Fade In");
+                // === 2. 線を中心に、市松模様が上下に広がり画面を埋める ===
+                
+                // Enable fullscreen checker
+                if (fullScreenCheckerImage != null) fullScreenCheckerImage.gameObject.SetActive(true);
+                if (checkerMaterial != null)
+                {
+                    checkerMaterial.SetFloat("_AspectRatio", (float)Screen.width / Screen.height);
+                    checkerMaterial.SetFloat("_Progress", 0f);
+                }
+
+                t = 0;
+                while (t < checkerFadeDuration)
+                {
+                    if (checkerMaterial != null) checkerMaterial.SetFloat("_Progress", t / checkerFadeDuration);
+                    t += Time.deltaTime;
+                    yield return null;
+                }
+                if (checkerMaterial != null) checkerMaterial.SetFloat("_Progress", 1f);
+                
+                // 画面が黒で覆われたので線を隠してサイズをリセット
+                horizontalLineRt.gameObject.SetActive(false);
+                horizontalLineRt.localScale = new Vector3(1, 0.15f, 1f);
             }
-            if (checkerMaterial != null) checkerMaterial.SetFloat("_Progress", 1f);
-            
-            // 画面が黒で覆われたので線を隠してサイズをリセット
-            horizontalLineRt.gameObject.SetActive(false);
-            horizontalLineRt.localScale = new Vector3(1, 0.15f, 1f);
             
             // Midpoint Callback (Behind the scenes UI toggles)
             Debug.Log("PhaseTransition: Midpoint invoked");
@@ -247,14 +240,14 @@ namespace KillingMahjong.UI
                 if (enemyBetObj != null) enemyBetObj.text = "Enemy Bet: " + enemyBetAmount;
                 if (playerBetObj != null) playerBetObj.text = "Your Bet: " + playerBetAmount;
 
-                t = 0;
-                while (t < hpDeductionDuration)
+                float tHp = 0;
+                while (tHp < hpDeductionDuration)
                 {
-                    int currentPlayerAnimHp = Mathf.RoundToInt(Mathf.Lerp(dummyInitialPlayerHp, targetPlayerHp, t / hpDeductionDuration));
-                    int currentEnemyAnimHp = Mathf.RoundToInt(Mathf.Lerp(dummyInitialEnemyHp, targetEnemyHp, t / hpDeductionDuration));
+                    int currentPlayerAnimHp = Mathf.RoundToInt(Mathf.Lerp(dummyInitialPlayerHp, targetPlayerHp, tHp / hpDeductionDuration));
+                    int currentEnemyAnimHp = Mathf.RoundToInt(Mathf.Lerp(dummyInitialEnemyHp, targetEnemyHp, tHp / hpDeductionDuration));
                     if (enemyHpObj != null) enemyHpObj.text = "Enemy HP: " + currentEnemyAnimHp;
                     if (playerHpObj != null) playerHpObj.text = "Your HP: " + currentPlayerAnimHp;
-                    t += Time.deltaTime;
+                    tHp += Time.deltaTime;
                     yield return null;
                 }
                 if (enemyHpObj != null) enemyHpObj.text = "Enemy HP: " + targetEnemyHp;
@@ -268,30 +261,33 @@ namespace KillingMahjong.UI
                 yield return new WaitForSeconds(1.5f);
             }
 
-            Debug.Log("PhaseTransition: Step 5 - Checker Fade Out");
+            Debug.Log("PhaseTransition: Step 5 - Checker Fade Out (Skipped if Darkened)");
             // === 5. テキスト消滅、市松模様フェードアウト ===
             if (centerText != null) centerText.gameObject.SetActive(false);
 
-            t = 0;
-            while (t < checkerFadeDuration)
+            if (!isDarkened)
             {
-                if (checkerMaterial != null) checkerMaterial.SetFloat("_Progress", 1f - (t / checkerFadeDuration));
-                t += Time.deltaTime;
-                yield return null;
+                float tFade = 0;
+                while (tFade < checkerFadeDuration)
+                {
+                    if (checkerMaterial != null) checkerMaterial.SetFloat("_Progress", 1f - (tFade / checkerFadeDuration));
+                    tFade += Time.deltaTime;
+                    yield return null;
+                }
+                if (checkerMaterial != null) checkerMaterial.SetFloat("_Progress", 0f);
+                if (fullScreenCheckerImage != null) fullScreenCheckerImage.gameObject.SetActive(false);
             }
-            if (checkerMaterial != null) checkerMaterial.SetFloat("_Progress", 0f);
-            if (fullScreenCheckerImage != null) fullScreenCheckerImage.gameObject.SetActive(false);
 
             Debug.Log("PhaseTransition: Step 6 - Turn Indicator");
 
             // === 6. 線が入り「先行/後攻」 ===
             horizontalLineRt.gameObject.SetActive(true);
             horizontalLineRt.localScale = new Vector3(0, 2f, 1f); 
-            t = 0;
-            while (t < lineInDuration)
+            float tTurnLine = 0;
+            while (tTurnLine < lineInDuration)
             {
-                horizontalLineRt.localScale = new Vector3(Mathf.Lerp(0, 10f, t / lineInDuration), 2f, 1f);
-                t += Time.deltaTime;
+                horizontalLineRt.localScale = new Vector3(Mathf.Lerp(0, 10f, tTurnLine / lineInDuration), 2f, 1f);
+                tTurnLine += Time.deltaTime;
                 yield return null;
             }
             horizontalLineRt.localScale = new Vector3(10f, 2f, 1f);
@@ -308,11 +304,11 @@ namespace KillingMahjong.UI
             Debug.Log("PhaseTransition: Step 7 - Finish");
             // === 7. 線アウト + 完了 ===
             if (centerText != null) centerText.gameObject.SetActive(false);
-            t = 0;
-            while (t < lineInDuration)
+            float tOut = 0;
+            while (tOut < lineInDuration)
             {
-                horizontalLineRt.localScale = new Vector3(Mathf.Lerp(10f, 0, t / lineInDuration), 2f, 1f);
-                t += Time.deltaTime;
+                horizontalLineRt.localScale = new Vector3(Mathf.Lerp(10f, 0, tOut / lineInDuration), 2f, 1f);
+                tOut += Time.deltaTime;
                 yield return null;
             }
             horizontalLineRt.gameObject.SetActive(false);
@@ -371,6 +367,93 @@ namespace KillingMahjong.UI
                 yield return null;
             }
             if (horizontalLineRt != null) horizontalLineRt.gameObject.SetActive(false);
+
+            onComplete?.Invoke();
+        }
+
+        private bool isDarkened = false;
+
+        public void PlayRoundStartDarken(string text)
+        {
+            if (isDarkened) return;
+            isDarkened = true;
+            StartCoroutine(RoundStartDarkenRoutine(text));
+        }
+
+        private IEnumerator RoundStartDarkenRoutine(string text)
+        {
+            ResetVisuals();
+
+            // 市松模様フェードイン (暗転)
+            if (fullScreenCheckerImage != null) fullScreenCheckerImage.gameObject.SetActive(true);
+            if (checkerMaterial != null)
+            {
+                checkerMaterial.SetFloat("_AspectRatio", (float)Screen.width / Screen.height);
+                checkerMaterial.SetFloat("_Progress", 0f);
+            }
+
+            float t = 0;
+            while (t < checkerFadeDuration)
+            {
+                if (checkerMaterial != null) checkerMaterial.SetFloat("_Progress", t / checkerFadeDuration);
+                t += Time.deltaTime;
+                yield return null;
+            }
+            if (checkerMaterial != null) checkerMaterial.SetFloat("_Progress", 1f);
+
+            // ドン！とテキスト表示
+            if (centerText != null)
+            {
+                centerText.text = text;
+                centerText.gameObject.SetActive(true);
+                centerText.color = Color.white;
+                
+                t = 0;
+                float duration = 0.4f;
+                Vector3 initialScale = new Vector3(3f, 3f, 1f);
+                Vector3 targetScale = Vector3.one;
+                
+                while (t < duration)
+                {
+                    float progress = t / duration;
+                    float scaleProgress = 1f - Mathf.Pow(1f - progress, 4f); 
+                    centerText.transform.localScale = Vector3.LerpUnclamped(initialScale, targetScale, scaleProgress);
+                    t += Time.deltaTime;
+                    yield return null;
+                }
+                centerText.transform.localScale = targetScale;
+                
+                // 画面揺れ（着弾の衝撃）
+                StartCoroutine(ScreenShakeRoutine(0.2f, 20f));
+            }
+        }
+
+        public void PlayRoundStartFadeOut(Action onComplete = null)
+        {
+            if (!isDarkened)
+            {
+                onComplete?.Invoke();
+                return;
+            }
+            isDarkened = false;
+            StartCoroutine(RoundStartFadeOutRoutine(onComplete));
+        }
+
+        private IEnumerator RoundStartFadeOutRoutine(Action onComplete)
+        {
+            // テキストを隠す
+            if (centerText != null) centerText.gameObject.SetActive(false);
+
+            // 市松模様フェードアウト (晴れる)
+            float t = 0;
+            while (t < checkerFadeDuration)
+            {
+                if (checkerMaterial != null) checkerMaterial.SetFloat("_Progress", 1f - (t / checkerFadeDuration));
+                t += Time.deltaTime;
+                yield return null;
+            }
+            if (checkerMaterial != null) checkerMaterial.SetFloat("_Progress", 0f);
+            if (fullScreenCheckerImage != null) fullScreenCheckerImage.gameObject.SetActive(false);
 
             onComplete?.Invoke();
         }

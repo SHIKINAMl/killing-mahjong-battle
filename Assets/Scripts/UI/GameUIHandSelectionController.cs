@@ -221,35 +221,11 @@ namespace KillingMahjong.UI
                 return;
             }
 
-            if (_autoConfirmNextHandSelection)
-            {
-                _autoConfirmNextHandSelection = false;
-                if (uiManager.HandUI != null) uiManager.HandUI.SetSubmittedState(true);
-                uiManager.SendActionToServer("select", new KillingMahjong.Network.ActionPayload { hand_indexes = data.hand_indexes, hand = _pendingHandTiles });
-                return;
-            }
-
-            if (uiManager.ConfirmationDialogUI != null)
-            {
-                uiManager.ConfirmationDialogUI.ShowDialog(
-                    data.message,
-                    () => {
-                        if (uiManager.HandUI != null) uiManager.HandUI.SetSubmittedState(true);
-                        uiManager.SendActionToServer("select", new KillingMahjong.Network.ActionPayload { hand_indexes = data.hand_indexes, hand = _pendingHandTiles });
-                    },
-                    () => {
-                        if (uiManager.HandUI != null) uiManager.HandUI.SetSubmittedState(false);
-                        BoardStateManager.Instance.ClearWaitTiles();
-                        if (uiManager.WaitUI != null) uiManager.WaitUI.Hide();
-                        if (uiManager.PhaseController != null) uiManager.PhaseController.SetMatchUIVisibility(true);
-                    }
-                );
-            }
-            else
-            {
-                if (uiManager.HandUI != null) uiManager.HandUI.SetSubmittedState(true);
-                uiManager.SendActionToServer("select", new KillingMahjong.Network.ActionPayload { hand_indexes = data.hand_indexes, hand = _pendingHandTiles });
-            }
+            _autoConfirmNextHandSelection = false;
+            
+            // 満貫未満の警告ダイアログを表示せず、自動で確定を送信する
+            if (uiManager.HandUI != null) uiManager.HandUI.SetSubmittedState(true);
+            uiManager.SendActionToServer("select_confirm", new KillingMahjong.Network.ActionPayload { hand_indexes = data.hand_indexes, hand = _pendingHandTiles });
         }
 
         public void OnHandSelectionAccepted()

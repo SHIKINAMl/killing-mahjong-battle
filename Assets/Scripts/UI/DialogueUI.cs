@@ -19,6 +19,7 @@ namespace KillingMahjong.UI
         [SerializeField] private GameObject logItemPrefab; // 1つ1つのログを表示するプレハブ（TextやUI四角などを持つ）
 
         private List<string> dialogueHistory = new List<string>();
+        private GameObject nextRoundButtonObj;
 
         public bool IsLogOpen => logPanel != null && logPanel.activeSelf;
 
@@ -107,6 +108,60 @@ namespace KillingMahjong.UI
             if (reactionController != null)
             {
                 reactionController.ProcessNextReaction(); // 止まっていた場合、ここから再開される
+            }
+        }
+
+        public void ShowNextRoundButton(System.Action onClick)
+        {
+            if (nextRoundButtonObj == null)
+            {
+                var canvas = GetComponentInParent<Canvas>();
+                if (canvas == null) return;
+
+                nextRoundButtonObj = new GameObject("NextRoundOKButton");
+                nextRoundButtonObj.transform.SetParent(transform, false);
+                
+                var rt = nextRoundButtonObj.AddComponent<RectTransform>();
+                // 右下付近に配置
+                rt.anchorMin = new Vector2(1, 0);
+                rt.anchorMax = new Vector2(1, 0);
+                rt.pivot = new Vector2(1, 0);
+                rt.anchoredPosition = new Vector2(-100, 100);
+                rt.sizeDelta = new Vector2(250, 80);
+
+                var img = nextRoundButtonObj.AddComponent<Image>();
+                img.color = new Color(0.2f, 0.2f, 0.2f, 1f);
+
+                var btn = nextRoundButtonObj.AddComponent<Button>();
+
+                var txtObj = new GameObject("Text");
+                txtObj.transform.SetParent(nextRoundButtonObj.transform, false);
+                var txtRt = txtObj.AddComponent<RectTransform>();
+                txtRt.anchorMin = Vector2.zero;
+                txtRt.anchorMax = Vector2.one;
+                txtRt.offsetMin = Vector2.zero;
+                txtRt.offsetMax = Vector2.zero;
+
+                var txt = txtObj.AddComponent<TextMeshProUGUI>();
+                txt.text = "OK";
+                txt.color = Color.white;
+                txt.fontSize = 50;
+                txt.alignment = TextAlignmentOptions.Center;
+
+                btn.onClick.AddListener(() => {
+                    HideNextRoundButton();
+                    onClick?.Invoke();
+                });
+            }
+
+            nextRoundButtonObj.SetActive(true);
+        }
+
+        public void HideNextRoundButton()
+        {
+            if (nextRoundButtonObj != null)
+            {
+                nextRoundButtonObj.SetActive(false);
             }
         }
     }
