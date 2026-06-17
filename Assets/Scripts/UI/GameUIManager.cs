@@ -32,6 +32,7 @@ namespace KillingMahjong.UI
         [SerializeField] private PhaseTransitionUI phaseTransitionUI;
         [SerializeField] private ConfirmationDialogUI confirmationDialogUI;
         [SerializeField] private RonAnimationUI ronAnimationUI;
+        [SerializeField] private VictoryUI victoryUI;
         [SerializeField] private MatchmakingUI matchmakingUI;
         [SerializeField] private DoraDisplayUI doraDisplayUI;
         [SerializeField] private GameObject ronWaitPanel;
@@ -182,9 +183,11 @@ namespace KillingMahjong.UI
 
         public void ShowGameResult()
         {
-            var resultUI = gameObject.AddComponent<GameResultUI>();
             bool isWin = LocalFinalScore > 0 && EnemyFinalScore <= 0;
-            resultUI.Show(isWin);
+            if (victoryUI != null)
+            {
+                victoryUI.PlayAnimation(isWin ? VictoryType.NormalVictory : VictoryType.NormalDefeat);
+            }
         }
 
         // --- Component accessors ---
@@ -204,6 +207,7 @@ namespace KillingMahjong.UI
         public PhaseTransitionUI PhaseTransitionUI => phaseTransitionUI;
         public ConfirmationDialogUI ConfirmationDialogUI => confirmationDialogUI;
         public RonAnimationUI RonAnimationUI => ronAnimationUI;
+        public VictoryUI VictoryUI => victoryUI;
         public MatchmakingUI MatchmakingUI => matchmakingUI;
         public DoraDisplayUI DoraDisplayUI => doraDisplayUI;
         public GameObject RonWaitPanel => ronWaitPanel;

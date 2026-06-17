@@ -92,6 +92,10 @@ namespace KillingMahjong.UI
         {
             _currentRoundIndex = 1;
             
+            Managers.BoardStateManager.Instance.UpdateHp(20000, 20000);
+            if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.SetHP(20000);
+            if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetHP(20000);
+            
             if (uiManager.PhaseTransitionUI != null)
             {
                 uiManager.PhaseTransitionUI.PlayRoundStartDarken("対局開始");
@@ -203,17 +207,7 @@ namespace KillingMahjong.UI
                     StartBettingPhase(Managers.BoardStateManager.Instance.LocalPlayerHp);
                     break;
                 case RoundStatus.Dealing:
-                    uiManager.ClearAllTiles();
-                    SetMatchUIVisibility(false);
-                    if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetPanelVisible(true);
-                    if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.gameObject.SetActive(true);
-                    if (uiManager.WaitUI != null) uiManager.WaitUI.gameObject.SetActive(false);
-                    if (uiManager.AbilityUI != null) uiManager.AbilityUI.gameObject.SetActive(false);
-                    
-                    if (ReactionController.Instance != null)
-                    {
-                        ReactionController.Instance.PlayDealingReaction();
-                    }
+                    StartCoroutine(DealingRoutine());
                     break;
                 case RoundStatus.HandSelection:
                     SetMatchUIVisibility(true);
@@ -319,7 +313,8 @@ namespace KillingMahjong.UI
         {
             if (uiManager.BettingUI != null)
             {
-                uiManager.BettingUI.ShowBettingPhase(20000, currentHealth, OnBetConfirmed);
+                int svCount = Managers.BoardStateManager.Instance.LocalPlayerSpecialVictoryCount;
+                uiManager.BettingUI.ShowBettingPhase(20000, currentHealth, svCount, OnBetConfirmed);
                 if (ReactionController.Instance != null)
                 {
                     ReactionController.Instance.StartBetPhaseTimer();
@@ -456,13 +451,13 @@ namespace KillingMahjong.UI
                         if (uiManager.DialogueUI != null)
                         {
                             uiManager.DialogueUI.ShowNextRoundButton(() => {
-                                uiManager.PhaseTransitionUI.PlayRoundStartDarken($"第{_currentRoundIndex}局待機中...");
+                                uiManager.PhaseTransitionUI.PlayRoundStartDarken("対戦相手を待機中...");
                                 SendNextRoundAction();
                             });
                         }
                         else
                         {
-                            uiManager.PhaseTransitionUI.PlayRoundStartDarken($"第{_currentRoundIndex}局待機中...");
+                            uiManager.PhaseTransitionUI.PlayRoundStartDarken("対戦相手を待機中...");
                             SendNextRoundAction();
                         }
                     }
@@ -489,8 +484,6 @@ namespace KillingMahjong.UI
         public void ExecuteRonAction()
         {
             if (uiManager.RonWaitPanel != null) uiManager.RonWaitPanel.SetActive(false);
-
-            SendNextRoundAction();
 
             bool isLocalWin = true;
             List<int> winningHand = new List<int>(BoardStateManager.Instance.CurrentHandTiles);
@@ -525,30 +518,8 @@ namespace KillingMahjong.UI
         {
             if (!isLocalWin)
             {
-                _waitingForOpponentRonAnimation = true;
-                Debug.Log("[GameUIPhaseController] 相手のロン成立。相手がロンボタンを押すのを待機します。");
-            }
-        }
+                Debug.Log("[GameUIPhaseController] 相手のロン成立。相手のロン演出を開始します。");
 
-        public void HandleGameEnded()
-        {
-            if (_waitingForOpponentRonAnimation)
-            {
-                Debug.Log("[GameUIPhaseController] ゲーム終了を受信しました。相手のロンアクション送信を待たずに即座にロン演出を開始します。");
-                HandleNextRoundWaitingReceived();
-            }
-        }
-
-        public void HandleNextRoundWaitingReceived()
-        {
-            Debug.Log("[GameUIPhaseController] HandleNextRoundWaitingReceived: 相手が次ラウンド準備完了（またはロンボタン押下）しました。");
-
-            if (_waitingForOpponentRonAnimation)
-            {
-                _waitingForOpponentRonAnimation = false;
-                Debug.Log("[GameUIPhaseController] 相手のロン演出を開始します。");
-
-                bool isLocalWin = false;
                 List<int> winningHand = new List<int>(BoardStateManager.Instance.CurrentEnemyHandTiles);
                 var liq = BoardStateManager.Instance.LastLiquidationData;
                 
@@ -576,6 +547,21 @@ namespace KillingMahjong.UI
                 
                 StartCoroutine(PlayRonWithPreDialogue(isLocalWin, winningHand, ronTile, actualYaku, actualFormula, actualRank));
             }
+        }
+
+        public void HandleGameEnded()
+        {
+            if (_waitingForOpponentRonAnimation)
+            {
+                Debug.Log("[GameUIPhaseController] ゲーム終了を受信しました。相手のロンアクション送信を待たずに即座にロン演出を開始します。");
+                HandleNextRoundWaitingReceived();
+            }
+        }
+
+        public void HandleNextRoundWaitingReceived()
+        {
+            Debug.Log("[GameUIPhaseController] HandleNextRoundWaitingReceived: 相手が次ラウンド準備完了（またはロンボタン押下）しました。");
+            // 既にアニメーションはHandleAgariで開始しているため、ここでは何もしない
         }
 
         private IEnumerator PlayRonWithPreDialogue(bool isLocalWin, List<int> winningHand, int ronTile, List<string> yaku, string formula, string rank)
@@ -709,7 +695,7 @@ namespace KillingMahjong.UI
                     {
                         if (uiManager.PhaseTransitionUI != null)
                         {
-                            uiManager.PhaseTransitionUI.PlayRoundStartDarken($"第{_currentRoundIndex}局待機中...");
+                            uiManager.PhaseTransitionUI.PlayRoundStartDarken("対戦相手を待機中...");
                         }
                         SendNextRoundAction();
                     }
@@ -725,7 +711,7 @@ namespace KillingMahjong.UI
                 {
                     if (uiManager.PhaseTransitionUI != null)
                     {
-                        uiManager.PhaseTransitionUI.PlayRoundStartDarken($"第{_currentRoundIndex}局待機中...");
+                        uiManager.PhaseTransitionUI.PlayRoundStartDarken("対戦相手を待機中...");
                     }
                     SendNextRoundAction();
                 }
@@ -758,10 +744,39 @@ namespace KillingMahjong.UI
         public void HandleSpecialVictoryWon(string playerId)
         {
             bool isLocalPlayer = (playerId == NetworkMessageHandler.Instance.LocalPlayerId);
-            string msg = isLocalPlayer ? "特殊勝利条件を達成しました！" : "相手が特殊勝利条件を達成しました...";
+            
+            if (uiManager.VictoryUI != null)
+            {
+                uiManager.VictoryUI.PlayAnimation(isLocalPlayer ? VictoryType.SpecialVictory : VictoryType.SpecialDefeat);
+            }
+            else if (uiManager.PhaseTransitionUI != null)
+            {
+                string msg = isLocalPlayer ? "特殊勝利条件を達成しました！" : "相手が特殊勝利条件を達成しました...";
+                uiManager.PhaseTransitionUI.PlayCenterTextAnim(msg, 3.0f, null);
+            }
+        }
+
+        private IEnumerator DealingRoutine()
+        {
             if (uiManager.PhaseTransitionUI != null)
             {
-                uiManager.PhaseTransitionUI.PlayCenterTextAnim(msg, 3.0f, null);
+                while (uiManager.PhaseTransitionUI.IsDarkenTransitioning)
+                {
+                    yield return null;
+                }
+                uiManager.PhaseTransitionUI.ChangeDarkenText($"第{_currentRoundIndex}局進行中...");
+            }
+            
+            uiManager.ClearAllTiles();
+            SetMatchUIVisibility(false);
+            if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetPanelVisible(true);
+            if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.gameObject.SetActive(true);
+            if (uiManager.WaitUI != null) uiManager.WaitUI.gameObject.SetActive(false);
+            if (uiManager.AbilityUI != null) uiManager.AbilityUI.gameObject.SetActive(false);
+            
+            if (ReactionController.Instance != null)
+            {
+                ReactionController.Instance.PlayDealingReaction();
             }
         }
     }

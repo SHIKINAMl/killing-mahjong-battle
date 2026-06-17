@@ -19,9 +19,9 @@ namespace KillingMahjong.UI
         [SerializeField] private Button confirmButton;
 
         [Header("Settings")]
-        [SerializeField] private int bettingUnit = 200;
-        [SerializeField] private float maxBetRatio = 0.25f; // 1/4 of initial hp
         [SerializeField] private float slideDuration = 0.5f;
+
+        private int bettingUnit = 200;
 
         [Header("Auto Dialogue Settings")]
         [SerializeField] private float dialogueInterval = 5.0f;
@@ -64,12 +64,14 @@ namespace KillingMahjong.UI
             if (confirmButton != null) confirmButton.onClick.AddListener(ConfirmBet);
         }
 
-        public void ShowBettingPhase(int initialHp, int currentHp, Action<int> onConfirm)
+        public void ShowBettingPhase(int initialHp, int currentHp, int specialVictoryCount, Action<int> onConfirm)
         {
+            var rules = GameRules.GetRuleSet(specialVictoryCount);
+            this.bettingUnit = rules.BetUnit;
             this.initialMoney = initialHp;
             this.currentMoney = currentHp;
-            this.maxBet = Mathf.FloorToInt(initialHp * maxBetRatio);
-            this.currentBet = bettingUnit; // Reset bet to minimum (200)
+            this.maxBet = rules.BetMax;
+            this.currentBet = bettingUnit; // Reset bet to minimum
             this.onConfirmAction = onConfirm;
             
             if (confirmButton != null) confirmButton.interactable = true;

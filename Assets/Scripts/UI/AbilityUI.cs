@@ -99,12 +99,20 @@ namespace KillingMahjong.UI
             foreach(Transform child in contentContainer) Destroy(child.gameObject);
             instantiatedItems.Clear();
 
+            int svCount = 0;
+            if (KillingMahjong.Managers.BoardStateManager.Instance != null)
+            {
+                svCount = KillingMahjong.Managers.BoardStateManager.Instance.LocalPlayerSpecialVictoryCount;
+            }
+
             float currentY = itemOffsetY;
             for (int i = 0; i < realAbilities.Count; i++)
             {
                 var data = realAbilities[i];
+                int currentCost = GameRules.GetSkillCost(data.skillType, svCount);
+                
                 var itemObj = Instantiate(itemPrefab, contentContainer);
-                itemObj.Setup(this, i, data.name, data.cost, data.description);
+                itemObj.Setup(this, i, data.name, currentCost, data.description);
                 
                 // Manual Layout
                 RectTransform rt = itemObj.GetComponent<RectTransform>();
@@ -189,6 +197,8 @@ namespace KillingMahjong.UI
 
             if (isWindowVisible)
             {
+                PopulateList();
+
                 // ウィンドウが開いた瞬間に説明文のスクロール位置を中央にリセットする
                 foreach (var item in instantiatedItems)
                 {

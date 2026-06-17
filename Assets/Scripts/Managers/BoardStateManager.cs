@@ -46,6 +46,7 @@ namespace KillingMahjong.Managers
         
         public int LocalPlayerHp { get; private set; } = 20000;
         public int EnemyPlayerHp { get; private set; } = 20000;
+        public int LocalPlayerSpecialVictoryCount { get; set; } = 0;
 
         public void SetLocalTurn(bool isLocalTurn)
         {

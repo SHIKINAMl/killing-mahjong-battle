@@ -195,6 +195,7 @@ namespace KillingMahjong.Network
                             // 文字列抽出による boost_hand_bonus の簡単な取得 (JsonUtility制約回避用)
                             if (statusMsg.data.player_state != null)
                             {
+                                Managers.BoardStateManager.Instance.LocalPlayerSpecialVictoryCount = statusMsg.data.player_state.special_victory_count;
                                 var bonusDict = ParseBoostHandBonus(jsonString, localPlayerId);
                                 if (bonusDict != null) {
                                     Managers.BoardStateManager.Instance.LocalBoostHandBonus = bonusDict;

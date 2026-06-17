@@ -43,19 +43,18 @@ namespace KillingMahjong.UI
             float time = Time.time + randomOffset;
             
             // Sin波とCos波を使って滑らかな浮遊オフセットを計算
-            // XとYで少しスピードを変えることで、単調な斜め移動ではなく8の字や円に近い自然な揺れを作る
             float offsetY = Mathf.Sin(time * floatSpeed) * floatAmplitudeY;
             float offsetX = Mathf.Cos(time * floatSpeed * 0.8f) * floatAmplitudeX;
             
-            // 初期座標に対してオフセットを足す
+            // 初期座標に対してオフセットを足す（回転処理のみジャギー防止のため無効化）
             transform.localPosition = initialPosition + new Vector3(offsetX, offsetY, 0);
 
-            // 回転が設定されていれば回転させる
-            if (rotationAmplitude > 0)
-            {
-                float rotZ = Mathf.Sin(time * rotationSpeed) * rotationAmplitude;
-                transform.localRotation = initialRotation * Quaternion.Euler(0, 0, rotZ);
-            }
+            // 回転が設定されている場合でも、ジャギー防止のため回転させない
+            // if (rotationAmplitude > 0)
+            // {
+            //     float rotZ = Mathf.Sin(time * rotationSpeed) * rotationAmplitude;
+            //     transform.localRotation = initialRotation * Quaternion.Euler(0, 0, rotZ);
+            // }
         }
         
         /// <summary>

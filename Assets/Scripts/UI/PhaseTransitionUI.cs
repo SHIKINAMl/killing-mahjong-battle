@@ -237,8 +237,8 @@ namespace KillingMahjong.UI
                 int targetPlayerHp = dummyInitialPlayerHp - playerBetAmount;
                 int targetEnemyHp = dummyInitialEnemyHp - enemyBetAmount;
 
-                if (enemyBetObj != null) enemyBetObj.text = "Enemy Bet: " + enemyBetAmount;
-                if (playerBetObj != null) playerBetObj.text = "Your Bet: " + playerBetAmount;
+                if (enemyBetObj != null) enemyBetObj.text = "Enemy Bet: <color=red>" + enemyBetAmount + "</color>";
+                if (playerBetObj != null) playerBetObj.text = "Your Bet: <color=red>" + playerBetAmount + "</color>";
 
                 float tHp = 0;
                 while (tHp < hpDeductionDuration)
@@ -373,10 +373,13 @@ namespace KillingMahjong.UI
 
         private bool isDarkened = false;
 
+        public bool IsDarkenTransitioning { get; private set; }
+
         public void PlayRoundStartDarken(string text)
         {
             if (isDarkened) return;
             isDarkened = true;
+            IsDarkenTransitioning = true;
             StartCoroutine(RoundStartDarkenRoutine(text));
         }
 
@@ -400,6 +403,8 @@ namespace KillingMahjong.UI
                 yield return null;
             }
             if (checkerMaterial != null) checkerMaterial.SetFloat("_Progress", 1f);
+
+            IsDarkenTransitioning = false;
 
             // ドン！とテキスト表示
             if (centerText != null)
@@ -437,6 +442,14 @@ namespace KillingMahjong.UI
             }
             isDarkened = false;
             StartCoroutine(RoundStartFadeOutRoutine(onComplete));
+        }
+
+        public void ChangeDarkenText(string text)
+        {
+            if (isDarkened && centerText != null)
+            {
+                centerText.text = text;
+            }
         }
 
         private IEnumerator RoundStartFadeOutRoutine(Action onComplete)
