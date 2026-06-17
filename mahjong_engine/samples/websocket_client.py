@@ -2,14 +2,20 @@
 手動テスト用 WebSocket クライアント
 
 使い方:
-    python -m mahjong_engine.samples.websocket_client [ws://localhost:8765]
+    python -m mahjong_engine.samples.websocket_client [wss://jongpire.onrender.com/ws]
 """
 import asyncio
+import inspect
 import json
+import os
+import re
 import sys
+from pathlib import Path
+from urllib.parse import urlparse, urlunparse
 from typing import Any
 
 import websockets
+from websockets.exceptions import InvalidStatus, InvalidURI
 
 # ─── ローカル状態キャッシュ ────────────────────────────────────────────────
 _state: dict[str, Any] = {
@@ -46,6 +52,7 @@ def build_action_message(command: str) -> dict[str, Any] | None:
     サポートコマンド:
         join
         ping
+        status                      # サーバー状態を取得
         tenpai 0,1,2,...            # wall index を指定して聴牌チェック
         select 0,1,2,...            # wall index を指定して手牌を確定
         bet <amount>                # 掛け金を設定
@@ -72,6 +79,15 @@ def build_action_message(command: str) -> dict[str, Any] | None:
     if name == "ping":
         return {"type": "ping"}
 
+    if name == "status":
+        return {
+            "type": "action",
+            "data": {
+                "action": "status",
+                "data": {},
+            },
+        }
+
     if name == "tenpai":
         try:
             wall_indexes = parse_int_list(arg1)
@@ -80,8 +96,10 @@ def build_action_message(command: str) -> dict[str, Any] | None:
             return None
         return {
             "type": "action",
-            "action": "is_tenpai",
-            "data": {"wall_indexes": wall_indexes},
+            "data": {
+                "action": "is_tenpai",
+                "data": {"wall_indexes": wall_indexes},
+            },
         }
 
     if name == "select":
@@ -92,8 +110,10 @@ def build_action_message(command: str) -> dict[str, Any] | None:
             return None
         return {
             "type": "action",
-            "action": "select",
-            "data": {"hand_indexes": hand_indexes},
+            "data": {
+                "action": "select",
+                "data": {"hand_indexes": hand_indexes},
+            },
         }
 
     if name == "bet":
@@ -104,8 +124,10 @@ def build_action_message(command: str) -> dict[str, Any] | None:
             return None
         return {
             "type": "action",
-            "action": "bet",
-            "data": {"bet_amount": amount},
+            "data": {
+                "action": "bet",
+                "data": {"bet_amount": amount},
+            },
         }
 
     if name == "discard":
@@ -116,15 +138,19 @@ def build_action_message(command: str) -> dict[str, Any] | None:
             return None
         return {
             "type": "action",
-            "action": "discard",
-            "data": {"wall_index": wall_index},
+            "data": {
+                "action": "discard",
+                "data": {"wall_index": wall_index},
+            },
         }
 
     if name == "next_round":
         return {
             "type": "action",
-            "action": "next_round",
-            "data": {},
+            "data": {
+                "action": "next_round",
+                "data": {},
+            },
         }
 
     if name == "skill":
@@ -155,8 +181,10 @@ def build_action_message(command: str) -> dict[str, Any] | None:
 
         return {
             "type": "action",
-            "action": "skill",
-            "data": data,
+            "data": {
+                "action": "skill",
+                "data": data,
+            },
         }
 
     return None
@@ -171,6 +199,7 @@ def print_help() -> None:
     print("=" * 54)
     print("  join                        マッチに参加")
     print("  ping                        サーバー疎通確認")
+    print("  status                      現在のサーバー状態を取得")
     print("  tenpai 0,1,2,...            聴牌チェック (wall index)")
     print("  select 0,1,2,...            手牌確定 (wall index)")
     print("  bet <amount>                掛け金設定")
@@ -199,8 +228,8 @@ def handle_message(data: dict[str, Any]) -> None:
         print(f"[接続完了] client_id={cid}")
 
     # ── Ping/Pong ─────────────────────────────────────────
-    elif msg_type == "pong":
-        print("[pong]")
+    elif msg_type in ("pong", "ping"):
+        print(f"[{msg_type}]")
 
     # ── ゲーム開始 ────────────────────────────────────────
     elif msg_type == "game_started":
@@ -383,6 +412,7 @@ async def sender(ws) -> None:
                 print(f"不明なコマンド: '{command}'  ('help' でコマンド一覧を確認)")
                 continue
             await ws.send(json.dumps(payload, ensure_ascii=False))
+            print(f"[send] {json.dumps(payload, ensure_ascii=False)}")
         except ValueError as exc:
             print(f"[入力エラー] {exc}")
         except Exception as exc:
@@ -391,24 +421,124 @@ async def sender(ws) -> None:
 
 async def receiver(ws) -> None:
     async for message in ws:
-        # サーバーから受信した JSON テキストを原文のまま表示
-        print(message)
+        # サーバーから受信した JSON を種別別に表示
+        try:
+            data = json.loads(message)
+            handle_message(data)
+            if data.get("type") == "connected":
+                join_payload = {"type": "join"}
+                await ws.send(json.dumps(join_payload, ensure_ascii=False))
+                print(f"[send] {json.dumps(join_payload, ensure_ascii=False)}")
+        except json.JSONDecodeError:
+            print(f"[raw] {message}")
+
+
+def normalize_ws_uri(raw_uri: str) -> str:
+    """入力URIを WebSocket 向けに正規化する。"""
+    parsed = urlparse(raw_uri)
+
+    scheme = parsed.scheme
+    if scheme in ("http", "https"):
+        scheme = "wss" if scheme == "https" else "ws"
+    elif scheme not in ("ws", "wss"):
+        raise ValueError("URI は ws:// または wss:// (または http(s)://) を指定してください")
+
+    path = parsed.path or ""
+    if path in ("", "/"):
+        path = "/ws"
+
+    return urlunparse((scheme, parsed.netloc, path, parsed.params, parsed.query, parsed.fragment))
+
+
+def load_token_from_env_file() -> tuple[str, str]:
+    """.env/.env.local から TOKEN/TOKENN を取得する。見つからない場合は環境変数も参照する。"""
+    env_candidates = [
+        Path.cwd() / ".env",
+        Path.cwd() / ".env.local",
+        Path(__file__).resolve().parents[2] / ".env",
+        Path(__file__).resolve().parents[2] / ".env.local",
+    ]
+
+    pattern = re.compile(r"^(TOKEN|TOKENN)\s*=\s*(.+)$")
+
+    for env_path in env_candidates:
+        if not env_path.exists():
+            continue
+
+        # utf-8-sig で BOM 付き .env も安全に扱う
+        for line in env_path.read_text(encoding="utf-8-sig").splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            if stripped.startswith("export "):
+                stripped = stripped[len("export "):].strip()
+
+            match = pattern.match(stripped)
+            if match:
+                raw_value = match.group(2).strip()
+                # インラインコメントを除去
+                if " #" in raw_value:
+                    raw_value = raw_value.split(" #", 1)[0].strip()
+
+                value = raw_value.strip('"').strip("'")
+                if value:
+                    return value, str(env_path)
+
+    env_token = os.getenv("TOKEN", "") or os.getenv("TOKENN", "")
+    if env_token:
+        return env_token, "environment variable"
+
+    return "", "not found"
 
 
 # ─── エントリーポイント ────────────────────────────────────────────────────
 
 async def main() -> None:
-    uri = sys.argv[1] if len(sys.argv) > 1 else "ws://localhost:8765"
+    raw_uri = sys.argv[1] if len(sys.argv) > 1 else "wss://jongpire.onrender.com/ws"
+    uri = normalize_ws_uri(raw_uri)
+    token, token_source = load_token_from_env_file()
+    headers = {}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+        headers["X-Token"] = token
+        print(f"[auth] token loaded from: {token_source} (length={len(token)})")
+    else:
+        print("[auth] token not found in .env/.env.local or environment")
+
     print(f"接続中: {uri} ...")
     try:
-        async with websockets.connect(uri) as ws:
+        connect_kwargs: dict[str, Any] = {
+            "open_timeout": 20,
+            "close_timeout": 10,
+            "ping_interval": 20,
+            "ping_timeout": 20,
+        }
+        if headers:
+            # websockets 14+ は additional_headers、旧版は extra_headers。
+            if "additional_headers" in inspect.signature(websockets.connect).parameters:
+                connect_kwargs["additional_headers"] = headers
+            else:
+                connect_kwargs["extra_headers"] = headers
+
+        async with websockets.connect(uri, **connect_kwargs) as ws:
+            print("[接続成功]")
             await asyncio.gather(
                 sender(ws),
                 receiver(ws),
                 return_exceptions=True,
             )
-    except (ConnectionRefusedError, OSError) as exc:
+    except InvalidStatus as exc:
+        status_code = getattr(exc, "status_code", None)
+        if status_code is None:
+            response = getattr(exc, "response", None)
+            status_code = getattr(response, "status_code", "unknown")
+        print(f"[接続失敗] HTTPステータス不正: {status_code}")
+    except InvalidURI as exc:
+        print(f"[接続失敗] URI不正: {exc}")
+    except (ConnectionRefusedError, OSError, asyncio.TimeoutError) as exc:
         print(f"[接続失敗] {exc}")
+    except Exception as exc:
+        print(f"[接続失敗] {type(exc).__name__}: {exc}")
 
 
 if __name__ == "__main__":

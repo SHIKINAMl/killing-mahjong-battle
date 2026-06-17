@@ -100,3 +100,6 @@ InitTestScene*.unity*
 
 **/__pycache__/**
 test.py
+
+# Environment variables
+.env

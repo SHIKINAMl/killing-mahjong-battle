@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Concurrent;
+using System.IO;
 using System.Net.WebSockets;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
@@ -25,15 +27,20 @@ using UnityEngine;
 /// </summary>
 public class WebSocketGameClientSample : MonoBehaviour
 {
-    // 接続先 URL（例: ws://127.0.0.1:8765）
+    // 接続先 URL（例: wss://jongpire.onrender.com/ws）
     [Header("Connection")]
-    [SerializeField] private string serverUrl = "ws://127.0.0.1:8765";
+    [SerializeField] private string serverUrl = "wss://jongpire.onrender.com/ws";
+        private string myClientId = "";
+
     // true の場合、Start 時に自動接続
     [SerializeField] private bool autoConnectOnStart = true;
 
     // ContextMenu の「Send Sample」で送るテキスト
     [Header("Send")]
     [SerializeField] private string sampleMessage = "{\"type\":\"ping\"}";
+
+    [Header("Auth")]
+    [SerializeField] private string tokenEnvFileName = ".env";
 
     // true の場合、送受信ログを Console に表示
     [Header("Debug")]
@@ -100,11 +107,19 @@ public class WebSocketGameClientSample : MonoBehaviour
         cancellationTokenSource = new CancellationTokenSource();
         webSocket = new ClientWebSocket();
 
+        string token = LoadTokenFromEnv();
+        if (!string.IsNullOrEmpty(token))
+        {
+            webSocket.Options.SetRequestHeader("Authorization", $"Bearer {token}");
+            webSocket.Options.SetRequestHeader("X-Token", token);
+        }
+
         try
         {
+            string normalizedUrl = NormalizeServerUrl(serverUrl);
             // WebSocket 接続
-            await webSocket.ConnectAsync(new Uri(serverUrl), cancellationTokenSource.Token);
-            Log($"Connected: {serverUrl}");
+            await webSocket.ConnectAsync(new Uri(normalizedUrl), cancellationTokenSource.Token);
+            Log($"Connected: {normalizedUrl}");
 
             // 受信待ちループをバックグラウンド開始
             _ = ReceiveLoopAsync(cancellationTokenSource.Token);
@@ -114,6 +129,52 @@ public class WebSocketGameClientSample : MonoBehaviour
             Debug.LogError($"WebSocket connect failed: {ex.Message}");
         }
 #endif
+    }
+
+    private string LoadTokenFromEnv()
+    {
+        try
+        {
+            string[] candidates =
+            {
+                Path.Combine(Directory.GetCurrentDirectory(), tokenEnvFileName),
+                Path.Combine(Application.dataPath, "..", tokenEnvFileName),
+            };
+
+            foreach (string path in candidates)
+            {
+                string fullPath = Path.GetFullPath(path);
+                if (!File.Exists(fullPath))
+                {
+                    continue;
+                }
+
+                foreach (string line in File.ReadAllLines(fullPath, Encoding.UTF8))
+                {
+                    string trimmed = line.Trim();
+                    if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith("#"))
+                    {
+                        continue;
+                    }
+
+                    if (trimmed.StartsWith("TOKEN="))
+                    {
+                        string value = trimmed.Substring("TOKEN=".Length).Trim().Trim('"').Trim('\'');
+                        if (!string.IsNullOrEmpty(value))
+                        {
+                            return value;
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[WebSocket] Failed to load TOKEN from .env: {ex.Message}");
+        }
+
+        string envToken = Environment.GetEnvironmentVariable("TOKEN");
+        return envToken ?? string.Empty;
     }
 
     /// <summary>
@@ -230,9 +291,69 @@ public class WebSocketGameClientSample : MonoBehaviour
     /// 受信メッセージの処理。
     /// 最小サンプルのため、内容解析はせずログ出力のみ行う。
     /// </summary>
-    private void HandleServerMessage(string raw)
+    private async void HandleServerMessage(string raw)
     {
         Log($"Recv: {raw}");
+
+        try
+        {
+            using JsonDocument doc = JsonDocument.Parse(raw);
+            if (!doc.RootElement.TryGetProperty("type", out JsonElement typeElem))
+            {
+                return;
+            }
+
+            string msgType = typeElem.GetString();
+            if (string.IsNullOrEmpty(msgType))
+            {
+                return;
+            }
+
+            if (msgType == "connected")
+            {
+                if (doc.RootElement.TryGetProperty("data", out JsonElement dataElem)
+                    && dataElem.TryGetProperty("client_id", out JsonElement clientElem))
+                {
+                    myClientId = clientElem.GetString() ?? "";
+                }
+                Log($"[WebSocket] Connection confirmed! Client ID: {myClientId}");
+                await SendAsync("{\"type\":\"join\"}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[WebSocket] Failed to parse message: {ex.Message}");
+        }
+    }
+
+    private string NormalizeServerUrl(string rawUrl)
+    {
+        if (string.IsNullOrWhiteSpace(rawUrl))
+        {
+            return "wss://jongpire.onrender.com/ws";
+        }
+
+        string url = rawUrl.Trim();
+
+        if (url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            url = "wss://" + url.Substring("https://".Length);
+        }
+        else if (url.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+        {
+            url = "ws://" + url.Substring("http://".Length);
+        }
+
+        if (url.EndsWith("/"))
+        {
+            url = url.TrimEnd('/');
+        }
+        if (!url.EndsWith("/ws", StringComparison.OrdinalIgnoreCase))
+        {
+            url += "/ws";
+        }
+
+        return url;
     }
 
     /// <summary>
