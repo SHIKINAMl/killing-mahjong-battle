@@ -17,6 +17,7 @@ namespace KillingMahjong.UI
         [SerializeField] private Button increaseBetButton;
         [SerializeField] private Button decreaseBetButton;
         [SerializeField] private Button confirmButton;
+        [SerializeField] private Button fullBetButton;
 
         [Header("Settings")]
         [SerializeField] private float slideDuration = 0.5f;
@@ -61,6 +62,8 @@ namespace KillingMahjong.UI
             if (increaseBetButton != null) increaseBetButton.onClick.AddListener(IncreaseBet);
             if (decreaseBetButton != null) decreaseBetButton.onClick.AddListener(DecreaseBet);
             if (confirmButton != null) confirmButton.onClick.AddListener(ConfirmBet);
+
+            if (fullBetButton != null) fullBetButton.onClick.AddListener(FullBet);
         }
 
         public void ShowBettingPhase(int initialHp, int currentHp, int specialVictoryCount, Action<int> onConfirm)
@@ -146,6 +149,17 @@ namespace KillingMahjong.UI
             }
         }
 
+        private void FullBet()
+        {
+            int maxAllowed = Mathf.Min(maxBet, currentMoney);
+            int validMax = Mathf.FloorToInt((float)maxAllowed / bettingUnit) * bettingUnit;
+            if (validMax >= bettingUnit)
+            {
+                currentBet = validMax;
+                UpdateUI();
+            }
+        }
+
         private void UpdateUI()
         {
             if (currentMoneyText != null)
@@ -164,14 +178,22 @@ namespace KillingMahjong.UI
             // Disable buttons appropriately
             increaseBetButton.interactable = (currentBet + bettingUnit <= maxBet && currentBet + bettingUnit <= currentMoney);
             decreaseBetButton.interactable = (currentBet - bettingUnit >= bettingUnit);
+            
+            if (fullBetButton != null)
+            {
+                int maxAllowed = Mathf.Min(maxBet, currentMoney);
+                int validMax = Mathf.FloorToInt((float)maxAllowed / bettingUnit) * bettingUnit;
+                fullBetButton.interactable = (currentBet < validMax);
+            }
         }
 
         private void ConfirmBet()
         {
             // Lock UI
-            increaseBetButton.interactable = false;
-            decreaseBetButton.interactable = false;
-            confirmButton.interactable = false;
+            if (increaseBetButton != null) increaseBetButton.interactable = false;
+            if (decreaseBetButton != null) decreaseBetButton.interactable = false;
+            if (fullBetButton != null) fullBetButton.interactable = false;
+            if (confirmButton != null) confirmButton.interactable = false;
 
             onConfirmAction?.Invoke(currentBet);
         }
