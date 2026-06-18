@@ -116,6 +116,13 @@ namespace KillingMahjong.Managers
                     OriginalWallTiles = new List<int>(wall);
                     DiscardedWallIndexes.Clear();
                 }
+                else
+                {
+                    for (int i = 0; i < wall.Count; i++)
+                    {
+                        OriginalWallTiles[i] = wall[i];
+                    }
+                }
                 
                 List<int> displayWall = new List<int>(wall);
                 if (hand != null)

@@ -64,7 +64,10 @@ namespace KillingMahjong.UI
                 for (int i = uiManager.HandUI.GetHandSlots().Count - 1; i >= 0; i--)
                 {
                     Transform t = uiManager.HandUI.GetHandSlots()[i];
-                    if (t != null) Destroy(t.gameObject);
+                    if (t != null) {
+                        t.SetParent(null);
+                        Destroy(t.gameObject);
+                    }
                 }
                 uiManager.HandUI.GetHandSlots().Clear();
             }
@@ -73,7 +76,10 @@ namespace KillingMahjong.UI
                 for (int i = uiManager.WallUI.GetWallSlots().Count - 1; i >= 0; i--)
                 {
                     Transform t = uiManager.WallUI.GetWallSlots()[i];
-                    if (t != null) Destroy(t.gameObject);
+                    if (t != null) {
+                        t.SetParent(null);
+                        Destroy(t.gameObject);
+                    }
                 }
                 uiManager.WallUI.GetWallSlots().Clear();
             }
@@ -250,7 +256,10 @@ namespace KillingMahjong.UI
                 for (int i = uiManager.EnemyWallUI.GetEnemyWallSlots().Count - 1; i >= 0; i--)
                 {
                     Transform t = uiManager.EnemyWallUI.GetEnemyWallSlots()[i];
-                    if (t != null) Destroy(t.gameObject);
+                    if (t != null) {
+                        t.SetParent(null);
+                        Destroy(t.gameObject);
+                    }
                 }
                 uiManager.EnemyWallUI.GetEnemyWallSlots().Clear();
 

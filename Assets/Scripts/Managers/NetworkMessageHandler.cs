@@ -192,6 +192,8 @@ namespace KillingMahjong.Network
                         StatusMessage statusMsg = JsonUtility.FromJson<StatusMessage>(jsonString);
                         if (statusMsg != null && statusMsg.data != null)
                         {
+                            bool shouldRebuild = false;
+
                             // 文字列抽出による boost_hand_bonus の簡単な取得 (JsonUtility制約回避用)
                             if (statusMsg.data.player_state != null)
                             {
@@ -199,6 +201,42 @@ namespace KillingMahjong.Network
                                 var bonusDict = ParseBoostHandBonus(jsonString, localPlayerId);
                                 if (bonusDict != null) {
                                     Managers.BoardStateManager.Instance.LocalBoostHandBonus = bonusDict;
+                                }
+
+                                if (statusMsg.data.player_state.wall != null && statusMsg.data.player_state.hand != null)
+                                {
+                                    var localWall = new System.Collections.Generic.List<int>(statusMsg.data.player_state.wall);
+                                    var localHand = new System.Collections.Generic.List<int>();
+                                    
+                                    if (statusMsg.data.game_state != null && statusMsg.data.game_state.status == "hand_selection") 
+                                    {
+                                        var targetIndexes = Managers.BoardStateManager.Instance.TargetHandIndexes;
+                                        if (targetIndexes != null) {
+                                            foreach(var idx in targetIndexes) {
+                                                if (idx >= 0 && idx < localWall.Count) {
+                                                    localHand.Add(localWall[idx]);
+                                                }
+                                            }
+                                        }
+                                    }
+                                    else 
+                                    {
+                                        var localHandIndices = statusMsg.data.player_state.hand;
+                                        if (localHandIndices != null) {
+                                            foreach(var idx in localHandIndices) {
+                                                if (idx >= 0 && idx < localWall.Count) {
+                                                    localHand.Add(localWall[idx]);
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Managers.BoardStateManager.Instance.SetLocalState(
+                                        localWall,
+                                        localHand,
+                                        statusMsg.data.player_state.waits != null ? new System.Collections.Generic.List<int>(statusMsg.data.player_state.waits) : new System.Collections.Generic.List<int>()
+                                    );
+                                    shouldRebuild = true;
                                 }
                             }
                             if (statusMsg.data.opponent_player_state != null)
@@ -208,6 +246,25 @@ namespace KillingMahjong.Network
                                 if (bonusDict != null) {
                                     Managers.BoardStateManager.Instance.EnemyBoostHandBonus = bonusDict;
                                 }
+
+                                if (statusMsg.data.opponent_player_state.wall != null && statusMsg.data.opponent_player_state.hand != null)
+                                {
+                                    var dummyEnemyHand = new System.Collections.Generic.List<int>();
+                                    foreach(var _ in statusMsg.data.opponent_player_state.hand) {
+                                        dummyEnemyHand.Add(-1);
+                                    }
+
+                                    Managers.BoardStateManager.Instance.SetEnemyState(
+                                        new System.Collections.Generic.List<int>(statusMsg.data.opponent_player_state.wall),
+                                        dummyEnemyHand
+                                    );
+                                    shouldRebuild = true;
+                                }
+                            }
+
+                            if (shouldRebuild)
+                            {
+                                Managers.BoardStateManager.Instance.FireRebuildEvent();
                             }
 
                             // 恒常強化された役のパース等、後でUI表示用に利用
@@ -632,7 +689,11 @@ namespace KillingMahjong.Network
                 }
                 else
                 {
-                    Managers.BoardStateManager.Instance.SetEnemyState(wallTiles, handTiles);
+                    var dummyEnemyHand = new System.Collections.Generic.List<int>();
+                    foreach(var _ in handTiles) {
+                        dummyEnemyHand.Add(-1);
+                    }
+                    Managers.BoardStateManager.Instance.SetEnemyState(wallTiles, dummyEnemyHand);
                 }
             }
             

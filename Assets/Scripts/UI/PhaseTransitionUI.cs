@@ -488,7 +488,7 @@ namespace KillingMahjong.UI
         [SerializeField] private Sprite bloodSplatterSprite;
         [SerializeField] private Color dimmerColor = new Color(0, 0, 0, 0.7f);
         [SerializeField] private Sprite playerCutinSprite;
-        [SerializeField] private Sprite enemyCutinSprite;
+        [SerializeField] private Sprite playerTroubledSprite;
 
         public void PlayScoreSettlementAnimation(
             bool isLocalWin,
@@ -789,6 +789,11 @@ namespace KillingMahjong.UI
             containerRt.anchorMax = Vector2.one;
             containerRt.sizeDelta = Vector2.zero;
 
+            Canvas containerCanvas = container.AddComponent<Canvas>();
+            container.AddComponent<UnityEngine.UI.GraphicRaycaster>();
+            containerCanvas.overrideSorting = true;
+            containerCanvas.sortingOrder = 32700;
+
             // 2. 即時ディマー（真っ暗に近い）
             GameObject dimmer = new GameObject("Dimmer");
             dimmer.transform.SetParent(containerRt, false);
@@ -799,63 +804,67 @@ namespace KillingMahjong.UI
             dimmerRt.anchorMax = Vector2.one;
             dimmerRt.sizeDelta = Vector2.zero;
 
-            // 3. ランダムな血飛沫と図形（背景）を生成（量を抑える）
-            int splatterCount = 2; // 5から2に減らしてスッキリさせる
+            // 3. 大迫力の斜め背景エフェクト（左下から右上へ）と血飛沫
             List<RectTransform> bgElements = new List<RectTransform>();
             List<Vector2> bgTargetPos = new List<Vector2>();
             List<Vector2> bgStartPos = new List<Vector2>();
 
-            for (int i = 0; i < splatterCount; i++)
+            // 巨大な斜め背景
+            GameObject bgStripeObj = new GameObject("BgStripe");
+            bgStripeObj.transform.SetParent(containerRt, false);
+            Image stripeImg = bgStripeObj.AddComponent<Image>();
+            
+            if (isLocalPlayer)
             {
-                GameObject bgObj = new GameObject($"BgElement_{i}");
-                bgObj.transform.SetParent(containerRt, false);
-                Image img = bgObj.AddComponent<Image>();
-                
-                // 血飛沫か長方形のスラッシュかランダム
-                bool isSplatter = bloodSplatterSprite != null && UnityEngine.Random.value > 0.4f;
-                if (isSplatter)
-                {
-                    img.sprite = bloodSplatterSprite;
-                    img.preserveAspect = true;
-                }
+                stripeImg.color = new Color32(10, 80, 200, 255); // 鮮やかな青
+            }
+            else
+            {
+                stripeImg.color = new Color32(180, 10, 10, 255); // 鮮やかな赤
+            }
 
-                // プレイヤーと敵でテーマカラーを完全に分ける
-                float colorRand = UnityEngine.Random.value;
-                if (isLocalPlayer)
-                {
-                    // 自分のターン：冷静なブルーテーマ
-                    if (colorRand > 0.7f) img.color = new Color32(10, 80, 200, 255); // 鮮やかな青
-                    else if (colorRand > 0.2f) img.color = new Color32(5, 15, 40, 255); // 深いネイビー（黒の代わり）
-                    else img.color = new Color32(200, 200, 255, 180); // 白（青み）
-                }
-                else
-                {
-                    // 相手のターン：狂気のレッドテーマ
-                    if (colorRand > 0.7f) img.color = new Color32(180, 10, 10, 255); // 赤
-                    else if (colorRand > 0.2f) img.color = new Color32(15, 15, 15, 255); // 黒
-                    else img.color = new Color32(200, 200, 200, 180); // 白
-                }
+            RectTransform stripeRt = bgStripeObj.GetComponent<RectTransform>();
+            // 画面を覆い尽くすほどの長方形
+            stripeRt.sizeDelta = new Vector2(Screen.width * 3f, Screen.height * 0.8f);
+            stripeRt.localRotation = Quaternion.Euler(0, 0, 25f); // 左下から右上への傾き
+            
+            // 下から斜めに突き抜けるように配置
+            Vector2 stripeTarget = new Vector2(0, 0);
+            Vector2 stripeStart = new Vector2(0, -Screen.height * 1.5f);
+            stripeRt.anchoredPosition = stripeStart;
 
-                RectTransform rt = bgObj.GetComponent<RectTransform>();
-                float size = isSplatter ? UnityEngine.Random.Range(600, 1000) : UnityEngine.Random.Range(400, 1000);
-                rt.sizeDelta = isSplatter ? new Vector2(size, size) : new Vector2(Screen.width * 2.5f, size / 4f);
-                
-                // 回転（少しマイルドに）
-                rt.localRotation = Quaternion.Euler(0, 0, UnityEngine.Random.Range(-20f, 20f));
+            bgElements.Add(stripeRt);
+            bgStartPos.Add(stripeStart);
+            bgTargetPos.Add(stripeTarget);
 
-                // 位置（画面中心付近から散らす）
-                Vector2 targetPos = new Vector2(UnityEngine.Random.Range(-400f, 400f), UnityEngine.Random.Range(-300f, 300f));
-                Vector2 startPos = targetPos + new Vector2(UnityEngine.Random.Range(-800f, 800f), UnityEngine.Random.Range(-800f, 800f)); // バラバラの方向から飛んでくる
-                
-                rt.anchoredPosition = startPos;
-                
-                bgElements.Add(rt);
-                bgStartPos.Add(startPos);
-                bgTargetPos.Add(targetPos);
+            // 追加の血飛沫（少しだけ）
+            if (bloodSplatterSprite != null)
+            {
+                for (int i = 0; i < 2; i++)
+                {
+                    GameObject splatterObj = new GameObject($"Splatter_{i}");
+                    splatterObj.transform.SetParent(containerRt, false);
+                    Image spImg = splatterObj.AddComponent<Image>();
+                    spImg.sprite = bloodSplatterSprite;
+                    spImg.color = isLocalPlayer ? new Color32(10, 80, 200, 180) : new Color32(180, 10, 10, 180);
+                    spImg.preserveAspect = true;
+
+                    RectTransform spRt = splatterObj.GetComponent<RectTransform>();
+                    float size = UnityEngine.Random.Range(600, 1200);
+                    spRt.sizeDelta = new Vector2(size, size);
+                    spRt.localRotation = Quaternion.Euler(0, 0, UnityEngine.Random.Range(0, 360f));
+                    
+                    Vector2 spTarget = new Vector2(UnityEngine.Random.Range(-300f, 300f), UnityEngine.Random.Range(-200f, 200f));
+                    Vector2 spStart = spTarget + new Vector2(0, -Screen.height);
+                    
+                    bgElements.Add(spRt);
+                    bgStartPos.Add(spStart);
+                    bgTargetPos.Add(spTarget);
+                }
             }
 
             // 4. キャラクター立ち絵
-            Sprite cutinSprite = isLocalPlayer ? playerCutinSprite : enemyCutinSprite;
+            Sprite cutinSprite = isLocalPlayer ? playerCutinSprite : playerTroubledSprite;
             GameObject portraitObj = null;
             RectTransform portraitRt = null;
             Vector2 portraitTargetPos = Vector2.zero;
@@ -873,23 +882,13 @@ namespace KillingMahjong.UI
                 portraitRt.pivot = new Vector2(0.5f, 0f); // 下端中央
                 portraitRt.sizeDelta = new Vector2(700, 900);
                 
-                if (isLocalPlayer)
-                {
-                    // 自分の場合は左下に配置
-                    portraitRt.anchorMin = new Vector2(0f, 0f);
-                    portraitRt.anchorMax = new Vector2(0f, 0f);
-                    portraitTargetPos = new Vector2(350, -50); 
-                }
-                else
-                {
-                    // 相手の場合は右下に配置し、画像を左右反転（敵側から向かってくる感）
-                    portraitRt.anchorMin = new Vector2(1f, 0f);
-                    portraitRt.anchorMax = new Vector2(1f, 0f);
-                    portraitTargetPos = new Vector2(-350, -50);
-                    portraitRt.localScale = new Vector3(-1f, 1f, 1f);
-                }
-
-                portraitRt.anchoredPosition = portraitTargetPos; 
+                // 常に左下に配置（自分の顔のみ出るため）
+                portraitRt.anchorMin = new Vector2(0f, 0f);
+                portraitRt.anchorMax = new Vector2(0f, 0f);
+                portraitTargetPos = new Vector2(180, -50); // 左側に寄せる
+                portraitStartPos = portraitTargetPos + new Vector2(0, -800); // 下から上がってくる
+                
+                portraitRt.anchoredPosition = portraitStartPos; 
                 
                 // 立ち絵にテーマカラーのドロップシャドウ
                 Shadow pShadow = portraitObj.AddComponent<Shadow>();
@@ -902,10 +901,10 @@ namespace KillingMahjong.UI
             mainTextObj.transform.SetParent(containerRt, false);
             TextMeshProUGUI mainText = mainTextObj.AddComponent<TextMeshProUGUI>();
             mainText.text = skillName;
-            mainText.fontSize = 120; // かなり小さく変更
+            mainText.fontSize = 90; // スケールを1にする代わりにフォントサイズを大きくする
             mainText.color = new Color32(255, 255, 255, 0); // 白字
             mainText.fontStyle = FontStyles.Bold;
-            mainText.alignment = TextAlignmentOptions.Center;
+            mainText.alignment = TextAlignmentOptions.Right;
             if (centerText != null) mainText.font = centerText.font;
 
             // 黒い影
@@ -919,10 +918,13 @@ namespace KillingMahjong.UI
             txtShadow2.effectDistance = new Vector2(-10, 8);
 
             RectTransform mainRt = mainText.GetComponent<RectTransform>();
-            mainRt.sizeDelta = new Vector2(2000, 800);
-            mainRt.anchoredPosition = new Vector2(0, string.IsNullOrEmpty(subText) ? 0 : 50); // より下に配置
-            mainRt.localRotation = Quaternion.Euler(0, 0, -15f); // 以前の傾きに戻す
-            mainRt.localScale = new Vector3(5f, 5f, 1f); // 以前のスケールに戻す
+            mainRt.anchorMin = new Vector2(1f, 1f);
+            mainRt.anchorMax = new Vector2(1f, 1f);
+            mainRt.pivot = new Vector2(1f, 1f);
+            mainRt.sizeDelta = new Vector2(500, 150); // 幅を絞る
+            mainRt.anchoredPosition = new Vector2(-100, string.IsNullOrEmpty(subText) ? -120 : -80); // さらに下・左へ移動
+            mainRt.localRotation = Quaternion.Euler(0, 0, -10f); // 少し傾ける
+            mainRt.localScale = Vector3.one; // スケールは1にする
 
             // 6. サブテキスト（役の名前など）
             TextMeshProUGUI subTextUI = null;
@@ -935,10 +937,10 @@ namespace KillingMahjong.UI
                 subCg.alpha = 0f;
                 subTextUI = subObj.AddComponent<TextMeshProUGUI>();
                 subTextUI.text = subText;
-                subTextUI.fontSize = 80; // かなり小さく変更
+                subTextUI.fontSize = 60; // 適切なサイズに
                 subTextUI.color = new Color32(255, 255, 255, 255);
                 subTextUI.fontStyle = FontStyles.Bold;
-                subTextUI.alignment = TextAlignmentOptions.Center;
+                subTextUI.alignment = TextAlignmentOptions.Right;
                 if (centerText != null) subTextUI.font = centerText.font;
 
                 Shadow s1 = subObj.AddComponent<Shadow>();
@@ -950,9 +952,12 @@ namespace KillingMahjong.UI
                 s2.effectDistance = new Vector2(-10, 8);
 
                 RectTransform subRt = subTextUI.GetComponent<RectTransform>();
-                subRt.sizeDelta = new Vector2(2000, 400);
-                subRt.anchoredPosition = new Vector2(0, -150); // メインテキストに合わせて下げる
-                subRt.localRotation = Quaternion.identity; // 水平
+                subRt.anchorMin = new Vector2(1f, 1f);
+                subRt.anchorMax = new Vector2(1f, 1f);
+                subRt.pivot = new Vector2(1f, 1f);
+                subRt.sizeDelta = new Vector2(500, 100);
+                subRt.anchoredPosition = new Vector2(-100, -180); // メインテキストの下へ
+                subRt.localRotation = Quaternion.Euler(0, 0, -10f); // メインテキストと同じ傾き
                 subRt.localScale = Vector3.one;
             }
 
@@ -960,8 +965,9 @@ namespace KillingMahjong.UI
             float t = 0;
             float impactDuration = 0.15f; 
 
-            // スライドを廃止し、背景要素は最初から定位置に「ばっ！」と表示する
-            for (int i = 0; i < bgElements.Count; i++) bgElements[i].anchoredPosition = bgTargetPos[i];
+            // スライドを廃止し、背景要素と立ち絵は下から「ばっ！」と突き上げる
+            for (int i = 0; i < bgElements.Count; i++) bgElements[i].anchoredPosition = bgStartPos[i];
+            if (portraitRt != null) portraitRt.anchoredPosition = portraitStartPos;
 
             // 画面揺れ
             StartCoroutine(ScreenShakeRoutine(0.2f, 15f));
@@ -971,9 +977,19 @@ namespace KillingMahjong.UI
                 float progress = t / impactDuration;
                 float easeIn = Mathf.Pow(progress, 3f);
 
-                // 文字が叩きつけられる演出だけは残す（勢いが出るため）
+                // 文字が叩きつけられる演出（スケール5から1へ）
                 mainRt.localScale = Vector3.LerpUnclamped(new Vector3(5f, 5f, 1f), Vector3.one, easeIn);
                 mainText.color = new Color32(255, 255, 255, (byte)(255 * progress));
+
+                // 背景と立ち絵の下からのスライドイン
+                for (int i = 0; i < bgElements.Count; i++)
+                {
+                    bgElements[i].anchoredPosition = Vector2.LerpUnclamped(bgStartPos[i], bgTargetPos[i], easeIn);
+                }
+                if (portraitRt != null)
+                {
+                    portraitRt.anchoredPosition = Vector2.LerpUnclamped(portraitStartPos, portraitTargetPos, easeIn);
+                }
 
                 if (subCg != null)
                 {

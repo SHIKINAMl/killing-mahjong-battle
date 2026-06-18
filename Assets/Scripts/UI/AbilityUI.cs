@@ -81,7 +81,7 @@ namespace KillingMahjong.UI
             // Pythonの設定に合わせたアビリティ一覧
             realAbilities = new System.Collections.Generic.List<AbilityData>
             {
-                new AbilityData("mulligan", "手牌交換", 1200, "不要な牌を山札と交換する。"),
+                new AbilityData("mulligan", "牌交換", 1200, "手牌か山牌から不要な牌を選び、山札と交換する。"),
                 new AbilityData("perspective", "透視", 1500, "相手の手牌をランダムに3枚公開する。"),
                 new AbilityData("boost_hand", "役強化", 10000, "指定した役の翻数を+1する。"),
                 new AbilityData("special_victory", "特殊勝利", 30000, "3回発動すると無条件で勝利する。")
@@ -263,14 +263,6 @@ namespace KillingMahjong.UI
 
                         if (data.skillType == "mulligan")
                         {
-                            var currentHand = KillingMahjong.Managers.BoardStateManager.Instance.CurrentHandTiles;
-                            if (currentHand == null || currentHand.Count == 0)
-                            {
-                                if (uiMgr.DialogueUI != null) uiMgr.DialogueUI.ShowText("「交換する手牌がないわ！」");
-                                DeselectAll();
-                                ToggleAbilityWindow(false);
-                                return;
-                            }
                             uiMgr.StartMulliganSelection();
                         }
                         else if (data.skillType == "boost_hand")

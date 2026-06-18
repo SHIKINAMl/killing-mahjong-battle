@@ -102,7 +102,7 @@ namespace KillingMahjong.UI
             yakuText.fontSizeMin = 20;
             yakuText.fontSizeMax = 50;
             yakuText.alignment = TextAlignmentOptions.Center;
-            yakuText.enableWordWrapping = false;
+            yakuText.textWrappingMode = TextWrappingModes.NoWrap;
             
             RectTransform yakuTextRt = yakuTextObj.GetComponent<RectTransform>();
             yakuTextRt.anchorMin = Vector2.zero;

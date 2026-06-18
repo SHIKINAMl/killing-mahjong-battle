@@ -49,7 +49,10 @@ namespace KillingMahjong.UI
         {
             foreach (var t in GetHandSlots())
             {
-                if (t != null) Destroy(t.gameObject);
+                if (t != null) {
+                    t.SetParent(null);
+                    Destroy(t.gameObject);
+                }
             }
             GetHandSlots().Clear();
             realTileIds.Clear();
