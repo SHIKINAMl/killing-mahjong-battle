@@ -48,12 +48,11 @@ namespace KillingMahjong.UI
 
         private void Awake()
         {
-            // Setup positions for sliding animation
+            // Setup positions (スライドイン廃止のため、現在位置をvisiblePosとして保持するだけにする)
             if (hpBarPanel != null)
             {
                 visiblePos = hpBarPanel.anchoredPosition;
-                hiddenPos = new Vector2(visiblePos.x + hpBarPanel.rect.width + 100f, visiblePos.y); // Hide to the right
-                hpBarPanel.anchoredPosition = hiddenPos;
+                hiddenPos = visiblePos; // もう隠さないので同じ位置にしておく
             }
 
             // Get DialogueUI reference
@@ -79,11 +78,11 @@ namespace KillingMahjong.UI
             gameObject.SetActive(true);
             UpdateUI();
             
-            // Slide In Animation
+            // Slide In Animationを廃止して即時表示
             if (hpBarPanel != null)
             {
                 StopAllCoroutines();
-                StartCoroutine(SlidePanel(hiddenPos, visiblePos));
+                hpBarPanel.anchoredPosition = visiblePos;
             }
             
             // Start Auto Dialogue
@@ -103,19 +102,15 @@ namespace KillingMahjong.UI
 
             if (immediate || !gameObject.activeInHierarchy)
             {
-                // すでに非アクティブ、または即時非表示指定なら、コルーチンを回さずにそのまま終了
-                if (hpBarPanel != null)
-                {
-                    hpBarPanel.anchoredPosition = hiddenPos;
-                }
                 gameObject.SetActive(false);
                 return;
             }
 
+            // スライドアウトアニメーションを廃止して即時非表示
             if (hpBarPanel != null)
             {
                 StopAllCoroutines();
-                StartCoroutine(SlidePanel(visiblePos, hiddenPos, () => gameObject.SetActive(false)));
+                gameObject.SetActive(false);
             }
             else
             {

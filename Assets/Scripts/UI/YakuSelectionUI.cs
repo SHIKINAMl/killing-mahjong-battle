@@ -88,9 +88,11 @@ namespace KillingMahjong.UI
             contentRt.offsetMin = Vector2.zero; contentRt.offsetMax = Vector2.zero;
 
             var grid = contentObj.AddComponent<GridLayoutGroup>();
-            grid.cellSize = new Vector2(200, 60);
-            grid.spacing = new Vector2(20, 20);
-            grid.padding = new RectOffset(20, 20, 20, 20);
+            grid.cellSize = new Vector2(160, 50); // 幅と高さを少し狭く
+            grid.spacing = new Vector2(10, 15);
+            grid.padding = new RectOffset(10, 10, 20, 20);
+            grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            grid.constraintCount = 3; // 3列に固定
 
             var fitter = contentObj.AddComponent<ContentSizeFitter>();
             fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
@@ -119,7 +121,7 @@ namespace KillingMahjong.UI
                 var txt = txtObj.AddComponent<Text>();
                 txt.text = y;
                 txt.font = fontToUse;
-                txt.fontSize = 28;
+                txt.fontSize = 22; // 枠に合わせて少し文字を小さく
                 txt.color = Color.black;
                 txt.alignment = TextAnchor.MiddleCenter;
                 var txtRt = txtObj.GetComponent<RectTransform>();

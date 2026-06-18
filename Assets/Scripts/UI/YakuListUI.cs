@@ -7,35 +7,31 @@ namespace KillingMahjong.UI
 {
     public class YakuListUI : MonoBehaviour
     {
-        [Header("Yaku List Panel")]
+        [Header("Yaku List Panel (役Canvas2)")]
         [SerializeField] private GameObject yakuListPanel;
-        [SerializeField] private Button toggleButton;
+        [SerializeField] private Button toggleButton; // 役Canvas側の開くボタン
+        [SerializeField] private Button closeButton;  // 役Canvas2側の閉じるボタン(xボタン)
 
-        [Header("Boost Texts")]
-        [SerializeField] private TextMeshProUGUI localBoostText;
-        [SerializeField] private TextMeshProUGUI enemyBoostText;
+        [Header("Yaku Items")]
+        [SerializeField] private YakuItemUI itemPrefab;
+        [SerializeField] private Transform contentContainer;
+        private List<YakuItemUI> spawnedItems = new List<YakuItemUI>();
 
-        [Header("Slide Settings")]
-        [SerializeField] private RectTransform panelRect;
-        [SerializeField] private float slideDistanceY = 200f; // パネルが降りてくる距離（ピクセル）
-        [SerializeField] private float slideDuration = 0.3f;  // アニメーションの時間
-
-        private bool isShown = false;
-        private Coroutine slideCoroutine;
-        private Vector2 hiddenPos;
-        private Vector2 shownPos;
+        [Header("Active Boosts (Always Visible)")]
+        [SerializeField] private TextMeshProUGUI[] localActiveBoostTexts = new TextMeshProUGUI[3];
+        [SerializeField] private TextMeshProUGUI[] enemyActiveBoostTexts = new TextMeshProUGUI[3];
 
         private void Start()
         {
-            if (toggleButton != null)
-                toggleButton.onClick.AddListener(ToggleYakuList);
-            
-            if (panelRect != null)
-            {
-                hiddenPos = panelRect.anchoredPosition;
-                shownPos = hiddenPos + new Vector2(0, -slideDistanceY);
-            }
+            if (yakuListPanel != null)
+                yakuListPanel.SetActive(false); // 最初は非表示
 
+            if (toggleButton != null)
+                toggleButton.onClick.AddListener(OpenYakuList);
+                
+            if (closeButton != null)
+                closeButton.onClick.AddListener(CloseYakuList);
+            
             // 初期化時に New Text のままにならないようにデータを更新
             if (Managers.BoardStateManager.Instance != null)
             {
@@ -47,43 +43,95 @@ namespace KillingMahjong.UI
             }
         }
 
-        public void ToggleYakuList()
+        public void OpenYakuList()
         {
-            isShown = !isShown;
-            if (slideCoroutine != null) StopCoroutine(slideCoroutine);
-
-            if (panelRect != null)
+            if (yakuListPanel != null)
             {
-                slideCoroutine = StartCoroutine(SlideRoutine(isShown ? shownPos : hiddenPos));
+                yakuListPanel.SetActive(true);
             }
         }
 
-        private System.Collections.IEnumerator SlideRoutine(Vector2 targetPos)
+        public void CloseYakuList()
         {
-            float time = 0;
-            Vector2 startPos = panelRect.anchoredPosition;
-
-            while (time < slideDuration)
+            if (yakuListPanel != null)
             {
-                time += Time.deltaTime;
-                float t = time / slideDuration;
-                t = t * (2f - t); // イーズアウト（減速）
-                panelRect.anchoredPosition = Vector2.Lerp(startPos, targetPos, t);
-                yield return null;
+                yakuListPanel.SetActive(false);
             }
-            panelRect.anchoredPosition = targetPos;
+        }
+
+        private void InitializeItems()
+        {
+            if (itemPrefab == null || contentContainer == null) return;
+            
+            foreach (var yaku in allYakus)
+            {
+                var item = Instantiate(itemPrefab, contentContainer);
+                spawnedItems.Add(item);
+            }
         }
 
         public void UpdateBoostData(Dictionary<string, int> localBoost, Dictionary<string, int> enemyBoost)
         {
-            if (localBoostText != null)
+            if (spawnedItems.Count == 0) InitializeItems();
+
+            if (localBoost == null) localBoost = new Dictionary<string, int>();
+            if (enemyBoost == null) enemyBoost = new Dictionary<string, int>();
+
+            for (int i = 0; i < allYakus.Length; i++)
             {
-                localBoostText.text = FormatBoostDict(localBoost);
+                string yaku = allYakus[i];
+                int lBoost = localBoost.ContainsKey(yaku) ? localBoost[yaku] : 0;
+                int eBoost = enemyBoost.ContainsKey(yaku) ? enemyBoost[yaku] : 0;
+
+                if (i < spawnedItems.Count && spawnedItems[i] != null)
+                {
+                    spawnedItems[i].Setup(yaku, lBoost, eBoost);
+                }
             }
 
-            if (enemyBoostText != null)
+            UpdateActiveBoosts(localBoost, localActiveBoostTexts);
+            UpdateActiveBoosts(enemyBoost, enemyActiveBoostTexts);
+        }
+
+        private void UpdateActiveBoosts(Dictionary<string, int> boostDict, TextMeshProUGUI[] textArray)
+        {
+            if (textArray == null || textArray.Length == 0) return;
+
+            List<KeyValuePair<string, int>> activeBoosts = new List<KeyValuePair<string, int>>();
+            if (boostDict != null)
             {
-                enemyBoostText.text = FormatBoostDict(enemyBoost);
+                foreach (var kvp in boostDict)
+                {
+                    if (kvp.Value > 0)
+                    {
+                        activeBoosts.Add(kvp);
+                    }
+                }
+            }
+
+            for (int i = 0; i < textArray.Length; i++)
+            {
+                if (textArray[i] == null) continue;
+
+                GameObject targetObj = textArray[i].gameObject;
+                // 背景画像（Image）が親オブジェクトに設定されている場合、親ごと表示・非表示を切り替える
+                if (textArray[i].transform.parent != null && 
+                    textArray[i].transform.parent.gameObject != yakuListPanel &&
+                    textArray[i].transform.parent.GetComponent<UnityEngine.UI.Image>() != null)
+                {
+                    targetObj = textArray[i].transform.parent.gameObject;
+                }
+
+                if (i < activeBoosts.Count)
+                {
+                    textArray[i].text = $"{activeBoosts[i].Key}+{activeBoosts[i].Value}";
+                    targetObj.SetActive(true);
+                    textArray[i].gameObject.SetActive(true); // テキスト自体も確実にONにする
+                }
+                else
+                {
+                    targetObj.SetActive(false);
+                }
             }
         }
 
@@ -94,18 +142,5 @@ namespace KillingMahjong.UI
             "清一色",
             "九蓮宝燈", "緑一色", "清老頭", "四暗刻", "純正九蓮宝燈"
         };
-
-        private string FormatBoostDict(Dictionary<string, int> dict)
-        {
-            if (dict == null) dict = new Dictionary<string, int>();
-            
-            string result = "";
-            foreach (var yaku in allYakus)
-            {
-                int level = dict.ContainsKey(yaku) ? dict[yaku] : 0;
-                result += $"{yaku}: +{level}\n";
-            }
-            return result.TrimEnd('\n');
-        }
     }
 }

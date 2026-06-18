@@ -15,7 +15,7 @@ namespace KillingMahjong.UI
 
         [Header("Zoom Target")]
         [SerializeField] private Transform zoomTarget; // 追加：拡大させたい子オブジェクトを指定
-        [SerializeField] private Vector2 zoomOffsetUI = new Vector2(-1200f, 100f); // UI時の移動量
+        [SerializeField] private Vector3 zoomOffsetUI = new Vector3(-1200f, 100f, -500f); // ズーム時に手前に出すためVector3に変更
         [SerializeField] private Vector3 zoomOffsetWorld = new Vector3(-4.0f, 1.0f, -2.0f); // 3D時の移動量
 
         [Header("Character Portrait")]
@@ -34,6 +34,8 @@ namespace KillingMahjong.UI
         private Vector3 originalLocalPos;
         private Vector3 originalScale;
 
+        private bool isInitialized = false;
+
         private void Awake()
         {
             if (characterData != null)
@@ -50,21 +52,41 @@ namespace KillingMahjong.UI
             {
                 normalSprite = characterRenderer.sprite;
             }
+
+            InitializeOriginalTransform();
         }
 
-        private void Start()
+        private void InitializeOriginalTransform()
         {
+            if (isInitialized) return;
+
             if (characterRenderer != null)
             {
                 originalPosition = characterRenderer.transform.localPosition;
             }
 
+            Transform targetObj = zoomTarget != null ? zoomTarget : transform;
+            originalLocalPos = targetObj.localPosition;
+            originalScale = targetObj.localScale;
+
             // UI要素が前面に出て牌のクリック判定を吸い取るのを防ぐため、当たり判定を無効化する
+            // ただし、ボタンとして機能すべき要素（自身や親にButtonコンポーネントを持つ）は除外する
             var graphics = GetComponentsInChildren<UnityEngine.UI.Graphic>(true);
             foreach (var g in graphics)
             {
+                if (g.GetComponentInParent<UnityEngine.UI.Button>(true) != null)
+                {
+                    continue;
+                }
                 g.raycastTarget = false;
             }
+
+            isInitialized = true;
+        }
+
+        private void Start()
+        {
+            InitializeOriginalTransform();
         }
 
         public void SetMaxHP(int max)
@@ -156,10 +178,6 @@ namespace KillingMahjong.UI
 
             Transform targetObj = zoomTarget != null ? zoomTarget : transform;
 
-            // ズーム開始直前の位置とサイズを記憶する
-            originalLocalPos = targetObj.localPosition;
-            originalScale = targetObj.localScale;
-
             // 0の場合の安全対策
             if (originalScale == Vector3.zero) originalScale = Vector3.one;
 
@@ -167,7 +185,7 @@ namespace KillingMahjong.UI
             RectTransform rt = targetObj.GetComponent<RectTransform>();
             float moveX = (rt != null) ? zoomOffsetUI.x : zoomOffsetWorld.x;
             float moveY = (rt != null) ? zoomOffsetUI.y : zoomOffsetWorld.y;
-            float moveZ = (rt != null) ? 0f : zoomOffsetWorld.z;
+            float moveZ = (rt != null) ? zoomOffsetUI.z : zoomOffsetWorld.z; // Z軸も移動可能にする
             
             Vector3 targetPos = originalLocalPos + new Vector3(moveX, moveY, moveZ);
             Vector3 targetScale = originalScale * targetScaleMulti;
@@ -187,6 +205,14 @@ namespace KillingMahjong.UI
 
             targetObj.localPosition = targetPos;
             targetObj.localScale = targetScale;
+        }
+
+        public void ResetZoomImmediate()
+        {
+            if (zoomCoroutine != null) StopCoroutine(zoomCoroutine);
+            Transform targetObj = zoomTarget != null ? zoomTarget : transform;
+            targetObj.localPosition = originalLocalPos;
+            targetObj.localScale = originalScale;
         }
 
         public System.Collections.IEnumerator ResetZoomRoutine(float duration = 0.3f)

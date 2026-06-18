@@ -93,8 +93,16 @@ namespace KillingMahjong.UI
             _currentRoundIndex = 1;
             
             Managers.BoardStateManager.Instance.UpdateHp(20000, 20000);
-            if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.SetHP(20000);
-            if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetHP(20000);
+            if (uiManager.PlayerInfoUI != null) 
+            {
+                uiManager.PlayerInfoUI.gameObject.SetActive(true);
+                uiManager.PlayerInfoUI.SetHP(20000);
+            }
+            if (uiManager.EnemyInfoUI != null) 
+            {
+                uiManager.EnemyInfoUI.SetPanelVisible(true);
+                uiManager.EnemyInfoUI.SetHP(20000);
+            }
             
             if (uiManager.PhaseTransitionUI != null)
             {
@@ -160,6 +168,23 @@ namespace KillingMahjong.UI
         {
             if (uiManager.IsTransitioning) return;
 
+            if (status != RoundStatus.Betting && uiManager.PlayerInfoUI != null)
+            {
+                if (uiManager.PlayerInfoUI.gameObject.activeInHierarchy)
+                {
+                    uiManager.PlayerInfoUI.StartCoroutine(uiManager.PlayerInfoUI.ResetZoomRoutine(0.3f));
+                }
+                else
+                {
+                    uiManager.PlayerInfoUI.ResetZoomImmediate();
+                }
+            }
+
+            if (status != RoundStatus.Betting && uiManager.BettingUI != null)
+            {
+                uiManager.BettingUI.HideBettingPhase(true);
+            }
+
             bool showBoardElements = status == RoundStatus.Discard || 
                                      status == RoundStatus.Agari || 
                                      status == RoundStatus.Ron || 
@@ -201,7 +226,11 @@ namespace KillingMahjong.UI
                 case RoundStatus.Betting:
                     SetMatchUIVisibility(true); 
                     if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetPanelVisible(true);
-                    if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.gameObject.SetActive(false);
+                    if (uiManager.PlayerInfoUI != null) 
+                    {
+                        uiManager.PlayerInfoUI.gameObject.SetActive(true);
+                        uiManager.PlayerInfoUI.StartCoroutine(uiManager.PlayerInfoUI.ZoomInRoutine(0.4f, 1.5f));
+                    }
                     if (uiManager.WaitUI != null) uiManager.WaitUI.gameObject.SetActive(false);
                     if (uiManager.AbilityUI != null) uiManager.AbilityUI.gameObject.SetActive(false);
                     StartBettingPhase(Managers.BoardStateManager.Instance.LocalPlayerHp);
@@ -360,7 +389,11 @@ namespace KillingMahjong.UI
                  uiManager.SetIsTransitioning(true);
                  
                  if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetPanelVisible(false);
-                 if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.gameObject.SetActive(false);
+                 if (uiManager.PlayerInfoUI != null) 
+                 {
+                     uiManager.PlayerInfoUI.ResetZoomImmediate();
+                     uiManager.PlayerInfoUI.gameObject.SetActive(false);
+                 }
                  if (uiManager.AbilityUI != null) uiManager.AbilityUI.gameObject.SetActive(false);
                  if (uiManager.DialogueUI != null) uiManager.DialogueUI.gameObject.SetActive(false);
 
