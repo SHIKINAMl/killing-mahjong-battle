@@ -20,11 +20,15 @@ namespace KillingMahjong.UI
 
         [Header("Character Portrait")]
         [SerializeField] private SpriteRenderer characterRenderer;
+        [SerializeField] private SpriteRenderer faceRenderer; // 追加：表情レイヤー用
         [SerializeField] private CharacterData characterData; // キャラクター管理データ
+
+        public CharacterData CurrentCharacterData => characterData;
 
         private int currentHp = 20000; // 暫定の初期HP
         private Sprite normalSprite;
         private Sprite discardSprite;
+        private Sprite normalFaceSprite; // 通常時の顔画像
         
         private Coroutine bounceCoroutine;
         private Coroutine zoomCoroutine;
@@ -40,20 +44,53 @@ namespace KillingMahjong.UI
         {
             if (characterData != null)
             {
-                normalSprite = characterData.normalSprite;
-                discardSprite = characterData.discardSprite;
-                
-                if (characterRenderer != null && normalSprite != null)
-                {
-                    characterRenderer.sprite = normalSprite;
-                }
+                ApplyCharacterData(characterData);
             }
             else if (characterRenderer != null)
             {
                 normalSprite = characterRenderer.sprite;
+                if (faceRenderer != null) normalFaceSprite = faceRenderer.sprite;
             }
 
             InitializeOriginalTransform();
+        }
+
+        private void ApplyCharacterData(CharacterData data)
+        {
+            if (data == null) return;
+
+            characterData = data;
+            normalSprite = data.normalSprite;
+            discardSprite = data.discardSprite;
+            
+            Sprite defaultBody = null;
+            Sprite defaultFace = null;
+            
+            if (data.bodySprites != null && data.bodySprites.Count > 0)
+            {
+                var match = data.bodySprites.Find(x => x.id == data.defaultBodyId);
+                if (match != null) defaultBody = match.sprite;
+                else defaultBody = data.bodySprites[0].sprite;
+                normalSprite = defaultBody; // 上書き
+            }
+            
+            if (data.faceSprites != null && data.faceSprites.Count > 0)
+            {
+                var match = data.faceSprites.Find(x => x.id == data.defaultFaceId);
+                if (match != null) defaultFace = match.sprite;
+                else defaultFace = data.faceSprites[0].sprite;
+                normalFaceSprite = defaultFace;
+            }
+
+            if (characterRenderer != null && normalSprite != null)
+            {
+                characterRenderer.sprite = normalSprite;
+            }
+            
+            if (faceRenderer != null && normalFaceSprite != null)
+            {
+                faceRenderer.sprite = normalFaceSprite;
+            }
         }
 
         private void InitializeOriginalTransform()
@@ -118,9 +155,30 @@ namespace KillingMahjong.UI
 
         public void SetCharacterSprite(Sprite sprite)
         {
+            // 旧互換として残す
             if (characterRenderer != null && sprite != null)
             {
                 characterRenderer.sprite = sprite;
+            }
+        }
+
+        public void SetBodyPose(string poseId)
+        {
+            if (characterData == null || characterRenderer == null) return;
+            var match = characterData.bodySprites?.Find(x => x.id == poseId);
+            if (match != null && match.sprite != null)
+            {
+                characterRenderer.sprite = match.sprite;
+            }
+        }
+
+        public void SetFaceExpression(string expressionId)
+        {
+            if (characterData == null || faceRenderer == null) return;
+            var match = characterData.faceSprites?.Find(x => x.id == expressionId);
+            if (match != null && match.sprite != null)
+            {
+                faceRenderer.sprite = match.sprite;
             }
         }
 

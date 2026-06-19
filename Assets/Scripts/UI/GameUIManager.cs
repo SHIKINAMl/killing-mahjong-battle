@@ -387,6 +387,21 @@ namespace KillingMahjong.UI
                 if (RonWaitPanel != null)
                 {
                     RonWaitPanel.SetActive(true);
+                    RonWaitPanel.transform.SetAsLastSibling();
+
+                    // 最前面に表示するためにCanvasを追加してソート順を強制する
+                    Canvas canvas = RonWaitPanel.GetComponent<Canvas>();
+                    if (canvas == null)
+                    {
+                        canvas = RonWaitPanel.AddComponent<Canvas>();
+                    }
+                    canvas.overrideSorting = true;
+                    canvas.sortingOrder = 50; // DialogueUI や BloodMeter より高い値
+
+                    if (RonWaitPanel.GetComponent<UnityEngine.UI.GraphicRaycaster>() == null)
+                    {
+                        RonWaitPanel.AddComponent<UnityEngine.UI.GraphicRaycaster>();
+                    }
                     
                     var images = RonWaitPanel.GetComponentsInChildren<UnityEngine.UI.Image>();
                     foreach (var img in images)

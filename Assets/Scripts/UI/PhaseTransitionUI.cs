@@ -771,12 +771,12 @@ namespace KillingMahjong.UI
             onComplete?.Invoke();
         }
 
-        public void PlaySkillCutinAnimation(string skillName, bool isLocalPlayer, float duration = 2.0f, Action onComplete = null)
+        public void PlaySkillCutinAnimation(string skillName, bool isLocalPlayer, CharacterData characterData = null, float duration = 2.0f, Action onComplete = null)
         {
-            StartCoroutine(PlaySkillCutinAnimationRoutine(skillName, isLocalPlayer, duration, onComplete));
+            StartCoroutine(PlaySkillCutinAnimationRoutine(skillName, isLocalPlayer, characterData, duration, onComplete));
         }
 
-        public IEnumerator PlaySkillCutinAnimationRoutine(string skillName, bool isLocalPlayer, float duration = 2.0f, Action onComplete = null, string subText = null)
+        public IEnumerator PlaySkillCutinAnimationRoutine(string skillName, bool isLocalPlayer, CharacterData characterData = null, float duration = 2.0f, Action onComplete = null, string subText = null)
         {
             ResetVisuals();
 
@@ -864,18 +864,33 @@ namespace KillingMahjong.UI
             }
 
             // 4. キャラクター立ち絵
-            Sprite cutinSprite = isLocalPlayer ? playerCutinSprite : playerTroubledSprite;
+            Sprite bodySprite = null;
+            Sprite faceSprite = null;
+
+            if (characterData != null)
+            {
+                var bodyMatch = characterData.bodySprites?.Find(x => x.id == characterData.defaultBodyId);
+                bodySprite = bodyMatch != null ? bodyMatch.sprite : characterData.normalSprite;
+
+                var faceMatch = characterData.faceSprites?.Find(x => x.id == characterData.defaultFaceId);
+                if (faceMatch != null) faceSprite = faceMatch.sprite;
+            }
+            else
+            {
+                bodySprite = isLocalPlayer ? playerCutinSprite : playerTroubledSprite;
+            }
+
             GameObject portraitObj = null;
             RectTransform portraitRt = null;
             Vector2 portraitTargetPos = Vector2.zero;
             Vector2 portraitStartPos = Vector2.zero;
 
-            if (cutinSprite != null)
+            if (bodySprite != null)
             {
                 portraitObj = new GameObject("Portrait");
                 portraitObj.transform.SetParent(containerRt, false);
                 Image portraitImg = portraitObj.AddComponent<Image>();
-                portraitImg.sprite = cutinSprite;
+                portraitImg.sprite = bodySprite;
                 portraitImg.preserveAspect = true;
 
                 portraitRt = portraitObj.GetComponent<RectTransform>();
@@ -894,6 +909,22 @@ namespace KillingMahjong.UI
                 Shadow pShadow = portraitObj.AddComponent<Shadow>();
                 pShadow.effectColor = isLocalPlayer ? new Color32(0, 100, 255, 150) : new Color32(200, 0, 0, 150);
                 pShadow.effectDistance = new Vector2(20, -20);
+
+                // 顔画像も合成
+                if (faceSprite != null)
+                {
+                    GameObject faceObj = new GameObject("Face");
+                    faceObj.transform.SetParent(portraitRt, false);
+                    Image faceImg = faceObj.AddComponent<Image>();
+                    faceImg.sprite = faceSprite;
+                    faceImg.preserveAspect = true;
+
+                    RectTransform faceRt = faceObj.GetComponent<RectTransform>();
+                    faceRt.anchorMin = new Vector2(0, 0);
+                    faceRt.anchorMax = new Vector2(1, 1);
+                    faceRt.offsetMin = Vector2.zero;
+                    faceRt.offsetMax = Vector2.zero;
+                }
             }
 
             // 5. メインテキスト（少し傾ける）

@@ -172,11 +172,9 @@ namespace KillingMahjong.UI
                 {
                     dialogueUI.ShowText(entry.Dialogue1.Contains("「") ? entry.Dialogue1 : $"「{entry.Dialogue1}」");
                 }
-                
-                Sprite faceSprite = Managers.DialogueManager.Instance.GetExpressionSprite(entry.Expression);
-                if (faceSprite != null) 
+                if (!string.IsNullOrEmpty(entry.Expression) || !string.IsNullOrEmpty(entry.Pose)) 
                 {
-                    enemyInfoUI.PlayReactionWithFace(faceSprite, Random.Range(3.0f, 5.0f));
+                    enemyInfoUI.PlayReactionWithVisualId(entry.Pose, entry.Expression, Random.Range(3.0f, 5.0f));
                 }
                 else 
                 {

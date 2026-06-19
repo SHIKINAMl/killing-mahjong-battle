@@ -18,10 +18,18 @@ namespace KillingMahjong.UI
     public class CharacterReaction
     {
         public ReactionTrigger trigger;
-        public Sprite faceSprite;
+        public string bodyExpressionId; // 追加: 表情に合わせた体のポーズ
+        public string faceExpressionId; // faceSprites に登録したIDを指定
         
         [TextArea(2, 4)]
         public string dialogueText;
+    }
+
+    [System.Serializable]
+    public class NamedSprite
+    {
+        public string id;
+        public Sprite sprite;
     }
 
     /// <summary>
@@ -34,7 +42,15 @@ namespace KillingMahjong.UI
         [Header("Character Information")]
         public string characterName = "Unknown";
 
-        [Header("Default Sprites")]
+        [Header("Body System (のっぺらぼう)")]
+        public System.Collections.Generic.List<NamedSprite> bodySprites = new System.Collections.Generic.List<NamedSprite>();
+        public string defaultBodyId = "normal";
+
+        [Header("Face System (表情)")]
+        public System.Collections.Generic.List<NamedSprite> faceSprites = new System.Collections.Generic.List<NamedSprite>();
+        public string defaultFaceId = "normal";
+
+        [Header("Default Sprites (Old System - Fallback)")]
         public Sprite normalSprite;     // 通常時の画像
         public Sprite discardSprite;    // 通常の打牌時の画像（リアクションが無い場合のフォールバック）
 

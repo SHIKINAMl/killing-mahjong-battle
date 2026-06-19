@@ -156,15 +156,17 @@ namespace KillingMahjong.Managers
                 {
                     string safeText1 = string.Format(entry.Dialogue1, formatArg);
                     string safeExpr = entry.Expression;
+                    string safePose = entry.Pose;
                     bool isLast = string.IsNullOrEmpty(entry.Dialogue2);
-                    reactionQueue.Enqueue(() => StartCoroutine(ProcessCSVDialogue(safeText1, safeExpr, isLast ? onComplete : null)));
+                    reactionQueue.Enqueue(() => StartCoroutine(ProcessCSVDialogue(safeText1, safePose, safeExpr, isLast ? onComplete : null)));
                 }
 
                 if (!string.IsNullOrEmpty(entry.Dialogue2))
                 {
                     string safeText2 = string.Format(entry.Dialogue2, formatArg);
                     string safeExpr = entry.Expression;
-                    reactionQueue.Enqueue(() => StartCoroutine(ProcessCSVDialogue(safeText2, safeExpr, onComplete)));
+                    string safePose = entry.Pose;
+                    reactionQueue.Enqueue(() => StartCoroutine(ProcessCSVDialogue(safeText2, safePose, safeExpr, onComplete)));
                 }
                 
                 if (!isProcessingReactions) ProcessNextReaction();
@@ -176,7 +178,7 @@ namespace KillingMahjong.Managers
             EnqueueFormattedCSVDialogue(condition, "", clearPrevious);
         }
 
-        private IEnumerator ProcessCSVDialogue(string text, string expressionName, Action onComplete = null)
+        private IEnumerator ProcessCSVDialogue(string text, string poseName, string expressionName, Action onComplete = null)
         {
             if (dialogueUI != null)
             {
@@ -185,9 +187,14 @@ namespace KillingMahjong.Managers
             }
             if (enemyInfoUI != null)
             {
-                Sprite faceSprite = Managers.DialogueManager.Instance.GetExpressionSprite(expressionName);
-                if (faceSprite != null) enemyInfoUI.PlayReactionWithFace(faceSprite, reactionDisplayDuration);
-                else enemyInfoUI.PlayBounceAnimation(reactionDisplayDuration);
+                if (!string.IsNullOrEmpty(expressionName) || !string.IsNullOrEmpty(poseName))
+                {
+                    enemyInfoUI.PlayReactionWithVisualId(poseName, expressionName, reactionDisplayDuration);
+                }
+                else
+                {
+                    enemyInfoUI.PlayBounceAnimation(reactionDisplayDuration);
+                }
             }
 
             yield return StartCoroutine(WaitWhileLogIsOpen(reactionDisplayDuration));

@@ -21,6 +21,7 @@ namespace KillingMahjong.UI
 
         [Header("Character Portrait")]
         [SerializeField] private SpriteRenderer characterRenderer;
+        [SerializeField] private SpriteRenderer faceRenderer; // 追加：表情レイヤー用
         [SerializeField] private CharacterData characterData; // キャラクター管理データ
         [SerializeField] private float bounceDuration = 0.5f; // 上下する時間（インスペクターで設定可能）
         [SerializeField] private float bounceHeight = 0.5f;   // 上下する高さ（インスペクターで設定可能）
@@ -34,6 +35,7 @@ namespace KillingMahjong.UI
 
         private Sprite normalSprite;
         private Sprite discardSprite;
+        private Sprite normalFaceSprite; // 通常時の顔画像
         
         private Coroutine bounceCoroutine;
         private Coroutine reactionCoroutine;
@@ -53,17 +55,12 @@ namespace KillingMahjong.UI
         {
             if (characterData != null)
             {
-                normalSprite = characterData.normalSprite;
-                discardSprite = characterData.discardSprite;
-                
-                if (characterRenderer != null && normalSprite != null)
-                {
-                    characterRenderer.sprite = normalSprite;
-                }
+                ApplyCharacterData(characterData);
             }
             else if (characterRenderer != null)
             {
                 normalSprite = characterRenderer.sprite;
+                if (faceRenderer != null) normalFaceSprite = faceRenderer.sprite;
             }
         }
 
@@ -104,10 +101,34 @@ namespace KillingMahjong.UI
             characterData = data;
             normalSprite = data.normalSprite;
             discardSprite = data.discardSprite;
+            
+            Sprite defaultBody = null;
+            Sprite defaultFace = null;
+            
+            if (data.bodySprites != null && data.bodySprites.Count > 0)
+            {
+                var match = data.bodySprites.Find(x => x.id == data.defaultBodyId);
+                if (match != null) defaultBody = match.sprite;
+                else defaultBody = data.bodySprites[0].sprite;
+                normalSprite = defaultBody; // 上書き
+            }
+            
+            if (data.faceSprites != null && data.faceSprites.Count > 0)
+            {
+                var match = data.faceSprites.Find(x => x.id == data.defaultFaceId);
+                if (match != null) defaultFace = match.sprite;
+                else defaultFace = data.faceSprites[0].sprite;
+                normalFaceSprite = defaultFace;
+            }
 
             if (characterRenderer != null && normalSprite != null)
             {
                 characterRenderer.sprite = normalSprite;
+            }
+            
+            if (faceRenderer != null && normalFaceSprite != null)
+            {
+                faceRenderer.sprite = normalFaceSprite;
             }
         }
 
@@ -124,10 +145,16 @@ namespace KillingMahjong.UI
             var reaction = matches[Random.Range(0, matches.Count)];
 
             // 画像が設定されていれば一時的に変更
-            if (reaction.faceSprite != null)
+            if (!string.IsNullOrEmpty(reaction.faceExpressionId))
             {
-                if (reactionCoroutine != null) StopCoroutine(reactionCoroutine);
-                reactionCoroutine = StartCoroutine(TemporaryFaceRoutine(reaction.faceSprite, duration));
+                var match = characterData.faceSprites?.Find(x => x.id == reaction.faceExpressionId);
+                var bodyMatch = characterData.bodySprites?.Find(x => x.id == reaction.bodyExpressionId);
+
+                if ((match != null && match.sprite != null) || (bodyMatch != null && bodyMatch.sprite != null))
+                {
+                    if (reactionCoroutine != null) StopCoroutine(reactionCoroutine);
+                    reactionCoroutine = StartCoroutine(TemporaryVisualRoutine(bodyMatch?.sprite, match?.sprite, duration));
+                }
             }
 
             string text = reaction.dialogueText;
@@ -141,28 +168,66 @@ namespace KillingMahjong.UI
             return string.IsNullOrEmpty(text) ? null : $"「{text}」";
         }
 
-        private System.Collections.IEnumerator TemporaryFaceRoutine(Sprite newSprite, float duration)
+        private System.Collections.IEnumerator TemporaryVisualRoutine(Sprite newBody, Sprite newFace, float duration)
         {
-            if (characterRenderer != null && newSprite != null)
-            {
-                characterRenderer.sprite = newSprite;
-            }
+            Sprite originalFace = (faceRenderer != null) ? normalFaceSprite : null;
+            Sprite originalBody = normalSprite;
+
+            if (faceRenderer != null && newFace != null)
+                faceRenderer.sprite = newFace;
+            
+            if (characterRenderer != null && newBody != null)
+                characterRenderer.sprite = newBody;
 
             yield return new WaitForSeconds(duration);
 
-            if (characterRenderer != null && normalSprite != null)
-            {
-                characterRenderer.sprite = normalSprite;
-            }
+            if (faceRenderer != null && originalFace != null)
+                faceRenderer.sprite = originalFace;
+            
+            if (characterRenderer != null && originalBody != null)
+                characterRenderer.sprite = originalBody;
             
             reactionCoroutine = null;
         }
 
-        public void PlayReactionWithFace(Sprite faceSprite, float duration)
+        public void PlayReactionWithVisual(Sprite newBody, Sprite newFace, float duration)
         {
             if (reactionCoroutine != null) StopCoroutine(reactionCoroutine);
-            reactionCoroutine = StartCoroutine(TemporaryFaceRoutine(faceSprite, duration));
+            reactionCoroutine = StartCoroutine(TemporaryVisualRoutine(newBody, newFace, duration));
             PlayBounceAnimation(0.3f); // 0.3秒で一瞬跳ねる
+        }
+
+        public void PlayReactionWithVisualId(string bodyId, string faceId, float duration)
+        {
+            if ((string.IsNullOrEmpty(bodyId) && string.IsNullOrEmpty(faceId)) || characterData == null)
+            {
+                PlayBounceAnimation(0.3f);
+                return;
+            }
+            
+            Sprite newBody = null;
+            if (!string.IsNullOrEmpty(bodyId))
+            {
+                var bodyMatch = characterData.bodySprites?.Find(x => x.id == bodyId);
+                if (bodyMatch != null) newBody = bodyMatch.sprite;
+            }
+
+            Sprite newFace = null;
+            if (!string.IsNullOrEmpty(faceId))
+            {
+                var faceMatch = characterData.faceSprites?.Find(x => x.id == faceId);
+                if (faceMatch != null) newFace = faceMatch.sprite;
+            }
+
+            if (newBody != null || newFace != null)
+            {
+                PlayReactionWithVisual(newBody, newFace, duration);
+            }
+            else
+            {
+                PlayBounceAnimation(0.3f);
+                Debug.LogWarning($"[EnemyInfoUI] Neither body '{bodyId}' nor face '{faceId}' found in CharacterData!");
+            }
         }
 
         public void SetMaxHP(int max)
@@ -194,9 +259,30 @@ namespace KillingMahjong.UI
 
         public void SetCharacterSprite(Sprite sprite)
         {
+            // SetBodyPoseかSetFaceExpressionを本来は推奨するが、旧互換として残す
             if (characterRenderer != null && sprite != null)
             {
                 characterRenderer.sprite = sprite;
+            }
+        }
+
+        public void SetBodyPose(string poseId)
+        {
+            if (characterData == null || characterRenderer == null) return;
+            var match = characterData.bodySprites?.Find(x => x.id == poseId);
+            if (match != null && match.sprite != null)
+            {
+                characterRenderer.sprite = match.sprite;
+            }
+        }
+
+        public void SetFaceExpression(string expressionId)
+        {
+            if (characterData == null || faceRenderer == null) return;
+            var match = characterData.faceSprites?.Find(x => x.id == expressionId);
+            if (match != null && match.sprite != null)
+            {
+                faceRenderer.sprite = match.sprite;
             }
         }
 

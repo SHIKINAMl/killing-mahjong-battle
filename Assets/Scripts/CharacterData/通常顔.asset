@@ -13,36 +13,58 @@ MonoBehaviour:
   m_Name: "\u901A\u5E38\u9854"
   m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.CharacterData
   characterName: Unknown
-  normalSprite: {fileID: 21300000, guid: 34ce26344f6b30c4ca9493273ba73ef6, type: 3}
+  bodySprites:
+  - id: "\u901A\u5E38"
+    sprite: {fileID: 21300000, guid: 18cc9a3089f434347b19cace7a24e749, type: 3}
+  - id: "\u30D4\u30FC\u30B9"
+    sprite: {fileID: 21300000, guid: 657de045cc25a964c8af23f0365faf6a, type: 3}
+  defaultBodyId: "\u901A\u5E38"
+  faceSprites:
+  - id: "\u901A\u5E38\u9854"
+    sprite: {fileID: 21300000, guid: 34ce26344f6b30c4ca9493273ba73ef6, type: 3}
+  - id: "\u30AD\u30E1\u9854"
+    sprite: {fileID: 21300000, guid: 442c0f2bc7f7fa64fb5602337bca67ed, type: 3}
+  - id: "\u30B3\u30DF\u30AB\u30EB\u9854"
+    sprite: {fileID: 21300000, guid: 8595f14d7ac7d9f4cbfc9efa4f24b0cf, type: 3}
+  - id: "\u7B11\u9854"
+    sprite: {fileID: 21300000, guid: bd73288f768b05745915c54d2181f00e, type: 3}
+  - id: "\u56F0\u308A\u9854"
+    sprite: {fileID: 21300000, guid: 18d6838353e1a1f4f9c9a6ff38f64e72, type: 3}
+  - id: "\u30AD\u30EC\u7B11\u9854"
+    sprite: {fileID: 21300000, guid: bf778c7af5630404585a4ad08283d6e3, type: 3}
+  - id: "\u717D\u308A\u9854"
+    sprite: {fileID: 21300000, guid: 314ce57c615640f47b3b490e51830163, type: 3}
+  defaultFaceId: "\u901A\u5E38\u9854"
+  normalSprite: {fileID: 21300000, guid: 18cc9a3089f434347b19cace7a24e749, type: 3}
   discardSprite: {fileID: 21300000, guid: 09e2862a4135c044ab24dd19fe1b9f02, type: 3}
   reactions:
   - trigger: 0
-    faceSprite: {fileID: 21300000, guid: cc90039260e983b48bcf9ebb159d53f7, type: 3}
+    faceExpressionId: "\u7B11\u9854"
     dialogueText: "\u3088\u308D\u3057\u304F\u304A\u9858\u3044\u3057\u307E\u3059"
   - trigger: 1
-    faceSprite: {fileID: 21300000, guid: 64d9fd812afaeb745803d4839fd0d9a5, type: 3}
+    faceExpressionId: "\u30B3\u30DF\u30AB\u30EB\u9854"
     dialogueText: "\u306A\u306B\u306A\u306B\uFF1F"
   - trigger: 2
-    faceSprite: {fileID: 21300000, guid: 543ee16e5a9f3cd4883e9e3832b40f7d, type: 3}
+    faceExpressionId: "\u56F0\u308A\u9854"
     dialogueText: "\u3069\u308C\u306B\u3057\u3088\u3046\u304B\u306A..."
   - trigger: 3
-    faceSprite: {fileID: 21300000, guid: 09e2862a4135c044ab24dd19fe1b9f02, type: 3}
+    faceExpressionId: "\u901A\u5E38\u9854"
     dialogueText: "\u3053\u308C\u3060\u308F"
   - trigger: 4
-    faceSprite: {fileID: 21300000, guid: ed01d5c76cd18c640a0e353a77ef32f7, type: 3}
+    faceExpressionId: "\u901A\u5E38\u9854"
     dialogueText: "\u3075\u30FC\u3093..."
   - trigger: 5
-    faceSprite: {fileID: 21300000, guid: cc90039260e983b48bcf9ebb159d53f7, type: 3}
+    faceExpressionId: "\u7B11\u9854"
     dialogueText: "\u79C1\u306E\u4FA1\u5024\uFF57"
   - trigger: 1
-    faceSprite: {fileID: 21300000, guid: b427fb4f7a3f70846a6bb01a3bdcc3e8, type: 3}
+    faceExpressionId: "\u30AD\u30EC\u7B11\u9854"
     dialogueText: "\u89E6\u3089\u306A\u3044\u3067\uFF1F"
   - trigger: 6
-    faceSprite: {fileID: 21300000, guid: 4bbf18ff9aebc5444a12859ac9133c07, type: 3}
+    faceExpressionId: "\u30B3\u30DF\u30AB\u30EB\u9854"
     dialogueText: "\u306A\u3093\u3067\u3088\u304A"
   - trigger: 5
-    faceSprite: {fileID: 21300000, guid: cc90039260e983b48bcf9ebb159d53f7, type: 3}
+    faceExpressionId: "\u56F0\u308A\u9854"
     dialogueText: "\u3050\u306F\u3042\u3042\u3042\u3042\u3042"
   - trigger: 5
-    faceSprite: {fileID: 21300000, guid: cc90039260e983b48bcf9ebb159d53f7, type: 3}
+    faceExpressionId: "\u7B11\u9854"
     dialogueText: "\u3084\u3081\u3066\u30AF\u30EC\u30E1\u30F3\u30B9"

@@ -7,16 +7,10 @@ namespace KillingMahjong.Managers
     public class CsvDialogueEntry
     {
         public string Condition;   // 状況
+        public string Pose;        // 体
         public string Expression;  // 表情
         public string Dialogue1;   // セリフ1
         public string Dialogue2;   // セリフ2
-    }
-
-    [System.Serializable]
-    public class ExpressionSpriteMapping
-    {
-        public string expressionName;
-        public Sprite faceSprite;
     }
 
     /// <summary>
@@ -28,10 +22,6 @@ namespace KillingMahjong.Managers
 
         [Header("Parsed CSV Data (Auto-loaded)")]
         public List<CsvDialogueEntry> parsedDialogues = new List<CsvDialogueEntry>();
-
-        [Header("Expression Settings")]
-        [Tooltip("CSVに書かれた表情名と、実際の画像(Sprite)を紐付けるリストです")]
-        public List<ExpressionSpriteMapping> expressionMappings = new List<ExpressionSpriteMapping>();
 
         private void Awake()
         {
@@ -58,6 +48,7 @@ namespace KillingMahjong.Managers
             string[] lines = csvFile.text.Split('\n');
             
             int conditionIdx = -1;
+            int poseIdx = -1;
             int expressionIdx = -1;
             int dialogue1Idx = -1;
             int dialogue2Idx = -1;
@@ -84,6 +75,7 @@ namespace KillingMahjong.Managers
                     {
                         string headerName = exactCols[i].Replace("\uFEFF", "").Trim();
                         if (headerName == "状況") conditionIdx = i;
+                        else if (headerName == "体" || headerName == "ポーズ") poseIdx = i;
                         else if (headerName == "表情") expressionIdx = i;
                         else if (headerName == "セリフ" || headerName == "セリフ1") dialogue1Idx = i;
                         else if (headerName == "セリフ2") dialogue2Idx = i;
@@ -104,6 +96,8 @@ namespace KillingMahjong.Managers
                 var entry = new CsvDialogueEntry();
                 entry.Condition = condition;
                 
+                if (poseIdx != -1 && exactCols.Count > poseIdx)
+                    entry.Pose = exactCols[poseIdx];
                 if (expressionIdx != -1 && exactCols.Count > expressionIdx) 
                     entry.Expression = exactCols[expressionIdx];
                 if (dialogue1Idx != -1 && exactCols.Count > dialogue1Idx) 
@@ -125,13 +119,6 @@ namespace KillingMahjong.Managers
             return parsedDialogues.Find(e => e.Condition == condition);
         }
 
-        public Sprite GetExpressionSprite(string expressionName)
-        {
-            if (string.IsNullOrEmpty(expressionName)) return null;
-            var mapping = expressionMappings.Find(m => m.expressionName == expressionName);
-            return mapping != null ? mapping.faceSprite : null;
-        }
-
 #if UNITY_EDITOR
         [ContextMenu("Save to CSV")]
         private void SaveToCSV()
@@ -143,17 +130,18 @@ namespace KillingMahjong.Managers
             using (System.IO.StreamWriter writer = new System.IO.StreamWriter(path, false, encoding))
             {
                 // ヘッダーを書き込む
-                writer.WriteLine("状況,表情,セリフ,セリフ2");
+                writer.WriteLine("状況,体,表情,セリフ,セリフ2");
                 
                 // データを書き込む
                 foreach (var entry in parsedDialogues)
                 {
                     string condition = EscapeCSV(entry.Condition);
+                    string pose = EscapeCSV(entry.Pose);
                     string expression = EscapeCSV(entry.Expression);
                     string dialogue1 = EscapeCSV(entry.Dialogue1);
                     string dialogue2 = EscapeCSV(entry.Dialogue2);
                     
-                    writer.WriteLine($"{condition},{expression},{dialogue1},{dialogue2}");
+                    writer.WriteLine($"{condition},{pose},{expression},{dialogue1},{dialogue2}");
                 }
             }
             
