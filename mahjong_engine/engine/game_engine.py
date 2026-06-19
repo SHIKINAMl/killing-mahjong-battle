@@ -613,7 +613,8 @@ class GameEngine:
             return 2.0
         if han >= 6:
             return 1.5
-        return 1.0
+        if han >= 4:
+            return 1.0
 
     def _is_tanki_wait_agari(self, hand: list[int], winning_tile: int, winner_waits: list[int]) -> bool:
         """単騎待ちでの和了かどうかを判定する。"""
