@@ -104,6 +104,12 @@ namespace KillingMahjong.Managers
             ExposedLocalHandWallIndexes.Clear();
         }
 
+        public void ClearBoosts()
+        {
+            LocalBoostHandBonus?.Clear();
+            EnemyBoostHandBonus?.Clear();
+        }
+
         /// <summary>
         /// 全データを外部から受け取って一括セットする（サーバーからのwall_dealt/hand_selectedなど）
         /// </summary>

@@ -509,80 +509,73 @@ namespace KillingMahjong.UI
 
         public System.Collections.IEnumerator PlayPerspectiveAnimation(List<int> newlyExposed)
         {
-            if (uiManager.EnemyHandUI == null) yield break;
+            if (uiManager.EnemyWallUI == null) yield break;
 
-            uiManager.EnemyHandUI.gameObject.SetActive(true);
             RebuildAllTilesFromState(newlyExposed);
 
-            RectTransform enemyHandRT = uiManager.EnemyHandUI.GetComponent<RectTransform>();
-            if (enemyHandRT == null) yield break;
+            yield return new WaitForSeconds(0.5f);
 
-            int originalSiblingIndex = enemyHandRT.GetSiblingIndex();
-            enemyHandRT.SetAsLastSibling();
+            List<UnityEngine.UI.Image> glowingImages = new List<UnityEngine.UI.Image>();
 
-            Vector3 originalScale = enemyHandRT.localScale;
-            Vector3 originalPos = enemyHandRT.position;
-            
-            yield return new WaitForEndOfFrame();
-
-            Vector3 centerPos = originalPos;
-            Canvas canvas = enemyHandRT.GetComponentInParent<Canvas>();
-            if (canvas != null)
+            foreach (int index in newlyExposed)
             {
-                if (canvas.renderMode == RenderMode.ScreenSpaceOverlay)
+                if (index >= 0 && index < uiManager.EnemyWallUI.GetEnemyWallSlots().Count)
                 {
-                    centerPos = new Vector3(Screen.width * 0.5f, Screen.height * 0.45f, originalPos.z);
-                }
-                else if (canvas.worldCamera != null)
-                {
-                    centerPos = canvas.worldCamera.ViewportToWorldPoint(new Vector3(0.5f, 0.45f, canvas.planeDistance));
-                    centerPos.z = originalPos.z;
-                }
-                else if (Camera.main != null)
-                {
-                    centerPos = Camera.main.ViewportToWorldPoint(new Vector3(0.5f, 0.45f, 0.5f));
-                    centerPos.z = originalPos.z;
+                    Transform slot = uiManager.EnemyWallUI.GetEnemyWallSlots()[index];
+                    if (slot != null && slot.childCount > 0)
+                    {
+                        RectTransform rt = slot.GetChild(0) as RectTransform;
+                        if (rt != null)
+                        {
+                            int actualTileId = Managers.BoardStateManager.Instance.OriginalEnemyWallTiles[index];
+                            InitializeTileComponent(rt, actualTileId, true);
+
+                            UnityEngine.UI.Image img = rt.GetComponent<UnityEngine.UI.Image>();
+                            if (img != null) glowingImages.Add(img);
+
+                            Vector3 origScale = rt.localScale;
+                            float duration = 0.25f;
+                            for (float t = 0; t < duration; t += Time.deltaTime)
+                            {
+                                float s = Mathf.Lerp(1f, 1.3f, Mathf.PingPong(t * (1f / (duration / 2f)), 1f));
+                                rt.localScale = origScale * s;
+                                yield return null;
+                            }
+                            rt.localScale = origScale;
+                        }
+                    }
                 }
             }
 
-            Vector3 targetScale = originalScale * 1.5f;
-            float duration = 0.3f;
-            float elapsed = 0f;
-
-            while (elapsed < duration)
+            // カットイン演出(2.0s) + HP減少(1.0s) = 計3.0s 待つ
+            float waitedSoFar = 0.5f + (0.25f * newlyExposed.Count);
+            float timeToWait = 3.0f - waitedSoFar;
+            if (timeToWait > 0)
             {
-                elapsed += Time.deltaTime;
-                float t = Mathf.SmoothStep(0f, 1f, elapsed / duration);
-                enemyHandRT.localScale = Vector3.Lerp(originalScale, targetScale, t);
-                enemyHandRT.position = Vector3.Lerp(originalPos, centerPos, t);
+                yield return new WaitForSeconds(timeToWait);
+            }
+
+            // 演出終了後、2秒間めくられた牌を光らせてアピール
+            float glowDuration = 2.0f;
+            Color originalColor = Color.white;
+            Color glowColor = new Color(1.0f, 0.8f, 0.2f); // 黄色っぽく発光
+            
+            for (float t = 0; t < glowDuration; t += Time.deltaTime)
+            {
+                float pingPong = Mathf.PingPong(t * 3f, 1f); 
+                Color currentColor = Color.Lerp(originalColor, glowColor, pingPong);
+                foreach (var img in glowingImages)
+                {
+                    if (img != null) img.color = currentColor;
+                }
                 yield return null;
             }
-            enemyHandRT.localScale = targetScale;
-            enemyHandRT.position = centerPos;
 
-            yield return new WaitForSeconds(0.2f);
-
-            foreach (int index in _lastSuppressedIndices)
+            // 元の色に戻す
+            foreach (var img in glowingImages)
             {
-                uiManager.EnemyHandUI.RevealTileByIndex(index);
-                yield return new WaitForSeconds(0.8f);
+                if (img != null) img.color = originalColor;
             }
-
-            yield return new WaitForSeconds(0.8f);
-
-            elapsed = 0f;
-            while (elapsed < duration)
-            {
-                elapsed += Time.deltaTime;
-                float t = Mathf.SmoothStep(0f, 1f, elapsed / duration);
-                enemyHandRT.localScale = Vector3.Lerp(targetScale, originalScale, t);
-                enemyHandRT.position = Vector3.Lerp(centerPos, originalPos, t);
-                yield return null;
-            }
-            enemyHandRT.localScale = originalScale;
-            enemyHandRT.position = originalPos;
-            
-            enemyHandRT.SetSiblingIndex(originalSiblingIndex);
 
             if (uiManager.PhaseController != null)
             {

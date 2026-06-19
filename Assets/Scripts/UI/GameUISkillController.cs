@@ -298,6 +298,50 @@ namespace KillingMahjong.UI
                 }
             }
 
+            // --- プレ解析：透視スキルの場合はカットインと同時に演出を開始する ---
+            List<int> newlyExposed = new List<int>();
+            if (data.skillType == "perspective" && isLocalPlayer)
+            {
+                if (data.exposedHandIndexes != null && data.exposedHandIndexes.Count > 0)
+                {
+                    List<int> targetIndexes = data.exposedHandIndexes;
+                    if (data.exposedHandIndexesByPlayer != null)
+                    {
+                        foreach (var kvp in data.exposedHandIndexesByPlayer)
+                        {
+                            if (kvp.Key != localPlayerId)
+                            {
+                                targetIndexes = kvp.Value;
+                                break;
+                            }
+                        }
+                    }
+
+                    foreach (int val in targetIndexes)
+                    {
+                        int wallIdx = val;
+                        if (wallIdx >= 0 && wallIdx < 34)
+                        {
+                            if (!Managers.BoardStateManager.Instance.ExposedEnemyHandWallIndexes.Contains(wallIdx))
+                            {
+                                newlyExposed.Add(wallIdx);
+                                Managers.BoardStateManager.Instance.ExposedEnemyHandWallIndexes.Add(wallIdx);
+                            }
+                        }
+                    }
+                }
+                
+                if (newlyExposed.Count > 0 && uiManager.VisualController != null)
+                {
+                    // カットイン演出と並行して裏でめくる演出をスタート
+                    StartCoroutine(uiManager.VisualController.PlayPerspectiveAnimation(newlyExposed));
+                }
+                else
+                {
+                    uiManager.VisualController?.RebuildAllTilesFromState();
+                }
+            }
+
             // 1. 以前の大迫力カットイン演出（血飛沫＋立ち絵＋巨大テキスト）を再生する
             if (uiManager.PhaseTransitionUI != null)
             {
@@ -329,71 +373,22 @@ namespace KillingMahjong.UI
             // 体力が減る様子をしっかり見せるためのタメ（待機）
             yield return new WaitForSeconds(1.0f);
 
-            // --- 以降、実際のアビリティ効果（透視など）を実行 ---
+            // --- 以降、実際のアビリティ効果（透視以外）を実行 ---
 
             if (data.skillType == "perspective")
             {
-                if (data.exposedHandIndexes != null && data.exposedHandIndexes.Count > 0)
+                // perspectiveのアニメーションは既に上部で並行スタートしているので、ここでは何もしない。
+                // 敵プレイヤーの透視の場合は、UIの更新等のみ（対象インデックス自体は既知なのでサーバーからの同期に任せるかリビルド）
+                if (!isLocalPlayer)
                 {
-                    // localPlayerId is already declared at the top of the method
                     List<int> targetIndexes = data.exposedHandIndexes;
-                    
-                    if (data.exposedHandIndexesByPlayer != null)
+                    if (data.exposedHandIndexesByPlayer != null && data.exposedHandIndexesByPlayer.ContainsKey(localPlayerId))
                     {
-                        if (isLocalPlayer)
-                        {
-                            foreach (var kvp in data.exposedHandIndexesByPlayer)
-                            {
-                                if (kvp.Key != localPlayerId)
-                                {
-                                    targetIndexes = kvp.Value;
-                                    break;
-                                }
-                            }
-                        }
-                        else
-                        {
-                            if (data.exposedHandIndexesByPlayer.ContainsKey(localPlayerId))
-                            {
-                                targetIndexes = data.exposedHandIndexesByPlayer[localPlayerId];
-                            }
-                        }
+                        targetIndexes = data.exposedHandIndexesByPlayer[localPlayerId];
                     }
 
-                    if (isLocalPlayer)
+                    if (targetIndexes != null)
                     {
-                        List<int> newlyExposed = new List<int>();
-                        foreach (int val in targetIndexes)
-                        {
-                            int wallIdx = val; // Python sends wall indices
-                            
-                            if (wallIdx >= 0 && wallIdx < 34)
-                            {
-                                if (!Managers.BoardStateManager.Instance.ExposedEnemyHandWallIndexes.Contains(wallIdx))
-                                {
-                                    newlyExposed.Add(wallIdx);
-                                    Managers.BoardStateManager.Instance.ExposedEnemyHandWallIndexes.Add(wallIdx);
-                                }
-                            }
-                        }
-                        
-                        Debug.Log($"[Skill] Local player cast perspective. targetIndexes: {string.Join(",", targetIndexes)}. newlyExposed: {string.Join(",", newlyExposed)}");
-                        
-                        if (newlyExposed.Count > 0)
-                        {
-                            if (uiManager.VisualController != null)
-                            {
-                                yield return uiManager.VisualController.PlayPerspectiveAnimation(newlyExposed);
-                            }
-                        }
-                        else
-                        {
-                            uiManager.VisualController?.RebuildAllTilesFromState();
-                        }
-                    }
-                    else
-                    {
-                        Debug.Log($"[Skill] Enemy player cast perspective. targetIndexes for local player: {string.Join(",", targetIndexes)}");
                         foreach (int val in targetIndexes)
                         {
                             int wallIdx = val; // Python sends wall indices
@@ -403,8 +398,8 @@ namespace KillingMahjong.UI
                                 Managers.BoardStateManager.Instance.ExposedLocalHandWallIndexes.Add(wallIdx);
                             }
                         }
-                        uiManager.VisualController?.RebuildAllTilesFromState();
                     }
+                    uiManager.VisualController?.RebuildAllTilesFromState();
                 }
             }
             else if (data.skillType == "mulligan")

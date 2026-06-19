@@ -198,7 +198,7 @@ namespace KillingMahjong.Network
                             if (statusMsg.data.player_state != null)
                             {
                                 Managers.BoardStateManager.Instance.LocalPlayerSpecialVictoryCount = statusMsg.data.player_state.special_victory_count;
-                                var bonusDict = ParseBoostHandBonus(jsonString, localPlayerId);
+                                var bonusDict = ParseBoostHandBonusFromStateKey(jsonString, "player_state");
                                 if (bonusDict != null) {
                                     Managers.BoardStateManager.Instance.LocalBoostHandBonus = bonusDict;
                                 }
@@ -241,8 +241,7 @@ namespace KillingMahjong.Network
                             }
                             if (statusMsg.data.opponent_player_state != null)
                             {
-                                var enemyId = statusMsg.data.opponent_player_state.id;
-                                var bonusDict = ParseBoostHandBonus(jsonString, enemyId);
+                                var bonusDict = ParseBoostHandBonusFromStateKey(jsonString, "opponent_player_state");
                                 if (bonusDict != null) {
                                     Managers.BoardStateManager.Instance.EnemyBoostHandBonus = bonusDict;
                                 }
@@ -575,11 +574,11 @@ namespace KillingMahjong.Network
             }
         }
 
-        private Dictionary<string, int> ParseBoostHandBonus(string jsonString, string targetPlayerId)
+        private Dictionary<string, int> ParseBoostHandBonusFromStateKey(string jsonString, string stateKey)
         {
             try
             {
-                string pattern = $"\"id\"\\s*:\\s*\"{targetPlayerId}\".*?\"boost_hand_bonus\"\\s*:\\s*{{([^}}]*?)}}";
+                string pattern = $"\"{stateKey}\"\\s*:\\s*{{.*?\"boost_hand_bonus\"\\s*:\\s*{{([^}}]*?)}}";
                 var match = System.Text.RegularExpressions.Regex.Match(jsonString, pattern, System.Text.RegularExpressions.RegexOptions.Singleline);
                 if (!match.Success) return null;
 

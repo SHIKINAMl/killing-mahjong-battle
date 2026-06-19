@@ -86,6 +86,31 @@ namespace KillingMahjong.UI
             Debug.Log("Applied Dummy GameState to UI.");
         }
 
+        private void Update()
+        {
+            // デバッグ用：Hキーを押したらHP増加コマンド（JSON）をサーバーに送信する
+            if (UnityEngine.InputSystem.Keyboard.current != null && UnityEngine.InputSystem.Keyboard.current.hKey.wasPressedThisFrame)
+            {
+                SendAddHpCommand();
+            }
+        }
+
+        public async void SendAddHpCommand()
+        {
+            var wsClient = FindFirstObjectByType<WebSocketGameClientSample>();
+            if (wsClient != null && wsClient.IsConnected)
+            {
+                // Python側のコマンド名やフォーマットに合わせて適宜変更してください
+                string json = "{\"type\":\"action\",\"action\":\"debug_add_hp\",\"data\":{\"amount\":1000}}";
+                Debug.Log($"[Debug] Sending HP Increase Command: {json}");
+                await wsClient.SendAsync(json);
+            }
+            else
+            {
+                Debug.LogWarning("[Debug] WebSocketClient is not connected. Cannot send HP command.");
+            }
+        }
+
         private void InitializeGame()
         {
              // For standard Initialization with status 2 (Betting Phase) as the first phase

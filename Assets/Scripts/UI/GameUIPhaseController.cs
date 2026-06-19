@@ -92,6 +92,12 @@ namespace KillingMahjong.UI
         {
             _currentRoundIndex = 1;
             
+            Managers.BoardStateManager.Instance.ClearBoosts();
+            if (uiManager.YakuListUI != null)
+            {
+                uiManager.YakuListUI.UpdateBoostData(Managers.BoardStateManager.Instance.LocalBoostHandBonus, Managers.BoardStateManager.Instance.EnemyBoostHandBonus);
+            }
+
             Managers.BoardStateManager.Instance.UpdateHp(20000, 20000);
             if (uiManager.PlayerInfoUI != null) 
             {
@@ -205,7 +211,7 @@ namespace KillingMahjong.UI
                     var layoutGroup = uiManager.EnemyHandUI.GetComponentInChildren<UnityEngine.UI.LayoutGroup>();
                     if (layoutGroup != null) layoutGroup.enabled = false;
                 }
-                uiManager.EnemyHandUI.gameObject.SetActive(showBoardElements);
+                uiManager.EnemyHandUI.gameObject.SetActive(isGameEndPhase);
             }
             if (uiManager.EnemyWallUI != null)
             {
@@ -330,7 +336,11 @@ namespace KillingMahjong.UI
             if (uiManager.HandUI != null) uiManager.HandUI.gameObject.SetActive(visible);
             if (uiManager.WallUI != null) uiManager.WallUI.gameObject.SetActive(visible);
             if (uiManager.EnemyWallUI != null) uiManager.EnemyWallUI.gameObject.SetActive(visible);
-            if (uiManager.YakuListUI != null) uiManager.YakuListUI.gameObject.SetActive(visible);
+            if (uiManager.YakuListUI != null) 
+            {
+                uiManager.YakuListUI.gameObject.SetActive(visible);
+                uiManager.YakuListUI.CloseYakuList();
+            }
             
             if (uiManager.WaitUI != null && BoardStateManager.Instance.CurrentWaitTiles != null && BoardStateManager.Instance.CurrentWaitTiles.Count > 0)
             {

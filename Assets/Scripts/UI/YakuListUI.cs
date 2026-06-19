@@ -21,8 +21,20 @@ namespace KillingMahjong.UI
         [SerializeField] private TextMeshProUGUI[] localActiveBoostTexts = new TextMeshProUGUI[3];
         [SerializeField] private TextMeshProUGUI[] enemyActiveBoostTexts = new TextMeshProUGUI[3];
 
+        private void Awake()
+        {
+            if (yakuListPanel == null)
+            {
+                // Fallback to find the panel if unassigned
+                Transform t = transform.Find("役Canvas2");
+                if (t != null) yakuListPanel = t.gameObject;
+                else if (gameObject.name == "役Canvas2") yakuListPanel = gameObject;
+            }
+        }
+
         private void Start()
         {
+
             if (yakuListPanel != null)
                 yakuListPanel.SetActive(false); // 最初は非表示
 
