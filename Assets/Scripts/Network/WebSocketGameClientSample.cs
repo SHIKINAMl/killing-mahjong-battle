@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.IO;
 using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
@@ -34,6 +35,9 @@ public class WebSocketGameClientSample : MonoBehaviour
     // ContextMenu の「Send Sample」で送るテキスト
     [Header("Send")]
     [SerializeField] private string sampleMessage = "{\"type\":\"ping\"}";
+
+    [Header("Auth")]
+    [SerializeField] private string tokenEnvFileName = ".env";
 
     // true の場合、送受信ログを Console に表示
     [Header("Debug")]
@@ -109,11 +113,19 @@ public class WebSocketGameClientSample : MonoBehaviour
         cancellationTokenSource = new CancellationTokenSource();
         webSocket = new ClientWebSocket();
 
+        string token = LoadTokenFromEnv();
+        if (!string.IsNullOrEmpty(token))
+        {
+            webSocket.Options.SetRequestHeader("Authorization", $"Bearer {token}");
+            webSocket.Options.SetRequestHeader("X-Token", token);
+        }
+
         try
         {
+            string normalizedUrl = NormalizeServerUrl(serverUrl);
             // WebSocket 接続
-            await webSocket.ConnectAsync(new Uri(serverUrl), cancellationTokenSource.Token);
-            Log($"Connected: {serverUrl}");
+            await webSocket.ConnectAsync(new Uri(normalizedUrl), cancellationTokenSource.Token);
+            Log($"Connected: {normalizedUrl}");
 
             // 受信待ちループをバックグラウンド開始
             _ = ReceiveLoopAsync(cancellationTokenSource.Token);
@@ -123,6 +135,69 @@ public class WebSocketGameClientSample : MonoBehaviour
             Debug.LogError($"WebSocket connect failed: {ex.Message}");
         }
 #endif
+    }
+
+    private string NormalizeServerUrl(string url)
+    {
+        if (string.IsNullOrEmpty(url)) return url;
+
+        if (url.EndsWith("/"))
+        {
+            url = url.TrimEnd('/');
+        }
+        if (!url.EndsWith("/ws", StringComparison.OrdinalIgnoreCase))
+        {
+            url += "/ws";
+        }
+
+        return url;
+    }
+
+    private string LoadTokenFromEnv()
+    {
+        try
+        {
+            string[] candidates =
+            {
+                Path.Combine(Directory.GetCurrentDirectory(), tokenEnvFileName),
+                Path.Combine(Application.dataPath, "..", tokenEnvFileName),
+                Path.Combine(Application.dataPath, tokenEnvFileName), // Assetsフォルダ直下も探す
+            };
+
+            foreach (string path in candidates)
+            {
+                string fullPath = Path.GetFullPath(path);
+                if (!File.Exists(fullPath))
+                {
+                    continue;
+                }
+
+                foreach (string line in File.ReadAllLines(fullPath, Encoding.UTF8))
+                {
+                    string trimmed = line.Trim();
+                    if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith("#"))
+                    {
+                        continue;
+                    }
+
+                    if (trimmed.StartsWith("TOKEN="))
+                    {
+                        string value = trimmed.Substring("TOKEN=".Length).Trim().Trim('"').Trim('\'');
+                        if (!string.IsNullOrEmpty(value))
+                        {
+                            return value;
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[WebSocket] Failed to load TOKEN from .env: {ex.Message}");
+        }
+
+        string envToken = Environment.GetEnvironmentVariable("TOKEN");
+        return envToken ?? string.Empty;
     }
 
     /// <summary>
