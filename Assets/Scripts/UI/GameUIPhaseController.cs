@@ -211,7 +211,7 @@ namespace KillingMahjong.UI
                     var layoutGroup = uiManager.EnemyHandUI.GetComponentInChildren<UnityEngine.UI.LayoutGroup>();
                     if (layoutGroup != null) layoutGroup.enabled = false;
                 }
-                uiManager.EnemyHandUI.gameObject.SetActive(isGameEndPhase);
+                uiManager.EnemyHandUI.gameObject.SetActive(showBoardElements);
             }
             if (uiManager.EnemyWallUI != null)
             {
@@ -223,7 +223,7 @@ namespace KillingMahjong.UI
                 }
                 else
                 {
-                    uiManager.EnemyWallUI.gameObject.SetActive(showBoardElements);
+                    uiManager.EnemyWallUI.gameObject.SetActive(false);
                 }
             }
 

@@ -458,15 +458,7 @@ namespace KillingMahjong.UI
             {
                 BoardStateManager.Instance.RemoveTileFromEnemyWall();
 
-                if (enemyWallUI != null && enemyRiverUI != null)
-                {
-                    RectTransform tileRt = enemyWallUI.GrabEnemyTile();
-                    if (tileRt != null)
-                    {
-                        enemyRiverUI.AddExistingTile(tileRt, discardedTileId);
-                    }
-                }
-                else if (enemyRiverUI != null)
+                if (enemyRiverUI != null)
                 {
                     enemyRiverUI.AddTile(discardedTileId);
                 }

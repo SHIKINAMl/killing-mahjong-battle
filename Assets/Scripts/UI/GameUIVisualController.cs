@@ -308,8 +308,7 @@ namespace KillingMahjong.UI
                     uiManager.WaitUI.DisplayWaits(board.CurrentWaitTiles);
                 }
             }
-
-            }
+        }
 
         public void InitializeTileComponent(RectTransform rt, int id, bool inHand)
         {

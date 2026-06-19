@@ -37,7 +37,8 @@ public class WebSocketGameClientSample : MonoBehaviour
     [SerializeField] private string sampleMessage = "{\"type\":\"ping\"}";
 
     [Header("Auth")]
-    [SerializeField] private string tokenEnvFileName = ".env";
+    [SerializeField, Tooltip("トークンを直接入力します")]
+    private string authToken = "";
 
     // true の場合、送受信ログを Console に表示
     [Header("Debug")]
@@ -113,11 +114,10 @@ public class WebSocketGameClientSample : MonoBehaviour
         cancellationTokenSource = new CancellationTokenSource();
         webSocket = new ClientWebSocket();
 
-        string token = LoadTokenFromEnv();
-        if (!string.IsNullOrEmpty(token))
+        if (!string.IsNullOrEmpty(authToken))
         {
-            webSocket.Options.SetRequestHeader("Authorization", $"Bearer {token}");
-            webSocket.Options.SetRequestHeader("X-Token", token);
+            webSocket.Options.SetRequestHeader("Authorization", $"Bearer {authToken}");
+            webSocket.Options.SetRequestHeader("X-Token", authToken);
         }
 
         try
@@ -153,52 +153,6 @@ public class WebSocketGameClientSample : MonoBehaviour
         return url;
     }
 
-    private string LoadTokenFromEnv()
-    {
-        try
-        {
-            string[] candidates =
-            {
-                Path.Combine(Directory.GetCurrentDirectory(), tokenEnvFileName),
-                Path.Combine(Application.dataPath, "..", tokenEnvFileName),
-                Path.Combine(Application.dataPath, tokenEnvFileName), // Assetsフォルダ直下も探す
-            };
-
-            foreach (string path in candidates)
-            {
-                string fullPath = Path.GetFullPath(path);
-                if (!File.Exists(fullPath))
-                {
-                    continue;
-                }
-
-                foreach (string line in File.ReadAllLines(fullPath, Encoding.UTF8))
-                {
-                    string trimmed = line.Trim();
-                    if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith("#"))
-                    {
-                        continue;
-                    }
-
-                    if (trimmed.StartsWith("TOKEN="))
-                    {
-                        string value = trimmed.Substring("TOKEN=".Length).Trim().Trim('"').Trim('\'');
-                        if (!string.IsNullOrEmpty(value))
-                        {
-                            return value;
-                        }
-                    }
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Debug.LogWarning($"[WebSocket] Failed to load TOKEN from .env: {ex.Message}");
-        }
-
-        string envToken = Environment.GetEnvironmentVariable("TOKEN");
-        return envToken ?? string.Empty;
-    }
 
     /// <summary>
     /// 接続を閉じてリソースを解放する。
