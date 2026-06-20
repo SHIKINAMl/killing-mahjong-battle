@@ -210,11 +210,19 @@ namespace KillingMahjong.Network
                                     
                                     if (statusMsg.data.game_state != null && statusMsg.data.game_state.status == "hand_selection") 
                                     {
-                                        var targetIndexes = Managers.BoardStateManager.Instance.TargetHandIndexes;
-                                        if (targetIndexes != null) {
-                                            foreach(var idx in targetIndexes) {
-                                                if (idx >= 0 && idx < localWall.Count) {
-                                                    localHand.Add(localWall[idx]);
+                                        var currentHand = Managers.BoardStateManager.Instance.CurrentHandTiles;
+                                        if (currentHand != null && currentHand.Count > 0)
+                                        {
+                                            localHand.AddRange(currentHand);
+                                        }
+                                        else
+                                        {
+                                            var targetIndexes = Managers.BoardStateManager.Instance.TargetHandIndexes;
+                                            if (targetIndexes != null) {
+                                                foreach(var idx in targetIndexes) {
+                                                    if (idx >= 0 && idx < localWall.Count) {
+                                                        localHand.Add(localWall[idx]);
+                                                    }
                                                 }
                                             }
                                         }

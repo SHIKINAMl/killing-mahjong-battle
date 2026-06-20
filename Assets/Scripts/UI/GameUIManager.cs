@@ -381,6 +381,13 @@ namespace KillingMahjong.UI
             
             if (data.winner_id == NetworkMessageHandler.Instance.LocalPlayerId)
             {
+                if (BoardStateManager.Instance.NonManganWaitTiles.Contains(data.tile_id))
+                {
+                    Debug.Log($"[GameUIManager] Ignored agari_pending because tile {data.tile_id} is non-mangan.");
+                    SendActionToServer("agari", new KillingMahjong.Network.ActionPayload { accept = false });
+                    return;
+                }
+
                 Debug.Log("[GameUIManager] I am the winner! Showing RonWaitPanel.");
                 _isAgariPending = true;
                 
@@ -528,9 +535,9 @@ namespace KillingMahjong.UI
             SkillController?.StartMulliganSelection();
         }
 
-        public void OnMulliganTileSelected(int tileId)
+        public void OnMulliganTileSelected(int tileId, RectTransform slotRt)
         {
-            SkillController?.OnMulliganTileSelected(tileId);
+            SkillController?.OnMulliganTileSelected(tileId, slotRt);
         }
 
         public void StartBoostHandSelection()

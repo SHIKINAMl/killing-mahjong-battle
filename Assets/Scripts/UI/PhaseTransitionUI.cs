@@ -771,6 +771,80 @@ namespace KillingMahjong.UI
             onComplete?.Invoke();
         }
 
+        public void PlayPromptText(string text, float duration = 2.0f)
+        {
+            StartCoroutine(PlayPromptTextRoutine(text, duration));
+        }
+
+        private IEnumerator PlayPromptTextRoutine(string text, float duration)
+        {
+            GameObject container = new GameObject("PromptTextContainer");
+            container.transform.SetParent(transform, false);
+
+            Canvas canvas = container.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 32700;
+            
+            var scaler = container.AddComponent<UnityEngine.UI.CanvasScaler>();
+            scaler.uiScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1280, 720);
+            
+            container.AddComponent<UnityEngine.UI.GraphicRaycaster>();
+
+            GameObject textObj = new GameObject("PromptText");
+            textObj.transform.SetParent(container.transform, false);
+            TextMeshProUGUI tmp = textObj.AddComponent<TextMeshProUGUI>();
+            tmp.text = text;
+            tmp.fontSize = 70;
+            tmp.enableWordWrapping = false;
+            tmp.overflowMode = TMPro.TextOverflowModes.Overflow;
+            tmp.color = new Color(1, 1, 1, 0); // 初期は透明
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.fontStyle = FontStyles.Bold;
+            
+            if (centerText != null && centerText.font != null) {
+                tmp.font = centerText.font;
+            } else if (TMPro.TMP_Settings.defaultFontAsset != null) {
+                tmp.font = TMPro.TMP_Settings.defaultFontAsset;
+            }
+            
+            UnityEngine.UI.Shadow shadow = textObj.AddComponent<UnityEngine.UI.Shadow>();
+            shadow.effectColor = new Color(0, 0, 0, 0.8f);
+            shadow.effectDistance = new Vector2(4, -4);
+
+            RectTransform tmpRt = textObj.GetComponent<RectTransform>();
+            tmpRt.anchoredPosition = Vector2.zero;
+            tmpRt.sizeDelta = new Vector2(1600, 400);
+
+            // フェードイン＆少しスケールダウンしてドスッという感じにする
+            float t = 0;
+            while(t < 0.3f)
+            {
+                t += Time.deltaTime;
+                float progress = t / 0.3f;
+                tmp.color = new Color(1, 1, 1, progress);
+                tmpRt.localScale = Vector3.Lerp(new Vector3(1.5f, 1.5f, 1f), Vector3.one, progress);
+                yield return null;
+            }
+            tmp.color = Color.white;
+            tmpRt.localScale = Vector3.one;
+
+            // 待機
+            yield return new WaitForSeconds(duration);
+
+            // フェードアウト
+            t = 0;
+            while(t < 0.3f)
+            {
+                t += Time.deltaTime;
+                float progress = t / 0.3f;
+                tmp.color = new Color(1, 1, 1, 1f - progress);
+                yield return null;
+            }
+
+            Destroy(container);
+        }
+
         public void PlaySkillCutinAnimation(string skillName, bool isLocalPlayer, CharacterData characterData = null, float duration = 2.0f, Action onComplete = null)
         {
             StartCoroutine(PlaySkillCutinAnimationRoutine(skillName, isLocalPlayer, characterData, duration, onComplete));
@@ -891,16 +965,21 @@ namespace KillingMahjong.UI
                 portraitObj.transform.SetParent(containerRt, false);
                 Image portraitImg = portraitObj.AddComponent<Image>();
                 portraitImg.sprite = bodySprite;
-                portraitImg.preserveAspect = true;
+                portraitImg.SetNativeSize();
 
                 portraitRt = portraitObj.GetComponent<RectTransform>();
                 portraitRt.pivot = new Vector2(0.5f, 0f); // 下端中央
-                portraitRt.sizeDelta = new Vector2(700, 900);
+                
+                // SetNativeSizeの直後だとrect.heightが未確定な場合があるため、spriteの実際のサイズからスケールを計算する
+                float targetHeight = 800f; // さらに少し小さめにして確実に頭が収まるようにする
+                float actualHeight = bodySprite.rect.height;
+                float scale = actualHeight > 0 ? targetHeight / actualHeight : 1f;
+                portraitRt.localScale = new Vector3(scale, scale, 1f);
                 
                 // 常に左下に配置（自分の顔のみ出るため）
                 portraitRt.anchorMin = new Vector2(0f, 0f);
                 portraitRt.anchorMax = new Vector2(0f, 0f);
-                portraitTargetPos = new Vector2(180, -50); // 左側に寄せる
+                portraitTargetPos = new Vector2(250, -150); // 少し下に移動して頭頂部が見切れないようにする
                 portraitStartPos = portraitTargetPos + new Vector2(0, -800); // 下から上がってくる
                 
                 portraitRt.anchoredPosition = portraitStartPos; 
@@ -917,13 +996,13 @@ namespace KillingMahjong.UI
                     faceObj.transform.SetParent(portraitRt, false);
                     Image faceImg = faceObj.AddComponent<Image>();
                     faceImg.sprite = faceSprite;
-                    faceImg.preserveAspect = true;
+                    faceImg.SetNativeSize();
 
                     RectTransform faceRt = faceObj.GetComponent<RectTransform>();
-                    faceRt.anchorMin = new Vector2(0, 0);
-                    faceRt.anchorMax = new Vector2(1, 1);
-                    faceRt.offsetMin = Vector2.zero;
-                    faceRt.offsetMax = Vector2.zero;
+                    faceRt.pivot = new Vector2(0.5f, 0f);
+                    faceRt.anchorMin = new Vector2(0.5f, 0f);
+                    faceRt.anchorMax = new Vector2(0.5f, 0f);
+                    faceRt.anchoredPosition = Vector2.zero;
                 }
             }
 

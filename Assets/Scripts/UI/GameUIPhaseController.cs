@@ -12,6 +12,7 @@ namespace KillingMahjong.UI
     {
         private GameUIManager uiManager;
         
+        private bool _hasShownHandSelectionPrompt = false;
         private bool _hasSentNextRoundForCurrentPhase = false;
         private int _currentRoundIndex = 1;
         private bool _waitingForOpponentRonAnimation = false;
@@ -235,13 +236,14 @@ namespace KillingMahjong.UI
                     if (uiManager.PlayerInfoUI != null) 
                     {
                         uiManager.PlayerInfoUI.gameObject.SetActive(true);
-                        uiManager.PlayerInfoUI.StartCoroutine(uiManager.PlayerInfoUI.ZoomInRoutine(0.4f, 1.5f));
+                        uiManager.PlayerInfoUI.StartCoroutine(uiManager.PlayerInfoUI.ZoomInRoutine(0.4f, 4.5f));
                     }
                     if (uiManager.WaitUI != null) uiManager.WaitUI.gameObject.SetActive(false);
                     if (uiManager.AbilityUI != null) uiManager.AbilityUI.gameObject.SetActive(false);
                     StartBettingPhase(Managers.BoardStateManager.Instance.LocalPlayerHp);
                     break;
                 case RoundStatus.Dealing:
+                    _hasShownHandSelectionPrompt = false; // 次の局のためにフラグをリセット
                     StartCoroutine(DealingRoutine());
                     break;
                 case RoundStatus.HandSelection:
@@ -255,6 +257,13 @@ namespace KillingMahjong.UI
                     if (ReactionController.Instance != null)
                     {
                         ReactionController.Instance.StartHandSelectionTimer();
+                    }
+                    
+                    // 黒幕が晴れて手牌フェイズに入った時に表示（1局につき1回のみ）
+                    if (uiManager.PhaseTransitionUI != null && !_hasShownHandSelectionPrompt)
+                    {
+                        uiManager.PhaseTransitionUI.PlayPromptText("手牌を選んでください", 1.5f);
+                        _hasShownHandSelectionPrompt = true;
                     }
                     break;
                 case RoundStatus.TurnDecision:
@@ -491,6 +500,7 @@ namespace KillingMahjong.UI
                     },
                     onComplete: () => {
                         uiManager.SetIsTransitioning(false);
+
                         if (uiManager.DialogueUI != null)
                         {
                             uiManager.DialogueUI.ShowNextRoundButton(() => {

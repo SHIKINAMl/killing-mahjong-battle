@@ -39,6 +39,9 @@ namespace KillingMahjong.UI
             RebuildAllTilesFromState(null);
         }
 
+        private List<int> _lastWallIds = new List<int>();
+        private List<int> _lastHandIds = new List<int>();
+
         public void RebuildAllTilesFromState(List<int> suppressRevealWallIndexes)
         {
             if (uiManager.IsTransitioning)
@@ -46,6 +49,44 @@ namespace KillingMahjong.UI
                 Debug.Log("[GameUIVisualController] IsTransitioning is true. Skipping RebuildAllTilesFromState to prevent visible tile movement.");
                 return;
             }
+
+            var board = BoardStateManager.Instance;
+            List<int> currentWallIds = new List<int>(board.CurrentWallTiles);
+            List<int> currentHandIds = new List<int>(board.CurrentHandTiles);
+
+            bool needFullRebuild = true;
+
+            if (_lastWallIds.Count == currentWallIds.Count && _lastHandIds.Count == currentHandIds.Count)
+            {
+                List<int> oldWallIds = new List<int>(_lastWallIds);
+                List<int> newWallIds = new List<int>(currentWallIds);
+                foreach (int id in _lastWallIds)
+                {
+                    if (newWallIds.Contains(id)) { newWallIds.Remove(id); oldWallIds.Remove(id); }
+                }
+
+                List<int> oldHandIds = new List<int>(_lastHandIds);
+                List<int> newHandIds = new List<int>(currentHandIds);
+                foreach (int id in _lastHandIds)
+                {
+                    if (newHandIds.Contains(id)) { newHandIds.Remove(id); oldHandIds.Remove(id); }
+                }
+
+                if (oldWallIds.Count == newWallIds.Count && oldHandIds.Count == newHandIds.Count)
+                {
+                    bool success = true;
+                    for (int i = 0; i < oldWallIds.Count; i++) success &= UpdateTileIdInUI(oldWallIds[i], newWallIds[i]);
+                    for (int i = 0; i < oldHandIds.Count; i++) success &= UpdateTileIdInUI(oldHandIds[i], newHandIds[i]);
+
+                    if (success)
+                    {
+                        needFullRebuild = false;
+                    }
+                }
+            }
+
+            _lastWallIds = currentWallIds;
+            _lastHandIds = currentHandIds;
 
             _lastSuppressedIndices.Clear();
             if (uiManager.TilePrefab == null) return;
@@ -56,38 +97,38 @@ namespace KillingMahjong.UI
                                   uiManager.CurrentPhaseStatus == RoundStatus.Draw;
             if (isGameEndPhase) return;
 
-            var board = BoardStateManager.Instance;
-
-            // 1. HandUI / WallUI を一括クリア
-            if (uiManager.HandUI != null)
+            if (needFullRebuild)
             {
-                for (int i = uiManager.HandUI.GetHandSlots().Count - 1; i >= 0; i--)
+                // 1. HandUI / WallUI を一括クリア
+                if (uiManager.HandUI != null)
                 {
-                    Transform t = uiManager.HandUI.GetHandSlots()[i];
-                    if (t != null) {
-                        t.SetParent(null);
-                        Destroy(t.gameObject);
+                    for (int i = uiManager.HandUI.GetHandSlots().Count - 1; i >= 0; i--)
+                    {
+                        Transform t = uiManager.HandUI.GetHandSlots()[i];
+                        if (t != null) {
+                            t.SetParent(null);
+                            Destroy(t.gameObject);
+                        }
                     }
+                    uiManager.HandUI.GetHandSlots().Clear();
                 }
-                uiManager.HandUI.GetHandSlots().Clear();
-            }
-            if (uiManager.WallUI != null)
-            {
-                for (int i = uiManager.WallUI.GetWallSlots().Count - 1; i >= 0; i--)
+                if (uiManager.WallUI != null)
                 {
-                    Transform t = uiManager.WallUI.GetWallSlots()[i];
-                    if (t != null) {
-                        t.SetParent(null);
-                        Destroy(t.gameObject);
+                    for (int i = uiManager.WallUI.GetWallSlots().Count - 1; i >= 0; i--)
+                    {
+                        Transform t = uiManager.WallUI.GetWallSlots()[i];
+                        if (t != null) {
+                            t.SetParent(null);
+                            Destroy(t.gameObject);
+                        }
                     }
+                    uiManager.WallUI.GetWallSlots().Clear();
                 }
-                uiManager.WallUI.GetWallSlots().Clear();
-            }
 
-            if (uiManager.WallUI != null)
-            {
-                List<int> combinedIds = new List<int>(board.CurrentWallTiles);
-                combinedIds.AddRange(board.CurrentHandTiles);
+                if (uiManager.WallUI != null)
+                {
+                    List<int> combinedIds = new List<int>(board.CurrentWallTiles);
+                    combinedIds.AddRange(board.CurrentHandTiles);
 
                 List<RectTransform> combinedGenerated = new List<RectTransform>();
                 foreach (var id in combinedIds)
@@ -158,8 +199,9 @@ namespace KillingMahjong.UI
                             visual.SetExposed(isExposed);
                         }
                     }
+                    }
                 }
-            }
+            } // End of needFullRebuild
 
             // 3. Enemy HandUI
             if (uiManager.EnemyHandUI != null)
@@ -580,6 +622,50 @@ namespace KillingMahjong.UI
             {
                 uiManager.PhaseController.HandlePhaseVisibility(uiManager.CurrentPhaseStatus);
             }
+        }
+
+        private bool UpdateTileIdInUI(int oldId, int newId)
+        {
+            bool found = false;
+            if (uiManager.WallUI != null)
+            {
+                foreach (var slot in uiManager.WallUI.GetWallSlots())
+                {
+                    if (slot == null) continue;
+                    var interaction = slot.GetComponent<TileInteraction>();
+                    if (interaction != null && interaction.TileId == oldId)
+                    {
+                        interaction.TileId = newId;
+                        var visual = slot.GetComponent<TileVisual>();
+                        if (visual != null && uiManager.TileResourceManager != null)
+                        {
+                            visual.SetTile(newId, uiManager.TileResourceManager.GetTileSprite(newId), uiManager.TileResourceManager);
+                        }
+                        found = true;
+                        break;
+                    }
+                }
+            }
+            if (!found && uiManager.HandUI != null)
+            {
+                foreach (var slot in uiManager.HandUI.GetHandSlots())
+                {
+                    if (slot == null) continue;
+                    var interaction = slot.GetComponent<TileInteraction>();
+                    if (interaction != null && interaction.TileId == oldId)
+                    {
+                        interaction.TileId = newId;
+                        var visual = slot.GetComponent<TileVisual>();
+                        if (visual != null && uiManager.TileResourceManager != null)
+                        {
+                            visual.SetTile(newId, uiManager.TileResourceManager.GetTileSprite(newId), uiManager.TileResourceManager);
+                        }
+                        found = true;
+                        break;
+                    }
+                }
+            }
+            return found;
         }
     }
 }

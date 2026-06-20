@@ -229,23 +229,132 @@ namespace KillingMahjong.UI
             bounceCoroutine = null;
         }
 
+        private class CanvasState
+        {
+            public Canvas CanvasRef;
+            public bool WasAdded;
+            public bool OriginalOverrideSorting;
+            public int OriginalSortingOrder;
+            public string OriginalSortingLayer;
+        }
+        private System.Collections.Generic.List<CanvasState> _canvasStates = new System.Collections.Generic.List<CanvasState>();
+
+        private void BringToFront(Transform target)
+        {
+            if (target == null) return;
+            
+            _canvasStates.Clear();
+            
+            // PlayerInfoUI本体および、その下にある全ての子Canvas（HPPanelなど）を取得する
+            var canvases = target.GetComponentsInChildren<Canvas>(true);
+            
+            foreach (var canvas in canvases)
+            {
+                var state = new CanvasState
+                {
+                    CanvasRef = canvas,
+                    WasAdded = false,
+                    OriginalOverrideSorting = canvas.overrideSorting,
+                    OriginalSortingOrder = canvas.sortingOrder,
+                    OriginalSortingLayer = canvas.sortingLayerName
+                };
+                
+                _canvasStates.Add(state);
+                
+                canvas.overrideSorting = true;
+                canvas.sortingLayerName = "UI";
+                canvas.sortingOrder = 32000;
+            }
+            
+            // もし対象オブジェクト自身にCanvasがなくて追加する必要がある場合（通常は既に親にあるはずなので滅多にないが念のため）
+            if (target.GetComponent<Canvas>() == null)
+            {
+                var newCanvas = target.gameObject.AddComponent<Canvas>();
+                target.gameObject.AddComponent<UnityEngine.UI.GraphicRaycaster>();
+                
+                _canvasStates.Add(new CanvasState
+                {
+                    CanvasRef = newCanvas,
+                    WasAdded = true
+                });
+                
+                newCanvas.overrideSorting = true;
+                newCanvas.sortingLayerName = "UI";
+                newCanvas.sortingOrder = 32000;
+            }
+            
+            var sprites = target.GetComponentsInChildren<SpriteRenderer>(true);
+            foreach (var s in sprites)
+            {
+                s.sortingLayerName = "UI";
+                s.sortingOrder = 32000;
+            }
+        }
+
+        private void ResetSorting(Transform target)
+        {
+            if (target == null) return;
+            
+            foreach (var state in _canvasStates)
+            {
+                if (state.CanvasRef != null)
+                {
+                    if (state.WasAdded)
+                    {
+                        var raycaster = state.CanvasRef.GetComponent<UnityEngine.UI.GraphicRaycaster>();
+                        if (raycaster != null) Destroy(raycaster);
+                        Destroy(state.CanvasRef);
+                    }
+                    else
+                    {
+                        state.CanvasRef.overrideSorting = state.OriginalOverrideSorting;
+                        state.CanvasRef.sortingOrder = state.OriginalSortingOrder;
+                        state.CanvasRef.sortingLayerName = state.OriginalSortingLayer;
+                    }
+                }
+            }
+            _canvasStates.Clear();
+            
+            var sprites = target.GetComponentsInChildren<SpriteRenderer>(true);
+            foreach (var s in sprites)
+            {
+                s.sortingLayerName = "Default";
+                s.sortingOrder = 0;
+            }
+        }
+
         // --- ズーム演出（指定したオブジェクトを巨大化し、少し手前・上に浮かせる） ---
         public System.Collections.IEnumerator ZoomInRoutine(float duration = 0.4f, float targetScaleMulti = 2.5f)
         {
             if (zoomCoroutine != null) StopCoroutine(zoomCoroutine);
 
             Transform targetObj = zoomTarget != null ? zoomTarget : transform;
+            
+            // ズーム対象が何であれ、PlayerInfoUI全体を最前面に出す
+            BringToFront(transform);
 
             // 0の場合の安全対策
             if (originalScale == Vector3.zero) originalScale = Vector3.one;
 
+            // ズーム中は揺れを止める
+            var floatAnims = GetComponentsInChildren<FloatingAnimator>(true);
+            foreach (var anim in floatAnims)
+            {
+                anim.enabled = false;
+            }
+
             // UI用（ピクセル単位）か、3D用かで移動量を変える必要がある
             RectTransform rt = targetObj.GetComponent<RectTransform>();
-            float moveX = (rt != null) ? zoomOffsetUI.x : zoomOffsetWorld.x;
-            float moveY = (rt != null) ? zoomOffsetUI.y : zoomOffsetWorld.y;
-            float moveZ = (rt != null) ? zoomOffsetUI.z : zoomOffsetWorld.z; // Z軸も移動可能にする
-            
-            Vector3 targetPos = originalLocalPos + new Vector3(moveX, moveY, moveZ);
+            Vector3 targetPos;
+            if (rt != null)
+            {
+                targetPos = Vector3.zero;
+            }
+            else
+            {
+                targetPos = Vector3.zero;
+            }
+
             Vector3 targetScale = originalScale * targetScaleMulti;
 
             float t = 0;
@@ -269,8 +378,15 @@ namespace KillingMahjong.UI
         {
             if (zoomCoroutine != null) StopCoroutine(zoomCoroutine);
             Transform targetObj = zoomTarget != null ? zoomTarget : transform;
+            var floatAnims = GetComponentsInChildren<FloatingAnimator>(true);
+            foreach (var anim in floatAnims)
+            {
+                anim.enabled = true;
+            }
+
             targetObj.localPosition = originalLocalPos;
             targetObj.localScale = originalScale;
+            ResetSorting(transform);
         }
 
         public System.Collections.IEnumerator ResetZoomRoutine(float duration = 0.3f)
@@ -297,6 +413,12 @@ namespace KillingMahjong.UI
 
             targetObj.localPosition = originalLocalPos;
             targetObj.localScale = originalScale;
+            var floatAnims = GetComponentsInChildren<FloatingAnimator>(true);
+            foreach (var anim in floatAnims)
+            {
+                anim.enabled = true;
+            }
+            ResetSorting(transform);
         }
     }
 }

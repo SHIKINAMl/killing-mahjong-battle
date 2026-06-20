@@ -6,7 +6,7 @@ namespace KillingMahjong.UI
 {
     public class TileInteraction : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerEnterHandler, IPointerExitHandler
     {
-        public int TileId { get; private set; }
+        public int TileId { get; set; }
         public bool IsInHand { get; private set; }
         public Vector3 OriginalWallPosition { get; set; } // ★ 壁の本来の座標を記憶するプロパティ追加
         public bool IsHovered { get; private set; }
@@ -79,7 +79,7 @@ namespace KillingMahjong.UI
             {
                 if (_gameUIManager != null && _gameUIManager.IsMulliganSelection)
                 {
-                    _gameUIManager.OnMulliganTileSelected(TileId);
+                    _gameUIManager.OnMulliganTileSelected(TileId, GetComponent<RectTransform>());
                 }
                 else
                 {
@@ -90,7 +90,7 @@ namespace KillingMahjong.UI
             {
                 if (_gameUIManager != null && _gameUIManager.IsMulliganSelection)
                 {
-                    _gameUIManager.OnMulliganTileSelected(TileId);
+                    _gameUIManager.OnMulliganTileSelected(TileId, GetComponent<RectTransform>());
                 }
                 else
                 {

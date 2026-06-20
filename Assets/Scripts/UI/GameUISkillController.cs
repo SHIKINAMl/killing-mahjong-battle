@@ -19,6 +19,9 @@ namespace KillingMahjong.UI
 
         public bool IsMulliganSelection { get; private set; }
 
+        private int _lastMulliganOutTileId = -1;
+        private int _lastMulliganTargetIndex = -1;
+
         public void Setup(GameUIManager manager)
         {
             this.uiManager = manager;
@@ -40,10 +43,15 @@ namespace KillingMahjong.UI
             CreateMulliganDimmer();
         }
 
-        public void OnMulliganTileSelected(int tileId)
+        private RectTransform _lastMulliganOutSlotRt;
+
+        public void OnMulliganTileSelected(int tileId, RectTransform slotRt)
         {
             IsMulliganSelection = false;
             DestroyMulliganDimmer();
+            
+            // アニメーション中の不意なRebuildを防ぐ
+            uiManager.SetIsTransitioning(true);
             
             var wallTiles = BoardStateManager.Instance.OriginalWallTiles;
             if (wallTiles != null)
@@ -51,11 +59,18 @@ namespace KillingMahjong.UI
                 int targetIndex = wallTiles.IndexOf(tileId);
                 if (targetIndex != -1)
                 {
+                    _lastMulliganOutTileId = tileId;
+                    _lastMulliganTargetIndex = targetIndex;
+                    _lastMulliganOutSlotRt = slotRt;
+                    
+                    // クリック直後には透明にしない。アニメーション開始時に透明にする。
+
                     uiManager.SendActionToServer("skill", new Network.ActionPayload { skill_type = "mulligan", target_hand_index = targetIndex });
                 }
                 else
                 {
                     Debug.LogWarning("Mulligan failed: Selected tile not found in wall tiles.");
+                    uiManager.SetIsTransitioning(false);
                 }
             }
         }
@@ -153,22 +168,33 @@ namespace KillingMahjong.UI
             }
         }
 
-        private System.Collections.Generic.Dictionary<GameObject, bool> addedCanvases = new System.Collections.Generic.Dictionary<GameObject, bool>();
+        private class CanvasState
+        {
+            public bool WasAdded;
+            public bool OriginalOverrideSorting;
+            public int OriginalSortingOrder;
+        }
+        private System.Collections.Generic.Dictionary<GameObject, CanvasState> _canvasStates = new System.Collections.Generic.Dictionary<GameObject, CanvasState>();
 
         private void BringToFront(GameObject go, int order)
         {
             if (go == null) return;
             var canvas = go.GetComponent<Canvas>();
+            CanvasState state = new CanvasState();
             if (canvas == null)
             {
                 canvas = go.AddComponent<Canvas>();
                 go.AddComponent<UnityEngine.UI.GraphicRaycaster>();
-                addedCanvases[go] = true;
+                state.WasAdded = true;
             }
             else
             {
-                addedCanvases[go] = false;
+                state.WasAdded = false;
+                state.OriginalOverrideSorting = canvas.overrideSorting;
+                state.OriginalSortingOrder = canvas.sortingOrder;
             }
+            
+            _canvasStates[go] = state;
             canvas.overrideSorting = true;
             canvas.sortingOrder = order;
         }
@@ -176,14 +202,25 @@ namespace KillingMahjong.UI
         private void ResetSorting(GameObject go)
         {
             if (go == null) return;
-            if (addedCanvases.TryGetValue(go, out bool wasAdded))
+            if (_canvasStates.TryGetValue(go, out CanvasState state))
             {
-                var canvas = go.GetComponent<Canvas>();
-                if (canvas != null)
+                if (state.WasAdded)
                 {
-                    canvas.overrideSorting = false;
+                    var raycaster = go.GetComponent<UnityEngine.UI.GraphicRaycaster>();
+                    if (raycaster != null) Destroy(raycaster);
+                    var canvas = go.GetComponent<Canvas>();
+                    if (canvas != null) Destroy(canvas);
                 }
-                addedCanvases.Remove(go);
+                else
+                {
+                    var canvas = go.GetComponent<Canvas>();
+                    if (canvas != null)
+                    {
+                        canvas.overrideSorting = state.OriginalOverrideSorting;
+                        canvas.sortingOrder = state.OriginalSortingOrder;
+                    }
+                }
+                _canvasStates.Remove(go);
             }
         }
 
@@ -408,8 +445,228 @@ namespace KillingMahjong.UI
                 if (isLocalPlayer)
                 {
                     uiManager.ClearSelection();
+                    
+                    if (_lastMulliganOutTileId != -1 && _lastMulliganTargetIndex != -1)
+                    {
+                        int oldTileId = _lastMulliganOutTileId;
+                        int newTileId = -1;
+                        
+                        float timeout = 2.0f;
+                        while (timeout > 0)
+                        {
+                            if (Managers.BoardStateManager.Instance.OriginalWallTiles != null &&
+                                Managers.BoardStateManager.Instance.OriginalWallTiles.Count > _lastMulliganTargetIndex)
+                            {
+                                int currentAtIdx = Managers.BoardStateManager.Instance.OriginalWallTiles[_lastMulliganTargetIndex];
+                                if (currentAtIdx != oldTileId)
+                                {
+                                    newTileId = currentAtIdx;
+                                    break;
+                                }
+                            }
+                            timeout -= Time.deltaTime;
+                            yield return null;
+                        }
+                        
+                        if (newTileId != -1)
+                        {
+                            yield return PlayMulliganAnimationRoutine(oldTileId, newTileId);
+                        }
+                        else
+                        {
+                            Debug.LogWarning("Mulligan animation failed: IN tile not received in time.");
+                        }
+
+                        _lastMulliganOutTileId = -1;
+                        _lastMulliganTargetIndex = -1;
+                    }
                 }
             }
+        }
+
+        private System.Collections.IEnumerator PlayMulliganAnimationRoutine(int outTileId, int inTileId)
+        {
+            // 1. 元の牌のUIスロットの座標を取得（選択時に保存したものを使う）
+            RectTransform originalSlotRt = _lastMulliganOutSlotRt;
+
+            GameObject animContainer = new GameObject("MulliganAnimationContainer");
+            Canvas canvas = animContainer.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 100;
+            animContainer.AddComponent<UnityEngine.UI.CanvasScaler>().uiScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize;
+
+            Vector2 startPos = new Vector2(0, -400); // 見つからなかった場合のデフォルト
+            Vector2 initialSize = new Vector2(120, 180);
+            Vector3 initialScale = Vector3.one;
+
+            if (originalSlotRt != null)
+            {
+                // Overlay Canvasの場合、positionはスクリーン座標
+                RectTransform animCanvasRt = animContainer.GetComponent<RectTransform>();
+                Vector2 localPos;
+                RectTransformUtility.ScreenPointToLocalPointInRectangle(animCanvasRt, originalSlotRt.position, null, out localPos);
+                startPos = localPos;
+
+                initialSize = originalSlotRt.rect.size;
+                initialScale = originalSlotRt.localScale;
+
+                // 元のスロットの画像を一時的に透明にする
+                var cg = originalSlotRt.GetComponent<CanvasGroup>();
+                if (cg == null) cg = originalSlotRt.gameObject.AddComponent<CanvasGroup>();
+                cg.alpha = 0;
+            }
+
+            // 背景の暗転
+            GameObject bgObj = new GameObject("Bg");
+            bgObj.transform.SetParent(animContainer.transform, false);
+            var bgImg = bgObj.AddComponent<UnityEngine.UI.Image>();
+            bgImg.color = new Color(0, 0, 0, 0.85f);
+            bgImg.rectTransform.anchorMin = Vector2.zero;
+            bgImg.rectTransform.anchorMax = Vector2.one;
+            bgImg.rectTransform.offsetMin = Vector2.zero;
+            bgImg.rectTransform.offsetMax = Vector2.zero;
+
+            // テキストの用意
+            GameObject outTextObj = new GameObject("OutText");
+            outTextObj.transform.SetParent(animContainer.transform, false);
+            var outText = outTextObj.AddComponent<TMPro.TextMeshProUGUI>();
+            outText.text = "OUT";
+            outText.fontSize = 150;
+            outText.color = new Color(1f, 0.2f, 0.2f, 0f);
+            outText.alignment = TMPro.TextAlignmentOptions.Center;
+            outText.fontStyle = TMPro.FontStyles.Bold;
+            outText.rectTransform.sizeDelta = new Vector2(400, 200);
+            outText.rectTransform.anchoredPosition = new Vector2(-280, 0); // 画面内に見える位置
+            
+            // テキストを牌の後ろにするために先に生成したが、Canvasのソートは無いので後でSiblingIndexを調整
+            outText.transform.SetAsFirstSibling();
+            bgObj.transform.SetAsFirstSibling();
+
+            GameObject inTextObj = new GameObject("InText");
+            inTextObj.transform.SetParent(animContainer.transform, false);
+            var inText = inTextObj.AddComponent<TMPro.TextMeshProUGUI>();
+            inText.text = "IN";
+            inText.fontSize = 150;
+            inText.color = new Color(0.2f, 0.8f, 1f, 0f);
+            inText.alignment = TMPro.TextAlignmentOptions.Center;
+            inText.fontStyle = TMPro.FontStyles.Bold;
+            inText.rectTransform.sizeDelta = new Vector2(400, 200);
+            inText.rectTransform.anchoredPosition = new Vector2(280, 0); // 画面内に見える位置
+            inText.transform.SetSiblingIndex(1); // 背景の次
+
+            // OUT Tile
+            GameObject outObj = new GameObject("OutTile");
+            outObj.transform.SetParent(animContainer.transform, false);
+            var outRt = outObj.AddComponent<RectTransform>();
+            outRt.sizeDelta = initialSize;
+            outRt.localScale = initialScale;
+            var outImg = outObj.AddComponent<UnityEngine.UI.Image>();
+            var outVis = outObj.AddComponent<TileVisual>();
+            if (uiManager.TileResourceManager != null)
+            {
+                outVis.SetTile(outTileId, uiManager.TileResourceManager.GetTileSprite(outTileId), uiManager.TileResourceManager);
+            }
+
+            // IN Tile (最初は非表示)
+            GameObject inObj = new GameObject("InTile");
+            inObj.transform.SetParent(animContainer.transform, false);
+            var inRt = inObj.AddComponent<RectTransform>();
+            inRt.sizeDelta = initialSize;
+            inRt.localScale = initialScale;
+            var inImg = inObj.AddComponent<UnityEngine.UI.Image>();
+            inImg.color = new Color(1, 1, 1, 0); // 初期は透明
+            var inVis = inObj.AddComponent<TileVisual>();
+            if (uiManager.TileResourceManager != null)
+            {
+                inVis.SetTile(inTileId, uiManager.TileResourceManager.GetTileSprite(inTileId), uiManager.TileResourceManager);
+            }
+
+            // --- アニメーション開始 ---
+            Vector3 targetScale = new Vector3(3.5f, 3.5f, 1f); // 牌をさらに大きく拡大
+            Vector2 outCenterPos = new Vector2(-80, 0); // 牌をさらに中央に寄せる
+            Vector2 inCenterPos = new Vector2(80, 0); // 牌をさらに中央に寄せる
+
+            // 1. 元の場所から左のOUT位置へ飛んでいく
+            outRt.anchoredPosition = startPos;
+            float t = 0;
+            while(t < 0.3f)
+            {
+                t += Time.deltaTime;
+                float progress = Mathf.Sin((t / 0.3f) * Mathf.PI * 0.5f);
+                outRt.anchoredPosition = Vector2.Lerp(startPos, outCenterPos, progress);
+                outRt.localScale = Vector3.Lerp(initialScale, targetScale, progress);
+                outText.color = new Color(1f, 0.2f, 0.2f, progress); // テキストフェードイン
+                outText.rectTransform.anchoredPosition = Vector2.Lerp(new Vector2(-330, 0), new Vector2(-280, 0), progress); // 画面内に見える位置へ
+                yield return null;
+            }
+            outRt.anchoredPosition = outCenterPos;
+            outRt.localScale = targetScale;
+            outText.color = new Color(1f, 0.2f, 0.2f, 1f);
+
+            // 2. 右側に新しい牌(IN)が上空から降ってくる
+            inRt.anchoredPosition = inCenterPos + new Vector2(0, 800);
+            inRt.localScale = targetScale;
+            t = 0;
+            while(t < 0.3f)
+            {
+                t += Time.deltaTime;
+                float progress = Mathf.Sin((t / 0.3f) * Mathf.PI * 0.5f);
+                inRt.anchoredPosition = Vector2.Lerp(inCenterPos + new Vector2(0, 800), inCenterPos, progress);
+                inImg.color = new Color(1, 1, 1, progress);
+                inText.color = new Color(0.2f, 0.8f, 1f, progress);
+                inText.rectTransform.anchoredPosition = Vector2.Lerp(new Vector2(330, 0), new Vector2(280, 0), progress); // 画面内に見える位置へ
+                yield return null;
+            }
+            inRt.anchoredPosition = inCenterPos;
+            inImg.color = new Color(1, 1, 1, 1f);
+            inText.color = new Color(0.2f, 0.8f, 1f, 1f);
+            
+            // 少し待機（左右に並んだ状態を見せる）
+            yield return new WaitForSeconds(0.6f);
+
+            // 3. OUTは上へ消え、INは元の場所へ戻る
+            t = 0;
+            while(t < 0.4f)
+            {
+                t += Time.deltaTime;
+                float progress = Mathf.Sin((t / 0.4f) * Mathf.PI * 0.5f);
+                
+                // OUT退場
+                outRt.anchoredPosition = Vector2.Lerp(outCenterPos, outCenterPos + new Vector2(0, 800), progress);
+                outImg.color = new Color(1, 1, 1, 1f - progress);
+                outText.color = new Color(1f, 0.2f, 0.2f, 1f - progress);
+
+                // IN帰還
+                inRt.anchoredPosition = Vector2.Lerp(inCenterPos, startPos, progress);
+                inRt.localScale = Vector3.Lerp(targetScale, initialScale, progress);
+                inText.color = new Color(0.2f, 0.8f, 1f, 1f - progress);
+                
+                yield return null;
+            }
+            inRt.anchoredPosition = startPos;
+            inRt.localScale = initialScale;
+
+            // 4. 全体がフェードアウト
+            t = 0;
+            var canvasGroup = animContainer.AddComponent<CanvasGroup>();
+            while(t < 0.2f)
+            {
+                t += Time.deltaTime;
+                canvasGroup.alpha = Mathf.Lerp(1, 0, t / 0.2f);
+                yield return null;
+            }
+
+            UnityEngine.Object.Destroy(animContainer);
+
+            // アニメーション終了後にUIを差分更新し、透明化を解除する
+            if (originalSlotRt != null)
+            {
+                var cg = originalSlotRt.GetComponent<CanvasGroup>();
+                if (cg != null) cg.alpha = 1;
+            }
+            
+            uiManager.SetIsTransitioning(false); // ★ここで解除してRebuildを許可する
+            uiManager.VisualController?.RebuildAllTilesFromState(null);
         }
     }
 }

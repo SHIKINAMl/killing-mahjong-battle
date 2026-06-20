@@ -77,7 +77,7 @@ namespace KillingMahjong.UI
                     if (rt != null)
                     {
                         rt.localScale = Vector3.one;
-                        rt.anchoredPosition = Vector2.zero;
+                        rt.anchoredPosition = new Vector2(0f, 15f);
                     }
                 }
             }
