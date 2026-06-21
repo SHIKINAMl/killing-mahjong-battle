@@ -23,6 +23,7 @@ namespace KillingMahjong.Managers
         public List<int> CurrentEnemyHandTiles { get; private set; } = new List<int>();
         public List<int> CurrentEnemyWallTiles { get; private set; } = new List<int>();
         public List<int> OriginalEnemyWallTiles { get; private set; } = new List<int>();
+        public List<int> CurrentEnemyWaitTiles { get; private set; } = new List<int>();
         public HashSet<int> ExposedEnemyHandWallIndexes { get; private set; } = new HashSet<int>();
         public HashSet<int> ExposedLocalHandWallIndexes { get; private set; } = new HashSet<int>();
         
@@ -97,6 +98,7 @@ namespace KillingMahjong.Managers
             NonManganWaitTiles.Clear();
             DiscardedWallIndexes.Clear();
             OriginalWallTiles.Clear();
+            OriginalEnemyWallTiles.Clear();
             CurrentDoraId = -1;
             TargetHandIndexes = null;
             HiddenTiles.Clear();
@@ -148,7 +150,7 @@ namespace KillingMahjong.Managers
             if (wait != null) CurrentWaitTiles = new List<int>(wait);
         }
 
-        public void SetEnemyState(List<int> wall, List<int> hand)
+        public void SetEnemyState(List<int> wall, List<int> hand, List<int> waits = null)
         {
             if (wall != null && wall.Count > 0)
             {
@@ -164,6 +166,7 @@ namespace KillingMahjong.Managers
                 CurrentEnemyWallTiles = displayEnemyWall;
             }
             if (hand != null) CurrentEnemyHandTiles = new List<int>(hand);
+            if (waits != null) CurrentEnemyWaitTiles = new List<int>(waits);
         }
 
         public void ClearWaitTiles()

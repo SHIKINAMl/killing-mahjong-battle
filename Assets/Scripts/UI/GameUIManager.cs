@@ -131,6 +131,25 @@ namespace KillingMahjong.UI
 
         private void SetupUI()
         {
+            if (waitUI != null && enemyWaitUI == null)
+            {
+                // 相手用のWaitUIを生成する
+                GameObject enemyWaitObj = Instantiate(waitUI.gameObject, waitUI.transform.parent);
+                enemyWaitObj.name = "EnemyWaitUI";
+                enemyWaitUI = enemyWaitObj.GetComponent<WaitUI>();
+                
+                // 画面中央に大きく配置するため、RectTransformのアンカーとスケールを調整
+                RectTransform rt = enemyWaitObj.GetComponent<RectTransform>();
+                if (rt != null)
+                {
+                    rt.anchorMin = new Vector2(0.5f, 0.5f);
+                    rt.anchorMax = new Vector2(0.5f, 0.5f);
+                    rt.anchoredPosition = new Vector2(0, 150); // 中央より少し上
+                    rt.localScale = new Vector3(1.5f, 1.5f, 1.5f); // 1.5倍に大きくして目立たせる
+                }
+                enemyWaitObj.SetActive(false);
+            }
+
             if (confirmationDialogUI == null)
             {
                 confirmationDialogUI = FindFirstObjectByType<ConfirmationDialogUI>(FindObjectsInactive.Include);
@@ -197,7 +216,10 @@ namespace KillingMahjong.UI
         public EnemyHandUI EnemyHandUI => enemyHandUI;
         public EnemyWallUI EnemyWallUI => enemyWallUI;
         public RiverUI EnemyRiverUI => enemyRiverUI;
+        private WaitUI enemyWaitUI;
+
         public WaitUI WaitUI => waitUI;
+        public WaitUI EnemyWaitUI => enemyWaitUI;
         public DialogueUI DialogueUI => dialogueUI;
         public PlayerInfoUI PlayerInfoUI => playerInfoUI;
         public EnemyInfoUI EnemyInfoUI => enemyInfoUI;
@@ -503,16 +525,16 @@ namespace KillingMahjong.UI
         // Methods invoked via Unity Events (e.g. Inspector Buttons)
         public void ExecuteRonAction()
         {
+            Debug.Log($"[GameUIManager] ExecuteRonAction called. _isAgariPending={_isAgariPending}");
             if (_isAgariPending)
             {
                 _isAgariPending = false;
                 if (RonWaitPanel != null) RonWaitPanel.SetActive(false);
                 SendActionToServer("agari", new KillingMahjong.Network.ActionPayload { accept = true });
+                Debug.Log("[GameUIManager] Sent 'agari' action to server.");
             }
-            else
-            {
-                PhaseController?.ExecuteRonAction();
-            }
+            
+            PhaseController?.ExecuteRonAction();
         }
 
         public void ShowMatchmakingWaiting()

@@ -373,6 +373,12 @@ namespace KillingMahjong.UI
         private void OnBetConfirmed(int betAmount)
         {
             uiManager.BettingUI.HideBettingPhase();
+            
+            if (uiManager.PlayerInfoUI != null && uiManager.PlayerInfoUI.gameObject.activeInHierarchy)
+            {
+                uiManager.PlayerInfoUI.StartCoroutine(uiManager.PlayerInfoUI.ResetZoomRoutine(0.3f));
+            }
+
             if (ReactionController.Instance != null)
             {
                 ReactionController.Instance.CheckAndPlayBetReaction(betAmount, Managers.BoardStateManager.Instance.LocalPlayerHp, true);
@@ -472,7 +478,7 @@ namespace KillingMahjong.UI
              }
         }
 
-        public void HandleDraw()
+        public void HandleDraw(KillingMahjong.EngineData.DrawPlayerData[] drawData = null)
         {
             Debug.Log("[GameUIManager] 流局処理開始");
             _isCarryOverNextRound = true;
@@ -484,6 +490,73 @@ namespace KillingMahjong.UI
                 ReactionController.Instance.HandleRoundStart(_currentRoundIndex);
             }
 
+            // --- 追加: 流局時の手牌と待ち牌の公開 ---
+            // --- 追加: 流局時の手牌と待ち牌の公開 ---
+            // 相手の手牌はローカルで既に実データを知っているので、ネットワークデータに依存せず強制公開する
+            if (uiManager.EnemyHandUI != null)
+            {
+                uiManager.EnemyHandUI.RevealAllHands(uiManager.TileResourceManager);
+            }
+
+            // 自分の待ち牌表示
+            if (uiManager.WaitUI != null && Managers.BoardStateManager.Instance.CurrentWaitTiles != null && Managers.BoardStateManager.Instance.CurrentWaitTiles.Count > 0)
+            {
+                uiManager.WaitUI.gameObject.SetActive(true);
+                uiManager.WaitUI.DisplayWaits(Managers.BoardStateManager.Instance.CurrentWaitTiles);
+            }
+
+            // 相手の待ち牌表示
+            if (uiManager.EnemyWaitUI != null && Managers.BoardStateManager.Instance.CurrentEnemyWaitTiles != null && Managers.BoardStateManager.Instance.CurrentEnemyWaitTiles.Count > 0)
+            {
+                uiManager.EnemyWaitUI.gameObject.SetActive(true);
+                uiManager.EnemyWaitUI.DisplayWaits(Managers.BoardStateManager.Instance.CurrentEnemyWaitTiles);
+            }
+
+            if (drawData != null)
+            {
+                string localId = NetworkMessageHandler.Instance.LocalPlayerId;
+                foreach (var data in drawData)
+                {
+                    if (data.client_id == localId)
+                    {
+                        // 自分の待ち牌表示 (drawDataがある場合のフォールバック)
+                        if (uiManager.WaitUI != null && data.waits != null && data.waits.Length > 0)
+                        {
+                            uiManager.WaitUI.gameObject.SetActive(true);
+                            uiManager.WaitUI.DisplayWaits(new System.Collections.Generic.List<int>(data.waits));
+                        }
+                    }
+                    else
+                    {
+                        // 相手の待ち牌表示 (drawDataがある場合のフォールバック)
+                        if (uiManager.EnemyWaitUI != null && data.waits != null && data.waits.Length > 0)
+                        {
+                            uiManager.EnemyWaitUI.gameObject.SetActive(true);
+                            uiManager.EnemyWaitUI.DisplayWaits(new System.Collections.Generic.List<int>(data.waits));
+                        }
+                    }
+                }
+            }
+
+            // ダイアログを出してOKボタンを待つ
+            if (uiManager.DialogueUI != null)
+            {
+                uiManager.DialogueUI.gameObject.SetActive(true);
+                uiManager.DialogueUI.ShowText("流局しました。\nお互いの手牌と待ちを確認してください。");
+                uiManager.DialogueUI.ShowNextRoundButton(() => {
+                    if (uiManager.WaitUI != null) uiManager.WaitUI.gameObject.SetActive(false);
+                    if (uiManager.EnemyWaitUI != null) uiManager.EnemyWaitUI.gameObject.SetActive(false);
+                    ExecuteDrawTransition();
+                });
+            }
+            else
+            {
+                ExecuteDrawTransition();
+            }
+        }
+
+        private void ExecuteDrawTransition()
+        {
             if (uiManager.PhaseTransitionUI != null)
             {
                 uiManager.SetIsTransitioning(true);
@@ -500,19 +573,8 @@ namespace KillingMahjong.UI
                     },
                     onComplete: () => {
                         uiManager.SetIsTransitioning(false);
-
-                        if (uiManager.DialogueUI != null)
-                        {
-                            uiManager.DialogueUI.ShowNextRoundButton(() => {
-                                uiManager.PhaseTransitionUI.PlayRoundStartDarken("対戦相手を待機中...");
-                                SendNextRoundAction();
-                            });
-                        }
-                        else
-                        {
-                            uiManager.PhaseTransitionUI.PlayRoundStartDarken("対戦相手を待機中...");
-                            SendNextRoundAction();
-                        }
+                        uiManager.PhaseTransitionUI.PlayRoundStartDarken("対戦相手を待機中...");
+                        SendNextRoundAction();
                     }
                 );
             }
@@ -635,50 +697,12 @@ namespace KillingMahjong.UI
             if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.gameObject.SetActive(true);
             if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetPanelVisible(true);
 
-            if (uiManager.RonAnimationUI != null)
-            {
-                uiManager.RonAnimationUI.PrepareForPreDialogue();
-                uiManager.RonAnimationUI.gameObject.SetActive(true);
-                uiManager.RonAnimationUI.ShowPlayerRonBubble(isLocalWin);
-            }
-
-            bool useBubble = isLocalWin && uiManager.RonAnimationUI != null && uiManager.RonAnimationUI.HasPlayerRonBubble();
-
-            if (useBubble)
-            {
-            }
-            else if (isLocalWin)
-            {
-                if (uiManager.DialogueUI != null)
-                {
-                    uiManager.DialogueUI.gameObject.SetActive(true);
-                    string loseText = (uiManager.EnemyInfoUI != null) ? uiManager.EnemyInfoUI.PlayReaction(ReactionTrigger.Lose) : null;
-                    if (string.IsNullOrEmpty(loseText)) loseText = "「ロン！」";
-                    uiManager.DialogueUI.ShowText(loseText);
-                }
-            }
-            else
-            {
-                if (uiManager.DialogueUI != null)
-                {
-                    uiManager.DialogueUI.gameObject.SetActive(true);
-                    string winText = (uiManager.EnemyInfoUI != null) ? uiManager.EnemyInfoUI.PlayReaction(ReactionTrigger.Win) : null;
-                    if (string.IsNullOrEmpty(winText)) winText = "「ロンよ！」";
-                    uiManager.DialogueUI.ShowText(winText);
-                }
-            }
-
-            if (isLocalWin && uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.PlayBounceAnimation(1.5f);
-            if (!isLocalWin && uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.PlayBounceAnimation(1.5f);
-
-            yield return new WaitForSeconds(1.5f);
-
-            if (uiManager.RonAnimationUI != null) uiManager.RonAnimationUI.ShowPlayerRonBubble(false);
-            if (uiManager.DialogueUI != null) uiManager.DialogueUI.gameObject.SetActive(false);
             if (uiManager.AbilityUI != null) uiManager.AbilityUI.gameObject.SetActive(false);
 
             if (uiManager.RonAnimationUI != null)
             {
+                uiManager.RonAnimationUI.gameObject.SetActive(true);
+
                 var liq = BoardStateManager.Instance.LastLiquidationData;
                 int score = liq != null ? liq.winner_gain : 0;
                 
@@ -692,6 +716,7 @@ namespace KillingMahjong.UI
                     uiManager.PlayerInfoUI, uiManager.EnemyInfoUI, prevLocalHp, newLocalHp, prevEnemyHp, newEnemyHp,
                     () => OnRonAnimationComplete(isLocalWin));
             }
+            yield break;
         }
 
         private void OnRonAnimationComplete(bool isLocalWin)
@@ -746,6 +771,9 @@ namespace KillingMahjong.UI
                     }
                     else
                     {
+                        BoardStateManager.Instance.ClearAllBoardData();
+                        uiManager.ClearAllTiles();
+                        
                         if (uiManager.PhaseTransitionUI != null)
                         {
                             uiManager.PhaseTransitionUI.PlayRoundStartDarken("対戦相手を待機中...");
@@ -762,6 +790,9 @@ namespace KillingMahjong.UI
                 }
                 else
                 {
+                    BoardStateManager.Instance.ClearAllBoardData();
+                    uiManager.ClearAllTiles();
+                    
                     if (uiManager.PhaseTransitionUI != null)
                     {
                         uiManager.PhaseTransitionUI.PlayRoundStartDarken("対戦相手を待機中...");

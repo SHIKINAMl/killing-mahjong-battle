@@ -14,19 +14,27 @@ namespace KillingMahjong.UI
             // まずは共通のUI追加処理を呼び出す
             base.AddTileToHand(tileTransform, visualId);
             
-            // プレイヤーと同じ操作用のInteractionがあると誤作動するため無効化・削除
-            var interaction = tileTransform.GetComponent<TileInteraction>();
-            if (interaction != null) Destroy(interaction);
+            // プレイヤーと同じ操作用のInteractionが残らないよう即時削除
+            var interactions = tileTransform.GetComponentsInChildren<TileInteraction>(true);
+            foreach(var interaction in interactions)
+            {
+                DestroyImmediate(interaction);
+            }
 
-            // 代わりにクリック公開用のButtonを追加
+            // 万が一ホバー状態が残っていた場合に備えて強制リセット
+            var visual = tileTransform.GetComponent<TileVisual>();
+            if (visual != null) visual.SetHoverHighlight(false);
+
+            // マウスカーソルに一切反応しないようにレイキャストを遮断する
+            var images = tileTransform.GetComponentsInChildren<UnityEngine.UI.Image>(true);
+            foreach(var img in images)
+            {
+                img.raycastTarget = false;
+            }
+
+            // クリック公開用のButtonは不要（ユーザーがクリックできてしまうため）なので削除
             var btn = tileTransform.gameObject.GetComponent<UnityEngine.UI.Button>();
-            if (btn == null) btn = tileTransform.gameObject.AddComponent<UnityEngine.UI.Button>();
-            
-            btn.onClick.RemoveAllListeners();
-            btn.onClick.AddListener(() => {
-                int index = handSlots.IndexOf(tileTransform);
-                if (index != -1) RevealTileByIndex(index);
-            });
+            if (btn != null) Destroy(btn);
 
             // 本当のIDをリストに追加して記憶する
             realTileIds.Add(realId);
@@ -97,6 +105,23 @@ namespace KillingMahjong.UI
             else
             {
                 Debug.LogError("[EnemyHandUI] targetTile is null!");
+            }
+        }
+
+        public void RevealAllHands(TileResourceManager tileResourceManager)
+        {
+            for (int i = 0; i < handSlots.Count; i++)
+            {
+                if (i < realTileIds.Count)
+                {
+                    int realId = realTileIds[i]; // ここにはencodedIdが入るようになった
+                    var visual = handSlots[i].GetComponent<TileVisual>();
+                    if (visual != null && tileResourceManager != null)
+                    {
+                        visual.SetTile(realId, tileResourceManager.GetTileSprite(realId));
+                        visual.SetExposed(false); // 目アイコンは出さない
+                    }
+                }
             }
         }
 

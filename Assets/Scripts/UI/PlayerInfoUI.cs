@@ -245,49 +245,41 @@ namespace KillingMahjong.UI
             
             _canvasStates.Clear();
             
-            // PlayerInfoUI本体および、その下にある全ての子Canvas（HPPanelなど）を取得する
-            var canvases = target.GetComponentsInChildren<Canvas>(true);
-            
-            foreach (var canvas in canvases)
+            // ルートのCanvasのみを取得して手前に出す（子Canvasを一律上書きすると表示順が壊れるため）
+            var canvas = target.GetComponent<Canvas>();
+            if (canvas == null)
             {
-                var state = new CanvasState
+                canvas = target.gameObject.AddComponent<Canvas>();
+                target.gameObject.AddComponent<UnityEngine.UI.GraphicRaycaster>();
+                
+                _canvasStates.Add(new CanvasState
+                {
+                    CanvasRef = canvas,
+                    WasAdded = true
+                });
+            }
+            else
+            {
+                _canvasStates.Add(new CanvasState
                 {
                     CanvasRef = canvas,
                     WasAdded = false,
                     OriginalOverrideSorting = canvas.overrideSorting,
                     OriginalSortingOrder = canvas.sortingOrder,
                     OriginalSortingLayer = canvas.sortingLayerName
-                };
-                
-                _canvasStates.Add(state);
-                
-                canvas.overrideSorting = true;
-                canvas.sortingLayerName = "UI";
-                canvas.sortingOrder = 32000;
-            }
-            
-            // もし対象オブジェクト自身にCanvasがなくて追加する必要がある場合（通常は既に親にあるはずなので滅多にないが念のため）
-            if (target.GetComponent<Canvas>() == null)
-            {
-                var newCanvas = target.gameObject.AddComponent<Canvas>();
-                target.gameObject.AddComponent<UnityEngine.UI.GraphicRaycaster>();
-                
-                _canvasStates.Add(new CanvasState
-                {
-                    CanvasRef = newCanvas,
-                    WasAdded = true
                 });
-                
-                newCanvas.overrideSorting = true;
-                newCanvas.sortingLayerName = "UI";
-                newCanvas.sortingOrder = 32000;
             }
             
+            canvas.overrideSorting = true;
+            canvas.sortingLayerName = "UI";
+            canvas.sortingOrder = 20;
+            
+            // 手やスマホ本体などのSpriteRendererを手前に持ってくる
             var sprites = target.GetComponentsInChildren<SpriteRenderer>(true);
             foreach (var s in sprites)
             {
                 s.sortingLayerName = "UI";
-                s.sortingOrder = 32000;
+                s.sortingOrder = 20;
             }
         }
 

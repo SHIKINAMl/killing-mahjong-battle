@@ -225,6 +225,15 @@ namespace KillingMahjong.EngineData
     {
         public bool is_draw;
         public LiquidationData liquidation;
+        public DrawPlayerData[] draw_data;
+    }
+    
+    [Serializable]
+    public class DrawPlayerData
+    {
+        public string client_id;
+        public int[] hand;
+        public int[] waits;
     }
 
     // --- アクション応答系 ---

@@ -54,6 +54,38 @@ namespace KillingMahjong.UI
         private IEnumerator SequenceRoutine(List<int> handTiles, int ronTile, List<string> yakuList, string formula, string rankName, int score, bool isLocalPlayerWin, 
             PlayerInfoUI playerInfo, EnemyInfoUI enemyInfo, int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp, System.Action onComplete)
         {
+            // 0. カットイン演出（勝者の顔と「ロン！」を表示）
+            bool cutinFinished = false;
+            
+            // 勝者の画像を取得
+            Sprite winnerSprite = null;
+            if (isLocalPlayerWin && playerInfo != null && playerInfo.CurrentCharacterData != null)
+            {
+                if (playerInfo.CurrentCharacterData.faceSprites.Count > 0)
+                    winnerSprite = playerInfo.CurrentCharacterData.faceSprites[0].sprite;
+                else
+                    winnerSprite = playerInfo.CurrentCharacterData.normalSprite;
+            }
+            else if (!isLocalPlayerWin && enemyInfo != null && enemyInfo.CurrentCharacterData != null)
+            {
+                if (enemyInfo.CurrentCharacterData.faceSprites.Count > 0)
+                    winnerSprite = enemyInfo.CurrentCharacterData.faceSprites[0].sprite;
+                else
+                    winnerSprite = enemyInfo.CurrentCharacterData.normalSprite;
+            }
+
+            if (winnerSprite != null)
+            {
+                CutinAnimationUI cutinUI = gameObject.AddComponent<CutinAnimationUI>();
+                cutinUI.PlayCutin(winnerSprite, customFont, () => {
+                    cutinFinished = true;
+                    Destroy(cutinUI);
+                });
+
+                // カットインが終わるまで待機
+                while (!cutinFinished) yield return null;
+            }
+
             // 1. 大枠コンテナの生成（すべてを包括する最前面キャンバス）
             GameObject container = new GameObject("RonCinematicContainer");
             container.transform.SetParent(transform, false);
@@ -215,78 +247,7 @@ namespace KillingMahjong.UI
                 yield return null;
             }
 
-            // HP UIを最前面へ表示して見やすくする
-            // （SetParentは座標系が大きく変わりUIが画面外に消える原因になるため、CanvasのSortingOrderで前面に持ってくる手法に戻しつつ、子オブジェクトも全て対応する）
-            Canvas[] pCanvases = playerInfo != null ? playerInfo.GetComponentsInChildren<Canvas>(true) : new Canvas[0];
-            bool pAddedRootCanvas = false;
-            Canvas pRootCanvas = playerInfo != null ? playerInfo.GetComponent<Canvas>() : null;
-            if (playerInfo != null && pRootCanvas == null)
-            {
-                pRootCanvas = playerInfo.gameObject.AddComponent<Canvas>();
-                pAddedRootCanvas = true;
-                pCanvases = playerInfo.GetComponentsInChildren<Canvas>(true);
-            }
-
-            int[] pOrigSorts = new int[pCanvases.Length];
-            bool[] pOrigOverrides = new bool[pCanvases.Length];
-            string[] pOrigLayers = new string[pCanvases.Length];
-            for (int i = 0; i < pCanvases.Length; i++)
-            {
-                pOrigSorts[i] = pCanvases[i].sortingOrder;
-                pOrigOverrides[i] = pCanvases[i].overrideSorting;
-                pOrigLayers[i] = pCanvases[i].sortingLayerName;
-
-                pCanvases[i].overrideSorting = true;
-                pCanvases[i].sortingLayerName = "UI";
-                pCanvases[i].sortingOrder = 30000 + i;
-            }
-
-            Canvas[] eCanvases = enemyInfo != null ? enemyInfo.GetComponentsInChildren<Canvas>(true) : new Canvas[0];
-            bool eAddedRootCanvas = false;
-            Canvas eRootCanvas = enemyInfo != null ? enemyInfo.GetComponent<Canvas>() : null;
-            if (enemyInfo != null && eRootCanvas == null)
-            {
-                eRootCanvas = enemyInfo.gameObject.AddComponent<Canvas>();
-                eAddedRootCanvas = true;
-                eCanvases = enemyInfo.GetComponentsInChildren<Canvas>(true);
-            }
-
-            int[] eOrigSorts = new int[eCanvases.Length];
-            bool[] eOrigOverrides = new bool[eCanvases.Length];
-            string[] eOrigLayers = new string[eCanvases.Length];
-            for (int i = 0; i < eCanvases.Length; i++)
-            {
-                eOrigSorts[i] = eCanvases[i].sortingOrder;
-                eOrigOverrides[i] = eCanvases[i].overrideSorting;
-                eOrigLayers[i] = eCanvases[i].sortingLayerName;
-
-                eCanvases[i].overrideSorting = true;
-                eCanvases[i].sortingLayerName = "UI";
-                eCanvases[i].sortingOrder = 30000 + i;
-            }
-            
-            // SpriteRenderer用
-            SpriteRenderer[] pSprites = playerInfo != null ? playerInfo.GetComponentsInChildren<SpriteRenderer>(true) : new SpriteRenderer[0];
-            int[] pOrigSpriteSorts = new int[pSprites.Length];
-            string[] pOrigSpriteLayers = new string[pSprites.Length];
-            for (int i = 0; i < pSprites.Length; i++)
-            {
-                pOrigSpriteSorts[i] = pSprites[i].sortingOrder;
-                pOrigSpriteLayers[i] = pSprites[i].sortingLayerName;
-                pSprites[i].sortingLayerName = "UI";
-                pSprites[i].sortingOrder = 30000 + i;
-            }
-
-            SpriteRenderer[] eSprites = enemyInfo != null ? enemyInfo.GetComponentsInChildren<SpriteRenderer>(true) : new SpriteRenderer[0];
-            int[] eOrigSpriteSorts = new int[eSprites.Length];
-            string[] eOrigSpriteLayers = new string[eSprites.Length];
-            for (int i = 0; i < eSprites.Length; i++)
-            {
-                eOrigSpriteSorts[i] = eSprites[i].sortingOrder;
-                eOrigSpriteLayers[i] = eSprites[i].sortingLayerName;
-                eSprites[i].sortingLayerName = "UI";
-                eSprites[i].sortingOrder = 30000 + i;
-            }
+            // HP UIを最前面へ表示する処理はユーザー要望により削除
 
             // 勝者のHPゲージへパーティクルが吸い込まれる演出
             Transform winnerTransform = isLocalPlayerWin ? playerInfo?.transform : enemyInfo?.transform;
@@ -313,58 +274,7 @@ namespace KillingMahjong.UI
             if (playerInfo != null) playerInfo.SetHP(newLocalHp);
             if (enemyInfo != null) enemyInfo.SetHP(newEnemyHp);
 
-            // HP UIの並び順を元に戻す
-            for (int i = 0; i < pCanvases.Length; i++)
-            {
-                if (pCanvases[i] != null)
-                {
-                    if (pCanvases[i] == pRootCanvas && pAddedRootCanvas)
-                    {
-                        Destroy(pCanvases[i]);
-                    }
-                    else
-                    {
-                        pCanvases[i].overrideSorting = pOrigOverrides[i];
-                        pCanvases[i].sortingLayerName = pOrigLayers[i];
-                        pCanvases[i].sortingOrder = pOrigSorts[i];
-                    }
-                }
-            }
-
-            for (int i = 0; i < eCanvases.Length; i++)
-            {
-                if (eCanvases[i] != null)
-                {
-                    if (eCanvases[i] == eRootCanvas && eAddedRootCanvas)
-                    {
-                        Destroy(eCanvases[i]);
-                    }
-                    else
-                    {
-                        eCanvases[i].overrideSorting = eOrigOverrides[i];
-                        eCanvases[i].sortingLayerName = eOrigLayers[i];
-                        eCanvases[i].sortingOrder = eOrigSorts[i];
-                    }
-                }
-            }
-
-            for (int i = 0; i < pSprites.Length; i++)
-            {
-                if (pSprites[i] != null)
-                {
-                    pSprites[i].sortingLayerName = pOrigSpriteLayers[i];
-                    pSprites[i].sortingOrder = pOrigSpriteSorts[i];
-                }
-            }
-
-            for (int i = 0; i < eSprites.Length; i++)
-            {
-                if (eSprites[i] != null)
-                {
-                    eSprites[i].sortingLayerName = eOrigSpriteLayers[i];
-                    eSprites[i].sortingOrder = eOrigSpriteSorts[i];
-                }
-            }
+            // 復元処理は削除済み
 
             // 終了処理
             Destroy(container);

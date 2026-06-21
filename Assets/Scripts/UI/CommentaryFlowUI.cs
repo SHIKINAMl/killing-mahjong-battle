@@ -323,7 +323,7 @@ namespace KillingMahjong.UI
             StartCoroutine(BurstComments(RonComments, dangerColor, 3, 0.5f));
         }
 
-        private void OnDraw()
+        private void OnDraw(KillingMahjong.EngineData.DrawPlayerData[] drawData)
         {
             SpawnComment(RandomPick(DrawComments), normalColor, 1.2f);
         }

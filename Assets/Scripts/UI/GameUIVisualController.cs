@@ -163,130 +163,52 @@ namespace KillingMahjong.UI
                             InitializeTileComponent(rt, id, true);
                             uiManager.HandUI.AddTileToHand(rt, id);
                             
-                            // 自分が透視されている牌のマーク表示
-                            var visual = rt.GetComponent<TileVisual>();
-                            if (visual != null)
-                            {
-                                bool isExposed = false;
-                                if (localExposedActualIds.Contains(id))
-                                {
-                                    isExposed = true;
-                                    localExposedActualIds.Remove(id);
-                                }
-                                visual.SetExposed(isExposed);
-                            }
                         }
                         else
                         {
                             Debug.LogWarning($"[Visual] Failed to grab tile by id: {id} for Local Hand!");
                         }
                     }
-
-                    // 残ったWallUIの牌（手牌選択フェーズなどで全牌がWallにある場合）についても透視判定を行う
-                    foreach (var rt in uiManager.WallUI.GetWallSlots())
-                    {
-                        var interaction = rt.GetComponent<TileInteraction>();
-                        var visual = rt.GetComponent<TileVisual>();
-                        if (interaction != null && visual != null)
-                        {
-                            bool isExposed = false;
-                            if (localExposedActualIds.Contains(interaction.TileId))
-                            {
-                                isExposed = true;
-                                localExposedActualIds.Remove(interaction.TileId);
-                            }
-                            // 既に SetExposed(true) されている可能性はないが、確実に反映させる
-                            visual.SetExposed(isExposed);
-                        }
-                    }
-                    }
+                }
                 }
             } // End of needFullRebuild
+
+            // 毎回の更新で、透視状態だけはフルリビルドに関わらず必ず同期する
+            SyncLocalExposedState(board);
 
             // 3. Enemy HandUI
             if (uiManager.EnemyHandUI != null)
             {
                 uiManager.EnemyHandUI.ClearHand();
 
-                bool isDummyHand = board.CurrentEnemyHandTiles.Count > 1 && 
-                                   board.CurrentEnemyHandTiles.TrueForAll(x => x <= 0);
-
-                List<int> exposedActualIds = new List<int>();
-                List<int> exposedWallIndexes = new List<int>();
-                if (isDummyHand)
+                // 透視された牌の encodedId を集計する
+                List<int> exposedEncodedIds = new List<int>();
+                foreach (int exposedIdx in board.ExposedEnemyHandWallIndexes)
                 {
-                    foreach (int exposedIdx in board.ExposedEnemyHandWallIndexes)
+                    if (exposedIdx >= 0 && exposedIdx < board.OriginalEnemyWallTiles.Count)
                     {
-                        if (exposedIdx >= 0 && exposedIdx < board.OriginalEnemyWallTiles.Count)
-                        {
-                            exposedActualIds.Add(board.OriginalEnemyWallTiles[exposedIdx]);
-                            exposedWallIndexes.Add(exposedIdx);
-                        }
+                        exposedEncodedIds.Add(board.OriginalEnemyWallTiles[exposedIdx]);
                     }
                 }
 
-                int exposedAssigned = 0;
-
                 for (int i = 0; i < board.CurrentEnemyHandTiles.Count; i++)
                 {
-                    int currentTileVal = board.CurrentEnemyHandTiles[i];
+                    int currentTileVal = board.CurrentEnemyHandTiles[i]; // encodedId
                     GameObject obj = Instantiate(uiManager.TilePrefab, transform);
                     RectTransform rt = obj.GetComponent<RectTransform>() ?? obj.transform as RectTransform;
                     if (rt != null) {
                         int visualId = -1; // Force hidden (-1)
-                        int actualTileId = -1;
-                        int wallIdx = -1;
-
-                        if (isDummyHand)
-                        {
-                            wallIdx = currentTileVal; // usually -1 or similar dummy value
-                            if (wallIdx >= 0 && wallIdx < board.OriginalEnemyWallTiles.Count) {
-                                actualTileId = board.OriginalEnemyWallTiles[wallIdx];
-                            }
-                        }
-                        else
-                        {
-                            actualTileId = currentTileVal;
-                            wallIdx = board.OriginalEnemyWallTiles.IndexOf(actualTileId);
-                        }
-
-                        bool revealThis = false;
-
-                        if (isDummyHand)
-                        {
-                            if (exposedAssigned < exposedActualIds.Count)
-                            {
-                                actualTileId = exposedActualIds[exposedAssigned];
-                                int assignedWallIdx = exposedWallIndexes[exposedAssigned];
-                                revealThis = true;
-                                if (suppressRevealWallIndexes != null && suppressRevealWallIndexes.Contains(assignedWallIdx))
-                                {
-                                    revealThis = false;
-                                    _lastSuppressedIndices.Add(i);
-                                }
-                                exposedAssigned++;
-                            }
-                        }
-                        else
-                        {
-                            if (board.ExposedEnemyHandWallIndexes.Contains(wallIdx))
-                            {
-                                revealThis = true;
-                                if (suppressRevealWallIndexes != null && suppressRevealWallIndexes.Contains(wallIdx))
-                                {
-                                    revealThis = false;
-                                    _lastSuppressedIndices.Add(i);
-                                }
-                            }
-                        }
+                        int actualTileId = currentTileVal; // 実際の牌ID
 
                         InitializeTileComponent(rt, visualId, false);
                         uiManager.EnemyHandUI.AddEnemyTile(rt, visualId, actualTileId);
 
-                        if (revealThis)
+                        // もしこの牌の encodedId が透視済みリストにあれば表にする
+                        if (exposedEncodedIds.Contains(actualTileId))
                         {
+                            exposedEncodedIds.Remove(actualTileId); // 一度表にしたらリストから消す（重複防止）
                             uiManager.EnemyHandUI.RevealTileByIndex(i);
-                            // 敵の牌には目のアイコンを表示しない要望のため SetExposed(true) は行わない
+                            // 目のアイコンは出さない
                         }
                     }
                 }
@@ -334,6 +256,15 @@ namespace KillingMahjong.UI
                             }
                             InitializeTileComponent(rt, visualId, false);
                             
+                            // --- 相手の牌（Wall扱い）は操作・ホバー不要なので完全に無効化する ---
+                            var interactions = rt.GetComponentsInChildren<TileInteraction>(true);
+                            foreach(var interaction in interactions) DestroyImmediate(interaction);
+                            var visual = rt.GetComponent<TileVisual>();
+                            if (visual != null) visual.SetHoverHighlight(false);
+                            var images = rt.GetComponentsInChildren<UnityEngine.UI.Image>(true);
+                            foreach(var img in images) img.raycastTarget = false;
+                            // --------------------------------------------------------------------
+
                             // 敵の壁牌には目のアイコンを表示しない要望のため SetExposed(isExposedInWall) は行わない
                             enemyWallGenerated.Add(rt);
                         }
@@ -368,6 +299,51 @@ namespace KillingMahjong.UI
             
             interaction.Initialize(id, inHand, uiManager, canvas);
         }
+
+        private void SyncLocalExposedState(Managers.BoardStateManager board)
+        {
+            List<int> localExposedActualIds = new List<int>();
+            foreach (int exposedIdx in board.ExposedLocalHandWallIndexes)
+            {
+                if (exposedIdx >= 0 && exposedIdx < board.OriginalWallTiles.Count)
+                {
+                    localExposedActualIds.Add(board.OriginalWallTiles[exposedIdx]);
+                }
+            }
+
+            if (uiManager.HandUI != null)
+            {
+                foreach (var rt in uiManager.HandUI.GetHandSlots())
+                {
+                    if (rt == null) continue;
+                    var interaction = rt.GetComponent<TileInteraction>();
+                    var visual = rt.GetComponent<TileVisual>();
+                    if (interaction != null && visual != null)
+                    {
+                        bool isExposed = localExposedActualIds.Contains(interaction.TileId);
+                        if (isExposed) localExposedActualIds.Remove(interaction.TileId);
+                        visual.SetExposed(isExposed);
+                    }
+                }
+            }
+
+            if (uiManager.WallUI != null)
+            {
+                foreach (var rt in uiManager.WallUI.GetWallSlots())
+                {
+                    if (rt == null) continue;
+                    var interaction = rt.GetComponent<TileInteraction>();
+                    var visual = rt.GetComponent<TileVisual>();
+                    if (interaction != null && visual != null)
+                    {
+                        bool isExposed = localExposedActualIds.Contains(interaction.TileId);
+                        if (isExposed) localExposedActualIds.Remove(interaction.TileId);
+                        visual.SetExposed(isExposed);
+                    }
+                }
+            }
+        }
+
 
         private void UpdateSelectedTileVisuals()
         {

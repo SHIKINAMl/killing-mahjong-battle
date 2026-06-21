@@ -107,7 +107,7 @@ namespace KillingMahjong.Network
         public event Action<RoundStatus> OnPhaseStatusChanged;
         public event Action<int, bool> OnTileDiscarded; // tileId, isLocalPlayer
         public event Action<bool> OnAgari; // isLocalWin
-        public event Action OnDraw; // 流局
+        public event Action<DrawPlayerData[]> OnDraw; // 流局
         public event Action<int, int> OnGameEnded; // localScore, enemyScore
         public event Action OnNextRoundWaitingReceived; // 相手からの次局待機（ロンボタン押下の合図として利用）
         
@@ -244,6 +244,16 @@ namespace KillingMahjong.Network
                                         localHand,
                                         statusMsg.data.player_state.waits != null ? new System.Collections.Generic.List<int>(statusMsg.data.player_state.waits) : new System.Collections.Generic.List<int>()
                                     );
+                                    
+                                    Managers.BoardStateManager.Instance.ExposedLocalHandWallIndexes.Clear();
+                                    if (statusMsg.data.player_state.exposed_hand_indexes != null)
+                                    {
+                                        foreach (var idx in statusMsg.data.player_state.exposed_hand_indexes)
+                                        {
+                                            Managers.BoardStateManager.Instance.ExposedLocalHandWallIndexes.Add(idx);
+                                        }
+                                    }
+
                                     shouldRebuild = true;
                                 }
                             }
@@ -256,15 +266,21 @@ namespace KillingMahjong.Network
 
                                 if (statusMsg.data.opponent_player_state.wall != null && statusMsg.data.opponent_player_state.hand != null)
                                 {
-                                    var dummyEnemyHand = new System.Collections.Generic.List<int>();
-                                    foreach(var _ in statusMsg.data.opponent_player_state.hand) {
-                                        dummyEnemyHand.Add(-1);
-                                    }
-
                                     Managers.BoardStateManager.Instance.SetEnemyState(
                                         new System.Collections.Generic.List<int>(statusMsg.data.opponent_player_state.wall),
-                                        dummyEnemyHand
+                                        new System.Collections.Generic.List<int>(statusMsg.data.opponent_player_state.hand),
+                                        statusMsg.data.opponent_player_state.waits != null ? new System.Collections.Generic.List<int>(statusMsg.data.opponent_player_state.waits) : new System.Collections.Generic.List<int>()
                                     );
+
+                                    Managers.BoardStateManager.Instance.ExposedEnemyHandWallIndexes.Clear();
+                                    if (statusMsg.data.opponent_player_state.exposed_hand_indexes != null)
+                                    {
+                                        foreach (var idx in statusMsg.data.opponent_player_state.exposed_hand_indexes)
+                                        {
+                                            Managers.BoardStateManager.Instance.ExposedEnemyHandWallIndexes.Add(idx);
+                                        }
+                                    }
+
                                     shouldRebuild = true;
                                 }
                             }
@@ -513,7 +529,7 @@ namespace KillingMahjong.Network
                                 // 流局
                                 Debug.Log("[Network] 流局が発生しました");
                                 OnPhaseStatusChanged?.Invoke(RoundStatus.Draw);
-                                OnDraw?.Invoke();
+                                OnDraw?.Invoke(reMsg.data.draw_data);
                             }
                             else if (!agariProcessed) {
                                 agariProcessed = true;
@@ -696,11 +712,7 @@ namespace KillingMahjong.Network
                 }
                 else
                 {
-                    var dummyEnemyHand = new System.Collections.Generic.List<int>();
-                    foreach(var _ in handTiles) {
-                        dummyEnemyHand.Add(-1);
-                    }
-                    Managers.BoardStateManager.Instance.SetEnemyState(wallTiles, dummyEnemyHand);
+                    Managers.BoardStateManager.Instance.SetEnemyState(wallTiles, handTiles);
                 }
             }
             

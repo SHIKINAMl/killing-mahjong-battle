@@ -127,9 +127,9 @@ namespace KillingMahjong.UI
             uiManager.PhaseController?.HandleAgari(isLocalWin);
         }
 
-        private void HandleDraw()
+        private void HandleDraw(DrawPlayerData[] drawData)
         {
-            uiManager.PhaseController?.HandleDraw();
+            uiManager.PhaseController?.HandleDraw(drawData);
         }
 
         private void HandleBettingComplete(int playerBet, int enemyBet, int playerHp, int enemyHp)

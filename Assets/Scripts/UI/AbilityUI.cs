@@ -30,6 +30,10 @@ namespace KillingMahjong.UI
         [SerializeField] private float itemHeight = 70f; // デフォルト100から縮小
         [SerializeField] private float itemSpacing = 5f;
 
+        [Header("Tooltip Settings")]
+        [SerializeField] private GameObject tooltipPanel;
+        [SerializeField] private TMPro.TextMeshProUGUI tooltipText;
+
         // Internal State
         private bool isWindowVisible = false;
         private Coroutine currentAnimationCoroutine;
@@ -89,6 +93,9 @@ namespace KillingMahjong.UI
 
             // Populate List
             PopulateList();
+            
+            // 起動時にツールチップを非表示にする
+            HideTooltip();
         }
 
         private void PopulateList()
@@ -312,6 +319,50 @@ namespace KillingMahjong.UI
         private void CancelOpponentReady()
         {
             Debug.Log("Ability Triggered: Opponent's Ready State Cancelled!");
+        }
+
+        public void ShowTooltip(string description)
+        {
+            if (tooltipPanel != null && tooltipText != null)
+            {
+                tooltipText.text = description;
+                
+                // tooltipPanel自身にCanvasが無ければ追加
+                Canvas tooltipCanvas = tooltipPanel.GetComponent<Canvas>();
+                if (tooltipCanvas == null)
+                {
+                    tooltipCanvas = tooltipPanel.AddComponent<Canvas>();
+                    tooltipPanel.AddComponent<UnityEngine.UI.GraphicRaycaster>();
+                }
+                tooltipCanvas.overrideSorting = true;
+                tooltipCanvas.sortingLayerName = "UI";
+                tooltipCanvas.sortingOrder = 25; // ツールチップをAbilityUI本体より少し手前に
+
+                // AbilityUI全体を最前面化するが、中身の表示順が壊れないようにルート(this)のみ設定する
+                Canvas rootCanvas = this.GetComponent<Canvas>();
+                if (rootCanvas == null)
+                {
+                    rootCanvas = this.gameObject.AddComponent<Canvas>();
+                    this.gameObject.AddComponent<UnityEngine.UI.GraphicRaycaster>();
+                }
+                rootCanvas.overrideSorting = true;
+                rootCanvas.sortingLayerName = "UI";
+                rootCanvas.sortingOrder = 20; // ユーザー指定の20
+                
+                // Z座標は0
+                Vector3 localPos = tooltipPanel.transform.localPosition;
+                tooltipPanel.transform.localPosition = new Vector3(localPos.x, localPos.y, 0f);
+
+                tooltipPanel.SetActive(true);
+            }
+        }
+
+        public void HideTooltip()
+        {
+            if (tooltipPanel != null)
+            {
+                tooltipPanel.SetActive(false);
+            }
         }
     }
 }
