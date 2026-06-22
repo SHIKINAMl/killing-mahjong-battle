@@ -338,6 +338,13 @@ namespace KillingMahjong.UI
 
             Transform targetObj = zoomTarget != null ? zoomTarget : transform;
 
+            // ズーム中は揺れを止める（右に戻ってしまうバグ対策）
+            var floatAnims = GetComponentsInChildren<FloatingAnimator>(true);
+            foreach (var anim in floatAnims)
+            {
+                anim.enabled = false;
+            }
+
             // ズーム開始直前の位置とサイズを記憶する
             originalLocalPos = targetObj.localPosition;
             originalScale = targetObj.localScale;
@@ -393,6 +400,14 @@ namespace KillingMahjong.UI
 
             targetObj.localPosition = originalLocalPos;
             targetObj.localScale = originalScale;
+
+            // ズーム終了後に揺れを再開する
+            var floatAnims = GetComponentsInChildren<FloatingAnimator>(true);
+            foreach (var anim in floatAnims)
+            {
+                anim.enabled = true;
+                anim.UpdateInitialPosition();
+            }
         }
     }
 }

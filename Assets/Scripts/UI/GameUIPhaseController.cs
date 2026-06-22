@@ -251,7 +251,15 @@ namespace KillingMahjong.UI
                     if (uiManager.DialogueUI != null) uiManager.DialogueUI.SetBackgroundRaycast(false);
                     if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetPanelVisible(true);
                     if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.gameObject.SetActive(true);
-                    if (uiManager.WaitUI != null) uiManager.WaitUI.gameObject.SetActive(false);
+                    if (uiManager.WaitUI != null && Managers.BoardStateManager.Instance.CurrentWaitTiles != null && Managers.BoardStateManager.Instance.CurrentWaitTiles.Count > 0)
+                    {
+                        uiManager.WaitUI.gameObject.SetActive(true);
+                        uiManager.WaitUI.DisplayWaits(Managers.BoardStateManager.Instance.CurrentWaitTiles);
+                    }
+                    else if (uiManager.WaitUI != null)
+                    {
+                        uiManager.WaitUI.gameObject.SetActive(false);
+                    }
                     if (uiManager.AbilityUI != null) uiManager.AbilityUI.gameObject.SetActive(true);
                     UpdateDoraDisplay();
                     if (ReactionController.Instance != null)

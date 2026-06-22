@@ -13,7 +13,7 @@ namespace KillingMahjong.UI
         [SerializeField] private GameObject discardPhaseContainer;
         [SerializeField] private GameObject gameEndContainer;
 
-        private AgariSelectionUI agariSelectionUI;
+        [SerializeField] private AgariSelectionUI agariSelectionUI;
 
         [Header("UI Components")]
         [SerializeField] private HandUI handUI;
@@ -35,6 +35,7 @@ namespace KillingMahjong.UI
         [SerializeField] private VictoryUI victoryUI;
         [SerializeField] private MatchmakingUI matchmakingUI;
         [SerializeField] private DoraDisplayUI doraDisplayUI;
+        [SerializeField] private TurnIndicatorUI turnIndicatorUI;
         [SerializeField] private GameObject ronWaitPanel;
 
         [Header("Effects")]
@@ -131,23 +132,9 @@ namespace KillingMahjong.UI
 
         private void SetupUI()
         {
-            if (waitUI != null && enemyWaitUI == null)
+            if (waitUI != null && enemyWaitUI != null)
             {
-                // 相手用のWaitUIを生成する
-                GameObject enemyWaitObj = Instantiate(waitUI.gameObject, waitUI.transform.parent);
-                enemyWaitObj.name = "EnemyWaitUI";
-                enemyWaitUI = enemyWaitObj.GetComponent<WaitUI>();
-                
-                // 画面中央に大きく配置するため、RectTransformのアンカーとスケールを調整
-                RectTransform rt = enemyWaitObj.GetComponent<RectTransform>();
-                if (rt != null)
-                {
-                    rt.anchorMin = new Vector2(0.5f, 0.5f);
-                    rt.anchorMax = new Vector2(0.5f, 0.5f);
-                    rt.anchoredPosition = new Vector2(0, 150); // 中央より少し上
-                    rt.localScale = new Vector3(1.5f, 1.5f, 1.5f); // 1.5倍に大きくして目立たせる
-                }
-                enemyWaitObj.SetActive(false);
+                enemyWaitUI.gameObject.SetActive(false);
             }
 
             if (confirmationDialogUI == null)
@@ -170,15 +157,8 @@ namespace KillingMahjong.UI
             }
             if (waitUI != null) waitUI.gameObject.SetActive(false);
             
-            if (agariSelectionUI == null)
+            if (agariSelectionUI != null)
             {
-                var go = new GameObject("AgariSelectionUI");
-                go.transform.SetParent(transform, false);
-                var rt = go.AddComponent<RectTransform>();
-                rt.anchorMin = new Vector2(0.5f, 0.5f);
-                rt.anchorMax = new Vector2(0.5f, 0.5f);
-                rt.anchoredPosition = Vector2.zero;
-                agariSelectionUI = go.AddComponent<AgariSelectionUI>();
                 agariSelectionUI.Hide();
             }
 
@@ -191,6 +171,8 @@ namespace KillingMahjong.UI
             if (bettingUI != null) bettingUI.HideBettingPhase(true);
             if (doraDisplayUI != null) doraDisplayUI.Hide();
             if (ronWaitPanel != null) ronWaitPanel.SetActive(false);
+
+            UpdateTurnIndicatorVisibility();
         }
 
         private void HandleGameEnded(int localScore, int enemyScore)
@@ -216,16 +198,17 @@ namespace KillingMahjong.UI
         public EnemyHandUI EnemyHandUI => enemyHandUI;
         public EnemyWallUI EnemyWallUI => enemyWallUI;
         public RiverUI EnemyRiverUI => enemyRiverUI;
-        private WaitUI enemyWaitUI;
+        [SerializeField] private WaitUI enemyWaitUI;
 
         public WaitUI WaitUI => waitUI;
         public WaitUI EnemyWaitUI => enemyWaitUI;
-        public DialogueUI DialogueUI => dialogueUI;
+        public TurnIndicatorUI TurnIndicatorUI => turnIndicatorUI;
         public PlayerInfoUI PlayerInfoUI => playerInfoUI;
         public EnemyInfoUI EnemyInfoUI => enemyInfoUI;
         public AbilityUI AbilityUI => abilityUI;
         public YakuListUI YakuListUI => yakuListUI;
         public BettingUI BettingUI => bettingUI;
+        public DialogueUI DialogueUI => dialogueUI;
         public PhaseTransitionUI PhaseTransitionUI => phaseTransitionUI;
         public ConfirmationDialogUI ConfirmationDialogUI => confirmationDialogUI;
         public RonAnimationUI RonAnimationUI => ronAnimationUI;
@@ -242,11 +225,23 @@ namespace KillingMahjong.UI
         public void SetCurrentPhaseStatus(RoundStatus status)
         {
             currentPhaseStatus = status;
+            UpdateTurnIndicatorVisibility();
         }
 
         public void SetIsTransitioning(bool value)
         {
             isTransitioning = value;
+            UpdateTurnIndicatorVisibility();
+        }
+
+        private void UpdateTurnIndicatorVisibility()
+        {
+            if (turnIndicatorUI != null)
+            {
+                // 打牌フェイズで、かつ演出中（先行・後攻演出など）ではない時だけ表示する
+                bool shouldShow = (currentPhaseStatus == RoundStatus.Discard) && !isTransitioning;
+                turnIndicatorUI.SetVisible(shouldShow);
+            }
         }
 
         // --- Entry points from external classes / old API ---
@@ -471,6 +466,8 @@ namespace KillingMahjong.UI
 
             if (isLocalPlayer)
             {
+                // 打牌した瞬間に自分のターンは終了したとみなしてUIを更新する
+                BoardStateManager.Instance.SetLocalTurn(false);
                 BoardStateManager.Instance.RemoveTileFromWall(discardedTileId);
 
                 if (wallUI != null)

@@ -38,6 +38,8 @@ namespace KillingMahjong.Managers
         public List<int> TargetHandIndexes { get; set; } = null;
         public HashSet<int> HiddenTiles { get; private set; } = new HashSet<int>();
         
+        public List<WaitData> LocalWaitDataList { get; private set; } = new List<WaitData>();
+        
         public bool LastIsLocalWin { get; set; } = true; 
         public LiquidationData LastLiquidationData { get; set; } = null;
         public bool IsLocalTurn { get; private set; } = false;
@@ -104,6 +106,7 @@ namespace KillingMahjong.Managers
             HiddenTiles.Clear();
             ExposedEnemyHandWallIndexes.Clear();
             ExposedLocalHandWallIndexes.Clear();
+            LocalWaitDataList.Clear();
         }
 
         public void ClearBoosts()

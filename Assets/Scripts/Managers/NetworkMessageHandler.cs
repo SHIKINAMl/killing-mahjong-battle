@@ -239,10 +239,13 @@ namespace KillingMahjong.Network
                                         }
                                     }
 
+                                    var waitTiles = statusMsg.data.player_state.waits ?? statusMsg.data.player_state.wait;
+                                    if (waitTiles != null && waitTiles.Length == 0) waitTiles = null;
+
                                     Managers.BoardStateManager.Instance.SetLocalState(
                                         localWall,
                                         localHand,
-                                        statusMsg.data.player_state.waits != null ? new System.Collections.Generic.List<int>(statusMsg.data.player_state.waits) : new System.Collections.Generic.List<int>()
+                                        waitTiles != null ? new System.Collections.Generic.List<int>(waitTiles) : null
                                     );
                                     
                                     Managers.BoardStateManager.Instance.ExposedLocalHandWallIndexes.Clear();
@@ -266,10 +269,13 @@ namespace KillingMahjong.Network
 
                                 if (statusMsg.data.opponent_player_state.wall != null && statusMsg.data.opponent_player_state.hand != null)
                                 {
+                                    var enemyWaitTiles = statusMsg.data.opponent_player_state.waits ?? statusMsg.data.opponent_player_state.wait;
+                                    if (enemyWaitTiles != null && enemyWaitTiles.Length == 0) enemyWaitTiles = null;
+
                                     Managers.BoardStateManager.Instance.SetEnemyState(
                                         new System.Collections.Generic.List<int>(statusMsg.data.opponent_player_state.wall),
                                         new System.Collections.Generic.List<int>(statusMsg.data.opponent_player_state.hand),
-                                        statusMsg.data.opponent_player_state.waits != null ? new System.Collections.Generic.List<int>(statusMsg.data.opponent_player_state.waits) : new System.Collections.Generic.List<int>()
+                                        enemyWaitTiles != null ? new System.Collections.Generic.List<int>(enemyWaitTiles) : null
                                     );
 
                                     Managers.BoardStateManager.Instance.ExposedEnemyHandWallIndexes.Clear();
@@ -418,17 +424,27 @@ namespace KillingMahjong.Network
                         {
                             var waits = new List<int>();
                             var nonManganList = new List<int>();
+                            var waitDataList = new List<WaitData>();
+
                             foreach (var w in tenpaiMsg.data.waits) 
                             {
                                 waits.Add(w.tile);
+                                waitDataList.Add(w);
                                 if (!w.mangan_or_more) 
                                 {
                                     nonManganList.Add(w.tile);
                                 }
                             }
+                            
+                            // 保存
+                            Managers.BoardStateManager.Instance.LocalWaitDataList.Clear();
+                            Managers.BoardStateManager.Instance.LocalWaitDataList.AddRange(waitDataList);
+
                             Managers.BoardStateManager.Instance.SetNonManganWaits(nonManganList);
-                            Managers.BoardStateManager.Instance.SetLocalState(null, null, waits);
-                            Managers.BoardStateManager.Instance.FireRebuildEvent();
+                            // テンパイ確認時(is_tenpai)の段階ではまだ手牌を「決定」していないため、
+                            // 左下のプレイヤー情報にはまだ待ち牌を表示しない（hand_selection_acceptedで表示する）
+                            // Managers.BoardStateManager.Instance.SetLocalState(null, null, waits);
+                            // Managers.BoardStateManager.Instance.FireRebuildEvent();
 
                             OnIsTenpaiReceived?.Invoke(tenpaiMsg.data);
                         }
@@ -696,15 +712,15 @@ namespace KillingMahjong.Network
             {
                 List<int> handTiles = new List<int>();
                 List<int> wallTiles = new List<int>();
-                List<int> waitTiles = new List<int>();
+                List<int> waitTiles = null; // nullで初期化し、空リストで上書きしないようにする
 
                 if (handDict.ContainsKey(h.client_id)) handTiles = handDict[h.client_id];
                 if (wallDict.ContainsKey(h.client_id)) wallTiles = wallDict[h.client_id];
-                if (waitDict.ContainsKey(h.client_id)) waitTiles = waitDict[h.client_id];
+                if (waitDict.ContainsKey(h.client_id) && waitDict[h.client_id].Count > 0) waitTiles = waitDict[h.client_id];
 
                 if (h.hand != null) handTiles = new List<int>(h.hand);
                 if (h.wall != null) wallTiles = new List<int>(h.wall);
-                if (h.waits != null) waitTiles = new List<int>(h.waits);
+                if (h.waits != null && h.waits.Length > 0) waitTiles = new List<int>(h.waits);
 
                 if (h.client_id == localPlayerId)
                 {

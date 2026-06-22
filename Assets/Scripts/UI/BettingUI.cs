@@ -64,6 +64,23 @@ namespace KillingMahjong.UI
             if (confirmButton != null) confirmButton.onClick.AddListener(ConfirmBet);
 
             if (fullBetButton != null) fullBetButton.onClick.AddListener(FullBet);
+
+            // Fix raycast target overlap for buttons
+            DisableRaycastForButtonTexts(increaseBetButton);
+            DisableRaycastForButtonTexts(decreaseBetButton);
+            DisableRaycastForButtonTexts(confirmButton);
+            DisableRaycastForButtonTexts(fullBetButton);
+        }
+
+        private void DisableRaycastForButtonTexts(Button btn)
+        {
+            if (btn != null)
+            {
+                var tmpros = btn.GetComponentsInChildren<TextMeshProUGUI>();
+                foreach (var t in tmpros) t.raycastTarget = false;
+                var texts = btn.GetComponentsInChildren<Text>();
+                foreach (var t in texts) t.raycastTarget = false;
+            }
         }
 
         public void ShowBettingPhase(int initialHp, int currentHp, int specialVictoryCount, Action<int> onConfirm)
@@ -77,6 +94,15 @@ namespace KillingMahjong.UI
             this.onConfirmAction = onConfirm;
             
             if (confirmButton != null) confirmButton.interactable = true;
+
+            // PlayerInfoUIの背面に隠れないように、自身のCanvasのSortingOrderを引き上げる
+            Canvas canvas = GetComponent<Canvas>();
+            if (canvas != null)
+            {
+                canvas.overrideSorting = true;
+                canvas.sortingLayerName = "UI";
+                canvas.sortingOrder = 101; // 親(PlayerInfoUI)が100になるため、それより手前に
+            }
 
             gameObject.SetActive(true);
             UpdateUI();
@@ -165,13 +191,27 @@ namespace KillingMahjong.UI
             if (currentMoneyText != null)
                 currentMoneyText.text = $"HP: {currentMoney}";
 
+            float expectedMultiplier = 1.0f;
+            if (Managers.BoardStateManager.Instance != null && Managers.BoardStateManager.Instance.LocalWaitDataList != null && Managers.BoardStateManager.Instance.LocalWaitDataList.Count > 0)
+            {
+                int maxHan = 0;
+                foreach (var wait in Managers.BoardStateManager.Instance.LocalWaitDataList)
+                {
+                    int han = GameRules.CalculateTotalHan(wait.yaku, Managers.BoardStateManager.Instance.LocalBoostHandBonus);
+                    if (han > maxHan) maxHan = han;
+                }
+                expectedMultiplier = GameRules.GetMultiplier(maxHan);
+            }
+
+            int reward = Mathf.FloorToInt(currentBet * expectedMultiplier);
+
             if (currentBetText != null)
-                currentBetText.text = $"Bet: {currentBet}";
+            {
+                currentBetText.text = $"Bet: {currentBet}\n<size=70%>予想報酬: {reward}</size>";
+            }
 
             if (expectedRewardText != null)
             {
-                // Dummy logic for expected reward (e.g. 2x the bet)
-                int reward = currentBet * 2; 
                 expectedRewardText.text = $"Expected Reward: {reward}";
             }
             

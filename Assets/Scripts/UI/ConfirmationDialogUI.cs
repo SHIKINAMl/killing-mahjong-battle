@@ -11,6 +11,12 @@ namespace KillingMahjong.UI
         [SerializeField] private Button okButton;
         [SerializeField] private Button noButton;
 
+        [Header("Wait Tiles Settings")]
+        [SerializeField] private RectTransform waitTilesContainer;
+        [SerializeField] private GameObject tilePrefab;
+        [SerializeField] private TileResourceManager tileResourceManager;
+        private System.Collections.Generic.List<GameObject> activeWaitTiles = new System.Collections.Generic.List<GameObject>();
+
         private Action onConfirmAction;
         private Action onCancelAction;
 
@@ -60,7 +66,8 @@ namespace KillingMahjong.UI
             {
                 messageText.enableAutoSizing = false;
                 messageText.fontSize = 25; // テキストが被らないように25に変更
-                messageText.alignment = TextAlignmentOptions.Center;
+                // テキストの行数で全体が上下に動くのを防ぐため、上揃え(Top)に変更
+                messageText.alignment = TextAlignmentOptions.Top;
                 messageText.overflowMode = TextOverflowModes.Overflow; // 文字が潰れるのを防ぐ
 
                 RectTransform textRt = messageText.GetComponent<RectTransform>();
@@ -71,8 +78,8 @@ namespace KillingMahjong.UI
                     textRt.anchorMax = new Vector2(1, 1);
                     // Left, Bottomの設定 (Bottomはボタンと被らないよう適度に空ける)
                     textRt.offsetMin = new Vector2(20, 200);
-                    // Right, Topの設定 (Topを55にする)
-                    textRt.offsetMax = new Vector2(-20, -55);
+                    // Right, Topの設定 (上揃えなので、上から適度に余白を設ける)
+                    textRt.offsetMax = new Vector2(-20, -150);
                 }
             }
 
@@ -112,15 +119,123 @@ namespace KillingMahjong.UI
             transform.SetAsLastSibling(); // 手牌UIなどより手前(最前面)に表示
         }
 
+        public void ShowDialogWithWaits(string message, int[] waitTileIds, Action onConfirm, Action onCancel)
+        {
+            ShowDialog(message, onConfirm, onCancel);
+            DisplayWaits(waitTileIds);
+        }
+
+        private void DisplayWaits(int[] waitTileIds)
+        {
+            ClearWaits();
+            if (waitTileIds == null || waitTileIds.Length == 0) return;
+
+            // WaitTilesContainerの作成と設定
+            if (waitTilesContainer == null)
+            {
+                GameObject containerObj = new GameObject("WaitTilesContainer");
+                waitTilesContainer = containerObj.AddComponent<RectTransform>();
+                waitTilesContainer.SetParent(transform, false);
+                // 画面中央基準のアンカーに戻す
+                waitTilesContainer.anchorMin = new Vector2(0.5f, 0.5f);
+                waitTilesContainer.anchorMax = new Vector2(0.5f, 0.5f);
+                waitTilesContainer.pivot = new Vector2(0.5f, 0.5f);
+            }
+
+            // 指定された通り、画面中央から上に135の位置で固定
+            waitTilesContainer.anchoredPosition = new Vector2(0, 135f);
+
+            // PrefabとResourceManagerの取得 (インスペクターで設定されていない場合、シーンから取得)
+            if (tilePrefab == null || tileResourceManager == null)
+            {
+                var waitUI = FindObjectOfType<WaitUI>(true);
+                if (waitUI != null)
+                {
+                    var pField = waitUI.GetType().GetField("tilePrefab", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                    if (pField != null) tilePrefab = pField.GetValue(waitUI) as GameObject;
+
+                    var rField = waitUI.GetType().GetField("tileResourceManager", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                    if (rField != null) tileResourceManager = rField.GetValue(waitUI) as TileResourceManager;
+                }
+            }
+
+            // 配置パラメータ
+            float tileWidth = 35f; // スケール後のおおよその幅(必要に応じて微調整)
+            float spacing = 2f;
+            float totalWidth = (waitTileIds.Length * tileWidth) + ((waitTileIds.Length - 1) * spacing);
+            float startX = -totalWidth / 2f + tileWidth / 2f;
+
+            for (int i = 0; i < waitTileIds.Length; i++)
+            {
+                int id = waitTileIds[i];
+                if (tilePrefab == null) break;
+                GameObject obj = Instantiate(tilePrefab, waitTilesContainer);
+                activeWaitTiles.Add(obj);
+                
+                float scale = waitTileIds.Length > 6 ? 0.6f : 1.0f;
+                // 手動レイアウトなのでスケールをそのまま適用し、アンカーを中央にする
+                RectTransform rt = obj.GetComponent<RectTransform>();
+                if (rt != null)
+                {
+                    rt.anchorMin = new Vector2(0.5f, 0.5f);
+                    rt.anchorMax = new Vector2(0.5f, 0.5f);
+                    rt.pivot = new Vector2(0.5f, 0.5f);
+                    
+                    float actualTileWidth = tileWidth * scale; // スケールに応じた実際の幅
+                    float actualSpacing = spacing * scale;
+                    float actualTotalWidth = (waitTileIds.Length * actualTileWidth) + ((waitTileIds.Length - 1) * actualSpacing);
+                    float actualStartX = -actualTotalWidth / 2f + actualTileWidth / 2f;
+                    
+                    rt.anchoredPosition = new Vector2(actualStartX + i * (actualTileWidth + actualSpacing), 0);
+                    rt.localScale = new Vector3(scale, scale, 1f);
+                }
+
+                TileVisual visual = obj.GetComponent<TileVisual>();
+                if (visual != null && tileResourceManager != null)
+                {
+                    visual.SetTile(id, tileResourceManager.GetTileSprite(id));
+                    if (KillingMahjong.Managers.BoardStateManager.Instance != null && 
+                        KillingMahjong.Managers.BoardStateManager.Instance.NonManganWaitTiles.Contains(id))
+                    {
+                        visual.SetAlpha(0.3f);
+                    }
+                    else 
+                    {
+                        visual.SetAlpha(1.0f);
+                    }
+                }
+
+                var interaction = obj.GetComponent<TileInteraction>();
+                if (interaction != null) Destroy(interaction);
+            }
+        }
+
+        private void ClearWaits()
+        {
+            foreach (var t in activeWaitTiles)
+            {
+                if (t != null) Destroy(t);
+            }
+            activeWaitTiles.Clear();
+        }
+
+        public void HideDialog()
+        {
+            gameObject.SetActive(false);
+            ClearWaits();
+        }
+
         private void OnOkClicked()
         {
             gameObject.SetActive(false);
+            ClearWaits();
             onConfirmAction?.Invoke();
         }
 
         private void OnNoClicked()
         {
             gameObject.SetActive(false);
+            ClearWaits();
             onCancelAction?.Invoke();
         }
     }

@@ -176,8 +176,8 @@ namespace KillingMahjong.UI
                 }
             }
 
-            // --- 0.5秒のタメ（ここでカットインと手牌が見える） ---
-            yield return new WaitForSeconds(0.5f);
+            // --- 2.0秒のタメ（ここで役と手牌をしっかり見せる） ---
+            yield return new WaitForSeconds(2.0f);
 
             // 5. 血飛沫と巨大スコアのバウンド表示（ドンッ！）
             GameObject splatterObj = null;

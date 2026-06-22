@@ -80,31 +80,39 @@ namespace KillingMahjong.UI
             if (uiManager.CurrentPhaseStatus != RoundStatus.HandSelection) return;
 
             string message = "【予想役・点数】\n";
+            int[] waitTileIds = new int[0];
             
             if (data.waits != null && data.waits.Length > 0)
             {
-                message += "待ち牌:\n\n\n\n\n\n"; // 麻雀牌と被らないように改行を増加
+                // ConfirmationDialogUI側で待ち牌を表示するため、ここではテキストのみ構築
+                message += "待ち牌:\n\n\n"; 
+                
+                System.Collections.Generic.List<int> ids = new System.Collections.Generic.List<int>();
                 foreach (var wait in data.waits)
                 {
+                    ids.Add(wait.tile);
                     string yakuText = (wait.yaku != null && wait.yaku.Length > 0) ? string.Join(" / ", wait.yaku) : "役なし";
                     bool isMangan = wait.mangan_or_more;
                     string manganText = isMangan ? "満貫以上" : "満貫未満";
                     message += $"-> {yakuText} ({manganText})\n";
                 }
+                waitTileIds = ids.ToArray();
             }
             message += "\nこの手牌で決定しますか？";
 
-            if (uiManager.WaitUI != null) uiManager.WaitUI.MoveToCenter();
+            // WaitUIを移動させる処理を廃止 (ConfirmationDialogUI内部で表示する)
+            // if (uiManager.WaitUI != null) uiManager.WaitUI.MoveToCenter();
 
             if (uiManager.ConfirmationDialogUI != null)
             {
-                uiManager.ConfirmationDialogUI.ShowDialog(
+                uiManager.ConfirmationDialogUI.ShowDialogWithWaits(
                     message,
+                    waitTileIds,
                     () => {
                         if (ReactionController.Instance != null) ReactionController.Instance.StopHandSelectionTimer(true);
                         _autoConfirmNextHandSelection = true;
                         if (uiManager.HandUI != null) uiManager.HandUI.SetSubmittedState(true);
-                        if (uiManager.WaitUI != null) uiManager.WaitUI.MoveToOriginalPosition();
+                        // if (uiManager.WaitUI != null) uiManager.WaitUI.MoveToOriginalPosition();
 
                         if (uiManager.PhaseTransitionUI != null)
                         {
@@ -112,11 +120,19 @@ namespace KillingMahjong.UI
                             uiManager.PhaseTransitionUI.PlayCenterTextAnim("手牌決定！", 2.0f, () =>
                             {
                                 uiManager.SetIsTransitioning(false);
+                                
+                                // 手牌決定演出が終わったタイミングで、左下のプレイヤー情報UIに待ち牌を表示する
+                                BoardStateManager.Instance.SetLocalState(null, null, new System.Collections.Generic.List<int>(waitTileIds));
+                                BoardStateManager.Instance.FireRebuildEvent();
+
                                 uiManager.SendActionToServer("select", new KillingMahjong.Network.ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
                             });
                         }
                         else
                         {
+                            BoardStateManager.Instance.SetLocalState(null, null, new System.Collections.Generic.List<int>(waitTileIds));
+                            BoardStateManager.Instance.FireRebuildEvent();
+
                             uiManager.SendActionToServer("select", new KillingMahjong.Network.ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
                         }
                     },
@@ -124,18 +140,18 @@ namespace KillingMahjong.UI
                         _autoConfirmNextHandSelection = false;
                         if (uiManager.HandUI != null) uiManager.HandUI.SetSubmittedState(false);
                         BoardStateManager.Instance.ClearWaitTiles();
-                        if (uiManager.WaitUI != null) 
-                        {
-                            uiManager.WaitUI.MoveToOriginalPosition();
-                            uiManager.WaitUI.Hide();
-                        }
+                        // if (uiManager.WaitUI != null) 
+                        // {
+                        //     uiManager.WaitUI.MoveToOriginalPosition();
+                        //     uiManager.WaitUI.Hide();
+                        // }
                         if (uiManager.PhaseController != null) uiManager.PhaseController.SetMatchUIVisibility(true);
                     }
                 );
             }
             else
             {
-                if (uiManager.WaitUI != null) uiManager.WaitUI.MoveToOriginalPosition();
+                // if (uiManager.WaitUI != null) uiManager.WaitUI.MoveToOriginalPosition();
                 if (ReactionController.Instance != null) ReactionController.Instance.StopHandSelectionTimer(true);
                 _autoConfirmNextHandSelection = true;
                 if (uiManager.HandUI != null) uiManager.HandUI.SetSubmittedState(true);

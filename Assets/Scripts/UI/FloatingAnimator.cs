@@ -26,6 +26,7 @@ namespace KillingMahjong.UI
 
         private Vector3 initialPosition;
         private Quaternion initialRotation;
+        private Vector3 initialScale; // 追加：初期スケール
         private float randomOffset;
 
         private void Start()
@@ -33,6 +34,7 @@ namespace KillingMahjong.UI
             // スクリプトがアタッチされたオブジェクトの初期座標と回転を記憶
             initialPosition = transform.localPosition;
             initialRotation = transform.localRotation;
+            initialScale = transform.localScale; // スケールも記憶
             
             // 複数のオブジェクトが全く同じタイミングで動かないように、開始時間をランダムにずらす
             randomOffset = Random.Range(0f, 100f);
@@ -40,6 +42,12 @@ namespace KillingMahjong.UI
 
         private void Update()
         {
+            // ズーム中（スケールが変わっている時）は揺れアニメーションを停止する
+            if (transform.localScale != initialScale)
+            {
+                return;
+            }
+
             float time = Time.time + randomOffset;
             
             // Sin波とCos波を使って滑らかな浮遊オフセットを計算
@@ -48,13 +56,6 @@ namespace KillingMahjong.UI
             
             // 初期座標に対してオフセットを足す（回転処理のみジャギー防止のため無効化）
             transform.localPosition = initialPosition + new Vector3(offsetX, offsetY, 0);
-
-            // 回転が設定されている場合でも、ジャギー防止のため回転させない
-            // if (rotationAmplitude > 0)
-            // {
-            //     float rotZ = Mathf.Sin(time * rotationSpeed) * rotationAmplitude;
-            //     transform.localRotation = initialRotation * Quaternion.Euler(0, 0, rotZ);
-            // }
         }
         
         /// <summary>

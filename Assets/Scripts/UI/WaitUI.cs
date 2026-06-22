@@ -38,12 +38,24 @@ namespace KillingMahjong.UI
                 {
                     waitContainer.gameObject.AddComponent<UnityEngine.UI.GraphicRaycaster>();
                 }
+                
+                // 自動レイアウトを使用せず、手動配置に切り替えるため、既存のLayoutGroupを無効化・削除
+                var hlg = waitContainer.GetComponent<UnityEngine.UI.HorizontalLayoutGroup>();
+                if (hlg != null)
+                {
+                    DestroyImmediate(hlg);
+                }
             }
         }
+
+        private Transform originalParent;
+        private Vector3 originalLocalScale;
 
         private void SaveOriginalRect()
         {
             if (isOriginalSaved || waitContainer == null) return;
+            originalParent = waitContainer.parent;
+            originalLocalScale = waitContainer.localScale;
             originalPosition = waitContainer.anchoredPosition;
             originalPivot = waitContainer.pivot;
             originalAnchorMin = waitContainer.anchorMin;
@@ -72,6 +84,13 @@ namespace KillingMahjong.UI
 
             if (waitContainer != null)
             {
+                // 親のスケールや位置の影響を断ち切るため、ルートのCanvasの直下に一時的に移動
+                Canvas rootCanvas = GetComponentInParent<Canvas>();
+                if (rootCanvas != null)
+                {
+                    waitContainer.SetParent(rootCanvas.rootCanvas.transform, true);
+                }
+
                 Canvas canvas = waitContainer.GetComponent<Canvas>();
                 if (canvas != null)
                 {
@@ -83,10 +102,12 @@ namespace KillingMahjong.UI
                 if (layoutElement == null) layoutElement = waitContainer.gameObject.AddComponent<UnityEngine.UI.LayoutElement>();
                 layoutElement.ignoreLayout = true;
 
+                waitContainer.localScale = Vector3.one; // 親の縮小スケールをリセット
                 waitContainer.anchorMin = new Vector2(0.5f, 0.5f);
                 waitContainer.anchorMax = new Vector2(0.5f, 0.5f);
                 waitContainer.pivot = new Vector2(0.5f, 0.5f);
-                waitContainer.anchoredPosition = dialogCenterPosition;
+                // 画面中央から少し上の位置に強制配置
+                waitContainer.anchoredPosition = new Vector2(0, 120f);
             }
 
             if (cg != null) cg.alpha = 1f;
@@ -96,6 +117,11 @@ namespace KillingMahjong.UI
         {
             if (!isOriginalSaved || waitContainer == null) return;
             
+            if (originalParent != null)
+            {
+                waitContainer.SetParent(originalParent, true);
+            }
+
             Canvas canvas = waitContainer.GetComponent<Canvas>();
             if (canvas != null)
             {
@@ -108,11 +134,11 @@ namespace KillingMahjong.UI
                 layoutElement.ignoreLayout = false;
             }
 
+            waitContainer.localScale = originalLocalScale;
             waitContainer.anchorMin = originalAnchorMin;
             waitContainer.anchorMax = originalAnchorMax;
             waitContainer.pivot = originalPivot;
             waitContainer.anchoredPosition = originalPosition;
-            // LayoutGroupの影響でanchoredPositionが効かない場合に備えてpositionも更新
             waitContainer.position = originalWorldPosition; 
         }
 
@@ -129,12 +155,36 @@ namespace KillingMahjong.UI
 
             gameObject.SetActive(true);
 
-            foreach (int id in waitTileIds)
+            // 配置パラメータ
+            float tileWidth = 35f; // スケール後のおおよその幅(必要に応じて微調整)
+            float spacing = 2f;
+
+            for (int i = 0; i < waitTileIds.Count; i++)
             {
+                int id = waitTileIds[i];
                 if (tilePrefab == null || waitContainer == null) return;
 
                 GameObject obj = Instantiate(tilePrefab, waitContainer);
                 activeWaitTiles.Add(obj);
+                
+                // --- 待ち牌が多い場合の重なり防止のためのスケール調整 ---
+                float scale = waitTileIds.Count > 6 ? 0.6f : 1.0f;
+                
+                RectTransform rt = obj.GetComponent<RectTransform>();
+                if (rt != null)
+                {
+                    rt.anchorMin = new Vector2(0.5f, 0.5f);
+                    rt.anchorMax = new Vector2(0.5f, 0.5f);
+                    rt.pivot = new Vector2(0.5f, 0.5f);
+                    
+                    float actualTileWidth = tileWidth * scale; // スケールに応じた実際の幅
+                    float actualSpacing = spacing * scale;
+                    float actualTotalWidth = (waitTileIds.Count * actualTileWidth) + ((waitTileIds.Count - 1) * actualSpacing);
+                    float actualStartX = -actualTotalWidth / 2f + actualTileWidth / 2f;
+                    
+                    rt.anchoredPosition = new Vector2(actualStartX + i * (actualTileWidth + actualSpacing), 0);
+                    rt.localScale = new Vector3(scale, scale, 1f);
+                }
 
                 TileVisual visual = obj.GetComponent<TileVisual>();
                 if (visual != null && tileResourceManager != null)
@@ -157,6 +207,26 @@ namespace KillingMahjong.UI
                 {
                     Destroy(interaction); // クリック不要
                 }
+            }
+
+            // レイアウトを強制的に更新して重なりを解消
+            var hlg = waitContainer.GetComponent<UnityEngine.UI.HorizontalLayoutGroup>();
+            if (hlg == null)
+            {
+                hlg = waitContainer.gameObject.AddComponent<UnityEngine.UI.HorizontalLayoutGroup>();
+            }
+            hlg.childControlWidth = false;
+            hlg.childControlHeight = false;
+            hlg.childForceExpandWidth = false;
+            hlg.childForceExpandHeight = false;
+            hlg.childAlignment = TextAnchor.MiddleCenter;
+            hlg.spacing = waitTileIds.Count > 5 ? 2f : 10f;
+
+            // ContentSizeFitterがanchoredPositionを破壊するため無効化/削除
+            var csf = waitContainer.GetComponent<UnityEngine.UI.ContentSizeFitter>();
+            if (csf != null)
+            {
+                Destroy(csf);
             }
         }
 
