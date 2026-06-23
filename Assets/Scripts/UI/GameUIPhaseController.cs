@@ -244,6 +244,7 @@ namespace KillingMahjong.UI
                     break;
                 case RoundStatus.Dealing:
                     _hasShownHandSelectionPrompt = false; // 次の局のためにフラグをリセット
+                    _hasExecutedRonAnimation = false; // ロン演出の二重再生防止フラグをリセット
                     StartCoroutine(DealingRoutine());
                     break;
                 case RoundStatus.HandSelection:
@@ -421,11 +422,12 @@ namespace KillingMahjong.UI
              {
                  uiManager.SetIsTransitioning(true);
                  
-                 if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetPanelVisible(false);
+                 // スマホは消さないようにする（ユーザー要望）
+                 // if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetPanelVisible(false);
                  if (uiManager.PlayerInfoUI != null) 
                  {
                      uiManager.PlayerInfoUI.ResetZoomImmediate();
-                     uiManager.PlayerInfoUI.gameObject.SetActive(false);
+                     // uiManager.PlayerInfoUI.gameObject.SetActive(false);
                  }
                  if (uiManager.AbilityUI != null) uiManager.AbilityUI.gameObject.SetActive(false);
                  if (uiManager.DialogueUI != null) uiManager.DialogueUI.gameObject.SetActive(false);
@@ -604,8 +606,13 @@ namespace KillingMahjong.UI
             SendNextRoundAction();
         }
 
+        private bool _hasExecutedRonAnimation = false;
+
         public void ExecuteRonAction()
         {
+            if (_hasExecutedRonAnimation) return;
+            _hasExecutedRonAnimation = true;
+
             if (uiManager.RonWaitPanel != null) uiManager.RonWaitPanel.SetActive(false);
 
             bool isLocalWin = true;

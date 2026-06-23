@@ -57,27 +57,34 @@ namespace KillingMahjong.UI
             // 0. カットイン演出（勝者の顔と「ロン！」を表示）
             bool cutinFinished = false;
             
-            // 勝者の画像を取得
+            // 勝者（ロンした側）の画像を取得（顔パーツではなく身体のあるnormalSpriteを使用）
             Sprite winnerSprite = null;
+            Sprite faceSprite = null;
+            string cutinText = "ロン！";
+
             if (isLocalPlayerWin && playerInfo != null && playerInfo.CurrentCharacterData != null)
             {
-                if (playerInfo.CurrentCharacterData.faceSprites.Count > 0)
-                    winnerSprite = playerInfo.CurrentCharacterData.faceSprites[0].sprite;
-                else
-                    winnerSprite = playerInfo.CurrentCharacterData.normalSprite;
+                winnerSprite = playerInfo.CurrentCharacterData.normalSprite;
+                if (playerInfo.CurrentCharacterData.faceSprites != null && playerInfo.CurrentCharacterData.faceSprites.Count > 0)
+                {
+                    var match = playerInfo.CurrentCharacterData.faceSprites.Find(x => x.id == playerInfo.CurrentCharacterData.defaultFaceId);
+                    faceSprite = match != null ? match.sprite : playerInfo.CurrentCharacterData.faceSprites[0].sprite;
+                }
             }
             else if (!isLocalPlayerWin && enemyInfo != null && enemyInfo.CurrentCharacterData != null)
             {
-                if (enemyInfo.CurrentCharacterData.faceSprites.Count > 0)
-                    winnerSprite = enemyInfo.CurrentCharacterData.faceSprites[0].sprite;
-                else
-                    winnerSprite = enemyInfo.CurrentCharacterData.normalSprite;
+                winnerSprite = enemyInfo.CurrentCharacterData.normalSprite;
+                if (enemyInfo.CurrentCharacterData.faceSprites != null && enemyInfo.CurrentCharacterData.faceSprites.Count > 0)
+                {
+                    var match = enemyInfo.CurrentCharacterData.faceSprites.Find(x => x.id == enemyInfo.CurrentCharacterData.defaultFaceId);
+                    faceSprite = match != null ? match.sprite : enemyInfo.CurrentCharacterData.faceSprites[0].sprite;
+                }
             }
 
             if (winnerSprite != null)
             {
                 CutinAnimationUI cutinUI = gameObject.AddComponent<CutinAnimationUI>();
-                cutinUI.PlayCutin(winnerSprite, customFont, () => {
+                cutinUI.PlayCutin(winnerSprite, faceSprite, customFont, cutinText, () => {
                     cutinFinished = true;
                     Destroy(cutinUI);
                 });
@@ -94,6 +101,13 @@ namespace KillingMahjong.UI
             containerRt.anchorMin = Vector2.zero;
             containerRt.anchorMax = Vector2.one;
             containerRt.sizeDelta = Vector2.zero;
+            
+            // スマホUIなどよりも確実に最前面に表示するため、Canvasを追加
+            Canvas containerCanvas = container.AddComponent<Canvas>();
+            containerCanvas.overrideSorting = true;
+            containerCanvas.sortingLayerName = "UI";
+            containerCanvas.sortingOrder = 30000;
+            container.AddComponent<UnityEngine.UI.GraphicRaycaster>();
 
             // 2. 暗転ディマー（背景のスマホ等が見えるように少し薄めに）
             GameObject dimmer = new GameObject("Dimmer");
@@ -125,10 +139,8 @@ namespace KillingMahjong.UI
             TextMeshProUGUI yakuText = yakuTextObj.AddComponent<TextMeshProUGUI>();
             if (customFont != null) yakuText.font = customFont;
             
-            // 役を一行にまとめる
-            string yakuJoined = string.Join("・", yakuList);
-            
-            yakuText.text = $"{yakuJoined}   <color=#FFFF00>×{formula}</color>"; // 黄色で倍率を強調
+            // 役テキストは後で1つずつ表示するため最初は空にする
+            yakuText.text = "";
             yakuText.color = new Color(1f, 1f, 1f); 
             yakuText.enableAutoSizing = true;
             yakuText.fontSizeMin = 20;
@@ -176,8 +188,24 @@ namespace KillingMahjong.UI
                 }
             }
 
-            // --- 2.0秒のタメ（ここで役と手牌をしっかり見せる） ---
-            yield return new WaitForSeconds(2.0f);
+            // --- 役を1つずつ表示する演出 ---
+            string currentYakuStr = "";
+            foreach (var yaku in yakuList)
+            {
+                if (!string.IsNullOrEmpty(currentYakuStr)) currentYakuStr += "・";
+                currentYakuStr += yaku;
+                yakuText.text = currentYakuStr;
+                
+                // 役を1つ表示するごとの間隔
+                yield return new WaitForSeconds(0.4f);
+            }
+            
+            // 最後に倍率を追加表示
+            yield return new WaitForSeconds(0.5f);
+            yakuText.text = $"{currentYakuStr}   <color=#FFFF00>×{formula}</color>";
+
+            // --- タメ（ここで役と手牌をしっかり見せる） ---
+            yield return new WaitForSeconds(1.0f);
 
             // 5. 血飛沫と巨大スコアのバウンド表示（ドンッ！）
             GameObject splatterObj = null;
@@ -235,17 +263,9 @@ namespace KillingMahjong.UI
             scoreTextRt.localScale = targetScale;
             if (splatterObj != null) splatterObj.transform.localScale = targetScale;
 
-            // 激しい画面揺れ
+            // 画面揺れは不要とのことなので削除し、位置を確実に戻すのみ
             Vector3 originalPos = containerRt.localPosition;
-            float shakeElapsed = 0;
-            while (shakeElapsed < 0.3f)
-            {
-                float x = UnityEngine.Random.Range(-1f, 1f) * 30f;
-                float y = UnityEngine.Random.Range(-1f, 1f) * 30f;
-                containerRt.localPosition = new Vector3(originalPos.x + x, originalPos.y + y, originalPos.z);
-                shakeElapsed += Time.deltaTime;
-                yield return null;
-            }
+            containerRt.localPosition = originalPos;
 
             // HP UIを最前面へ表示する処理はユーザー要望により削除
 

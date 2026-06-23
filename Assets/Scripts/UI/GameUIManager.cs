@@ -528,7 +528,8 @@ namespace KillingMahjong.UI
                 _isAgariPending = false;
                 if (RonWaitPanel != null) RonWaitPanel.SetActive(false);
                 SendActionToServer("agari", new KillingMahjong.Network.ActionPayload { accept = true });
-                Debug.Log("[GameUIManager] Sent 'agari' action to server.");
+                Debug.Log("[GameUIManager] Sent 'agari' action to server. Waiting for server response to play animation.");
+                return; // サーバーからの確定（役のデータ等）を待ってからアニメーションを再生するため、ここでは抜ける
             }
             
             PhaseController?.ExecuteRonAction();

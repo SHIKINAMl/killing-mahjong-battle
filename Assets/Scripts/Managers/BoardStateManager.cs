@@ -158,12 +158,12 @@ namespace KillingMahjong.Managers
             if (wall != null && wall.Count > 0)
             {
                 OriginalEnemyWallTiles = new List<int>(wall);
-                List<int> displayEnemyWall = new List<int>();
-                for (int i = 0; i < wall.Count; i++)
+                List<int> displayEnemyWall = new List<int>(wall);
+                if (hand != null)
                 {
-                    if (hand == null || !hand.Contains(i))
+                    foreach (int h in hand)
                     {
-                        displayEnemyWall.Add(wall[i]);
+                        displayEnemyWall.Remove(h);
                     }
                 }
                 CurrentEnemyWallTiles = displayEnemyWall;

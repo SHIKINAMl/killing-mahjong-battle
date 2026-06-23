@@ -237,12 +237,23 @@ namespace KillingMahjong.UI
                     List<RectTransform> enemyWallGenerated = new List<RectTransform>();
                     List<int> displayIdsForWall = new List<int>();
 
+                    List<int> handTilesToRemove = new List<int>();
+                    // 打牌フェイズ以降のみ手牌を壁から減らす（掛け金フェイズまでは壁を減らさない）
+                    if (board.CurrentEnemyHandTiles != null && uiManager.CurrentPhaseStatus >= RoundStatus.Discard)
+                    {
+                        handTilesToRemove.AddRange(board.CurrentEnemyHandTiles);
+                    }
+
                     for (int i = 0; i < board.OriginalEnemyWallTiles.Count; i++)
                     {
-                        if (board.CurrentEnemyHandTiles != null && board.CurrentEnemyHandTiles.Contains(i))
-                            continue;
-
                         int actualTileId = board.OriginalEnemyWallTiles[i];
+
+                        if (handTilesToRemove.Contains(actualTileId))
+                        {
+                            handTilesToRemove.Remove(actualTileId);
+                            continue;
+                        }
+
                         displayIdsForWall.Add(actualTileId);
 
                         GameObject obj = Instantiate(uiManager.TilePrefab, transform);

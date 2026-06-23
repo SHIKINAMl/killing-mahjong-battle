@@ -156,8 +156,9 @@ namespace KillingMahjong.UI
             gameObject.SetActive(true);
 
             // 配置パラメータ
-            float tileWidth = 35f; // スケール後のおおよその幅(必要に応じて微調整)
-            float spacing = 2f;
+            // 手牌確認UIとは異なり、WaitUI側は親スケール等の影響でローカルの見た目幅が小さいため幅を狭める
+            float tileWidth = 18f; // 左下・上部のWaitUIでのスケール後のおおよその幅
+            float spacing = 1f;
 
             for (int i = 0; i < waitTileIds.Count; i++)
             {
