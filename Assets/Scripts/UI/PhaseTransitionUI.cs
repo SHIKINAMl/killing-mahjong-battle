@@ -375,15 +375,19 @@ namespace KillingMahjong.UI
 
         public bool IsDarkenTransitioning { get; private set; }
 
-        public void PlayRoundStartDarken(string text)
+        public void PlayRoundStartDarken(string text, Action onDarkened = null)
         {
-            if (isDarkened) return;
+            if (isDarkened)
+            {
+                onDarkened?.Invoke();
+                return;
+            }
             isDarkened = true;
             IsDarkenTransitioning = true;
-            StartCoroutine(RoundStartDarkenRoutine(text));
+            StartCoroutine(RoundStartDarkenRoutine(text, onDarkened));
         }
 
-        private IEnumerator RoundStartDarkenRoutine(string text)
+        private IEnumerator RoundStartDarkenRoutine(string text, Action onDarkened)
         {
             ResetVisuals();
 
@@ -405,6 +409,9 @@ namespace KillingMahjong.UI
             if (checkerMaterial != null) checkerMaterial.SetFloat("_Progress", 1f);
 
             IsDarkenTransitioning = false;
+            
+            // 暗転完了のコールバック（ここで盤面をクリアする）
+            onDarkened?.Invoke();
 
             // ドン！とテキスト表示
             if (centerText != null)

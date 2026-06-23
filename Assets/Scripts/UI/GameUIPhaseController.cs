@@ -786,14 +786,20 @@ namespace KillingMahjong.UI
                     }
                     else
                     {
-                        BoardStateManager.Instance.ClearAllBoardData();
-                        uiManager.ClearAllTiles();
-                        
                         if (uiManager.PhaseTransitionUI != null)
                         {
-                            uiManager.PhaseTransitionUI.PlayRoundStartDarken("対戦相手を待機中...");
+                            uiManager.PhaseTransitionUI.PlayRoundStartDarken("対戦相手を待機中...", () => {
+                                BoardStateManager.Instance.ClearAllBoardData();
+                                uiManager.ClearAllTiles();
+                                SendNextRoundAction();
+                            });
                         }
-                        SendNextRoundAction();
+                        else
+                        {
+                            BoardStateManager.Instance.ClearAllBoardData();
+                            uiManager.ClearAllTiles();
+                            SendNextRoundAction();
+                        }
                     }
                 });
             }
@@ -805,14 +811,20 @@ namespace KillingMahjong.UI
                 }
                 else
                 {
-                    BoardStateManager.Instance.ClearAllBoardData();
-                    uiManager.ClearAllTiles();
-                    
                     if (uiManager.PhaseTransitionUI != null)
                     {
-                        uiManager.PhaseTransitionUI.PlayRoundStartDarken("対戦相手を待機中...");
+                        uiManager.PhaseTransitionUI.PlayRoundStartDarken("対戦相手を待機中...", () => {
+                            BoardStateManager.Instance.ClearAllBoardData();
+                            uiManager.ClearAllTiles();
+                            SendNextRoundAction();
+                        });
                     }
-                    SendNextRoundAction();
+                    else
+                    {
+                        BoardStateManager.Instance.ClearAllBoardData();
+                        uiManager.ClearAllTiles();
+                        SendNextRoundAction();
+                    }
                 }
             }
         }
