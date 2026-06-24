@@ -408,6 +408,9 @@ namespace KillingMahjong.UI
                 Debug.Log("[GameUIManager] I am the winner! Showing RonWaitPanel.");
                 _isAgariPending = true;
                 
+                var autoDiscard = GetComponent<AutoDiscardController>();
+                if (autoDiscard != null) autoDiscard.CancelAutoDiscard();
+
                 if (RonWaitPanel != null)
                 {
                     RonWaitPanel.SetActive(true);

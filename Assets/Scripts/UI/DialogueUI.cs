@@ -59,7 +59,10 @@ namespace KillingMahjong.UI
                 }
 
                 // ログが追加されたら一番下まで自動スクロールさせる
-                StartCoroutine(ScrollToBottom());
+                if (gameObject.activeInHierarchy)
+                {
+                    StartCoroutine(ScrollToBottom());
+                }
             }
         }
 

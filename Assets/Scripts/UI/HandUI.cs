@@ -24,6 +24,18 @@ namespace KillingMahjong.UI
         private int currentSelectionIndex = 0;
 
         private Button reselectButton;
+        private Button autoDiscardButton;
+        private bool isAutoDiscardEnabled = false;
+
+        public bool IsAutoDiscardEnabled
+        {
+            get => isAutoDiscardEnabled;
+            set
+            {
+                isAutoDiscardEnabled = value;
+                UpdateAutoDiscardButtonText();
+            }
+        }
 
         private void Start()
         {
@@ -45,6 +57,48 @@ namespace KillingMahjong.UI
                 if (txt != null) txt.text = "選び直す";
 
                 reselectButton.gameObject.SetActive(false);
+
+                autoDiscardButton = Instantiate(decideButton, decideButton.transform.parent);
+                autoDiscardButton.name = "AutoDiscardButton";
+                autoDiscardButton.onClick.RemoveAllListeners();
+                autoDiscardButton.onClick.AddListener(OnAutoDiscardClicked);
+                
+                RectTransform rt = autoDiscardButton.GetComponent<RectTransform>();
+                if (rt != null)
+                {
+                    rt.anchoredPosition = new Vector2(rt.anchoredPosition.x, rt.anchoredPosition.y + 80);
+                }
+                UpdateAutoDiscardButtonText();
+                autoDiscardButton.gameObject.SetActive(false);
+            }
+        }
+
+        private void OnAutoDiscardClicked()
+        {
+            IsAutoDiscardEnabled = !IsAutoDiscardEnabled;
+            if (IsAutoDiscardEnabled && gameUIManager != null && gameUIManager.CurrentPhaseStatus == RoundStatus.Discard)
+            {
+                var autoDiscard = gameUIManager.GetComponent<AutoDiscardController>();
+                if (autoDiscard == null)
+                {
+                    autoDiscard = gameUIManager.gameObject.AddComponent<AutoDiscardController>();
+                }
+                autoDiscard.CheckAndExecuteAutoDiscard();
+            }
+        }
+
+        private void UpdateAutoDiscardButtonText()
+        {
+            if (autoDiscardButton != null)
+            {
+                string t = IsAutoDiscardEnabled ? "自動: ON" : "自動: OFF";
+                var tmp = autoDiscardButton.GetComponentInChildren<TMPro.TextMeshProUGUI>();
+                if (tmp != null) tmp.text = t;
+                var txt = autoDiscardButton.GetComponentInChildren<UnityEngine.UI.Text>();
+                if (txt != null) txt.text = t;
+
+                var img = autoDiscardButton.GetComponent<Image>();
+                if (img != null) img.color = IsAutoDiscardEnabled ? Color.green : Color.red;
             }
         }
 
@@ -194,6 +248,10 @@ namespace KillingMahjong.UI
             {
                 bool canReselect = (phaseStatus == RoundStatus.HandSelection) && isSubmitted && (gameUIManager != null && !gameUIManager.IsTransitioning && !gameUIManager.IsMulliganSelection);
                 reselectButton.gameObject.SetActive(canReselect);
+            }
+            if (autoDiscardButton != null)
+            {
+                autoDiscardButton.gameObject.SetActive(phaseStatus == RoundStatus.Discard);
             }
         }
     }
