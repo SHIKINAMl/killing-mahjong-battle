@@ -62,11 +62,23 @@ namespace KillingMahjong.UI
                     GameObject obj = Instantiate(tilePrefab, doraContainer);
                     activeDoraTiles.Add(obj);
 
-                    TileVisual visual = obj.GetComponent<TileVisual>();
+                    var visual = obj.GetComponent<TileVisual>();
                     if (visual != null && tileResourceManager != null)
                     {
                         visual.SetTile(doraId, tileResourceManager.GetTileSprite(doraId));
                     }
+
+                    // UIEffecterのみでシンプルにサイバー（ホログラム）風の調整を行う
+                    var uiEffect = obj.GetComponent<Coffee.UIEffects.UIEffect>();
+                    if (uiEffect == null) uiEffect = obj.AddComponent<Coffee.UIEffects.UIEffect>();
+                    
+                    // 虹色（RgbShift）や飛び跳ね（座標移動）をなくし、シンプルに青白く光らせる
+                    uiEffect.samplingFilter = Coffee.UIEffects.SamplingFilter.BlurFast;
+                    uiEffect.samplingIntensity = 0.2f;
+                    uiEffect.colorFilter = Coffee.UIEffects.ColorFilter.Additive;
+                    uiEffect.color = new Color(0f, 0.8f, 1f, 1f); // シアン
+                    uiEffect.colorIntensity = 0.6f;
+                    uiEffect.colorGlow = true;
 
                     // ドラ表示用なのでクリック判定は不要
                     var interaction = obj.GetComponent<TileInteraction>();
@@ -132,9 +144,85 @@ namespace KillingMahjong.UI
                     Transform tileTrans = currentCyberEffectInstance.transform.Find("DoraTile");
                     if (tileTrans != null)
                     {
-                        var visual = tileTrans.GetComponent<TileVisual>();
-                        if (visual == null) visual = tileTrans.gameObject.AddComponent<TileVisual>();
+                        GameObject tileObj = tileTrans.gameObject;
+
+                        // ----- 3D Mesh/Sprite を WorldSpace Canvas + Image に動的変換 -----
+                        var meshRenderer = tileObj.GetComponent<MeshRenderer>();
+                        var spriteRenderer = tileObj.GetComponent<SpriteRenderer>();
+                        
+                        if (meshRenderer != null || spriteRenderer != null)
+                        {
+                            if (meshRenderer != null) DestroyImmediate(meshRenderer);
+                            if (spriteRenderer != null) DestroyImmediate(spriteRenderer);
+                            
+                            var meshFilter = tileObj.GetComponent<MeshFilter>();
+                            if (meshFilter != null) DestroyImmediate(meshFilter);
+
+                            // Canvasを追加すると元のTransformがRectTransformに置換（Destroy）されるため、
+                            // 以降は tileTrans ではなく tileObj を使用する
+                            var canvas = tileObj.AddComponent<Canvas>();
+                            canvas.renderMode = RenderMode.WorldSpace;
+                            canvas.sortingOrder = 10;
+
+                            var rt = tileObj.GetComponent<RectTransform>();
+                            if (rt == null) rt = tileObj.AddComponent<RectTransform>();
+                            
+                            // Imageを追加
+                            tileObj.AddComponent<UnityEngine.UI.Image>();
+
+                            // TileVisualが古いキャッシュを持っている場合があるので再付与してリセット
+                            var oldVisual = tileObj.GetComponent<TileVisual>();
+                            if (oldVisual != null) DestroyImmediate(oldVisual);
+                        }
+                        // -------------------------------------------------------------
+
+                        var visual = tileObj.GetComponent<TileVisual>();
+                        if (visual == null) visual = tileObj.AddComponent<TileVisual>();
                         visual.SetTile(doraId, tileResourceManager.GetTileSprite(doraId));
+
+                        // SpriteRendererの本来の表示サイズ（PPU考慮済みのサイズ）にRectTransformを合わせる
+                        var image = tileObj.GetComponent<UnityEngine.UI.Image>();
+                        if (image != null && image.sprite != null)
+                        {
+                            var rt = tileObj.GetComponent<RectTransform>();
+                            if (rt != null) rt.sizeDelta = new Vector2(image.sprite.bounds.size.x, image.sprite.bounds.size.y);
+                        }
+
+                        // 正常なCanvasコンポーネントになったので、UIEffectがエラーなく適用できる
+                        var uiEffect = tileObj.GetComponent<Coffee.UIEffects.UIEffect>();
+                        if (uiEffect == null) uiEffect = tileObj.AddComponent<Coffee.UIEffects.UIEffect>();
+
+                        // ホログラム感を出すための設定
+                        // ブラーと加算合成で発光させる
+                        uiEffect.samplingFilter = Coffee.UIEffects.SamplingFilter.BlurFast;
+                        uiEffect.samplingIntensity = 0.2f;
+                        uiEffect.colorFilter = Coffee.UIEffects.ColorFilter.MultiplyAdditive;
+                        uiEffect.color = new Color(0f, 0.8f, 1f, 1f); // シアン
+                        uiEffect.colorIntensity = 0.8f;
+                        uiEffect.colorGlow = true;
+
+                        if (image != null)
+                        {
+                            image.color = new Color(1f, 1f, 1f, 0.7f);
+                        }
+                    }
+                    
+                    // グランドライトの土台（ProjectorBase）にも色の明滅だけを追加（形はうねらせない）
+                    Transform projectorBase = currentCyberEffectInstance.transform.Find("ProjectorBase");
+                    if (projectorBase != null)
+                    {
+                        var auroraBase = projectorBase.GetComponent<KillingMahjong.Visuals.AuroraLightAnimator>();
+                        if (auroraBase == null) auroraBase = projectorBase.gameObject.AddComponent<KillingMahjong.Visuals.AuroraLightAnimator>();
+                        auroraBase.animateScale = false; // 土台はスケールを変えない
+                    }
+
+                    // グランドライトの光（LightPillarParticle）にオーロラのような太さと揺らぎを追加
+                    Transform lightPillar = currentCyberEffectInstance.transform.Find("LightPillarParticle");
+                    if (lightPillar != null)
+                    {
+                        var aurora = lightPillar.GetComponent<KillingMahjong.Visuals.AuroraLightAnimator>();
+                        if (aurora == null) aurora = lightPillar.gameObject.AddComponent<KillingMahjong.Visuals.AuroraLightAnimator>();
+                        aurora.animateScale = true; // 光の柱は太さをうねらせる
                     }
                 }
             }

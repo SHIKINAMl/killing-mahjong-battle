@@ -165,10 +165,10 @@ namespace KillingMahjong.UI
             ResetVisuals();
 
             // トランジション（対局開始演出）が開始された瞬間に敵のHPなどのUIを非表示にする
-            if (targetPlayerInfoUI != null)
-            {
-                targetPlayerInfoUI.gameObject.SetActive(false);
-            }
+            // if (targetPlayerInfoUI != null)
+            // {
+            //     targetPlayerInfoUI.gameObject.SetActive(false);
+            // }
 
             if (!isDarkened)
             {

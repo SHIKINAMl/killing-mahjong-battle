@@ -69,10 +69,24 @@ namespace KillingMahjong.UI
             if (uiManager.WaitUI != null) uiManager.WaitUI.gameObject.SetActive(false);
             if (uiManager.PhaseController != null) uiManager.PhaseController.SetMatchUIVisibility(true);
 
-            // 裏技: Python側のキャンセルアクションがないため、意図的に1枚の牌(非テンパイ確定)を送り
-            // サーバー側の _unmark_hand_selection_confirmed を誘発して確定状態を解除させる
+            // 裏技: Python側のキャンセルアクションがないため、以前は1枚の牌を送って解除していたが
+            // それだと選び直しの際に手牌が1枚になってしまうため、仮の処置として
+            // 前回選択していた13枚をそのまま送りなおして確定状態を解除させる。
+            // ※今後Python側に専用のキャンセルコマンドが実装される予定
             _isCanceling = true;
-            uiManager.SendActionToServer("select", new KillingMahjong.Network.ActionPayload { hand_indexes = new System.Collections.Generic.List<int> { 0 } });
+            
+            var payload = new KillingMahjong.Network.ActionPayload();
+            if (_pendingHandIndexes != null && _pendingHandIndexes.Count > 0)
+            {
+                payload.hand_indexes = _pendingHandIndexes;
+                payload.hand = _pendingHandTiles;
+            }
+            else
+            {
+                payload.hand_indexes = new System.Collections.Generic.List<int> { 0 };
+            }
+            
+            uiManager.SendActionToServer("select", payload);
         }
 
         public void HandleIsTenpaiReceived(IsTenpaiData data)

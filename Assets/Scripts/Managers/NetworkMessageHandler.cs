@@ -610,7 +610,7 @@ namespace KillingMahjong.Network
             }
             catch (System.Exception e)
             {
-                Debug.LogError($"Failed to parse JSON: {e.Message}\n{jsonString}");
+                Debug.LogError($"Failed to parse JSON: {e.Message}\nStackTrace:\n{e.StackTrace}\n{jsonString}");
             }
         }
 

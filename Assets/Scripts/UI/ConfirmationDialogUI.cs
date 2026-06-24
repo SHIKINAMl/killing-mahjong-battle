@@ -148,7 +148,7 @@ namespace KillingMahjong.UI
             // PrefabとResourceManagerの取得 (インスペクターで設定されていない場合、シーンから取得)
             if (tilePrefab == null || tileResourceManager == null)
             {
-                var waitUI = FindObjectOfType<WaitUI>(true);
+                var waitUI = UnityEngine.Object.FindFirstObjectByType<WaitUI>(FindObjectsInactive.Include);
                 if (waitUI != null)
                 {
                     var pField = waitUI.GetType().GetField("tilePrefab", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);

@@ -200,11 +200,78 @@ namespace KillingMahjong.UI
                 yield return new WaitForSeconds(0.4f);
             }
             
-            // 最後に倍率を追加表示
-            yield return new WaitForSeconds(0.5f);
-            yakuText.text = $"{currentYakuStr}   <color=#FFFF00>×{formula}</color>";
-
             // --- タメ（ここで役と手牌をしっかり見せる） ---
+            yield return new WaitForSeconds(1.0f);
+
+            // 【追加】計算式の表示（ダミー）
+            GameObject formulaTextObj = new GameObject("FormulaText");
+            formulaTextObj.transform.SetParent(containerRt, false);
+            TextMeshProUGUI formulaText = formulaTextObj.AddComponent<TextMeshProUGUI>();
+            if (customFont != null) formulaText.font = customFont;
+            
+            // Python側からスコアしか来ないので、ダミーの数式を表示
+            formulaText.text = $"??? × ??? = {score}";
+            formulaText.color = new Color(1f, 1f, 0.5f); // 薄い黄色
+            formulaText.fontSize = 60; 
+            formulaText.alignment = TextAlignmentOptions.Center;
+            
+            // 手牌の上に配置する
+            RectTransform formulaTextRt = formulaTextObj.GetComponent<RectTransform>();
+            formulaTextRt.anchorMin = new Vector2(0.5f, 0.35f); // 手牌が0.20fなので少し上
+            formulaTextRt.anchorMax = new Vector2(0.5f, 0.35f);
+            formulaTextRt.sizeDelta = new Vector2(800, 100);
+            formulaTextRt.anchoredPosition = Vector2.zero;
+
+            // アニメーション（ふわっと浮き出る）
+            float fadeTime = 0.5f;
+            for (float animT = 0; animT < fadeTime; animT += Time.deltaTime)
+            {
+                float alpha = animT / fadeTime;
+                formulaText.color = new Color(1f, 1f, 0.5f, alpha);
+                formulaTextRt.anchoredPosition = new Vector2(0, -20f + (20f * alpha)); // 下から少し上がる
+                yield return null;
+            }
+            formulaText.color = new Color(1f, 1f, 0.5f, 1f);
+
+            // 計算式表示後のタメ
+            yield return new WaitForSeconds(1.5f);
+
+            // 【追加】役ランク（跳満・満貫など）の中央表示
+            GameObject rankTextObj = new GameObject("RankText");
+            rankTextObj.transform.SetParent(containerRt, false);
+            TextMeshProUGUI rankTextUI = rankTextObj.AddComponent<TextMeshProUGUI>();
+            if (customFont != null) rankTextUI.font = customFont;
+            
+            rankTextUI.text = rankName;
+            rankTextUI.color = new Color(1f, 0.8f, 0.2f); // ゴールドっぽい色
+            rankTextUI.fontSize = 150; 
+            rankTextUI.alignment = TextAlignmentOptions.Center;
+            rankTextUI.fontStyle = FontStyles.Bold;
+            rankTextUI.outlineWidth = 0.2f;
+            rankTextUI.outlineColor = new Color32(0, 0, 0, 255); // 黒フチ
+            
+            RectTransform rankTextRt = rankTextObj.GetComponent<RectTransform>();
+            rankTextRt.anchorMin = new Vector2(0.5f, 0.5f);
+            rankTextRt.anchorMax = new Vector2(0.5f, 0.5f);
+            rankTextRt.sizeDelta = new Vector2(1000, 300);
+            rankTextRt.anchoredPosition = Vector2.zero; // 画面中央
+
+            // ドンッと出るアニメーション
+            float rankAnimTime = 0.3f;
+            Vector3 initialRankScale = new Vector3(3f, 3f, 1f);
+            for (float animT = 0; animT < rankAnimTime; animT += Time.deltaTime)
+            {
+                float progress = animT / rankAnimTime;
+                float scale = 1f - Mathf.Pow(1f - progress, 3f);
+                rankTextRt.localScale = Vector3.LerpUnclamped(initialRankScale, Vector3.one, scale);
+                // αフェードイン
+                rankTextUI.color = new Color(1f, 0.8f, 0.2f, progress);
+                yield return null;
+            }
+            rankTextRt.localScale = Vector3.one;
+            rankTextUI.color = new Color(1f, 0.8f, 0.2f, 1f);
+
+            // 役ランク表示後のタメ
             yield return new WaitForSeconds(1.0f);
 
             // 5. 血飛沫と巨大スコアのバウンド表示（ドンッ！）
@@ -267,17 +334,29 @@ namespace KillingMahjong.UI
             Vector3 originalPos = containerRt.localPosition;
             containerRt.localPosition = originalPos;
 
-            // HP UIを最前面へ表示する処理はユーザー要望により削除
+            // スコアをしばらく見せる
+            yield return new WaitForSeconds(2.0f);
 
-            // 勝者のHPゲージへパーティクルが吸い込まれる演出
+            // 点数計算画面を先に消す
+            Destroy(container);
+
+            // 画面が消えてから、スマホ（自軍）と敵メーターに注目させるためのタメ
+            yield return new WaitForSeconds(0.5f);
+
+            // 【追加】勝者へのキラキラエフェクトと敗者へのダメージエフェクト（点数画面が消えた後に発生）
+            PlayWinnerSparkleEffect(isLocalPlayerWin);
+            PlayLoserDamageEffect(isLocalPlayerWin);
+
+            // 画面中央から勝者のHPゲージへパーティクルが吸い込まれる演出
             Transform winnerTransform = isLocalPlayerWin ? playerInfo?.transform : enemyInfo?.transform;
             if (winnerTransform != null)
             {
-                StartCoroutine(SpawnAbsorbParticles(containerRt, scoreTextRt.position, winnerTransform.position));
+                // containerRtは破棄されているため、このスクリプト自体のRectTransformを親にする
+                StartCoroutine(SpawnAbsorbParticles(GetComponent<RectTransform>(), new Vector3(Screen.width/2f, Screen.height/2f, 0), winnerTransform.position));
             }
 
-            // 画像のように、一枚絵としてプレイヤーにしばらく見せつけつつHPを増減させる
-            float holdTime = 3.5f;
+            // キラキラ・ダメージエフェクトを見せつつHPを増減させる
+            float holdTime = 3.0f;
             float hpTimer = 0;
             while (hpTimer < holdTime)
             {
@@ -294,10 +373,7 @@ namespace KillingMahjong.UI
             if (playerInfo != null) playerInfo.SetHP(newLocalHp);
             if (enemyInfo != null) enemyInfo.SetHP(newEnemyHp);
 
-            // 復元処理は削除済み
-
             // 終了処理
-            Destroy(container);
             onComplete?.Invoke();
         }
 
@@ -395,6 +471,140 @@ namespace KillingMahjong.UI
             string dummyFormula = "ダブル役満";
             string dummyRank = "ダブル役満";
             PlayRonSequence(dummyHand, 33, dummyYaku, dummyFormula, dummyRank, 64000, false, null, null, 20000, 20000, 20000, 84000, () => Debug.Log("Test Enemy Win complete"));
+        }
+
+        private void PlayWinnerSparkleEffect(bool isLocalPlayerWin)
+        {
+            StartCoroutine(SparkleRoutine(isLocalPlayerWin));
+        }
+
+        private IEnumerator SparkleRoutine(bool isLocalPlayerWin)
+        {
+            GameObject sparkleContainer = new GameObject("SparkleContainer");
+            sparkleContainer.transform.SetParent(transform, false);
+            sparkleContainer.transform.SetAsLastSibling();
+            RectTransform containerRt = sparkleContainer.AddComponent<RectTransform>();
+            containerRt.anchorMin = Vector2.zero;
+            containerRt.anchorMax = Vector2.one;
+            containerRt.sizeDelta = Vector2.zero;
+
+            int numSparkles = 20;
+            float duration = 3.0f; // エフェクト継続時間
+            float timer = 0;
+
+            while (timer < duration)
+            {
+                GameObject star = new GameObject("Star");
+                star.transform.SetParent(containerRt, false);
+                Image img = star.AddComponent<Image>();
+                img.color = new Color(1f, 1f, 0f, 0f); // 透明な黄色
+                RectTransform rt = star.GetComponent<RectTransform>();
+                rt.sizeDelta = new Vector2(40, 40);
+                
+                // 勝者が自分なら下部、敵なら上部付近にキラキラを発生
+                float randX = Random.Range(-500f, 500f);
+                float randY = isLocalPlayerWin ? Random.Range(-400f, -50f) : Random.Range(50f, 400f);
+                rt.anchoredPosition = new Vector2(randX, randY);
+                rt.localRotation = Quaternion.Euler(0, 0, Random.Range(0f, 360f));
+
+                StartCoroutine(SingleSparkleAnim(rt, img));
+
+                timer += 0.1f;
+                yield return new WaitForSeconds(0.1f);
+            }
+
+            yield return new WaitForSeconds(1.0f);
+            Destroy(sparkleContainer);
+        }
+
+        private IEnumerator SingleSparkleAnim(RectTransform rt, Image img)
+        {
+            float t = 0;
+            float life = Random.Range(0.5f, 1.2f);
+            float rotSpeed = Random.Range(90f, 180f);
+            
+            while(t < life && rt != null && img != null)
+            {
+                t += Time.deltaTime;
+                float progress = t / life;
+                
+                // フェードイン＆アウト
+                float alpha = Mathf.Sin(progress * Mathf.PI);
+                img.color = new Color(1f, 1f, 0.6f, alpha);
+                
+                // 拡縮（星のまたたき表現）
+                float scale = 0.5f + alpha * 1.5f;
+                rt.localScale = new Vector3(scale, scale, 1f);
+                
+                rt.Rotate(0, 0, rotSpeed * Time.deltaTime);
+                rt.anchoredPosition += new Vector2(0, 50f * Time.deltaTime);
+                
+                yield return null;
+            }
+            if (rt != null) Destroy(rt.gameObject);
+        }
+
+        private void PlayLoserDamageEffect(bool isLocalPlayerWin)
+        {
+            StartCoroutine(DamageRoutine(isLocalPlayerWin));
+        }
+
+        private IEnumerator DamageRoutine(bool isLocalPlayerWin)
+        {
+            GameObject damageContainer = new GameObject("DamageContainer");
+            damageContainer.transform.SetParent(transform, false);
+            damageContainer.transform.SetAsLastSibling();
+            RectTransform containerRt = damageContainer.AddComponent<RectTransform>();
+            containerRt.anchorMin = Vector2.zero;
+            containerRt.anchorMax = Vector2.one;
+            containerRt.sizeDelta = Vector2.zero;
+
+            // 敗者側を赤くフラッシュさせるパネル
+            GameObject flash = new GameObject("RedFlash");
+            flash.transform.SetParent(containerRt, false);
+            Image img = flash.AddComponent<Image>();
+            img.color = new Color(1f, 0f, 0f, 0f);
+            
+            RectTransform rt = flash.GetComponent<RectTransform>();
+            if (isLocalPlayerWin)
+            {
+                // 勝者が自分 = 敗者は敵（画面上部）
+                rt.anchorMin = new Vector2(0, 0.5f);
+                rt.anchorMax = new Vector2(1, 1);
+            }
+            else
+            {
+                // 勝者が敵 = 敗者は自分（画面下部）
+                rt.anchorMin = new Vector2(0, 0);
+                rt.anchorMax = new Vector2(1, 0.5f);
+            }
+            rt.sizeDelta = Vector2.zero;
+            rt.anchoredPosition = Vector2.zero;
+
+            // 赤フラッシュアニメーション（3回激しく点滅）
+            for (int i = 0; i < 3; i++)
+            {
+                float t = 0;
+                float flashIn = 0.05f;
+                float flashOut = 0.1f;
+                
+                while(t < flashIn && img != null)
+                {
+                    t += Time.deltaTime;
+                    img.color = new Color(1f, 0f, 0f, (t/flashIn) * 0.8f);
+                    yield return null;
+                }
+                
+                t = 0;
+                while(t < flashOut && img != null)
+                {
+                    t += Time.deltaTime;
+                    img.color = new Color(1f, 0f, 0f, 0.8f - (t/flashOut) * 0.8f);
+                    yield return null;
+                }
+            }
+
+            if (damageContainer != null) Destroy(damageContainer);
         }
     }
 }
