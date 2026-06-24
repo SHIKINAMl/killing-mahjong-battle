@@ -32,6 +32,7 @@ namespace KillingMahjong.UI
         
         private Coroutine bounceCoroutine;
         private Coroutine zoomCoroutine;
+        private Coroutine blinkCoroutine;
         private Vector3 originalPosition;
         
         // ズーム用
@@ -39,6 +40,57 @@ namespace KillingMahjong.UI
         private Vector3 originalScale;
 
         private bool isInitialized = false;
+
+        private void OnEnable()
+        {
+            if (blinkCoroutine == null)
+            {
+                blinkCoroutine = StartCoroutine(BlinkRoutine());
+            }
+        }
+
+        private void OnDisable()
+        {
+            if (blinkCoroutine != null)
+            {
+                StopCoroutine(blinkCoroutine);
+                blinkCoroutine = null;
+            }
+        }
+
+        private System.Collections.IEnumerator BlinkRoutine()
+        {
+            while (true)
+            {
+                if (characterData == null || !characterData.enableBlink || faceRenderer == null)
+                {
+                    yield return new WaitForSeconds(1.0f);
+                    continue;
+                }
+
+                float waitTime = Random.Range(characterData.blinkIntervalMin, characterData.blinkIntervalMax);
+                yield return new WaitForSeconds(waitTime);
+
+                if (faceRenderer.sprite != normalFaceSprite)
+                    continue;
+
+                Sprite fullBlink = characterData.faceSprites?.Find(x => x.id == characterData.blinkFaceId)?.sprite;
+
+                if (fullBlink != null)
+                {
+                    if (faceRenderer.sprite == normalFaceSprite)
+                    {
+                        faceRenderer.sprite = fullBlink;
+                        yield return new WaitForSeconds(0.12f);
+                    }
+
+                    if (faceRenderer.sprite == fullBlink)
+                    {
+                        faceRenderer.sprite = normalFaceSprite;
+                    }
+                }
+            }
+        }
 
         private void Awake()
         {

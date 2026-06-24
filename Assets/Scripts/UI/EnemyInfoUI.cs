@@ -40,6 +40,7 @@ namespace KillingMahjong.UI
         private Coroutine bounceCoroutine;
         private Coroutine reactionCoroutine;
         private Coroutine zoomCoroutine;
+        private Coroutine blinkCoroutine;
         private Vector3 originalPosition;
 
         // ズーム用
@@ -50,6 +51,57 @@ namespace KillingMahjong.UI
         /// 現在選択されている CharacterData を取得する
         /// </summary>
         public CharacterData CurrentCharacterData => characterData;
+
+        private void OnEnable()
+        {
+            if (blinkCoroutine == null)
+            {
+                blinkCoroutine = StartCoroutine(BlinkRoutine());
+            }
+        }
+
+        private void OnDisable()
+        {
+            if (blinkCoroutine != null)
+            {
+                StopCoroutine(blinkCoroutine);
+                blinkCoroutine = null;
+            }
+        }
+
+        private System.Collections.IEnumerator BlinkRoutine()
+        {
+            while (true)
+            {
+                if (characterData == null || !characterData.enableBlink || faceRenderer == null)
+                {
+                    yield return new WaitForSeconds(1.0f);
+                    continue;
+                }
+
+                float waitTime = Random.Range(characterData.blinkIntervalMin, characterData.blinkIntervalMax);
+                yield return new WaitForSeconds(waitTime);
+
+                if (reactionCoroutine != null || faceRenderer.sprite != normalFaceSprite)
+                    continue;
+
+                Sprite fullBlink = characterData.faceSprites?.Find(x => x.id == characterData.blinkFaceId)?.sprite;
+
+                if (fullBlink != null)
+                {
+                    if (faceRenderer.sprite == normalFaceSprite && reactionCoroutine == null)
+                    {
+                        faceRenderer.sprite = fullBlink;
+                        yield return new WaitForSeconds(0.12f);
+                    }
+
+                    if (faceRenderer.sprite == fullBlink && reactionCoroutine == null)
+                    {
+                        faceRenderer.sprite = normalFaceSprite;
+                    }
+                }
+            }
+        }
 
         private void Awake()
         {

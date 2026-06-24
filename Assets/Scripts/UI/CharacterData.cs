@@ -50,6 +50,12 @@ namespace KillingMahjong.UI
         public System.Collections.Generic.List<NamedSprite> faceSprites = new System.Collections.Generic.List<NamedSprite>();
         public string defaultFaceId = "normal";
 
+        [Header("Blink Animation (瞬き)")]
+        public bool enableBlink = true;
+        public float blinkIntervalMin = 2.0f;
+        public float blinkIntervalMax = 5.0f;
+        public string blinkFaceId = "blink";       // 完全に閉じた目
+
         [Header("Default Sprites (Old System - Fallback)")]
         public Sprite normalSprite;     // 通常時の画像
         public Sprite discardSprite;    // 通常の打牌時の画像（リアクションが無い場合のフォールバック）
