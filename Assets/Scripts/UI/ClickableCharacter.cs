@@ -1,11 +1,25 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using System.Collections.Generic;
 
 namespace KillingMahjong.UI
 {
+    [System.Serializable]
+    public class CharacterClickArea
+    {
+        [Tooltip("部位の名前（例：Head, Body, Leg など）\n空欄にすると全体のデフォルトになります。")]
+        public string areaName = "Body";
+        
+        [Tooltip("クリック判定のサイズ（ワールド座標）")]
+        public Vector2 size = new Vector2(1, 1);
+        
+        [Tooltip("中心からのオフセット（ローカル座標）")]
+        public Vector2 offset = Vector2.zero;
+    }
+
     /// <summary>
     /// 敵キャラクターの SpriteRenderer にアタッチして、
-    /// クリックで敵キャラクターを切り替えるためのスクリプト。
+    /// クリック部位ごとの判定を行うためのスクリプト。
     /// UIレイヤーに遮られないよう、Update で直接範囲判定を行う。
     /// </summary>
     public class ClickableCharacter : MonoBehaviour
@@ -14,11 +28,8 @@ namespace KillingMahjong.UI
         [SerializeField] private EnemyInfoUI enemyInfoUI;
 
         [Header("Click Area Settings")]
-        [Tooltip("クリック判定の範囲サイズ（ワールド座標）。0の場合は SpriteRenderer の Bounds を使用します。")]
-        [SerializeField] private Vector2 clickAreaSize = Vector2.zero;
-        
-        [Tooltip("クリック判定の中心オフセット（ローカル座標）")]
-        [SerializeField] private Vector2 clickAreaOffset = Vector2.zero;
+        [Tooltip("部位ごとのクリック判定リスト。上にあるものほど優先して判定されます。")]
+        [SerializeField] private List<CharacterClickArea> clickAreas = new List<CharacterClickArea>();
 
         [Header("Debug")]
         [Tooltip("Game View 上でクリック判定範囲を半透明で表示する")]
@@ -27,16 +38,16 @@ namespace KillingMahjong.UI
 
         private DialogueUI dialogueUI;
         private SpriteRenderer spriteRenderer;
-        private GameObject debugOverlay;
+        private List<GameObject> debugOverlays = new List<GameObject>();
 
         private void Start()
         {
             spriteRenderer = GetComponent<SpriteRenderer>();
 
-            // DialogueUI の参照を自動取得する（非アクティブ時も取得できるように修正）
+            // DialogueUI の参照を自動取得する
             dialogueUI = FindFirstObjectByType<DialogueUI>(FindObjectsInactive.Include);
 
-            // EnemyInfoUI が未設定の場合、親階層から自動取得を試みる
+            // EnemyInfoUI が未設定の場合、親階層から自動取得
             if (enemyInfoUI == null)
             {
                 enemyInfoUI = GetComponentInParent<EnemyInfoUI>();
@@ -44,126 +55,115 @@ namespace KillingMahjong.UI
 
             Debug.Log($"[ClickableCharacter] Start完了 - enemyInfoUI={(enemyInfoUI != null ? "OK" : "NULL")} / spriteRenderer={(spriteRenderer != null ? "OK" : "NULL")}");
 
+            // もしリストが空なら、後方互換のためにデフォルトの全体枠を1つ追加
+            if (clickAreas.Count == 0)
+            {
+                var defaultArea = new CharacterClickArea { areaName = "" };
+                if (spriteRenderer != null)
+                {
+                    defaultArea.size = spriteRenderer.bounds.size;
+                    defaultArea.offset = (Vector2)(spriteRenderer.bounds.center - transform.position);
+                }
+                clickAreas.Add(defaultArea);
+            }
+
             // デバッグ用の半透明オーバーレイを生成
-            CreateDebugOverlay();
+            CreateDebugOverlays();
         }
 
-        /// <summary>
-        /// Game View 上でクリック判定範囲を表示するための半透明オーバーレイを生成する
-        /// </summary>
-        private void CreateDebugOverlay()
+        private void CreateDebugOverlays()
         {
             if (!showDebugArea) return;
 
-            // 1x1 の白ピクセルスプライトをコードで生成
             Texture2D tex = new Texture2D(1, 1);
             tex.SetPixel(0, 0, Color.white);
             tex.Apply();
             Sprite whiteSprite = Sprite.Create(tex, new Rect(0, 0, 1, 1), new Vector2(0.5f, 0.5f), 1f);
 
-            // 子オブジェクトとして半透明スプライトを配置
-            debugOverlay = new GameObject("ClickArea_DebugOverlay");
-            debugOverlay.transform.SetParent(transform, false);
-
-            var sr = debugOverlay.AddComponent<SpriteRenderer>();
-            sr.sprite = whiteSprite;
-            sr.color = debugAreaColor;
-            sr.sortingOrder = 999; // 最前面に表示
-
-            UpdateDebugOverlay();
-        }
-
-        /// <summary>
-        /// オーバーレイの位置とサイズをクリック判定範囲に合わせる
-        /// </summary>
-        private void UpdateDebugOverlay()
-        {
-            if (debugOverlay == null) return;
-
-            Vector2 size = clickAreaSize;
-            Vector2 offset = clickAreaOffset;
-
-            if (size.x <= 0 || size.y <= 0)
+            for (int i = 0; i < clickAreas.Count; i++)
             {
-                if (spriteRenderer != null)
-                {
-                    // SpriteRenderer の Bounds をローカルに変換
-                    size = spriteRenderer.bounds.size;
-                    offset = (Vector2)(spriteRenderer.bounds.center - transform.position);
-                }
-                else
-                {
-                    size = new Vector2(2f, 2f); // フォールバック
-                }
+                var area = clickAreas[i];
+                GameObject overlay = new GameObject($"ClickArea_DebugOverlay_{area.areaName}");
+                overlay.transform.SetParent(transform, false);
+
+                var sr = overlay.AddComponent<SpriteRenderer>();
+                sr.sprite = whiteSprite;
+                sr.color = debugAreaColor;
+                sr.sortingOrder = 999; // 最前面
+
+                debugOverlays.Add(overlay);
             }
 
-            debugOverlay.transform.localPosition = new Vector3(offset.x, offset.y, -0.01f);
-            debugOverlay.transform.localScale = new Vector3(size.x, size.y, 1f);
+            UpdateDebugOverlays();
+        }
+
+        private void UpdateDebugOverlays()
+        {
+            if (debugOverlays.Count == 0 || debugOverlays.Count != clickAreas.Count) return;
+
+            for (int i = 0; i < clickAreas.Count; i++)
+            {
+                var area = clickAreas[i];
+                var overlay = debugOverlays[i];
+
+                Vector2 size = area.size;
+                Vector2 offset = area.offset;
+
+                overlay.transform.localPosition = new Vector3(offset.x, offset.y, -0.01f);
+                overlay.transform.localScale = new Vector3(size.x, size.y, 1f);
+            }
         }
 
         private void Update()
         {
-            // 新Input Systemでマウスクリック（左ボタン）を検知
             var mouse = Mouse.current;
             if (mouse == null || !mouse.leftButton.wasPressedThisFrame) return;
             if (Camera.main == null) return;
 
-            // マウスのスクリーン座標をワールド座標に変換
-            // パースペクティブカメラの場合、スプライトのZ深度に合わせた距離を使う必要がある
             Vector2 screenPos = mouse.position.ReadValue();
             float zDistance = Camera.main.WorldToScreenPoint(transform.position).z;
             Vector3 worldPos = Camera.main.ScreenToWorldPoint(new Vector3(screenPos.x, screenPos.y, zDistance));
 
-            // デバッグ: クリック位置と判定範囲を毎回表示
-            Vector2 center = (Vector2)transform.position + clickAreaOffset;
-            Debug.Log($"[ClickableCharacter] クリック位置: screen={screenPos}, world=({worldPos.x:F2}, {worldPos.y:F2}) / 判定中心=({center.x:F2}, {center.y:F2}) / 判定サイズ={clickAreaSize} / transform.pos={transform.position}");
-
-            // クリック判定
-            if (IsInsideClickArea(worldPos))
+            // リストの上から順に判定（重なっている場合は上の要素が優先される）
+            foreach (var area in clickAreas)
             {
-                OnClicked();
+                if (IsInsideClickArea(worldPos, area))
+                {
+                    OnClicked(area.areaName);
+                    break; // 1箇所クリックしたら終了
+                }
             }
         }
 
-        /// <summary>
-        /// ワールド座標がクリック判定範囲内かどうかを判定する
-        /// </summary>
-        private bool IsInsideClickArea(Vector3 worldPos)
+        private bool IsInsideClickArea(Vector3 worldPos, CharacterClickArea area)
         {
-            Vector2 center = (Vector2)transform.position + clickAreaOffset;
+            Vector2 center = (Vector2)transform.position + area.offset;
+            float halfW = area.size.x * 0.5f;
+            float halfH = area.size.y * 0.5f;
 
-            // clickAreaSize が設定されている場合はそちらを使う
-            if (clickAreaSize.x > 0 && clickAreaSize.y > 0)
-            {
-                float halfW = clickAreaSize.x * 0.5f;
-                float halfH = clickAreaSize.y * 0.5f;
-                return worldPos.x >= center.x - halfW && worldPos.x <= center.x + halfW &&
-                       worldPos.y >= center.y - halfH && worldPos.y <= center.y + halfH;
-            }
-
-            // 未設定の場合は SpriteRenderer の Bounds を使用
-            if (spriteRenderer != null)
-            {
-                Bounds b = spriteRenderer.bounds;
-                return worldPos.x >= b.min.x && worldPos.x <= b.max.x &&
-                       worldPos.y >= b.min.y && worldPos.y <= b.max.y;
-            }
-
-            return false;
+            return worldPos.x >= center.x - halfW && worldPos.x <= center.x + halfW &&
+                   worldPos.y >= center.y - halfH && worldPos.y <= center.y + halfH;
         }
 
-        private void OnClicked()
+        private void OnClicked(string areaName)
         {
-            Debug.Log("[ClickableCharacter] クリック検知！");
+            Debug.Log($"[ClickableCharacter] クリック検知！部位: {areaName}");
 
             if (enemyInfoUI == null)
             {
-                Debug.LogWarning("[ClickableCharacter] enemyInfoUI が null です！インスペクターで設定してください。");
+                Debug.LogWarning("[ClickableCharacter] enemyInfoUI が null です！");
                 return;
             }
 
             int randomIdx = Random.Range(1, 21); // 1〜20
-            string condition = $"クリックされた時{randomIdx}";
+            
+            // 部位名が設定されている場合は、プレフィックスとして追加
+            // 例: areaNameが"Head"の場合 -> "クリックされた時_Head1"
+            // 空欄の場合は従来通り -> "クリックされた時1"
+            string condition = string.IsNullOrEmpty(areaName) 
+                ? $"クリックされた時{randomIdx}" 
+                : $"クリックされた時_{areaName}{randomIdx}";
+
             var entry = Managers.DialogueManager.Instance.GetDialogueEntry(condition);
             
             if (entry != null)
@@ -183,38 +183,53 @@ namespace KillingMahjong.UI
             }
             else
             {
-                // フォールバック
-                string clickDialogue = enemyInfoUI.PlayReaction(ReactionTrigger.Click, Random.Range(3.0f, 5.0f));
-                enemyInfoUI.PlayBounceAnimation(0.3f);
-                if (dialogueUI != null && clickDialogue != null)
+                // エントリーが見つからなかった場合のフォールバック
+                // 部位専用のセリフが無い場合は、従来の全体用条件で再検索を試みる
+                string fallbackCondition = $"クリックされた時{randomIdx}";
+                var fallbackEntry = Managers.DialogueManager.Instance.GetDialogueEntry(fallbackCondition);
+
+                if (fallbackEntry != null)
                 {
-                    dialogueUI.ShowText(clickDialogue);
+                    if (dialogueUI != null && !string.IsNullOrEmpty(fallbackEntry.Dialogue1))
+                    {
+                        dialogueUI.ShowText(fallbackEntry.Dialogue1.Contains("「") ? fallbackEntry.Dialogue1 : $"「{fallbackEntry.Dialogue1}」");
+                    }
+                    if (!string.IsNullOrEmpty(fallbackEntry.Expression) || !string.IsNullOrEmpty(fallbackEntry.Pose)) 
+                    {
+                        enemyInfoUI.PlayReactionWithVisualId(fallbackEntry.Pose, fallbackEntry.Expression, Random.Range(3.0f, 5.0f));
+                    }
+                    else 
+                    {
+                        enemyInfoUI.PlayBounceAnimation(0.3f);
+                    }
+                }
+                else
+                {
+                    // 最終フォールバック
+                    string clickDialogue = enemyInfoUI.PlayReaction(ReactionTrigger.Click, Random.Range(3.0f, 5.0f));
+                    enemyInfoUI.PlayBounceAnimation(0.3f);
+                    if (dialogueUI != null && clickDialogue != null)
+                    {
+                        dialogueUI.ShowText(clickDialogue);
+                    }
                 }
             }
         }
 
-        /// <summary>
-        /// エディタ上でクリック判定範囲を視覚的に確認するためのギズモ
-        /// </summary>
         private void OnDrawGizmosSelected()
         {
-            Vector2 center = (Vector2)transform.position + clickAreaOffset;
-            Vector2 size = clickAreaSize;
+            if (clickAreas == null || clickAreas.Count == 0) return;
 
-            if (size.x <= 0 || size.y <= 0)
+            foreach (var area in clickAreas)
             {
-                var sr = GetComponent<SpriteRenderer>();
-                if (sr != null)
-                {
-                    center = sr.bounds.center;
-                    size = sr.bounds.size;
-                }
-            }
+                Vector2 center = (Vector2)transform.position + area.offset;
+                Vector2 size = area.size;
 
-            Gizmos.color = new Color(0f, 1f, 0f, 0.3f);
-            Gizmos.DrawCube(new Vector3(center.x, center.y, transform.position.z), new Vector3(size.x, size.y, 0.1f));
-            Gizmos.color = Color.green;
-            Gizmos.DrawWireCube(new Vector3(center.x, center.y, transform.position.z), new Vector3(size.x, size.y, 0.1f));
+                Gizmos.color = new Color(0f, 1f, 0f, 0.3f);
+                Gizmos.DrawCube(new Vector3(center.x, center.y, transform.position.z), new Vector3(size.x, size.y, 0.1f));
+                Gizmos.color = Color.green;
+                Gizmos.DrawWireCube(new Vector3(center.x, center.y, transform.position.z), new Vector3(size.x, size.y, 0.1f));
+            }
         }
     }
 }
