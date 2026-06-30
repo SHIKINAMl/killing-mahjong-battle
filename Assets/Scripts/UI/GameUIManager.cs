@@ -261,12 +261,7 @@ namespace KillingMahjong.UI
 
         public void MoveTileToHand(int tileId)
         {
-            Debug.Log($"[GameUIManager] MoveTileToHand called. tileId: {tileId}, currentPhaseStatus: {currentPhaseStatus}");
-            if (currentPhaseStatus != RoundStatus.HandSelection) 
-            {
-                Debug.Log($"[GameUIManager] MoveTileToHand aborted. Not HandSelection phase. current: {currentPhaseStatus}");
-                return;
-            }
+            if (currentPhaseStatus != RoundStatus.HandSelection) return;
             if (handUI != null && handUI.IsSubmitted) 
             {
                 Debug.Log("[GameUIManager] MoveTileToHand aborted. HandUI is already submitted.");
@@ -275,7 +270,9 @@ namespace KillingMahjong.UI
             
             Debug.Log($"[GameUIManager] Executing BoardStateManager.MoveTileToHand({tileId})");
             BoardStateManager.Instance.TargetHandIndexes = null;
+
             BoardStateManager.Instance.MoveTileToHand(tileId);
+            ClearSelection();
         }
 
         public void MoveTileToWall(int tileId)
@@ -283,6 +280,7 @@ namespace KillingMahjong.UI
             if (currentPhaseStatus != RoundStatus.HandSelection) return;
             if (handUI != null && handUI.IsSubmitted) return;
             BoardStateManager.Instance.TargetHandIndexes = null;
+            
             BoardStateManager.Instance.MoveTileToWall(tileId);
             ClearSelection();
         }
@@ -291,14 +289,36 @@ namespace KillingMahjong.UI
         {
             if (currentPhaseStatus != RoundStatus.HandSelection) return;
             if (handUI != null && handUI.IsSubmitted) return;
-            BoardStateManager.Instance.SelectManganHand();
+            
+            if (VisualController != null)
+            {
+                StartCoroutine(VisualController.PlayTransitionAnimationRoutine(() => 
+                {
+                    BoardStateManager.Instance.SelectManganHand();
+                }));
+            }
+            else
+            {
+                BoardStateManager.Instance.SelectManganHand();
+            }
         }
 
         public void SelectRandomHand()
         {
             if (currentPhaseStatus != RoundStatus.HandSelection) return;
             if (handUI != null && handUI.IsSubmitted) return;
-            BoardStateManager.Instance.SelectRandomHand();
+            
+            if (VisualController != null)
+            {
+                StartCoroutine(VisualController.PlayTransitionAnimationRoutine(() => 
+                {
+                    BoardStateManager.Instance.SelectRandomHand();
+                }));
+            }
+            else
+            {
+                BoardStateManager.Instance.SelectRandomHand();
+            }
         }
 
         public void SelectTile(int tileId, bool isInHand, bool multiSelect)
@@ -476,7 +496,7 @@ namespace KillingMahjong.UI
                 if (wallUI != null)
                 {
                     RectTransform tileRt = wallUI.GrabTile(discardedTileId);
-                    if (tileRt != null) Destroy(tileRt.gameObject);
+                    if (tileRt != null) VisualController.ReturnTileToPool(tileRt.gameObject);
                     
                     wallUI.UpdateWallHighlights(BoardStateManager.Instance.CurrentWaitTiles, currentPhaseStatus == RoundStatus.Discard);
                 }
@@ -500,18 +520,18 @@ namespace KillingMahjong.UI
         {
             if (handUI != null)
             {
-                foreach (RectTransform t in handUI.GetHandSlots().ToArray()) if (t != null) Destroy(t.gameObject);
+                foreach (RectTransform t in handUI.GetHandSlots().ToArray()) if (t != null) VisualController.ReturnTileToPool(t.gameObject);
                 handUI.GetHandSlots().Clear();
             }
             if (wallUI != null)
             {
-                foreach (Transform t in wallUI.GetWallSlots().ToArray()) if (t != null) Destroy(t.gameObject);
+                foreach (Transform t in wallUI.GetWallSlots().ToArray()) if (t != null) VisualController.ReturnTileToPool(t.gameObject);
                 wallUI.GetWallSlots().Clear();
             }
             if (enemyHandUI != null) enemyHandUI.ClearHand();
             if (enemyWallUI != null)
             {
-                foreach (Transform t in enemyWallUI.GetEnemyWallSlots().ToArray()) if (t != null) Destroy(t.gameObject);
+                foreach (Transform t in enemyWallUI.GetEnemyWallSlots().ToArray()) if (t != null) VisualController.ReturnTileToPool(t.gameObject);
                 enemyWallUI.GetEnemyWallSlots().Clear();
             }
             if (riverUI != null) riverUI.Clear();

@@ -12,6 +12,66 @@ namespace KillingMahjong.UI
         private GameUIManager uiManager;
         private List<int> _lastSuppressedIndices = new List<int>();
 
+        private Queue<GameObject> _tilePool = new Queue<GameObject>();
+        private Transform _poolContainer;
+
+        private void InitPool()
+        {
+            if (_poolContainer == null)
+            {
+                GameObject poolObj = new GameObject("TilePoolContainer");
+                poolObj.transform.SetParent(this.transform, false);
+                poolObj.SetActive(false);
+                _poolContainer = poolObj.transform;
+            }
+        }
+
+        public GameObject GetTileFromPool(Transform parent)
+        {
+            if (_poolContainer == null) InitPool();
+
+            GameObject obj;
+            if (_tilePool.Count > 0)
+            {
+                obj = _tilePool.Dequeue();
+                obj.transform.SetParent(parent, false);
+                obj.SetActive(true);
+                
+                var cg = obj.GetComponent<CanvasGroup>();
+                if (cg != null) { cg.alpha = 1f; cg.blocksRaycasts = true; }
+                obj.transform.localScale = Vector3.one;
+
+                var interactions = obj.GetComponentsInChildren<TileInteraction>(true);
+                foreach (var i in interactions) i.enabled = true;
+
+                // 全ての子ImageのraycastTargetを復元するが、色は変更しない（DoraなどのOverlayが白塗りになるのを防ぐ）
+                var images = obj.GetComponentsInChildren<UnityEngine.UI.Image>(true);
+                foreach (var img in images) { img.raycastTarget = true; }
+
+                // ルートのImage（もしあれば）のカラーだけは白に戻す（フェード等のリセット）
+                var rootImg = obj.GetComponent<UnityEngine.UI.Image>();
+                if (rootImg != null) rootImg.color = Color.white;
+
+                var btn = obj.GetComponent<UnityEngine.UI.Button>();
+                if (btn != null) btn.interactable = true;
+            }
+            else
+            {
+                obj = Instantiate(uiManager.TilePrefab, parent);
+            }
+            return obj;
+        }
+
+        public void ReturnTileToPool(GameObject obj)
+        {
+            if (obj == null) return;
+            if (_poolContainer == null) InitPool();
+            
+            obj.transform.SetParent(_poolContainer, false);
+            obj.SetActive(false);
+            _tilePool.Enqueue(obj);
+        }
+
         public void Setup(GameUIManager manager)
         {
             this.uiManager = manager;
@@ -106,20 +166,20 @@ namespace KillingMahjong.UI
                     {
                         Transform t = uiManager.HandUI.GetHandSlots()[i];
                         if (t != null) {
-                            t.SetParent(null);
-                            Destroy(t.gameObject);
+                            ReturnTileToPool(t.gameObject);
                         }
                     }
                     uiManager.HandUI.GetHandSlots().Clear();
                 }
                 if (uiManager.WallUI != null)
                 {
+                    // 矢印インジケータを牌スロットから安全に切り離してからプールに返す
+                    uiManager.WallUI.SetActiveDiscardTile(null);
                     for (int i = uiManager.WallUI.GetWallSlots().Count - 1; i >= 0; i--)
                     {
                         Transform t = uiManager.WallUI.GetWallSlots()[i];
                         if (t != null) {
-                            t.SetParent(null);
-                            Destroy(t.gameObject);
+                            ReturnTileToPool(t.gameObject);
                         }
                     }
                     uiManager.WallUI.GetWallSlots().Clear();
@@ -133,7 +193,7 @@ namespace KillingMahjong.UI
                 List<RectTransform> combinedGenerated = new List<RectTransform>();
                 foreach (var id in combinedIds)
                 {
-                    GameObject obj = Instantiate(uiManager.TilePrefab, transform);
+                    GameObject obj = GetTileFromPool(transform);
                     RectTransform rt = obj.GetComponent<RectTransform>() ?? obj.transform as RectTransform;
                     if (rt != null)
                     {
@@ -194,7 +254,7 @@ namespace KillingMahjong.UI
                 for (int i = 0; i < board.CurrentEnemyHandTiles.Count; i++)
                 {
                     int currentTileVal = board.CurrentEnemyHandTiles[i]; // encodedId
-                    GameObject obj = Instantiate(uiManager.TilePrefab, transform);
+                    GameObject obj = GetTileFromPool(transform);
                     RectTransform rt = obj.GetComponent<RectTransform>() ?? obj.transform as RectTransform;
                     if (rt != null) {
                         int visualId = -1; // Force hidden (-1)
@@ -256,7 +316,7 @@ namespace KillingMahjong.UI
 
                         displayIdsForWall.Add(actualTileId);
 
-                        GameObject obj = Instantiate(uiManager.TilePrefab, transform);
+                        GameObject obj = GetTileFromPool(transform);
                         RectTransform rt = obj.GetComponent<RectTransform>() ?? obj.transform as RectTransform;
                         if (rt != null) {
                             int visualId = -1; // Force hidden (-1)
@@ -269,11 +329,14 @@ namespace KillingMahjong.UI
                             
                             // --- 相手の牌（Wall扱い）は操作・ホバー不要なので完全に無効化する ---
                             var interactions = rt.GetComponentsInChildren<TileInteraction>(true);
-                            foreach(var interaction in interactions) DestroyImmediate(interaction);
+                            foreach(var interaction in interactions) interaction.enabled = false;
                             var visual = rt.GetComponent<TileVisual>();
                             if (visual != null) visual.SetHoverHighlight(false);
                             var images = rt.GetComponentsInChildren<UnityEngine.UI.Image>(true);
                             foreach(var img in images) img.raycastTarget = false;
+                            
+                            var btn = rt.gameObject.GetComponent<UnityEngine.UI.Button>();
+                            if (btn != null) btn.interactable = false;
                             // --------------------------------------------------------------------
 
                             // 敵の壁牌には目のアイコンを表示しない要望のため SetExposed(isExposedInWall) は行わない
@@ -296,10 +359,17 @@ namespace KillingMahjong.UI
 
         public void InitializeTileComponent(RectTransform rt, int id, bool inHand)
         {
-            if (uiManager.TileResourceManager != null)
+            var visual = rt.GetComponent<TileVisual>();
+            if (visual != null)
             {
-                var visual = rt.GetComponent<TileVisual>();
-                if (visual != null) visual.SetTile(id, uiManager.TileResourceManager.GetTileSprite(id));
+                visual.SetHoverHighlight(false);
+                visual.SetFuritenHighlight(false);
+                visual.SetExposed(false);
+                
+                if (uiManager.TileResourceManager != null)
+                {
+                    visual.SetTile(id, uiManager.TileResourceManager.GetTileSprite(id));
+                }
             }
 
             var interaction = rt.GetComponent<TileInteraction>();
@@ -381,7 +451,9 @@ namespace KillingMahjong.UI
                 RectTransform movedTile = uiManager.WallUI.GrabTile(tileId);
                 if (movedTile != null)
                 {
+                    Vector3 startPos = movedTile.position;
                     uiManager.HandUI.AddTileToHand(movedTile, tileId);
+                    StartCoroutine(AnimateTileMovementRoutine(movedTile, startPos, 0.25f));
                 }
             }
         }
@@ -405,8 +477,10 @@ namespace KillingMahjong.UI
 
             if (movedTile != null)
             {
+                Vector3 startPos = movedTile.position;
                 uiManager.HandUI.RemoveTileFromHand(movedTile, tileId);
                 uiManager.WallUI.ReturnTileToWall(movedTile, tileId);
+                StartCoroutine(AnimateTileMovementRoutine(movedTile, startPos, 0.25f));
             }
         }
 
@@ -653,6 +727,327 @@ namespace KillingMahjong.UI
                 }
             }
             return found;
+        }
+
+        public IEnumerator PlayHandSortAnimationRoutine()
+        {
+            if (uiManager.HandUI == null) yield break;
+
+            var handSlots = uiManager.HandUI.GetHandSlots();
+            if (handSlots == null || handSlots.Count == 0) yield break;
+
+            var board = BoardStateManager.Instance;
+            var currentHandIds = board.CurrentHandTiles;
+
+            Dictionary<RectTransform, Vector2> startPositions = new Dictionary<RectTransform, Vector2>();
+            foreach (var slot in handSlots)
+            {
+                startPositions[slot] = slot.anchoredPosition;
+            }
+
+            List<RectTransform> sortedSlots = new List<RectTransform>();
+            List<RectTransform> unsortedSlots = new List<RectTransform>(handSlots);
+            
+            foreach (int targetId in currentHandIds)
+            {
+                RectTransform foundSlot = null;
+                foreach(var slot in unsortedSlots)
+                {
+                    var visual = slot.GetComponent<TileVisual>();
+                    if (visual != null && visual.GetId() == targetId)
+                    {
+                        foundSlot = slot;
+                        break;
+                    }
+                }
+                if (foundSlot != null)
+                {
+                    sortedSlots.Add(foundSlot);
+                    unsortedSlots.Remove(foundSlot);
+                }
+                else if (unsortedSlots.Count > 0)
+                {
+                    sortedSlots.Add(unsortedSlots[0]);
+                    unsortedSlots.RemoveAt(0);
+                }
+            }
+
+            for (int i = 0; i < sortedSlots.Count; i++)
+            {
+                sortedSlots[i].SetSiblingIndex(i);
+            }
+
+            UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(uiManager.HandUI.GetComponent<RectTransform>());
+            yield return null;
+
+            Dictionary<RectTransform, Vector2> targetPositions = new Dictionary<RectTransform, Vector2>();
+            foreach (var slot in sortedSlots)
+            {
+                targetPositions[slot] = slot.anchoredPosition;
+            }
+
+            var layoutGroup = uiManager.HandUI.GetComponentInChildren<UnityEngine.UI.LayoutGroup>();
+            bool wasLayoutEnabled = false;
+            if (layoutGroup != null)
+            {
+                wasLayoutEnabled = layoutGroup.enabled;
+                layoutGroup.enabled = false;
+            }
+
+            foreach (var slot in sortedSlots)
+            {
+                slot.anchoredPosition = startPositions[slot];
+            }
+
+            float duration = 0.4f;
+            float elapsed = 0f;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+                t = 1f - Mathf.Pow(1f - t, 3f);
+
+                foreach (var slot in sortedSlots)
+                {
+                    slot.anchoredPosition = Vector2.Lerp(startPositions[slot], targetPositions[slot], t);
+                }
+                yield return null;
+            }
+
+            foreach (var slot in sortedSlots)
+            {
+                slot.anchoredPosition = targetPositions[slot];
+            }
+
+            if (layoutGroup != null)
+            {
+                layoutGroup.enabled = wasLayoutEnabled;
+            }
+
+            uiManager.HandUI.GetHandSlots().Clear();
+            uiManager.HandUI.GetHandSlots().AddRange(sortedSlots);
+
+            RebuildAllTilesFromState(null);
+        }
+
+        public IEnumerator PlayTransitionAnimationRoutine(System.Action onUpdateState)
+        {
+            if (uiManager.WallUI == null && uiManager.HandUI == null)
+            {
+                onUpdateState?.Invoke();
+                yield break;
+            }
+
+            var allSlots = new List<RectTransform>();
+            if (uiManager.WallUI != null) allSlots.AddRange(uiManager.WallUI.GetWallSlots());
+            if (uiManager.HandUI != null) allSlots.AddRange(uiManager.HandUI.GetHandSlots());
+
+            var oldData = new List<(int tileId, Vector3 worldPos, Quaternion rotation, Vector3 lossyScale, Vector2 rectSize, Vector2 pivot)>();
+            
+            // rootCanvasの取得を、UIスロット自身から行う（GameUIManagerがCanvasの外にある場合に対応）
+            Canvas rootCanvas = null;
+            if (allSlots.Count > 0 && allSlots[0] != null)
+            {
+                rootCanvas = allSlots[0].GetComponentInParent<Canvas>();
+                while (rootCanvas != null && rootCanvas.isRootCanvas == false)
+                {
+                    var parentCanvas = rootCanvas.transform.parent?.GetComponentInParent<Canvas>();
+                    if (parentCanvas == null) break;
+                    rootCanvas = parentCanvas;
+                }
+            }
+
+            foreach (var slot in allSlots)
+            {
+                if (slot == null || !slot.gameObject.activeInHierarchy) continue;
+                var interaction = slot.GetComponent<TileInteraction>();
+                if (interaction != null)
+                {
+                    oldData.Add((interaction.TileId, slot.position, slot.rotation, slot.lossyScale, slot.rect.size, slot.pivot));
+                }
+            }
+
+            // 2. 最前面用コンテナ生成 (rootCanvasの子)
+            GameObject animCanvasObj = new GameObject("TransitionAnimContainer", typeof(RectTransform));
+            if (rootCanvas != null)
+            {
+                animCanvasObj.transform.SetParent(rootCanvas.transform, false);
+            }
+            // SetAsLastSiblingで同階層内の最前面描画にする
+            animCanvasObj.transform.SetAsLastSibling();
+            animCanvasObj.layer = rootCanvas != null ? rootCanvas.gameObject.layer : 5;
+
+            var animCanvasRt = animCanvasObj.GetComponent<RectTransform>();
+            animCanvasRt.anchorMin = Vector2.zero;
+            animCanvasRt.anchorMax = Vector2.one;
+            animCanvasRt.offsetMin = Vector2.zero;
+            animCanvasRt.offsetMax = Vector2.zero;
+            animCanvasRt.localScale = Vector3.one;
+
+            // Nested Canvas特有の座標ズレやスケールバグを避けるため、CanvasのAddComponentは行わない。
+            UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(animCanvasRt);
+
+            var dummies = new List<(RectTransform rt, int tileId, Vector3 startPos, Quaternion startRot, Vector3 startScale)>();
+            foreach (var data in oldData)
+            {
+                GameObject dummyObj = GetTileFromPool(animCanvasObj.transform);
+                var rt = dummyObj.GetComponent<RectTransform>();
+                
+                // 親のアンカー設定に影響されないよう中心固定
+                rt.anchorMin = new Vector2(0.5f, 0.5f);
+                rt.anchorMax = new Vector2(0.5f, 0.5f);
+                rt.pivot = data.pivot;
+                rt.sizeDelta = data.rectSize;
+                
+                // ワールド空間でのスケールを一致させるため、親のlossyScaleで割った値をlocalScaleに代入
+                Vector3 pLossy = animCanvasObj.transform.lossyScale;
+                rt.localScale = new Vector3(
+                    pLossy.x != 0 ? data.lossyScale.x / pLossy.x : data.lossyScale.x,
+                    pLossy.y != 0 ? data.lossyScale.y / pLossy.y : data.lossyScale.y,
+                    pLossy.z != 0 ? data.lossyScale.z / pLossy.z : data.lossyScale.z
+                );
+                
+                rt.rotation = data.rotation;
+                rt.position = data.worldPos;
+
+                var visual = dummyObj.GetComponent<TileVisual>();
+                if (visual != null && uiManager.TileResourceManager != null)
+                {
+                    visual.SetTile(data.tileId, uiManager.TileResourceManager.GetTileSprite(data.tileId), uiManager.TileResourceManager);
+                }
+
+                var interaction = dummyObj.GetComponent<TileInteraction>();
+                if (interaction != null) interaction.enabled = false;
+
+                var cg = dummyObj.GetComponent<CanvasGroup>();
+                if (cg == null) cg = dummyObj.AddComponent<CanvasGroup>();
+                cg.blocksRaycasts = false;
+                cg.alpha = 1f;
+
+                var allImages = dummyObj.GetComponentsInChildren<UnityEngine.UI.Image>(true);
+                foreach (var img in allImages)
+                {
+                    img.color = new Color(img.color.r, img.color.g, img.color.b, 1f);
+                }
+
+                dummies.Add((rt, data.tileId, rt.position, rt.rotation, rt.localScale));
+            }
+
+            uiManager.SetIsTransitioning(true);
+
+            onUpdateState?.Invoke();
+            
+            uiManager.SetIsTransitioning(false);
+            RebuildAllTilesFromState(null);
+            uiManager.SetIsTransitioning(true);
+
+            var newSlots = new List<RectTransform>();
+            if (uiManager.WallUI != null) newSlots.AddRange(uiManager.WallUI.GetWallSlots());
+            if (uiManager.HandUI != null) newSlots.AddRange(uiManager.HandUI.GetHandSlots());
+
+            foreach (var slot in newSlots)
+            {
+                if (slot == null || !slot.gameObject.activeInHierarchy) continue;
+                var cg = slot.GetComponent<CanvasGroup>();
+                if (cg == null) cg = slot.gameObject.AddComponent<CanvasGroup>();
+                cg.alpha = 0f;
+            }
+
+            if (uiManager.HandUI != null) UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(uiManager.HandUI.GetComponent<RectTransform>());
+            if (uiManager.WallUI != null) UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(uiManager.WallUI.GetComponent<RectTransform>());
+            yield return null;
+
+            // 3. ゴール地点のワールドパラメータを取得
+            var availableNewData = new List<(int id, Vector3 targetPos, Quaternion targetRot, Vector3 targetScale)>();
+            Vector3 pLossyEnd = animCanvasObj.transform.lossyScale;
+            foreach (var slot in newSlots)
+            {
+                if (slot == null || !slot.gameObject.activeInHierarchy) continue;
+                var interaction = slot.GetComponent<TileInteraction>();
+                if (interaction != null)
+                {
+                    // ゴール地点も同様に親のスケールを考慮して逆算
+                    Vector3 localSc = new Vector3(
+                        pLossyEnd.x != 0 ? slot.lossyScale.x / pLossyEnd.x : slot.lossyScale.x,
+                        pLossyEnd.y != 0 ? slot.lossyScale.y / pLossyEnd.y : slot.lossyScale.y,
+                        pLossyEnd.z != 0 ? slot.lossyScale.z / pLossyEnd.z : slot.lossyScale.z
+                    );
+                    availableNewData.Add((interaction.TileId, slot.position, slot.rotation, localSc));
+                }
+            }
+
+            var targetPositions = new Dictionary<RectTransform, (Vector3 pos, Quaternion rot, Vector3 scale, bool isFading)>();
+
+            foreach (var dummy in dummies)
+            {
+                var rt = dummy.rt;
+                int id = dummy.tileId;
+
+                int matchIdx = availableNewData.FindIndex(d => d.id == id);
+                if (matchIdx != -1)
+                {
+                    var target = availableNewData[matchIdx];
+                    targetPositions[rt] = (target.targetPos, target.targetRot, target.targetScale, false);
+                    availableNewData.RemoveAt(matchIdx);
+                }
+                else
+                {
+                    targetPositions[rt] = (dummy.startPos, dummy.startRot, dummy.startScale, true);
+                }
+            }
+
+            float duration = 0.2f;
+            float elapsed = 0f;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+                t = 1f - Mathf.Pow(1f - t, 3f);
+
+                foreach (var dummy in dummies)
+                {
+                    var rt = dummy.rt;
+                    if (targetPositions.TryGetValue(rt, out var target))
+                    {
+                        if (target.isFading)
+                        {
+                            var cg = rt.GetComponent<CanvasGroup>();
+                            if (cg != null) cg.alpha = 1f - t;
+                        }
+                        else
+                        {
+                            rt.position = Vector3.Lerp(dummy.startPos, target.pos, t);
+                            rt.rotation = Quaternion.Lerp(dummy.startRot, target.rot, t);
+                            rt.localScale = Vector3.Lerp(dummy.startScale, target.scale, t);
+                        }
+                    }
+                }
+                yield return null;
+            }
+
+            foreach (var dummy in dummies)
+            {
+                if (dummy.rt != null)
+                {
+                    ReturnTileToPool(dummy.rt.gameObject);
+                }
+            }
+
+            if (animCanvasObj != null)
+            {
+                Destroy(animCanvasObj);
+            }
+
+            foreach (var slot in newSlots)
+            {
+                if (slot == null) continue;
+                var cg = slot.GetComponent<CanvasGroup>();
+                if (cg != null) cg.alpha = 1f;
+            }
+
+            uiManager.SetIsTransitioning(false);
         }
     }
 }
