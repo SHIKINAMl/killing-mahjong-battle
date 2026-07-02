@@ -252,7 +252,7 @@ namespace KillingMahjong.UI
                         }
                     }
 
-                    if (board.CurrentEnemyHandTiles != null && board.CurrentEnemyHandTiles.Count > 0)
+                    if (board.CurrentEnemyHandTiles != null && board.CurrentEnemyHandTiles.Count > 0 && uiManager.CurrentPhaseStatus >= RoundStatus.Discard)
                     {
                         uiManager.EnemyHandUI.gameObject.SetActive(true);
 
@@ -570,19 +570,21 @@ namespace KillingMahjong.UI
                 if (index >= 0 && index < uiManager.EnemyWallUI.GetEnemyWallSlots().Count)
                 {
                     Transform slot = uiManager.EnemyWallUI.GetEnemyWallSlots()[index];
-                    if (slot != null && slot.childCount > 0)
+                    RectTransform rt = slot as RectTransform;
+                    if (rt != null)
                     {
-                        RectTransform rt = slot.GetChild(0) as RectTransform;
-                        if (rt != null)
+                        int actualTileId = -1;
+                        if (index < Managers.BoardStateManager.Instance.OriginalEnemyWallTiles.Count)
                         {
-                            int actualTileId = Managers.BoardStateManager.Instance.OriginalEnemyWallTiles[index];
-                            InitializeTileComponent(rt, actualTileId, true);
+                            actualTileId = Managers.BoardStateManager.Instance.OriginalEnemyWallTiles[index];
+                            InitializeTileComponent(rt, actualTileId, false); // isHandTile = false (壁牌なので)
+                        }
 
-                            UnityEngine.UI.Image img = rt.GetComponent<UnityEngine.UI.Image>();
-                            if (img != null) glowingImages.Add(img);
+                        UnityEngine.UI.Image img = rt.GetComponent<UnityEngine.UI.Image>();
+                        if (img != null) glowingImages.Add(img);
 
-                            Vector3 origScale = rt.localScale;
-                            float duration = 0.25f;
+                        Vector3 origScale = rt.localScale;
+                        float duration = 0.25f;
                             for (float t = 0; t < duration; t += Time.deltaTime)
                             {
                                 float s = Mathf.Lerp(1f, 1.3f, Mathf.PingPong(t * (1f / (duration / 2f)), 1f));
@@ -593,7 +595,6 @@ namespace KillingMahjong.UI
                         }
                     }
                 }
-            }
 
             // カットイン演出(2.0s) + HP減少(1.0s) = 計3.0s 待つ
             float waitedSoFar = 0.5f + (0.25f * newlyExposed.Count);

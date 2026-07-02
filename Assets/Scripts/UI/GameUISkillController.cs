@@ -335,7 +335,8 @@ namespace KillingMahjong.UI
                 }
             }
 
-            // --- プレ解析：透視スキルの場合はカットインと同時に演出を開始する ---
+            // --- プレ解析：透視スキルの場合の newlyExposed の抽出 ---
+            // サーバーからのstatus上書き前に最新の追加分を計算する
             List<int> newlyExposed = new List<int>();
             if (data.skillType == "perspective" && isLocalPlayer)
             {
@@ -367,18 +368,7 @@ namespace KillingMahjong.UI
                         }
                     }
                 }
-                
-                if (newlyExposed.Count > 0 && uiManager.VisualController != null)
-                {
-                    // カットイン演出と並行して裏でめくる演出をスタート
-                    StartCoroutine(uiManager.VisualController.PlayPerspectiveAnimation(newlyExposed));
-                }
-                else
-                {
-                    uiManager.VisualController?.RebuildAllTilesFromState();
-                }
             }
-
             // 1. 以前の大迫力カットイン演出（血飛沫＋立ち絵＋巨大テキスト）を再生する
             if (uiManager.PhaseTransitionUI != null)
             {
@@ -411,14 +401,25 @@ namespace KillingMahjong.UI
             // 体力が減る様子をしっかり見せるためのタメ（待機）
             yield return new WaitForSeconds(1.0f);
 
-            // --- 以降、実際のアビリティ効果（透視以外）を実行 ---
+            // --- 以降、実際のアビリティ効果（透視以外も含む）を実行 ---
 
             if (data.skillType == "perspective")
             {
-                // perspectiveのアニメーションは既に上部で並行スタートしているので、ここでは何もしない。
-                // 敵プレイヤーの透視の場合は、UIの更新等のみ（対象インデックス自体は既知なのでサーバーからの同期に任せるかリビルド）
-                if (!isLocalPlayer)
+                if (isLocalPlayer)
                 {
+                    if (newlyExposed.Count > 0 && uiManager.VisualController != null)
+                    {
+                        // 演出を見せるため、アニメーション完了を待つ
+                        yield return StartCoroutine(uiManager.VisualController.PlayPerspectiveAnimation(newlyExposed));
+                    }
+                    else
+                    {
+                        uiManager.VisualController?.RebuildAllTilesFromState();
+                    }
+                }
+                else
+                {
+                    // 敵プレイヤーの透視の場合は、ローカルプレイヤーの手牌が透視される
                     List<int> targetIndexes = data.exposedHandIndexes;
                     if (data.exposedHandIndexesByPlayer != null && data.exposedHandIndexesByPlayer.ContainsKey(localPlayerId))
                     {

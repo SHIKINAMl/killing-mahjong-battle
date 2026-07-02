@@ -136,19 +136,26 @@ namespace KillingMahjong.Managers
                 }
                 
                 List<int> displayWall = new List<int>(wall);
+                List<int> actualHandIds = new List<int>();
                 if (hand != null)
                 {
-                    foreach (int hTile in hand)
+                    foreach (int hIndex in hand)
                     {
-                        displayWall.Remove(hTile);
+                        if (hIndex >= 0 && hIndex < wall.Count)
+                        {
+                            int actualId = wall[hIndex];
+                            actualHandIds.Add(actualId);
+                            displayWall.Remove(actualId);
+                        }
                     }
                 }
                 CurrentWallTiles = SortTileIds(displayWall);
-            }
-            if (hand != null) 
-            {
-                CurrentHandTiles = SortTileIds(new List<int>(hand));
-                HiddenTiles.Clear();
+                
+                if (hand != null)
+                {
+                    CurrentHandTiles = SortTileIds(actualHandIds);
+                    HiddenTiles.Clear();
+                }
             }
             if (wait != null) CurrentWaitTiles = new List<int>(wait);
         }
@@ -159,16 +166,23 @@ namespace KillingMahjong.Managers
             {
                 OriginalEnemyWallTiles = new List<int>(wall);
                 List<int> displayEnemyWall = new List<int>(wall);
+                List<int> actualHandIds = new List<int>();
                 if (hand != null)
                 {
-                    foreach (int h in hand)
+                    foreach (int hIndex in hand)
                     {
-                        displayEnemyWall.Remove(h);
+                        if (hIndex >= 0 && hIndex < wall.Count)
+                        {
+                            int actualId = wall[hIndex];
+                            actualHandIds.Add(actualId);
+                            // displayEnemyWall.Remove(actualId); // 山牌から物理的に消さず、UI側(GameUIVisualController)の表示制御に任せる
+                        }
                     }
                 }
                 CurrentEnemyWallTiles = displayEnemyWall;
+                
+                if (hand != null) CurrentEnemyHandTiles = new List<int>(actualHandIds);
             }
-            if (hand != null) CurrentEnemyHandTiles = new List<int>(hand);
             if (waits != null) CurrentEnemyWaitTiles = new List<int>(waits);
         }
 

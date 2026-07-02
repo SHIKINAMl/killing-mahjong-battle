@@ -82,6 +82,8 @@ namespace KillingMahjong.UI
             if (abilityWindow != null)
                 abilityWindow.anchoredPosition = hiddenPosition;
 
+            animationDuration = 0.2f; // 強制的に0.2秒にする
+
             // Pythonの設定に合わせたアビリティ一覧
             realAbilities = new System.Collections.Generic.List<AbilityData>
             {

@@ -271,10 +271,23 @@ namespace KillingMahjong.Network
                                 {
                                     var enemyWaitTiles = statusMsg.data.opponent_player_state.waits ?? statusMsg.data.opponent_player_state.wait;
                                     if (enemyWaitTiles != null && enemyWaitTiles.Length == 0) enemyWaitTiles = null;
+                                    
+                                    var enemyWall = new System.Collections.Generic.List<int>(statusMsg.data.opponent_player_state.wall);
+                                    var enemyHandIndices = statusMsg.data.opponent_player_state.hand;
+                                    var enemyHand = new System.Collections.Generic.List<int>();
+                                    
+                                    if (statusMsg.data.game_state == null || statusMsg.data.game_state.status != "hand_selection")
+                                    {
+                                        if (enemyHandIndices != null) {
+                                            foreach (var idx in enemyHandIndices) {
+                                                if (idx >= 0 && idx < enemyWall.Count) enemyHand.Add(enemyWall[idx]);
+                                            }
+                                        }
+                                    }
 
                                     Managers.BoardStateManager.Instance.SetEnemyState(
-                                        new System.Collections.Generic.List<int>(statusMsg.data.opponent_player_state.wall),
-                                        new System.Collections.Generic.List<int>(statusMsg.data.opponent_player_state.hand),
+                                        enemyWall,
+                                        enemyHand,
                                         enemyWaitTiles != null ? new System.Collections.Generic.List<int>(enemyWaitTiles) : null
                                     );
 
