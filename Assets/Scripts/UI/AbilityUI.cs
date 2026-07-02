@@ -10,7 +10,7 @@ namespace KillingMahjong.UI
         [SerializeField] private RectTransform abilityWindow; // The window on the left
         [SerializeField] private Vector2 hiddenPosition = new Vector2(-500, -500); // Off-screen or hidden
         [SerializeField] private Vector2 showPosition = new Vector2(100, 100); // On-screen
-        [SerializeField] private float animationDuration = 0.5f;
+        [SerializeField] private float animationDuration = 0.2f;
 
         [Header("Button Sprites")]
         [SerializeField] private Sprite normalSprite;

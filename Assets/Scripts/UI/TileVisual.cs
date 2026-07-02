@@ -42,18 +42,20 @@ namespace KillingMahjong.UI
         public void SetTile(int encodedId, Sprite sprite, TileResourceManager resourceManager = null)
         {
             _currentId = encodedId;
-            if (sprite == null) return;
 
-            if (spriteRenderer != null)        spriteRenderer.sprite = sprite;
-            else if (uiImage != null)          uiImage.sprite = sprite;
-            else if (meshRenderer != null)     meshRenderer.material.mainTexture = sprite.texture;
+            if (sprite != null)
+            {
+                if (spriteRenderer != null)    spriteRenderer.sprite = sprite;
+                else if (uiImage != null)      uiImage.sprite = sprite;
+                else if (meshRenderer != null) meshRenderer.material.mainTexture = sprite.texture;
+            }
 
-            // ドラ枠オーバーレイ
+            // ドラ枠オーバーレイはスプライトの有無に関わらず常に更新する（プール再利用時の状態リーク防止）
             if (doraOverlayImage != null)
             {
-                bool isDora = resourceManager != null
+                bool isDora = sprite != null && encodedId >= 0 && (resourceManager != null
                     ? resourceManager.IsDora(encodedId)
-                    : new TileData(encodedId).IsDora || new TileData(encodedId).IsRedDora;
+                    : new TileData(encodedId).IsDora || new TileData(encodedId).IsRedDora);
                 doraOverlayImage.gameObject.SetActive(isDora);
             }
         }

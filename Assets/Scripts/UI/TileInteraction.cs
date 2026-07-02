@@ -34,6 +34,9 @@ namespace KillingMahjong.UI
 
         public void OnPointerClick(PointerEventData eventData)
         {
+            if (_gameUIManager != null && _gameUIManager.IsTransitioning) return;
+            
+            // アニメーション中もホバーを受け付ける
             Debug.Log($"[TileInteraction] OnPointerClick called. TileId: {TileId}, IsInHand: {IsInHand}, Button: {eventData.button}, Phase: {(_gameUIManager != null ? _gameUIManager.CurrentPhaseStatus.ToString() : "null")}");
             
             if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard)
@@ -75,6 +78,9 @@ namespace KillingMahjong.UI
             }
 
             // Any Click -> Move (Left or Right) or Select for Mulligan
+            IsHovered = false;
+            if (_tileVisual != null) _tileVisual.SetHoverHighlight(false);
+
             if (IsInHand)
             {
                 if (_gameUIManager != null && _gameUIManager.IsMulliganSelection)
@@ -102,6 +108,7 @@ namespace KillingMahjong.UI
 
         public void OnBeginDrag(PointerEventData eventData)
         {
+            // アニメーション中もクリックを受け付ける
             if (eventData.button != PointerEventData.InputButton.Left) return;
             if (_gameUIManager != null && _gameUIManager.IsOpponentSkillProcessing) return;
             if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard) return;
@@ -114,6 +121,7 @@ namespace KillingMahjong.UI
 
         public void OnDrag(PointerEventData eventData)
         {
+            // アニメーション中もドラッグ開始を受け付ける
             if (eventData.button != PointerEventData.InputButton.Left) return;
             if (_gameUIManager != null && _gameUIManager.IsOpponentSkillProcessing) return;
             if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard) return;
@@ -138,11 +146,12 @@ namespace KillingMahjong.UI
 
         public void OnEndDrag(PointerEventData eventData)
         {
-            if (eventData.button != PointerEventData.InputButton.Left) return;
-            if (_gameUIManager != null && _gameUIManager.IsOpponentSkillProcessing) return;
-            if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard) return;
-
             _canvasGroup.blocksRaycasts = true;
+
+            // アニメーション中もドラッグ終了を受け付ける
+            if (eventData.button != PointerEventData.InputButton.Left) { ReturnToOriginal(); return; }
+            if (_gameUIManager != null && _gameUIManager.IsOpponentSkillProcessing) { ReturnToOriginal(); return; }
+            if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard) { ReturnToOriginal(); return; }
 
             // Hit Detection
             bool droppedInHand = _gameUIManager.IsPointerInHandArea(eventData.position);
@@ -179,6 +188,7 @@ namespace KillingMahjong.UI
 
         public void OnPointerEnter(PointerEventData eventData)
         {
+            if (_gameUIManager != null && _gameUIManager.IsTransitioning) return;
             IsHovered = true;
             
             bool canHighlight = false;
@@ -212,6 +222,9 @@ namespace KillingMahjong.UI
         {
             IsHovered = false;
             if (_tileVisual != null) _tileVisual.SetHoverHighlight(false);
+
+            if (_gameUIManager != null && _gameUIManager.IsTransitioning) return;
+            
             if (_gameUIManager != null) _gameUIManager.OnTileHoverExit(this);
         }
     }

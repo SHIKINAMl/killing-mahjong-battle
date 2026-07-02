@@ -34,6 +34,9 @@ namespace KillingMahjong.Editor
 
             Debug.Log($"WebGLビルドを開始します... 出力先: {buildFolder}");
 
+            // GitHub PagesでBrotli圧縮ファイルを正常に読み込めるようにFallbackを有効化する
+            PlayerSettings.WebGL.decompressionFallback = true;
+
             // ビルドオプションの設定
             BuildPlayerOptions buildPlayerOptions = new BuildPlayerOptions
             {

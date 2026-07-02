@@ -470,6 +470,20 @@ namespace KillingMahjong.UI
                         
                         if (newTileId != -1)
                         {
+                            var stateMgr = Managers.BoardStateManager.Instance;
+                            if (stateMgr.CurrentHandTiles.Contains(oldTileId))
+                            {
+                                stateMgr.CurrentHandTiles.Remove(oldTileId);
+                                stateMgr.CurrentHandTiles.Add(newTileId);
+                                stateMgr.SortTileIds(stateMgr.CurrentHandTiles);
+                            }
+                            else if (stateMgr.CurrentWallTiles.Contains(oldTileId))
+                            {
+                                stateMgr.CurrentWallTiles.Remove(oldTileId);
+                                stateMgr.CurrentWallTiles.Add(newTileId);
+                                stateMgr.SortTileIds(stateMgr.CurrentWallTiles);
+                            }
+
                             yield return PlayMulliganAnimationRoutine(oldTileId, newTileId);
                         }
                         else
@@ -501,10 +515,22 @@ namespace KillingMahjong.UI
 
             if (originalSlotRt != null)
             {
-                // Overlay Canvasの場合、positionはスクリーン座標
                 RectTransform animCanvasRt = animContainer.GetComponent<RectTransform>();
+                
+                Camera uiCamera = null;
+                Canvas parentCanvas = originalSlotRt.GetComponentInParent<Canvas>();
+                if (parentCanvas != null)
+                {
+                    parentCanvas = parentCanvas.rootCanvas;
+                    if (parentCanvas.renderMode == RenderMode.ScreenSpaceCamera || parentCanvas.renderMode == RenderMode.WorldSpace)
+                    {
+                        uiCamera = parentCanvas.worldCamera;
+                    }
+                }
+                
+                Vector2 screenPos = RectTransformUtility.WorldToScreenPoint(uiCamera, originalSlotRt.position);
                 Vector2 localPos;
-                RectTransformUtility.ScreenPointToLocalPointInRectangle(animCanvasRt, originalSlotRt.position, null, out localPos);
+                RectTransformUtility.ScreenPointToLocalPointInRectangle(animCanvasRt, screenPos, null, out localPos);
                 startPos = localPos;
 
                 initialSize = originalSlotRt.rect.size;
@@ -658,11 +684,41 @@ namespace KillingMahjong.UI
 
             UnityEngine.Object.Destroy(animContainer);
 
-            // アニメーション終了後にUIを差分更新し、透明化を解除する
+            // アニメーション終了後に元のスロットの画像を復活し、先行して絵柄を更新する
             if (originalSlotRt != null)
             {
                 var cg = originalSlotRt.GetComponent<CanvasGroup>();
                 if (cg != null) cg.alpha = 1;
+
+                var interaction = originalSlotRt.GetComponent<TileInteraction>();
+                var visual = originalSlotRt.GetComponent<TileVisual>();
+                if (visual != null && uiManager.TileResourceManager != null)
+                {
+                    visual.SetTile(inTileId, uiManager.TileResourceManager.GetTileSprite(inTileId), uiManager.TileResourceManager);
+                }
+                if (interaction != null)
+                {
+                    interaction.TileId = inTileId;
+                }
+            }
+
+            // スライドアニメーションを実行（VisualControllerで定義）
+            if (uiManager.VisualController != null)
+            {
+                yield return uiManager.VisualController.PlayHandSortAnimationRoutine();
+            }
+
+            // 特別ルールの牌（南、北、白、發、中）が来た場合のセリフ演出
+            int baseId = inTileId & 0x1F;
+            if (baseId == 28 || baseId >= 30)
+            {
+                var reactionController = Managers.ReactionController.Instance;
+                if (reactionController != null)
+                {
+                    var tileData = new TileData(inTileId);
+                    string tileName = tileData.GetTileName();
+                    reactionController.EnqueueCustomDialogue($"あっ！「{tileName}」が来たわね…！", "Idle", "Surprised");
+                }
             }
             
             uiManager.SetIsTransitioning(false); // ★ここで解除してRebuildを許可する

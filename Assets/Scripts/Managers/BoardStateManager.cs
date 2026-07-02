@@ -454,7 +454,7 @@ namespace KillingMahjong.Managers
             }
         }
 
-        private List<int> SortTileIds(List<int> ids)
+        public List<int> SortTileIds(List<int> ids)
         {
             ids.Sort((a, b) =>
             {

@@ -14,11 +14,11 @@ namespace KillingMahjong.UI
             // まずは共通のUI追加処理を呼び出す
             base.AddTileToHand(tileTransform, visualId);
             
-            // プレイヤーと同じ操作用のInteractionが残らないよう即時削除
+            // プレイヤーと同じ操作用のInteractionが残らないよう無効化
             var interactions = tileTransform.GetComponentsInChildren<TileInteraction>(true);
             foreach(var interaction in interactions)
             {
-                DestroyImmediate(interaction);
+                interaction.enabled = false;
             }
 
             // 万が一ホバー状態が残っていた場合に備えて強制リセット
@@ -32,9 +32,9 @@ namespace KillingMahjong.UI
                 img.raycastTarget = false;
             }
 
-            // クリック公開用のButtonは不要（ユーザーがクリックできてしまうため）なので削除
+            // クリック公開用のButtonは不要（ユーザーがクリックできてしまうため）なので無効化
             var btn = tileTransform.gameObject.GetComponent<UnityEngine.UI.Button>();
-            if (btn != null) Destroy(btn);
+            if (btn != null) btn.interactable = false;
 
             // 本当のIDをリストに追加して記憶する
             realTileIds.Add(realId);
@@ -55,13 +55,7 @@ namespace KillingMahjong.UI
 
         public void ClearHand()
         {
-            foreach (var t in GetHandSlots())
-            {
-                if (t != null) {
-                    t.SetParent(null);
-                    Destroy(t.gameObject);
-                }
-            }
+            // 注: 実際のGameObjectのプール返却は GameUIManager 経由で行うため、ここではリストのクリアのみ行う
             GetHandSlots().Clear();
             realTileIds.Clear();
         }

@@ -173,6 +173,13 @@ namespace KillingMahjong.Managers
             }
         }
 
+        public void EnqueueCustomDialogue(string text, string poseName = "", string expressionName = "", bool clearPrevious = true)
+        {
+            if (clearPrevious) ClearReactions();
+            reactionQueue.Enqueue(() => StartCoroutine(ProcessCSVDialogue(text, poseName, expressionName, null)));
+            if (!isProcessingReactions) ProcessNextReaction();
+        }
+
         public void EnqueueCSVDialogue(string condition, bool clearPrevious = true)
         {
             EnqueueFormattedCSVDialogue(condition, "", clearPrevious);

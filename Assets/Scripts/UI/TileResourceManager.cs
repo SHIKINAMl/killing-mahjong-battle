@@ -60,13 +60,23 @@ namespace KillingMahjong.UI
                 if (baseId == 22) return redDoraSprites[2]; // 赤五索
             }
 
-            // 通常スプライト（ドラフラグは無視して牌種別で引く）
-            if (baseId < 0 || baseId >= tileSprites.Count)
+            // サーバーのIDとUnity側の画像配列（29種）のマッピング補正
+            int spriteIndex = baseId;
+            if (baseId >= 27)
             {
-                Debug.LogWarning($"[TileResourceManager] Tile base ID {baseId} (encoded: {encodedId}) is out of range.");
-                return null;
+                if (baseId == 27) spriteIndex = 27; // 東
+                else if (baseId == 28) spriteIndex = 27; // 南 -> 東でフォールバック
+                else if (baseId == 29) spriteIndex = 28; // 西 -> Unity側の西画像（index 28）
+                else if (baseId >= 30) spriteIndex = 28; // 北・白・發・中 -> 西でフォールバック
             }
-            return tileSprites[baseId];
+
+            // 通常スプライト
+            if (spriteIndex < 0 || spriteIndex >= tileSprites.Count)
+            {
+                Debug.LogWarning($"[TileResourceManager] Tile base ID {baseId} (encoded: {encodedId}, index: {spriteIndex}) is out of range.");
+                return backTileSprite; // エラーで透明になるのを防ぐため裏面を返す
+            }
+            return tileSprites[spriteIndex];
         }
 
         /// <summary>

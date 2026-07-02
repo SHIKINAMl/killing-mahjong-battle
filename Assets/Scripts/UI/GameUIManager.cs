@@ -239,7 +239,7 @@ namespace KillingMahjong.UI
             if (turnIndicatorUI != null)
             {
                 // 打牌フェイズで、かつ演出中（先行・後攻演出など）ではない時だけ表示する
-                bool shouldShow = (currentPhaseStatus == RoundStatus.Discard) && !isTransitioning;
+                bool shouldShow = (currentPhaseStatus == RoundStatus.Discard) && !IsTransitioning;
                 turnIndicatorUI.SetVisible(shouldShow);
             }
         }
@@ -271,8 +271,19 @@ namespace KillingMahjong.UI
             Debug.Log($"[GameUIManager] Executing BoardStateManager.MoveTileToHand({tileId})");
             BoardStateManager.Instance.TargetHandIndexes = null;
 
-            BoardStateManager.Instance.MoveTileToHand(tileId);
-            ClearSelection();
+            if (VisualController != null)
+            {
+                StartCoroutine(VisualController.PlayTransitionAnimationRoutine(() => 
+                {
+                    BoardStateManager.Instance.MoveTileToHand(tileId);
+                    ClearSelection();
+                }));
+            }
+            else
+            {
+                BoardStateManager.Instance.MoveTileToHand(tileId);
+                ClearSelection();
+            }
         }
 
         public void MoveTileToWall(int tileId)
@@ -281,8 +292,19 @@ namespace KillingMahjong.UI
             if (handUI != null && handUI.IsSubmitted) return;
             BoardStateManager.Instance.TargetHandIndexes = null;
             
-            BoardStateManager.Instance.MoveTileToWall(tileId);
-            ClearSelection();
+            if (VisualController != null)
+            {
+                StartCoroutine(VisualController.PlayTransitionAnimationRoutine(() => 
+                {
+                    BoardStateManager.Instance.MoveTileToWall(tileId);
+                    ClearSelection();
+                }));
+            }
+            else
+            {
+                BoardStateManager.Instance.MoveTileToWall(tileId);
+                ClearSelection();
+            }
         }
 
         public void SelectManganHand()
@@ -493,23 +515,36 @@ namespace KillingMahjong.UI
                 BoardStateManager.Instance.SetLocalTurn(false);
                 BoardStateManager.Instance.RemoveTileFromWall(discardedTileId);
 
-                if (wallUI != null)
+                if (wallUI != null && riverUI != null)
                 {
                     RectTransform tileRt = wallUI.GrabTile(discardedTileId);
-                    if (tileRt != null) VisualController.ReturnTileToPool(tileRt.gameObject);
+                    if (tileRt != null)
+                    {
+                        riverUI.AddExistingTile(tileRt, discardedTileId);
+                    }
+                    else
+                    {
+                        riverUI.AddTile(discardedTileId); // fallback
+                    }
                     
                     wallUI.UpdateWallHighlights(BoardStateManager.Instance.CurrentWaitTiles, currentPhaseStatus == RoundStatus.Discard);
                 }
-
-                if (riverUI != null) riverUI.AddTile(discardedTileId);
             }
             else
             {
                 BoardStateManager.Instance.RemoveTileFromEnemyWall();
 
-                if (enemyRiverUI != null)
+                if (enemyWallUI != null && enemyRiverUI != null)
                 {
-                    enemyRiverUI.AddTile(discardedTileId);
+                    RectTransform tileRt = enemyWallUI.GrabEnemyTile();
+                    if (tileRt != null)
+                    {
+                        enemyRiverUI.AddExistingTile(tileRt, discardedTileId);
+                    }
+                    else
+                    {
+                        enemyRiverUI.AddTile(discardedTileId); // fallback
+                    }
                 }
             }
 

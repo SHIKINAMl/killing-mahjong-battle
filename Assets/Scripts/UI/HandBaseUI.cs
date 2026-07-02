@@ -83,6 +83,33 @@ namespace KillingMahjong.UI
                     Canvas canvas = GetComponentInParent<Canvas>();
                     interaction.Initialize(tileId, false, gameUIManager, canvas);
                 }
+                
+                // 牌が抜けた後に、残りの手牌のレイアウト（目標座標）を更新して詰めるアニメーションを発動
+                if (gameUIManager != null)
+                {
+                    UpdateLayout(gameUIManager.CurrentPhaseStatus);
+                }
+                else
+                {
+                    UpdateLayout(RoundStatus.None);
+                }
+            }
+        }
+
+
+        private Dictionary<RectTransform, Vector2> targetPositions = new Dictionary<RectTransform, Vector2>();
+        [SerializeField] protected float animationSpeed = 15f; // 追従スピード
+
+        protected virtual void Update()
+        {
+            // 毎フレーム、目標座標に向けて滑らかに追従移動する
+            foreach (var rt in handSlots)
+            {
+                if (rt == null) continue;
+                if (targetPositions.TryGetValue(rt, out Vector2 targetPos))
+                {
+                    rt.anchoredPosition = Vector2.Lerp(rt.anchoredPosition, targetPos, Time.deltaTime * animationSpeed);
+                }
             }
         }
 
@@ -111,43 +138,22 @@ namespace KillingMahjong.UI
                 handSlotContainer.gameObject.SetActive(activeContainer == handSlotContainer);
             }
 
-            if (!isBoardActivePhase)
-            {
-                if (layoutGroup != null) layoutGroup.enabled = true;
-                
-                foreach (var st in handSlots)
-                {
-                    if (st.parent != activeContainer) st.SetParent(activeContainer, false);
-                }
-                
-                handSlots.Sort((a, b) => 
-                {
-                    var interactionA = a.GetComponent<TileInteraction>();
-                    var interactionB = b.GetComponent<TileInteraction>();
-                    if (interactionA == null || interactionB == null) return 0;
-                    
-                    int baseA = interactionA.TileId & 0x1F;
-                    int baseB = interactionB.TileId & 0x1F;
-                    if (baseA != baseB) return baseA.CompareTo(baseB);
-                    
-                    return interactionA.TileId.CompareTo(interactionB.TileId);
-                });
-
-                for (int i = 0; i < handSlots.Count; i++)
-                {
-                    handSlots[i].SetSiblingIndex(i);
-                }
-                return;
-            }
-
-            // Discard Phase Layout
+            // LayoutGroupは完全に使用しない（スクリプトでの座標管理に移行）
             if (layoutGroup != null) layoutGroup.enabled = false;
-            
+
             foreach (var st in handSlots)
             {
                 if (st.parent != activeContainer) st.SetParent(activeContainer, false);
+                
+                // 初めて登録される牌なら、初期位置は現在の位置にするか、山牌側にする等の工夫ができるが
+                // ここではとりあえず現在位置を維持しつつ、後でUpdateで引っ張る
+                if (!targetPositions.ContainsKey(st))
+                {
+                    targetPositions[st] = st.anchoredPosition;
+                }
             }
 
+            // ソート処理（同じルール）
             handSlots.Sort((a, b) => 
             {
                 var intA = a.GetComponent<TileInteraction>();
@@ -162,47 +168,58 @@ namespace KillingMahjong.UI
             });
 
             if (handSlots.Count == 0) return;
-            
-            // 位置を先に計算してから、行ごとにSiblingIndexを設定する
-            // 2段目（row 1）が1段目（row 0）より前面に来るように、
-            // 1段目を先に配置し、2段目を後に配置する
-            List<RectTransform> row0 = new List<RectTransform>();
-            List<RectTransform> row1 = new List<RectTransform>();
 
-            for (int i = 0; i < handSlots.Count; i++)
+            if (!isBoardActivePhase)
             {
-                int rowIndex = i / 7; 
-                int colIndex = i % 7; 
-
-                float w = tileSpacingX;
-                float h = tileSpacingY;
-
-                float targetY = -rowIndex * h;
-                float targetX = colIndex * w;
-
-                RectTransform rt = handSlots[i].GetComponent<RectTransform>();
-                if (rt != null)
+                // 通常フェイズ（横一列）の座標計算
+                float totalWidth = (handSlots.Count - 1) * tileSpacingX;
+                // コンテナ内で中央寄せ等したい場合は調整するが、ここでは左寄せ(x=0から)とする
+                for (int i = 0; i < handSlots.Count; i++)
                 {
+                    RectTransform rt = handSlots[i];
+                    rt.anchorMin = new Vector2(0, 0.5f);
+                    rt.anchorMax = new Vector2(0, 0.5f);
+                    rt.pivot = new Vector2(0, 0.5f);
+                    
+                    Vector2 targetPos = new Vector2(i * tileSpacingX, 0);
+                    targetPositions[rt] = targetPos;
+                    
+                    rt.SetSiblingIndex(i);
+                }
+            }
+            else
+            {
+                // Discard Phase Layout（2段）
+                List<RectTransform> row0 = new List<RectTransform>();
+                List<RectTransform> row1 = new List<RectTransform>();
+
+                for (int i = 0; i < handSlots.Count; i++)
+                {
+                    int rowIndex = i / 7; 
+                    int colIndex = i % 7; 
+
+                    float w = tileSpacingX;
+                    float h = tileSpacingY;
+
+                    float targetY = -rowIndex * h;
+                    float targetX = colIndex * w;
+
+                    RectTransform rt = handSlots[i];
                     rt.anchorMin = new Vector2(0, 1);
                     rt.anchorMax = new Vector2(0, 1);
                     rt.pivot = new Vector2(0, 1);
-                    rt.anchoredPosition = new Vector2(targetX, targetY);
+                    
+                    Vector2 targetPos = new Vector2(targetX, targetY);
+                    targetPositions[rt] = targetPos;
+
+                    if (rowIndex == 0) row0.Add(rt);
+                    else row1.Add(rt);
                 }
 
-                if (rowIndex == 0) row0.Add(handSlots[i]);
-                else row1.Add(handSlots[i]);
-            }
-
-            // 1段目を先にSiblingIndex設定（奥側）
-            int sibIdx = 0;
-            for (int i = 0; i < row0.Count; i++)
-            {
-                row0[i].SetSiblingIndex(sibIdx++);
-            }
-            // 2段目を後にSiblingIndex設定（手前側＝前面）
-            for (int i = 0; i < row1.Count; i++)
-            {
-                row1[i].SetSiblingIndex(sibIdx++);
+                // SiblingIndex設定
+                int sibIdx = 0;
+                for (int i = 0; i < row0.Count; i++) row0[i].SetSiblingIndex(sibIdx++);
+                for (int i = 0; i < row1.Count; i++) row1[i].SetSiblingIndex(sibIdx++);
             }
         }
     }

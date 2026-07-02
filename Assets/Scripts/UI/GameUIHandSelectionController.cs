@@ -67,6 +67,7 @@ namespace KillingMahjong.UI
 
             if (uiManager.HandUI != null) uiManager.HandUI.SetSubmittedState(false);
             if (uiManager.WaitUI != null) uiManager.WaitUI.gameObject.SetActive(false);
+            KillingMahjong.Managers.BoardStateManager.Instance.ClearWaitTiles();
             if (uiManager.PhaseController != null) uiManager.PhaseController.SetMatchUIVisibility(true);
 
             // 裏技: Python側のキャンセルアクションがないため、以前は1枚の牌を送って解除していたが

@@ -17,7 +17,9 @@ namespace KillingMahjong.UI
         
         [Header("Text References")]
         [SerializeField] private TextMeshProUGUI centerText; // Used for "対局開始", "1 Round", "先行/後攻"
-        
+        [SerializeField] private TextMeshProUGUI loadingText; // "対戦相手を待機中..." など用
+        [SerializeField] private TextMeshProUGUI promptText; // "手牌を選んでください" などのプロンプト用
+
         [Header("Bet & HP Deduction Setup")]
         [SerializeField] private GameObject hpBetContainer;
         [SerializeField] private TextMeshProUGUI enemyBetObj;
@@ -31,13 +33,8 @@ namespace KillingMahjong.UI
         [SerializeField] private float checkerFadeDuration = 1.0f;
         [SerializeField] private float hpDeductionDuration = 1.5f;
 
-        [Header("Loading UI Settings")]
-        [SerializeField] private Vector2 loadingTextPosition = new Vector2(-50, 50);
-        [SerializeField] private Color loadingTextColor = Color.white;
-
         private bool isWaitingForDeal = false;
         private float dealWaitTimer = 0f;
-        private TextMeshProUGUI loadingText;
 
         private void Start()
         {
@@ -59,22 +56,8 @@ namespace KillingMahjong.UI
 
             ResetVisuals();
 
-            if (centerText != null && loadingText == null)
+            if (loadingText != null)
             {
-                loadingText = Instantiate(centerText, centerText.transform.parent);
-                loadingText.gameObject.name = "LoadingText";
-                RectTransform rt = loadingText.GetComponent<RectTransform>();
-                
-                // 右下に配置 (Inspectorから位置調整可能)
-                rt.anchorMin = new Vector2(1, 0);
-                rt.anchorMax = new Vector2(1, 0);
-                rt.pivot = new Vector2(1, 0);
-                rt.anchoredPosition = loadingTextPosition; // 変更点
-                
-                loadingText.enableAutoSizing = false;
-                loadingText.fontSize = 60;
-                loadingText.color = loadingTextColor; // 変更点
-                loadingText.alignment = TextAlignmentOptions.BottomRight;
                 loadingText.gameObject.SetActive(false);
             }
 
@@ -785,43 +768,17 @@ namespace KillingMahjong.UI
 
         private IEnumerator PlayPromptTextRoutine(string text, float duration)
         {
-            GameObject container = new GameObject("PromptTextContainer");
-            container.transform.SetParent(transform, false);
-
-            Canvas canvas = container.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = 32700;
-            
-            var scaler = container.AddComponent<UnityEngine.UI.CanvasScaler>();
-            scaler.uiScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1280, 720);
-            
-            container.AddComponent<UnityEngine.UI.GraphicRaycaster>();
-
-            GameObject textObj = new GameObject("PromptText");
-            textObj.transform.SetParent(container.transform, false);
-            TextMeshProUGUI tmp = textObj.AddComponent<TextMeshProUGUI>();
-            tmp.text = text;
-            tmp.fontSize = 70;
-            tmp.enableWordWrapping = false;
-            tmp.overflowMode = TMPro.TextOverflowModes.Overflow;
-            tmp.color = new Color(1, 1, 1, 0); // 初期は透明
-            tmp.alignment = TextAlignmentOptions.Center;
-            tmp.fontStyle = FontStyles.Bold;
-            
-            if (centerText != null && centerText.font != null) {
-                tmp.font = centerText.font;
-            } else if (TMPro.TMP_Settings.defaultFontAsset != null) {
-                tmp.font = TMPro.TMP_Settings.defaultFontAsset;
+            if (promptText == null)
+            {
+                Debug.LogWarning("[PhaseTransitionUI] promptText is not assigned in the inspector!");
+                yield break;
             }
-            
-            UnityEngine.UI.Shadow shadow = textObj.AddComponent<UnityEngine.UI.Shadow>();
-            shadow.effectColor = new Color(0, 0, 0, 0.8f);
-            shadow.effectDistance = new Vector2(4, -4);
 
-            RectTransform tmpRt = textObj.GetComponent<RectTransform>();
-            tmpRt.anchoredPosition = Vector2.zero;
-            tmpRt.sizeDelta = new Vector2(1600, 400);
+            promptText.text = text;
+            promptText.gameObject.SetActive(true);
+            promptText.color = new Color(1, 1, 1, 0); // 初期は透明
+
+            RectTransform tmpRt = promptText.GetComponent<RectTransform>();
 
             // フェードイン＆少しスケールダウンしてドスッという感じにする
             float t = 0;
@@ -829,11 +786,11 @@ namespace KillingMahjong.UI
             {
                 t += Time.deltaTime;
                 float progress = t / 0.3f;
-                tmp.color = new Color(1, 1, 1, progress);
+                promptText.color = new Color(1, 1, 1, progress);
                 tmpRt.localScale = Vector3.Lerp(new Vector3(1.5f, 1.5f, 1f), Vector3.one, progress);
                 yield return null;
             }
-            tmp.color = Color.white;
+            promptText.color = Color.white;
             tmpRt.localScale = Vector3.one;
 
             // 待機
@@ -845,11 +802,11 @@ namespace KillingMahjong.UI
             {
                 t += Time.deltaTime;
                 float progress = t / 0.3f;
-                tmp.color = new Color(1, 1, 1, 1f - progress);
+                promptText.color = new Color(1, 1, 1, 1f - progress);
                 yield return null;
             }
 
-            Destroy(container);
+            promptText.gameObject.SetActive(false);
         }
 
         public void PlaySkillCutinAnimation(string skillName, bool isLocalPlayer, CharacterData characterData = null, float duration = 2.0f, Action onComplete = null)
@@ -875,11 +832,11 @@ namespace KillingMahjong.UI
             containerCanvas.overrideSorting = true;
             containerCanvas.sortingOrder = 32700;
 
-            // 2. 即時ディマー（真っ暗に近い）
+            // 2. 即時ディマー（背景が少し見えるように半透明）
             GameObject dimmer = new GameObject("Dimmer");
             dimmer.transform.SetParent(containerRt, false);
             Image dimmerImg = dimmer.AddComponent<Image>();
-            dimmerImg.color = new Color(0, 0, 0, 0.85f);
+            dimmerImg.color = new Color(0, 0, 0, 0.5f);
             RectTransform dimmerRt = dimmer.GetComponent<RectTransform>();
             dimmerRt.anchorMin = Vector2.zero;
             dimmerRt.anchorMax = Vector2.one;
@@ -890,7 +847,7 @@ namespace KillingMahjong.UI
             List<Vector2> bgTargetPos = new List<Vector2>();
             List<Vector2> bgStartPos = new List<Vector2>();
 
-            // 巨大な斜め背景
+            // 斜めの帯（カットイン）背景
             GameObject bgStripeObj = new GameObject("BgStripe");
             bgStripeObj.transform.SetParent(containerRt, false);
             Image stripeImg = bgStripeObj.AddComponent<Image>();
@@ -905,13 +862,13 @@ namespace KillingMahjong.UI
             }
 
             RectTransform stripeRt = bgStripeObj.GetComponent<RectTransform>();
-            // 画面を覆い尽くすほどの長方形
-            stripeRt.sizeDelta = new Vector2(Screen.width * 3f, Screen.height * 0.8f);
-            stripeRt.localRotation = Quaternion.Euler(0, 0, 25f); // 左下から右上への傾き
+            // 画面を覆い尽くす長方形から、帯状（バナー）に変更
+            stripeRt.sizeDelta = new Vector2(6000f, 600f);
+            stripeRt.localRotation = Quaternion.Euler(0, 0, 15f); // 傾きを少し緩やかに
             
             // 下から斜めに突き抜けるように配置
             Vector2 stripeTarget = new Vector2(0, 0);
-            Vector2 stripeStart = new Vector2(0, -Screen.height * 1.5f);
+            Vector2 stripeStart = new Vector2(0, -3000f);
             stripeRt.anchoredPosition = stripeStart;
 
             bgElements.Add(stripeRt);
@@ -936,7 +893,7 @@ namespace KillingMahjong.UI
                     spRt.localRotation = Quaternion.Euler(0, 0, UnityEngine.Random.Range(0, 360f));
                     
                     Vector2 spTarget = new Vector2(UnityEngine.Random.Range(-300f, 300f), UnityEngine.Random.Range(-200f, 200f));
-                    Vector2 spStart = spTarget + new Vector2(0, -Screen.height);
+                    Vector2 spStart = spTarget + new Vector2(0, -2500f);
                     
                     bgElements.Add(spRt);
                     bgStartPos.Add(spStart);

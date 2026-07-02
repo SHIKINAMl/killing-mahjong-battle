@@ -170,9 +170,17 @@ namespace KillingMahjong.UI
 
         public void Clear()
         {
+            var uiManager = FindFirstObjectByType<GameUIManager>();
             foreach (var t in discardedTiles)
             {
-                if (t != null) Destroy(t.gameObject);
+                if (t != null && uiManager != null && uiManager.VisualController != null)
+                {
+                    uiManager.VisualController.poolManager.ReturnTileToPool(t.gameObject);
+                }
+                else if (t != null)
+                {
+                    Destroy(t.gameObject);
+                }
             }
             discardedTiles.Clear();
         }

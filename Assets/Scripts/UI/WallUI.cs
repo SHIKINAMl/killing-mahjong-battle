@@ -24,6 +24,21 @@ namespace KillingMahjong.UI
             this.gameUIManager = manager;
         }
 
+        private Dictionary<RectTransform, Vector2> targetPositions = new Dictionary<RectTransform, Vector2>();
+        [SerializeField] private float animationSpeed = 15f;
+
+        private void Update()
+        {
+            foreach (var rt in wallSlots)
+            {
+                if (rt == null) continue;
+                if (targetPositions.TryGetValue(rt, out Vector2 targetPos))
+                {
+                    rt.anchoredPosition = Vector2.Lerp(rt.anchoredPosition, targetPos, Time.deltaTime * animationSpeed);
+                }
+            }
+        }
+
         private List<RectTransform> wallSlots = new List<RectTransform>();
         public List<RectTransform> GetWallSlots() => wallSlots;
 
@@ -99,6 +114,7 @@ namespace KillingMahjong.UI
 
             // 3. 固定順で並べる: 萬子→ピンズ→索子→字牌
             var categoryLists = new List<List<TileData>> { manzu, pinzu, souzu, honors };
+            categoryLists.Sort((a, b) => GetCategoryPriority(a).CompareTo(GetCategoryPriority(b)));
 
             // 4. Layout
             float currentY = startPosition.y;
@@ -123,125 +139,92 @@ namespace KillingMahjong.UI
                 int j = 0;
                 while (j < list.Count)
                 {
-                    // Detect Structure
-                    bool isKoutsu = false;
-                    bool isShuntsu = false;
+                    int targetId = list[j].Id;
                     
-                    if (j + 2 < list.Count)
-                    {
-                        if (list[j].Id == list[j+1].Id && list[j].Id == list[j+2].Id)
-                            isKoutsu = true;
-                    }
-
-                    if (!isKoutsu && j + 2 < list.Count) 
-                    {
-                        if (list[j].Category != TileCategory.Honor &&
-                            list[j].Category == list[j+1].Category && 
-                            list[j].Category == list[j+2].Category)
-                        {
-                            if (list[j].Number + 1 == list[j+1].Number && 
-                                list[j].Number + 2 == list[j+2].Number)
-                                isShuntsu = true;
-                        }
-                    }
-
-                    int groupSize = (isKoutsu || isShuntsu) ? 3 : 1;
-                    
-                    // 描画する前に、このグループを描画したら maxWidthX を超えるかチェック
-                    float expectedWidth = (groupSize - 1) * tileIntervalX;
-                    if (currentX + expectedWidth > startPosition.x + maxWidthX)
+                    // 描画する前にmaxWidthX を超えるかチェック
+                    if (currentX > startPosition.x + maxWidthX)
                     {
                         currentX = startPosition.x;
                         currentY -= rowIntervalY; // 元の下の段に切り返す設定に戻す
                     }
 
-                    // Render current group
-                    for (int k = 0; k < groupSize; k++)
+                    RectTransform slot = null;
+
+                    // 該当のTileIdを持つオブジェクトを探す
+                    for (int t = 0; t < remainingGeneratedTiles.Count; t++)
                     {
-                        int targetId = list[j + k].Id;
-                        RectTransform slot = null;
-
-                        // 該当のTileIdを持つオブジェクトを探す
-                        for (int t = 0; t < remainingGeneratedTiles.Count; t++)
+                        var tInteraction = remainingGeneratedTiles[t].GetComponent<TileInteraction>();
+                        if (tInteraction != null && tInteraction.TileId == targetId)
                         {
-                            var tInteraction = remainingGeneratedTiles[t].GetComponent<TileInteraction>();
-                            if (tInteraction != null && tInteraction.TileId == targetId)
-                            {
-                                slot = remainingGeneratedTiles[t];
-                                remainingGeneratedTiles.RemoveAt(t);
-                                break;
-                            }
+                            slot = remainingGeneratedTiles[t];
+                            remainingGeneratedTiles.RemoveAt(t);
+                            break;
                         }
-
-                        if (slot == null)
-                        {
-                            Debug.LogWarning("WallUI: Could not find generated tile for TileId: " + targetId);
-                            if (remainingGeneratedTiles.Count > 0)
-                            {
-                                slot = remainingGeneratedTiles[0];
-                                remainingGeneratedTiles.RemoveAt(0);
-                            }
-                            else
-                            {
-                                break;
-                            }
-                        }
-                        slot.SetParent(wallContainer, false);
-                        
-                        // Reset scaling and anchors properly to avoid overlap/squishing
-                        slot.localScale = Vector3.one;
-                        slot.anchorMin = new Vector2(0.5f, 0.5f);
-                        slot.anchorMax = new Vector2(0.5f, 0.5f);
-                        slot.pivot = new Vector2(0.5f, 0.5f);
-                        
-                        float targetX = currentX;
-                        float targetY = currentY;
-
-                        Vector2 anchoredPos = new Vector2(targetX, targetY);
-                        slot.anchoredPosition = anchoredPos;
-                        slot.localRotation = Quaternion.identity;
-
-                        var interaction = slot.GetComponent<TileInteraction>();
-                        if (interaction != null)
-                        {
-                            // anchoredPosition（アンカー基準座標）で保存する
-                            interaction.OriginalWallPosition = new Vector3(anchoredPos.x, anchoredPos.y, 0);
-                        }
-                        
-                        var visual = slot.GetComponent<TileVisual>();
-                        if (visual != null)
-                        {
-                            // 待ち牌リストに含まれていても赤枠を出さないように修正（ホバー時のみ赤枠にする）
-                            visual.SetFuritenHighlight(false);
-                        }
-
-                        wallSlots.Add(slot);
-                        slot.gameObject.SetActive(true);
-
-                        if (k < groupSize - 1) currentX += tileIntervalX;
                     }
 
-                    // グループ間やカテゴリ間のギャップ処理
-                    if (j + groupSize < list.Count)
+                    if (slot == null)
                     {
-                        var lastTile = list[j + groupSize - 1];
-                        var nextTile = list[j + groupSize];
-                        
-                        bool needGap = false;
-                        if (isKoutsu || isShuntsu) needGap = true;
-                        else if (lastTile.Category == nextTile.Category && lastTile.Category != TileCategory.Honor)
+                        Debug.LogWarning("WallUI: Could not find generated tile for TileId: " + targetId);
+                        if (remainingGeneratedTiles.Count > 0)
                         {
-                            if (nextTile.Number - lastTile.Number > 1) needGap = true;
+                            slot = remainingGeneratedTiles[0];
+                            remainingGeneratedTiles.RemoveAt(0);
                         }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                    slot.SetParent(wallContainer, false);
+                    
+                    // Reset scaling and anchors properly to avoid overlap/squishing
+                    slot.localScale = Vector3.one;
+                    slot.anchorMin = new Vector2(0.5f, 0.5f);
+                    slot.anchorMax = new Vector2(0.5f, 0.5f);
+                    slot.pivot = new Vector2(0.5f, 0.5f);
+                    
+                    float targetXPos = currentX;
+                    float targetYPos = currentY;
 
-                        currentX += (needGap ? gapIntervalX : tileIntervalX);
+                    Vector2 anchoredPos = new Vector2(targetXPos, targetYPos);
+                    
+                    // アニメーション用に目標位置を設定。初期配置の場合は即座に設定する
+                    if (!targetPositions.ContainsKey(slot))
+                    {
+                        slot.anchoredPosition = anchoredPos;
+                    }
+                    targetPositions[slot] = anchoredPos;
+                    
+                    slot.localRotation = Quaternion.identity;
+
+                    var interaction = slot.GetComponent<TileInteraction>();
+                    if (interaction != null)
+                    {
+                        // anchoredPosition（アンカー基準座標）で保存する
+                        interaction.OriginalWallPosition = new Vector3(anchoredPos.x, anchoredPos.y, 0);
+                    }
+                    
+                    var visual = slot.GetComponent<TileVisual>();
+                    if (visual != null)
+                    {
+                        // 待ち牌リストに含まれていても赤枠を出さないように修正（ホバー時のみ赤枠にする）
+                        visual.SetFuritenHighlight(false);
+                    }
+
+                    wallSlots.Add(slot);
+                    slot.gameObject.SetActive(true);
+
+                    // 同一カテゴリ内なら隙間なし、最後の牌ならカテゴリ間の隙間を追加
+                    if (j < list.Count - 1)
+                    {
+                        currentX += tileIntervalX;
                     }
                     else if (i < categoryLists.Count - 1)
                     {
                         currentX += gapIntervalX;
                     }
 
-                    j += groupSize;
+                    j++;
                 }
             }
         }
@@ -303,11 +286,9 @@ namespace KillingMahjong.UI
                 tileTransform.localScale = Vector3.one;
                 tileTransform.localRotation = Quaternion.identity;
                 
-                // OriginalWallPositionはanchoredPosition基準で保存されているため、anchoredPositionで復元する
-                tileTransform.anchoredPosition = new Vector2(
-                    interaction.OriginalWallPosition.x,
-                    interaction.OriginalWallPosition.y
-                );
+                // OriginalWallPositionを目標座標（targetPositions）に設定し、UpdateのLerpでアニメーションさせる
+                Vector2 originalPos = new Vector2(interaction.OriginalWallPosition.x, interaction.OriginalWallPosition.y);
+                targetPositions[tileTransform] = originalPos;
             }
         }
 
@@ -350,11 +331,16 @@ namespace KillingMahjong.UI
                 if (newSlot != null)
                 {
                     newSlot.anchoredPosition = new Vector2(currentActiveInteraction.OriginalWallPosition.x, currentActiveInteraction.OriginalWallPosition.y + 8f);
-                    
+
                     if (arrowIndicator == null) CreateArrowIndicator();
                     arrowIndicator.gameObject.SetActive(true);
-                    arrowIndicator.SetParent(newSlot, false);
-                    arrowIndicator.anchoredPosition = new Vector2(0, 45f);
+                    // 矢印は常にwallContainerの子として保持し、牌スロットへの依存を断ちプール汚染を防ぐ
+                    Transform arrowParent = wallContainer != null ? wallContainer : (Transform)this.transform;
+                    arrowIndicator.SetParent(arrowParent, false);
+                    arrowIndicator.anchoredPosition = new Vector2(
+                        currentActiveInteraction.OriginalWallPosition.x,
+                        currentActiveInteraction.OriginalWallPosition.y + 8f + 45f
+                    );
                 }
             }
             else
@@ -398,17 +384,22 @@ namespace KillingMahjong.UI
             GameObject arrowObj = new GameObject("DiscardArrowIndicator");
             arrowIndicator = arrowObj.AddComponent<RectTransform>();
             arrowIndicator.sizeDelta = new Vector2(50, 50);
-            
+
             var text = arrowObj.AddComponent<UnityEngine.UI.Text>();
             text.text = "▼";
             text.fontSize = 40;
             text.color = Color.red;
             text.alignment = TextAnchor.MiddleCenter;
             text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            
+
             var outline = arrowObj.AddComponent<UnityEngine.UI.Outline>();
             outline.effectColor = Color.black;
             outline.effectDistance = new Vector2(2, -2);
+
+            // 生成直後にwallContainerの子として登録することで、牌のプール汚染を防ぐ
+            Transform parent = wallContainer != null ? wallContainer : (Transform)this.transform;
+            arrowIndicator.SetParent(parent, false);
+            arrowIndicator.gameObject.SetActive(false);
         }
     }
 }
