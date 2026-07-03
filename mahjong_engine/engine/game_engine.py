@@ -176,6 +176,7 @@ class GameEngine:
             return False
 
         player.bet = bet_amount
+        player.base_bet = bet_amount
         return True
 
     def _can_all_players_cover_min_bet(self) -> bool:
@@ -432,6 +433,11 @@ class GameEngine:
             self.state.round_state.reserved_tiles.append(old_tile_id)
             # wall 内の指定位置の牌を差し替える
             user.wall[wall_idx] = new_tile_id
+            exposed_tiles["__mulligan__"] = {
+                "target_hand_index": wall_idx,
+                "old_tile": old_tile_id,
+                "new_tile": new_tile_id,
+            }
 
         return exposed_tiles
 
@@ -517,13 +523,19 @@ class GameEngine:
 
         self._invoke_callback(self.on_discarded, player_id, discarded_tile)
 
-        # 打牌後、相手の待ち牌なら和了入力待ちへ移行
+        # 打牌後、相手の待ち牌なら和了入力待ちへ移行（フリテン時は不可）
         discarded_tile_base = discarded_tile & 0b11111
         winning_waits = []
+        winning_discard_bases = set()
         if winning_player is not None:
             winning_waits = [tile & 0b11111 for tile in winning_player.waits]
+            winning_discard_bases = {tile & 0b11111 for tile in winning_player.discards}
 
-        if winning_player is not None and discarded_tile_base in winning_waits:
+        if (
+            winning_player is not None
+            and discarded_tile_base in winning_waits
+            and discarded_tile_base not in winning_discard_bases
+        ):
             logger.info(
                 "和了入力待ち: discarder=%s winner=%s tile=%d tile_base=%d",
                 player_id,
@@ -543,6 +555,15 @@ class GameEngine:
                 discarded_tile,
             )
             return False
+
+        if winning_player is not None and discarded_tile_base in winning_waits and discarded_tile_base in winning_discard_bases:
+            logger.info(
+                "フリテンのため和了入力待ちを作成しない: discarder=%s winner=%s tile=%d tile_base=%d",
+                player_id,
+                winning_player.player_id,
+                discarded_tile,
+                discarded_tile_base,
+            )
 
         if all(len(player.discards) >= 16 for player in self.state.players):
             logger.info(
@@ -575,6 +596,22 @@ class GameEngine:
             winner = self.get_player_by_id(player_id)
             if winner is None:
                 return False
+
+            if winning_tile is not None:
+                winning_tile_base = winning_tile & 0b11111
+                winner_discard_bases = {tile & 0b11111 for tile in winner.discards}
+                if winning_tile_base in winner_discard_bases:
+                    logger.info("フリテンのため和了不可: winner=%s tile_base=%d", winner.player_id, winning_tile_base)
+                    if all(len(player.discards) >= 16 for player in self.state.players):
+                        logger.info(
+                            "和了拒否（フリテン）後に流局: all players reached 16 discards (%s)",
+                            {player.player_id: len(player.discards) for player in self.state.players},
+                        )
+                        self.end_round(is_draw=True)
+                        return False
+
+                    self._advance_player()
+                    return False
 
             try:
                 winning_hand_tiles = [winner.wall[idx] for idx in winner.hand]
@@ -757,6 +794,7 @@ class GameEngine:
                 discards=[],
                 discarded_wall_indexes=set(),
                 bet=p.bet if self._carry_over_bets else 0,
+                base_bet=p.base_bet if self._carry_over_bets else 0,
                 special_victory_count=p.special_victory_count,
                 boost_hand_bonus=p.boost_hand_bonus.copy(),
                 exposed_hand_indexes=p.exposed_hand_indexes.copy(),
@@ -809,6 +847,12 @@ class GameEngine:
             self._invoke_callback(self.on_round_end, is_draw)
             self._on_game_end()
             return
+
+        if is_draw:
+            # 流局が続く間は、最初に設定した掛け金を毎局分として加算する。
+            for player in self.state.players:
+                if player.base_bet > 0:
+                    player.bet += player.base_bet
 
         self._carry_over_bets = is_draw
         self._next_round_ready_players.clear()
