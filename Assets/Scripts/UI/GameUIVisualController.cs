@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using KillingMahjong.EngineData;
 using KillingMahjong.Managers;
+using KillingMahjong.Common;
 
 namespace KillingMahjong.UI
 {
@@ -22,9 +23,16 @@ namespace KillingMahjong.UI
         [Header("Pool Settings")]
         public TilePoolManager poolManager;
 
+        /// <summary>牌の移動・ソートアニメーション（分離クラス）</summary>
+        private TileMoveAnimator _moveAnimator;
+        /// <summary>透視スキルの公開牌演出（分離クラス）</summary>
+        private ExposedTileEffectPlayer _exposedEffectPlayer;
+
         public void Setup(GameUIManager manager)
         {
             this.uiManager = manager;
+            _moveAnimator = new TileMoveAnimator(manager, this);
+            _exposedEffectPlayer = new ExposedTileEffectPlayer(manager, this);
             
             if (poolManager != null)
             {
@@ -52,7 +60,7 @@ namespace KillingMahjong.UI
                 _animCanvas = animObj.AddComponent<Canvas>();
                 // renderModeは設定せず親に依存。最前面にだけ出す。
                 _animCanvas.overrideSorting = true;
-                _animCanvas.sortingOrder = 999;
+                _animCanvas.sortingOrder = UISortingOrders.TileAnimationLayer;
                 
                 var cg = animObj.AddComponent<CanvasGroup>();
                 cg.blocksRaycasts = false;
@@ -298,19 +306,12 @@ namespace KillingMahjong.UI
                         List<RectTransform> enemyWallGenerated = new List<RectTransform>();
                         List<int> displayIdsForWall = new List<int>();
 
-                        List<int> handTilesToRemove = new List<int>();
-                        if (board.CurrentEnemyHandTiles != null && uiManager.CurrentPhaseStatus >= RoundStatus.Discard)
-                        {
-                            handTilesToRemove.AddRange(board.CurrentEnemyHandTiles);
-                        }
-
                         for (int i = 0; i < board.OriginalEnemyWallTiles.Count; i++)
                         {
                             int actualTileId = board.OriginalEnemyWallTiles[i];
 
-                            if (handTilesToRemove.Contains(actualTileId))
+                            if (board.EnemyHandIndexes != null && board.EnemyHandIndexes.Contains(i))
                             {
-                                handTilesToRemove.Remove(actualTileId);
                                 continue;
                             }
 
@@ -465,171 +466,19 @@ namespace KillingMahjong.UI
             }
         }
 
-        private Vector2 GetScreenPosition(RectTransform rt)
-        {
-            Canvas canvas = rt.GetComponentInParent<Canvas>();
-            Camera cam = null;
-            if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
-            {
-                cam = canvas.worldCamera;
-                if (cam == null) cam = Camera.main;
-            }
-            return RectTransformUtility.WorldToScreenPoint(cam, rt.position);
-        }
-
         private void HandleTileMovedToHand(int tileId)
         {
-            if (uiManager.IsTransitioning) return;
-
-            if (uiManager.WallUI != null && uiManager.HandUI != null)
-            {
-                RectTransform movedTile = uiManager.WallUI.GrabTile(tileId);
-                if (movedTile != null)
-                {
-                    Vector2 startScreenPos = GetScreenPosition(movedTile);
-                    uiManager.HandUI.AddTileToHand(movedTile, tileId);
-                    
-                    Camera cam = null;
-                    Canvas canvas = uiManager.HandUI.GetComponentInParent<Canvas>();
-                    if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
-                    {
-                        cam = canvas.worldCamera;
-                        if (cam == null) cam = Camera.main;
-                    }
-
-                    Vector2 localPoint;
-                    RectTransform container = movedTile.parent as RectTransform;
-                    if (container != null && RectTransformUtility.ScreenPointToLocalPointInRectangle(container, startScreenPos, cam, out localPoint))
-                    {
-                        movedTile.anchoredPosition = localPoint;
-                    }
-                    else
-                    {
-                        movedTile.anchoredPosition = Vector2.zero;
-                    }
-                }
-            }
+            _moveAnimator.HandleTileMovedToHand(tileId);
         }
 
         private void HandleTileMovedToWall(int tileId)
         {
-            if (uiManager.IsTransitioning) return;
-
-            if (uiManager.HandUI == null || uiManager.WallUI == null) return;
-
-            RectTransform movedTile = null;
-            foreach (RectTransform t in uiManager.HandUI.GetHandSlots())
-            {
-                var interaction = t.GetComponent<TileInteraction>();
-                if (interaction != null && interaction.TileId == tileId)
-                {
-                    movedTile = t;
-                    break;
-                }
-            }
-
-            if (movedTile != null)
-            {
-                Vector2 startScreenPos = GetScreenPosition(movedTile);
-                uiManager.HandUI.RemoveTileFromHand(movedTile, tileId);
-                uiManager.WallUI.ReturnTileToWall(movedTile, tileId);
-                
-                Camera cam = null;
-                Canvas canvas = uiManager.WallUI.GetComponentInParent<Canvas>();
-                if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
-                {
-                    cam = canvas.worldCamera;
-                    if (cam == null) cam = Camera.main;
-                }
-
-                Vector2 localPoint;
-                RectTransform container = movedTile.parent as RectTransform;
-                if (container != null && RectTransformUtility.ScreenPointToLocalPointInRectangle(container, startScreenPos, cam, out localPoint))
-                {
-                    movedTile.anchoredPosition = localPoint;
-                }
-                else
-                {
-                    movedTile.anchoredPosition = Vector2.zero;
-                }
-            }
+            _moveAnimator.HandleTileMovedToWall(tileId);
         }
 
         public System.Collections.IEnumerator PlayPerspectiveAnimation(List<int> newlyExposed)
         {
-            if (uiManager.EnemyWallUI == null) yield break;
-
-            RebuildAllTilesFromState(newlyExposed);
-
-            yield return new WaitForSeconds(0.5f);
-
-            List<UnityEngine.UI.Image> glowingImages = new List<UnityEngine.UI.Image>();
-
-            foreach (int index in newlyExposed)
-            {
-                if (index >= 0 && index < uiManager.EnemyWallUI.GetEnemyWallSlots().Count)
-                {
-                    Transform slot = uiManager.EnemyWallUI.GetEnemyWallSlots()[index];
-                    RectTransform rt = slot as RectTransform;
-                    if (rt != null)
-                    {
-                        int actualTileId = -1;
-                        if (index < Managers.BoardStateManager.Instance.OriginalEnemyWallTiles.Count)
-                        {
-                            actualTileId = Managers.BoardStateManager.Instance.OriginalEnemyWallTiles[index];
-                            InitializeTileComponent(rt, actualTileId, false); // isHandTile = false (壁牌なので)
-                        }
-
-                        UnityEngine.UI.Image img = rt.GetComponent<UnityEngine.UI.Image>();
-                        if (img != null) glowingImages.Add(img);
-
-                        Vector3 origScale = rt.localScale;
-                        float duration = 0.25f;
-                            for (float t = 0; t < duration; t += Time.deltaTime)
-                            {
-                                float s = Mathf.Lerp(1f, 1.3f, Mathf.PingPong(t * (1f / (duration / 2f)), 1f));
-                                rt.localScale = origScale * s;
-                                yield return null;
-                            }
-                            rt.localScale = origScale;
-                        }
-                    }
-                }
-
-            // カットイン演出(2.0s) + HP減少(1.0s) = 計3.0s 待つ
-            float waitedSoFar = 0.5f + (0.25f * newlyExposed.Count);
-            float timeToWait = 3.0f - waitedSoFar;
-            if (timeToWait > 0)
-            {
-                yield return new WaitForSeconds(timeToWait);
-            }
-
-            // 演出終了後、2秒間めくられた牌を光らせてアピール
-            float glowDuration = 2.0f;
-            Color originalColor = Color.white;
-            Color glowColor = new Color(1.0f, 0.8f, 0.2f); // 黄色っぽく発光
-            
-            for (float t = 0; t < glowDuration; t += Time.deltaTime)
-            {
-                float pingPong = Mathf.PingPong(t * 3f, 1f); 
-                Color currentColor = Color.Lerp(originalColor, glowColor, pingPong);
-                foreach (var img in glowingImages)
-                {
-                    if (img != null) img.color = currentColor;
-                }
-                yield return null;
-            }
-
-            // 元の色に戻す
-            foreach (var img in glowingImages)
-            {
-                if (img != null) img.color = originalColor;
-            }
-
-            if (uiManager.PhaseController != null)
-            {
-                uiManager.PhaseController.HandlePhaseVisibility(uiManager.CurrentPhaseStatus);
-            }
+            return _exposedEffectPlayer.PlayPerspectiveAnimation(newlyExposed);
         }
 
         private bool UpdateTileIdInUI(int oldId, int newId)
@@ -678,220 +527,18 @@ namespace KillingMahjong.UI
 
         public IEnumerator PlayHandSortAnimationRoutine()
         {
-            if (uiManager.HandUI == null) yield break;
-
-            var handSlots = uiManager.HandUI.GetHandSlots();
-            if (handSlots == null || handSlots.Count == 0) yield break;
-
-            var board = BoardStateManager.Instance;
-            var currentHandIds = board.CurrentHandTiles;
-
-            Dictionary<RectTransform, Vector2> startPositions = new Dictionary<RectTransform, Vector2>();
-            foreach (var slot in handSlots)
-            {
-                startPositions[slot] = slot.anchoredPosition;
-            }
-
-            List<RectTransform> sortedSlots = new List<RectTransform>();
-            List<RectTransform> unsortedSlots = new List<RectTransform>(handSlots);
-            
-            foreach (int targetId in currentHandIds)
-            {
-                RectTransform foundSlot = null;
-                foreach(var slot in unsortedSlots)
-                {
-                    var visual = slot.GetComponent<TileVisual>();
-                    if (visual != null && visual.GetId() == targetId)
-                    {
-                        foundSlot = slot;
-                        break;
-                    }
-                }
-                if (foundSlot != null)
-                {
-                    sortedSlots.Add(foundSlot);
-                    unsortedSlots.Remove(foundSlot);
-                }
-                else if (unsortedSlots.Count > 0)
-                {
-                    sortedSlots.Add(unsortedSlots[0]);
-                    unsortedSlots.RemoveAt(0);
-                }
-            }
-
-            for (int i = 0; i < sortedSlots.Count; i++)
-            {
-                sortedSlots[i].SetSiblingIndex(i);
-            }
-
-            UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(uiManager.HandUI.GetComponent<RectTransform>());
-            yield return null;
-
-            Dictionary<RectTransform, Vector2> targetPositions = new Dictionary<RectTransform, Vector2>();
-            foreach (var slot in sortedSlots)
-            {
-                targetPositions[slot] = slot.anchoredPosition;
-            }
-
-            var layoutGroup = uiManager.HandUI.GetComponentInChildren<UnityEngine.UI.LayoutGroup>();
-            bool wasLayoutEnabled = false;
-            if (layoutGroup != null)
-            {
-                wasLayoutEnabled = layoutGroup.enabled;
-                layoutGroup.enabled = false;
-            }
-
-            foreach (var slot in sortedSlots)
-            {
-                slot.anchoredPosition = startPositions[slot];
-            }
-
-            float duration = 0.4f;
-            float elapsed = 0f;
-
-            while (elapsed < duration)
-            {
-                elapsed += Time.deltaTime;
-                float t = Mathf.Clamp01(elapsed / duration);
-                t = 1f - Mathf.Pow(1f - t, 3f);
-
-                foreach (var slot in sortedSlots)
-                {
-                    slot.anchoredPosition = Vector2.Lerp(startPositions[slot], targetPositions[slot], t);
-                }
-                yield return null;
-            }
-
-            foreach (var slot in sortedSlots)
-            {
-                slot.anchoredPosition = targetPositions[slot];
-            }
-
-            if (layoutGroup != null)
-            {
-                layoutGroup.enabled = wasLayoutEnabled;
-            }
-
-            uiManager.HandUI.GetHandSlots().Clear();
-            uiManager.HandUI.GetHandSlots().AddRange(sortedSlots);
-
-            RebuildAllTilesFromState(null);
+            return _moveAnimator.PlayHandSortAnimationRoutine();
         }
+
 
         public IEnumerator PlayTransitionAnimationRoutine(System.Action onUpdateState)
         {
-            if (uiManager.WallUI == null && uiManager.HandUI == null)
-            {
-                onUpdateState?.Invoke();
-                yield break;
-            }
+            return _moveAnimator.PlayTransitionAnimationRoutine(onUpdateState);
+        }
 
-            uiManager.SetIsTransitioning(true);
-
-            // 1. 状態更新前の配置を記録
-            List<int> oldHand = new List<int>(BoardStateManager.Instance.CurrentHandTiles);
-            List<int> oldWall = new List<int>(BoardStateManager.Instance.CurrentWallTiles);
-
-            // 2. 状態を更新（IsTransitioning=true なので RebuildAllTilesFromState はスキップされる）
-            onUpdateState?.Invoke();
-
-            List<int> newHand = new List<int>(BoardStateManager.Instance.CurrentHandTiles);
-            List<int> newWall = new List<int>(BoardStateManager.Instance.CurrentWallTiles);
-
-            List<int> movedToHand = new List<int>();
-            List<int> oldHandTemp = new List<int>(oldHand);
-            foreach (int id in newHand) 
-            {
-                if (oldHandTemp.Contains(id)) oldHandTemp.Remove(id);
-                else movedToHand.Add(id);
-            }
-
-            List<int> movedToWall = new List<int>();
-            List<int> oldWallTemp = new List<int>(oldWall);
-            foreach (int id in newWall) 
-            {
-                if (oldWallTemp.Contains(id)) oldWallTemp.Remove(id);
-                else movedToWall.Add(id);
-            }
-
-            // 3. 手牌から山牌へ戻る牌を視覚的に移動
-            foreach (int id in movedToWall)
-            {
-                if (uiManager.WallUI != null && uiManager.HandUI != null)
-                {
-                    RectTransform tileRt = null;
-                    foreach(var slot in uiManager.HandUI.GetHandSlots()) {
-                        var inter = slot.GetComponent<TileInteraction>();
-                        if (inter != null && inter.TileId == id) { tileRt = slot; break; }
-                    }
-                    if (tileRt != null) {
-                        Vector2 startScreenPos = GetScreenPosition(tileRt);
-                        
-                        uiManager.HandUI.RemoveTileFromHand(tileRt, id);
-                        uiManager.WallUI.ReturnTileToWall(tileRt, id);
-                        
-                        // アニメーションのため、親が変わった直後の位置を元に戻す
-                        Camera cam = null;
-                        Canvas canvas = uiManager.WallUI.GetComponentInParent<Canvas>();
-                        if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
-                        {
-                            cam = canvas.worldCamera;
-                            if (cam == null) cam = Camera.main;
-                        }
-
-                        Vector2 localPoint;
-                        RectTransform container = tileRt.parent as RectTransform;
-                        if (container != null && RectTransformUtility.ScreenPointToLocalPointInRectangle(container, startScreenPos, cam, out localPoint))
-                        {
-                            tileRt.anchoredPosition = localPoint;
-                        }
-                    }
-                }
-            }
-
-            // 4. 山牌から手牌へ移動する牌を視覚的に移動
-            foreach (int id in movedToHand)
-            {
-                if (uiManager.WallUI != null && uiManager.HandUI != null)
-                {
-                    RectTransform tileRt = uiManager.WallUI.GrabTileById(id);
-                    if (tileRt != null)
-                    {
-                        Vector2 startScreenPos = GetScreenPosition(tileRt);
-                        
-                        uiManager.HandUI.AddTileToHand(tileRt, id);
-                        
-                        // アニメーションのため、親が変わった直後の位置を元に戻す
-                        Camera cam = null;
-                        Canvas canvas = uiManager.HandUI.GetComponentInParent<Canvas>();
-                        if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
-                        {
-                            cam = canvas.worldCamera;
-                            if (cam == null) cam = Camera.main;
-                        }
-                        Vector2 localPoint;
-                        RectTransform container = tileRt.parent as RectTransform;
-                        if (container != null && RectTransformUtility.ScreenPointToLocalPointInRectangle(container, startScreenPos, cam, out localPoint))
-                        {
-                            tileRt.anchoredPosition = localPoint;
-                        }
-                    }
-                }
-            }
-
-            // 5. 新しい配置で手牌のレイアウトのみ更新（WallUIの再整列は行わず、元の位置のまま穴を開けたり埋めたりする）
-            if (uiManager.HandUI != null)
-            {
-                uiManager.HandUI.UpdateLayout(uiManager.CurrentPhaseStatus);
-            }
-
-            // 6. ユーザー指定のアニメーション時間 (0.2秒) 待機
-            float duration = 0.2f;
-            yield return new WaitForSeconds(duration);
-
-            uiManager.SetIsTransitioning(false);
-            
-            // 7. Rebuild時にプール回収が走らないよう、内部の同期用キャッシュを最新化
+        /// <summary>Rebuildの差分検出用キャッシュを現在の盤面状態と同期する（TileMoveAnimatorから使用）</summary>
+        internal void SyncRebuildCache()
+        {
             _lastWallIds = new List<int>(BoardStateManager.Instance.CurrentWallTiles);
             _lastHandIds = new List<int>(BoardStateManager.Instance.CurrentHandTiles);
         }

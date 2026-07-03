@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using System;
+using KillingMahjong.Common;
 
 namespace KillingMahjong.UI
 {
@@ -42,7 +43,7 @@ namespace KillingMahjong.UI
 
             var uiCanvas = uiPanel.AddComponent<Canvas>();
             uiCanvas.overrideSorting = true;
-            uiCanvas.sortingOrder = 10000;
+            uiCanvas.sortingOrder = UISortingOrders.YakuSelection;
             uiPanel.AddComponent<GraphicRaycaster>();
 
             Font fontToUse = customFont != null ? customFont : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");

@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using KillingMahjong.EngineData;
 using KillingMahjong.Managers;
 using KillingMahjong.Network;
+using KillingMahjong.Common;
 
 namespace KillingMahjong.UI
 {
@@ -232,7 +233,7 @@ namespace KillingMahjong.UI
 
             rootCanvas = canvasObj.AddComponent<Canvas>();
             rootCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            rootCanvas.sortingOrder = 999; // 最前面に表示
+            rootCanvas.sortingOrder = UISortingOrders.CommentaryFlow;
 
             // CanvasScaler で解像度に合わせてスケール
             CanvasScaler scaler = canvasObj.AddComponent<CanvasScaler>();

@@ -1,5 +1,6 @@
 using UnityEngine;
 using TMPro;
+using KillingMahjong.Common;
 
 namespace KillingMahjong.UI
 {
@@ -281,84 +282,31 @@ namespace KillingMahjong.UI
             bounceCoroutine = null;
         }
 
-        private class CanvasState
-        {
-            public Canvas CanvasRef;
-            public bool WasAdded;
-            public bool OriginalOverrideSorting;
-            public int OriginalSortingOrder;
-            public string OriginalSortingLayer;
-        }
-        private System.Collections.Generic.List<CanvasState> _canvasStates = new System.Collections.Generic.List<CanvasState>();
+        /// <summary>強調表示時の前面化と復元。プロジェクトルールに従いルートCanvasの overrideSorting のみを操作する。</summary>
+        private readonly CanvasSortingScope _sortingScope = new CanvasSortingScope();
 
         private void BringToFront(Transform target)
         {
             if (target == null) return;
-            
-            _canvasStates.Clear();
-            
-            // ルートのCanvasのみを取得して手前に出す（子Canvasを一律上書きすると表示順が壊れるため）
-            var canvas = target.GetComponent<Canvas>();
-            if (canvas == null)
-            {
-                canvas = target.gameObject.AddComponent<Canvas>();
-                target.gameObject.AddComponent<UnityEngine.UI.GraphicRaycaster>();
-                
-                _canvasStates.Add(new CanvasState
-                {
-                    CanvasRef = canvas,
-                    WasAdded = true
-                });
-            }
-            else
-            {
-                _canvasStates.Add(new CanvasState
-                {
-                    CanvasRef = canvas,
-                    WasAdded = false,
-                    OriginalOverrideSorting = canvas.overrideSorting,
-                    OriginalSortingOrder = canvas.sortingOrder,
-                    OriginalSortingLayer = canvas.sortingLayerName
-                });
-            }
-            
-            canvas.overrideSorting = true;
-            canvas.sortingLayerName = "UI";
-            canvas.sortingOrder = 20;
-            
+
+            // ルートのCanvasのみを手前に出す（子Canvasを一律上書きすると表示順が壊れるため）
+            _sortingScope.BringToFront(target.gameObject, UISortingOrders.InfoPanelHighlight, "UI");
+
             // 手やスマホ本体などのSpriteRendererを手前に持ってくる
             var sprites = target.GetComponentsInChildren<SpriteRenderer>(true);
             foreach (var s in sprites)
             {
                 s.sortingLayerName = "UI";
-                s.sortingOrder = 20;
+                s.sortingOrder = UISortingOrders.InfoPanelHighlight;
             }
         }
 
         private void ResetSorting(Transform target)
         {
             if (target == null) return;
-            
-            foreach (var state in _canvasStates)
-            {
-                if (state.CanvasRef != null)
-                {
-                    if (state.WasAdded)
-                    {
-                        var raycaster = state.CanvasRef.GetComponent<UnityEngine.UI.GraphicRaycaster>();
-                        if (raycaster != null) Destroy(raycaster);
-                        Destroy(state.CanvasRef);
-                    }
-                    else
-                    {
-                        state.CanvasRef.overrideSorting = state.OriginalOverrideSorting;
-                        state.CanvasRef.sortingOrder = state.OriginalSortingOrder;
-                        state.CanvasRef.sortingLayerName = state.OriginalSortingLayer;
-                    }
-                }
-            }
-            _canvasStates.Clear();
-            
+
+            _sortingScope.Restore(target.gameObject);
+
             var sprites = target.GetComponentsInChildren<SpriteRenderer>(true);
             foreach (var s in sprites)
             {
@@ -366,6 +314,7 @@ namespace KillingMahjong.UI
                 s.sortingOrder = 0;
             }
         }
+
 
         // --- ズーム演出（指定したオブジェクトを巨大化し、少し手前・上に浮かせる） ---
         public System.Collections.IEnumerator ZoomInRoutine(float duration = 0.4f, float targetScaleMulti = 2.5f)

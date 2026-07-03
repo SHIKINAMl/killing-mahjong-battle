@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using KillingMahjong.Common;
 
 namespace KillingMahjong.UI
 {
@@ -338,7 +339,7 @@ namespace KillingMahjong.UI
                 }
                 tooltipCanvas.overrideSorting = true;
                 tooltipCanvas.sortingLayerName = "UI";
-                tooltipCanvas.sortingOrder = 25; // ツールチップをAbilityUI本体より少し手前に
+                tooltipCanvas.sortingOrder = UISortingOrders.AbilityTooltip;
 
                 // AbilityUI全体を最前面化するが、中身の表示順が壊れないようにルート(this)のみ設定する
                 Canvas rootCanvas = this.GetComponent<Canvas>();
@@ -349,7 +350,7 @@ namespace KillingMahjong.UI
                 }
                 rootCanvas.overrideSorting = true;
                 rootCanvas.sortingLayerName = "UI";
-                rootCanvas.sortingOrder = 20; // ユーザー指定の20
+                rootCanvas.sortingOrder = UISortingOrders.InfoPanelHighlight;
                 
                 // Z座標は0
                 Vector3 localPos = tooltipPanel.transform.localPosition;

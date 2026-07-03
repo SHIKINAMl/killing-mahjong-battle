@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using KillingMahjong.Common;
 
 namespace KillingMahjong.UI
 {
@@ -78,7 +79,7 @@ namespace KillingMahjong.UI
             {
                 canvas = gameObject.AddComponent<Canvas>();
                 canvas.renderMode = RenderMode.ScreenSpaceOverlay; // Force screen space
-                canvas.sortingOrder = 32767; // Max sorting order
+                canvas.sortingOrder = UISortingOrders.AgariSelectionMax;
                 
                 var scaler = gameObject.AddComponent<CanvasScaler>();
                 scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;

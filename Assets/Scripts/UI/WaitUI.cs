@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using KillingMahjong.Common;
 
 namespace KillingMahjong.UI
 {
@@ -95,7 +96,7 @@ namespace KillingMahjong.UI
                 if (canvas != null)
                 {
                     canvas.overrideSorting = true;
-                    canvas.sortingOrder = 10000;
+                    canvas.sortingOrder = UISortingOrders.WaitDisplayFront;
                 }
 
                 UnityEngine.UI.LayoutElement layoutElement = waitContainer.GetComponent<UnityEngine.UI.LayoutElement>();

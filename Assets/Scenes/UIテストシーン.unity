@@ -37380,7 +37380,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 35ba84bc28b2bf94bb79f92ff049a194, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.TilePoolManager
-  initialPoolSize: 136
+  initialPoolSize: 116
   showDebugVisuals: 1
   _container: {fileID: 563980793}
 --- !u!114 &1775443041

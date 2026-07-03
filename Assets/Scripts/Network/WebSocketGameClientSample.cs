@@ -122,6 +122,8 @@ public class WebSocketGameClientSample : MonoBehaviour
 
         try
         {
+            KillingMahjong.UI.LoadingManager.Instance.Show();
+            
             string normalizedUrl = NormalizeServerUrl(serverUrl);
             // WebSocket 接続
             await webSocket.ConnectAsync(new Uri(normalizedUrl), cancellationTokenSource.Token);
@@ -133,6 +135,10 @@ public class WebSocketGameClientSample : MonoBehaviour
         catch (Exception ex)
         {
             Debug.LogError($"WebSocket connect failed: {ex.Message}");
+        }
+        finally
+        {
+            KillingMahjong.UI.LoadingManager.Instance.Hide();
         }
 #endif
     }

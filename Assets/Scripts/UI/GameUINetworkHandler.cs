@@ -74,16 +74,19 @@ namespace KillingMahjong.UI
 
         private void HandleGameStarted()
         {
+            KillingMahjong.UI.LoadingManager.Instance.ForceHide();
             uiManager.PhaseController?.OnGameStarted();
         }
 
         private void HandleMatchmakingWaiting()
         {
+            KillingMahjong.UI.LoadingManager.Instance.Show();
             uiManager.PhaseController?.ShowMatchmakingWaiting();
         }
 
         private void HandleMatchCancelled(string reason)
         {
+            KillingMahjong.UI.LoadingManager.Instance.ForceHide();
             uiManager.PhaseController?.ShowMatchCancelled(reason);
         }
 

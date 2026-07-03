@@ -13,14 +13,19 @@ namespace KillingMahjong.Managers
     {
         public static BoardStateManager Instance { get; private set; }
 
+        /// <summary>手牌構築ロジック（分離クラス）</summary>
+        private HandSelectionService _handSelection;
+
         // --- データモデル ---
         public List<int> CurrentHandTiles { get; private set; } = new List<int>();
+        public List<int> LocalHandIndexes { get; private set; } = new List<int>();
         public List<int> CurrentWallTiles { get; private set; } = new List<int>();
         public List<int> OriginalWallTiles { get; private set; } = new List<int>();
         public List<int> CurrentWaitTiles { get; private set; } = new List<int>();
         public List<int> NonManganWaitTiles { get; private set; } = new List<int>();
         
         public List<int> CurrentEnemyHandTiles { get; private set; } = new List<int>();
+        public List<int> EnemyHandIndexes { get; private set; } = new List<int>();
         public List<int> CurrentEnemyWallTiles { get; private set; } = new List<int>();
         public List<int> OriginalEnemyWallTiles { get; private set; } = new List<int>();
         public List<int> CurrentEnemyWaitTiles { get; private set; } = new List<int>();
@@ -76,6 +81,7 @@ namespace KillingMahjong.Managers
         {
             if (Instance == null) {
                 Instance = this;
+                _handSelection = new HandSelectionService(this);
             } else {
                 Destroy(gameObject);
             }
@@ -93,7 +99,9 @@ namespace KillingMahjong.Managers
         public void ClearAllBoardData()
         {
             CurrentHandTiles.Clear();
+            LocalHandIndexes.Clear();
             CurrentEnemyHandTiles.Clear();
+            EnemyHandIndexes.Clear();
             CurrentEnemyWallTiles.Clear();
             SelectedTileIds.Clear();
             CurrentWaitTiles.Clear();
@@ -120,35 +128,27 @@ namespace KillingMahjong.Managers
         /// </summary>
         public void SetLocalState(List<int> wall, List<int> hand, List<int> wait = null)
         {
-            if (wall != null && wall.Count > 0) 
+            if (wall != null && wall.Count > 0)
             {
-                if (OriginalWallTiles.Count == 0 || OriginalWallTiles.Count != wall.Count) 
+                OriginalWallTiles = new List<int>(wall);
+                List<int> displayWall = new List<int>();
+                List<int> actualHandIds = new List<int>();
+                LocalHandIndexes = new List<int>();
+
+                for (int i = 0; i < wall.Count; i++)
                 {
-                    OriginalWallTiles = new List<int>(wall);
-                    DiscardedWallIndexes.Clear();
-                }
-                else
-                {
-                    for (int i = 0; i < wall.Count; i++)
+                    if (hand != null && hand.Contains(i))
                     {
-                        OriginalWallTiles[i] = wall[i];
+                        actualHandIds.Add(wall[i]);
+                        LocalHandIndexes.Add(i);
+                    }
+                    else
+                    {
+                        displayWall.Add(wall[i]);
                     }
                 }
                 
-                List<int> displayWall = new List<int>(wall);
-                List<int> actualHandIds = new List<int>();
-                if (hand != null)
-                {
-                    foreach (int hIndex in hand)
-                    {
-                        if (hIndex >= 0 && hIndex < wall.Count)
-                        {
-                            int actualId = wall[hIndex];
-                            actualHandIds.Add(actualId);
-                            displayWall.Remove(actualId);
-                        }
-                    }
-                }
+                // CurrentWallTiles は山牌として残る牌（表示側で手牌と結合して理牌し、引っこ抜く）
                 CurrentWallTiles = SortTileIds(displayWall);
                 
                 if (hand != null)
@@ -165,8 +165,10 @@ namespace KillingMahjong.Managers
             if (wall != null && wall.Count > 0)
             {
                 OriginalEnemyWallTiles = new List<int>(wall);
-                List<int> displayEnemyWall = new List<int>(wall);
+                
                 List<int> actualHandIds = new List<int>();
+                EnemyHandIndexes = new List<int>();
+                
                 if (hand != null)
                 {
                     foreach (int hIndex in hand)
@@ -175,11 +177,11 @@ namespace KillingMahjong.Managers
                         {
                             int actualId = wall[hIndex];
                             actualHandIds.Add(actualId);
-                            // displayEnemyWall.Remove(actualId); // 山牌から物理的に消さず、UI側(GameUIVisualController)の表示制御に任せる
+                            EnemyHandIndexes.Add(hIndex);
                         }
                     }
                 }
-                CurrentEnemyWallTiles = displayEnemyWall;
+                CurrentEnemyWallTiles = OriginalEnemyWallTiles;
                 
                 if (hand != null) CurrentEnemyHandTiles = new List<int>(actualHandIds);
             }
@@ -198,6 +200,9 @@ namespace KillingMahjong.Managers
         }
 
         private int _fixedManganExampleIndex = 0;
+
+        /// <summary>SetTenpaiExamples 時に抽選されたお手本インデックス（HandSelectionService から参照）</summary>
+        internal int FixedManganExampleIndex { get { return _fixedManganExampleIndex; } }
 
         public void SetTenpaiExamples(List<int[]> tenpaiExamples)
         {
@@ -296,134 +301,16 @@ namespace KillingMahjong.Managers
 
         // --- 選択・デモ支援ロジック ---
 
-        private int[] OptimizeHandIndicesForDora(int[] originalIndexes)
-        {
-            List<int> upgraded = new List<int>(originalIndexes);
-            List<int> wall = OriginalWallTiles;
-            
-            for (int i = 0; i < upgraded.Count; i++)
-            {
-                int currentIndex = upgraded[i];
-                if (currentIndex < 0 || currentIndex >= wall.Count) continue;
-                
-                int currentTile = wall[currentIndex];
-                int baseId = currentTile & 0x1F;
-                int currentDoraFlag = currentTile >> 5;
-                
-                int bestIndex = currentIndex;
-                int bestDoraFlag = currentDoraFlag;
-                
-                for (int w = 0; w < wall.Count; w++)
-                {
-                    if (upgraded.Contains(w)) continue;
-                    
-                    int wTile = wall[w];
-                    if ((wTile & 0x1F) == baseId)
-                    {
-                        int wDoraFlag = wTile >> 5;
-                        if (wDoraFlag > bestDoraFlag)
-                        {
-                            bestDoraFlag = wDoraFlag;
-                            bestIndex = w;
-                        }
-                    }
-                }
-                
-                upgraded[i] = bestIndex;
-            }
-            
-            return upgraded.ToArray();
-        }
-
         public void SelectManganHand()
         {
-            Debug.Log($"[SelectManganHand] CurrentTenpaiExamples count: {CurrentTenpaiExamples?.Count ?? -1}, OriginalWallTiles count: {OriginalWallTiles.Count}");
-            
-            if (CurrentTenpaiExamples == null || CurrentTenpaiExamples.Count == 0)
-            {
-                Debug.LogWarning("[SelectManganHand] サーバーからお手本データが届いていません。テスト続行のため、代わりにランダムな手牌を選択します。");
-                SelectRandomHand();
-                return;
-            }
-
-            int exampleIndex = _fixedManganExampleIndex;
-            if (exampleIndex < 0 || exampleIndex >= CurrentTenpaiExamples.Count) exampleIndex = 0;
-
-            int[] rawTargetHand = CurrentTenpaiExamples[exampleIndex];
-            
-            // Pythonサーバーから送られてきたインデックスをそのまま使用する
-            List<int> targetTileIds = new List<int>();
-            
-            foreach (int rawIdx in rawTargetHand)
-            {
-                if (rawIdx >= 0 && rawIdx < OriginalWallTiles.Count)
-                {
-                    targetTileIds.Add(OriginalWallTiles[rawIdx]);
-                }
-                else
-                {
-                    Debug.LogWarning($"[SelectManganHand] 無効なインデックスを受け取りました: {rawIdx}");
-                }
-            }
-
-            Debug.Log($"[SelectManganHand] targetTileIds (count: {targetTileIds.Count}): [{string.Join(", ", targetTileIds)}]");
-
-            // 現在の手牌から、目標に含まれない牌だけを壁に戻す
-            List<int> currentHandCopy = new List<int>(CurrentHandTiles);
-            foreach (int id in currentHandCopy)
-            {
-                if (targetTileIds.Contains(id))
-                {
-                    // 目標にも含まれているので手牌に残す
-                    targetTileIds.Remove(id); // 同一IDが複数ある場合のために1つ消費する
-                }
-                else
-                {
-                    // 目標に含まれていないので壁に戻す
-                    MoveTileToWall(id);
-                }
-            }
-
-            // まだ手牌に足りていない牌を壁から取る
-            foreach (int id in targetTileIds)
-            {
-                bool moved = MoveTileToHand(id);
-                if (!moved) Debug.LogWarning($"[SelectManganHand] Failed to move tile {id} to hand!");
-            }
-            
-            Debug.Log($"[SelectManganHand] Result: hand has {CurrentHandTiles.Count} tiles");
+            _handSelection.SelectManganHand();
         }
 
         public void SelectRandomHand()
         {
-            ResetHandToWall();
-
-            int tilesToPick = Mathf.Min(13, CurrentWallTiles.Count);
-            List<int> tempWall = new List<int>(CurrentWallTiles);
-            List<int> targetIds = new List<int>();
-
-            for (int i = 0; i < tilesToPick; i++)
-            {
-                int randomIndex = UnityEngine.Random.Range(0, tempWall.Count);
-                int selectedId = tempWall[randomIndex];
-                targetIds.Add(selectedId);
-                tempWall.RemoveAt(randomIndex);
-            }
-
-            foreach (int id in targetIds)
-            {
-                MoveTileToHand(id);
-            }
+            _handSelection.SelectRandomHand();
         }
 
-        private void ResetHandToWall()
-        {
-            List<int> currentHandCopy = new List<int>(CurrentHandTiles);
-            foreach (int id in currentHandCopy)
-            {
-                MoveTileToWall(id);
-            }
-        }
 
         public void SelectTile(int tileId, bool multiSelect)
         {

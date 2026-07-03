@@ -65,9 +65,8 @@ namespace KillingMahjong.UI
             if (baseId >= 27)
             {
                 if (baseId == 27) spriteIndex = 27; // 東
-                else if (baseId == 28) spriteIndex = 27; // 南 -> 東でフォールバック
-                else if (baseId == 29) spriteIndex = 28; // 西 -> Unity側の西画像（index 28）
-                else if (baseId >= 30) spriteIndex = 28; // 北・白・發・中 -> 西でフォールバック
+                else if (baseId == 28) spriteIndex = 28; // 西 (Python側ではID 28が西)
+                else if (baseId >= 29) spriteIndex = 28; // その他は無いが念のため西でフォールバック
             }
 
             // 通常スプライト

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using KillingMahjong.EngineData;
 using KillingMahjong.Managers;
 using KillingMahjong.Network;
+using KillingMahjong.Common;
 
 namespace KillingMahjong.UI
 {
@@ -465,7 +466,7 @@ namespace KillingMahjong.UI
                         canvas = RonWaitPanel.AddComponent<Canvas>();
                     }
                     canvas.overrideSorting = true;
-                    canvas.sortingOrder = 50; // DialogueUI や BloodMeter より高い値
+                    canvas.sortingOrder = UISortingOrders.RonWaitPanel;
 
                     if (RonWaitPanel.GetComponent<UnityEngine.UI.GraphicRaycaster>() == null)
                     {

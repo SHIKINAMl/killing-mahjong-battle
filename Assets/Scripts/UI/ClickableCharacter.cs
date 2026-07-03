@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using System.Collections.Generic;
+using KillingMahjong.Common;
 
 namespace KillingMahjong.UI
 {
@@ -89,7 +90,7 @@ namespace KillingMahjong.UI
                 var sr = overlay.AddComponent<SpriteRenderer>();
                 sr.sprite = whiteSprite;
                 sr.color = debugAreaColor;
-                sr.sortingOrder = 999; // 最前面
+                sr.sortingOrder = UISortingOrders.DebugOverlaySprite;
 
                 debugOverlays.Add(overlay);
             }

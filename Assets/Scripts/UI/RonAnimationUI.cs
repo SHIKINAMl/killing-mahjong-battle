@@ -3,6 +3,7 @@ using UnityEngine.UI;
 using TMPro;
 using System.Collections;
 using System.Collections.Generic;
+using KillingMahjong.Common;
 
 namespace KillingMahjong.UI
 {
@@ -106,7 +107,7 @@ namespace KillingMahjong.UI
             Canvas containerCanvas = container.AddComponent<Canvas>();
             containerCanvas.overrideSorting = true;
             containerCanvas.sortingLayerName = "UI";
-            containerCanvas.sortingOrder = 30000;
+            containerCanvas.sortingOrder = UISortingOrders.RonAnimation;
             container.AddComponent<UnityEngine.UI.GraphicRaycaster>();
 
             // 2. 暗転ディマー（背景のスマホ等が見えるように少し薄めに）

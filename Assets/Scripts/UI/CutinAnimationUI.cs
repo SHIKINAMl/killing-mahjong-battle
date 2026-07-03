@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System.Collections;
+using KillingMahjong.Common;
 
 namespace KillingMahjong.UI
 {
@@ -25,7 +26,7 @@ namespace KillingMahjong.UI
             Canvas canvas = root.AddComponent<Canvas>();
             canvas.overrideSorting = true;
             canvas.sortingLayerName = "UI";
-            canvas.sortingOrder = 32000; // 最前面
+            canvas.sortingOrder = UISortingOrders.CutinAnimation;
 
             CanvasGroup canvasGroup = root.AddComponent<CanvasGroup>();
             canvasGroup.alpha = 1f;

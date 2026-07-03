@@ -3,6 +3,7 @@ using UnityEngine.UI;
 using TMPro;
 using System.Collections;
 using System;
+using KillingMahjong.Common;
 
 namespace KillingMahjong.UI
 {
@@ -101,7 +102,7 @@ namespace KillingMahjong.UI
             {
                 canvas.overrideSorting = true;
                 canvas.sortingLayerName = "UI";
-                canvas.sortingOrder = 101; // 親(PlayerInfoUI)が100になるため、それより手前に
+                canvas.sortingOrder = UISortingOrders.BettingPanel;
             }
 
             gameObject.SetActive(true);

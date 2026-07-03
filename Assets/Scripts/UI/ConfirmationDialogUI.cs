@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System;
+using KillingMahjong.Common;
 
 namespace KillingMahjong.UI
 {
@@ -33,7 +34,7 @@ namespace KillingMahjong.UI
                 canvas = gameObject.AddComponent<Canvas>();
             }
             canvas.overrideSorting = true;
-            canvas.sortingOrder = 9999; // 非常に高い値にして手牌や他のCanvasより手前に出す
+            canvas.sortingOrder = UISortingOrders.ConfirmationDialog;
 
             // ボタンのクリック判定が効くようにGraphicRaycasterを追加
             GraphicRaycaster raycaster = GetComponent<GraphicRaycaster>();

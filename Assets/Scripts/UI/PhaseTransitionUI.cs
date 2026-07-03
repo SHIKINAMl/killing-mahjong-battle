@@ -5,6 +5,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System;
 using KillingMahjong.Network;
+using KillingMahjong.Common;
 
 namespace KillingMahjong.UI
 {
@@ -45,7 +46,7 @@ namespace KillingMahjong.UI
                 canvas = gameObject.AddComponent<Canvas>();
             }
             canvas.overrideSorting = true;
-            canvas.sortingOrder = 19; // 最前面に設定
+            canvas.sortingOrder = UISortingOrders.PhaseTransitionBase;
             
             // レイキャストを有効にする場合（必要に応じて）
             UnityEngine.UI.GraphicRaycaster raycaster = GetComponent<UnityEngine.UI.GraphicRaycaster>();
@@ -830,7 +831,7 @@ namespace KillingMahjong.UI
             Canvas containerCanvas = container.AddComponent<Canvas>();
             container.AddComponent<UnityEngine.UI.GraphicRaycaster>();
             containerCanvas.overrideSorting = true;
-            containerCanvas.sortingOrder = 32700;
+            containerCanvas.sortingOrder = UISortingOrders.PhaseTransitionTop;
 
             // 2. 即時ディマー（背景が少し見えるように半透明）
             GameObject dimmer = new GameObject("Dimmer");

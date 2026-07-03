@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using KillingMahjong.Managers;
+using KillingMahjong.Common;
 
 namespace KillingMahjong.UI
 {
@@ -30,7 +31,7 @@ namespace KillingMahjong.UI
             var canvas = containerObj.GetComponent<Canvas>();
             if (canvas == null) canvas = containerObj.AddComponent<Canvas>();
             canvas.overrideSorting = true;
-            canvas.sortingOrder = 999;
+            canvas.sortingOrder = UISortingOrders.TileAnimationLayer;
 
             var rt = containerObj.GetComponent<RectTransform>();
             if (rt == null) rt = containerObj.AddComponent<RectTransform>();
@@ -107,7 +108,8 @@ namespace KillingMahjong.UI
         private List<int> GenerateDeck()
         {
             List<int> deck = new List<int>();
-            for (int i = 0; i < 34; i++)
+            // 29種類（萬子1-9、筒子1-9、索子1-9、東、西）× 4枚 = 116枚
+            for (int i = 0; i < 29; i++)
             {
                 for (int j = 0; j < 4; j++)
                 {
@@ -129,6 +131,9 @@ namespace KillingMahjong.UI
                 InitializePool(uiManager);
             }
 
+            // 検索時は通常ドラフラグ(0x20)を除外したIDを使う (赤ドラフラグ0x40は残す)
+            int searchId = encodedId & ~0x20;
+
             for (int i = 0; i < _poolSlots.Count; i++)
             {
                 Transform slot = _poolSlots[i];
@@ -136,7 +141,8 @@ namespace KillingMahjong.UI
                 {
                     Transform tileTransform = slot.GetChild(0);
                     var interaction = tileTransform.GetComponent<TileInteraction>();
-                    if (interaction != null && interaction.TileId == encodedId)
+                    // プール内の牌は生成時にドラフラグを持たないので、searchIdと照合する
+                    if (interaction != null && (interaction.TileId & ~0x20) == searchId)
                     {
                         GameObject obj = tileTransform.gameObject;
                         obj.transform.SetParent(parent, false);
@@ -147,7 +153,19 @@ namespace KillingMahjong.UI
                         obj.transform.localScale = Vector3.one;
 
                         var interactions = obj.GetComponentsInChildren<TileInteraction>(true);
-                        foreach (var inter in interactions) inter.enabled = true;
+                        foreach (var inter in interactions)
+                        {
+                            // ドラフラグを含む本来のIDを再セットする
+                            inter.TileId = encodedId;
+                            inter.enabled = true;
+                        }
+
+                        // Visual側にも本来のIDをセットして、ドラエフェクトなどの更新ができるようにする
+                        var visual = obj.GetComponent<TileVisual>();
+                        if (visual != null && uiManager.TileResourceManager != null)
+                        {
+                            visual.SetTile(encodedId, uiManager.TileResourceManager.GetTileSprite(encodedId & 0x1F));
+                        }
 
                         var images = obj.GetComponentsInChildren<UnityEngine.UI.Image>(true);
                         foreach (var img in images) { img.raycastTarget = true; }
@@ -157,7 +175,7 @@ namespace KillingMahjong.UI
                 }
             }
 
-            Debug.LogWarning($"[TilePoolManager] Could not find tile with ID {encodedId} in pool! Instantiating fallback.");
+            Debug.LogWarning($"[TilePoolManager] Could not find tile with ID {encodedId} (searchId {searchId}) in pool! Instantiating fallback.");
             
             GameObject fallbackObj;
             if (uiManager != null && uiManager.TilePrefab != null)
@@ -201,14 +219,23 @@ namespace KillingMahjong.UI
             {
                 obj.transform.SetParent(targetSlot, false);
                 
-                var visual = obj.GetComponent<TileVisual>();
-                var uiManager = FindFirstObjectByType<GameUIManager>();
-                if (visual != null && uiManager != null && uiManager.TileResourceManager != null && tileId != -1)
+                if (interaction != null)
                 {
-                    visual.SetTile(tileId, uiManager.TileResourceManager.GetTileSprite(tileId));
+                    // プールに戻す際はドラフラグを初期化し、ベースのID（+赤ドラ）のみにする
+                    interaction.TileId &= ~0x20;
                 }
-                
-                obj.SetActive(showDebugVisuals);
+
+                var visual = obj.GetComponent<TileVisual>();
+                if (visual != null && interaction != null)
+                {
+                    // Mangerへの参照がないため、ここではIDのみ戻しておく（使用時に再度SetTileされる）
+                    visual.SetTile(interaction.TileId, null);
+                }
+
+                var cg = obj.GetComponent<CanvasGroup>();
+                if (cg != null) { cg.alpha = 1f; cg.blocksRaycasts = false; }
+
+                obj.SetActive(_container.gameObject.activeInHierarchy && _container.GetComponent<CanvasGroup>().alpha > 0);
             }
             else
             {

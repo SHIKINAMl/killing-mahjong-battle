@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using KillingMahjong.Common;
 
 namespace KillingMahjong.UI
 {
@@ -162,7 +163,7 @@ namespace KillingMahjong.UI
                             // 以降は tileTrans ではなく tileObj を使用する
                             var canvas = tileObj.AddComponent<Canvas>();
                             canvas.renderMode = RenderMode.WorldSpace;
-                            canvas.sortingOrder = 10;
+                            canvas.sortingOrder = UISortingOrders.DoraTile;
 
                             var rt = tileObj.GetComponent<RectTransform>();
                             if (rt == null) rt = tileObj.AddComponent<RectTransform>();

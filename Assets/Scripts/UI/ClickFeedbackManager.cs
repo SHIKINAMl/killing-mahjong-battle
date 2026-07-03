@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.InputSystem;
 using System.Collections;
+using KillingMahjong.Common;
 
 namespace KillingMahjong.UI
 {
@@ -35,7 +36,7 @@ namespace KillingMahjong.UI
             canvasObj.transform.SetParent(transform);
             targetCanvas = canvasObj.AddComponent<Canvas>();
             targetCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            targetCanvas.sortingOrder = 32000; // 最前面に表示
+            targetCanvas.sortingOrder = UISortingOrders.ClickFeedback;
 
             var scaler = canvasObj.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
