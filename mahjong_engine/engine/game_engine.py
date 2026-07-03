@@ -30,6 +30,7 @@ class GameEngine:
         self.num_players = 2
         self.max_rounds = max_rounds
         self._carry_over_bets = False
+        self._carry_over_draw_count = 0
         self._last_liquidation_result: Optional[dict] = None
         self._next_round_ready_players: set[str] = set()
         self._pending_agari: Optional[dict] = None
@@ -644,6 +645,22 @@ class GameEngine:
         if han >= 4:
             return 1.0
 
+    def _get_multiplier_label(self, han: int) -> str:
+        """翻数から点数倍率の呼称を返す。"""
+        if han >= 26:
+            return "ダブル役満"
+        if han >= 13:
+            return "役満"
+        if han >= 11:
+            return "三倍満"
+        if han >= 8:
+            return "倍満"
+        if han >= 6:
+            return "跳満"
+        if han >= 4:
+            return "満貫"
+        return "満貫未満"
+
     def _is_tanki_wait_agari(self, hand: list[int], winning_tile: int, winner_waits: list[int]) -> bool:
         """単騎待ちでの和了かどうかを判定する。"""
         if winning_tile is None or not winner_waits:
@@ -740,13 +757,18 @@ class GameEngine:
         logger.info("精算: winner=%s  yaku=%s  base_han=%d  bonus_han=%d  multiplier=%.1f",
                     winner.player_id, display_yaku_list, base_han, bonus_han, multiplier)
 
-        # 勝者: 自身の賭け金 × 自身の役倍率分を獲得
-        winner_gain = int(winner.bet * multiplier)
+        # 流局持ち越しは「支払い設定額を固定」し、清算時のみ累積回数を掛ける。
+        carry_rounds = self._carry_over_draw_count + 1
+        winner_effective_bet = winner.bet * carry_rounds
+        loser_effective_bet = loser.bet * carry_rounds
+
+        # 勝者: 累積済み掛け金 × 役倍率分を獲得
+        winner_gain = int(winner_effective_bet * multiplier)
         winner.health += winner_gain
 
         # 敗者: 単騎待ち和了時のみ支払いを倍化（勝者獲得量は据え置き）
         loser_loss_multiplier = 2 if is_tanki_wait else 1
-        loser_loss = int(loser.bet * multiplier * loser_loss_multiplier)
+        loser_loss = int(loser_effective_bet * multiplier * loser_loss_multiplier)
         loser.health = max(0, loser.health - loser_loss)
 
         self._last_liquidation_result = {
@@ -759,12 +781,13 @@ class GameEngine:
             "bonus_han": bonus_han,
             "han": han,
             "multiplier": multiplier,
-            "winner_bet": winner.bet,
-            "loser_bet": loser.bet,
+            "winner_bet": winner_effective_bet,
+            "loser_bet": loser_effective_bet,
             "winner_gain": winner_gain,
             "loser_loss": loser_loss,
             "loser_loss_multiplier": loser_loss_multiplier,
             "is_tanki_wait": is_tanki_wait,
+            "carry_over_draw_count": self._carry_over_draw_count,
             "winner_health": winner.health,
             "loser_health": loser.health,
         }
@@ -841,10 +864,9 @@ class GameEngine:
             return
 
         if is_draw:
-            # 流局が続く間は、最初に設定した掛け金を毎局分として加算する。
-            for player in self.state.players:
-                if player.base_bet > 0:
-                    player.bet += player.base_bet
+            self._carry_over_draw_count += 1
+        else:
+            self._carry_over_draw_count = 0
 
         self._carry_over_bets = is_draw
         self._next_round_ready_players.clear()
@@ -892,7 +914,7 @@ class GameEngine:
             if key in player.__dataclass_fields__:
                 setattr(player, key, value)
 
-    def get_waits(self, hand_indexes: list[int], player: PlayerState) -> list[tuple[int, bool, list[str], list[str]]]:
+    def get_waits(self, hand_indexes: list[int], player: PlayerState) -> list[tuple[int, bool, list[str], list[str], int, float, str]]:
         """
         手牌から待ち牌を取得
 
@@ -906,6 +928,9 @@ class GameEngine:
                 - 満貫以上の待ちかどうか
                 - 表示用役のリスト（役名+強化回数）
                 - 生の役のリスト
+                - 合計翻数
+                - 点数倍率
+                - 点数倍率の呼称
         """
         # index から牌 ID に変換
         hand_tiles = [player.wall[idx] for idx in hand_indexes]
@@ -922,8 +947,11 @@ class GameEngine:
             base_yaku_list = HandAnalyzer.enum_yaku(hand_tiles + [w], winning_tile=w)
             base_han = sum(Yaku.get_han_by_name(y) for y in base_yaku_list)
             bonus = sum(boost_bonus_map.get(y, 0) for y in base_yaku_list)
+            total_han = base_han + bonus
             display_yaku_list = self._build_display_yaku_list(base_yaku_list, boost_bonus_map)
-            result.append((w, base_han + bonus >= 4, display_yaku_list, base_yaku_list))
+            multiplier = self._get_liquidation_multiplier(total_han) if total_han >= 4 else 0.0
+            multiplier_label = self._get_multiplier_label(total_han)
+            result.append((w, total_han >= 4, display_yaku_list, base_yaku_list, total_han, multiplier, multiplier_label))
         return result
 
 
