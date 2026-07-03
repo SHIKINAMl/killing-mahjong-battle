@@ -116,6 +116,15 @@ namespace KillingMahjong.UI
                 return;
             }
 
+            // Bettingフェーズ中は手牌のリビルドを行わない。
+            // リビルドするとDiscardフェーズ用のコンテナからHandSelection用コンテナに牌が移され、
+            // 牌が消えてプールに戻ってしまうバグの原因となる。
+            if (uiManager.CurrentPhaseStatus == RoundStatus.Betting)
+            {
+                Debug.Log("[GameUIVisualController] Betting phase. Skipping RebuildAllTilesFromState.");
+                return;
+            }
+
             var board = BoardStateManager.Instance;
             List<int> currentWallIds = new List<int>(board.CurrentWallTiles);
             List<int> currentHandIds = new List<int>(board.CurrentHandTiles);

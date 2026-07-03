@@ -564,7 +564,13 @@ namespace KillingMahjong.UI
                 foreach (Transform t in wallUI.GetWallSlots().ToArray()) if (t != null) VisualController.ReturnTileToPool(t.gameObject);
                 wallUI.GetWallSlots().Clear();
             }
-            if (enemyHandUI != null) enemyHandUI.ClearHand();
+            if (enemyHandUI != null)
+            {
+                // ClearHand() はリストをクリアするだけなので、先にGameObjectをプールに返却する。
+                // （返却しないと前局の敵手牌が孤児化して画面に残り続ける）
+                foreach (RectTransform t in enemyHandUI.GetHandSlots().ToArray()) if (t != null) VisualController.ReturnTileToPool(t.gameObject);
+                enemyHandUI.ClearHand();
+            }
             if (enemyWallUI != null)
             {
                 foreach (Transform t in enemyWallUI.GetEnemyWallSlots().ToArray()) if (t != null) VisualController.ReturnTileToPool(t.gameObject);

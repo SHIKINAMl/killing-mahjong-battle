@@ -123,6 +123,13 @@ namespace KillingMahjong.UI
                                   phaseStatus == RoundStatus.Draw;
             if (isGameEndPhase) return;
 
+            // Bettingフェーズではコンテナ切り替え／レイアウト更新を行わない。
+            // どの呼び出し元経由でも牌が消えるバグの原因となるため、発生源で一括ガードする。
+            if (phaseStatus == RoundStatus.Betting)
+            {
+                return;
+            }
+
             bool isBoardActivePhase = phaseStatus == RoundStatus.Discard;
 
             var layoutGroup = handSlotContainer.GetComponent<UnityEngine.UI.LayoutGroup>();

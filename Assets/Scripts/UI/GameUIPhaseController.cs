@@ -159,6 +159,8 @@ namespace KillingMahjong.UI
 
             if (!isGameEndPhase && !uiManager.IsTransitioning)
             {
+                // コンテナ切り替えはBetting時にHandBaseUI.UpdateLayout内部でガードされる。
+                // ここでは呼び出しをスキップしない（ボタン表示の更新のために必要）。
                 if (uiManager.HandUI != null) uiManager.HandUI.UpdateLayout(uiManager.CurrentPhaseStatus);
 
                 if (uiManager.WallUI != null)

@@ -135,10 +135,27 @@ namespace KillingMahjong.Managers
                 List<int> actualHandIds = new List<int>();
                 LocalHandIndexes = new List<int>();
 
+                // hand はサーバー由来の「牌の値」のリスト（壁インデックスではない）。
+                // 値一致で壁スロットを1枚ずつ消費して手牌に割り当てる（重複牌対応）。
+                // 完全一致を優先し、無ければ baseId(0x1F) でドラフラグ差を許容して照合する。
+                List<int> remainingHand = hand != null ? new List<int>(hand) : null;
+
                 for (int i = 0; i < wall.Count; i++)
                 {
-                    if (hand != null && hand.Contains(i))
+                    int matchIdx = -1;
+                    if (remainingHand != null)
                     {
+                        matchIdx = remainingHand.IndexOf(wall[i]);
+                        if (matchIdx < 0)
+                        {
+                            int baseId = wall[i] & 0x1F;
+                            matchIdx = remainingHand.FindIndex(t => (t & 0x1F) == baseId);
+                        }
+                    }
+
+                    if (matchIdx >= 0)
+                    {
+                        remainingHand.RemoveAt(matchIdx);
                         actualHandIds.Add(wall[i]);
                         LocalHandIndexes.Add(i);
                     }
@@ -146,6 +163,11 @@ namespace KillingMahjong.Managers
                     {
                         displayWall.Add(wall[i]);
                     }
+                }
+
+                if (remainingHand != null && remainingHand.Count > 0)
+                {
+                    Debug.LogWarning($"[BoardStateManager] SetLocalState: {remainingHand.Count} 枚の手牌が壁に見つかりませんでした: [{string.Join(",", remainingHand)}]");
                 }
                 
                 // CurrentWallTiles は山牌として残る牌（表示側で手牌と結合して理牌し、引っこ抜く）
@@ -171,14 +193,26 @@ namespace KillingMahjong.Managers
                 
                 if (hand != null)
                 {
-                    foreach (int hIndex in hand)
+                    // hand は「牌の値」のリスト（壁インデックスではない）。SetLocalState と同じ規約で照合する。
+                    List<int> remainingHand = new List<int>(hand);
+                    for (int i = 0; i < wall.Count; i++)
                     {
-                        if (hIndex >= 0 && hIndex < wall.Count)
+                        int matchIdx = remainingHand.IndexOf(wall[i]);
+                        if (matchIdx < 0)
                         {
-                            int actualId = wall[hIndex];
-                            actualHandIds.Add(actualId);
-                            EnemyHandIndexes.Add(hIndex);
+                            int baseId = wall[i] & 0x1F;
+                            matchIdx = remainingHand.FindIndex(t => (t & 0x1F) == baseId);
                         }
+                        if (matchIdx >= 0)
+                        {
+                            remainingHand.RemoveAt(matchIdx);
+                            actualHandIds.Add(wall[i]);
+                            EnemyHandIndexes.Add(i);
+                        }
+                    }
+                    if (remainingHand.Count > 0)
+                    {
+                        Debug.LogWarning($"[BoardStateManager] SetEnemyState: {remainingHand.Count} 枚の手牌が壁に見つかりませんでした: [{string.Join(",", remainingHand)}]");
                     }
                 }
                 CurrentEnemyWallTiles = OriginalEnemyWallTiles;

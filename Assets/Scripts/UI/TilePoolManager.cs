@@ -14,10 +14,13 @@ namespace KillingMahjong.UI
 
         private List<Transform> _poolSlots = new List<Transform>();
         private bool _isInitialized = false;
+        private GameUIManager _uiManager;
+        private List<int> _slotTileIds = new List<int>(); // 各スロットの本来の牌 ID（初期化時の deck 順）
         [SerializeField] private Transform _container;
 
         public void InitializePool(GameUIManager uiManager)
         {
+            _uiManager = uiManager;
             if (_isInitialized) return;
 
             if (_container == null)
@@ -81,6 +84,7 @@ namespace KillingMahjong.UI
                     slotRt.SetParent(_container, false);
                     slotRt.sizeDelta = grid.cellSize;
                     _poolSlots.Add(slotRt);
+                    _slotTileIds.Add(tileId);
 
                     GameObject obj = Instantiate(uiManager.TilePrefab, slotRt);
                     
@@ -205,20 +209,60 @@ namespace KillingMahjong.UI
             int tileId = interaction != null ? interaction.TileId : -1;
 
             Transform targetSlot = null;
-            // 本来はTileIdに合致するスロットを探すべきだが、簡単な実装として空いているスロットの若い順に戻す
-            for (int i = 0; i < _poolSlots.Count; i++)
+            // 元のIDに合致する空きスロットを優先して戻す
+            // （赤ドラ0x40込みの完全一致 → baseId(0x1F)一致 → 任意の空き、の順）
+            if (tileId >= 0)
             {
-                if (_poolSlots[i].childCount == 0)
+                int normalizedId = tileId & ~0x20;
+                for (int i = 0; i < _poolSlots.Count && i < _slotTileIds.Count; i++)
                 {
-                    targetSlot = _poolSlots[i];
-                    break;
+                    if (_poolSlots[i].childCount == 0 && _slotTileIds[i] == normalizedId)
+                    {
+                        targetSlot = _poolSlots[i];
+                        break;
+                    }
+                }
+                if (targetSlot == null)
+                {
+                    for (int i = 0; i < _poolSlots.Count && i < _slotTileIds.Count; i++)
+                    {
+                        if (_poolSlots[i].childCount == 0 && (_slotTileIds[i] & 0x1F) == (tileId & 0x1F))
+                        {
+                            targetSlot = _poolSlots[i];
+                            break;
+                        }
+                    }
+                }
+            }
+            if (targetSlot == null)
+            {
+                for (int i = 0; i < _poolSlots.Count; i++)
+                {
+                    if (_poolSlots[i].childCount == 0)
+                    {
+                        targetSlot = _poolSlots[i];
+                        break;
+                    }
                 }
             }
 
             if (targetSlot != null)
             {
                 obj.transform.SetParent(targetSlot, false);
-                
+
+                // 直前のレイアウトでついたローカル座標・回転・スケールをリセットし、
+                // スロットの中心にぴったり収まるようにする
+                var rt = obj.transform as RectTransform;
+                if (rt != null)
+                {
+                    rt.anchorMin = new Vector2(0.5f, 0.5f);
+                    rt.anchorMax = new Vector2(0.5f, 0.5f);
+                    rt.pivot = new Vector2(0.5f, 0.5f);
+                    rt.anchoredPosition3D = Vector3.zero;
+                    rt.localRotation = Quaternion.identity;
+                    rt.localScale = Vector3.one;
+                }
+
                 if (interaction != null)
                 {
                     // プールに戻す際はドラフラグを初期化し、ベースのID（+赤ドラ）のみにする
@@ -228,8 +272,16 @@ namespace KillingMahjong.UI
                 var visual = obj.GetComponent<TileVisual>();
                 if (visual != null && interaction != null)
                 {
-                    // Mangerへの参照がないため、ここではIDのみ戻しておく（使用時に再度SetTileされる）
-                    visual.SetTile(interaction.TileId, null);
+                    // 表向きのスプライトを当て直して戻す（敵の裏牌表示などをリセット）
+                    Sprite sprite = null;
+                    if (_uiManager != null && _uiManager.TileResourceManager != null)
+                    {
+                        sprite = _uiManager.TileResourceManager.GetTileSprite(interaction.TileId & 0x1F);
+                    }
+                    visual.SetTile(interaction.TileId, sprite);
+                    visual.SetHoverHighlight(false);
+                    visual.SetFuritenHighlight(false);
+                    visual.SetExposed(false);
                 }
 
                 var cg = obj.GetComponent<CanvasGroup>();
