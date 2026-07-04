@@ -380,6 +380,7 @@ namespace KillingMahjong.UI
 
             // 毎回の更新で、透視状態だけはフルリビルドに関わらず必ず同期する
             SyncLocalExposedState(board);
+            SyncLocalFuritenState(board);
 
             if (uiManager.WaitUI != null && (uiManager.CurrentPhaseStatus == RoundStatus.Discard || uiManager.CurrentPhaseStatus == RoundStatus.HandSelection))
             {
@@ -455,6 +456,50 @@ namespace KillingMahjong.UI
                         if (isExposed) localExposedActualIds.Remove(interaction.TileId);
                         visual.SetExposed(isExposed);
                     }
+                }
+            }
+        }
+
+        private void SyncLocalFuritenState(Managers.BoardStateManager board)
+        {
+            // --- 手牌のアラートはすべてオフにする ---
+            if (uiManager.HandUI != null)
+            {
+                foreach (var rt in uiManager.HandUI.GetHandSlots())
+                {
+                    if (rt == null) continue;
+                    var visual = rt.GetComponent<TileVisual>();
+                    if (visual != null) visual.SetFuritenHighlight(false);
+                }
+            }
+
+            if (uiManager.WallUI == null) return;
+            
+            // --- 打牌フェーズ(Discard)の時だけアラートを表示する ---
+            bool isDiscardPhase = (uiManager.CurrentPhaseStatus == RoundStatus.Discard);
+
+            // 自分の待ち牌のベースID（ドラフラグ0x20を除いた純粋な牌ID）のリストを作成
+            List<int> waitBaseIds = new List<int>();
+            if (isDiscardPhase && board.CurrentWaitTiles != null)
+            {
+                foreach (int waitId in board.CurrentWaitTiles)
+                {
+                    waitBaseIds.Add(waitId & 0x1F);
+                }
+            }
+
+            // --- 壁の牌に対してアラートを設定する ---
+            foreach (var rt in uiManager.WallUI.GetWallSlots())
+            {
+                if (rt == null) continue;
+                var interaction = rt.GetComponent<TileInteraction>();
+                var visual = rt.GetComponent<TileVisual>();
+                if (interaction != null && visual != null)
+                {
+                    // 壁牌のベースIDが待ち牌のベースIDに含まれていればフリテン警告対象
+                    // （isDiscardPhase == false なら waitBaseIds は空なので自動的に false になる）
+                    bool isFuritenAlert = waitBaseIds.Contains(interaction.TileId & 0x1F);
+                    visual.SetFuritenHighlight(isFuritenAlert);
                 }
             }
         }

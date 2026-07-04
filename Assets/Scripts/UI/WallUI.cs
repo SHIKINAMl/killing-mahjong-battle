@@ -294,6 +294,15 @@ namespace KillingMahjong.UI
 
         public void UpdateWallHighlights(List<int> waitTiles, bool isDiscardPhase)
         {
+            List<int> waitBaseIds = new List<int>();
+            if (isDiscardPhase && waitTiles != null)
+            {
+                foreach (int waitId in waitTiles)
+                {
+                    waitBaseIds.Add(waitId & 0x1F);
+                }
+            }
+
             foreach (var slot in wallSlots)
             {
                 if (slot == null) continue;
@@ -301,8 +310,8 @@ namespace KillingMahjong.UI
                 var interaction = slot.GetComponent<TileInteraction>();
                 if (visual != null && interaction != null)
                 {
-                    // ここでも赤枠を更新しないようfalseで固定
-                    visual.SetFuritenHighlight(false);
+                    bool isFuritenAlert = waitBaseIds.Contains(interaction.TileId & 0x1F);
+                    visual.SetFuritenHighlight(isFuritenAlert);
                 }
             }
         }

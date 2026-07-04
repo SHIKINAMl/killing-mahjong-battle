@@ -86,7 +86,7 @@ namespace KillingMahjong.UI
             charRt.anchorMax = new Vector2(0.5f, 0.5f);
             charRt.sizeDelta = new Vector2(1000f, 1000f);
             charRt.localRotation = Quaternion.Euler(0, 0, -15f); // キャラは傾きをキャンセルしてまっすぐに
-            charRt.anchoredPosition = new Vector2(-200f, 0); // 左側に寄せる
+            charRt.anchoredPosition = new Vector2(-200f, -250f); // 左側に寄せつつ、顔が中心に来るように全体を下へずらす
 
             // 4.5 顔パーツ画像（身体の上に乗せる）
             if (faceSprite != null)
