@@ -14,6 +14,10 @@ namespace KillingMahjong.UI
         [Header("Boost Bonus")]
         [SerializeField] private TextMeshProUGUI boostBonusText; // 動的生成も可
 
+        [Header("Ready Mark")]
+        [SerializeField] private GameObject readyBoxContainer;
+        [SerializeField] private GameObject readyCheckImage;
+
         [Header("Zoom Target")]
         [SerializeField] private Transform zoomTarget; // 追加：拡大させたい子オブジェクトを指定
         [SerializeField] private Vector3 zoomOffsetUI = new Vector3(-1200f, 100f, -500f); // ズーム時に手前に出すためVector3に変更
@@ -39,6 +43,7 @@ namespace KillingMahjong.UI
         // ズーム用
         private Vector3 originalLocalPos;
         private Vector3 originalScale;
+        private bool isZoomedIn = false; // 追加：ズーム状態を管理
 
         private bool isInitialized = false;
 
@@ -56,6 +61,19 @@ namespace KillingMahjong.UI
             {
                 StopCoroutine(blinkCoroutine);
                 blinkCoroutine = null;
+            }
+        }
+
+        private void LateUpdate()
+        {
+            // アニメーター等で強制的に10に戻されてしまうのを防ぐため、ズーム中は毎フレーム最後に20に上書きする
+            if (isZoomedIn)
+            {
+                var myCanvas = GetComponent<Canvas>();
+                if (myCanvas != null && myCanvas.sortingOrder != 20)
+                {
+                    myCanvas.sortingOrder = 20;
+                }
             }
         }
 
@@ -319,12 +337,24 @@ namespace KillingMahjong.UI
         // --- ズーム演出（指定したオブジェクトを巨大化し、少し手前・上に浮かせる） ---
         public System.Collections.IEnumerator ZoomInRoutine(float duration = 0.4f, float targetScaleMulti = 2.5f)
         {
+            Debug.Log($"[PlayerInfoUI] ZoomInRoutine called! Target scale: {targetScaleMulti}");
             if (zoomCoroutine != null) StopCoroutine(zoomCoroutine);
+            
+            isZoomedIn = true; // ズーム開始
 
             Transform targetObj = zoomTarget != null ? zoomTarget : transform;
             
             // ズーム対象が何であれ、PlayerInfoUI全体を最前面に出す
             BringToFront(transform);
+
+            // 強制的にCanvasのSortOrderを20にする（インスペクターで10のままになる現象の回避）
+            var myCanvas = GetComponent<Canvas>();
+            if (myCanvas != null)
+            {
+                Debug.Log($"[PlayerInfoUI] Current sortingOrder was {myCanvas.sortingOrder}, setting to 20.");
+                myCanvas.overrideSorting = true;
+                myCanvas.sortingOrder = 20;
+            }
 
             // 0の場合の安全対策
             if (originalScale == Vector3.zero) originalScale = Vector3.one;
@@ -369,6 +399,7 @@ namespace KillingMahjong.UI
 
         public void ResetZoomImmediate()
         {
+            isZoomedIn = false; // ズーム終了
             if (zoomCoroutine != null) StopCoroutine(zoomCoroutine);
             Transform targetObj = zoomTarget != null ? zoomTarget : transform;
             var floatAnims = GetComponentsInChildren<FloatingAnimator>(true);
@@ -380,10 +411,18 @@ namespace KillingMahjong.UI
             targetObj.localPosition = originalLocalPos;
             targetObj.localScale = originalScale;
             ResetSorting(transform);
+
+            // ズーム解除時に確実に10に戻す
+            var myCanvas = GetComponent<Canvas>();
+            if (myCanvas != null)
+            {
+                myCanvas.sortingOrder = 10;
+            }
         }
 
         public System.Collections.IEnumerator ResetZoomRoutine(float duration = 0.3f)
         {
+            isZoomedIn = false; // ズーム終了
             if (zoomCoroutine != null) StopCoroutine(zoomCoroutine);
 
             Transform targetObj = zoomTarget != null ? zoomTarget : transform;
@@ -412,6 +451,34 @@ namespace KillingMahjong.UI
                 anim.enabled = true;
             }
             ResetSorting(transform);
+
+            // ズーム解除時に確実に10に戻す
+            var myCanvas = GetComponent<Canvas>();
+            if (myCanvas != null)
+            {
+                myCanvas.sortingOrder = 10;
+            }
+        }
+
+        public void ShowReadyBox(bool show)
+        {
+            if (readyBoxContainer != null)
+            {
+                readyBoxContainer.SetActive(show);
+            }
+            // ボックス表示時はチェックを外す、非表示時も念のため外す
+            if (readyCheckImage != null)
+            {
+                readyCheckImage.SetActive(false);
+            }
+        }
+
+        public void SetReadyCheck(bool isReady)
+        {
+            if (readyCheckImage != null)
+            {
+                readyCheckImage.SetActive(isReady);
+            }
         }
     }
 }

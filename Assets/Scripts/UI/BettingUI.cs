@@ -102,7 +102,7 @@ namespace KillingMahjong.UI
             {
                 canvas.overrideSorting = true;
                 canvas.sortingLayerName = "UI";
-                canvas.sortingOrder = UISortingOrders.BettingPanel;
+                canvas.sortingOrder = 20; // 敵のdialogより前にするために20に設定
             }
 
             gameObject.SetActive(true);
@@ -136,7 +136,6 @@ namespace KillingMahjong.UI
                 return;
             }
 
-            // スライドアウトアニメーションを廃止して即時非表示
             if (hpBarPanel != null)
             {
                 StopAllCoroutines();

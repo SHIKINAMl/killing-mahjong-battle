@@ -105,9 +105,9 @@ namespace KillingMahjong.UI
             uiManager.HandSelectionController?.HandleNotTenpaiReceived(reason);
         }
 
-        private void HandleNextRoundWaitingReceived()
+        private void HandleNextRoundWaitingReceived(NextRoundWaitingData data)
         {
-            uiManager.PhaseController?.HandleNextRoundWaitingReceived();
+            uiManager.PhaseController?.HandleNextRoundWaitingReceived(data);
         }
 
         private void HandleHandSelectionConfirmation(HandSelectionConfirmationData data)
