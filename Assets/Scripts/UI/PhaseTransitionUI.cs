@@ -731,34 +731,17 @@ namespace KillingMahjong.UI
             }
             if (checkerMaterial != null) checkerMaterial.SetFloat("_Progress", 1f);
 
-            // 線とテキストを隠す
-            if (horizontalLineRt != null)
-            {
-                horizontalLineRt.gameObject.SetActive(false);
-                horizontalLineRt.localScale = new Vector3(1, 0.15f, 1f);
-            }
-            if (centerText != null) centerText.gameObject.SetActive(false);
-
             // === 3. 暗転中のコールバック (UIリセットなど) ===
             Debug.Log("[DrawTransition] Midpoint invoked");
             onMidpoint?.Invoke();
 
+            isDarkened = true; // 暗転状態を記録
+
             // 少し暗転状態で待機
             yield return new WaitForSeconds(1.0f);
 
-            // === 4. 市松模様フェードアウト (晴れる) ===
-            Debug.Log("[DrawTransition] Step 4 - Checker Fade Out");
-            t = 0;
-            while (t < checkerFadeDuration)
-            {
-                if (checkerMaterial != null) checkerMaterial.SetFloat("_Progress", 1f - (t / checkerFadeDuration));
-                t += Time.deltaTime;
-                yield return null;
-            }
-            if (checkerMaterial != null) checkerMaterial.SetFloat("_Progress", 0f);
-            if (fullScreenCheckerImage != null) fullScreenCheckerImage.gameObject.SetActive(false);
-
-            Debug.Log("[DrawTransition] Complete");
+            // フェードアウトせずに暗転状態を維持したまま完了とする
+            Debug.Log("[DrawTransition] Complete (stay dark)");
             onComplete?.Invoke();
         }
 

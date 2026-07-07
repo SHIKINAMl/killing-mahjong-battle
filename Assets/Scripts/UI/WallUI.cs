@@ -227,6 +227,26 @@ namespace KillingMahjong.UI
                     j++;
                 }
             }
+
+            // 安全網: 配置されずに余った generatedTiles があれば、確実にプールに返す（幽霊オブジェクトによる西増殖バグ防止）
+            if (remainingGeneratedTiles.Count > 0)
+            {
+                var poolManager = UnityEngine.Object.FindFirstObjectByType<TilePoolManager>();
+                if (poolManager != null)
+                {
+                    foreach (var leftover in remainingGeneratedTiles)
+                    {
+                        if (leftover != null) poolManager.ReturnTileToPool(leftover.gameObject);
+                    }
+                }
+                else
+                {
+                    foreach (var leftover in remainingGeneratedTiles)
+                    {
+                        if (leftover != null) Destroy(leftover.gameObject);
+                    }
+                }
+            }
         }
 
         private int GetCategoryPriority(List<TileData> list)

@@ -8,6 +8,8 @@ namespace KillingMahjong.UI
     {
         // 敵の本来の牌IDを記録する（見た目は0のダミーでも、後々の公開イベントで使うため）
         private List<int> realTileIds = new List<int>();
+        
+        public List<int> GetRealTileIds() => realTileIds;
 
         public void AddEnemyTile(RectTransform tileTransform, int visualId, int realId)
         {
@@ -119,6 +121,36 @@ namespace KillingMahjong.UI
             }
         }
 
+        public override void SortHandSlots()
+        {
+            var pairs = new List<System.Tuple<int, RectTransform>>();
+            for (int i = 0; i < handSlots.Count; i++)
+            {
+                int id = (i < realTileIds.Count) ? realTileIds[i] : 0;
+                pairs.Add(new System.Tuple<int, RectTransform>(id, handSlots[i]));
+            }
+            
+            pairs.Sort((a, b) =>
+            {
+                int baseA = a.Item1 & 0x1F;
+                int baseB = b.Item1 & 0x1F;
+                if (baseA != baseB) return baseA.CompareTo(baseB);
+                return a.Item1.CompareTo(b.Item1);
+            });
+
+            handSlots.Clear();
+            realTileIds.Clear();
+            for (int i = 0; i < pairs.Count; i++)
+            {
+                var p = pairs[i];
+                realTileIds.Add(p.Item1);
+                handSlots.Add(p.Item2);
+                p.Item2.SetSiblingIndex(i);
+            }
+            
+            if (gameUIManager != null) UpdateLayout(gameUIManager.CurrentPhaseStatus);
+        }
+
         public override void UpdateLayout(RoundStatus phaseStatus)
         {
             if (handSlotContainer == null) return;
@@ -127,9 +159,8 @@ namespace KillingMahjong.UI
                                   phaseStatus == RoundStatus.Ron || 
                                   phaseStatus == RoundStatus.Result || 
                                   phaseStatus == RoundStatus.Draw;
-            if (isGameEndPhase) return;
 
-            bool isBoardActivePhase = phaseStatus == RoundStatus.Discard;
+            bool isBoardActivePhase = phaseStatus == RoundStatus.Discard || isGameEndPhase;
 
             var layoutGroup = handSlotContainer.GetComponent<UnityEngine.UI.LayoutGroup>();
             Transform activeContainer = (isBoardActivePhase && discardPhaseContainer != null) 

@@ -107,9 +107,17 @@ namespace KillingMahjong.UI
                 {
                     ids.Add(wait.tile);
                     string yakuText = (wait.yaku != null && wait.yaku.Length > 0) ? string.Join(" / ", wait.yaku) : "役なし";
-                    bool isMangan = wait.mangan_or_more;
-                    string manganText = isMangan ? "満貫以上" : "満貫未満";
-                    message += $"-> {yakuText} ({manganText})\n";
+                    
+                    // 翻数(han)とmangan_or_moreに基づいて詳細なランクを決定する
+                    string rankText = "満貫未満";
+                    if (wait.yaku != null && System.Array.Exists(wait.yaku, y => y.Contains("役満"))) rankText = "役満確定";
+                    else if (wait.han >= 13) rankText = "数え役満以上";
+                    else if (wait.han >= 11) rankText = "三倍満以上";
+                    else if (wait.han >= 8) rankText = "倍満以上";
+                    else if (wait.han >= 6) rankText = "跳満以上";
+                    else if (wait.han >= 5 || wait.mangan_or_more) rankText = "満貫以上";
+                    
+                    message += $"-> {yakuText} ({rankText})\n";
                 }
                 waitTileIds = ids.ToArray();
             }

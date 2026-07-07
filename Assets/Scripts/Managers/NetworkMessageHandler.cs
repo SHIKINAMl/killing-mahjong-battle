@@ -38,6 +38,15 @@ namespace KillingMahjong.Network
         public List<int> exposedHandIndexes;
         // manually populated
         public System.Collections.Generic.Dictionary<string, System.Collections.Generic.List<int>> exposedHandIndexesByPlayer;
+        public MulliganResultData mulliganResult;
+    }
+
+    [System.Serializable]
+    public class MulliganResultData
+    {
+        public int targetHandIndex;
+        public int oldTile;
+        public int newTile;
     }
 
     [System.Serializable]

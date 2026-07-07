@@ -88,6 +88,15 @@ namespace KillingMahjong.UI
 
                     GameObject obj = Instantiate(uiManager.TilePrefab, slotRt);
                     
+                    var objRt = obj.transform as RectTransform;
+                    if (objRt != null)
+                    {
+                        objRt.anchorMin = new Vector2(0.5f, 0.5f);
+                        objRt.anchorMax = new Vector2(0.5f, 0.5f);
+                        objRt.pivot = new Vector2(0.5f, 0.5f);
+                        objRt.anchoredPosition = Vector2.zero;
+                    }
+
                     var visual = obj.GetComponent<TileVisual>();
                     if (visual != null && uiManager.TileResourceManager != null)
                     {
@@ -97,6 +106,7 @@ namespace KillingMahjong.UI
                     var interaction = obj.GetComponent<TileInteraction>();
                     if (interaction == null) interaction = obj.AddComponent<TileInteraction>();
                     interaction.Initialize(tileId, false, uiManager, canvas);
+                    interaction.PoolSlotIndex = i; // ★ 自分が属するスロット番号を記憶させる
 
                     obj.SetActive(showDebugVisuals);
                 }
@@ -207,43 +217,24 @@ namespace KillingMahjong.UI
 
             var interaction = obj.GetComponent<TileInteraction>();
             int tileId = interaction != null ? interaction.TileId : -1;
+            int poolIndex = interaction != null ? interaction.PoolSlotIndex : -1;
 
             Transform targetSlot = null;
-            // 元のIDに合致する空きスロットを優先して戻す
-            // （赤ドラ0x40込みの完全一致 → baseId(0x1F)一致 → 任意の空き、の順）
-            if (tileId >= 0)
+            
+            // ★ コンポーネントに記憶されている PoolSlotIndex を使って直接元のスロットに戻す
+            if (poolIndex >= 0 && poolIndex < _poolSlots.Count)
             {
-                int normalizedId = tileId & ~0x20;
-                for (int i = 0; i < _poolSlots.Count && i < _slotTileIds.Count; i++)
+                // もし元のスロットが既に空いていればそこに戻す
+                if (_poolSlots[poolIndex].childCount == 0)
                 {
-                    if (_poolSlots[i].childCount == 0 && _slotTileIds[i] == normalizedId)
-                    {
-                        targetSlot = _poolSlots[i];
-                        break;
-                    }
-                }
-                if (targetSlot == null)
-                {
-                    for (int i = 0; i < _poolSlots.Count && i < _slotTileIds.Count; i++)
-                    {
-                        if (_poolSlots[i].childCount == 0 && (_slotTileIds[i] & 0x1F) == (tileId & 0x1F))
-                        {
-                            targetSlot = _poolSlots[i];
-                            break;
-                        }
-                    }
+                    targetSlot = _poolSlots[poolIndex];
                 }
             }
-            if (targetSlot == null)
+            else
             {
-                for (int i = 0; i < _poolSlots.Count; i++)
-                {
-                    if (_poolSlots[i].childCount == 0)
-                    {
-                        targetSlot = _poolSlots[i];
-                        break;
-                    }
-                }
+                // プールインデックスを持たない（Fallbackで生成された）牌はプールに戻さず破棄する
+                Destroy(obj);
+                return;
             }
 
             if (targetSlot != null)
@@ -263,9 +254,13 @@ namespace KillingMahjong.UI
                     rt.localScale = Vector3.one;
                 }
 
-                if (interaction != null)
+                if (interaction != null && poolIndex >= 0 && poolIndex < _slotTileIds.Count)
                 {
-                    // プールに戻す際はドラフラグを初期化し、ベースのID（+赤ドラ）のみにする
+                    // プールに戻す際は、そのスロット本来のID（初期化時に設定されたID）に完全にリセットする
+                    interaction.TileId = _slotTileIds[poolIndex];
+                }
+                else if (interaction != null)
+                {
                     interaction.TileId &= ~0x20;
                 }
 

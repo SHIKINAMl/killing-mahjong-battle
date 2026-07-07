@@ -101,7 +101,7 @@ namespace KillingMahjong.UI
         private List<int> _lastWallIds = new List<int>();
         private List<int> _lastHandIds = new List<int>();
 
-        public void RebuildAllTilesFromState(List<int> suppressRevealWallIndexes)
+        public void RebuildAllTilesFromState(List<int> suppressRevealWallIndexes = null, bool forceRebuildInEndPhase = false)
         {
             // --- アニメーション競合防止 ---
             foreach (var cleanup in _activeAnimationCleanups)
@@ -160,6 +160,11 @@ namespace KillingMahjong.UI
                 }
             }
 
+            if (forceRebuildInEndPhase)
+            {
+                needFullRebuild = true;
+            }
+
             _lastWallIds = currentWallIds;
             _lastHandIds = currentHandIds;
 
@@ -170,7 +175,7 @@ namespace KillingMahjong.UI
                                   uiManager.CurrentPhaseStatus == RoundStatus.Ron || 
                                   uiManager.CurrentPhaseStatus == RoundStatus.Result || 
                                   uiManager.CurrentPhaseStatus == RoundStatus.Draw;
-            if (isGameEndPhase) return;
+            if (isGameEndPhase && !forceRebuildInEndPhase) return;
 
             if (needFullRebuild)
             {
@@ -292,6 +297,8 @@ namespace KillingMahjong.UI
                                 }
                             }
                         }
+
+                        uiManager.EnemyHandUI.UpdateLayout(uiManager.CurrentPhaseStatus);
                     }
                 }
 
@@ -305,7 +312,8 @@ namespace KillingMahjong.UI
                     }
                     uiManager.EnemyWallUI.GetEnemyWallSlots().Clear();
 
-                    if (uiManager.CurrentPhaseStatus == RoundStatus.Discard && suppressRevealWallIndexes == null)
+                    bool isEndPhase = uiManager.CurrentPhaseStatus >= RoundStatus.Liquidation;
+                    if ((uiManager.CurrentPhaseStatus == RoundStatus.Discard && suppressRevealWallIndexes == null) || isEndPhase)
                     {
                         uiManager.EnemyWallUI.gameObject.SetActive(false);
                     }
@@ -380,6 +388,7 @@ namespace KillingMahjong.UI
 
             // 毎回の更新で、透視状態だけはフルリビルドに関わらず必ず同期する
             SyncLocalExposedState(board);
+            SyncEnemyExposedState(board);
             SyncLocalFuritenState(board);
 
             if (uiManager.WaitUI != null && (uiManager.CurrentPhaseStatus == RoundStatus.Discard || uiManager.CurrentPhaseStatus == RoundStatus.HandSelection))
@@ -410,6 +419,8 @@ namespace KillingMahjong.UI
             var interaction = rt.GetComponent<TileInteraction>();
             if (interaction == null) interaction = rt.gameObject.AddComponent<TileInteraction>();
             
+            interaction.enabled = true;
+
             Canvas canvas = GetComponentInParent<Canvas>();
             if (canvas == null) canvas = FindFirstObjectByType<Canvas>();
             
@@ -454,6 +465,59 @@ namespace KillingMahjong.UI
                     {
                         bool isExposed = localExposedActualIds.Contains(interaction.TileId);
                         if (isExposed) localExposedActualIds.Remove(interaction.TileId);
+                        visual.SetExposed(isExposed);
+                    }
+                }
+            }
+        }
+
+        private void SyncEnemyExposedState(Managers.BoardStateManager board)
+        {
+            List<int> enemyExposedActualIds = new List<int>();
+            foreach (int exposedIdx in board.ExposedEnemyHandWallIndexes)
+            {
+                if (exposedIdx >= 0 && exposedIdx < board.OriginalEnemyWallTiles.Count)
+                {
+                    enemyExposedActualIds.Add(board.OriginalEnemyWallTiles[exposedIdx]);
+                }
+            }
+
+            if (uiManager.EnemyHandUI != null)
+            {
+                var handSlots = uiManager.EnemyHandUI.GetHandSlots();
+                var realIds = uiManager.EnemyHandUI.GetRealTileIds();
+
+                for (int i = 0; i < handSlots.Count; i++)
+                {
+                    var rt = handSlots[i];
+                    if (rt == null || i >= realIds.Count) continue;
+
+                    int realId = realIds[i];
+                    var visual = rt.GetComponent<TileVisual>();
+                    if (visual != null)
+                    {
+                        bool isExposed = enemyExposedActualIds.Contains(realId);
+                        if (isExposed) 
+                        {
+                            enemyExposedActualIds.Remove(realId);
+                            uiManager.EnemyHandUI.RevealTileByIndex(i);
+                        }
+                        visual.SetExposed(isExposed);
+                    }
+                }
+            }
+
+            if (uiManager.EnemyWallUI != null)
+            {
+                foreach (var rt in uiManager.EnemyWallUI.GetEnemyWallSlots())
+                {
+                    if (rt == null) continue;
+                    var interaction = rt.GetComponent<TileInteraction>();
+                    var visual = rt.GetComponent<TileVisual>();
+                    if (interaction != null && visual != null)
+                    {
+                        bool isExposed = enemyExposedActualIds.Contains(interaction.TileId);
+                        if (isExposed) enemyExposedActualIds.Remove(interaction.TileId);
                         visual.SetExposed(isExposed);
                     }
                 }

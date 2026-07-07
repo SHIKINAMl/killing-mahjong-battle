@@ -230,6 +230,8 @@ namespace KillingMahjong.UI
 
         private System.Collections.IEnumerator HandleSkillCastedRoutine(SkillCastedData data)
         {
+            uiManager.SetIsTransitioning(true); // ★ アニメーション中の非同期Rebuildを防ぐ
+
             string localPlayerId = KillingMahjong.Network.NetworkMessageHandler.Instance.LocalPlayerId;
             bool isLocalPlayer = (data.player_id == localPlayerId);
             string skillName = SkillNames.GetDisplayName(data.skillType);
@@ -352,9 +354,14 @@ namespace KillingMahjong.UI
                     {
                         // 演出を見せるため、アニメーション完了を待つ
                         yield return StartCoroutine(uiManager.VisualController.PlayPerspectiveAnimation(newlyExposed));
+                        
+                        // アニメーション完了後にUIロックを解除する
+                        uiManager.SetIsTransitioning(false);
+                        uiManager.VisualController?.RebuildAllTilesFromState();
                     }
                     else
                     {
+                        uiManager.SetIsTransitioning(false);
                         uiManager.VisualController?.RebuildAllTilesFromState();
                     }
                 }
@@ -379,6 +386,7 @@ namespace KillingMahjong.UI
                             }
                         }
                     }
+                    uiManager.SetIsTransitioning(false);
                     uiManager.VisualController?.RebuildAllTilesFromState();
                 }
             }
@@ -388,54 +396,93 @@ namespace KillingMahjong.UI
                 {
                     uiManager.ClearSelection();
                     
-                    if (_lastMulliganOutTileId != -1 && _lastMulliganTargetIndex != -1)
+                    if (data.mulliganResult != null)
                     {
-                        int oldTileId = _lastMulliganOutTileId;
-                        int newTileId = -1;
+                        int oldTileId = data.mulliganResult.oldTile;
+                        int newTileId = data.mulliganResult.newTile;
+                        int targetHandIndex = data.mulliganResult.targetHandIndex;
                         
-                        float timeout = 2.0f;
-                        while (timeout > 0)
+                        var stateMgr = Managers.BoardStateManager.Instance;
+                        if (stateMgr.CurrentHandTiles.Contains(oldTileId))
                         {
-                            if (Managers.BoardStateManager.Instance.OriginalWallTiles != null &&
-                                Managers.BoardStateManager.Instance.OriginalWallTiles.Count > _lastMulliganTargetIndex)
+                            stateMgr.CurrentHandTiles.Remove(oldTileId);
+                            stateMgr.CurrentHandTiles.Add(newTileId);
+                            stateMgr.SortTileIds(stateMgr.CurrentHandTiles);
+
+                            int wallIdx = stateMgr.CurrentWallTiles.IndexOf(newTileId);
+                            if (wallIdx >= 0)
                             {
-                                int currentAtIdx = Managers.BoardStateManager.Instance.OriginalWallTiles[_lastMulliganTargetIndex];
-                                if (currentAtIdx != oldTileId)
-                                {
-                                    newTileId = currentAtIdx;
-                                    break;
-                                }
+                                stateMgr.CurrentWallTiles[wallIdx] = oldTileId;
                             }
-                            timeout -= Time.deltaTime;
-                            yield return null;
                         }
-                        
-                        if (newTileId != -1)
+                        else if (stateMgr.CurrentWallTiles.Contains(oldTileId))
                         {
-                            var stateMgr = Managers.BoardStateManager.Instance;
-                            if (stateMgr.CurrentHandTiles.Contains(oldTileId))
+                            // If oldTileId is not in hand, this might be an invalid state, but we swap it out safely
+                            int wallIdx = stateMgr.CurrentWallTiles.IndexOf(oldTileId);
+                            if (wallIdx >= 0)
                             {
-                                stateMgr.CurrentHandTiles.Remove(oldTileId);
-                                stateMgr.CurrentHandTiles.Add(newTileId);
-                                stateMgr.SortTileIds(stateMgr.CurrentHandTiles);
-                            }
-                            else if (stateMgr.CurrentWallTiles.Contains(oldTileId))
-                            {
-                                stateMgr.CurrentWallTiles.Remove(oldTileId);
+                                stateMgr.CurrentWallTiles.RemoveAt(wallIdx);
                                 stateMgr.CurrentWallTiles.Add(newTileId);
                                 stateMgr.SortTileIds(stateMgr.CurrentWallTiles);
                             }
-
-                            yield return _mulliganSwapAnimator.PlayRoutine(oldTileId, newTileId, _lastMulliganOutSlotRt);
                         }
-                        else
+
+                        // アニメーション用のスロットを取得（直前の操作時の記録があればそれを使う、無ければデフォルト）
+                        RectTransform targetSlot = _lastMulliganOutSlotRt;
+                        if (targetSlot == null && uiManager.HandUI != null)
                         {
-                            Debug.LogWarning("Mulligan animation failed: IN tile not received in time.");
+                            targetSlot = uiManager.HandUI.GetTileSlotRectTransform(oldTileId);
                         }
 
-                        _lastMulliganOutTileId = -1;
-                        _lastMulliganTargetIndex = -1;
+                        if (_mulliganSwapAnimator != null)
+                        {
+                            yield return _mulliganSwapAnimator.PlayRoutine(oldTileId, newTileId, targetSlot);
+                        }
                     }
+                    else
+                    {
+                        Debug.LogWarning("Mulligan animation failed: mulliganResult is null.");
+                    }
+
+                    _lastMulliganOutTileId = -1;
+                    _lastMulliganTargetIndex = -1;
+                    
+                    // MulliganSwapAnimator側で IsTransitioning=false と RebuildAllTilesFromState が呼ばれるため、ここでは不要
+                }
+                else
+                {
+                    if (data.mulliganResult != null)
+                    {
+                        int oldTileId = data.mulliganResult.oldTile;
+                        int newTileId = data.mulliganResult.newTile;
+                        
+                        var stateMgr = Managers.BoardStateManager.Instance;
+                        if (stateMgr.CurrentEnemyHandTiles.Contains(oldTileId))
+                        {
+                            stateMgr.CurrentEnemyHandTiles.Remove(oldTileId);
+                            stateMgr.CurrentEnemyHandTiles.Add(newTileId);
+                            stateMgr.SortTileIds(stateMgr.CurrentEnemyHandTiles);
+
+                            int wallIdx = stateMgr.CurrentEnemyWallTiles.IndexOf(newTileId);
+                            if (wallIdx >= 0)
+                            {
+                                stateMgr.CurrentEnemyWallTiles[wallIdx] = oldTileId;
+                            }
+                        }
+                        else if (stateMgr.CurrentEnemyWallTiles.Contains(oldTileId))
+                        {
+                            int wallIdx = stateMgr.CurrentEnemyWallTiles.IndexOf(oldTileId);
+                            if (wallIdx >= 0)
+                            {
+                                stateMgr.CurrentEnemyWallTiles.RemoveAt(wallIdx);
+                                stateMgr.CurrentEnemyWallTiles.Add(newTileId);
+                                stateMgr.SortTileIds(stateMgr.CurrentEnemyWallTiles);
+                            }
+                        }
+                    }
+                    
+                    uiManager.SetIsTransitioning(false);
+                    uiManager.VisualController?.RebuildAllTilesFromState();
                 }
             }
         }

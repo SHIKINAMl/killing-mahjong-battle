@@ -7,6 +7,7 @@ namespace KillingMahjong.UI
     public class TileInteraction : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerEnterHandler, IPointerExitHandler
     {
         public int TileId { get; set; }
+        public int PoolSlotIndex { get; set; } = -1; // ★ プールのどのスロットに属するかを記憶する
         public bool IsInHand { get; private set; }
         public Vector3 OriginalWallPosition { get; set; } // ★ 壁の本来の座標を記憶するプロパティ追加
         public bool IsHovered { get; private set; }
@@ -208,7 +209,7 @@ namespace KillingMahjong.UI
             }
             else if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard)
             {
-                if (KillingMahjong.Managers.BoardStateManager.Instance.IsLocalTurn && !IsInHand && TileId != -1)
+                if (KillingMahjong.Managers.BoardStateManager.Instance.IsLocalTurn && IsInHand && TileId != -1)
                 {
                     canHighlight = true;
                 }
@@ -225,6 +226,13 @@ namespace KillingMahjong.UI
 
             if (_gameUIManager != null && _gameUIManager.IsTransitioning) return;
             
+            if (_gameUIManager != null) _gameUIManager.OnTileHoverExit(this);
+        }
+
+        private void OnDisable()
+        {
+            IsHovered = false;
+            if (_tileVisual != null) _tileVisual.SetHoverHighlight(false);
             if (_gameUIManager != null) _gameUIManager.OnTileHoverExit(this);
         }
     }
