@@ -181,7 +181,13 @@ namespace KillingMahjong.UI
                 
                 foreach (var st in handSlots)
                 {
-                    if (st.parent != activeContainer) st.SetParent(activeContainer, false);
+                    if (st.parent != activeContainer) 
+                    {
+                        st.SetParent(activeContainer, false);
+                    }
+                    st.localPosition = new Vector3(st.localPosition.x, st.localPosition.y, 0f);
+                    st.localScale = Vector3.one;
+                    st.localRotation = Quaternion.identity;
                 }
                 
                 // Do NOT sort enemy hand slots! Sorting messes up the index mapping for RevealTileByIndex.
@@ -198,7 +204,13 @@ namespace KillingMahjong.UI
             
             foreach (var st in handSlots)
             {
-                if (st.parent != activeContainer) st.SetParent(activeContainer, false);
+                if (st.parent != activeContainer) 
+                {
+                    st.SetParent(activeContainer, false);
+                }
+                st.localPosition = new Vector3(st.localPosition.x, st.localPosition.y, 0f);
+                st.localScale = Vector3.one;
+                st.localRotation = Quaternion.identity;
             }
 
             // Do NOT sort enemy hand slots!
@@ -220,6 +232,7 @@ namespace KillingMahjong.UI
 
                 var rt = handSlots[i];
                 rt.anchoredPosition3D = new Vector3(xPos, yPos, 0f);
+                rt.localPosition = new Vector3(rt.localPosition.x, rt.localPosition.y, 0f); // 念のためローカルZも0に
                 
                 rt.SetSiblingIndex(i);
             }

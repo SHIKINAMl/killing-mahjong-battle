@@ -168,8 +168,14 @@ namespace KillingMahjong.UI
 
             foreach (var st in handSlots)
             {
-                if (st.parent != activeContainer) st.SetParent(activeContainer, false);
-                
+                if (st.parent != activeContainer)
+                {
+                    st.SetParent(activeContainer, false);
+                }
+                st.localPosition = new Vector3(st.localPosition.x, st.localPosition.y, 0f);
+                st.localScale = Vector3.one;
+                st.localRotation = Quaternion.identity;
+
                 // 初めて登録される牌なら、初期位置は現在の位置にするか、山牌側にする等の工夫ができるが
                 // ここではとりあえず現在位置を維持しつつ、後でUpdateで引っ張る
                 if (!targetPositions.ContainsKey(st))
