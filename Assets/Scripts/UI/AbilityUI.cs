@@ -220,6 +220,12 @@ namespace KillingMahjong.UI
                 DeselectAll(); // Deselect on close
                 var uiMgr = FindFirstObjectByType<GameUIManager>();
                 if (uiMgr != null && cancelSkill) uiMgr.CancelSkillSelection();
+
+                Canvas rootCanvas = this.GetComponent<Canvas>();
+                if (rootCanvas != null)
+                {
+                    rootCanvas.sortingOrder = 15;
+                }
             }
 
             if (currentAnimationCoroutine != null) StopCoroutine(currentAnimationCoroutine);
@@ -365,6 +371,11 @@ namespace KillingMahjong.UI
             if (tooltipPanel != null)
             {
                 tooltipPanel.SetActive(false);
+            }
+            Canvas rootCanvas = this.GetComponent<Canvas>();
+            if (rootCanvas != null)
+            {
+                rootCanvas.sortingOrder = 15;
             }
         }
     }

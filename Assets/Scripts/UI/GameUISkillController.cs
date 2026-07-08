@@ -30,22 +30,27 @@ namespace KillingMahjong.UI
         {
             this.uiManager = manager;
             _mulliganSwapAnimator = new MulliganSwapAnimator(manager);
+
+            if (mulliganCanvas != null)
+            {
+                mulliganCanvas.SetActive(false);
+            }
         }
 
         public void CancelSkillSelection()
         {
             IsMulliganSelection = false;
-            DestroyMulliganDimmer();
+            HideMulliganUI();
         }
 
-        private GameObject mulliganDimmer;
-        private GameObject mulliganTextCanvas;
+        [Header("Mulligan UI Settings")]
+        [SerializeField] private GameObject mulliganCanvas;
         private System.Collections.Generic.List<GameObject> hiddenUIs = new System.Collections.Generic.List<GameObject>();
 
         public void StartMulliganSelection()
         {
             IsMulliganSelection = true;
-            CreateMulliganDimmer();
+            ShowMulliganUI();
         }
 
         private RectTransform _lastMulliganOutSlotRt;
@@ -53,7 +58,7 @@ namespace KillingMahjong.UI
         public void OnMulliganTileSelected(int tileId, RectTransform slotRt)
         {
             IsMulliganSelection = false;
-            DestroyMulliganDimmer();
+            HideMulliganUI();
             
             // アニメーション中の不意なRebuildを防ぐ
             uiManager.SetIsTransitioning(true);
@@ -80,78 +85,9 @@ namespace KillingMahjong.UI
             }
         }
 
-        private void CreateMulliganDimmer()
+        private void ShowMulliganUI()
         {
-            if (mulliganDimmer != null) return;
-            
-            mulliganDimmer = new GameObject("MulliganDimmer");
-            var rt = mulliganDimmer.AddComponent<RectTransform>();
-            
-            // Parent to the root Canvas to ensure it covers the whole screen
-            Canvas rootCanvas = uiManager.HandUI != null ? uiManager.HandUI.GetComponentInParent<Canvas>() : null;
-            if (rootCanvas != null) rootCanvas = rootCanvas.rootCanvas;
-            Transform parentTransform = rootCanvas != null ? rootCanvas.transform : uiManager.transform;
-            
-            mulliganDimmer.transform.SetParent(parentTransform, false);
-            
-            Canvas dimmerCanvas = mulliganDimmer.AddComponent<Canvas>();
-            dimmerCanvas.overrideSorting = true;
-            dimmerCanvas.sortingOrder = UISortingOrders.SkillDimmer;
-            if (rootCanvas != null) dimmerCanvas.sortingLayerID = rootCanvas.sortingLayerID;
-            
-            mulliganDimmer.AddComponent<UnityEngine.UI.GraphicRaycaster>();
-
-            // 1. Dimmer Background (Nested, ScreenSpaceCamera to allow Hand/Wall on top)
-            Image bg = mulliganDimmer.AddComponent<Image>();
-            bg.color = new Color(0, 0, 0, 0.75f);
-            
-            // Stretch to fill root canvas
-            rt.anchorMin = Vector2.zero;
-            rt.anchorMax = Vector2.one;
-            rt.sizeDelta = Vector2.zero;
-            rt.anchoredPosition = Vector2.zero;
-
-            // 2. Text Canvas (Root, ScreenSpaceOverlay to guarantee it is on top of ALL UI)
-            mulliganTextCanvas = new GameObject("MulliganTextCanvas");
-            mulliganTextCanvas.transform.SetParent(null);
-            Canvas textCanvas = mulliganTextCanvas.AddComponent<Canvas>();
-            textCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            textCanvas.sortingOrder = UISortingOrders.MulliganPromptText;
-            
-            var scaler = mulliganTextCanvas.AddComponent<UnityEngine.UI.CanvasScaler>();
-            scaler.uiScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(800, 600);
-
-            GameObject textObj = new GameObject("PromptText");
-            textObj.transform.SetParent(mulliganTextCanvas.transform, false);
-            TextMeshProUGUI tmp = textObj.AddComponent<TextMeshProUGUI>();
-            
-            // Ensure font is set by copying from DialogueUI
-            if (uiManager.DialogueUI != null)
-            {
-                var dialogueTmp = uiManager.DialogueUI.GetComponentInChildren<TextMeshProUGUI>(true);
-                if (dialogueTmp != null) tmp.font = dialogueTmp.font;
-            }
-            if (tmp.font == null && TMPro.TMP_Settings.defaultFontAsset != null) 
-            {
-                tmp.font = TMPro.TMP_Settings.defaultFontAsset;
-            }
-
-            tmp.text = "手牌か山牌から交換する牌を選んでください";
-            tmp.fontSize = 36;
-            tmp.color = Color.white;
-            tmp.alignment = TextAlignmentOptions.Center;
-            tmp.fontStyle = FontStyles.Bold;
-            
-            UnityEngine.UI.Shadow shadow = textObj.AddComponent<UnityEngine.UI.Shadow>();
-            shadow.effectColor = Color.black;
-            shadow.effectDistance = new Vector2(4, -4);
-
-            RectTransform txtRt = textObj.GetComponent<RectTransform>();
-            txtRt.anchorMin = new Vector2(0, 0.45f);
-            txtRt.anchorMax = new Vector2(1, 0.85f);
-            txtRt.sizeDelta = Vector2.zero;
-            txtRt.anchoredPosition = Vector2.zero;
+            if (mulliganCanvas != null) mulliganCanvas.SetActive(true);
             
             _sortingScope.BringToFront(uiManager.HandUI?.gameObject, UISortingOrders.MulliganFocusTiles);
             _sortingScope.BringToFront(uiManager.WallUI?.gameObject, UISortingOrders.MulliganFocusTiles);
@@ -177,18 +113,9 @@ namespace KillingMahjong.UI
         /// プロジェクトルールに従い、対象のルートCanvasの overrideSorting のみを操作する。</summary>
         private readonly CanvasSortingScope _sortingScope = new CanvasSortingScope();
 
-        private void DestroyMulliganDimmer()
+        private void HideMulliganUI()
         {
-            if (mulliganDimmer != null)
-            {
-                Destroy(mulliganDimmer);
-                mulliganDimmer = null;
-            }
-            if (mulliganTextCanvas != null)
-            {
-                Destroy(mulliganTextCanvas);
-                mulliganTextCanvas = null;
-            }
+            if (mulliganCanvas != null) mulliganCanvas.SetActive(false);
             if (uiManager != null)
             {
                 _sortingScope.Restore(uiManager.HandUI?.gameObject);

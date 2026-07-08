@@ -412,11 +412,11 @@ namespace KillingMahjong.UI
             targetObj.localScale = originalScale;
             ResetSorting(transform);
 
-            // ズーム解除時に確実に10に戻す
+            // ズーム解除時に確実に15に戻す
             var myCanvas = GetComponent<Canvas>();
             if (myCanvas != null)
             {
-                myCanvas.sortingOrder = 10;
+                myCanvas.sortingOrder = 15;
             }
         }
 
@@ -452,11 +452,11 @@ namespace KillingMahjong.UI
             }
             ResetSorting(transform);
 
-            // ズーム解除時に確実に10に戻す
+            // ズーム解除時に確実に15に戻す
             var myCanvas = GetComponent<Canvas>();
             if (myCanvas != null)
             {
-                myCanvas.sortingOrder = 10;
+                myCanvas.sortingOrder = 15;
             }
         }
 

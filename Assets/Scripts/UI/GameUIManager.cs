@@ -613,16 +613,19 @@ namespace KillingMahjong.UI
         public void CancelSkillSelection()
         {
             SkillController?.CancelSkillSelection();
+            HandUI?.UpdateLayout(currentPhaseStatus);
         }
 
         public void StartMulliganSelection()
         {
             SkillController?.StartMulliganSelection();
+            HandUI?.UpdateLayout(currentPhaseStatus);
         }
 
         public void OnMulliganTileSelected(int tileId, RectTransform slotRt)
         {
             SkillController?.OnMulliganTileSelected(tileId, slotRt);
+            HandUI?.UpdateLayout(currentPhaseStatus);
         }
 
         public void StartBoostHandSelection()
