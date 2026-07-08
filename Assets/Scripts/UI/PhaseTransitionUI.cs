@@ -447,6 +447,7 @@ namespace KillingMahjong.UI
         {
             // テキストを隠す
             if (centerText != null) centerText.gameObject.SetActive(false);
+            if (horizontalLineRt != null) horizontalLineRt.gameObject.SetActive(false);
 
             // 市松模様フェードアウト (晴れる)
             float t = 0;

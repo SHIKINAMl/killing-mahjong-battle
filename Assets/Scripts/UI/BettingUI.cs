@@ -191,10 +191,14 @@ namespace KillingMahjong.UI
             if (currentMoneyText != null)
                 currentMoneyText.text = $"HP: {currentMoney}";
 
+            bool isTenpai = Managers.BoardStateManager.Instance != null && 
+                            Managers.BoardStateManager.Instance.LocalWaitDataList != null && 
+                            Managers.BoardStateManager.Instance.LocalWaitDataList.Count > 0;
+
+            int maxHan = 0;
             float expectedMultiplier = 1.0f;
-            if (Managers.BoardStateManager.Instance != null && Managers.BoardStateManager.Instance.LocalWaitDataList != null && Managers.BoardStateManager.Instance.LocalWaitDataList.Count > 0)
+            if (isTenpai)
             {
-                int maxHan = 0;
                 foreach (var wait in Managers.BoardStateManager.Instance.LocalWaitDataList)
                 {
                     int han = GameRules.CalculateTotalHan(wait.yaku, Managers.BoardStateManager.Instance.LocalBoostHandBonus);
@@ -203,16 +207,35 @@ namespace KillingMahjong.UI
                 expectedMultiplier = GameRules.GetMultiplier(maxHan);
             }
 
-            int reward = Mathf.FloorToInt(currentBet * expectedMultiplier);
+            // ノーテン、または満貫未満(通常5飜未満を指す。簡略ルールで4飜満貫の場合も考慮し、ここでは5飜以上を満貫とみなす。
+            // もしこのゲームが4飜満貫を採用しているなら4にするが、一般的には5以上を明示的に満貫と扱うことが多い)
+            // ただし、もし倍率が跳満以上(>1.0f)であれば確実に表示する
+            bool isManganOrMore = maxHan >= 5 || expectedMultiplier > 1.0f;
 
             if (currentBetText != null)
             {
-                currentBetText.text = $"Bet: {currentBet}\n<size=70%>予想報酬: {reward}</size>";
+                if (isTenpai && isManganOrMore)
+                {
+                    int reward = Mathf.FloorToInt(currentBet * expectedMultiplier);
+                    currentBetText.text = $"Bet: {currentBet}\n<size=70%>予想報酬: {reward}</size>";
+                }
+                else
+                {
+                    currentBetText.text = $"Bet: {currentBet}";
+                }
             }
 
             if (expectedRewardText != null)
             {
-                expectedRewardText.text = $"Expected Reward: {reward}";
+                if (isTenpai && isManganOrMore)
+                {
+                    int reward = Mathf.FloorToInt(currentBet * expectedMultiplier);
+                    expectedRewardText.text = $"Expected Reward: {reward}";
+                }
+                else
+                {
+                    expectedRewardText.text = "";
+                }
             }
             
             // Disable buttons appropriately

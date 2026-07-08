@@ -58,7 +58,6 @@ namespace KillingMahjong.UI
             uiManager.SendActionToServer("is_tenpai", new KillingMahjong.Network.ActionPayload { wall_indexes = _pendingHandIndexes });
         }
 
-        private bool _isCanceling = false;
 
         public void CancelHandSelection()
         {
@@ -70,24 +69,14 @@ namespace KillingMahjong.UI
             KillingMahjong.Managers.BoardStateManager.Instance.ClearWaitTiles();
             if (uiManager.PhaseController != null) uiManager.PhaseController.SetMatchUIVisibility(true);
 
-            // 裏技: Python側のキャンセルアクションがないため、以前は1枚の牌を送って解除していたが
-            // それだと選び直しの際に手牌が1枚になってしまうため、仮の処置として
-            // 前回選択していた13枚をそのまま送りなおして確定状態を解除させる。
-            // ※今後Python側に専用のキャンセルコマンドが実装される予定
-            _isCanceling = true;
-            
-            var payload = new KillingMahjong.Network.ActionPayload();
-            if (_pendingHandIndexes != null && _pendingHandIndexes.Count > 0)
+            // 手牌をすべて選んでいない状態（山牌に戻す）
+            var tilesToReturn = new System.Collections.Generic.List<int>(KillingMahjong.Managers.BoardStateManager.Instance.CurrentHandTiles);
+            foreach (var t in tilesToReturn)
             {
-                payload.hand_indexes = _pendingHandIndexes;
-                payload.hand = _pendingHandTiles;
+                KillingMahjong.Managers.BoardStateManager.Instance.MoveTileToWall(t);
             }
-            else
-            {
-                payload.hand_indexes = new System.Collections.Generic.List<int> { 0 };
-            }
-            
-            uiManager.SendActionToServer("select", payload);
+
+            uiManager.SendActionToServer("select_cancel", new KillingMahjong.Network.ActionPayload());
         }
 
         public void HandleIsTenpaiReceived(IsTenpaiData data)
@@ -254,12 +243,6 @@ namespace KillingMahjong.UI
 
         public void HandleHandSelectionConfirmation(HandSelectionConfirmationData data)
         {
-            if (_isCanceling)
-            {
-                _isCanceling = false;
-                return;
-            }
-
             _autoConfirmNextHandSelection = false;
             
             // 満貫未満の警告ダイアログを表示せず、自動で確定を送信する
