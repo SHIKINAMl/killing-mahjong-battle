@@ -27,11 +27,19 @@ namespace KillingMahjong.UI
         {
             if (optionUIPanel != null)
             {
-                optionUIPanel.SetActive(true);
+                var ui = optionUIPanel.GetComponent<OptionUI>();
+                if (ui != null)
+                {
+                    ui.Open();
+                }
+                else
+                {
+                    optionUIPanel.SetActive(true);
+                }
             }
             else
             {
-                Debug.LogWarning("インスペクターで OptionUIPanel が設定されていません！");
+                Debug.LogWarning("インスペクターで OptionUIPanel 設定されていません");
             }
         }
 

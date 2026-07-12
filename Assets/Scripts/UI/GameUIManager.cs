@@ -197,7 +197,7 @@ namespace KillingMahjong.UI
         {
             if (optionUI != null)
             {
-                optionUI.gameObject.SetActive(true);
+                optionUI.Open();
             }
             else
             {

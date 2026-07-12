@@ -8,6 +8,45 @@ namespace KillingMahjong.Editor
 {
     public class OptionUICreator : MonoBehaviour
     {
+        [MenuItem("Tools/UI/OptionUIプレハブにすりガラスを適用")]
+        public static void ApplyBlurToPrefab()
+        {
+            string prefabPath = "Assets/Prefabs/OptionUI.prefab";
+            GameObject prefabRoot = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            if (prefabRoot == null)
+            {
+                Debug.LogError("Prefab not found at " + prefabPath);
+                return;
+            }
+            
+            Material blurMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/UIGlassmorphismBlurMat.mat");
+            if (blurMat == null)
+            {
+                Shader blurShader = Shader.Find("UI/StylishPattern");
+                if (blurShader != null)
+                {
+                    blurMat = new Material(blurShader);
+                    if (!System.IO.Directory.Exists("Assets/Materials")) System.IO.Directory.CreateDirectory("Assets/Materials");
+                    AssetDatabase.CreateAsset(blurMat, "Assets/Materials/UIGlassmorphismBlurMat.mat");
+                    AssetDatabase.SaveAssets();
+                }
+            }
+
+            Image img = prefabRoot.GetComponent<Image>();
+            if (img != null && blurMat != null)
+            {
+                img.material = blurMat;
+                img.color = new Color(0.1f, 0.1f, 0.1f, 0.95f); // 背景の基本色を濃く（ほぼ黒に）戻す
+                EditorUtility.SetDirty(prefabRoot);
+                PrefabUtility.SavePrefabAsset(prefabRoot);
+                Debug.Log("【成功】Prefabs/OptionUI にスタイリッシュな斜線パターンを適用しました！");
+            }
+            else
+            {
+                Debug.LogError($"Failed to apply blur. Image is null: {img == null}, Material is null: {blurMat == null}");
+            }
+        }
+
         [MenuItem("Tools/UI/オプション画面（OptionUI）を作成")]
         public static void CreateOptionUI()
         {
@@ -32,7 +71,25 @@ namespace KillingMahjong.Editor
             var rect = panelObj.AddComponent<RectTransform>();
             rect.sizeDelta = new Vector2(800, 600); // 800x600ジャストに設定
             var img = panelObj.AddComponent<Image>();
-            img.color = new Color(0.1f, 0.1f, 0.1f, 0.95f); // ダークグレー背景
+            img.color = new Color(0.1f, 0.1f, 0.1f, 0.6f); // ガラス感が強く出るように透明度を下げる
+
+            // すりガラスマテリアルの適用
+            Material blurMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/UIGlassmorphismBlurMat.mat");
+            if (blurMat == null)
+            {
+                Shader blurShader = Shader.Find("UI/StylishPattern");
+                if (blurShader != null)
+                {
+                    blurMat = new Material(blurShader);
+                    if (!System.IO.Directory.Exists("Assets/Materials")) System.IO.Directory.CreateDirectory("Assets/Materials");
+                    AssetDatabase.CreateAsset(blurMat, "Assets/Materials/UIGlassmorphismBlurMat.mat");
+                    AssetDatabase.SaveAssets();
+                }
+            }
+            if (blurMat != null)
+            {
+                img.material = blurMat;
+            }
 
             OptionUI optionUI = panelObj.AddComponent<OptionUI>();
 

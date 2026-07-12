@@ -1,5 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
+using DG.Tweening;
+using System.Collections;
 
 namespace KillingMahjong.UI
 {
@@ -31,6 +33,27 @@ namespace KillingMahjong.UI
         [Tooltip("『戻る』ボタンを押したときに遷移するシーン名")]
         [SerializeField] private string returnSceneName = "TitleScene";
 
+        private CanvasGroup _canvasGroup;
+        private RectTransform _rectTransform;
+
+        private void Awake()
+        {
+            _canvasGroup = GetComponent<CanvasGroup>();
+            if (_canvasGroup == null) _canvasGroup = gameObject.AddComponent<CanvasGroup>();
+            
+            _rectTransform = GetComponent<RectTransform>();
+
+            // 配下のすべてのボタンにホバーエフェクトを自動追加
+            Button[] allButtons = GetComponentsInChildren<Button>(true);
+            foreach (var btn in allButtons)
+            {
+                if (btn.GetComponent<UIButtonHoverEffect>() == null)
+                {
+                    btn.gameObject.AddComponent<UIButtonHoverEffect>();
+                }
+            }
+        }
+
         private void Start()
         {
             InitializeUI();
@@ -54,12 +77,58 @@ namespace KillingMahjong.UI
                 returnToTitleButton.onClick.AddListener(ReturnToScene);
             }
             if (quitButton != null) quitButton.onClick.AddListener(QuitGame);
+
+            if (_canvasGroup.alpha <= 0)
+            {
+                _canvasGroup.blocksRaycasts = false;
+                _canvasGroup.interactable = false;
+            }
         }
 
         private void OnEnable()
         {
-            // 画面が開かれるたびに、現在の設定値をUIに反映させる
             InitializeUI();
+        }
+
+        /// <summary>
+        /// アニメーション付きでオプション画面を開く
+        /// </summary>
+        public void Open()
+        {
+            gameObject.SetActive(true);
+            
+            if (_canvasGroup == null) _canvasGroup = GetComponent<CanvasGroup>();
+            
+            _canvasGroup.blocksRaycasts = true;
+            _canvasGroup.interactable = true;
+
+            InitializeUI();
+
+            _rectTransform.DOKill();
+            _canvasGroup.DOKill();
+
+            _rectTransform.localScale = Vector3.one;
+            _canvasGroup.alpha = 1f;
+
+            _rectTransform.DOScale(Vector3.one * 0.9f, 0.25f).From().SetEase(Ease.OutBack).SetUpdate(true);
+            _canvasGroup.DOFade(0f, 0.2f).From().SetEase(Ease.OutQuad).SetUpdate(true);
+        }
+
+        public void Close()
+        {
+            if (_canvasGroup == null) return;
+
+            _canvasGroup.blocksRaycasts = false;
+            _canvasGroup.interactable = false;
+
+            _rectTransform.DOKill();
+            _canvasGroup.DOKill();
+
+            _rectTransform.DOScale(Vector3.one * 0.9f, 0.15f).SetEase(Ease.InQuad).SetUpdate(true);
+            _canvasGroup.DOFade(0f, 0.15f).SetEase(Ease.InQuad).SetUpdate(true).OnComplete(() => 
+            {
+                gameObject.SetActive(false);
+            });
         }
 
         /// <summary>
@@ -113,7 +182,7 @@ namespace KillingMahjong.UI
             {
                 Core.SettingsManager.Instance.SaveSettings();
             }
-            gameObject.SetActive(false);
+            Close();
         }
 
         public void CloseWithoutSave()
@@ -123,7 +192,7 @@ namespace KillingMahjong.UI
             {
                 Core.SettingsManager.Instance.LoadSettings();
             }
-            gameObject.SetActive(false);
+            Close();
         }
 
         public void ReturnToScene()
