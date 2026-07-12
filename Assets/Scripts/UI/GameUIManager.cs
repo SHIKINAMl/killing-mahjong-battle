@@ -286,22 +286,19 @@ namespace KillingMahjong.UI
             Debug.Log($"[GameUIManager] Executing BoardStateManager.MoveTileToHand({tileId})");
             BoardStateManager.Instance.TargetHandIndexes = null;
 
+            if (KillingMahjong.Managers.AudioManager.Instance != null)
+                KillingMahjong.Managers.AudioManager.Instance.PlaySE(KillingMahjong.Managers.AudioManager.Instance.selectTileSE);
+
             if (VisualController != null)
             {
                 StartCoroutine(VisualController.PlayTransitionAnimationRoutine(() => 
                 {
-                    if (KillingMahjong.Managers.AudioManager.Instance != null)
-                        KillingMahjong.Managers.AudioManager.Instance.PlaySE(KillingMahjong.Managers.AudioManager.Instance.selectTileSE);
-
                     BoardStateManager.Instance.MoveTileToHand(tileId);
                     ClearSelection();
                 }));
             }
             else
             {
-                if (KillingMahjong.Managers.AudioManager.Instance != null)
-                    KillingMahjong.Managers.AudioManager.Instance.PlaySE(KillingMahjong.Managers.AudioManager.Instance.selectTileSE);
-
                 BoardStateManager.Instance.MoveTileToHand(tileId);
                 ClearSelection();
             }
@@ -313,6 +310,9 @@ namespace KillingMahjong.UI
             if (handUI != null && handUI.IsSubmitted) return;
             BoardStateManager.Instance.TargetHandIndexes = null;
             
+            if (KillingMahjong.Managers.AudioManager.Instance != null)
+                KillingMahjong.Managers.AudioManager.Instance.PlaySE(KillingMahjong.Managers.AudioManager.Instance.selectTileSE);
+
             if (VisualController != null)
             {
                 StartCoroutine(VisualController.PlayTransitionAnimationRoutine(() => 
@@ -333,6 +333,9 @@ namespace KillingMahjong.UI
             if (currentPhaseStatus != RoundStatus.HandSelection) return;
             if (handUI != null && handUI.IsSubmitted) return;
             
+            if (KillingMahjong.Managers.AudioManager.Instance != null)
+                KillingMahjong.Managers.AudioManager.Instance.PlaySE(KillingMahjong.Managers.AudioManager.Instance.selectTileSE);
+
             if (VisualController != null)
             {
                 StartCoroutine(VisualController.PlayTransitionAnimationRoutine(() => 
@@ -351,6 +354,9 @@ namespace KillingMahjong.UI
             if (currentPhaseStatus != RoundStatus.HandSelection) return;
             if (handUI != null && handUI.IsSubmitted) return;
             
+            if (KillingMahjong.Managers.AudioManager.Instance != null)
+                KillingMahjong.Managers.AudioManager.Instance.PlaySE(KillingMahjong.Managers.AudioManager.Instance.selectTileSE);
+
             if (VisualController != null)
             {
                 StartCoroutine(VisualController.PlayTransitionAnimationRoutine(() => 
@@ -367,9 +373,6 @@ namespace KillingMahjong.UI
         public void SelectTile(int tileId, bool isInHand, bool multiSelect)
         {
             if (currentPhaseStatus == RoundStatus.Discard && !BoardStateManager.Instance.IsLocalTurn) return;
-            
-            if (KillingMahjong.Managers.AudioManager.Instance != null)
-                KillingMahjong.Managers.AudioManager.Instance.PlaySE(KillingMahjong.Managers.AudioManager.Instance.selectTileSE);
 
             BoardStateManager.Instance.SelectTile(tileId, multiSelect);
             DeselectAbility();
