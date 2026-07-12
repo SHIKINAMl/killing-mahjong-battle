@@ -230,6 +230,29 @@ namespace KillingMahjong.UI
             if (gameUIManager != null) UpdateLayout(gameUIManager.CurrentPhaseStatus);
         }
 
+        public override void SortHandSlots()
+        {
+            handSlots.Sort((a, b) =>
+            {
+                var ia = a.GetComponent<TileInteraction>();
+                var ib = b.GetComponent<TileInteraction>();
+                int idA = (ia != null) ? ia.TileId : 0;
+                int idB = (ib != null) ? ib.TileId : 0;
+
+                int baseA = idA & 0x1F;
+                int baseB = idB & 0x1F;
+                if (baseA != baseB) return baseA.CompareTo(baseB);
+                return idA.CompareTo(idB);
+            });
+
+            for (int i = 0; i < handSlots.Count; i++)
+            {
+                handSlots[i].SetSiblingIndex(i);
+            }
+
+            if (gameUIManager != null) UpdateLayout(gameUIManager.CurrentPhaseStatus);
+        }
+
         public override void UpdateLayout(RoundStatus phaseStatus)
         {
             base.UpdateLayout(phaseStatus);

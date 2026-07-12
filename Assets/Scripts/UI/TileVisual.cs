@@ -18,6 +18,10 @@ namespace KillingMahjong.UI
         [Tooltip("透視されている時に表示するオーバーレイImage（子オブジェクトのImageを指定）")]
         [SerializeField] private Image exposedOverlayImage;
 
+        [Header("Furiten Alert Overlay")]
+        [Tooltip("フリテン（待ち牌と同じ牌）の時に表示するアラートImage")]
+        [SerializeField] private Image alertOverlayImage;
+
         private void OnValidate()
         {
             if (spriteRenderer == null) spriteRenderer = GetComponent<SpriteRenderer>();
@@ -35,6 +39,7 @@ namespace KillingMahjong.UI
             // デフォルトでアウトラインはオフにする（Prefab設定漏れ対策）
             SetFuritenHighlight(false);
             SetHoverHighlight(false);
+            SetExposed(false);
         }
 
         private int _currentId = -1;
@@ -75,18 +80,13 @@ namespace KillingMahjong.UI
                 {
                     exposedOverlayImage.transform.SetAsLastSibling();
                     exposedOverlayImage.color = new Color(1f, 1f, 1f, 1f);
-                    var rt = exposedOverlayImage.GetComponent<RectTransform>();
-                    if (rt != null)
-                    {
-                        rt.localScale = Vector3.one;
-                        rt.anchoredPosition = new Vector2(0f, 15f);
-                    }
                 }
             }
             else if (isExposed)
             {
                 Debug.LogWarning($"[TileVisual] exposedOverlayImage is NULL for Tile ID: {_currentId}. Did you assign it in the Inspector?");
             }
+            UpdateOverlayPositions();
         }
 
         private bool _isFuriten = false;
@@ -95,12 +95,85 @@ namespace KillingMahjong.UI
         public void SetFuritenHighlight(bool isFuriten)
         {
             _isFuriten = isFuriten;
-            UpdateOutline();
+            UpdateOutline(); // 既存の赤枠アウトラインは維持（ホバー時など）
             
             if (spriteRenderer != null)
             {
                 if (_isFuriten) spriteRenderer.color = Color.red;
                 else spriteRenderer.color = Color.white;
+            }
+
+            // 新たに追加した「アラート画像」の表示処理
+            if (_isFuriten)
+            {
+                if (alertOverlayImage == null)
+                {
+                    // フォールバック: Inspectorで未設定の場合、動的に生成
+                    GameObject obj = new GameObject("FuritenAlertOverlay");
+                    obj.transform.SetParent(this.transform, false);
+                    alertOverlayImage = obj.AddComponent<Image>();
+                    alertOverlayImage.color = new Color(1f, 0f, 0f, 0.4f); 
+                    RectTransform rt = alertOverlayImage.GetComponent<RectTransform>();
+                    rt.anchorMin = new Vector2(0.5f, 0.5f);
+                    rt.anchorMax = new Vector2(0.5f, 0.5f);
+                    rt.sizeDelta = new Vector2(50, 50);
+                    rt.anchoredPosition = Vector2.zero;
+
+                    GameObject textObj = new GameObject("FuritenText");
+                    textObj.transform.SetParent(obj.transform, false);
+                    var text = textObj.AddComponent<UnityEngine.UI.Text>();
+                    text.text = "⚠️";
+                    text.fontSize = 50;
+                    text.alignment = TextAnchor.MiddleCenter;
+                    text.color = Color.white;
+                    var textRt = textObj.GetComponent<RectTransform>();
+                    textRt.anchorMin = Vector2.zero;
+                    textRt.anchorMax = Vector2.one;
+                    textRt.sizeDelta = Vector2.zero;
+                    textRt.anchoredPosition = Vector2.zero;
+                }
+
+                alertOverlayImage.gameObject.SetActive(true);
+                alertOverlayImage.transform.SetAsLastSibling();
+            }
+            else
+            {
+                if (alertOverlayImage != null)
+                {
+                    alertOverlayImage.gameObject.SetActive(false);
+                }
+            }
+            UpdateOverlayPositions();
+        }
+
+        private void UpdateOverlayPositions()
+        {
+            bool hasExposed = exposedOverlayImage != null && exposedOverlayImage.gameObject.activeSelf;
+            bool hasAlert = alertOverlayImage != null && alertOverlayImage.gameObject.activeSelf;
+
+            float yPos = 15f; // 牌の上部付近により近づける（元は40fで高すぎた）
+            float xOffset = 12f; // 並べた時の中心からのズレ（30fだと離れすぎていたため狭める）
+
+            if (hasExposed && hasAlert)
+            {
+                // 両方表示の場合は並べる
+                var expRt = exposedOverlayImage.GetComponent<RectTransform>();
+                if (expRt != null) expRt.anchoredPosition = new Vector2(-xOffset, yPos);
+
+                var alertRt = alertOverlayImage.GetComponent<RectTransform>();
+                if (alertRt != null) alertRt.anchoredPosition = new Vector2(xOffset, yPos);
+            }
+            else if (hasExposed)
+            {
+                // 透視マークのみ
+                var expRt = exposedOverlayImage.GetComponent<RectTransform>();
+                if (expRt != null) expRt.anchoredPosition = new Vector2(0f, yPos);
+            }
+            else if (hasAlert)
+            {
+                // アラートのみ
+                var alertRt = alertOverlayImage.GetComponent<RectTransform>();
+                if (alertRt != null) alertRt.anchoredPosition = new Vector2(0f, yPos);
             }
         }
 

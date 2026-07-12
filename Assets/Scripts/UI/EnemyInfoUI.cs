@@ -22,6 +22,9 @@ namespace KillingMahjong.UI
         [Header("Character Portrait")]
         [SerializeField] private SpriteRenderer characterRenderer;
         [SerializeField] private SpriteRenderer faceRenderer; // 追加：表情レイヤー用
+        [Header("Ready Mark")]
+        [SerializeField] private GameObject readyBoxContainer;
+        [SerializeField] private GameObject readyCheckImage;
         [SerializeField] private CharacterData characterData; // キャラクター管理データ
         [SerializeField] private float bounceDuration = 0.5f; // 上下する時間（インスペクターで設定可能）
         [SerializeField] private float bounceHeight = 0.5f;   // 上下する高さ（インスペクターで設定可能）
@@ -306,6 +309,31 @@ namespace KillingMahjong.UI
             if (enemyPanel != null)
             {
                 enemyPanel.SetActive(visible);
+            }
+            if (!visible)
+            {
+                ShowReadyBox(false);
+            }
+        }
+
+        public void ShowReadyBox(bool show)
+        {
+            if (readyBoxContainer != null)
+            {
+                readyBoxContainer.SetActive(show);
+            }
+            // ボックス表示時はチェックを外す、非表示時も念のため外す
+            if (readyCheckImage != null)
+            {
+                readyCheckImage.SetActive(false);
+            }
+        }
+
+        public void SetReadyCheck(bool isReady)
+        {
+            if (readyCheckImage != null)
+            {
+                readyCheckImage.SetActive(isReady);
             }
         }
 

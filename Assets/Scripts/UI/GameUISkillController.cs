@@ -30,22 +30,27 @@ namespace KillingMahjong.UI
         {
             this.uiManager = manager;
             _mulliganSwapAnimator = new MulliganSwapAnimator(manager);
+
+            if (mulliganCanvas != null)
+            {
+                mulliganCanvas.SetActive(false);
+            }
         }
 
         public void CancelSkillSelection()
         {
             IsMulliganSelection = false;
-            DestroyMulliganDimmer();
+            HideMulliganUI();
         }
 
-        private GameObject mulliganDimmer;
-        private GameObject mulliganTextCanvas;
+        [Header("Mulligan UI Settings")]
+        [SerializeField] private GameObject mulliganCanvas;
         private System.Collections.Generic.List<GameObject> hiddenUIs = new System.Collections.Generic.List<GameObject>();
 
         public void StartMulliganSelection()
         {
             IsMulliganSelection = true;
-            CreateMulliganDimmer();
+            ShowMulliganUI();
         }
 
         private RectTransform _lastMulliganOutSlotRt;
@@ -53,7 +58,7 @@ namespace KillingMahjong.UI
         public void OnMulliganTileSelected(int tileId, RectTransform slotRt)
         {
             IsMulliganSelection = false;
-            DestroyMulliganDimmer();
+            HideMulliganUI();
             
             // アニメーション中の不意なRebuildを防ぐ
             uiManager.SetIsTransitioning(true);
@@ -80,78 +85,9 @@ namespace KillingMahjong.UI
             }
         }
 
-        private void CreateMulliganDimmer()
+        private void ShowMulliganUI()
         {
-            if (mulliganDimmer != null) return;
-            
-            mulliganDimmer = new GameObject("MulliganDimmer");
-            var rt = mulliganDimmer.AddComponent<RectTransform>();
-            
-            // Parent to the root Canvas to ensure it covers the whole screen
-            Canvas rootCanvas = uiManager.HandUI != null ? uiManager.HandUI.GetComponentInParent<Canvas>() : null;
-            if (rootCanvas != null) rootCanvas = rootCanvas.rootCanvas;
-            Transform parentTransform = rootCanvas != null ? rootCanvas.transform : uiManager.transform;
-            
-            mulliganDimmer.transform.SetParent(parentTransform, false);
-            
-            Canvas dimmerCanvas = mulliganDimmer.AddComponent<Canvas>();
-            dimmerCanvas.overrideSorting = true;
-            dimmerCanvas.sortingOrder = UISortingOrders.SkillDimmer;
-            if (rootCanvas != null) dimmerCanvas.sortingLayerID = rootCanvas.sortingLayerID;
-            
-            mulliganDimmer.AddComponent<UnityEngine.UI.GraphicRaycaster>();
-
-            // 1. Dimmer Background (Nested, ScreenSpaceCamera to allow Hand/Wall on top)
-            Image bg = mulliganDimmer.AddComponent<Image>();
-            bg.color = new Color(0, 0, 0, 0.75f);
-            
-            // Stretch to fill root canvas
-            rt.anchorMin = Vector2.zero;
-            rt.anchorMax = Vector2.one;
-            rt.sizeDelta = Vector2.zero;
-            rt.anchoredPosition = Vector2.zero;
-
-            // 2. Text Canvas (Root, ScreenSpaceOverlay to guarantee it is on top of ALL UI)
-            mulliganTextCanvas = new GameObject("MulliganTextCanvas");
-            mulliganTextCanvas.transform.SetParent(null);
-            Canvas textCanvas = mulliganTextCanvas.AddComponent<Canvas>();
-            textCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            textCanvas.sortingOrder = UISortingOrders.MulliganPromptText;
-            
-            var scaler = mulliganTextCanvas.AddComponent<UnityEngine.UI.CanvasScaler>();
-            scaler.uiScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(800, 600);
-
-            GameObject textObj = new GameObject("PromptText");
-            textObj.transform.SetParent(mulliganTextCanvas.transform, false);
-            TextMeshProUGUI tmp = textObj.AddComponent<TextMeshProUGUI>();
-            
-            // Ensure font is set by copying from DialogueUI
-            if (uiManager.DialogueUI != null)
-            {
-                var dialogueTmp = uiManager.DialogueUI.GetComponentInChildren<TextMeshProUGUI>(true);
-                if (dialogueTmp != null) tmp.font = dialogueTmp.font;
-            }
-            if (tmp.font == null && TMPro.TMP_Settings.defaultFontAsset != null) 
-            {
-                tmp.font = TMPro.TMP_Settings.defaultFontAsset;
-            }
-
-            tmp.text = "手牌か山牌から交換する牌を選んでください";
-            tmp.fontSize = 36;
-            tmp.color = Color.white;
-            tmp.alignment = TextAlignmentOptions.Center;
-            tmp.fontStyle = FontStyles.Bold;
-            
-            UnityEngine.UI.Shadow shadow = textObj.AddComponent<UnityEngine.UI.Shadow>();
-            shadow.effectColor = Color.black;
-            shadow.effectDistance = new Vector2(4, -4);
-
-            RectTransform txtRt = textObj.GetComponent<RectTransform>();
-            txtRt.anchorMin = new Vector2(0, 0.45f);
-            txtRt.anchorMax = new Vector2(1, 0.85f);
-            txtRt.sizeDelta = Vector2.zero;
-            txtRt.anchoredPosition = Vector2.zero;
+            if (mulliganCanvas != null) mulliganCanvas.SetActive(true);
             
             _sortingScope.BringToFront(uiManager.HandUI?.gameObject, UISortingOrders.MulliganFocusTiles);
             _sortingScope.BringToFront(uiManager.WallUI?.gameObject, UISortingOrders.MulliganFocusTiles);
@@ -177,18 +113,9 @@ namespace KillingMahjong.UI
         /// プロジェクトルールに従い、対象のルートCanvasの overrideSorting のみを操作する。</summary>
         private readonly CanvasSortingScope _sortingScope = new CanvasSortingScope();
 
-        private void DestroyMulliganDimmer()
+        private void HideMulliganUI()
         {
-            if (mulliganDimmer != null)
-            {
-                Destroy(mulliganDimmer);
-                mulliganDimmer = null;
-            }
-            if (mulliganTextCanvas != null)
-            {
-                Destroy(mulliganTextCanvas);
-                mulliganTextCanvas = null;
-            }
+            if (mulliganCanvas != null) mulliganCanvas.SetActive(false);
             if (uiManager != null)
             {
                 _sortingScope.Restore(uiManager.HandUI?.gameObject);
@@ -230,6 +157,8 @@ namespace KillingMahjong.UI
 
         private System.Collections.IEnumerator HandleSkillCastedRoutine(SkillCastedData data)
         {
+            uiManager.SetIsTransitioning(true); // ★ アニメーション中の非同期Rebuildを防ぐ
+
             string localPlayerId = KillingMahjong.Network.NetworkMessageHandler.Instance.LocalPlayerId;
             bool isLocalPlayer = (data.player_id == localPlayerId);
             string skillName = SkillNames.GetDisplayName(data.skillType);
@@ -352,9 +281,14 @@ namespace KillingMahjong.UI
                     {
                         // 演出を見せるため、アニメーション完了を待つ
                         yield return StartCoroutine(uiManager.VisualController.PlayPerspectiveAnimation(newlyExposed));
+                        
+                        // アニメーション完了後にUIロックを解除する
+                        uiManager.SetIsTransitioning(false);
+                        uiManager.VisualController?.RebuildAllTilesFromState();
                     }
                     else
                     {
+                        uiManager.SetIsTransitioning(false);
                         uiManager.VisualController?.RebuildAllTilesFromState();
                     }
                 }
@@ -379,6 +313,7 @@ namespace KillingMahjong.UI
                             }
                         }
                     }
+                    uiManager.SetIsTransitioning(false);
                     uiManager.VisualController?.RebuildAllTilesFromState();
                 }
             }
@@ -388,54 +323,93 @@ namespace KillingMahjong.UI
                 {
                     uiManager.ClearSelection();
                     
-                    if (_lastMulliganOutTileId != -1 && _lastMulliganTargetIndex != -1)
+                    if (data.mulliganResult != null)
                     {
-                        int oldTileId = _lastMulliganOutTileId;
-                        int newTileId = -1;
+                        int oldTileId = data.mulliganResult.oldTile;
+                        int newTileId = data.mulliganResult.newTile;
+                        int targetHandIndex = data.mulliganResult.targetHandIndex;
                         
-                        float timeout = 2.0f;
-                        while (timeout > 0)
+                        var stateMgr = Managers.BoardStateManager.Instance;
+                        if (stateMgr.CurrentHandTiles.Contains(oldTileId))
                         {
-                            if (Managers.BoardStateManager.Instance.OriginalWallTiles != null &&
-                                Managers.BoardStateManager.Instance.OriginalWallTiles.Count > _lastMulliganTargetIndex)
+                            stateMgr.CurrentHandTiles.Remove(oldTileId);
+                            stateMgr.CurrentHandTiles.Add(newTileId);
+                            stateMgr.SortTileIds(stateMgr.CurrentHandTiles);
+
+                            int wallIdx = stateMgr.CurrentWallTiles.IndexOf(newTileId);
+                            if (wallIdx >= 0)
                             {
-                                int currentAtIdx = Managers.BoardStateManager.Instance.OriginalWallTiles[_lastMulliganTargetIndex];
-                                if (currentAtIdx != oldTileId)
-                                {
-                                    newTileId = currentAtIdx;
-                                    break;
-                                }
+                                stateMgr.CurrentWallTiles[wallIdx] = oldTileId;
                             }
-                            timeout -= Time.deltaTime;
-                            yield return null;
                         }
-                        
-                        if (newTileId != -1)
+                        else if (stateMgr.CurrentWallTiles.Contains(oldTileId))
                         {
-                            var stateMgr = Managers.BoardStateManager.Instance;
-                            if (stateMgr.CurrentHandTiles.Contains(oldTileId))
+                            // If oldTileId is not in hand, this might be an invalid state, but we swap it out safely
+                            int wallIdx = stateMgr.CurrentWallTiles.IndexOf(oldTileId);
+                            if (wallIdx >= 0)
                             {
-                                stateMgr.CurrentHandTiles.Remove(oldTileId);
-                                stateMgr.CurrentHandTiles.Add(newTileId);
-                                stateMgr.SortTileIds(stateMgr.CurrentHandTiles);
-                            }
-                            else if (stateMgr.CurrentWallTiles.Contains(oldTileId))
-                            {
-                                stateMgr.CurrentWallTiles.Remove(oldTileId);
+                                stateMgr.CurrentWallTiles.RemoveAt(wallIdx);
                                 stateMgr.CurrentWallTiles.Add(newTileId);
                                 stateMgr.SortTileIds(stateMgr.CurrentWallTiles);
                             }
-
-                            yield return _mulliganSwapAnimator.PlayRoutine(oldTileId, newTileId, _lastMulliganOutSlotRt);
                         }
-                        else
+
+                        // アニメーション用のスロットを取得（直前の操作時の記録があればそれを使う、無ければデフォルト）
+                        RectTransform targetSlot = _lastMulliganOutSlotRt;
+                        if (targetSlot == null && uiManager.HandUI != null)
                         {
-                            Debug.LogWarning("Mulligan animation failed: IN tile not received in time.");
+                            targetSlot = uiManager.HandUI.GetTileSlotRectTransform(oldTileId);
                         }
 
-                        _lastMulliganOutTileId = -1;
-                        _lastMulliganTargetIndex = -1;
+                        if (_mulliganSwapAnimator != null)
+                        {
+                            yield return _mulliganSwapAnimator.PlayRoutine(oldTileId, newTileId, targetSlot);
+                        }
                     }
+                    else
+                    {
+                        Debug.LogWarning("Mulligan animation failed: mulliganResult is null.");
+                    }
+
+                    _lastMulliganOutTileId = -1;
+                    _lastMulliganTargetIndex = -1;
+                    
+                    // MulliganSwapAnimator側で IsTransitioning=false と RebuildAllTilesFromState が呼ばれるため、ここでは不要
+                }
+                else
+                {
+                    if (data.mulliganResult != null)
+                    {
+                        int oldTileId = data.mulliganResult.oldTile;
+                        int newTileId = data.mulliganResult.newTile;
+                        
+                        var stateMgr = Managers.BoardStateManager.Instance;
+                        if (stateMgr.CurrentEnemyHandTiles.Contains(oldTileId))
+                        {
+                            stateMgr.CurrentEnemyHandTiles.Remove(oldTileId);
+                            stateMgr.CurrentEnemyHandTiles.Add(newTileId);
+                            stateMgr.SortTileIds(stateMgr.CurrentEnemyHandTiles);
+
+                            int wallIdx = stateMgr.CurrentEnemyWallTiles.IndexOf(newTileId);
+                            if (wallIdx >= 0)
+                            {
+                                stateMgr.CurrentEnemyWallTiles[wallIdx] = oldTileId;
+                            }
+                        }
+                        else if (stateMgr.CurrentEnemyWallTiles.Contains(oldTileId))
+                        {
+                            int wallIdx = stateMgr.CurrentEnemyWallTiles.IndexOf(oldTileId);
+                            if (wallIdx >= 0)
+                            {
+                                stateMgr.CurrentEnemyWallTiles.RemoveAt(wallIdx);
+                                stateMgr.CurrentEnemyWallTiles.Add(newTileId);
+                                stateMgr.SortTileIds(stateMgr.CurrentEnemyWallTiles);
+                            }
+                        }
+                    }
+                    
+                    uiManager.SetIsTransitioning(false);
+                    uiManager.VisualController?.RebuildAllTilesFromState();
                 }
             }
         }

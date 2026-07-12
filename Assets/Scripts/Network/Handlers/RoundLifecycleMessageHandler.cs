@@ -87,7 +87,7 @@ namespace KillingMahjong.Network.Handlers
                         if (nrwMsg.data.ready_count > 0)
                         {
                             Debug.Log("[Network] 次局進行待ち (ready_count > 0) - 相手が演出を進行させた合図として処理します");
-                            network.RaiseNextRoundWaitingReceived();
+                            network.RaiseNextRoundWaitingReceived(nrwMsg.data);
                         }
                         else
                         {
@@ -97,7 +97,7 @@ namespace KillingMahjong.Network.Handlers
                     else
                     {
                         // パース失敗時等のフォールバック
-                        network.RaiseNextRoundWaitingReceived();
+                        network.RaiseNextRoundWaitingReceived(new NextRoundWaitingData() { ready_players = new List<string>() });
                     }
                     break;
 

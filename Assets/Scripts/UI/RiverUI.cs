@@ -37,6 +37,15 @@ namespace KillingMahjong.UI
             if (visual != null && tileResourceManager != null)
             {
                 visual.SetTile(tileId, tileResourceManager.GetDiscardTileSprite(tileId, isEnemyRiver));
+                visual.SetExposed(false);
+                visual.SetHoverHighlight(false);
+            }
+
+            TileInteraction interaction = rt.GetComponent<TileInteraction>();
+            if (interaction != null)
+            {
+                interaction.Initialize(tileId, false, FindFirstObjectByType<GameUIManager>(), FindFirstObjectByType<Canvas>());
+                interaction.enabled = false;
             }
 
             discardedTiles.Add(rt);
@@ -59,6 +68,15 @@ namespace KillingMahjong.UI
             if (visual != null && tileResourceManager != null)
             {
                 visual.SetTile(tileId, tileResourceManager.GetDiscardTileSprite(tileId, isEnemyRiver));
+                visual.SetExposed(false);
+                visual.SetHoverHighlight(false);
+            }
+
+            TileInteraction interaction = obj.GetComponent<TileInteraction>();
+            if (interaction != null)
+            {
+                interaction.Initialize(tileId, false, FindFirstObjectByType<GameUIManager>(), FindFirstObjectByType<Canvas>());
+                interaction.enabled = false;
             }
 
             discardedTiles.Add(obj.transform);

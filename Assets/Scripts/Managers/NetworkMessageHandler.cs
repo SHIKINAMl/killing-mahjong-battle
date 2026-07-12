@@ -38,6 +38,15 @@ namespace KillingMahjong.Network
         public List<int> exposedHandIndexes;
         // manually populated
         public System.Collections.Generic.Dictionary<string, System.Collections.Generic.List<int>> exposedHandIndexesByPlayer;
+        public MulliganResultData mulliganResult;
+    }
+
+    [System.Serializable]
+    public class MulliganResultData
+    {
+        public int targetHandIndex;
+        public int oldTile;
+        public int newTile;
     }
 
     [System.Serializable]
@@ -110,7 +119,7 @@ namespace KillingMahjong.Network
         public event Action<bool> OnAgari; // isLocalWin
         public event Action<DrawPlayerData[]> OnDraw; // 流局
         public event Action<int, int> OnGameEnded; // localScore, enemyScore
-        public event Action OnNextRoundWaitingReceived; // 相手からの次局待機（ロンボタン押下の合図として利用）
+        public event Action<NextRoundWaitingData> OnNextRoundWaitingReceived; // 相手からの次局待機（ロンボタン押下の合図として利用）
         
         public event Action<StatusData> OnStatusReceived;
         public event Action<AgariPendingData> OnAgariPendingReceived;
@@ -150,7 +159,7 @@ namespace KillingMahjong.Network
         internal void RaiseAgari(bool isLocalWin) => OnAgari?.Invoke(isLocalWin);
         internal void RaiseDraw(DrawPlayerData[] drawData) => OnDraw?.Invoke(drawData);
         internal void RaiseGameEnded(int localScore, int enemyScore) => OnGameEnded?.Invoke(localScore, enemyScore);
-        internal void RaiseNextRoundWaitingReceived() => OnNextRoundWaitingReceived?.Invoke();
+        internal void RaiseNextRoundWaitingReceived(NextRoundWaitingData data) => OnNextRoundWaitingReceived?.Invoke(data);
         internal void RaiseStatusReceived(StatusData data) => OnStatusReceived?.Invoke(data);
         internal void RaiseAgariPendingReceived(AgariPendingData data) => OnAgariPendingReceived?.Invoke(data);
         internal void RaiseError(string message) => OnError?.Invoke(message);

@@ -17,6 +17,20 @@ namespace KillingMahjong.UI
             return handSlots;
         }
 
+        public RectTransform GetTileSlotRectTransform(int tileId)
+        {
+            if (handSlots == null) return null;
+            foreach (var slot in handSlots)
+            {
+                var interaction = slot.GetComponent<TileInteraction>();
+                if (interaction != null && interaction.TileId == tileId)
+                {
+                    return slot;
+                }
+            }
+            return null;
+        }
+
         [SerializeField] protected TileResourceManager tileResourceManager;
 
         [Header("Layout Settings")]
@@ -37,6 +51,7 @@ namespace KillingMahjong.UI
             handSlots.Add(tileTransform);
 
             tileTransform.SetParent(handSlotContainer, false);
+            tileTransform.SetAsLastSibling();
             tileTransform.localPosition = Vector3.zero;
             
             RectTransform rt = tileTransform.GetComponent<RectTransform>();
@@ -113,6 +128,10 @@ namespace KillingMahjong.UI
             }
         }
 
+        public virtual void SortHandSlots()
+        {
+        }
+
         public virtual void UpdateLayout(RoundStatus phaseStatus)
         {
             if (handSlotContainer == null) return;
@@ -121,7 +140,6 @@ namespace KillingMahjong.UI
                                   phaseStatus == RoundStatus.Ron || 
                                   phaseStatus == RoundStatus.Result || 
                                   phaseStatus == RoundStatus.Draw;
-            if (isGameEndPhase) return;
 
             // Bettingフェーズではコンテナ切り替え／レイアウト更新を行わない。
             // どの呼び出し元経由でも牌が消えるバグの原因となるため、発生源で一括ガードする。
@@ -130,7 +148,7 @@ namespace KillingMahjong.UI
                 return;
             }
 
-            bool isBoardActivePhase = phaseStatus == RoundStatus.Discard;
+            bool isBoardActivePhase = phaseStatus == RoundStatus.Discard || isGameEndPhase;
 
             var layoutGroup = handSlotContainer.GetComponent<UnityEngine.UI.LayoutGroup>();
             Transform activeContainer = (isBoardActivePhase && discardPhaseContainer != null) 
@@ -150,8 +168,14 @@ namespace KillingMahjong.UI
 
             foreach (var st in handSlots)
             {
-                if (st.parent != activeContainer) st.SetParent(activeContainer, false);
-                
+                if (st.parent != activeContainer)
+                {
+                    st.SetParent(activeContainer, false);
+                }
+                st.localPosition = new Vector3(st.localPosition.x, st.localPosition.y, 0f);
+                st.localScale = Vector3.one;
+                st.localRotation = Quaternion.identity;
+
                 // 初めて登録される牌なら、初期位置は現在の位置にするか、山牌側にする等の工夫ができるが
                 // ここではとりあえず現在位置を維持しつつ、後でUpdateで引っ張る
                 if (!targetPositions.ContainsKey(st))

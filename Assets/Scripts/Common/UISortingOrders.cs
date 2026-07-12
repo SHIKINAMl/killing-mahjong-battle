@@ -63,7 +63,7 @@ namespace KillingMahjong.Common
         public const int SkillDimmer = 32000;
 
         /// <summary>GameUISkillController: マリガン中に選択対象の手牌/山UIをディマーより手前に出すレイヤー</summary>
-        public const int MulliganFocusTiles = 32005;
+        public const int MulliganFocusTiles = 21;
 
         /// <summary>ClickFeedbackManager: クリックエフェクト</summary>
         public const int ClickFeedback = 32000;

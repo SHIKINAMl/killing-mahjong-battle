@@ -193,6 +193,10 @@ namespace KillingMahjong.UI
                 {
                     visual.SetTile(id, tileResourceManager.GetTileSprite(id));
                     
+                    // 待ち牌表示には透視マークやフリテンアラートは不要なので必ずオフにする
+                    visual.SetExposed(false);
+                    visual.SetFuritenHighlight(false);
+
                     if (KillingMahjong.Managers.BoardStateManager.Instance.NonManganWaitTiles.Contains(id))
                     {
                         visual.SetAlpha(0.3f); // 透明度をさらに薄くして強調

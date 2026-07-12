@@ -82,6 +82,20 @@ namespace KillingMahjong.UI
 
                 currentSlot++;
             }
+
+            // 安全網: 配置されずに余った generatedTiles があれば、確実にプールに返す（幽霊オブジェクトによるバグ防止）
+            if (tileIndex < generatedTiles.Count)
+            {
+                var poolManager = UnityEngine.Object.FindFirstObjectByType<TilePoolManager>();
+                for (int i = tileIndex; i < generatedTiles.Count; i++)
+                {
+                    if (generatedTiles[i] != null)
+                    {
+                        if (poolManager != null) poolManager.ReturnTileToPool(generatedTiles[i].gameObject);
+                        else Destroy(generatedTiles[i].gameObject);
+                    }
+                }
+            }
         }
 
         public RectTransform GrabEnemyTile()

@@ -43,10 +43,50 @@ namespace KillingMahjong.UI
         private int currentBet = 0;
         private int maxBet = 0;
 
-        private Vector2 hiddenPos; // Off-screen right
         private Vector2 visiblePos; // On-screen
         
         private Action<int> onConfirmAction;
+
+        private GameObject bettingDimmer;
+
+        private void CreateDimmer()
+        {
+            if (bettingDimmer != null) return;
+            
+            bettingDimmer = new GameObject("BettingDimmer");
+            var rt = bettingDimmer.AddComponent<RectTransform>();
+            
+            Canvas rootCanvas = GetComponentInParent<Canvas>();
+            if (rootCanvas != null) rootCanvas = rootCanvas.rootCanvas;
+            Transform parentTransform = rootCanvas != null ? rootCanvas.transform : transform;
+            
+            bettingDimmer.transform.SetParent(parentTransform, false);
+            
+            Canvas dimmerCanvas = bettingDimmer.AddComponent<Canvas>();
+            dimmerCanvas.overrideSorting = true;
+            dimmerCanvas.sortingOrder = 19; // PlayerInfoUI (20) より奥にする
+            
+            bettingDimmer.AddComponent<UnityEngine.UI.GraphicRaycaster>();
+
+            Image bg = bettingDimmer.AddComponent<Image>();
+            bg.color = new Color(0, 0, 0, 0.7f); // 半透明の黒（スマホ以外が暗くなる）
+            
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.sizeDelta = Vector2.zero;
+            rt.anchoredPosition = Vector2.zero;
+        }
+
+        private void ShowDimmer()
+        {
+            if (bettingDimmer == null) CreateDimmer();
+            bettingDimmer.SetActive(true);
+        }
+
+        private void HideDimmer()
+        {
+            if (bettingDimmer != null) bettingDimmer.SetActive(false);
+        }
 
         private void Awake()
         {
@@ -54,7 +94,6 @@ namespace KillingMahjong.UI
             if (hpBarPanel != null)
             {
                 visiblePos = hpBarPanel.anchoredPosition;
-                hiddenPos = visiblePos; // もう隠さないので同じ位置にしておく
             }
 
             // Get DialogueUI reference
@@ -102,10 +141,11 @@ namespace KillingMahjong.UI
             {
                 canvas.overrideSorting = true;
                 canvas.sortingLayerName = "UI";
-                canvas.sortingOrder = UISortingOrders.BettingPanel;
+                canvas.sortingOrder = 20; // 敵のdialogより前にするために20に設定
             }
 
             gameObject.SetActive(true);
+            ShowDimmer();
             UpdateUI();
             
             // Slide In Animationを廃止して即時表示
@@ -133,18 +173,20 @@ namespace KillingMahjong.UI
             if (immediate || !gameObject.activeInHierarchy)
             {
                 gameObject.SetActive(false);
+                HideDimmer();
                 return;
             }
 
-            // スライドアウトアニメーションを廃止して即時非表示
             if (hpBarPanel != null)
             {
                 StopAllCoroutines();
                 gameObject.SetActive(false);
+                HideDimmer();
             }
             else
             {
                 gameObject.SetActive(false);
+                HideDimmer();
             }
         }
 
@@ -192,10 +234,14 @@ namespace KillingMahjong.UI
             if (currentMoneyText != null)
                 currentMoneyText.text = $"HP: {currentMoney}";
 
+            bool isTenpai = Managers.BoardStateManager.Instance != null && 
+                            Managers.BoardStateManager.Instance.LocalWaitDataList != null && 
+                            Managers.BoardStateManager.Instance.LocalWaitDataList.Count > 0;
+
+            int maxHan = 0;
             float expectedMultiplier = 1.0f;
-            if (Managers.BoardStateManager.Instance != null && Managers.BoardStateManager.Instance.LocalWaitDataList != null && Managers.BoardStateManager.Instance.LocalWaitDataList.Count > 0)
+            if (isTenpai)
             {
-                int maxHan = 0;
                 foreach (var wait in Managers.BoardStateManager.Instance.LocalWaitDataList)
                 {
                     int han = GameRules.CalculateTotalHan(wait.yaku, Managers.BoardStateManager.Instance.LocalBoostHandBonus);
@@ -204,16 +250,35 @@ namespace KillingMahjong.UI
                 expectedMultiplier = GameRules.GetMultiplier(maxHan);
             }
 
-            int reward = Mathf.FloorToInt(currentBet * expectedMultiplier);
+            // ノーテン、または満貫未満(通常5飜未満を指す。簡略ルールで4飜満貫の場合も考慮し、ここでは5飜以上を満貫とみなす。
+            // もしこのゲームが4飜満貫を採用しているなら4にするが、一般的には5以上を明示的に満貫と扱うことが多い)
+            // ただし、もし倍率が跳満以上(>1.0f)であれば確実に表示する
+            bool isManganOrMore = maxHan >= 5 || expectedMultiplier > 1.0f;
 
             if (currentBetText != null)
             {
-                currentBetText.text = $"Bet: {currentBet}\n<size=70%>予想報酬: {reward}</size>";
+                if (isTenpai && isManganOrMore)
+                {
+                    int reward = Mathf.FloorToInt(currentBet * expectedMultiplier);
+                    currentBetText.text = $"Bet: {currentBet}\n<size=70%>予想報酬: {reward}</size>";
+                }
+                else
+                {
+                    currentBetText.text = $"Bet: {currentBet}";
+                }
             }
 
             if (expectedRewardText != null)
             {
-                expectedRewardText.text = $"Expected Reward: {reward}";
+                if (isTenpai && isManganOrMore)
+                {
+                    int reward = Mathf.FloorToInt(currentBet * expectedMultiplier);
+                    expectedRewardText.text = $"Expected Reward: {reward}";
+                }
+                else
+                {
+                    expectedRewardText.text = "";
+                }
             }
             
             // Disable buttons appropriately
