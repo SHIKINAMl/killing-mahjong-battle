@@ -22,6 +22,14 @@ namespace KillingMahjong.UI
         [Header("Buttons")]
         [SerializeField] private Button closeButton; // 保存せずに閉じる
         [SerializeField] private Button saveAndCloseButton; // 保存して閉じる
+        [SerializeField] private Button returnToTitleButton; // タイトル（または別シーン）に戻る
+        [SerializeField] private Button quitButton; // ゲーム終了
+
+        [Header("Scene Transition Settings")]
+        [Tooltip("このシーンで『戻る』ボタンを表示するかどうか")]
+        [SerializeField] private bool showReturnButton = true;
+        [Tooltip("『戻る』ボタンを押したときに遷移するシーン名")]
+        [SerializeField] private string returnSceneName = "TitleScene";
 
         private void Start()
         {
@@ -39,6 +47,13 @@ namespace KillingMahjong.UI
             // --- ボタンのイベント登録 ---
             if (closeButton != null) closeButton.onClick.AddListener(CloseWithoutSave);
             if (saveAndCloseButton != null) saveAndCloseButton.onClick.AddListener(SaveAndClose);
+            
+            if (returnToTitleButton != null) 
+            {
+                returnToTitleButton.gameObject.SetActive(showReturnButton);
+                returnToTitleButton.onClick.AddListener(ReturnToScene);
+            }
+            if (quitButton != null) quitButton.onClick.AddListener(QuitGame);
         }
 
         private void OnEnable()
@@ -109,6 +124,25 @@ namespace KillingMahjong.UI
                 Core.SettingsManager.Instance.LoadSettings();
             }
             gameObject.SetActive(false);
+        }
+
+        public void ReturnToScene()
+        {
+            SaveAndClose();
+            if (!string.IsNullOrEmpty(returnSceneName))
+            {
+                UnityEngine.SceneManagement.SceneManager.LoadScene(returnSceneName);
+            }
+        }
+
+        public void QuitGame()
+        {
+            SaveAndClose();
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.isPlaying = false;
+#else
+            Application.Quit();
+#endif
         }
     }
 }

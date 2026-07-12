@@ -38,6 +38,7 @@ namespace KillingMahjong.UI
         [SerializeField] private DoraDisplayUI doraDisplayUI;
         [SerializeField] private TurnIndicatorUI turnIndicatorUI;
         [SerializeField] private GameObject ronWaitPanel;
+        [SerializeField] private OptionUI optionUI;
 
         [Header("Effects")]
         [SerializeField] private GameObject victoryEffectPrefab;
@@ -192,6 +193,18 @@ namespace KillingMahjong.UI
             }
         }
 
+        public void OpenOptionUI()
+        {
+            if (optionUI != null)
+            {
+                optionUI.gameObject.SetActive(true);
+            }
+            else
+            {
+                Debug.LogWarning("[GameUIManager] OptionUI is not assigned!");
+            }
+        }
+
         // --- Component accessors ---
         public HandUI HandUI => handUI;
         public WallUI WallUI => wallUI;
@@ -217,6 +230,7 @@ namespace KillingMahjong.UI
         public MatchmakingUI MatchmakingUI => matchmakingUI;
         public DoraDisplayUI DoraDisplayUI => doraDisplayUI;
         public GameObject RonWaitPanel => ronWaitPanel;
+        public OptionUI OptionUI => optionUI;
 
         public GameObject TilePrefab => tilePrefab;
         public TileResourceManager TileResourceManager => tileResourceManager;
@@ -276,12 +290,18 @@ namespace KillingMahjong.UI
             {
                 StartCoroutine(VisualController.PlayTransitionAnimationRoutine(() => 
                 {
+                    if (KillingMahjong.Managers.AudioManager.Instance != null)
+                        KillingMahjong.Managers.AudioManager.Instance.PlaySE(KillingMahjong.Managers.AudioManager.Instance.selectTileSE);
+
                     BoardStateManager.Instance.MoveTileToHand(tileId);
                     ClearSelection();
                 }));
             }
             else
             {
+                if (KillingMahjong.Managers.AudioManager.Instance != null)
+                    KillingMahjong.Managers.AudioManager.Instance.PlaySE(KillingMahjong.Managers.AudioManager.Instance.selectTileSE);
+
                 BoardStateManager.Instance.MoveTileToHand(tileId);
                 ClearSelection();
             }
@@ -347,6 +367,10 @@ namespace KillingMahjong.UI
         public void SelectTile(int tileId, bool isInHand, bool multiSelect)
         {
             if (currentPhaseStatus == RoundStatus.Discard && !BoardStateManager.Instance.IsLocalTurn) return;
+            
+            if (KillingMahjong.Managers.AudioManager.Instance != null)
+                KillingMahjong.Managers.AudioManager.Instance.PlaySE(KillingMahjong.Managers.AudioManager.Instance.selectTileSE);
+
             BoardStateManager.Instance.SelectTile(tileId, multiSelect);
             DeselectAbility();
         }
@@ -451,6 +475,9 @@ namespace KillingMahjong.UI
                 Debug.Log("[GameUIManager] I am the winner! Showing RonWaitPanel.");
                 _isAgariPending = true;
                 
+                if (KillingMahjong.Managers.AudioManager.Instance != null)
+                    KillingMahjong.Managers.AudioManager.Instance.PlayVoice(KillingMahjong.Managers.AudioManager.Instance.ronVoice);
+
                 var autoDiscard = GetComponent<AutoDiscardController>();
                 if (autoDiscard != null) autoDiscard.CancelAutoDiscard();
 
@@ -500,6 +527,9 @@ namespace KillingMahjong.UI
         public void HandleDiscardEvent(int discardedTileId, bool isLocalPlayer)
         {
             BoardStateManager.Instance.LastDiscardedTileId = discardedTileId;
+
+            if (KillingMahjong.Managers.AudioManager.Instance != null)
+                KillingMahjong.Managers.AudioManager.Instance.PlaySE(KillingMahjong.Managers.AudioManager.Instance.discardSE);
 
             bool isGameEndPhase = currentPhaseStatus == RoundStatus.Agari || 
                                   currentPhaseStatus == RoundStatus.Ron || 

@@ -11,15 +11,24 @@ namespace KillingMahjong.Core
         public static SettingsManager Instance { get; private set; }
 
         // --- オーディオ設定 ---
-        public float BgmVolume { get; private set; }
-        public float SeVolume { get; private set; }
-        public float VoiceVolume { get; private set; }
+        [Header("Audio Settings")]
+        [SerializeField, Range(0f, 1f)] private float bgmVolume = 0.5f;
+        [SerializeField, Range(0f, 1f)] private float seVolume = 0.5f;
+        [SerializeField, Range(0f, 1f)] private float voiceVolume = 0.5f;
+
+        public float BgmVolume => bgmVolume;
+        public float SeVolume => seVolume;
+        public float VoiceVolume => voiceVolume;
 
         // --- ゲームプレイ設定 ---
-        public bool IsHighSpeedMode { get; private set; } // 打牌スピード（標準/高速）
+        [Header("Game Settings")]
+        [SerializeField] private bool isHighSpeedMode = false;
+        public bool IsHighSpeedMode => isHighSpeedMode; // 打牌スピード（標準/高速）
 
         // --- 表示・システム設定 ---
-        public bool IsEffectEnabled { get; private set; } // 背景エフェクトのON/OFF
+        [Header("System Settings")]
+        [SerializeField] private bool isEffectEnabled = true;
+        public bool IsEffectEnabled => isEffectEnabled; // 背景エフェクトのON/OFF
 
         // 設定が変更された時に呼ばれるイベント（UI側で受け取る用）
         public event Action OnSettingsChanged;
@@ -43,12 +52,12 @@ namespace KillingMahjong.Core
         /// </summary>
         public void LoadSettings()
         {
-            BgmVolume = PlayerPrefs.GetFloat("BgmVolume", 0.5f); // デフォルト音量は50%
-            SeVolume = PlayerPrefs.GetFloat("SeVolume", 0.5f);
-            VoiceVolume = PlayerPrefs.GetFloat("VoiceVolume", 0.5f);
+            bgmVolume = PlayerPrefs.GetFloat("BgmVolume", bgmVolume);
+            seVolume = PlayerPrefs.GetFloat("SeVolume", seVolume);
+            voiceVolume = PlayerPrefs.GetFloat("VoiceVolume", voiceVolume);
             
-            IsHighSpeedMode = PlayerPrefs.GetInt("IsHighSpeedMode", 0) == 1; // 0 = false, 1 = true
-            IsEffectEnabled = PlayerPrefs.GetInt("IsEffectEnabled", 1) == 1; // デフォルトはON
+            isHighSpeedMode = PlayerPrefs.GetInt("IsHighSpeedMode", isHighSpeedMode ? 1 : 0) == 1;
+            isEffectEnabled = PlayerPrefs.GetInt("IsEffectEnabled", isEffectEnabled ? 1 : 0) == 1;
 
             ApplySettings();
         }
@@ -58,12 +67,12 @@ namespace KillingMahjong.Core
         /// </summary>
         public void SaveSettings()
         {
-            PlayerPrefs.SetFloat("BgmVolume", BgmVolume);
-            PlayerPrefs.SetFloat("SeVolume", SeVolume);
-            PlayerPrefs.SetFloat("VoiceVolume", VoiceVolume);
+            PlayerPrefs.SetFloat("BgmVolume", bgmVolume);
+            PlayerPrefs.SetFloat("SeVolume", seVolume);
+            PlayerPrefs.SetFloat("VoiceVolume", voiceVolume);
             
-            PlayerPrefs.SetInt("IsHighSpeedMode", IsHighSpeedMode ? 1 : 0);
-            PlayerPrefs.SetInt("IsEffectEnabled", IsEffectEnabled ? 1 : 0);
+            PlayerPrefs.SetInt("IsHighSpeedMode", isHighSpeedMode ? 1 : 0);
+            PlayerPrefs.SetInt("IsEffectEnabled", isEffectEnabled ? 1 : 0);
 
             PlayerPrefs.Save();
             
@@ -72,19 +81,37 @@ namespace KillingMahjong.Core
         }
 
         // --- 設定値の変更メソッド ---
-        public void SetBgmVolume(float volume) { BgmVolume = volume; }
-        public void SetSeVolume(float volume) { SeVolume = volume; }
-        public void SetVoiceVolume(float volume) { VoiceVolume = volume; }
-        public void SetHighSpeedMode(bool isHighSpeed) { IsHighSpeedMode = isHighSpeed; }
-        public void SetEffectEnabled(bool isEnabled) { IsEffectEnabled = isEnabled; }
+        public void SetBgmVolume(float volume) { bgmVolume = volume; }
+        public void SetSeVolume(float volume) { seVolume = volume; }
+        public void SetVoiceVolume(float volume) { voiceVolume = volume; }
+        public void SetHighSpeedMode(bool isHighSpeed) { isHighSpeedMode = isHighSpeed; }
+        public void SetEffectEnabled(bool isEnabled) { isEffectEnabled = isEnabled; }
+
+        private void OnValidate()
+        {
+            // インスペクターで値を変えた時に、即座に適用されるようにする
+            if (Application.isPlaying)
+            {
+                ApplySettings();
+            }
+        }
 
         /// <summary>
         /// 設定値を実際のゲーム内要素（音量など）に反映させる
         /// </summary>
         private void ApplySettings()
         {
-            // 仮実装: AudioListenerの音量をBGM音量に合わせる（本来はAudioMixerやAudioManagerで個別制御する）
-            AudioListener.volume = BgmVolume;
+            if (KillingMahjong.Managers.AudioManager.Instance != null)
+            {
+                KillingMahjong.Managers.AudioManager.Instance.bgmVolume = bgmVolume;
+                KillingMahjong.Managers.AudioManager.Instance.seVolume = seVolume;
+                KillingMahjong.Managers.AudioManager.Instance.voiceVolume = voiceVolume;
+                KillingMahjong.Managers.AudioManager.Instance.ApplyVolumes();
+            }
+            else
+            {
+                AudioListener.volume = bgmVolume; // Fallback
+            }
         }
     }
 }
