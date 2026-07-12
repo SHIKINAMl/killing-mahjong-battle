@@ -6,7 +6,7 @@ namespace KillingMahjong.Editor
 {
     public class UIStyleApplier : EditorWindow
     {
-        private Color panelColor = new Color(0.1f, 0.4f, 0.8f, 0.8f); // デフォルトの青色（少し透過）
+        private Color panelColor = new Color(0.3f, 0.0f, 0.05f, 0.8f); // デフォルトの深い赤色（少し透過）
         private Color outlineColor = new Color(0f, 0f, 0f, 1f);       // 黒の境界線
         private Vector2 outlineThickness = new Vector2(3f, -3f);
 

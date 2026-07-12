@@ -43,10 +43,50 @@ namespace KillingMahjong.UI
         private int currentBet = 0;
         private int maxBet = 0;
 
-        private Vector2 hiddenPos; // Off-screen right
         private Vector2 visiblePos; // On-screen
         
         private Action<int> onConfirmAction;
+
+        private GameObject bettingDimmer;
+
+        private void CreateDimmer()
+        {
+            if (bettingDimmer != null) return;
+            
+            bettingDimmer = new GameObject("BettingDimmer");
+            var rt = bettingDimmer.AddComponent<RectTransform>();
+            
+            Canvas rootCanvas = GetComponentInParent<Canvas>();
+            if (rootCanvas != null) rootCanvas = rootCanvas.rootCanvas;
+            Transform parentTransform = rootCanvas != null ? rootCanvas.transform : transform;
+            
+            bettingDimmer.transform.SetParent(parentTransform, false);
+            
+            Canvas dimmerCanvas = bettingDimmer.AddComponent<Canvas>();
+            dimmerCanvas.overrideSorting = true;
+            dimmerCanvas.sortingOrder = 19; // PlayerInfoUI (20) より奥にする
+            
+            bettingDimmer.AddComponent<UnityEngine.UI.GraphicRaycaster>();
+
+            Image bg = bettingDimmer.AddComponent<Image>();
+            bg.color = new Color(0, 0, 0, 0.7f); // 半透明の黒（スマホ以外が暗くなる）
+            
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.sizeDelta = Vector2.zero;
+            rt.anchoredPosition = Vector2.zero;
+        }
+
+        private void ShowDimmer()
+        {
+            if (bettingDimmer == null) CreateDimmer();
+            bettingDimmer.SetActive(true);
+        }
+
+        private void HideDimmer()
+        {
+            if (bettingDimmer != null) bettingDimmer.SetActive(false);
+        }
 
         private void Awake()
         {
@@ -54,7 +94,6 @@ namespace KillingMahjong.UI
             if (hpBarPanel != null)
             {
                 visiblePos = hpBarPanel.anchoredPosition;
-                hiddenPos = visiblePos; // もう隠さないので同じ位置にしておく
             }
 
             // Get DialogueUI reference
@@ -106,6 +145,7 @@ namespace KillingMahjong.UI
             }
 
             gameObject.SetActive(true);
+            ShowDimmer();
             UpdateUI();
             
             // Slide In Animationを廃止して即時表示
@@ -133,6 +173,7 @@ namespace KillingMahjong.UI
             if (immediate || !gameObject.activeInHierarchy)
             {
                 gameObject.SetActive(false);
+                HideDimmer();
                 return;
             }
 
@@ -140,10 +181,12 @@ namespace KillingMahjong.UI
             {
                 StopAllCoroutines();
                 gameObject.SetActive(false);
+                HideDimmer();
             }
             else
             {
                 gameObject.SetActive(false);
+                HideDimmer();
             }
         }
 

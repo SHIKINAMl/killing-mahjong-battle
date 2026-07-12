@@ -8,7 +8,7 @@ namespace KillingMahjong.Editor
     public class RetroPopUIApplicator : EditorWindow
     {
         // カラー定義
-        private readonly Color colorNavy = new Color32(42, 52, 87, 255);       // 深いネイビーブルー
+        private readonly Color colorDarkRed = new Color32(80, 0, 15, 255);       // 深いワインレッド（元ネイビーブルー）
         private readonly Color colorRed = new Color32(194, 39, 45, 255);       // ディープレッド
         private readonly Color colorCream = new Color32(245, 245, 220, 255);     // クリーム色（オフホワイト）
         private readonly Color colorDarkShadow = new Color32(26, 26, 26, 200);   // ドロップシャドウ用の濃い黒
@@ -30,7 +30,7 @@ namespace KillingMahjong.Editor
 
             EditorGUILayout.Space();
 
-            if (GUILayout.Button("現在のシーンに適用する", GUILayout.Height(40)))
+            if (GUILayout.Button("選択中のオブジェクト（と子要素）に適用", GUILayout.Height(40)))
             {
                 ApplyRetroPopStyle();
             }
@@ -44,23 +44,22 @@ namespace KillingMahjong.Editor
                 Debug.LogWarning($"[RetroPopUI] フォントが見つかりません: {fontAssetPath}");
             }
 
-            // --- 0. 対象のPrefabとSceneオブジェクトを取得 ---
-            var allImages = new System.Collections.Generic.List<Image>(FindObjectsByType<Image>(FindObjectsInactive.Include, FindObjectsSortMode.None));
-            var allTexts = new System.Collections.Generic.List<TextMeshProUGUI>(FindObjectsByType<TextMeshProUGUI>(FindObjectsInactive.Include, FindObjectsSortMode.None));
-            var allAbilityItems = new System.Collections.Generic.List<KillingMahjong.UI.AbilityItemUI>(FindObjectsByType<KillingMahjong.UI.AbilityItemUI>(FindObjectsInactive.Include, FindObjectsSortMode.None));
+            // --- 0. 選択中のオブジェクトから対象を取得 ---
+            var allImages = new System.Collections.Generic.List<Image>();
+            var allTexts = new System.Collections.Generic.List<TextMeshProUGUI>();
+            var allAbilityItems = new System.Collections.Generic.List<KillingMahjong.UI.AbilityItemUI>();
 
-            // Prefabからも収集
-            string[] prefabGuids = AssetDatabase.FindAssets("t:Prefab", new[] { "Assets/Preafb" });
-            foreach (string guid in prefabGuids)
+            if (Selection.gameObjects.Length == 0)
             {
-                string path = AssetDatabase.GUIDToAssetPath(guid);
-                GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
-                if (prefab != null)
-                {
-                    allImages.AddRange(prefab.GetComponentsInChildren<Image>(true));
-                    allTexts.AddRange(prefab.GetComponentsInChildren<TextMeshProUGUI>(true));
-                    allAbilityItems.AddRange(prefab.GetComponentsInChildren<KillingMahjong.UI.AbilityItemUI>(true));
-                }
+                Debug.LogWarning("対象のオブジェクトが選択されていません。ヒエラルキーで適用したいUIオブジェクトを選択してください。");
+                return;
+            }
+
+            foreach (GameObject obj in Selection.gameObjects)
+            {
+                allImages.AddRange(obj.GetComponentsInChildren<Image>(true));
+                allTexts.AddRange(obj.GetComponentsInChildren<TextMeshProUGUI>(true));
+                allAbilityItems.AddRange(obj.GetComponentsInChildren<KillingMahjong.UI.AbilityItemUI>(true));
             }
 
             int buttonIndex = 0;
@@ -69,7 +68,7 @@ namespace KillingMahjong.Editor
             foreach (var ability in allAbilityItems)
             {
                 var so = new SerializedObject(ability);
-                so.FindProperty("normalColor").colorValue = colorNavy;
+                so.FindProperty("normalColor").colorValue = colorDarkRed;
                 so.FindProperty("selectedColor").colorValue = colorRed;
                 so.ApplyModifiedProperties();
                 EditorUtility.SetDirty(ability.gameObject);
@@ -106,14 +105,14 @@ namespace KillingMahjong.Editor
                 {
                     img.sprite = null; 
 
-                    if (btn != null && ability == null)
+                    if (btn != null)
                     {
-                        img.color = (buttonIndex % 2 == 0) ? colorRed : colorNavy;
+                        img.color = (buttonIndex % 2 == 0) ? colorRed : colorDarkRed;
                         buttonIndex++;
                     }
-                    else if (isPanel && ability == null)
+                    else if (isPanel || ability != null)
                     {
-                        img.color = colorNavy;
+                        img.color = colorDarkRed;
                     }
 
                     // 既存のShadow/Outlineを全削除（重複や描画順のバグを防ぐため）
