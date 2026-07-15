@@ -35,7 +35,13 @@ namespace KillingMahjong.UI
             StopAllCoroutines(); // 既存の文字送り演出などがあれば即座にキャンセルする
 
             if (dialogueText != null)
+            {
                 dialogueText.text = text;
+                // セリフの折り返しを有効化
+                dialogueText.enableWordWrapping = true;
+                // 長すぎる場合は省略記号などを出さずに、単に下にはみ出させる（UI枠内に収めるための基本設定）
+                dialogueText.overflowMode = TextOverflowModes.Overflow;
+            }
             
             AddToLog(text);
             dialoguePanel.SetActive(true);

@@ -13,9 +13,16 @@ namespace KillingMahjong.Editor
         {
             // 1. GitHub Pages向けに圧縮を無効化（Unable to parse エラー対策）
             PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Disabled;
-            // 念のためDecompression Fallbackも有効にしておく
             PlayerSettings.WebGL.decompressionFallback = true;
-            // Color Spaceをチェック（URPはLinear必須だがWebGLでは警告が出る場合がある。今回はそのままLinearを維持）
+            // WebGLの基本解像度を800x600 (4:3)に固定
+            PlayerSettings.defaultScreenWidth = 800;
+            PlayerSettings.defaultScreenHeight = 600;
+            // 余計なフッター(960x600固定)を消し、画面全体にフィットするMinimalテンプレートを使用する
+            PlayerSettings.WebGL.template = "APPLICATION:Minimal";
+            
+            // RuntimeError: null function などのWASMクラッシュ対策
+            PlayerSettings.WebGL.exceptionSupport = WebGLExceptionSupport.FullWithoutStacktrace;
+            PlayerSettings.stripEngineCode = false;
 
             // 2. 出力先のフォルダ（docs）を設定
             string projectPath = Directory.GetParent(Application.dataPath).FullName;
@@ -54,6 +61,19 @@ namespace KillingMahjong.Editor
             if (summary.result == BuildResult.Succeeded)
             {
                 Debug.Log($"[WebGL Build] ビルド成功！ 出力先: {buildPath} / サイズ: {summary.totalSize} bytes");
+                
+                // ビルド後に自動で index.html をレスポンシブ（全画面対応）に書き換える
+                string indexPath = Path.Combine(buildPath, "index.html");
+                if (File.Exists(indexPath))
+                {
+                    string html = File.ReadAllText(indexPath);
+                    html = html.Replace("canvas.style.width = \"960px\";", "canvas.style.width = \"100%\";");
+                    html = html.Replace("canvas.style.height = \"600px\";", "canvas.style.height = \"100%\";");
+                    html = html.Replace("width: 960px; height: 600px;", "width: 100%; height: 100%; aspect-ratio: 4/3; max-width: 800px; max-height: 600px; margin: auto;");
+                    File.WriteAllText(indexPath, html);
+                    Debug.Log("[WebGL Build] index.html をレスポンシブ対応に書き換えました。");
+                }
+
                 // エクスプローラーでフォルダを開く
                 EditorUtility.RevealInFinder(buildPath);
             }

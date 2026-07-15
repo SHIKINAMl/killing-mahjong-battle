@@ -502,7 +502,8 @@ namespace KillingMahjong.UI
                             enemyExposedActualIds.Remove(realId);
                             uiManager.EnemyHandUI.RevealTileByIndex(i);
                         }
-                        visual.SetExposed(isExposed);
+                        // 敵の牌には透視の目アイコンを表示しない
+                        visual.SetExposed(false);
                     }
                 }
             }
@@ -518,7 +519,8 @@ namespace KillingMahjong.UI
                     {
                         bool isExposed = enemyExposedActualIds.Contains(interaction.TileId);
                         if (isExposed) enemyExposedActualIds.Remove(interaction.TileId);
-                        visual.SetExposed(isExposed);
+                        // 敵の牌には透視の目アイコンを表示しない
+                        visual.SetExposed(false);
                     }
                 }
             }

@@ -77,12 +77,6 @@ namespace KillingMahjong.UI
                 returnToTitleButton.onClick.AddListener(ReturnToScene);
             }
             if (quitButton != null) quitButton.onClick.AddListener(QuitGame);
-
-            if (_canvasGroup.alpha <= 0)
-            {
-                _canvasGroup.blocksRaycasts = false;
-                _canvasGroup.interactable = false;
-            }
         }
 
         private void OnEnable()
@@ -111,7 +105,11 @@ namespace KillingMahjong.UI
             _canvasGroup.alpha = 1f;
 
             _rectTransform.DOScale(Vector3.one * 0.9f, 0.25f).From().SetEase(Ease.OutBack).SetUpdate(true);
-            _canvasGroup.DOFade(0f, 0.2f).From().SetEase(Ease.OutQuad).SetUpdate(true);
+            _canvasGroup.DOFade(0f, 0.2f).From().SetEase(Ease.OutQuad).SetUpdate(true).OnComplete(() => {
+                // アニメーション完了後に再度確実に入力を有効化
+                _canvasGroup.blocksRaycasts = true;
+                _canvasGroup.interactable = true;
+            });
         }
 
         public void Close()

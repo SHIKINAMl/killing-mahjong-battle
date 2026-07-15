@@ -11,6 +11,20 @@ namespace KillingMahjong.UI
         [Header("設定画面パネル")]
         [SerializeField] private GameObject optionUIPanel;
 
+        private void Start()
+        {
+            // 解像度が変わった際に見切れるのを防ぐため、
+            // 強制的にCanvasScalerの設定を800x600(4:3)の自動調整モードに上書きする
+            var canvasScaler = GetComponentInParent<UnityEngine.UI.CanvasScaler>();
+            if (canvasScaler != null)
+            {
+                canvasScaler.uiScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize;
+                canvasScaler.referenceResolution = new Vector2(800, 600);
+                canvasScaler.screenMatchMode = UnityEngine.UI.CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+                canvasScaler.matchWidthOrHeight = 0.5f;
+            }
+        }
+
         /// <summary>
         /// 1つ目のボタン（ゲームスタートなど）が押された時の処理
         /// </summary>

@@ -477,9 +477,6 @@ namespace KillingMahjong.UI
 
                 Debug.Log("[GameUIManager] I am the winner! Showing RonWaitPanel.");
                 _isAgariPending = true;
-                
-                if (KillingMahjong.Managers.AudioManager.Instance != null)
-                    KillingMahjong.Managers.AudioManager.Instance.PlayVoice(KillingMahjong.Managers.AudioManager.Instance.ronVoice);
 
                 var autoDiscard = GetComponent<AutoDiscardController>();
                 if (autoDiscard != null) autoDiscard.CancelAutoDiscard();
@@ -621,6 +618,12 @@ namespace KillingMahjong.UI
         public void ExecuteRonAction()
         {
             Debug.Log($"[GameUIManager] ExecuteRonAction called. _isAgariPending={_isAgariPending}");
+            
+            if (KillingMahjong.Managers.AudioManager.Instance != null)
+            {
+                KillingMahjong.Managers.AudioManager.Instance.PlayVoice(KillingMahjong.Managers.AudioManager.Instance.ronVoice);
+            }
+
             if (_isAgariPending)
             {
                 _isAgariPending = false;
