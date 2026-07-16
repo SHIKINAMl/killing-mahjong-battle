@@ -14,7 +14,12 @@ namespace KillingMahjong.UI
         [Header("Dialog Position Settings")]
         [SerializeField] private Vector2 dialogCenterPosition = new Vector2(0, 50);
 
-        private List<GameObject> activeWaitTiles = new List<GameObject>();
+        private System.Collections.Generic.List<GameObject> activeWaitTiles = new System.Collections.Generic.List<GameObject>();
+        
+        private System.Collections.Generic.List<int> currentWaitTileIds = new System.Collections.Generic.List<int>();
+        private int currentPage = 0;
+        private Coroutine paginationCoroutine = null;
+        private const int MaxTilesPerPage = 3;
 
         private Vector2 originalPosition;
         private Vector2 originalPivot;
@@ -155,22 +160,45 @@ namespace KillingMahjong.UI
             }
 
             gameObject.SetActive(true);
+            currentWaitTileIds = waitTileIds;
+            currentPage = 0;
 
-            // 配置パラメータ
-            // 手牌確認UIとは異なり、WaitUI側は親スケール等の影響でローカルの見た目幅が小さいため幅を狭める
-            float tileWidth = 18f; // 左下・上部のWaitUIでのスケール後のおおよその幅
-            float spacing = 1f;
-
-            for (int i = 0; i < waitTileIds.Count; i++)
+            if (currentWaitTileIds.Count > MaxTilesPerPage)
             {
-                int id = waitTileIds[i];
+                paginationCoroutine = StartCoroutine(PaginationRoutine());
+            }
+            else
+            {
+                CanvasGroup cg = waitContainer.GetComponent<CanvasGroup>();
+                if (cg != null) cg.alpha = 1f;
+                RenderPage(0);
+            }
+        }
+
+        private void RenderPage(int pageIndex)
+        {
+            // まず既存のオブジェクトを破棄
+            foreach (var t in activeWaitTiles)
+            {
+                if (t != null) Destroy(t);
+            }
+            activeWaitTiles.Clear();
+
+            int startIndex = pageIndex * MaxTilesPerPage;
+            int count = Mathf.Min(MaxTilesPerPage, currentWaitTileIds.Count - startIndex);
+            if (count <= 0) return;
+
+            float tileWidth = 18f;
+            float spacing = 5f;
+            float scale = 1.0f; // 常に1.0で綺麗に表示する
+
+            for (int i = 0; i < count; i++)
+            {
+                int id = currentWaitTileIds[startIndex + i];
                 if (tilePrefab == null || waitContainer == null) return;
 
                 GameObject obj = Instantiate(tilePrefab, waitContainer);
                 activeWaitTiles.Add(obj);
-                
-                // --- 待ち牌が多い場合の重なり防止のためのスケール調整 ---
-                float scale = waitTileIds.Count > 6 ? 0.6f : 1.0f;
                 
                 RectTransform rt = obj.GetComponent<RectTransform>();
                 if (rt != null)
@@ -179,9 +207,9 @@ namespace KillingMahjong.UI
                     rt.anchorMax = new Vector2(0.5f, 0.5f);
                     rt.pivot = new Vector2(0.5f, 0.5f);
                     
-                    float actualTileWidth = tileWidth * scale; // スケールに応じた実際の幅
+                    float actualTileWidth = tileWidth * scale;
                     float actualSpacing = spacing * scale;
-                    float actualTotalWidth = (waitTileIds.Count * actualTileWidth) + ((waitTileIds.Count - 1) * actualSpacing);
+                    float actualTotalWidth = (count * actualTileWidth) + ((count - 1) * actualSpacing);
                     float actualStartX = -actualTotalWidth / 2f + actualTileWidth / 2f;
                     
                     rt.anchoredPosition = new Vector2(actualStartX + i * (actualTileWidth + actualSpacing), 0);
@@ -192,14 +220,12 @@ namespace KillingMahjong.UI
                 if (visual != null && tileResourceManager != null)
                 {
                     visual.SetTile(id, tileResourceManager.GetTileSprite(id));
-                    
-                    // 待ち牌表示には透視マークやフリテンアラートは不要なので必ずオフにする
                     visual.SetExposed(false);
                     visual.SetFuritenHighlight(false);
 
                     if (KillingMahjong.Managers.BoardStateManager.Instance.NonManganWaitTiles.Contains(id))
                     {
-                        visual.SetAlpha(0.3f); // 透明度をさらに薄くして強調
+                        visual.SetAlpha(0.3f);
                     }
                     else 
                     {
@@ -207,32 +233,55 @@ namespace KillingMahjong.UI
                     }
                 }
 
-                // 待ち牌表示用なので、クリック判定などはオフにする
                 var interaction = obj.GetComponent<TileInteraction>();
-                if (interaction != null)
-                {
-                    Destroy(interaction); // クリック不要
-                }
+                if (interaction != null) Destroy(interaction);
             }
 
-            // レイアウトを強制的に更新して重なりを解消
             var hlg = waitContainer.GetComponent<UnityEngine.UI.HorizontalLayoutGroup>();
-            if (hlg == null)
-            {
-                hlg = waitContainer.gameObject.AddComponent<UnityEngine.UI.HorizontalLayoutGroup>();
-            }
+            if (hlg == null) hlg = waitContainer.gameObject.AddComponent<UnityEngine.UI.HorizontalLayoutGroup>();
             hlg.childControlWidth = false;
             hlg.childControlHeight = false;
             hlg.childForceExpandWidth = false;
             hlg.childForceExpandHeight = false;
             hlg.childAlignment = TextAnchor.MiddleCenter;
-            hlg.spacing = waitTileIds.Count > 5 ? 2f : 10f;
+            hlg.spacing = spacing;
 
-            // ContentSizeFitterがanchoredPositionを破壊するため無効化/削除
             var csf = waitContainer.GetComponent<UnityEngine.UI.ContentSizeFitter>();
-            if (csf != null)
+            if (csf != null) Destroy(csf);
+        }
+
+        private System.Collections.IEnumerator PaginationRoutine()
+        {
+            CanvasGroup cg = waitContainer.GetComponent<CanvasGroup>();
+            if (cg == null) cg = waitContainer.gameObject.AddComponent<CanvasGroup>();
+
+            int totalPages = Mathf.CeilToInt((float)currentWaitTileIds.Count / MaxTilesPerPage);
+
+            while (true)
             {
-                Destroy(csf);
+                RenderPage(currentPage);
+                cg.alpha = 1f;
+
+                yield return new WaitForSeconds(1.6f);
+
+                // フェードアウト
+                for (float t = 0; t < 0.2f; t += Time.deltaTime)
+                {
+                    cg.alpha = Mathf.Lerp(1f, 0f, t / 0.2f);
+                    yield return null;
+                }
+                cg.alpha = 0f;
+
+                currentPage = (currentPage + 1) % totalPages;
+                RenderPage(currentPage);
+
+                // フェードイン
+                for (float t = 0; t < 0.2f; t += Time.deltaTime)
+                {
+                    cg.alpha = Mathf.Lerp(0f, 1f, t / 0.2f);
+                    yield return null;
+                }
+                cg.alpha = 1f;
             }
         }
 
@@ -244,6 +293,11 @@ namespace KillingMahjong.UI
 
         public void ClearWaits()
         {
+            if (paginationCoroutine != null)
+            {
+                StopCoroutine(paginationCoroutine);
+                paginationCoroutine = null;
+            }
             foreach (var t in activeWaitTiles)
             {
                 if (t != null) Destroy(t);

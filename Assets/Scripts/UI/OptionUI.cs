@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using DG.Tweening;
 using System.Collections;
+using TMPro;
 
 namespace KillingMahjong.UI
 {
@@ -20,6 +21,10 @@ namespace KillingMahjong.UI
 
         [Header("System Settings (Toggles)")]
         [SerializeField] private Toggle effectToggle;
+
+        [Header("Window Settings")]
+        [SerializeField] private TMP_Dropdown resolutionDropdown;
+        [SerializeField] private Toggle fullscreenToggle;
 
         [Header("Buttons")]
         [SerializeField] private Button closeButton; // 保存せずに閉じる
@@ -66,6 +71,10 @@ namespace KillingMahjong.UI
             // --- トグルのイベント登録 ---
             if (highSpeedToggle != null) highSpeedToggle.onValueChanged.AddListener(OnHighSpeedChanged);
             if (effectToggle != null) effectToggle.onValueChanged.AddListener(OnEffectChanged);
+            if (fullscreenToggle != null) fullscreenToggle.onValueChanged.AddListener(OnFullscreenChanged);
+
+            // --- ドロップダウンのイベント登録 ---
+            if (resolutionDropdown != null) resolutionDropdown.onValueChanged.AddListener(OnResolutionChanged);
 
             // --- ボタンのイベント登録 ---
             if (closeButton != null) closeButton.onClick.AddListener(CloseWithoutSave);
@@ -144,6 +153,9 @@ namespace KillingMahjong.UI
                 
                 if (highSpeedToggle != null) highSpeedToggle.isOn = settings.IsHighSpeedMode;
                 if (effectToggle != null) effectToggle.isOn = settings.IsEffectEnabled;
+                
+                if (resolutionDropdown != null) resolutionDropdown.value = settings.ResolutionIndex;
+                if (fullscreenToggle != null) fullscreenToggle.isOn = settings.IsFullScreen;
             }
         }
 
@@ -171,6 +183,16 @@ namespace KillingMahjong.UI
         private void OnEffectChanged(bool isOn)
         {
             if (Core.SettingsManager.Instance != null) Core.SettingsManager.Instance.SetEffectEnabled(isOn);
+        }
+
+        private void OnFullscreenChanged(bool isOn)
+        {
+            if (Core.SettingsManager.Instance != null) Core.SettingsManager.Instance.SetFullScreen(isOn);
+        }
+
+        private void OnResolutionChanged(int index)
+        {
+            if (Core.SettingsManager.Instance != null) Core.SettingsManager.Instance.SetResolutionIndex(index);
         }
 
         // --- ボタン処理 ---

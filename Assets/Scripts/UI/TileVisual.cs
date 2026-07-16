@@ -122,8 +122,8 @@ namespace KillingMahjong.UI
                     GameObject textObj = new GameObject("FuritenText");
                     textObj.transform.SetParent(obj.transform, false);
                     var text = textObj.AddComponent<UnityEngine.UI.Text>();
-                    text.text = "⚠️";
-                    text.fontSize = 50;
+                    text.text = "⚠";
+                    text.fontSize = (int)KillingMahjong.Common.UITypography.BodyLarge;
                     text.alignment = TextAnchor.MiddleCenter;
                     text.color = Color.white;
                     var textRt = textObj.GetComponent<RectTransform>();
@@ -188,14 +188,14 @@ namespace KillingMahjong.UI
             if (uiImage != null)
             {
                 var outline = uiImage.GetComponent<UnityEngine.UI.Outline>();
-                if (_isFuriten || _isHovered)
+                if (_isFuriten)
                 {
                     if (outline == null)
                     {
                         outline = uiImage.gameObject.AddComponent<UnityEngine.UI.Outline>();
                         outline.effectDistance = new Vector2(3, 3);
                     }
-                    outline.effectColor = Color.red; // ホバー時もフリテン時も赤
+                    outline.effectColor = Color.red; // フリテン時のみ赤枠
                     outline.enabled = true;
                 }
                 else

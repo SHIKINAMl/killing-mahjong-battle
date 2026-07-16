@@ -86,7 +86,7 @@ namespace KillingMahjong.UI
             charRt.anchorMax = new Vector2(0.5f, 0.5f);
             charRt.sizeDelta = new Vector2(1000f, 1000f);
             charRt.localRotation = Quaternion.Euler(0, 0, -15f); // キャラは傾きをキャンセルしてまっすぐに
-            charRt.anchoredPosition = new Vector2(-200f, -250f); // 左側に寄せつつ、顔が中心に来るように全体を下へずらす
+            charRt.anchoredPosition = new Vector2(-200f, -150f); // 左側に寄せつつ、少し上に調整
 
             // 4.5 顔パーツ画像（身体の上に乗せる）
             if (faceSprite != null)
@@ -107,10 +107,10 @@ namespace KillingMahjong.UI
             GameObject textObj = new GameObject("RonText");
             textObj.transform.SetParent(revealRt, false); // revealRtの子にする
             TextMeshProUGUI textMesh = textObj.AddComponent<TextMeshProUGUI>();
-            textMesh.text = string.IsNullOrEmpty(cutinText) ? "ロン！" : cutinText;
+            textMesh.text = string.IsNullOrEmpty(cutinText) ? "ロン！！" : cutinText;
             if (font != null) textMesh.font = font;
             textMesh.color = Color.white;
-            textMesh.fontSize = 250;
+            textMesh.fontSize = KillingMahjong.Common.UITypography.Giant;
             textMesh.fontStyle = FontStyles.Bold | FontStyles.Italic;
             textMesh.alignment = TextAlignmentOptions.Center;
             textMesh.outlineWidth = 0.2f;

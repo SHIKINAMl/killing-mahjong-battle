@@ -80,7 +80,7 @@ namespace KillingMahjong.UI
             outTextObj.transform.SetParent(animContainer.transform, false);
             var outText = outTextObj.AddComponent<TMPro.TextMeshProUGUI>();
             outText.text = "OUT";
-            outText.fontSize = 150;
+            outText.fontSize = KillingMahjong.Common.UITypography.Huge;
             outText.color = new Color(1f, 0.2f, 0.2f, 0f);
             outText.alignment = TMPro.TextAlignmentOptions.Center;
             outText.fontStyle = TMPro.FontStyles.Bold;
@@ -95,7 +95,7 @@ namespace KillingMahjong.UI
             inTextObj.transform.SetParent(animContainer.transform, false);
             var inText = inTextObj.AddComponent<TMPro.TextMeshProUGUI>();
             inText.text = "IN";
-            inText.fontSize = 150;
+            inText.fontSize = KillingMahjong.Common.UITypography.Huge;
             inText.color = new Color(0.2f, 0.8f, 1f, 0f);
             inText.alignment = TMPro.TextAlignmentOptions.Center;
             inText.fontStyle = TMPro.FontStyles.Bold;

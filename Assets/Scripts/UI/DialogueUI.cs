@@ -154,7 +154,7 @@ namespace KillingMahjong.UI
                 var txt = txtObj.AddComponent<TextMeshProUGUI>();
                 txt.text = "OK";
                 txt.color = Color.white;
-                txt.fontSize = 50;
+                txt.fontSize = KillingMahjong.Common.UITypography.BodyLarge;
                 txt.alignment = TextAlignmentOptions.Center;
 
                 btn.onClick.AddListener(() => {

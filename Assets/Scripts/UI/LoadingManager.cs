@@ -88,7 +88,7 @@ namespace KillingMahjong.UI
                 tmp.font = TMPro.TMP_Settings.defaultFontAsset;
             }
             tmp.text = "Now Loading...";
-            tmp.fontSize = 24;
+            tmp.fontSize = KillingMahjong.Common.UITypography.BodySmall;
             tmp.color = Color.white;
             tmp.alignment = TextAlignmentOptions.Left | TextAlignmentOptions.Midline;
             tmp.fontStyle = FontStyles.Bold;

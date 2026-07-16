@@ -33,7 +33,7 @@ namespace KillingMahjong.UI
             ronText.color = Color.white;
             ronText.alignment = TextAnchor.MiddleCenter;
             ronText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            ronText.fontSize = 40;
+            ronText.fontSize = (int)KillingMahjong.Common.UITypography.BodyLarge;
             var ronTextRt = ronTextObj.GetComponent<RectTransform>();
             ronTextRt.anchorMin = Vector2.zero;
             ronTextRt.anchorMax = Vector2.one;
@@ -57,7 +57,7 @@ namespace KillingMahjong.UI
             skipText.color = Color.white;
             skipText.alignment = TextAnchor.MiddleCenter;
             skipText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            skipText.fontSize = 40;
+            skipText.fontSize = (int)KillingMahjong.Common.UITypography.BodyLarge;
             var skipTextRt = skipTextObj.GetComponent<RectTransform>();
             skipTextRt.anchorMin = Vector2.zero;
             skipTextRt.anchorMax = Vector2.one;

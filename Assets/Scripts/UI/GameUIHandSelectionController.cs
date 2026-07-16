@@ -89,7 +89,7 @@ namespace KillingMahjong.UI
             if (data.waits != null && data.waits.Length > 0)
             {
                 // ConfirmationDialogUI側で待ち牌を表示するため、ここではテキストのみ構築
-                message += "待ち牌:\n\n\n"; 
+                message += "待ち牌：\n\n\n\n"; // 改行を1つ増やしてかぶらないように調整
                 
                 System.Collections.Generic.List<int> ids = new System.Collections.Generic.List<int>();
                 foreach (var wait in data.waits)

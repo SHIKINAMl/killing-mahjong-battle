@@ -960,8 +960,8 @@ namespace KillingMahjong.UI
             mainTextObj.transform.SetParent(containerRt, false);
             TextMeshProUGUI mainText = mainTextObj.AddComponent<TextMeshProUGUI>();
             mainText.text = skillName;
-            mainText.fontSize = 90; // スケールを1にする代わりにフォントサイズを大きくする
-            mainText.color = new Color32(255, 255, 255, 0); // 白字
+            mainText.fontSize = KillingMahjong.Common.UITypography.Title; // スケールを1にする代わりにフォントサイズを大きくする
+            mainText.color = new Color32(255, 255, 255, 0); // 白色字
             mainText.fontStyle = FontStyles.Bold;
             mainText.alignment = TextAlignmentOptions.Right;
             if (centerText != null) mainText.font = centerText.font;
@@ -996,7 +996,7 @@ namespace KillingMahjong.UI
                 subCg.alpha = 0f;
                 subTextUI = subObj.AddComponent<TextMeshProUGUI>();
                 subTextUI.text = subText;
-                subTextUI.fontSize = 60; // 適切なサイズに
+                subTextUI.fontSize = KillingMahjong.Common.UITypography.Header; // 適切なサイズに
                 subTextUI.color = new Color32(255, 255, 255, 255);
                 subTextUI.fontStyle = FontStyles.Bold;
                 subTextUI.alignment = TextAlignmentOptions.Right;

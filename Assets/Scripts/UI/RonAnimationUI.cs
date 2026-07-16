@@ -144,8 +144,8 @@ namespace KillingMahjong.UI
             yakuText.text = "";
             yakuText.color = new Color(1f, 1f, 1f); 
             yakuText.enableAutoSizing = true;
-            yakuText.fontSizeMin = 20;
-            yakuText.fontSizeMax = 50;
+            yakuText.fontSizeMin = KillingMahjong.Common.UITypography.BodySmall;
+            yakuText.fontSizeMax = KillingMahjong.Common.UITypography.BodyLarge;
             yakuText.alignment = TextAlignmentOptions.Center;
             yakuText.textWrappingMode = TextWrappingModes.NoWrap;
             
@@ -213,7 +213,7 @@ namespace KillingMahjong.UI
             // Python側からスコアしか来ないので、ダミーの数式を表示
             formulaText.text = $"??? × ??? = {score}";
             formulaText.color = new Color(1f, 1f, 0.5f); // 薄い黄色
-            formulaText.fontSize = 60; 
+            formulaText.fontSize = KillingMahjong.Common.UITypography.Header; 
             formulaText.alignment = TextAlignmentOptions.Center;
             
             // 手牌の上に配置する
@@ -245,7 +245,7 @@ namespace KillingMahjong.UI
             
             rankTextUI.text = rankName;
             rankTextUI.color = new Color(1f, 0.8f, 0.2f); // ゴールドっぽい色
-            rankTextUI.fontSize = 150; 
+            rankTextUI.fontSize = KillingMahjong.Common.UITypography.Huge; 
             rankTextUI.alignment = TextAlignmentOptions.Center;
             rankTextUI.fontStyle = FontStyles.Bold;
             rankTextUI.outlineWidth = 0.2f;
@@ -300,7 +300,7 @@ namespace KillingMahjong.UI
             // スコアが0の時などは役満や満貫などのランク名をそのまま表示
             scoreText.text = score > 0 ? score.ToString() : rankName;
             scoreText.color = new Color(1f, 0.2f, 0.2f); // 真っ赤な文字
-            scoreText.fontSize = 250; // 巨大文字
+            scoreText.fontSize = KillingMahjong.Common.UITypography.Giant; // 巨大文字
             scoreText.alignment = TextAlignmentOptions.Center;
             scoreText.fontStyle = FontStyles.Bold;
             

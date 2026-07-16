@@ -66,7 +66,7 @@ namespace KillingMahjong.UI
             if (messageText != null)
             {
                 messageText.enableAutoSizing = false;
-                messageText.fontSize = 25; // テキストが被らないように25に変更
+                messageText.fontSize = KillingMahjong.Common.UITypography.BodySmall; // テキストが被らないように小さめのサイズに統一
                 // テキストの行数で全体が上下に動くのを防ぐため、上揃え(Top)に変更
                 messageText.alignment = TextAlignmentOptions.Top;
                 messageText.overflowMode = TextOverflowModes.Overflow; // 文字が潰れるのを防ぐ
