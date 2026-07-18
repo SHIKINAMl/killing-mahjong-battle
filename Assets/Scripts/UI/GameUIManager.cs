@@ -404,6 +404,8 @@ namespace KillingMahjong.UI
 
             int tileToDiscard = BoardStateManager.Instance.SelectedTileIds[0];
 
+            if (playerInfoUI != null) playerInfoUI.StopTurnTimer();
+
             BoardStateManager.Instance.SetLocalTurn(false);
 
             int wallIndex = BoardStateManager.Instance.FindAvailableWallIndex(tileToDiscard);
@@ -517,10 +519,23 @@ namespace KillingMahjong.UI
 
         private void HandleTurnChanged(bool isLocalTurn)
         {
-            if (IsTransitioning) return; // アニメーション演出中は矢印を出さない
+            if (IsTransitioning) return; // アニメーション演出中は矢印を消さない
             if (wallUI != null)
             {
                 wallUI.UpdateDiscardTurnIndicator(isLocalTurn, currentPhaseStatus == RoundStatus.Discard);
+            }
+
+            // 打牌フェイズ中にターンが変わった場合、タイマーをリセット・開始/停止する
+            if (currentPhaseStatus == RoundStatus.Discard && playerInfoUI != null)
+            {
+                if (isLocalTurn)
+                {
+                    playerInfoUI.StartTurnTimer(10f); // 10秒でリセットして開始
+                }
+                else
+                {
+                    playerInfoUI.StopTurnTimer();
+                }
             }
         }
 
