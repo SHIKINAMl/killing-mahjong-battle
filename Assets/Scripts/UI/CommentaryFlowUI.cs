@@ -29,7 +29,7 @@ namespace KillingMahjong.UI
 
         [Header("フォント設定")]
         [SerializeField] private TMP_FontAsset customFont;
-        [SerializeField] private float fontSize = 36f;
+        [SerializeField] private float fontSize = KillingMahjong.Common.UITypography.BodyLarge;
         [SerializeField] private Color normalColor = Color.white;
         [SerializeField] private Color excitedColor = new Color(1f, 0.85f, 0.2f, 1f);
         [SerializeField] private Color dangerColor = new Color(1f, 0.3f, 0.3f, 1f);

@@ -80,7 +80,6 @@ namespace KillingMahjong.UI
 
         private void HandleMatchmakingWaiting()
         {
-            KillingMahjong.UI.LoadingManager.Instance.Show();
             uiManager.PhaseController?.ShowMatchmakingWaiting();
         }
 

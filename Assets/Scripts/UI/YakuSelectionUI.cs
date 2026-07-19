@@ -53,7 +53,7 @@ namespace KillingMahjong.UI
             var titleTxt = titleObj.AddComponent<Text>();
             titleTxt.text = "強化する役を選んでください";
             titleTxt.font = fontToUse;
-            titleTxt.fontSize = 40;
+            titleTxt.fontSize = (int)KillingMahjong.Common.UITypography.BodyLarge;
             titleTxt.color = Color.white;
             titleTxt.alignment = TextAnchor.MiddleCenter;
             var titleRt = titleObj.GetComponent<RectTransform>();
@@ -122,7 +122,7 @@ namespace KillingMahjong.UI
                 var txt = txtObj.AddComponent<Text>();
                 txt.text = y;
                 txt.font = fontToUse;
-                txt.fontSize = 22; // 枠に合わせて少し文字を小さく
+                txt.fontSize = (int)KillingMahjong.Common.UITypography.BodySmall; // 枠に合わせて少し文字を小さく
                 txt.color = Color.black;
                 txt.alignment = TextAnchor.MiddleCenter;
                 var txtRt = txtObj.GetComponent<RectTransform>();
@@ -152,7 +152,7 @@ namespace KillingMahjong.UI
             var cTxt = cTxtObj.AddComponent<Text>();
             cTxt.text = "キャンセル";
             cTxt.font = fontToUse;
-            cTxt.fontSize = 28;
+            cTxt.fontSize = (int)KillingMahjong.Common.UITypography.Body;
             cTxt.color = Color.white;
             cTxt.alignment = TextAnchor.MiddleCenter;
             var cTxtRt = cTxtObj.GetComponent<RectTransform>();

@@ -30,6 +30,14 @@ namespace KillingMahjong.Core
         [SerializeField] private bool isEffectEnabled = true;
         public bool IsEffectEnabled => isEffectEnabled; // 背景エフェクトのON/OFF
 
+        // --- ウィンドウ（解像度）設定 ---
+        [Header("Window Settings")]
+        [SerializeField] private int resolutionIndex = 0; // デフォルトは1920x1080
+        [SerializeField] private bool isFullScreen = false;
+
+        public int ResolutionIndex => resolutionIndex;
+        public bool IsFullScreen => isFullScreen;
+
         // 設定が変更された時に呼ばれるイベント（UI側で受け取る用）
         public event Action OnSettingsChanged;
 
@@ -59,6 +67,9 @@ namespace KillingMahjong.Core
             isHighSpeedMode = PlayerPrefs.GetInt("IsHighSpeedMode", isHighSpeedMode ? 1 : 0) == 1;
             isEffectEnabled = PlayerPrefs.GetInt("IsEffectEnabled", isEffectEnabled ? 1 : 0) == 1;
 
+            resolutionIndex = PlayerPrefs.GetInt("ResolutionIndex", resolutionIndex);
+            isFullScreen = PlayerPrefs.GetInt("IsFullScreen", isFullScreen ? 1 : 0) == 1;
+
             ApplySettings();
         }
 
@@ -74,6 +85,9 @@ namespace KillingMahjong.Core
             PlayerPrefs.SetInt("IsHighSpeedMode", isHighSpeedMode ? 1 : 0);
             PlayerPrefs.SetInt("IsEffectEnabled", isEffectEnabled ? 1 : 0);
 
+            PlayerPrefs.SetInt("ResolutionIndex", resolutionIndex);
+            PlayerPrefs.SetInt("IsFullScreen", isFullScreen ? 1 : 0);
+
             PlayerPrefs.Save();
             
             ApplySettings();
@@ -86,6 +100,8 @@ namespace KillingMahjong.Core
         public void SetVoiceVolume(float volume) { voiceVolume = volume; }
         public void SetHighSpeedMode(bool isHighSpeed) { isHighSpeedMode = isHighSpeed; }
         public void SetEffectEnabled(bool isEnabled) { isEffectEnabled = isEnabled; }
+        public void SetResolutionIndex(int index) { resolutionIndex = index; }
+        public void SetFullScreen(bool isFull) { isFullScreen = isFull; }
 
         private void OnValidate()
         {
@@ -112,6 +128,26 @@ namespace KillingMahjong.Core
             {
                 AudioListener.volume = bgmVolume; // Fallback
             }
+
+            ApplyResolution();
+        }
+
+        private void ApplyResolution()
+        {
+            int width = 1920;
+            int height = 1080;
+            switch(resolutionIndex)
+            {
+                case 0: width = 1920; height = 1080; break;
+                case 1: width = 1600; height = 900; break;
+                case 2: width = 1280; height = 720; break;
+                case 3: width = 1024; height = 576; break;
+                case 4: width = 800; height = 600; break;
+                default: width = 1920; height = 1080; break;
+            }
+#if !UNITY_WEBGL
+            Screen.SetResolution(width, height, isFullScreen);
+#endif
         }
     }
 }

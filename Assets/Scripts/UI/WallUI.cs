@@ -77,6 +77,13 @@ namespace KillingMahjong.UI
                                                                  : new Vector3(normalContainerPos.x, normalContainerPos.y, 0);
                 }
             }
+
+            Canvas canvas = GetComponent<Canvas>();
+            if (canvas != null)
+            {
+                canvas.overrideSorting = true;
+                canvas.sortingOrder = isDiscardPhase ? 2 : 1;
+            }
         }
 
 
@@ -368,7 +375,7 @@ namespace KillingMahjong.UI
                     arrowIndicator.SetParent(arrowParent, false);
                     arrowIndicator.anchoredPosition = new Vector2(
                         currentActiveInteraction.OriginalWallPosition.x,
-                        currentActiveInteraction.OriginalWallPosition.y + 8f + 45f
+                        currentActiveInteraction.OriginalWallPosition.y + 8f + 25f
                     );
                 }
             }
@@ -416,7 +423,7 @@ namespace KillingMahjong.UI
 
             var text = arrowObj.AddComponent<UnityEngine.UI.Text>();
             text.text = "▼";
-            text.fontSize = 40;
+            text.fontSize = (int)KillingMahjong.Common.UITypography.BodyLarge;
             text.color = Color.red;
             text.alignment = TextAnchor.MiddleCenter;
             text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
@@ -424,6 +431,10 @@ namespace KillingMahjong.UI
             var outline = arrowObj.AddComponent<UnityEngine.UI.Outline>();
             outline.effectColor = Color.black;
             outline.effectDistance = new Vector2(2, -2);
+
+            var canvas = arrowObj.AddComponent<Canvas>();
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = 16;
 
             // 生成直後にwallContainerの子として登録することで、牌のプール汚染を防ぐ
             Transform parent = wallContainer != null ? wallContainer : (Transform)this.transform;

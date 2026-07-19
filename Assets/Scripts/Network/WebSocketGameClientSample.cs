@@ -1,15 +1,12 @@
 using System;
-using System.Collections.Concurrent;
-using System.IO;
-using System.Net.WebSockets;
+using System.Collections.Generic;
 using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
-
+using NativeWebSocket; // 導入したWebGL対応WebSocketライブラリ
 
 /// <summary>
-/// Unity 用の最小 WebSocket クライアントサンプル。
+/// Unity 用の最小 WebSocket クライアントサンプル（NativeWebSocket版）
 ///
 /// 目的:
 /// - 接続
@@ -17,20 +14,14 @@ using UnityEngine;
 /// - 受信
 /// - 切断
 /// の基本フローだけを確認するためのコンポーネントです。
-///
-/// 使い方:
-/// 1) GameObject にアタッチ
-/// 2) Inspector の serverUrl を設定
-/// 3) autoConnectOnStart を ON にするか、ContextMenu の Connect を実行
-/// 4) sampleMessage を設定して ContextMenu の Send Sample を実行
 /// </summary>
 public class WebSocketGameClientSample : MonoBehaviour
 {
     // 接続先 URL（例: ws://127.0.0.1:8765）
     [Header("Connection")]
-    [SerializeField] private string serverUrl = "ws://127.0.0.1:8765";
-    // true の場合、Start 時に自動接続
-    [SerializeField] private bool autoConnectOnStart = true;
+    [SerializeField] private string serverUrl = "ws://localhost:8765";
+    [SerializeField] private bool autoConnectOnStart = false; // 手動でGameUIManagerなどから接続するように変更
+    [SerializeField] private int autoReconnectDelayMs = 3000;
 
     // ContextMenu の「Send Sample」で送るテキスト
     [Header("Send")]
@@ -48,17 +39,15 @@ public class WebSocketGameClientSample : MonoBehaviour
     [SerializeField] private KillingMahjong.UI.GameUIManager gameUIManager;
     private string myClientId = "";
 
-    // .NET 標準の WebSocket クライアント
-    private ClientWebSocket webSocket;
-    // 非同期処理停止用トークン
-    private CancellationTokenSource cancellationTokenSource;
-    // 受信スレッド -> Unity メインスレッドへの受け渡しキュー
-    private readonly ConcurrentQueue<string> receiveQueue = new ConcurrentQueue<string>();
+    // NativeWebSocket の WebSocket クライアント
+    private WebSocket webSocket;
 
     /// <summary>
     /// 接続中かどうか。
     /// </summary>
     public bool IsConnected => webSocket != null && webSocket.State == WebSocketState.Open;
+
+    private bool isConnecting = false;
 
     /// <summary>
     /// 起動時。必要なら自動接続する。
@@ -79,21 +68,16 @@ public class WebSocketGameClientSample : MonoBehaviour
     }
 
     /// <summary>
-    /// 破棄時に安全に切断する。
-    /// </summary>
-    private async void OnDestroy()
-    {
-        await DisconnectAsync();
-    }
-
-    /// <summary>
     /// メインスレッド側で受信キューを処理する。
     /// </summary>
     private void Update()
     {
-        while (receiveQueue.TryDequeue(out var message))
+        if (webSocket != null)
         {
-            HandleServerMessage(message);
+#if !UNITY_WEBGL || UNITY_EDITOR
+            // WebGL以外の環境では、メインスレッドでキューを処理するためにこれを呼ぶ必要があります
+            webSocket.DispatchMessageQueue();
+#endif
         }
     }
 
@@ -102,35 +86,69 @@ public class WebSocketGameClientSample : MonoBehaviour
     /// </summary>
     public async Task ConnectAsync()
     {
-#if UNITY_WEBGL && !UNITY_EDITOR
-        Debug.LogError("WebSocketGameClientSample: WebGL では ClientWebSocket は使用できません。");
-        return;
-#else
-        if (IsConnected)
+        if (IsConnected || isConnecting)
         {
             return;
         }
 
-        cancellationTokenSource = new CancellationTokenSource();
-        webSocket = new ClientWebSocket();
+        isConnecting = true;
 
+        // 古い接続があれば確実にキャンセル・解放する
+        if (webSocket != null)
+        {
+            await webSocket.Close();
+            webSocket = null;
+        }
+
+        string normalizedUrl = NormalizeServerUrl(serverUrl);
+        
+#if UNITY_WEBGL && !UNITY_EDITOR
+        // WebGL環境（ブラウザ）では、JavaScriptの標準WebSocket APIの仕様上、
+        // 接続時のカスタムヘッダー（Authorization等）の付与が禁止されています。
+        // クエリパラメータを付与するとサーバー側で404になるため、ヘッダー・パラメータなしで接続します。
+        webSocket = new WebSocket(normalizedUrl);
+#else
+        // ヘッダー（認証トークン）の設定 (PC/エディタ環境用)
+        var headers = new Dictionary<string, string>();
         if (!string.IsNullOrEmpty(authToken))
         {
-            webSocket.Options.SetRequestHeader("Authorization", $"Bearer {authToken}");
-            webSocket.Options.SetRequestHeader("X-Token", authToken);
+            headers.Add("Authorization", $"Bearer {authToken}");
+            headers.Add("X-Token", authToken);
         }
+
+        // NativeWebSocket のインスタンス化
+        webSocket = new WebSocket(normalizedUrl, headers);
+#endif
+
+        // --- イベントの登録 ---
+        webSocket.OnOpen += () =>
+        {
+            Log($"Connected: {normalizedUrl}");
+        };
+
+        webSocket.OnError += (e) =>
+        {
+            Debug.LogError($"WebSocket Error: {e}");
+        };
+
+        webSocket.OnClose += (e) =>
+        {
+            Log("WebSocket Closed!");
+        };
+
+        webSocket.OnMessage += (bytes) =>
+        {
+            // 受信したバイナリデータを文字列に変換して処理
+            var message = Encoding.UTF8.GetString(bytes);
+            HandleServerMessage(message);
+        };
 
         try
         {
             KillingMahjong.UI.LoadingManager.Instance.Show();
             
-            string normalizedUrl = NormalizeServerUrl(serverUrl);
-            // WebSocket 接続
-            await webSocket.ConnectAsync(new Uri(normalizedUrl), cancellationTokenSource.Token);
-            Log($"Connected: {normalizedUrl}");
-
-            // 受信待ちループをバックグラウンド開始
-            _ = ReceiveLoopAsync(cancellationTokenSource.Token);
+            // WebSocket 接続開始
+            await webSocket.Connect();
         }
         catch (Exception ex)
         {
@@ -138,9 +156,9 @@ public class WebSocketGameClientSample : MonoBehaviour
         }
         finally
         {
+            isConnecting = false;
             KillingMahjong.UI.LoadingManager.Instance.Hide();
         }
-#endif
     }
 
     private string NormalizeServerUrl(string url)
@@ -159,7 +177,6 @@ public class WebSocketGameClientSample : MonoBehaviour
         return url;
     }
 
-
     /// <summary>
     /// 接続を閉じてリソースを解放する。
     /// </summary>
@@ -172,19 +189,10 @@ public class WebSocketGameClientSample : MonoBehaviour
 
         try
         {
-            cancellationTokenSource?.Cancel();
-            if (webSocket.State == WebSocketState.Open || webSocket.State == WebSocketState.CloseReceived)
+            if (webSocket.State == WebSocketState.Open)
             {
-                // タイムアウト付きでクローズを送信（サーバーがブロック中でもハングしない）
-                using (var closeCts = new CancellationTokenSource(TimeSpan.FromSeconds(2)))
-                {
-                    await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Client disconnect", closeCts.Token);
-                }
+                await webSocket.Close();
             }
-        }
-        catch (OperationCanceledException)
-        {
-            Debug.LogWarning("WebSocket close timed out (server may be busy). Forcing disconnect.");
         }
         catch (Exception ex)
         {
@@ -192,31 +200,21 @@ public class WebSocketGameClientSample : MonoBehaviour
         }
         finally
         {
-            webSocket.Dispose();
             webSocket = null;
-            cancellationTokenSource?.Dispose();
-            cancellationTokenSource = null;
         }
     }
 
     /// <summary>
     /// アプリ終了/エディタ再生停止時に確実に切断する。
     /// </summary>
-    private void OnApplicationQuit()
+    private async void OnApplicationQuit()
     {
-        if (webSocket != null && webSocket.State == WebSocketState.Open)
-        {
-            try
-            {
-                // 同期的にAbortして即座に接続を切る（OnDestroyのasyncが間に合わない場合の保険）
-                webSocket.Abort();
-                Debug.Log("[WebSocket] Connection aborted on application quit.");
-            }
-            catch (Exception ex)
-            {
-                Debug.LogWarning($"WebSocket abort warning: {ex.Message}");
-            }
-        }
+        await DisconnectAsync();
+    }
+    
+    private async void OnDestroy()
+    {
+        await DisconnectAsync();
     }
 
     /// <summary>
@@ -229,7 +227,7 @@ public class WebSocketGameClientSample : MonoBehaviour
     }
 
     /// <summary>
-    /// テキストメッセージを 1 フレームとして送信する。
+    /// テキストメッセージを送信する。
     /// </summary>
     private async Task SendTextAsync(string message)
     {
@@ -239,61 +237,14 @@ public class WebSocketGameClientSample : MonoBehaviour
             return;
         }
 
-        var bytes = Encoding.UTF8.GetBytes(message);
-        var segment = new ArraySegment<byte>(bytes);
-
         try
         {
-            await webSocket.SendAsync(segment, WebSocketMessageType.Text, true, cancellationTokenSource.Token);
+            await webSocket.SendText(message);
             Log($"Send: {message}");
         }
         catch (Exception ex)
         {
             Debug.LogError($"WebSocket send failed: {ex.Message}");
-        }
-    }
-
-    /// <summary>
-    /// サーバーからの受信を継続監視するループ。
-    /// 受信結果はスレッドセーフキューへ積み、Update で処理する。
-    /// </summary>
-    private async Task ReceiveLoopAsync(CancellationToken token)
-    {
-        var buffer = new byte[4096];
-
-        try
-        {
-            while (!token.IsCancellationRequested && webSocket != null && webSocket.State == WebSocketState.Open)
-            {
-                var builder = new StringBuilder();
-                WebSocketReceiveResult result;
-
-                do
-                {
-                    result = await webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), token);
-
-                    // サーバーからクローズ要求が来た場合
-                    if (result.MessageType == WebSocketMessageType.Close)
-                    {
-                        Log("Server requested close.");
-                        await DisconnectAsync();
-                        return;
-                    }
-
-                    builder.Append(Encoding.UTF8.GetString(buffer, 0, result.Count));
-                }
-                while (!result.EndOfMessage);
-
-                receiveQueue.Enqueue(builder.ToString());
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            // 切断時の想定内キャンセル
-        }
-        catch (Exception ex)
-        {
-            Debug.LogError($"WebSocket receive failed: {ex.Message}");
         }
     }
 
@@ -307,7 +258,6 @@ public class WebSocketGameClientSample : MonoBehaviour
 
         try
         {
-            // JsonUtility parses the exact matching types. So we write a quick struct to grab the type.
             ServerMessage msg = JsonUtility.FromJson<ServerMessage>(raw);
 
             if (msg == null || string.IsNullOrEmpty(msg.type)) return;
@@ -390,4 +340,3 @@ public class WebSocketGameClientSample : MonoBehaviour
         await DisconnectAsync();
     }
 }
-

@@ -20,13 +20,20 @@ namespace KillingMahjong.UI
 
         [Header("Zoom Target")]
         [SerializeField] private Transform zoomTarget; // 追加：拡大させたい子オブジェクトを指定
+        [SerializeField] private Vector3 zoomedLocalPos = new Vector3(0, 50f, 0f);
+        [SerializeField] private Vector3 zoomedScale = new Vector3(1.2f, 1.2f, 1.0f);
         [SerializeField] private Vector3 zoomOffsetUI = new Vector3(-1200f, 100f, -500f); // ズーム時に手前に出すためVector3に変更
         [SerializeField] private Vector3 zoomOffsetWorld = new Vector3(-4.0f, 1.0f, -2.0f); // 3D時の移動量
+
+        [Header("Prefabs")]
+        [SerializeField] private GameObject damagePopupPrefab;
 
         [Header("Character Portrait")]
         [SerializeField] private SpriteRenderer characterRenderer;
         [SerializeField] private SpriteRenderer faceRenderer; // 追加：表情レイヤー用
         [SerializeField] private CharacterData characterData; // キャラクター管理データ
+
+        private TimerUI timerUI; // 追加：タイマーUI
 
         public CharacterData CurrentCharacterData => characterData;
 
@@ -195,6 +202,50 @@ namespace KillingMahjong.UI
         private void Start()
         {
             InitializeOriginalTransform();
+            InitializeTimerUI();
+        }
+
+        private void InitializeTimerUI()
+        {
+            if (timerUI == null)
+            {
+                GameObject timerObj = new GameObject("TimerUI");
+                timerUI = timerObj.AddComponent<TimerUI>();
+                timerUI.Initialize();
+                timerUI.SetSize(60f); // 懐中時計のサイズ
+
+                // スマホ全体（hpFillImageの親）を親にして、スマホ枠に追従させる
+                Transform parentTransform = (hpFillImage != null && hpFillImage.transform.parent != null) 
+                                            ? hpFillImage.transform.parent 
+                                            : this.transform;
+                timerObj.transform.SetParent(parentTransform, false);
+
+                // 配置をスマホパネルの下部中央にする
+                RectTransform rt = timerUI.GetComponent<RectTransform>();
+                if (rt != null)
+                {
+                    rt.anchorMin = new Vector2(0.5f, 0f);
+                    rt.anchorMax = new Vector2(0.5f, 0f);
+                    rt.pivot = new Vector2(0.5f, 1f);
+                    rt.anchoredPosition = new Vector2(0, -30f); // スマホ枠の少し下
+                }
+            }
+        }
+
+        public void StartTurnTimer(float duration)
+        {
+            if (timerUI != null)
+            {
+                timerUI.StartTimer(duration);
+            }
+        }
+
+        public void StopTurnTimer()
+        {
+            if (timerUI != null)
+            {
+                timerUI.StopTimer();
+            }
         }
 
         public void SetMaxHP(int max)
@@ -204,6 +255,11 @@ namespace KillingMahjong.UI
 
         public void SetHP(int hp)
         {
+            // 初回セットアップ時はポップアップを出さないように、現在値が0かつhpがmaxHpと同じならスキップするなどの制御が必要ですが、
+            // 今回は通信で更新されたときだけ出したいので、初期化かどうかの簡易判定を入れます。
+            bool isFirstSetup = (currentHp == 0 && hp > 0);
+            int diff = hp - currentHp;
+
             currentHp = hp;
             if (hpText != null)
             {
@@ -215,6 +271,43 @@ namespace KillingMahjong.UI
             if (hpFillImage != null)
             {
                 hpFillImage.fillAmount = (float)hp / maxHp;
+            }
+
+            if (!isFirstSetup && diff != 0)
+            {
+                ShowHpPopup(diff);
+            }
+        }
+        
+        private void ShowHpPopup(int amount)
+        {
+            GameObject popupObj;
+            if (damagePopupPrefab != null)
+            {
+                popupObj = Instantiate(damagePopupPrefab, transform);
+            }
+            else
+            {
+                // プレハブが未設定の場合のフォールバック
+                popupObj = new GameObject("DamagePopup");
+                popupObj.transform.SetParent(transform, false);
+                var rt = popupObj.AddComponent<RectTransform>();
+                rt.sizeDelta = new Vector2(300, 100);
+                popupObj.AddComponent<DamagePopupUI>();
+            }
+
+            RectTransform popupRt = popupObj.GetComponent<RectTransform>();
+            if (popupRt != null)
+            {
+                // スマホの中心より少し上あたりに生成
+                popupRt.anchoredPosition = new Vector2(0, 50f); 
+            }
+
+            DamagePopupUI popup = popupObj.GetComponent<DamagePopupUI>();
+            if (popup != null)
+            {
+                Color c = amount > 0 ? Color.green : Color.red;
+                popup.Setup(amount, c);
             }
         }
         

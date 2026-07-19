@@ -43,6 +43,8 @@ namespace KillingMahjong.UI
 
         public void ShowMatchmakingWaiting()
         {
+            if (uiManager != null && uiManager.IsTutorialMode) return; // チュートリアル中は非表示
+
             if (uiManager.MatchmakingUI != null) uiManager.MatchmakingUI.ShowWaiting();
             SetMatchUIVisibility(false);
             
@@ -281,6 +283,7 @@ namespace KillingMahjong.UI
                     {
                         ReactionController.Instance.StartHandSelectionTimer();
                     }
+                    if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.StartTurnTimer(15f);
                     
                     // 黒幕が晴れて手牌フェイズに入った時に表示（1局につき1回のみ）
                     if (uiManager.PhaseTransitionUI != null && !_hasShownHandSelectionPrompt)
@@ -291,7 +294,11 @@ namespace KillingMahjong.UI
                     break;
                 case RoundStatus.TurnDecision:
                     if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetPanelVisible(false);
-                    if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.gameObject.SetActive(false);
+                    if (uiManager.PlayerInfoUI != null)
+                    {
+                        uiManager.PlayerInfoUI.gameObject.SetActive(false);
+                        uiManager.PlayerInfoUI.StopTurnTimer();
+                    }
                     if (uiManager.WaitUI != null) uiManager.WaitUI.gameObject.SetActive(false);
                     break;
                 case RoundStatus.Discard:
@@ -313,6 +320,18 @@ namespace KillingMahjong.UI
                     }
                     if (uiManager.AbilityUI != null) uiManager.AbilityUI.gameObject.SetActive(false);
                     UpdateDoraDisplay();
+
+                    if (uiManager.PlayerInfoUI != null)
+                    {
+                        if (Managers.BoardStateManager.Instance.IsLocalTurn)
+                        {
+                            uiManager.PlayerInfoUI.StartTurnTimer(10f); // 10秒
+                        }
+                        else
+                        {
+                            uiManager.PlayerInfoUI.StopTurnTimer();
+                        }
+                    }
                     break;
                 case RoundStatus.Agari:
                 case RoundStatus.Ron:
@@ -390,6 +409,7 @@ namespace KillingMahjong.UI
                 {
                     ReactionController.Instance.StartBetPhaseTimer();
                 }
+                if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.StartTurnTimer(10f); // 10秒
             }
         }
 
@@ -397,9 +417,13 @@ namespace KillingMahjong.UI
         {
             uiManager.BettingUI.HideBettingPhase();
             
-            if (uiManager.PlayerInfoUI != null && uiManager.PlayerInfoUI.gameObject.activeInHierarchy)
+            if (uiManager.PlayerInfoUI != null)
             {
-                uiManager.PlayerInfoUI.StartCoroutine(uiManager.PlayerInfoUI.ResetZoomRoutine(0.3f));
+                uiManager.PlayerInfoUI.StopTurnTimer();
+                if (uiManager.PlayerInfoUI.gameObject.activeInHierarchy)
+                {
+                    uiManager.PlayerInfoUI.StartCoroutine(uiManager.PlayerInfoUI.ResetZoomRoutine(0.3f));
+                }
             }
 
             if (ReactionController.Instance != null)

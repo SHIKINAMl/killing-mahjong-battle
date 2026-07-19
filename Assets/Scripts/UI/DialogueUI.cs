@@ -35,10 +35,22 @@ namespace KillingMahjong.UI
             StopAllCoroutines(); // 既存の文字送り演出などがあれば即座にキャンセルする
 
             if (dialogueText != null)
+            {
                 dialogueText.text = text;
+                // セリフの折り返しを有効化
+                dialogueText.enableWordWrapping = true;
+                // 長すぎる場合は省略記号などを出さずに、単に下にはみ出させる（UI枠内に収めるための基本設定）
+                dialogueText.overflowMode = TextOverflowModes.Overflow;
+            }
             
             AddToLog(text);
             dialoguePanel.SetActive(true);
+        }
+
+        public void HideText()
+        {
+            if (dialoguePanel != null) dialoguePanel.SetActive(false);
+            if (gameObject.activeSelf) gameObject.SetActive(false); // パネル自体も隠す
         }
 
         private void AddToLog(string text)
@@ -148,7 +160,7 @@ namespace KillingMahjong.UI
                 var txt = txtObj.AddComponent<TextMeshProUGUI>();
                 txt.text = "OK";
                 txt.color = Color.white;
-                txt.fontSize = 50;
+                txt.fontSize = KillingMahjong.Common.UITypography.BodyLarge;
                 txt.alignment = TextAlignmentOptions.Center;
 
                 btn.onClick.AddListener(() => {

@@ -11,13 +11,36 @@ namespace KillingMahjong.UI
         [Header("設定画面パネル")]
         [SerializeField] private GameObject optionUIPanel;
 
+        private void Start()
+        {
+            // CanvasScalerの強制上書きは、OptionUIでの解像度設定とコンフリクトするため削除
+        }
+
         /// <summary>
         /// 1つ目のボタン（ゲームスタートなど）が押された時の処理
         /// </summary>
         public void OnClickStartButton()
         {
             Debug.Log("ゲーム開始！ " + nextSceneName + " に遷移します。");
-            SceneManager.LoadScene(nextSceneName);
+            
+            if (KillingMahjong.UI.LoadingManager.Instance != null)
+            {
+                KillingMahjong.UI.LoadingManager.Instance.Show();
+            }
+
+            StartCoroutine(LoadSceneAsyncCoroutine());
+        }
+
+        private System.Collections.IEnumerator LoadSceneAsyncCoroutine()
+        {
+            // ロードUIの表示を確実に画面に反映させるために1フレーム待機
+            yield return null;
+
+            var asyncOp = SceneManager.LoadSceneAsync(nextSceneName);
+            while (!asyncOp.isDone)
+            {
+                yield return null;
+            }
         }
 
         /// <summary>

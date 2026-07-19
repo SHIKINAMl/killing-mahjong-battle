@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using DG.Tweening;
 using System.Collections;
+using TMPro;
 
 namespace KillingMahjong.UI
 {
@@ -21,6 +22,10 @@ namespace KillingMahjong.UI
         [Header("System Settings (Toggles)")]
         [SerializeField] private Toggle effectToggle;
 
+        [Header("Window Settings")]
+        [SerializeField] private TMP_Dropdown resolutionDropdown;
+        [SerializeField] private Toggle fullscreenToggle;
+
         [Header("Buttons")]
         [SerializeField] private Button closeButton; // 保存せずに閉じる
         [SerializeField] private Button saveAndCloseButton; // 保存して閉じる
@@ -31,7 +36,7 @@ namespace KillingMahjong.UI
         [Tooltip("このシーンで『戻る』ボタンを表示するかどうか")]
         [SerializeField] private bool showReturnButton = true;
         [Tooltip("『戻る』ボタンを押したときに遷移するシーン名")]
-        [SerializeField] private string returnSceneName = "TitleScene";
+        [SerializeField] private string returnSceneName = "タイトルシーン";
 
         private CanvasGroup _canvasGroup;
         private RectTransform _rectTransform;
@@ -66,6 +71,10 @@ namespace KillingMahjong.UI
             // --- トグルのイベント登録 ---
             if (highSpeedToggle != null) highSpeedToggle.onValueChanged.AddListener(OnHighSpeedChanged);
             if (effectToggle != null) effectToggle.onValueChanged.AddListener(OnEffectChanged);
+            if (fullscreenToggle != null) fullscreenToggle.onValueChanged.AddListener(OnFullscreenChanged);
+
+            // --- ドロップダウンのイベント登録 ---
+            if (resolutionDropdown != null) resolutionDropdown.onValueChanged.AddListener(OnResolutionChanged);
 
             // --- ボタンのイベント登録 ---
             if (closeButton != null) closeButton.onClick.AddListener(CloseWithoutSave);
@@ -77,12 +86,6 @@ namespace KillingMahjong.UI
                 returnToTitleButton.onClick.AddListener(ReturnToScene);
             }
             if (quitButton != null) quitButton.onClick.AddListener(QuitGame);
-
-            if (_canvasGroup.alpha <= 0)
-            {
-                _canvasGroup.blocksRaycasts = false;
-                _canvasGroup.interactable = false;
-            }
         }
 
         private void OnEnable()
@@ -95,23 +98,44 @@ namespace KillingMahjong.UI
         /// </summary>
         public void Open()
         {
+            Debug.Log("[OptionUI] Open() が呼ばれました。");
             gameObject.SetActive(true);
             
-            if (_canvasGroup == null) _canvasGroup = GetComponent<CanvasGroup>();
-            
+            if (_canvasGroup == null) 
+            {
+                _canvasGroup = GetComponent<CanvasGroup>();
+                if (_canvasGroup == null)
+                {
+                    _canvasGroup = gameObject.AddComponent<CanvasGroup>();
+                    Debug.Log("[OptionUI] CanvasGroupを自動追加しました。");
+                }
+            }            
             _canvasGroup.blocksRaycasts = true;
             _canvasGroup.interactable = true;
 
             InitializeUI();
 
+            if (_rectTransform == null) _rectTransform = GetComponent<RectTransform>();
+
+            Debug.Log($"[OptionUI] アニメーション開始。現在位置: {_rectTransform.anchoredPosition}, 親: {transform.parent?.name}");
+
             _rectTransform.DOKill();
             _canvasGroup.DOKill();
 
-            _rectTransform.localScale = Vector3.one;
-            _canvasGroup.alpha = 1f;
+            // 確実に画面中央に配置
+            _rectTransform.anchoredPosition = Vector2.zero;
 
-            _rectTransform.DOScale(Vector3.one * 0.9f, 0.25f).From().SetEase(Ease.OutBack).SetUpdate(true);
-            _canvasGroup.DOFade(0f, 0.2f).From().SetEase(Ease.OutQuad).SetUpdate(true);
+            // アニメーションの初期状態を明示的にセット
+            _rectTransform.localScale = Vector3.one * 0.9f;
+            _canvasGroup.alpha = 0f;
+
+            // 目標値（スケール1、アルファ1）に向かってアニメーション
+            _rectTransform.DOScale(Vector3.one, 0.25f).SetEase(Ease.OutBack).SetUpdate(true);
+            _canvasGroup.DOFade(1f, 0.2f).SetEase(Ease.OutQuad).SetUpdate(true).OnComplete(() => {
+                // アニメーション完了後に再度確実に入力を有効化
+                _canvasGroup.blocksRaycasts = true;
+                _canvasGroup.interactable = true;
+            });
         }
 
         public void Close()
@@ -120,6 +144,8 @@ namespace KillingMahjong.UI
 
             _canvasGroup.blocksRaycasts = false;
             _canvasGroup.interactable = false;
+
+            if (_rectTransform == null) _rectTransform = GetComponent<RectTransform>();
 
             _rectTransform.DOKill();
             _canvasGroup.DOKill();
@@ -146,6 +172,9 @@ namespace KillingMahjong.UI
                 
                 if (highSpeedToggle != null) highSpeedToggle.isOn = settings.IsHighSpeedMode;
                 if (effectToggle != null) effectToggle.isOn = settings.IsEffectEnabled;
+                
+                if (resolutionDropdown != null) resolutionDropdown.value = settings.ResolutionIndex;
+                if (fullscreenToggle != null) fullscreenToggle.isOn = settings.IsFullScreen;
             }
         }
 
@@ -173,6 +202,16 @@ namespace KillingMahjong.UI
         private void OnEffectChanged(bool isOn)
         {
             if (Core.SettingsManager.Instance != null) Core.SettingsManager.Instance.SetEffectEnabled(isOn);
+        }
+
+        private void OnFullscreenChanged(bool isOn)
+        {
+            if (Core.SettingsManager.Instance != null) Core.SettingsManager.Instance.SetFullScreen(isOn);
+        }
+
+        private void OnResolutionChanged(int index)
+        {
+            if (Core.SettingsManager.Instance != null) Core.SettingsManager.Instance.SetResolutionIndex(index);
         }
 
         // --- ボタン処理 ---
