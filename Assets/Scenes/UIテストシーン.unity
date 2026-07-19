@@ -6366,7 +6366,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CustomCursor
   handCursor: {fileID: 2800000, guid: afdde632ffb9e634f86a843180336e1b, type: 3}
-  hotspot: {x: 100, y: 100}
+  hotspot: {x: 20, y: 20}
   cursorSize: 64
 --- !u!4 &312065929
 Transform:

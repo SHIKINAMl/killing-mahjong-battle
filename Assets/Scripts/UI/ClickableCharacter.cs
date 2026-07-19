@@ -57,17 +57,7 @@ namespace KillingMahjong.UI
 
             Debug.Log($"[ClickableCharacter] Start完了 - enemyInfoUI={(enemyInfoUI != null ? "OK" : "NULL")} / spriteRenderer={(spriteRenderer != null ? "OK" : "NULL")}");
 
-            // もしリストが空なら、後方互換のためにデフォルトの全体枠を1つ追加
-            if (clickAreas.Count == 0)
-            {
-                var defaultArea = new CharacterClickArea { areaName = "" };
-                if (spriteRenderer != null)
-                {
-                    defaultArea.size = spriteRenderer.bounds.size;
-                    defaultArea.offset = (Vector2)(spriteRenderer.bounds.center - transform.position);
-                }
-                clickAreas.Add(defaultArea);
-            }
+            // （削除）もしリストが空でも、自動的に全体枠を追加しないように変更（明示的に設定された枠のみ判定する）
 
             // デバッグ用の半透明オーバーレイを生成
             CreateDebugOverlays();

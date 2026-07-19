@@ -98,23 +98,40 @@ namespace KillingMahjong.UI
         /// </summary>
         public void Open()
         {
+            Debug.Log("[OptionUI] Open() が呼ばれました。");
             gameObject.SetActive(true);
             
-            if (_canvasGroup == null) _canvasGroup = GetComponent<CanvasGroup>();
-            
+            if (_canvasGroup == null) 
+            {
+                _canvasGroup = GetComponent<CanvasGroup>();
+                if (_canvasGroup == null)
+                {
+                    _canvasGroup = gameObject.AddComponent<CanvasGroup>();
+                    Debug.Log("[OptionUI] CanvasGroupを自動追加しました。");
+                }
+            }            
             _canvasGroup.blocksRaycasts = true;
             _canvasGroup.interactable = true;
 
             InitializeUI();
 
+            if (_rectTransform == null) _rectTransform = GetComponent<RectTransform>();
+
+            Debug.Log($"[OptionUI] アニメーション開始。現在位置: {_rectTransform.anchoredPosition}, 親: {transform.parent?.name}");
+
             _rectTransform.DOKill();
             _canvasGroup.DOKill();
 
-            _rectTransform.localScale = Vector3.one;
-            _canvasGroup.alpha = 1f;
+            // 確実に画面中央に配置
+            _rectTransform.anchoredPosition = Vector2.zero;
 
-            _rectTransform.DOScale(Vector3.one * 0.9f, 0.25f).From().SetEase(Ease.OutBack).SetUpdate(true);
-            _canvasGroup.DOFade(0f, 0.2f).From().SetEase(Ease.OutQuad).SetUpdate(true).OnComplete(() => {
+            // アニメーションの初期状態を明示的にセット
+            _rectTransform.localScale = Vector3.one * 0.9f;
+            _canvasGroup.alpha = 0f;
+
+            // 目標値（スケール1、アルファ1）に向かってアニメーション
+            _rectTransform.DOScale(Vector3.one, 0.25f).SetEase(Ease.OutBack).SetUpdate(true);
+            _canvasGroup.DOFade(1f, 0.2f).SetEase(Ease.OutQuad).SetUpdate(true).OnComplete(() => {
                 // アニメーション完了後に再度確実に入力を有効化
                 _canvasGroup.blocksRaycasts = true;
                 _canvasGroup.interactable = true;
@@ -127,6 +144,8 @@ namespace KillingMahjong.UI
 
             _canvasGroup.blocksRaycasts = false;
             _canvasGroup.interactable = false;
+
+            if (_rectTransform == null) _rectTransform = GetComponent<RectTransform>();
 
             _rectTransform.DOKill();
             _canvasGroup.DOKill();

@@ -133,6 +133,7 @@ GameObject:
   - component: {fileID: 6076870161178495208}
   - component: {fileID: 513981118758342538}
   - component: {fileID: 5474931286746725664}
+  - component: {fileID: 1547131274103323127}
   m_Layer: 0
   m_Name: OptionUI
   m_TagString: Untagged
@@ -243,6 +244,18 @@ MonoBehaviour:
   quitButton: {fileID: 47264401268662596}
   showReturnButton: 1
   returnSceneName: TitleScene
+--- !u!225 &1547131274103323127
+CanvasGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 101164359642086039}
+  m_Enabled: 1
+  m_Alpha: 1
+  m_Interactable: 1
+  m_BlocksRaycasts: 1
+  m_IgnoreParentGroups: 0
 --- !u!1 &156213738118036756
 GameObject:
   m_ObjectHideFlags: 0
@@ -1176,7 +1189,7 @@ MonoBehaviour:
   onValueChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_IsOn: 1
+  m_IsOn: 0
 --- !u!1 &1202268513522179675
 GameObject:
   m_ObjectHideFlags: 0
@@ -3071,7 +3084,7 @@ MonoBehaviour:
   m_MinValue: 0
   m_MaxValue: 1
   m_WholeNumbers: 0
-  m_Value: 0
+  m_Value: 0.5
   m_OnValueChanged:
     m_PersistentCalls:
       m_Calls: []
@@ -4084,7 +4097,7 @@ MonoBehaviour:
   m_MinValue: 0
   m_MaxValue: 1
   m_WholeNumbers: 0
-  m_Value: 0
+  m_Value: 1
   m_OnValueChanged:
     m_PersistentCalls:
       m_Calls: []
@@ -4174,7 +4187,7 @@ MonoBehaviour:
   m_MinValue: 0
   m_MaxValue: 1
   m_WholeNumbers: 0
-  m_Value: 0
+  m_Value: 0.5
   m_OnValueChanged:
     m_PersistentCalls:
       m_Calls: []

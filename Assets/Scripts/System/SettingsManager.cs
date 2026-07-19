@@ -145,7 +145,9 @@ namespace KillingMahjong.Core
                 case 4: width = 800; height = 600; break;
                 default: width = 1920; height = 1080; break;
             }
+#if !UNITY_WEBGL
             Screen.SetResolution(width, height, isFullScreen);
+#endif
         }
     }
 }

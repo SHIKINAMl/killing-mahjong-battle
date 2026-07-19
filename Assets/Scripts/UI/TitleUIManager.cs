@@ -13,16 +13,7 @@ namespace KillingMahjong.UI
 
         private void Start()
         {
-            // 解像度が変わった際に見切れるのを防ぐため、
-            // 強制的にCanvasScalerの設定を800x600(4:3)の自動調整モードに上書きする
-            var canvasScaler = GetComponentInParent<UnityEngine.UI.CanvasScaler>();
-            if (canvasScaler != null)
-            {
-                canvasScaler.uiScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize;
-                canvasScaler.referenceResolution = new Vector2(800, 600);
-                canvasScaler.screenMatchMode = UnityEngine.UI.CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-                canvasScaler.matchWidthOrHeight = 0.5f;
-            }
+            // CanvasScalerの強制上書きは、OptionUIでの解像度設定とコンフリクトするため削除
         }
 
         /// <summary>
