@@ -36,7 +36,7 @@ namespace KillingMahjong.UI
         [Tooltip("このシーンで『戻る』ボタンを表示するかどうか")]
         [SerializeField] private bool showReturnButton = true;
         [Tooltip("『戻る』ボタンを押したときに遷移するシーン名")]
-        [SerializeField] private string returnSceneName = "TitleScene";
+        [SerializeField] private string returnSceneName = "タイトルシーン";
 
         private CanvasGroup _canvasGroup;
         private RectTransform _rectTransform;

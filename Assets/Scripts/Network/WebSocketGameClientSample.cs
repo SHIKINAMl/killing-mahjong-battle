@@ -28,9 +28,9 @@ public class WebSocketGameClientSample : MonoBehaviour
 {
     // 接続先 URL（例: ws://127.0.0.1:8765）
     [Header("Connection")]
-    [SerializeField] private string serverUrl = "ws://127.0.0.1:8765";
-    // true の場合、Start 時に自動接続
-    [SerializeField] private bool autoConnectOnStart = true;
+    [SerializeField] private string serverUrl = "ws://localhost:8765";
+    [SerializeField] private bool autoConnectOnStart = false; // 手動でGameUIManagerなどから接続するように変更
+    [SerializeField] private int autoReconnectDelayMs = 3000;
 
     // ContextMenu の「Send Sample」で送るテキスト
     [Header("Send")]
@@ -59,6 +59,8 @@ public class WebSocketGameClientSample : MonoBehaviour
     /// 接続中かどうか。
     /// </summary>
     public bool IsConnected => webSocket != null && webSocket.State == WebSocketState.Open;
+
+    private bool isConnecting = false;
 
     /// <summary>
     /// 起動時。必要なら自動接続する。
@@ -106,9 +108,19 @@ public class WebSocketGameClientSample : MonoBehaviour
         Debug.LogError("WebSocketGameClientSample: WebGL では ClientWebSocket は使用できません。");
         return;
 #else
-        if (IsConnected)
+        if (IsConnected || isConnecting)
         {
             return;
+        }
+
+        isConnecting = true;
+
+        // 古い接続があれば確実にキャンセル・解放する
+        if (webSocket != null)
+        {
+            cancellationTokenSource?.Cancel();
+            webSocket.Dispose();
+            webSocket = null;
         }
 
         cancellationTokenSource = new CancellationTokenSource();
@@ -138,6 +150,7 @@ public class WebSocketGameClientSample : MonoBehaviour
         }
         finally
         {
+            isConnecting = false;
             KillingMahjong.UI.LoadingManager.Instance.Hide();
         }
 #endif

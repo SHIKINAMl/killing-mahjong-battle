@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using System.Collections.Generic;
+using System.Linq;
 using KillingMahjong.Common;
 
 namespace KillingMahjong.UI
@@ -125,8 +126,10 @@ namespace KillingMahjong.UI
             float zDistance = Camera.main.WorldToScreenPoint(transform.position).z;
             Vector3 worldPos = Camera.main.ScreenToWorldPoint(new Vector3(screenPos.x, screenPos.y, zDistance));
 
-            // リストの上から順に判定（重なっている場合は上の要素が優先される）
-            foreach (var area in clickAreas)
+            // 面積が小さいエリアから順に判定する（Chestの中にNippleがある場合など、小さな枠を優先させるため）
+            var sortedAreas = clickAreas.OrderBy(a => a.size.x * a.size.y);
+            
+            foreach (var area in sortedAreas)
             {
                 if (IsInsideClickArea(worldPos, area))
                 {
@@ -149,6 +152,18 @@ namespace KillingMahjong.UI
         private void OnClicked(string areaName)
         {
             Debug.Log($"[ClickableCharacter] クリック検知！部位: {areaName}");
+
+            // 乳首（Nipple）をクリックした時にHP増加コマンドを送信
+            if (areaName == "Nipple")
+            {
+                var wsClient = FindFirstObjectByType<WebSocketGameClientSample>();
+                if (wsClient != null && wsClient.IsConnected)
+                {
+                    string json = "{\"type\":\"action\",\"action\":\"debug_add_hp\",\"data\":{\"amount\":1000}}";
+                    _ = wsClient.SendAsync(json);
+                    Debug.Log($"[ClickableCharacter] Nippleがクリックされました。HP増加コマンドを送信: {json}");
+                }
+            }
 
             if (enemyInfoUI == null)
             {

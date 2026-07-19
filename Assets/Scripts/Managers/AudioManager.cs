@@ -11,6 +11,14 @@ namespace KillingMahjong.Managers
         [SerializeField] private AudioSource bgmSource;
         [SerializeField] private AudioSource seSource;
         [SerializeField] private AudioSource voiceSource;
+        private AudioSource discardSeSource; // 打牌専用のAudioSource
+
+        [Header("Discard Pitch Settings")]
+        private float currentDiscardPitch = 1.0f;
+        private float lastDiscardTime = 0f;
+        private const float PITCH_RESET_TIME = 2.5f; // 2.5秒間打牌がなければピッチリセット
+        private const float SEMITONE_RATIO = 1.059463094359295f; // 半音の周波数比率
+        private const float MAX_PITCH = 2.0f; // 1オクターブ上まで
 
         [Header("Volume Settings")]
         [Range(0f, 1f)] public float masterVolume = 1f;
@@ -61,6 +69,7 @@ namespace KillingMahjong.Managers
             if (bgmSource == null) bgmSource = gameObject.AddComponent<AudioSource>();
             if (seSource == null) seSource = gameObject.AddComponent<AudioSource>();
             if (voiceSource == null) voiceSource = gameObject.AddComponent<AudioSource>();
+            if (discardSeSource == null) discardSeSource = gameObject.AddComponent<AudioSource>();
 
             bgmSource.loop = true;
             ApplyVolumes();
@@ -71,6 +80,7 @@ namespace KillingMahjong.Managers
             if (bgmSource != null) bgmSource.volume = bgmVolume * masterVolume;
             if (seSource != null) seSource.volume = seVolume * masterVolume;
             if (voiceSource != null) voiceSource.volume = voiceVolume * masterVolume;
+            if (discardSeSource != null) discardSeSource.volume = seVolume * masterVolume;
         }
 
         // --- BGM Control ---
@@ -99,6 +109,34 @@ namespace KillingMahjong.Managers
             {
                 seSource.PlayOneShot(clip, seVolume * masterVolume);
             }
+        }
+
+        // --- Discard SE Control ---
+        public void PlayDiscardSE(AudioClip clip = null)
+        {
+            if (clip == null) clip = discardSE;
+            if (clip == null || discardSeSource == null) return;
+
+            // 一定時間経過していればピッチをリセット
+            if (Time.time - lastDiscardTime > PITCH_RESET_TIME)
+            {
+                currentDiscardPitch = 1.0f;
+            }
+            else
+            {
+                // 半音上げる
+                currentDiscardPitch *= SEMITONE_RATIO;
+                if (currentDiscardPitch > MAX_PITCH)
+                {
+                    currentDiscardPitch = MAX_PITCH;
+                }
+            }
+
+            discardSeSource.pitch = currentDiscardPitch;
+            discardSeSource.volume = seVolume * masterVolume;
+            discardSeSource.PlayOneShot(clip);
+
+            lastDiscardTime = Time.time;
         }
 
         // --- Voice Control ---

@@ -31,7 +31,25 @@ namespace KillingMahjong.UI
         public void OnClickStartButton()
         {
             Debug.Log("ゲーム開始！ " + nextSceneName + " に遷移します。");
-            SceneManager.LoadScene(nextSceneName);
+            
+            if (KillingMahjong.UI.LoadingManager.Instance != null)
+            {
+                KillingMahjong.UI.LoadingManager.Instance.Show();
+            }
+
+            StartCoroutine(LoadSceneAsyncCoroutine());
+        }
+
+        private System.Collections.IEnumerator LoadSceneAsyncCoroutine()
+        {
+            // ロードUIの表示を確実に画面に反映させるために1フレーム待機
+            yield return null;
+
+            var asyncOp = SceneManager.LoadSceneAsync(nextSceneName);
+            while (!asyncOp.isDone)
+            {
+                yield return null;
+            }
         }
 
         /// <summary>

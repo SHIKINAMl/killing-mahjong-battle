@@ -43,6 +43,8 @@ namespace KillingMahjong.UI
 
         public void ShowMatchmakingWaiting()
         {
+            if (uiManager != null && uiManager.IsTutorialMode) return; // チュートリアル中は非表示
+
             if (uiManager.MatchmakingUI != null) uiManager.MatchmakingUI.ShowWaiting();
             SetMatchUIVisibility(false);
             

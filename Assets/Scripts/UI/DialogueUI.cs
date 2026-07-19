@@ -47,6 +47,12 @@ namespace KillingMahjong.UI
             dialoguePanel.SetActive(true);
         }
 
+        public void HideText()
+        {
+            if (dialoguePanel != null) dialoguePanel.SetActive(false);
+            if (gameObject.activeSelf) gameObject.SetActive(false); // パネル自体も隠す
+        }
+
         private void AddToLog(string text)
         {
             dialogueHistory.Add(text);

@@ -53,6 +53,9 @@ namespace KillingMahjong.UI
         [SerializeField] private GameObject tilePrefab;
         [SerializeField] private TileResourceManager tileResourceManager;
 
+        public bool IsTutorialMode { get; set; } = false;
+        public Managers.TutorialManager TutorialManager { get; set; }
+
         private RoundStatus currentPhaseStatus = RoundStatus.None;
         public RoundStatus CurrentPhaseStatus => currentPhaseStatus;
         
@@ -70,9 +73,24 @@ namespace KillingMahjong.UI
 
         private void Start()
         {
+            if (KillingMahjong.UI.LoadingManager.Instance != null)
+            {
+                KillingMahjong.UI.LoadingManager.Instance.ForceHide();
+            }
+
             SetupManagers();
             SetupControllers();
             SetupUI();
+
+            // チュートリアルモードでなければWebSocketに自動接続する
+            if (!IsTutorialMode)
+            {
+                var wsClient = UnityEngine.Object.FindFirstObjectByType<WebSocketGameClientSample>();
+                if (wsClient != null)
+                {
+                    _ = wsClient.ConnectAsync();
+                }
+            }
         }
 
         private void SetupManagers()
@@ -404,6 +422,36 @@ namespace KillingMahjong.UI
 
             int tileToDiscard = BoardStateManager.Instance.SelectedTileIds[0];
 
+            if (IsTutorialMode && TutorialManager != null)
+            {
+                bool allowDiscard = TutorialManager.OnTryDiscardTile(tileToDiscard);
+                if (!allowDiscard) 
+                {
+                    ClearSelection();
+                    return; // 指定牌以外は打てない
+                }
+
+                if (playerInfoUI != null) playerInfoUI.StopTurnTimer();
+                BoardStateManager.Instance.SetLocalTurn(false);
+                ClearSelection();
+
+                // 疑似的に河へ移動
+                if (handUI != null)
+                {
+                    RectTransform tileRt = handUI.GetTileSlotRectTransform(tileToDiscard);
+                    if (tileRt != null)
+                    {
+                        handUI.RemoveTileFromHand(tileRt, tileToDiscard);
+                        if (riverUI != null) riverUI.AddExistingTile(tileRt, tileToDiscard);
+                    }
+                }
+
+                if (KillingMahjong.Managers.AudioManager.Instance != null)
+                    KillingMahjong.Managers.AudioManager.Instance.PlayDiscardSE(KillingMahjong.Managers.AudioManager.Instance.discardSE);
+                
+                return;
+            }
+
             if (playerInfoUI != null) playerInfoUI.StopTurnTimer();
 
             BoardStateManager.Instance.SetLocalTurn(false);
@@ -544,7 +592,7 @@ namespace KillingMahjong.UI
             BoardStateManager.Instance.LastDiscardedTileId = discardedTileId;
 
             if (KillingMahjong.Managers.AudioManager.Instance != null)
-                KillingMahjong.Managers.AudioManager.Instance.PlaySE(KillingMahjong.Managers.AudioManager.Instance.discardSE);
+                KillingMahjong.Managers.AudioManager.Instance.PlayDiscardSE(KillingMahjong.Managers.AudioManager.Instance.discardSE);
 
             bool isGameEndPhase = currentPhaseStatus == RoundStatus.Agari || 
                                   currentPhaseStatus == RoundStatus.Ron || 

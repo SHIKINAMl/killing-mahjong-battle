@@ -36,16 +36,36 @@ namespace KillingMahjong.Managers
         [ContextMenu("Reload CSV")]
         private void LoadCSV()
         {
-            TextAsset csvFile = Resources.Load<TextAsset>("MajangGameTaskBoard - セリフ一覧");
-            if (csvFile == null)
-            {
-                Debug.LogWarning("[DialogueManager] CSV file 'MajangGameTaskBoard - セリフ一覧' not found in Resources!");
-                return;
-            }
-
             parsedDialogues.Clear();
 
-            string[] lines = csvFile.text.Split('\n');
+            // 本編用CSVの読み込み
+            TextAsset mainCsvFile = Resources.Load<TextAsset>("MajangGameTaskBoard - セリフ一覧");
+            if (mainCsvFile != null)
+            {
+                ParseCSV(mainCsvFile.text);
+            }
+            else
+            {
+                Debug.LogWarning("[DialogueManager] Main CSV file not found in Resources!");
+            }
+
+            // チュートリアル用CSVの読み込み
+            TextAsset tutorialCsvFile = Resources.Load<TextAsset>("TutorialDialogue");
+            if (tutorialCsvFile != null)
+            {
+                ParseCSV(tutorialCsvFile.text);
+            }
+            else
+            {
+                Debug.LogWarning("[DialogueManager] Tutorial CSV file not found in Resources!");
+            }
+            
+            Debug.Log($"[DialogueManager] Loaded {parsedDialogues.Count} dialogue conditions.");
+        }
+
+        private void ParseCSV(string csvText)
+        {
+            string[] lines = csvText.Split('\n');
             
             int conditionIdx = -1;
             int poseIdx = -1;
