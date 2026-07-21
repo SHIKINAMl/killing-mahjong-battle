@@ -7,10 +7,9 @@ namespace KillingMahjong.UI
 {
     public class TimerUI : MonoBehaviour
     {
-        private Image backgroundImage;
-        private Image fillImage;
-        private RectTransform needleRect;
-        private Image needleImage;
+        [Header("UI References")]
+        [SerializeField] private Image backgroundImage;
+        [SerializeField] private TextMeshProUGUI timeText;
 
         private float timeLimit;
         private float currentTime;
@@ -18,55 +17,15 @@ namespace KillingMahjong.UI
         private bool isTimeout;
 
         private Coroutine flashCoroutine;
+        private Color originalTextColor = Color.black; // デフォルトの色
 
         public void Initialize()
         {
-            if (backgroundImage != null) return; // 既に初期化済み
-
-            // --- 背景（時計の枠）の作成 ---
-            backgroundImage = gameObject.AddComponent<Image>();
-            backgroundImage.color = new Color(0.2f, 0.2f, 0.2f, 0.8f);
-            
-            // --- ゲージ（残り時間）の作成 ---
-            GameObject fillObj = new GameObject("FillImage");
-            fillObj.transform.SetParent(transform, false);
-            fillImage = fillObj.AddComponent<Image>();
-            fillImage.color = new Color(0.1f, 0.8f, 0.9f, 0.8f);
-            fillImage.type = Image.Type.Filled;
-            fillImage.fillMethod = Image.FillMethod.Radial360;
-            fillImage.fillOrigin = (int)Image.Origin360.Top;
-            fillImage.fillClockwise = false; // 反時計回りに減るようにする
-
-            RectTransform fillRt = fillImage.rectTransform;
-            fillRt.anchorMin = Vector2.zero;
-            fillRt.anchorMax = Vector2.one;
-            fillRt.sizeDelta = Vector2.zero;
-            fillRt.offsetMin = new Vector2(4, 4);
-            fillRt.offsetMax = new Vector2(-4, -4);
-
-            // --- 針の作成 ---
-            GameObject needleObj = new GameObject("Needle");
-            needleObj.transform.SetParent(transform, false);
-            needleRect = needleObj.AddComponent<RectTransform>();
-            needleImage = needleObj.AddComponent<Image>();
-            needleImage.color = Color.white;
-
-            // 針のピボットを下中央にし、上に向かって伸びるようにする
-            needleRect.pivot = new Vector2(0.5f, 0f);
-            needleRect.anchorMin = new Vector2(0.5f, 0.5f);
-            needleRect.anchorMax = new Vector2(0.5f, 0.5f);
-            needleRect.anchoredPosition = Vector2.zero;
-            
-            // 標準のSpriteを探して設定（あれば）
-#if UNITY_EDITOR
-            Sprite knobSprite = UnityEditor.AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd");
-            if (knobSprite != null)
+            // 動的生成は廃止し、インスペクターからセットする仕様に変更
+            if (timeText != null)
             {
-                backgroundImage.sprite = knobSprite;
-                fillImage.sprite = knobSprite;
+                originalTextColor = timeText.color;
             }
-#endif
-
             gameObject.SetActive(false);
         }
 
@@ -77,16 +36,10 @@ namespace KillingMahjong.UI
             {
                 rt.sizeDelta = new Vector2(size, size);
             }
-            if (needleRect != null)
-            {
-                needleRect.sizeDelta = new Vector2(size * 0.05f, size * 0.45f); // 針の太さと長さ
-            }
         }
 
         public void StartTimer(float duration)
         {
-            if (backgroundImage == null) Initialize();
-
             timeLimit = duration;
             currentTime = duration;
             isRunning = true;
@@ -98,10 +51,12 @@ namespace KillingMahjong.UI
                 flashCoroutine = null;
             }
             
-            // 色をリセット
-            fillImage.color = new Color(0.1f, 0.8f, 0.9f, 0.8f);
-            needleImage.color = Color.white;
-            backgroundImage.color = new Color(0.2f, 0.2f, 0.2f, 0.8f);
+            // 色をリセット（画像に色が設定されている前提）
+            if (timeText != null) 
+            {
+                timeText.color = originalTextColor;
+                timeText.text = Mathf.CeilToInt(currentTime).ToString();
+            }
 
             gameObject.SetActive(true);
         }
@@ -125,19 +80,17 @@ namespace KillingMahjong.UI
             {
                 currentTime -= Time.deltaTime;
                 
-                // ゲージの更新
-                fillImage.fillAmount = currentTime / timeLimit;
-
-                // 針の回転（360度）
-                float angle = (1.0f - (currentTime / timeLimit)) * 360f;
-                needleRect.localRotation = Quaternion.Euler(0, 0, -angle);
+                if (timeText != null)
+                {
+                    timeText.text = Mathf.CeilToInt(currentTime).ToString();
+                }
 
                 if (currentTime <= 0)
                 {
                     currentTime = 0;
                     isRunning = false;
                     isTimeout = true;
-                    fillImage.fillAmount = 0;
+                    if (timeText != null) timeText.text = "0";
                     
                     // タイムアウト時の点滅を開始
                     flashCoroutine = StartCoroutine(FlashRoutine());
@@ -152,13 +105,11 @@ namespace KillingMahjong.UI
             {
                 if (isRed)
                 {
-                    backgroundImage.color = new Color(0.2f, 0.2f, 0.2f, 0.8f);
-                    needleImage.color = Color.white;
+                    if (timeText != null) timeText.color = originalTextColor;
                 }
                 else
                 {
-                    backgroundImage.color = new Color(0.8f, 0.1f, 0.1f, 0.8f); // 赤色
-                    needleImage.color = Color.red;
+                    if (timeText != null) timeText.color = Color.red; // 赤色
                 }
                 isRed = !isRed;
                 yield return new WaitForSeconds(0.2f);

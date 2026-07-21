@@ -33,7 +33,8 @@ namespace KillingMahjong.UI
         [SerializeField] private SpriteRenderer faceRenderer; // 追加：表情レイヤー用
         [SerializeField] private CharacterData characterData; // キャラクター管理データ
 
-        private TimerUI timerUI; // 追加：タイマーUI
+        [Header("Timer UI")]
+        [SerializeField] private TimerUI timerUI; // インスペクターからセットする
 
         public CharacterData CurrentCharacterData => characterData;
 
@@ -202,34 +203,6 @@ namespace KillingMahjong.UI
         private void Start()
         {
             InitializeOriginalTransform();
-            InitializeTimerUI();
-        }
-
-        private void InitializeTimerUI()
-        {
-            if (timerUI == null)
-            {
-                GameObject timerObj = new GameObject("TimerUI");
-                timerUI = timerObj.AddComponent<TimerUI>();
-                timerUI.Initialize();
-                timerUI.SetSize(60f); // 懐中時計のサイズ
-
-                // スマホ全体（hpFillImageの親）を親にして、スマホ枠に追従させる
-                Transform parentTransform = (hpFillImage != null && hpFillImage.transform.parent != null) 
-                                            ? hpFillImage.transform.parent 
-                                            : this.transform;
-                timerObj.transform.SetParent(parentTransform, false);
-
-                // 配置をスマホパネルの下部中央にする
-                RectTransform rt = timerUI.GetComponent<RectTransform>();
-                if (rt != null)
-                {
-                    rt.anchorMin = new Vector2(0.5f, 0f);
-                    rt.anchorMax = new Vector2(0.5f, 0f);
-                    rt.pivot = new Vector2(0.5f, 1f);
-                    rt.anchoredPosition = new Vector2(0, -30f); // スマホ枠の少し下
-                }
-            }
         }
 
         public void StartTurnTimer(float duration)
