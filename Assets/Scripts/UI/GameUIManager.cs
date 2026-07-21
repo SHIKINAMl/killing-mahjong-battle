@@ -73,11 +73,6 @@ namespace KillingMahjong.UI
 
         private void Start()
         {
-            if (KillingMahjong.UI.LoadingManager.Instance != null)
-            {
-                KillingMahjong.UI.LoadingManager.Instance.ForceHide();
-            }
-
             SetupManagers();
             SetupControllers();
             SetupUI();
@@ -85,11 +80,30 @@ namespace KillingMahjong.UI
             // チュートリアルモードでなければWebSocketに自動接続する
             if (!IsTutorialMode)
             {
-                var wsClient = UnityEngine.Object.FindFirstObjectByType<WebSocketGameClientSample>();
-                if (wsClient != null)
+                bool isDebugMode = false;
+                if (NetworkMessageHandler.Instance != null && NetworkMessageHandler.Instance.UseDebugClient)
                 {
-                    _ = wsClient.ConnectAsync();
+                    isDebugMode = true;
                 }
+
+                if (!isDebugMode)
+                {
+                    var wsClient = UnityEngine.Object.FindFirstObjectByType<WebSocketGameClientSample>();
+                    if (wsClient != null)
+                    {
+                        // UIの初期化が完全に終わった次のフレームで接続を開始する
+                        StartCoroutine(ConnectWebSocketNextFrame(wsClient));
+                    }
+                }
+            }
+        }
+
+        private System.Collections.IEnumerator ConnectWebSocketNextFrame(WebSocketGameClientSample wsClient)
+        {
+            yield return null; // 1フレーム待機
+            if (wsClient != null)
+            {
+                _ = wsClient.ConnectAsync();
             }
         }
 

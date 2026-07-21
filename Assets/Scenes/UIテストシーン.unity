@@ -6165,12 +6165,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WebSocketGameClientSample
   serverUrl: wss://jongpire.onrender.com/ws
-  autoConnectOnStart: 0
-  autoReconnectDelayMs: 3000
+  autoConnectOnStart: 1
   sampleMessage: '{"type":"ping"}'
   authToken: 3b009c13c4f84a2d521a55a5ff644d8c
   verboseLog: 1
-  gameUIManager: {fileID: 536350430}
 --- !u!114 &300672386
 MonoBehaviour:
   m_ObjectHideFlags: 0

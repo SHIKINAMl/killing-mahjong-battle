@@ -105,8 +105,9 @@ namespace KillingMahjong.Network
         [Header("Client References")]
         [SerializeField] private WebSocketGameClientSample webSocketClient;
         
-        [Header("Debug")]
         [SerializeField] private bool useDebugClient;
+        public bool UseDebugClient => useDebugClient;
+
         [SerializeField] private KillingMahjong.Network.DebugWebSocketClient debugWebSocketClient;
 
         // イベントルーティング

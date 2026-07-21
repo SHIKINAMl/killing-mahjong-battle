@@ -43,6 +43,7 @@ namespace KillingMahjong.UI
 
         public void ShowMatchmakingWaiting()
         {
+            Debug.Log("[GameUIPhaseController] ShowMatchmakingWaiting called.");
             if (uiManager != null && uiManager.IsTutorialMode) return; // チュートリアル中は非表示
 
             if (uiManager.MatchmakingUI != null) uiManager.MatchmakingUI.ShowWaiting();
@@ -95,50 +96,64 @@ namespace KillingMahjong.UI
         {
             _currentRoundIndex = 1;
             
-            Managers.BoardStateManager.Instance.ClearBoosts();
-            if (uiManager.YakuListUI != null)
+            try
             {
-                uiManager.YakuListUI.UpdateBoostData(Managers.BoardStateManager.Instance.LocalBoostHandBonus, Managers.BoardStateManager.Instance.EnemyBoostHandBonus);
-            }
+                Managers.BoardStateManager.Instance.ClearBoosts();
+                if (uiManager.YakuListUI != null)
+                {
+                    uiManager.YakuListUI.UpdateBoostData(Managers.BoardStateManager.Instance.LocalBoostHandBonus, Managers.BoardStateManager.Instance.EnemyBoostHandBonus);
+                }
 
-            Managers.BoardStateManager.Instance.UpdateHp(20000, 20000);
-            if (uiManager.PlayerInfoUI != null) 
-            {
-                uiManager.PlayerInfoUI.gameObject.SetActive(true);
-                uiManager.PlayerInfoUI.SetHP(20000);
-            }
-            if (uiManager.EnemyInfoUI != null) 
-            {
-                uiManager.EnemyInfoUI.SetPanelVisible(true);
-                uiManager.EnemyInfoUI.SetHP(20000);
-                uiManager.EnemyInfoUI.ShowReadyBox(false);
-            }
-            
-            if (uiManager.PhaseTransitionUI != null)
-            {
-                uiManager.PhaseTransitionUI.PlayRoundStartDarken("対局開始");
-            }
+                Managers.BoardStateManager.Instance.UpdateHp(20000, 20000);
+                if (uiManager.PlayerInfoUI != null) 
+                {
+                    uiManager.PlayerInfoUI.gameObject.SetActive(true);
+                    uiManager.PlayerInfoUI.SetHP(20000);
+                }
+                if (uiManager.EnemyInfoUI != null) 
+                {
+                    uiManager.EnemyInfoUI.SetPanelVisible(true);
+                    uiManager.EnemyInfoUI.SetHP(20000);
+                    uiManager.EnemyInfoUI.ShowReadyBox(false);
+                }
+                
+                if (uiManager.PhaseTransitionUI != null)
+                {
+                    uiManager.PhaseTransitionUI.PlayRoundStartDarken("対局開始");
+                }
 
-            if (ReactionController.Instance != null)
-            {
-                ReactionController.Instance.ResetStateForNewGame();
-                ReactionController.Instance.SetPlayerHp(20000);
-                ReactionController.Instance.SetEnemyHp(20000);
-                ReactionController.Instance.HandleRoundStart(1);
+                if (ReactionController.Instance != null)
+                {
+                    ReactionController.Instance.ResetStateForNewGame();
+                    ReactionController.Instance.SetPlayerHp(20000);
+                    ReactionController.Instance.SetEnemyHp(20000);
+                    ReactionController.Instance.HandleRoundStart(1);
+                }
+                
+                if (uiManager.DialogueUI != null) 
+                {
+                    uiManager.DialogueUI.gameObject.SetActive(true);
+                    string introText = (uiManager.EnemyInfoUI != null) ? uiManager.EnemyInfoUI.PlayReaction(ReactionTrigger.GameStart) : null;
+                    if (string.IsNullOrEmpty(introText)) introText = "Match Found! Game Starting...";
+                    uiManager.DialogueUI.ShowText(introText);
+                }
+                if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.SetHP(20000);
+                
+                SetMatchUIVisibility(true);
+                uiManager.SetCurrentPhaseStatus(RoundStatus.None);
             }
-            if (uiManager.MatchmakingUI != null)
+            catch (System.Exception ex)
             {
-                uiManager.MatchmakingUI.Hide();
+                Debug.LogError($"[GameUIPhaseController] OnGameStarted Error: {ex.Message}\n{ex.StackTrace}");
             }
-            if (uiManager.DialogueUI != null) 
+            finally
             {
-                uiManager.DialogueUI.gameObject.SetActive(true);
-                string introText = (uiManager.EnemyInfoUI != null) ? uiManager.EnemyInfoUI.PlayReaction(ReactionTrigger.GameStart) : null;
-                if (string.IsNullOrEmpty(introText)) introText = "Match Found! Game Starting...";
-                uiManager.DialogueUI.ShowText(introText);
+                // 何があっても必ずマッチング画面は閉じる
+                if (uiManager.MatchmakingUI != null)
+                {
+                    uiManager.MatchmakingUI.Hide();
+                }
             }
-            if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.SetHP(20000);
-            if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetHP(20000);
         }
 
         public void UpdatePhaseStatus(RoundStatus newStatus)

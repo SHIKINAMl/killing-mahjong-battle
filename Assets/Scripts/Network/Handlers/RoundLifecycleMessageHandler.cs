@@ -17,7 +17,8 @@ namespace KillingMahjong.Network.Handlers
             "round_end",
             "next_round_waiting",
             "next_round_accepted",
-            "game_end"
+            "game_end",
+            "round_start"
         };
         public IReadOnlyList<string> MessageTypes => Types;
 
@@ -27,6 +28,10 @@ namespace KillingMahjong.Network.Handlers
 
             switch (messageType)
             {
+                case "round_start":
+                    network.RaiseGameStarted();
+                    break;
+                    
                 case "agari_pending":
                     AgariPendingMessage agariPendingMsg = JsonUtility.FromJson<AgariPendingMessage>(jsonString);
                     if (agariPendingMsg != null && agariPendingMsg.data != null)

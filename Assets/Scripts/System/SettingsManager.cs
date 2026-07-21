@@ -32,7 +32,7 @@ namespace KillingMahjong.Core
 
         // --- ウィンドウ（解像度）設定 ---
         [Header("Window Settings")]
-        [SerializeField] private int resolutionIndex = 0; // デフォルトは1920x1080
+        [SerializeField] private int resolutionIndex = 4; // デフォルトは 800x600
         [SerializeField] private bool isFullScreen = false;
 
         public int ResolutionIndex => resolutionIndex;
@@ -134,17 +134,8 @@ namespace KillingMahjong.Core
 
         private void ApplyResolution()
         {
-            int width = 1920;
-            int height = 1080;
-            switch(resolutionIndex)
-            {
-                case 0: width = 1920; height = 1080; break;
-                case 1: width = 1600; height = 900; break;
-                case 2: width = 1280; height = 720; break;
-                case 3: width = 1024; height = 576; break;
-                case 4: width = 800; height = 600; break;
-                default: width = 1920; height = 1080; break;
-            }
+            int width = 800;
+            int height = 600;
 #if !UNITY_WEBGL
             Screen.SetResolution(width, height, isFullScreen);
 #endif

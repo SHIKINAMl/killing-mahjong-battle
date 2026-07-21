@@ -6119,70 +6119,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 2510914364966831182, guid: 013a0cbcca9ea1942a3b51ba6ec6ecef, type: 3}
   m_PrefabInstance: {fileID: 297457033}
   m_PrefabAsset: {fileID: 0}
---- !u!1 &300672383
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 300672384}
-  - component: {fileID: 300672386}
-  - component: {fileID: 300672385}
-  m_Layer: 0
-  m_Name: WebSocketClient
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &300672384
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 300672383}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &300672385
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 300672383}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a73b6fbffc7ba004c9083ba37393eee3, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::WebSocketGameClientSample
-  serverUrl: wss://jongpire.onrender.com/ws
-  autoConnectOnStart: 0
-  autoReconnectDelayMs: 3000
-  sampleMessage: '{"type":"ping"}'
-  authToken: 3b009c13c4f84a2d521a55a5ff644d8c
-  verboseLog: 1
-  gameUIManager: {fileID: 536350430}
---- !u!114 &300672386
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 300672383}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b3efa2590e1898f4ea97eb400fd8c25e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.Network.UnityMainThreadDispatcher
 --- !u!1 &306529786
 GameObject:
   m_ObjectHideFlags: 0
@@ -11620,9 +11556,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c7a8226a349e15a42854412d1269e04e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.Network.NetworkMessageHandler
-  webSocketClient: {fileID: 300672385}
+  webSocketClient: {fileID: 0}
   useDebugClient: 0
-  debugWebSocketClient: {fileID: 1644618189}
+  debugWebSocketClient: {fileID: 0}
 --- !u!114 &536350432
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -35370,54 +35306,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 7205852514466138065, guid: 2746cc77170c0434c96d64572db649d2, type: 3}
   m_PrefabInstance: {fileID: 1638102660}
   m_PrefabAsset: {fileID: 0}
---- !u!1 &1644618188
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1644618190}
-  - component: {fileID: 1644618189}
-  m_Layer: 0
-  m_Name: Debugwebsocket
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1644618189
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1644618188}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ab978ed9abe2c9947afded2c4ec4f506, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.Network.DebugWebSocketClient
-  gameUIManager: {fileID: 536350430}
-  networkDelay: 0.5
-  localPlayerId: player_local
-  enemyPlayerId: enemy_bot
---- !u!4 &1644618190
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1644618188}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 921.07965, y: 397.38394, z: -124.83131}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &1646348365
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -45889,8 +45777,6 @@ SceneRoots:
   - {fileID: 1355573765}
   - {fileID: 52962405}
   - {fileID: 592429296}
-  - {fileID: 300672384}
-  - {fileID: 1644618190}
   - {fileID: 952856419}
   - {fileID: 803083765}
   - {fileID: 312065929}

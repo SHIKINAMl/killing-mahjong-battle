@@ -17,6 +17,7 @@ namespace KillingMahjong.Network.Handlers
             switch (messageType)
             {
                 case "matching_waiting":
+                    Debug.Log("[MatchLifecycleMessageHandler] matching_waiting received.");
                     network.RaiseMatchmakingWaiting();
                     break;
 

@@ -162,6 +162,12 @@ namespace KillingMahjong.UI
         /// </summary>
         private void InitializeUI()
         {
+            if (resolutionDropdown != null)
+            {
+                resolutionDropdown.ClearOptions();
+                resolutionDropdown.AddOptions(new System.Collections.Generic.List<string> { "800x600" });
+            }
+
             if (Core.SettingsManager.Instance != null)
             {
                 var settings = Core.SettingsManager.Instance;
@@ -173,7 +179,7 @@ namespace KillingMahjong.UI
                 if (highSpeedToggle != null) highSpeedToggle.isOn = settings.IsHighSpeedMode;
                 if (effectToggle != null) effectToggle.isOn = settings.IsEffectEnabled;
                 
-                if (resolutionDropdown != null) resolutionDropdown.value = settings.ResolutionIndex;
+                if (resolutionDropdown != null) resolutionDropdown.value = 0;
                 if (fullscreenToggle != null) fullscreenToggle.isOn = settings.IsFullScreen;
             }
         }
