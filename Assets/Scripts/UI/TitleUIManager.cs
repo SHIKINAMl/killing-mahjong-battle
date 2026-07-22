@@ -25,17 +25,20 @@ namespace KillingMahjong.UI
             
             if (KillingMahjong.UI.LoadingManager.Instance != null)
             {
-                KillingMahjong.UI.LoadingManager.Instance.Show();
+                KillingMahjong.UI.LoadingManager.Instance.FadeOutScreen(() => 
+                {
+                    StartCoroutine(LoadSceneAsyncCoroutine());
+                });
             }
-
-            StartCoroutine(LoadSceneAsyncCoroutine());
+            else
+            {
+                StartCoroutine(LoadSceneAsyncCoroutine());
+            }
         }
 
         private System.Collections.IEnumerator LoadSceneAsyncCoroutine()
         {
-            // ロードUIの表示を確実に画面に反映させるために1フレーム待機
-            yield return null;
-
+            // 暗転完了後、非同期でシーンをロードする
             var asyncOp = SceneManager.LoadSceneAsync(nextSceneName);
             while (!asyncOp.isDone)
             {

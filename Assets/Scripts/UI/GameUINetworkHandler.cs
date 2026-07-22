@@ -92,10 +92,17 @@ namespace KillingMahjong.UI
         private void HandleMatchmakingWaiting()
         {
             Debug.Log("[GameUINetworkHandler] HandleMatchmakingWaiting called.");
+            
+            // 暗転を明けさせつつ、マッチング待機画面を出す
             if (KillingMahjong.UI.LoadingManager.Instance != null)
             {
-                KillingMahjong.UI.LoadingManager.Instance.ForceHide();
+                // 暗転中（フェード）を徐々に透明にして解除する
+                KillingMahjong.UI.LoadingManager.Instance.FadeInScreen(() => 
+                {
+                    // 必要ならコールバック内で追加処理
+                });
             }
+            
             uiManager.PhaseController?.ShowMatchmakingWaiting();
         }
 

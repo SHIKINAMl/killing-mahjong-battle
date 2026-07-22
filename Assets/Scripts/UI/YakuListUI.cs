@@ -125,24 +125,34 @@ namespace KillingMahjong.UI
             {
                 if (textArray[i] == null) continue;
 
-                GameObject targetObj = textArray[i].gameObject;
-                // 背景画像（Image）が親オブジェクトに設定されている場合、親ごと表示・非表示を切り替える
-                if (textArray[i].transform.parent != null && 
-                    textArray[i].transform.parent.gameObject != yakuListPanel &&
-                    textArray[i].transform.parent.GetComponent<UnityEngine.UI.Image>() != null)
-                {
-                    targetObj = textArray[i].transform.parent.gameObject;
-                }
-
                 if (i < activeBoosts.Count)
                 {
                     textArray[i].text = $"{activeBoosts[i].Key}+{activeBoosts[i].Value}";
-                    targetObj.SetActive(true);
-                    textArray[i].gameObject.SetActive(true); // テキスト自体も確実にONにする
+                    textArray[i].gameObject.SetActive(true); 
+                    
+                    // 背景画像（親オブジェクト）がある場合はそれも表示する
+                    if (textArray[i].transform.parent != null && 
+                        textArray[i].transform.parent.gameObject != yakuListPanel &&
+                        !textArray[i].transform.parent.name.ToLower().Contains("panel") && // パネル全体を消さないように
+                        textArray[i].transform.parent.GetComponent<UnityEngine.UI.Image>() != null)
+                    {
+                        textArray[i].transform.parent.gameObject.SetActive(true);
+                    }
                 }
                 else
                 {
-                    targetObj.SetActive(false);
+                    textArray[i].gameObject.SetActive(false);
+                    textArray[i].text = "";
+                    
+                    // 背景画像（親オブジェクト）がある場合は非表示にする
+                    // ただし、それが親パネル（yakuListPanel）全体を包むものでないことを確認する
+                    if (textArray[i].transform.parent != null && 
+                        textArray[i].transform.parent.gameObject != yakuListPanel &&
+                        !textArray[i].transform.parent.name.ToLower().Contains("panel") && // パネル全体を消さないように
+                        textArray[i].transform.parent.GetComponent<UnityEngine.UI.Image>() != null)
+                    {
+                        textArray[i].transform.parent.gameObject.SetActive(false);
+                    }
                 }
             }
         }

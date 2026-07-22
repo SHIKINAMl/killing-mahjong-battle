@@ -18,10 +18,24 @@ namespace KillingMahjong.UI
 
         private Coroutine flashCoroutine;
         private Color originalTextColor = Color.black; // デフォルトの色
+        private bool isInitialized = false;
+
+        private void Awake()
+        {
+            Initialize();
+        }
 
         public void Initialize()
         {
+            if (isInitialized) return;
+            isInitialized = true;
+            
             // 動的生成は廃止し、インスペクターからセットする仕様に変更
+            if (timeText == null)
+            {
+                timeText = GetComponentInChildren<TextMeshProUGUI>();
+            }
+            
             if (timeText != null)
             {
                 originalTextColor = timeText.color;

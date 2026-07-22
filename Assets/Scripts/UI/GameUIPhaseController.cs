@@ -98,12 +98,6 @@ namespace KillingMahjong.UI
             
             try
             {
-                Managers.BoardStateManager.Instance.ClearBoosts();
-                if (uiManager.YakuListUI != null)
-                {
-                    uiManager.YakuListUI.UpdateBoostData(Managers.BoardStateManager.Instance.LocalBoostHandBonus, Managers.BoardStateManager.Instance.EnemyBoostHandBonus);
-                }
-
                 Managers.BoardStateManager.Instance.UpdateHp(20000, 20000);
                 if (uiManager.PlayerInfoUI != null) 
                 {
