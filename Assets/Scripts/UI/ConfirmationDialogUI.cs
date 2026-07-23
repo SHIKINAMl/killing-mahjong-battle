@@ -65,8 +65,9 @@ namespace KillingMahjong.UI
             // テキストが巨大化するのを防ぎ、適切なサイズ・配置にする
             if (messageText != null)
             {
-                messageText.enableAutoSizing = false;
-                messageText.fontSize = KillingMahjong.Common.UITypography.BodySmall; // テキストが被らないように小さめのサイズに統一
+                messageText.enableAutoSizing = true;
+                messageText.fontSizeMin = 10;
+                messageText.fontSizeMax = KillingMahjong.Common.UITypography.BodySmall; // テキストが被らないように小さめのサイズに統一
                 // テキストの行数で全体が上下に動くのを防ぐため、上揃え(Top)に変更
                 messageText.alignment = TextAlignmentOptions.Top;
                 messageText.overflowMode = TextOverflowModes.Overflow; // 文字が潰れるのを防ぐ
@@ -77,10 +78,10 @@ namespace KillingMahjong.UI
                     // アンカーをStretchに設定
                     textRt.anchorMin = new Vector2(0, 0);
                     textRt.anchorMax = new Vector2(1, 1);
-                    // Left, Bottomの設定 (Bottomはボタンと被らないよう適度に空ける)
+                    // Left, Bottomの設定(Bottomはボタンと被らないように適度に空ける)
                     textRt.offsetMin = new Vector2(20, 200);
-                    // Right, Topの設定 (上揃えなので、上から適度に余白を設ける)
-                    textRt.offsetMax = new Vector2(-20, -150);
+                    // Right, Topの設定(上揃えなので、上から適度に余白を設ける)
+                    textRt.offsetMax = new Vector2(-20, -180);
                 }
             }
 
@@ -143,8 +144,8 @@ namespace KillingMahjong.UI
                 waitTilesContainer.pivot = new Vector2(0.5f, 0.5f);
             }
 
-            // 指定された通り、画面中央から上に135の位置で固定
-            waitTilesContainer.anchoredPosition = new Vector2(0, 135f);
+            // 指定された通り、画面中央から少し上の位置で固定
+            waitTilesContainer.anchoredPosition = new Vector2(0, 110f);
 
             // PrefabとResourceManagerの取得 (インスペクターで設定されていない場合、シーンから取得)
             if (tilePrefab == null || tileResourceManager == null)

@@ -248,6 +248,15 @@ namespace KillingMahjong.UI
 
             var csf = waitContainer.GetComponent<UnityEngine.UI.ContentSizeFitter>();
             if (csf != null) Destroy(csf);
+            
+            // 枠の幅を牌の数に合わせて自動調整
+            float finalTotalWidth = (count * (tileWidth * scale)) + ((count - 1) * (spacing * scale));
+            RectTransform containerRt = waitContainer.GetComponent<RectTransform>();
+            if (containerRt != null)
+            {
+                // 左右に余裕（パディング）を持たせるために少し大きめに設定
+                containerRt.sizeDelta = new Vector2(finalTotalWidth + 24f, containerRt.sizeDelta.y);
+            }
         }
 
         private System.Collections.IEnumerator PaginationRoutine()
