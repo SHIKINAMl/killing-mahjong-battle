@@ -25,7 +25,7 @@ namespace KillingMahjong.Managers
         
         // チュートリアルのステップごとのツモ牌と、捨てるべき牌のシーケンス
         [SerializeField] private List<int> tsumoTilesSequence = new List<int>() { 14, 15 };
-        [SerializeField] private List<int> targetDiscardTilesSequence = new List<int>() { 1, 2 };
+        [SerializeField] private List<int> targetDiscardTilesSequence = new List<int>() { 30, 31 };
 
         // HandSelection用ステート
         private bool isWaitingForHandSelectionMove = false;
@@ -39,6 +39,10 @@ namespace KillingMahjong.Managers
 
         public void StartTutorial()
         {
+            // インスペクタの値に上書きされるのを防ぐため、正しいシーケンスをコードから強制設定
+            // 手牌選択フェイズで 1(一萬) を山に戻し、30(西) を手牌に入れるため、山牌に残るのは 1 と 31 などになる。
+            targetDiscardTilesSequence = new List<int>() { 1, 31 };
+            
             StartCoroutine(TutorialRoutine());
         }
 
@@ -49,6 +53,10 @@ namespace KillingMahjong.Managers
 
             // HandSelectionモードとして手牌と山牌をセットアップ
             SetupMockHandAndWall();
+
+            // UIレイアウトが確定するまで1フレーム待機（ワールド座標を正しく取得するため）
+            yield return null;
+            yield return null;
 
             // 不要な牌を山に戻す誘導
             dialogueUI.ShowText("まずは手牌から不要な牌を山に戻してね。");
@@ -82,30 +90,37 @@ namespace KillingMahjong.Managers
             // 決定後、少し待ってから打牌（Discard）フェーズへ
             yield return new WaitForSeconds(1.0f);
             dialogueUI.ShowText("いよいよ対局スタートよ。");
-            gameUIManager.SetCurrentPhaseStatus(KillingMahjong.EngineData.RoundStatus.Discard);
+            
+            if (gameUIManager.PhaseController != null)
+            {
+                gameUIManager.PhaseController.UpdatePhaseStatus(KillingMahjong.EngineData.RoundStatus.Discard);
+            }
+            else
+            {
+                gameUIManager.SetCurrentPhaseStatus(KillingMahjong.EngineData.RoundStatus.Discard);
+            }
+            
             yield return new WaitForSeconds(1.0f);
 
             currentStepIndex = 0;
 
             // --- ステップ2: ターン進行のループ ---
-            while (currentStepIndex < tsumoTilesSequence.Count)
+            while (currentStepIndex < targetDiscardTilesSequence.Count)
             {
-                int currentTsumo = tsumoTilesSequence[currentStepIndex];
-                int currentTargetDiscard = targetDiscardTilesSequence[currentStepIndex];
+                KillingMahjong.Managers.BoardStateManager.Instance.SetLocalTurn(true);
 
-                // ツモ牌を手牌に追加
-                AddTileToPlayerHand(currentTsumo);
+                int currentTargetDiscard = targetDiscardTilesSequence[currentStepIndex];
 
                 yield return new WaitForSeconds(0.5f);
 
-                // もし1巡目なら打牌指示のセリフを入れる、2巡目以降なら別のセリフなど
+                // もし1巡目なら打牌指示のセリフを先に入れる
                 if (currentStepIndex == 0)
                 {
                     yield return StartCoroutine(PlayDialogueRoutine("チュートリアル_打牌指示"));
                 }
 
-                // 矢印とマスクUIを対象の牌に表示する
-                ShowHighlightOnTile(currentTargetDiscard);
+                // セリフの後に矢印とマスクUIを対象の牌（山牌）に表示する
+                ShowHighlightOnTile(currentTargetDiscard, true);
                 isWaitingForDiscard = true;
                 this.targetDiscardTileId = currentTargetDiscard; // 打牌検証用
 
@@ -210,20 +225,18 @@ namespace KillingMahjong.Managers
                 gameUIManager.SetCurrentPhaseStatus(KillingMahjong.EngineData.RoundStatus.HandSelection);
                 
                 // 配牌 (BoardStateに直接登録してからUIに反映)
+                // BoardStateのSetLocalStateは「wallの中からhandを抽出する」仕様のため、
+                // wallListには手牌と山牌の合計を渡す必要があります。
                 List<int> handList = new List<int>(initialHandIds);
-                List<int> wallList = new List<int>(initialWallIds);
-                KillingMahjong.Managers.BoardStateManager.Instance.SetLocalState(wallList, handList, new List<int>());
+                List<int> fullWallList = new List<int>(initialHandIds);
+                fullWallList.AddRange(initialWallIds);
+                
+                KillingMahjong.Managers.BoardStateManager.Instance.SetLocalState(fullWallList, handList, new List<int>());
 
-                // UIへの追加 (Hand)
-                foreach (int id in handList)
+                // UIへの追加 (VisualControllerを使って全ての牌を正しく生成・ソート・レイアウトする)
+                if (gameUIManager.VisualController != null)
                 {
-                    AddTileToPlayerHand(id);
-                }
-
-                // UIへの追加 (Wall)
-                foreach (int id in wallList)
-                {
-                    AddTileToWall(id);
+                    gameUIManager.VisualController.RebuildAllTilesFromState();
                 }
                 
                 if (gameUIManager.PhaseController != null)
@@ -313,10 +326,14 @@ namespace KillingMahjong.Managers
             }
         }
 
-        // HandSelection時のフック
         public bool OnTryMoveTile(int tileId, bool toHand)
         {
-            if (!isWaitingForHandSelectionMove) return true; // 何でも許可する状態（ただしシナリオ中は常に待機状態）
+            if (!isWaitingForHandSelectionMove) 
+            {
+                // シナリオの指示がない時（OKボタン待ちの時など）は、ユーザーの勝手な牌移動をブロックする
+                dialogueUI.ShowText("今は「OK」ボタンを押して決定してね。");
+                return false; 
+            }
             
             if (tileId == targetMoveTileId && toHand == targetMoveToHand)
             {

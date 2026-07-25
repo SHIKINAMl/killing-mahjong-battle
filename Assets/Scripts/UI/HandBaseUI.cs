@@ -50,14 +50,35 @@ namespace KillingMahjong.UI
             
             handSlots.Add(tileTransform);
 
-            tileTransform.SetParent(handSlotContainer, false);
+            Transform activeContainer = handSlotContainer;
+            if (gameUIManager != null)
+            {
+                bool isGameEndPhase = gameUIManager.CurrentPhaseStatus == RoundStatus.Agari || 
+                                      gameUIManager.CurrentPhaseStatus == RoundStatus.Ron || 
+                                      gameUIManager.CurrentPhaseStatus == RoundStatus.Result || 
+                                      gameUIManager.CurrentPhaseStatus == RoundStatus.Draw;
+                if ((gameUIManager.CurrentPhaseStatus == RoundStatus.Discard || isGameEndPhase) && discardPhaseContainer != null)
+                {
+                    activeContainer = discardPhaseContainer;
+                }
+            }
+
+            tileTransform.SetParent(activeContainer, false);
             tileTransform.SetAsLastSibling();
-            tileTransform.localPosition = Vector3.zero;
             
             RectTransform rt = tileTransform.GetComponent<RectTransform>();
             if (rt != null)
             {
-                rt.anchoredPosition3D = Vector3.zero;
+                if (handSlots.Count > 1)
+                {
+                    // 既にある最後の牌の少し右側に初期位置をセット（虚空から飛んでくるのを防ぐ）
+                    var prevRt = handSlots[handSlots.Count - 2];
+                    rt.anchoredPosition = prevRt.anchoredPosition + new Vector2(50f, 0f);
+                }
+                else
+                {
+                    rt.anchoredPosition = Vector2.zero;
+                }
             }
             
             tileTransform.localRotation = Quaternion.identity;
@@ -208,7 +229,6 @@ namespace KillingMahjong.UI
             {
                 // 通常フェイズ（横一列）の座標計算
                 float totalWidth = (handSlots.Count - 1) * tileSpacingX;
-                // コンテナ内で中央寄せ等したい場合は調整するが、ここでは左寄せ(x=0から)とする
                 for (int i = 0; i < handSlots.Count; i++)
                 {
                     RectTransform rt = handSlots[i];
@@ -236,13 +256,15 @@ namespace KillingMahjong.UI
                     float w = tileSpacingX;
                     float h = tileSpacingY;
 
-                    float targetY = -rowIndex * h;
+                    // コンテナの中央(Y=0)に対して上下対称に配置するため、(h / 2f)を足す
+                    // さらに少し上寄りにするための微調整(+5f)を加える
+                    float targetY = -rowIndex * h + (h / 2f) + 5f;
                     float targetX = colIndex * w;
 
                     RectTransform rt = handSlots[i];
-                    rt.anchorMin = new Vector2(0, 1);
-                    rt.anchorMax = new Vector2(0, 1);
-                    rt.pivot = new Vector2(0, 1);
+                    rt.anchorMin = new Vector2(0, 0.5f);
+                    rt.anchorMax = new Vector2(0, 0.5f);
+                    rt.pivot = new Vector2(0, 0.5f);
                     
                     Vector2 targetPos = new Vector2(targetX, targetY);
                     targetPositions[rt] = targetPos;

@@ -109,76 +109,17 @@ namespace KillingMahjong.UI
 
         public void OnBeginDrag(PointerEventData eventData)
         {
-            // アニメーション中もクリックを受け付ける
-            if (eventData.button != PointerEventData.InputButton.Left) return;
-            if (_gameUIManager != null && _gameUIManager.IsOpponentSkillProcessing) return;
-            if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard) return;
-            
-            _originalPosition = transform.position;
-            _originalParent = transform.parent;
-            
-            _canvasGroup.blocksRaycasts = false;
+            // ユーザー要望によりドラッグでの移動は無効化
         }
 
         public void OnDrag(PointerEventData eventData)
         {
-            // アニメーション中もドラッグ開始を受け付ける
-            if (eventData.button != PointerEventData.InputButton.Left) return;
-            if (_gameUIManager != null && _gameUIManager.IsOpponentSkillProcessing) return;
-            if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard) return;
-
-            // If Screen Space Overlay/Camera
-            if (_rectTransform != null && _canvas != null)
-            {
-                _rectTransform.anchoredPosition += eventData.delta / _canvas.scaleFactor;
-            }
-            else
-            {
-                // World Space Drag?
-                // Simple implementation: Screen to World point
-                Plane plane = new Plane(Vector3.up, transform.position);
-                Ray ray = Camera.main.ScreenPointToRay(eventData.position);
-                if (plane.Raycast(ray, out float enter))
-                {
-                    transform.position = ray.GetPoint(enter);
-                }
-            }
+            // ユーザー要望によりドラッグでの移動は無効化
         }
 
         public void OnEndDrag(PointerEventData eventData)
         {
-            _canvasGroup.blocksRaycasts = true;
-
-            // アニメーション中もドラッグ終了を受け付ける
-            if (eventData.button != PointerEventData.InputButton.Left) { ReturnToOriginal(); return; }
-            if (_gameUIManager != null && _gameUIManager.IsOpponentSkillProcessing) { ReturnToOriginal(); return; }
-            if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard) { ReturnToOriginal(); return; }
-
-            // Hit Detection
-            bool droppedInHand = _gameUIManager.IsPointerInHandArea(eventData.position);
-
-            if (IsInHand)
-            {
-                if (!droppedInHand)
-                {
-                    _gameUIManager.MoveTileToWall(TileId);
-                }
-                else
-                {
-                    ReturnToOriginal();
-                }
-            }
-            else
-            {
-                if (droppedInHand)
-                {
-                    _gameUIManager.MoveTileToHand(TileId);
-                }
-                else
-                {
-                    ReturnToOriginal();
-                }
-            }
+            // ユーザー要望によりドラッグでの移動は無効化
         }
 
         private void ReturnToOriginal()

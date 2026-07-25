@@ -10,7 +10,7 @@ namespace KillingMahjong.UI
         
         [Header("Layout Settings")]
         [SerializeField] private Vector2 normalContainerPos = new Vector2(0, 0);       // 通常時のコンテナ位置
-        [SerializeField] private Vector2 discardContainerPos = new Vector2(0, -100);   // 打牌フェイズ時のコンテナ位置
+        [SerializeField] private Vector2 discardContainerPos = new Vector2(0, -350);   // 打牌フェイズ時のコンテナ位置 (より手前に)
         [SerializeField] private Vector2 startPosition = new Vector2(40, 150);         // コンテナ内での牌の基点
         [SerializeField] private float tileIntervalX = 55f;
         [SerializeField] private float gapIntervalX = 80f;

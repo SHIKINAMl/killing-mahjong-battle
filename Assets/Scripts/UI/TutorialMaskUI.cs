@@ -33,32 +33,48 @@ namespace KillingMahjong.UI
             Hide();
         }
 
+        private RectTransform _currentTarget;
+
         public void Show(RectTransform targetRect)
         {
             gameObject.SetActive(true);
 
             if (targetRect == null)
             {
-                // ターゲットがない場合は全画面を覆う
                 SetFullScreenMask();
+                _currentTarget = null;
                 return;
             }
+
+            _currentTarget = targetRect;
+            UpdateMaskPosition();
+        }
+
+        private void Update()
+        {
+            if (_currentTarget != null)
+            {
+                UpdateMaskPosition();
+            }
+        }
+
+        private void UpdateMaskPosition()
+        {
+            if (_currentTarget == null) return;
 
             // Canvas の RectTransform (親)
             RectTransform canvasRect = _canvas.GetComponent<RectTransform>();
 
             // ターゲットのワールド四隅を取得
             Vector3[] corners = new Vector3[4];
-            targetRect.GetWorldCorners(corners);
+            _currentTarget.GetWorldCorners(corners);
 
-            // ワールド座標からCanvas内のローカル座標に変換
-            Vector2 bottomLeft, topRight;
-            RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, RectTransformUtility.WorldToScreenPoint(_canvas.worldCamera, corners[0]), _canvas.worldCamera, out bottomLeft);
-            RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, RectTransformUtility.WorldToScreenPoint(_canvas.worldCamera, corners[2]), _canvas.worldCamera, out topRight);
+            // 直接Canvasのローカル座標に変換する (CameraSpace/Overlay問わず確実)
+            Vector3 bottomLeft3D = canvasRect.InverseTransformPoint(corners[0]);
+            Vector3 topRight3D = canvasRect.InverseTransformPoint(corners[2]);
 
-            // パディングを追加
-            bottomLeft -= new Vector2(padding, padding);
-            topRight += new Vector2(padding, padding);
+            Vector2 bottomLeft = new Vector2(bottomLeft3D.x - padding, bottomLeft3D.y - padding);
+            Vector2 topRight = new Vector2(topRight3D.x + padding, topRight3D.y + padding);
 
             // キャンバスのサイズ
             float canvasWidth = canvasRect.rect.width;

@@ -461,14 +461,18 @@ namespace KillingMahjong.UI
                 ClearSelection();
 
                 // 疑似的に河へ移動
-                if (handUI != null)
+                if (wallUI != null)
                 {
-                    RectTransform tileRt = handUI.GetTileSlotRectTransform(tileToDiscard);
+                    RectTransform tileRt = wallUI.GrabTileById(tileToDiscard);
                     if (tileRt != null)
                     {
-                        handUI.RemoveTileFromHand(tileRt, tileToDiscard);
                         if (riverUI != null) riverUI.AddExistingTile(tileRt, tileToDiscard);
                     }
+                    else
+                    {
+                        if (riverUI != null) riverUI.AddTile(tileToDiscard);
+                    }
+                    wallUI.UpdateWallHighlights(BoardStateManager.Instance.CurrentWaitTiles, currentPhaseStatus == RoundStatus.Discard);
                 }
 
                 if (KillingMahjong.Managers.AudioManager.Instance != null)

@@ -9,6 +9,9 @@ namespace KillingMahjong.UI
         [SerializeField] private float bobbingSpeed = 5f;   // 揺れる速度
         [SerializeField] private Vector2 offset = new Vector2(0, 100f); // 牌の中心からのオフセット（上に表示）
 
+        [Header("Visual Settings")]
+        [SerializeField] private Sprite arrowSprite; // ここに矢印画像を設定できます
+
         private RectTransform myRectTransform;
         private RectTransform targetRectTransform;
         private Vector2 basePosition;
@@ -16,6 +19,43 @@ namespace KillingMahjong.UI
         private void Awake()
         {
             myRectTransform = GetComponent<RectTransform>();
+            
+            UnityEngine.UI.Image image = GetComponent<UnityEngine.UI.Image>();
+            if (image == null)
+            {
+                image = gameObject.AddComponent<UnityEngine.UI.Image>();
+            }
+
+            if (arrowSprite != null)
+            {
+                image.sprite = arrowSprite;
+            }
+
+            if (myRectTransform != null)
+            {
+                myRectTransform.anchorMin = new Vector2(0.5f, 0.5f);
+                myRectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+                myRectTransform.pivot = new Vector2(0.5f, 0.5f);
+                
+                // どんな画像でも一定の大きさに収まるように固定サイズにする
+                myRectTransform.sizeDelta = new Vector2(80, 80);
+                
+                if (image != null)
+                {
+                    // アスペクト比（縦横比）を維持する
+                    image.preserveAspect = true;
+                }
+            }
+
+            // 矢印を最前面に表示するためのCanvas設定
+            Canvas canvas = GetComponent<Canvas>();
+            if (canvas == null)
+            {
+                canvas = gameObject.AddComponent<Canvas>();
+            }
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = 50;
+
             gameObject.SetActive(false);
         }
 
@@ -41,17 +81,32 @@ namespace KillingMahjong.UI
 
         private void UpdatePosition()
         {
-            // ターゲット（牌のUI）のスクリーン座標やワールド座標を、矢印の親Canvas内のローカル座標に変換して追従させる。
-            // ターゲットが同じCanvas内にある前提なら、直接position（ワールド座標）を合わせるのが簡単。
-            basePosition = (Vector2)targetRectTransform.position + offset;
+            if (targetRectTransform == null) return;
+
+            Vector3[] corners = new Vector3[4];
+            targetRectTransform.GetWorldCorners(corners);
             
-            // LayoutGroup内で並び替えが発生しても自動で追従する
+            Vector3 topCenterWorld = (corners[1] + corners[2]) * 0.5f;
+            
+            // Canvasのローカル空間に変換して配置することで、解像度やカメラの影響を吸収する
+            // 自身にCanvasがあるため、親のCanvasを取得する
+            Canvas canvas = transform.parent != null ? transform.parent.GetComponentInParent<Canvas>() : null;
+            if (canvas != null)
+            {
+                RectTransform canvasRect = canvas.GetComponent<RectTransform>();
+                Vector3 localPos = canvasRect.InverseTransformPoint(topCenterWorld);
+                basePosition = (Vector2)localPos + offset;
+            }
+            else
+            {
+                basePosition = (Vector2)topCenterWorld + offset;
+            }
         }
 
         private void Animate()
         {
             float yOffset = Mathf.Sin(Time.time * bobbingSpeed) * bobbingAmount;
-            myRectTransform.position = new Vector3(basePosition.x, basePosition.y + yOffset, myRectTransform.position.z);
+            myRectTransform.anchoredPosition = basePosition + new Vector2(0, yOffset);
         }
     }
 }

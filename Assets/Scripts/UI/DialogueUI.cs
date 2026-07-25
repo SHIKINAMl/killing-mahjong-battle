@@ -126,23 +126,28 @@ namespace KillingMahjong.UI
             }
         }
 
+        private System.Action onNextRoundButtonClicked;
+
         public void ShowNextRoundButton(System.Action onClick)
         {
+            onNextRoundButtonClicked = onClick;
+
             if (nextRoundButtonObj == null)
             {
                 var canvas = GetComponentInParent<Canvas>();
                 if (canvas == null) return;
 
+                // Canvas直下の子として生成し、確実に全画面基準の右下に配置する
                 nextRoundButtonObj = new GameObject("NextRoundOKButton");
-                nextRoundButtonObj.transform.SetParent(transform, false);
+                nextRoundButtonObj.transform.SetParent(canvas.transform, false);
                 
                 var rt = nextRoundButtonObj.AddComponent<RectTransform>();
-                // 右下付近に配置
+                // 画面の右下に配置
                 rt.anchorMin = new Vector2(1, 0);
                 rt.anchorMax = new Vector2(1, 0);
                 rt.pivot = new Vector2(1, 0);
-                rt.anchoredPosition = new Vector2(-100, 100);
-                rt.sizeDelta = new Vector2(250, 80);
+                rt.anchoredPosition = new Vector2(-20, 20);
+                rt.sizeDelta = new Vector2(120, 45);
 
                 var img = nextRoundButtonObj.AddComponent<Image>();
                 img.color = new Color(0.2f, 0.2f, 0.2f, 1f);
@@ -160,15 +165,19 @@ namespace KillingMahjong.UI
                 var txt = txtObj.AddComponent<TextMeshProUGUI>();
                 txt.text = "OK";
                 txt.color = Color.white;
-                txt.fontSize = KillingMahjong.Common.UITypography.BodyLarge;
+                txt.fontSize = 24; // フォントサイズを固定して巨大化を防ぐ
                 txt.alignment = TextAlignmentOptions.Center;
 
                 btn.onClick.AddListener(() => {
                     HideNextRoundButton();
-                    onClick?.Invoke();
+                    var action = onNextRoundButtonClicked;
+                    onNextRoundButtonClicked = null;
+                    action?.Invoke();
                 });
             }
 
+            // 万が一他のUIの下に隠れないように、表示するたびに最前面に持ってくる
+            nextRoundButtonObj.transform.SetAsLastSibling();
             nextRoundButtonObj.SetActive(true);
         }
 
@@ -179,5 +188,6 @@ namespace KillingMahjong.UI
                 nextRoundButtonObj.SetActive(false);
             }
         }
+
     }
 }

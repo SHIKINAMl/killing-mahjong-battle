@@ -275,8 +275,15 @@ namespace KillingMahjong.UI
                 case RoundStatus.HandSelection:
                     SetMatchUIVisibility(true);
                     if (uiManager.DialogueUI != null) uiManager.DialogueUI.SetBackgroundRaycast(false);
-                    if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetPanelVisible(true);
-                    if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.gameObject.SetActive(true);
+                    
+                    if (!uiManager.IsTutorialMode)
+                    {
+                        if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetPanelVisible(true);
+                        if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.gameObject.SetActive(true);
+                        if (uiManager.AbilityUI != null) uiManager.AbilityUI.gameObject.SetActive(true);
+                        if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.StartTurnTimer(15f);
+                    }
+                    
                     if (uiManager.WaitUI != null && Managers.BoardStateManager.Instance.CurrentWaitTiles != null && Managers.BoardStateManager.Instance.CurrentWaitTiles.Count > 0)
                     {
                         uiManager.WaitUI.gameObject.SetActive(true);
@@ -286,16 +293,15 @@ namespace KillingMahjong.UI
                     {
                         uiManager.WaitUI.gameObject.SetActive(false);
                     }
-                    if (uiManager.AbilityUI != null) uiManager.AbilityUI.gameObject.SetActive(true);
                     UpdateDoraDisplay();
-                    if (ReactionController.Instance != null)
+                    
+                    if (ReactionController.Instance != null && !uiManager.IsTutorialMode)
                     {
                         ReactionController.Instance.StartHandSelectionTimer();
                     }
-                    if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.StartTurnTimer(15f);
                     
                     // 黒幕が晴れて手牌フェイズに入った時に表示（1局につき1回のみ）
-                    if (uiManager.PhaseTransitionUI != null && !_hasShownHandSelectionPrompt)
+                    if (uiManager.PhaseTransitionUI != null && !_hasShownHandSelectionPrompt && !uiManager.IsTutorialMode)
                     {
                         uiManager.PhaseTransitionUI.PlayPromptText("手牌を選んでください", 1.5f);
                         _hasShownHandSelectionPrompt = true;
@@ -319,8 +325,22 @@ namespace KillingMahjong.UI
                     if (uiManager.RiverUI != null) uiManager.RiverUI.UpdateTurnText();
                     if (uiManager.EnemyRiverUI != null) uiManager.EnemyRiverUI.UpdateTurnText();
                     
-                    if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.gameObject.SetActive(true);
-                    if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetPanelVisible(true);
+                    if (!uiManager.IsTutorialMode)
+                    {
+                        if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.gameObject.SetActive(true);
+                        if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetPanelVisible(true);
+                        if (uiManager.PlayerInfoUI != null)
+                        {
+                            if (Managers.BoardStateManager.Instance.IsLocalTurn)
+                            {
+                                uiManager.PlayerInfoUI.StartTurnTimer(10f); // 10秒
+                            }
+                            else
+                            {
+                                uiManager.PlayerInfoUI.StopTurnTimer();
+                            }
+                        }
+                    }
                     
                     if (uiManager.WaitUI != null && BoardStateManager.Instance.CurrentWaitTiles != null && BoardStateManager.Instance.CurrentWaitTiles.Count > 0)
                     {
@@ -329,18 +349,6 @@ namespace KillingMahjong.UI
                     }
                     if (uiManager.AbilityUI != null) uiManager.AbilityUI.gameObject.SetActive(false);
                     UpdateDoraDisplay();
-
-                    if (uiManager.PlayerInfoUI != null)
-                    {
-                        if (Managers.BoardStateManager.Instance.IsLocalTurn)
-                        {
-                            uiManager.PlayerInfoUI.StartTurnTimer(10f); // 10秒
-                        }
-                        else
-                        {
-                            uiManager.PlayerInfoUI.StopTurnTimer();
-                        }
-                    }
                     break;
                 case RoundStatus.Agari:
                 case RoundStatus.Ron:
