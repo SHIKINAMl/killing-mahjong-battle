@@ -190,6 +190,19 @@ namespace KillingMahjong.UI
 
             float tileWidth = 18f;
             float spacing = 5f;
+            float offsetX = 0f;
+
+            if (count == 2)
+            {
+                spacing = -3f;
+                offsetX = -8f;
+            }
+            else if (count >= 3)
+            {
+                spacing = -8f;
+                offsetX = -16f;
+            }
+
             float scale = 1.0f; // 常に1.0で綺麗に表示する
 
             for (int i = 0; i < count; i++)
@@ -256,6 +269,12 @@ namespace KillingMahjong.UI
             {
                 // 左右に余裕（パディング）を持たせるために少し大きめに設定
                 containerRt.sizeDelta = new Vector2(finalTotalWidth + 24f, containerRt.sizeDelta.y);
+
+                // 中央表示(ダイアログ)ではなく、オリジナル位置(左下)にいる場合のみX座標をズラす
+                if (isOriginalSaved && containerRt.parent == originalParent)
+                {
+                    containerRt.anchoredPosition = new Vector2(originalPosition.x + offsetX, originalPosition.y);
+                }
             }
         }
 

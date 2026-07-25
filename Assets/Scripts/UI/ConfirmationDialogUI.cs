@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System;
+using System.Collections;
 using KillingMahjong.Common;
 
 namespace KillingMahjong.UI
@@ -11,6 +12,10 @@ namespace KillingMahjong.UI
         [SerializeField] private TextMeshProUGUI messageText;
         [SerializeField] private Button okButton;
         [SerializeField] private Button noButton;
+
+        [Header("Effect Sounds")]
+        [SerializeField] private AudioClip explodeSound;
+        [SerializeField] private AudioClip coinSound;
 
         [Header("Wait Tiles Settings")]
         [SerializeField] private RectTransform waitTilesContainer;
@@ -113,12 +118,19 @@ namespace KillingMahjong.UI
 
         public void ShowDialog(string message, Action onConfirm, Action onCancel)
         {
+            if (okButton != null) okButton.interactable = true;
+            if (noButton != null) noButton.interactable = true;
             if (messageText != null) messageText.text = message;
             onConfirmAction = onConfirm;
             onCancelAction = onCancel;
             
             gameObject.SetActive(true);
             transform.SetAsLastSibling(); // 手牌UIなどより手前(最前面)に表示
+
+            if (KillingMahjong.Managers.AudioManager.Instance != null)
+            {
+                KillingMahjong.Managers.AudioManager.Instance.PlayUIPopupSE();
+            }
         }
 
         public void ShowDialogWithWaits(string message, int[] waitTileIds, Action onConfirm, Action onCancel)
@@ -144,8 +156,8 @@ namespace KillingMahjong.UI
                 waitTilesContainer.pivot = new Vector2(0.5f, 0.5f);
             }
 
-            // 指定された通り、画面中央から少し上の位置で固定
-            waitTilesContainer.anchoredPosition = new Vector2(0, 110f);
+            // 指定された位置に配置
+            waitTilesContainer.anchoredPosition = new Vector2(0, 100f);
 
             // PrefabとResourceManagerの取得 (インスペクターで設定されていない場合、シーンから取得)
             if (tilePrefab == null || tileResourceManager == null)
@@ -183,12 +195,7 @@ namespace KillingMahjong.UI
                     rt.anchorMax = new Vector2(0.5f, 0.5f);
                     rt.pivot = new Vector2(0.5f, 0.5f);
                     
-                    float actualTileWidth = tileWidth * scale; // スケールに応じた実際の幅
-                    float actualSpacing = spacing * scale;
-                    float actualTotalWidth = (waitTileIds.Length * actualTileWidth) + ((waitTileIds.Length - 1) * actualSpacing);
-                    float actualStartX = -actualTotalWidth / 2f + actualTileWidth / 2f;
-                    
-                    rt.anchoredPosition = new Vector2(actualStartX + i * (actualTileWidth + actualSpacing), 0);
+                    rt.anchoredPosition = new Vector2(startX + i * (tileWidth + spacing), 0);
                     rt.localScale = new Vector3(scale, scale, 1f);
                 }
 
@@ -229,6 +236,50 @@ namespace KillingMahjong.UI
 
         private void OnOkClicked()
         {
+            if (okButton != null) okButton.interactable = false;
+            if (noButton != null) noButton.interactable = false;
+            
+            StartCoroutine(OkClickRoutine());
+        }
+
+        private IEnumerator OkClickRoutine()
+        {
+            // --- SE再生（ドーパミン音） ---
+            if (KillingMahjong.Managers.AudioManager.Instance != null)
+            {
+                // 用意されたSEがあれば鳴らす。今回は仮の音源として実装
+                if (explodeSound != null) KillingMahjong.Managers.AudioManager.Instance.PlaySE(explodeSound);
+                if (coinSound != null) KillingMahjong.Managers.AudioManager.Instance.PlaySE(coinSound);
+            }
+
+            // --- 画面フラッシュ演出 ---
+            GameObject flashObj = new GameObject("FlashPanel");
+            flashObj.transform.SetParent(transform.parent, false); // ダイアログの親（全体Canvas）に配置
+            flashObj.transform.SetAsLastSibling(); // 一番手前にする
+            
+            Image flashImg = flashObj.AddComponent<Image>();
+            flashImg.color = new Color(1f, 1f, 1f, 1f); // 完全な白
+            
+            RectTransform flashRt = flashObj.GetComponent<RectTransform>();
+            flashRt.anchorMin = Vector2.zero;
+            flashRt.anchorMax = Vector2.one;
+            flashRt.offsetMin = Vector2.zero;
+            flashRt.offsetMax = Vector2.zero;
+
+            // フェードアウト
+            float duration = 0.5f;
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float alpha = Mathf.Lerp(1f, 0f, elapsed / duration);
+                flashImg.color = new Color(1f, 1f, 1f, alpha);
+                yield return null;
+            }
+
+            Destroy(flashObj);
+
+            // --- 終了処理 ---
             gameObject.SetActive(false);
             ClearWaits();
             onConfirmAction?.Invoke();

@@ -80,6 +80,10 @@ namespace KillingMahjong.UI
             if (gameUIManager != null)
             {
                 UpdateLayout(gameUIManager.CurrentPhaseStatus);
+                if (KillingMahjong.Managers.AudioManager.Instance != null)
+                {
+                    KillingMahjong.Managers.AudioManager.Instance.PlayDrawTileSE();
+                }
             }
             else
             {

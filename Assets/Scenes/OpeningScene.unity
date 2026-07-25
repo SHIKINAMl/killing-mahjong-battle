@@ -21137,6 +21137,66 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 5495478802348933110, guid: 732bef5d5f763fc4eb8deb436a0715b1, type: 3}
   m_PrefabInstance: {fileID: 1001780497}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &1007755305
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1007755307}
+  - component: {fileID: 1007755306}
+  m_Layer: 0
+  m_Name: AudioManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1007755306
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1007755305}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fabaabe49c657e64e8575ab1767b014e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.Managers.AudioManager
+  bgmSource: {fileID: 0}
+  seSource: {fileID: 0}
+  voiceSource: {fileID: 0}
+  masterVolume: 1
+  bgmVolume: 1
+  seVolume: 1
+  voiceVolume: 1
+  defaultBgm: {fileID: 0}
+  discardSE: {fileID: 8300000, guid: 89c9942a1cc33af4198da3b27d04bda2, type: 3}
+  selectTileSE: {fileID: 8300000, guid: 4230ad990bd415844842b3ad82b0effb, type: 3}
+  ronVoice: {fileID: 8300000, guid: 8bc296f5f1c07a349846ad715cd7bf38, type: 3}
+  hoverSE: {fileID: 8300000, guid: e01d65bd702398744825285b24f0fa6d, type: 3}
+  pickTileSE: {fileID: 0}
+  drawTileSE: {fileID: 0}
+  uiPopupSE: {fileID: 0}
+  paperSlideSE: {fileID: 8300000, guid: 20523512c44165445be27fa1b439a844, type: 3}
+--- !u!4 &1007755307
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1007755305}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1008364661
 GameObject:
   m_ObjectHideFlags: 0
@@ -29134,6 +29194,7 @@ MonoBehaviour:
   arrowUI: {fileID: 399943608}
   maskUI: {fileID: 1784872914}
   initialHandIds: 0100000002000000030000000400000005000000060000000700000008000000090000000a0000000b0000000c0000000d000000
+  initialWallIds: 1e0000001f00000020000000
   tsumoTilesSequence: 0e0000000f000000
   targetDiscardTilesSequence: 0100000002000000
 --- !u!114 &1377704493
@@ -35233,6 +35294,8 @@ MonoBehaviour:
   messageText: {fileID: 1424438300}
   okButton: {fileID: 1335786870}
   noButton: {fileID: 1121907429}
+  explodeSound: {fileID: 0}
+  coinSound: {fileID: 0}
   waitTilesContainer: {fileID: 1287630059}
   tilePrefab: {fileID: 0}
   tileResourceManager: {fileID: 0}
@@ -45961,5 +46024,6 @@ SceneRoots:
   - {fileID: 312065929}
   - {fileID: 523536353}
   - {fileID: 326032734}
+  - {fileID: 1007755307}
   - {fileID: 291622811}
   - {fileID: 1377704494}

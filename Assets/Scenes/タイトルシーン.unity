@@ -1704,9 +1704,14 @@ MonoBehaviour:
   seVolume: 1
   voiceVolume: 1
   defaultBgm: {fileID: 0}
-  discardSE: {fileID: 8300000, guid: 54c5f137c2e2c264198feda0d84e5980, type: 3}
+  discardSE: {fileID: 8300000, guid: 89c9942a1cc33af4198da3b27d04bda2, type: 3}
   selectTileSE: {fileID: 8300000, guid: 4230ad990bd415844842b3ad82b0effb, type: 3}
   ronVoice: {fileID: 8300000, guid: 8bc296f5f1c07a349846ad715cd7bf38, type: 3}
+  hoverSE: {fileID: 8300000, guid: e01d65bd702398744825285b24f0fa6d, type: 3}
+  pickTileSE: {fileID: 0}
+  drawTileSE: {fileID: 0}
+  uiPopupSE: {fileID: 0}
+  paperSlideSE: {fileID: 8300000, guid: 20523512c44165445be27fa1b439a844, type: 3}
 --- !u!4 &1599908500
 Transform:
   m_ObjectHideFlags: 0

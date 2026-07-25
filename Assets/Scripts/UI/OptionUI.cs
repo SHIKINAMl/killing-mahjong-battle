@@ -121,6 +121,11 @@ namespace KillingMahjong.UI
 
             _rectTransform.DOKill();
             _canvasGroup.DOKill();
+            
+            if (KillingMahjong.Managers.AudioManager.Instance != null)
+            {
+                KillingMahjong.Managers.AudioManager.Instance.PlayPaperSlideSE();
+            }
 
             // 確実に画面中央に配置
             _rectTransform.anchoredPosition = Vector2.zero;
@@ -149,6 +154,11 @@ namespace KillingMahjong.UI
 
             _rectTransform.DOKill();
             _canvasGroup.DOKill();
+            
+            if (KillingMahjong.Managers.AudioManager.Instance != null)
+            {
+                KillingMahjong.Managers.AudioManager.Instance.PlayPaperSlideSE();
+            }
 
             _rectTransform.DOScale(Vector3.one * 0.9f, 0.15f).SetEase(Ease.InQuad).SetUpdate(true);
             _canvasGroup.DOFade(0f, 0.15f).SetEase(Ease.InQuad).SetUpdate(true).OnComplete(() => 

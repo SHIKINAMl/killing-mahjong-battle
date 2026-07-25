@@ -31,10 +31,24 @@ namespace KillingMahjong.Managers
         public AudioClip defaultBgm;
         [Tooltip("打牌した時のSE")]
         public AudioClip discardSE;
-        [Tooltip("牌を選択・移動した時のSE")]
+        [Tooltip("牌を選択・移動した時のSE（旧）")]
         public AudioClip selectTileSE;
         [Tooltip("ロンした時のボイス（声）")]
         public AudioClip ronVoice;
+
+        [Header("ASMR Sound Clips")]
+        [Tooltip("牌やボタンにカーソルを乗せた時の音（スッ…）")]
+        public AudioClip hoverSE;
+        [Tooltip("牌を選択（クリック）した時の音（カチャッ）")]
+        public AudioClip pickTileSE;
+        [Tooltip("山から牌をツモってきた時の音（スチャッ）")]
+        public AudioClip drawTileSE;
+        [Tooltip("UIやダイアログがポップアップした時の音（ポポンッ）")]
+        public AudioClip uiPopupSE;
+        
+        [Header("Paper UI Sound Clips")]
+        [Tooltip("紙のUIがスライドしてくる/戻る時の音")]
+        public AudioClip paperSlideSE;
 
         // 今後の「音ハメ」拡張用プロパティ
         public float CurrentBgmTime => bgmSource != null ? bgmSource.time : 0f;
@@ -137,6 +151,33 @@ namespace KillingMahjong.Managers
             discardSeSource.PlayOneShot(clip);
 
             lastDiscardTime = Time.time;
+        }
+
+        // --- ASMR Specific SE Control ---
+        public void PlayHoverSE()
+        {
+            if (hoverSE != null) PlaySE(hoverSE);
+        }
+
+        public void PlayPickTileSE()
+        {
+            if (pickTileSE != null) PlaySE(pickTileSE);
+            else if (selectTileSE != null) PlaySE(selectTileSE); // フォールバック
+        }
+
+        public void PlayDrawTileSE()
+        {
+            if (drawTileSE != null) PlaySE(drawTileSE);
+        }
+
+        public void PlayUIPopupSE()
+        {
+            if (uiPopupSE != null) PlaySE(uiPopupSE);
+        }
+
+        public void PlayPaperSlideSE()
+        {
+            if (paperSlideSE != null) PlaySE(paperSlideSE);
         }
 
         // --- Voice Control ---

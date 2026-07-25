@@ -16622,7 +16622,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -3, y: 0}
+  m_AnchoredPosition: {x: -15, y: 0}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &807858480
@@ -34541,6 +34541,8 @@ MonoBehaviour:
   messageText: {fileID: 1424438300}
   okButton: {fileID: 1335786870}
   noButton: {fileID: 1121907429}
+  explodeSound: {fileID: 8300000, guid: f9c8c5b35770abc49a17a761a24bcc10, type: 3}
+  coinSound: {fileID: 0}
   waitTilesContainer: {fileID: 1287630059}
   tilePrefab: {fileID: 0}
   tileResourceManager: {fileID: 0}

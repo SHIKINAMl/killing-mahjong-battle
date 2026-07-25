@@ -315,11 +315,16 @@ namespace KillingMahjong.UI
                 return;
             }
             
+            if (IsTutorialMode && TutorialManager != null)
+            {
+                if (!TutorialManager.OnTryMoveTile(tileId, toHand: true)) return;
+            }
+            
             Debug.Log($"[GameUIManager] Executing BoardStateManager.MoveTileToHand({tileId})");
             BoardStateManager.Instance.TargetHandIndexes = null;
 
             if (KillingMahjong.Managers.AudioManager.Instance != null)
-                KillingMahjong.Managers.AudioManager.Instance.PlaySE(KillingMahjong.Managers.AudioManager.Instance.selectTileSE);
+                KillingMahjong.Managers.AudioManager.Instance.PlayPickTileSE();
 
             if (VisualController != null)
             {
@@ -340,10 +345,16 @@ namespace KillingMahjong.UI
         {
             if (currentPhaseStatus != RoundStatus.HandSelection) return;
             if (handUI != null && handUI.IsSubmitted) return;
+            
+            if (IsTutorialMode && TutorialManager != null)
+            {
+                if (!TutorialManager.OnTryMoveTile(tileId, toHand: false)) return;
+            }
+            
             BoardStateManager.Instance.TargetHandIndexes = null;
             
             if (KillingMahjong.Managers.AudioManager.Instance != null)
-                KillingMahjong.Managers.AudioManager.Instance.PlaySE(KillingMahjong.Managers.AudioManager.Instance.selectTileSE);
+                KillingMahjong.Managers.AudioManager.Instance.PlayPickTileSE();
 
             if (VisualController != null)
             {
@@ -366,7 +377,7 @@ namespace KillingMahjong.UI
             if (handUI != null && handUI.IsSubmitted) return;
             
             if (KillingMahjong.Managers.AudioManager.Instance != null)
-                KillingMahjong.Managers.AudioManager.Instance.PlaySE(KillingMahjong.Managers.AudioManager.Instance.selectTileSE);
+                KillingMahjong.Managers.AudioManager.Instance.PlayPickTileSE();
 
             if (VisualController != null)
             {
@@ -387,7 +398,7 @@ namespace KillingMahjong.UI
             if (handUI != null && handUI.IsSubmitted) return;
             
             if (KillingMahjong.Managers.AudioManager.Instance != null)
-                KillingMahjong.Managers.AudioManager.Instance.PlaySE(KillingMahjong.Managers.AudioManager.Instance.selectTileSE);
+                KillingMahjong.Managers.AudioManager.Instance.PlayPickTileSE();
 
             if (VisualController != null)
             {
@@ -480,6 +491,10 @@ namespace KillingMahjong.UI
 
         public void CompleteHandSelection()
         {
+            if (IsTutorialMode && TutorialManager != null)
+            {
+                if (!TutorialManager.OnTryCompleteHandSelection()) return;
+            }
             HandSelectionController?.CompleteHandSelection();
         }
 

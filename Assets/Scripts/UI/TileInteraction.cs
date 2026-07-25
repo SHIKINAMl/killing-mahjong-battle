@@ -215,7 +215,14 @@ namespace KillingMahjong.UI
                 }
             }
 
-            if (canHighlight && _tileVisual != null) _tileVisual.SetHoverHighlight(true);
+            if (canHighlight)
+            {
+                if (_tileVisual != null) _tileVisual.SetHoverHighlight(true);
+                if (KillingMahjong.Managers.AudioManager.Instance != null)
+                {
+                    KillingMahjong.Managers.AudioManager.Instance.PlayHoverSE();
+                }
+            }
             if (_gameUIManager != null) _gameUIManager.OnTileHoverEnter(this);
         }
 

@@ -20,10 +20,18 @@ namespace KillingMahjong.Managers
         // 固定の配牌（ID）
         [SerializeField] private List<int> initialHandIds = new List<int>() { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13 };
         
+        // チュートリアル用の山牌 (HandSelection用)
+        [SerializeField] private List<int> initialWallIds = new List<int>() { 30, 31, 32 };
+        
         // チュートリアルのステップごとのツモ牌と、捨てるべき牌のシーケンス
-        // 簡単なループを作成するため、リストにします。
         [SerializeField] private List<int> tsumoTilesSequence = new List<int>() { 14, 15 };
         [SerializeField] private List<int> targetDiscardTilesSequence = new List<int>() { 1, 2 };
+
+        // HandSelection用ステート
+        private bool isWaitingForHandSelectionMove = false;
+        private bool isWaitingForHandSelectionComplete = false;
+        private int targetMoveTileId = -1;
+        private bool targetMoveToHand = false;
 
         private bool isWaitingForDiscard = false;
         private int currentStepIndex = 0;
@@ -36,11 +44,46 @@ namespace KillingMahjong.Managers
 
         private IEnumerator TutorialRoutine()
         {
-            // --- ステップ1: セリフと配牌 ---
+            // --- ステップ1: セリフと配牌（HandSelectionフェーズ） ---
             yield return StartCoroutine(PlayDialogueRoutine("チュートリアル_開始"));
 
-            // GameUIManagerを経由するか、直接HandUIに牌を追加する
-            SetupMockHand();
+            // HandSelectionモードとして手牌と山牌をセットアップ
+            SetupMockHandAndWall();
+
+            // 不要な牌を山に戻す誘導
+            dialogueUI.ShowText("まずは手牌から不要な牌を山に戻してね。");
+            targetMoveTileId = initialHandIds[0]; // 最初の牌（例: 1）
+            targetMoveToHand = false;
+            isWaitingForHandSelectionMove = true;
+            ShowHighlightOnTile(targetMoveTileId, false);
+
+            yield return new WaitUntil(() => !isWaitingForHandSelectionMove);
+            arrowUI.Hide();
+            if (maskUI != null) maskUI.Hide();
+
+            // 山からドラ（特定の牌）を取る誘導
+            dialogueUI.ShowText("次は山からドラ（や字牌）を手牌に入れてね。");
+            targetMoveTileId = initialWallIds[0]; // 山の最初の牌（例: 30）
+            targetMoveToHand = true;
+            isWaitingForHandSelectionMove = true;
+            ShowHighlightOnTile(targetMoveTileId, true);
+
+            yield return new WaitUntil(() => !isWaitingForHandSelectionMove);
+            arrowUI.Hide();
+            if (maskUI != null) maskUI.Hide();
+
+            // OKボタンで決定させる
+            dialogueUI.ShowText("これで手配が完成したわね。「OK」ボタンを押して決定してね。");
+            isWaitingForHandSelectionComplete = true;
+
+            // 決定されるまで待つ（GameUIHandSelectionController側からOnTryCompleteHandSelectionが呼ばれる）
+            yield return new WaitUntil(() => !isWaitingForHandSelectionComplete);
+
+            // 決定後、少し待ってから打牌（Discard）フェーズへ
+            yield return new WaitForSeconds(1.0f);
+            dialogueUI.ShowText("いよいよ対局スタートよ。");
+            gameUIManager.SetCurrentPhaseStatus(KillingMahjong.EngineData.RoundStatus.Discard);
+            yield return new WaitForSeconds(1.0f);
 
             currentStepIndex = 0;
 
@@ -149,14 +192,13 @@ namespace KillingMahjong.Managers
             }
         }
 
-        private void SetupMockHand()
+        private void SetupMockHandAndWall()
         {
-            if (gameUIManager != null && gameUIManager.HandUI != null)
+            if (gameUIManager != null && gameUIManager.HandUI != null && gameUIManager.WallUI != null)
             {
                 gameUIManager.IsTutorialMode = true;
                 gameUIManager.TutorialManager = this;
                 
-                // チュートリアル中はフェーズ遷移演出は不要なのでOFFにする
                 if (gameUIManager.PhaseTransitionUI != null)
                 {
                     gameUIManager.PhaseTransitionUI.gameObject.SetActive(false);
@@ -164,18 +206,30 @@ namespace KillingMahjong.Managers
                 
                 gameUIManager.ClearAllTiles();
                 
-                // 配牌
-                foreach (int id in initialHandIds)
+                KillingMahjong.Managers.BoardStateManager.Instance.SetLocalTurn(true);
+                gameUIManager.SetCurrentPhaseStatus(KillingMahjong.EngineData.RoundStatus.HandSelection);
+                
+                // 配牌 (BoardStateに直接登録してからUIに反映)
+                List<int> handList = new List<int>(initialHandIds);
+                List<int> wallList = new List<int>(initialWallIds);
+                KillingMahjong.Managers.BoardStateManager.Instance.SetLocalState(wallList, handList, new List<int>());
+
+                // UIへの追加 (Hand)
+                foreach (int id in handList)
                 {
                     AddTileToPlayerHand(id);
                 }
 
-                // ツモ牌
-                AddTileToPlayerHand(tsumoTilesSequence[0]);
+                // UIへの追加 (Wall)
+                foreach (int id in wallList)
+                {
+                    AddTileToWall(id);
+                }
                 
-                // チュートリアル中はローカルで完結させるため、GameUIManagerのフェーズとターンを手動で設定
-                KillingMahjong.Managers.BoardStateManager.Instance.SetLocalTurn(true);
-                gameUIManager.SetCurrentPhaseStatus(KillingMahjong.EngineData.RoundStatus.Discard);
+                if (gameUIManager.PhaseController != null)
+                {
+                    gameUIManager.PhaseController.HandlePhaseVisibility(KillingMahjong.EngineData.RoundStatus.HandSelection);
+                }
             }
         }
 
@@ -194,12 +248,44 @@ namespace KillingMahjong.Managers
             gameUIManager.HandUI.AddTileToHand(rt, id);
         }
 
-        private void ShowHighlightOnTile(int tileId)
+        private void AddTileToWall(int id)
         {
-            if (gameUIManager != null && gameUIManager.HandUI != null)
+            if (gameUIManager.TilePrefab == null) return;
+            GameObject obj = Instantiate(gameUIManager.TilePrefab);
+            RectTransform rt = obj.GetComponent<RectTransform>();
+            
+            var visual = obj.GetComponent<TileVisual>();
+            if (visual != null && gameUIManager.TileResourceManager != null)
             {
-                // UIから対象の牌のRectTransformを探す
-                RectTransform targetRt = gameUIManager.HandUI.GetTileSlotRectTransform(tileId);
+                visual.SetTile(id, gameUIManager.TileResourceManager.GetTileSprite(id));
+            }
+            
+            gameUIManager.WallUI.ReturnTileToWall(rt, id);
+
+        }
+
+        private void ShowHighlightOnTile(int tileId, bool isWallTile = false)
+        {
+            if (gameUIManager != null)
+            {
+                RectTransform targetRt = null;
+                if (isWallTile && gameUIManager.WallUI != null)
+                {
+                    foreach (var rt in gameUIManager.WallUI.GetWallSlots())
+                    {
+                        var interaction = rt.GetComponent<KillingMahjong.UI.TileInteraction>();
+                        if (interaction != null && interaction.TileId == tileId)
+                        {
+                            targetRt = rt;
+                            break;
+                        }
+                    }
+                }
+                else if (!isWallTile && gameUIManager.HandUI != null)
+                {
+                    targetRt = gameUIManager.HandUI.GetTileSlotRectTransform(tileId);
+                }
+
                 if (targetRt != null)
                 {
                     if (arrowUI != null) arrowUI.ShowAt(targetRt);
@@ -225,6 +311,41 @@ namespace KillingMahjong.Managers
                 dialogueUI.ShowText("そっちじゃないわ。指定した牌を捨ててね。");
                 return false; // 打牌処理をキャンセル
             }
+        }
+
+        // HandSelection時のフック
+        public bool OnTryMoveTile(int tileId, bool toHand)
+        {
+            if (!isWaitingForHandSelectionMove) return true; // 何でも許可する状態（ただしシナリオ中は常に待機状態）
+            
+            if (tileId == targetMoveTileId && toHand == targetMoveToHand)
+            {
+                isWaitingForHandSelectionMove = false; // 正解
+                return true;
+            }
+            else
+            {
+                dialogueUI.ShowText("そっちじゃないわ。指定した牌を選んでね。");
+                return false;
+            }
+        }
+
+        public bool OnTryCompleteHandSelection()
+        {
+            if (isWaitingForHandSelectionMove)
+            {
+                dialogueUI.ShowText("まずは指定された牌を移動させてね。");
+                return false; // まだ牌の移動が終わっていない
+            }
+
+            if (!isWaitingForHandSelectionComplete)
+            {
+                dialogueUI.ShowText("まだ手牌が完成していないわ。");
+                return false;
+            }
+            
+            isWaitingForHandSelectionComplete = false; // 正解
+            return true;
         }
     }
 }
