@@ -127,22 +127,15 @@ namespace KillingMahjong.Managers
             bgmLowPassFilter.cutoffFrequency = 1000f; // こもった音の周波数
             bgmLowPassFilter.enabled = true;
 
-            // AudioSynth用の専用GameObjectを作成（複数AudioSourceによるOnAudioFilterReadエラー回避のため）
+            // AudioSynth用の専用GameObjectを作成
             if (synth == null) 
             {
                 GameObject synthObj = new GameObject("AudioSynthEngine");
                 synthObj.transform.SetParent(this.transform);
                 
                 synth = synthObj.AddComponent<AudioSynth>();
-                
-                // AudioSynth は AudioSource と一緒に鳴るため、専用のAudioSourceを追加
-                AudioSource synthSource = synthObj.AddComponent<AudioSource>();
-                synthSource.loop = true;
-                synthSource.playOnAwake = true;
-                // 無音のClipを設定して再生状態にする
-                synthSource.clip = AudioClip.Create("SynthDummy", 1, 1, 44100, false);
-                synthSource.Play();
             }
+
 
             bgmSource.loop = true;
             ApplyVolumes();

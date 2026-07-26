@@ -86,7 +86,7 @@ namespace KillingMahjong.UI
 
         private System.Collections.IEnumerator MoveToCenterCoroutine(CanvasGroup cg)
         {
-            yield return new WaitForEndOfFrame();
+            yield return null; // レイアウト更新を1フレーム待つ（WebGL互換）
 
             if (waitContainer != null)
             {

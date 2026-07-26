@@ -12,44 +12,28 @@ namespace KillingMahjong.Managers
         Noise
     }
 
+    /// <summary>
+    /// プロシージャル音声（シンセサイザー）を生成・再生するクラス。
+    /// OnAudioFilterRead を使わず AudioClip を動的に生成して PlayOneShot で再生するため、
+    /// WebGL 環境でも安全に動作する。
+    /// 同一パラメータの音はキャッシュして再利用する。
+    /// </summary>
     public class AudioSynth : MonoBehaviour
     {
-        private class SynthVoice
-        {
-            public bool isActive;
-            public SynthWaveType type1;
-            public SynthWaveType type2;
-            public bool isDualWave;
-            
-            public float startFreq;
-            public float endFreq;
-            public float duration;
-            public float time;
-            public float phase1;
-            public float phase2;
-            
-            public float attackTime = 0.01f; // 10msで立ち上げ
-            public float volume = 1.0f;
-            
-            // Noise用シンプルLPF状態
-            public float noiseValue = 0f;
-            public float noiseLpfAlpha = 0.5f; 
-        }
-
-        private List<SynthVoice> voices = new List<SynthVoice>();
-        private int maxVoices = 16;
         private double sampleRate;
         private System.Random rnd = new System.Random();
+        private AudioSource audioSource;
+
+        // 同一パラメータのAudioClipをキャッシュして再利用する
+        private Dictionary<string, AudioClip> clipCache = new Dictionary<string, AudioClip>();
 
         private void Awake()
         {
             sampleRate = AudioSettings.outputSampleRate;
             if (sampleRate == 0) sampleRate = 48000;
-            
-            for (int i = 0; i < maxVoices; i++)
-            {
-                voices.Add(new SynthVoice { isActive = false });
-            }
+
+            audioSource = GetComponent<AudioSource>();
+            if (audioSource == null) audioSource = gameObject.AddComponent<AudioSource>();
         }
 
         /// <summary>
@@ -65,121 +49,88 @@ namespace KillingMahjong.Managers
         /// </summary>
         public void PlayDual(SynthWaveType type1, SynthWaveType type2, bool isDual, float startFreq, float endFreq, float duration, float vol = 1.0f)
         {
-            SynthVoice voice = GetFreeVoice();
-            if (voice == null) return;
+            if (audioSource == null) return;
 
-            voice.isActive = true;
-            voice.type1 = type1;
-            voice.type2 = type2;
-            voice.isDualWave = isDual;
-            voice.startFreq = startFreq;
-            voice.endFreq = endFreq;
-            voice.duration = duration;
-            voice.time = 0f;
-            voice.phase1 = 0f;
-            voice.phase2 = 0f;
-            voice.volume = vol;
-            voice.noiseValue = 0f;
-        }
+            // キャッシュキー生成（Noiseは毎回異なるのでキャッシュしない）
+            bool useCache = (type1 != SynthWaveType.Noise && (!isDual || type2 != SynthWaveType.Noise));
+            string cacheKey = useCache ? $"{type1}_{type2}_{isDual}_{startFreq:F1}_{endFreq:F1}_{duration:F4}" : null;
 
-        private SynthVoice GetFreeVoice()
-        {
-            foreach (var v in voices)
+            AudioClip clip = null;
+            if (useCache && cacheKey != null && clipCache.TryGetValue(cacheKey, out clip))
             {
-                if (!v.isActive) return v;
+                // キャッシュヒット：既存のClipを再利用
             }
-            // 空きがない場合は一番古いものを強制停止して再利用
-            float maxTime = -1f;
-            SynthVoice oldest = null;
-            foreach (var v in voices)
+            else
             {
-                if (v.time > maxTime)
+                // 新規生成
+                clip = GenerateClip(type1, type2, isDual, startFreq, endFreq, duration);
+                if (clip == null) return;
+
+                if (useCache && cacheKey != null)
                 {
-                    maxTime = v.time;
-                    oldest = v;
+                    clipCache[cacheKey] = clip;
                 }
             }
-            return oldest;
+
+            float masterVol = AudioManager.Instance != null ? AudioManager.Instance.seVolume * AudioManager.Instance.masterVolume : 1f;
+            audioSource.PlayOneShot(clip, vol * masterVol);
         }
 
-        private void OnAudioFilterRead(float[] data, int channels)
+        private AudioClip GenerateClip(SynthWaveType type1, SynthWaveType type2, bool isDual, float startFreq, float endFreq, float duration)
         {
-            int dataLen = data.Length / channels;
+            int sampleCount = Mathf.CeilToInt((float)(sampleRate * duration));
+            if (sampleCount <= 0) return null;
+
+            float[] data = new float[sampleCount];
+            float phase1 = 0f;
+            float phase2 = 0f;
+            float noiseValue = 0f;
+            float noiseLpfAlpha = 0.5f;
+            float attackTime = 0.01f;
             double sampleDur = 1.0 / sampleRate;
 
-            // バッファをゼロクリア
-            for (int i = 0; i < data.Length; i++)
+            for (int i = 0; i < sampleCount; i++)
             {
-                data[i] = 0f;
-            }
+                float time = (float)(i * sampleDur);
+                float tRate = time / duration;
+                float currentFreq = Mathf.Lerp(startFreq, endFreq, tRate);
 
-            foreach (var v in voices)
-            {
-                if (!v.isActive) continue;
-
-                for (int i = 0; i < dataLen; i++)
+                // エンベロープの計算
+                float env = 1.0f;
+                if (time < attackTime)
                 {
-                    if (v.time >= v.duration)
-                    {
-                        v.isActive = false;
-                        break;
-                    }
-
-                    // 周波数の計算（線形補間）
-                    float tRate = v.time / v.duration;
-                    float currentFreq = Mathf.Lerp(v.startFreq, v.endFreq, tRate);
-
-                    // エンベロープの計算
-                    float env = 1.0f;
-                    if (v.time < v.attackTime)
-                    {
-                        // 10msで立ち上げ
-                        env = v.time / v.attackTime;
-                    }
-                    else
-                    {
-                        // 指数減衰：徐々に減衰するが、最後は0に近づくようにする
-                        float decayTime = v.time - v.attackTime;
-                        float totalDecay = v.duration - v.attackTime;
-                        if (totalDecay > 0)
-                        {
-                            env = Mathf.Exp(-5.0f * (decayTime / totalDecay)); // e^-5 でほぼ0になる
-                        }
-                    }
-
-                    // 波形1のサンプリング
-                    float sample1 = GenerateSample(v, v.type1, currentFreq, ref v.phase1, sampleDur);
-                    
-                    float mixedSample = sample1;
-                    if (v.isDualWave)
-                    {
-                        // デュアル波形の場合は合成。
-                        float sample2 = GenerateSample(v, v.type2, currentFreq, ref v.phase2, sampleDur);
-                        mixedSample = (sample1 + sample2) * 0.5f;
-                    }
-
-                    // 音量調整（全体のボリュームを下げる、マスターボリュームにも合わせる）
-                    float masterVol = AudioManager.Instance != null ? AudioManager.Instance.seVolume * AudioManager.Instance.masterVolume : 1f;
-                    float finalSample = mixedSample * env * v.volume * 0.2f * masterVol;
-
-                    // チャンネルに書き込み
-                    for (int c = 0; c < channels; c++)
-                    {
-                        data[i * channels + c] += finalSample;
-                    }
-
-                    v.time += (float)sampleDur;
+                    env = time / attackTime;
                 }
+                else
+                {
+                    float decayTime = time - attackTime;
+                    float totalDecay = duration - attackTime;
+                    if (totalDecay > 0)
+                    {
+                        env = Mathf.Exp(-5.0f * (decayTime / totalDecay));
+                    }
+                }
+
+                // 波形1のサンプリング
+                float sample1 = GenerateSample(type1, currentFreq, ref phase1, sampleDur, ref noiseValue, noiseLpfAlpha);
+
+                float mixedSample = sample1;
+                if (isDual)
+                {
+                    float sample2 = GenerateSample(type2, currentFreq, ref phase2, sampleDur, ref noiseValue, noiseLpfAlpha);
+                    mixedSample = (sample1 + sample2) * 0.5f;
+                }
+
+                // 音量調整（全体のボリュームを下げる）
+                data[i] = Mathf.Clamp(mixedSample * env * 0.2f, -1f, 1f);
             }
-            
-            // 全体のクリッピング防止
-            for (int i = 0; i < data.Length; i++)
-            {
-                data[i] = Mathf.Clamp(data[i], -1f, 1f);
-            }
+
+            AudioClip clip = AudioClip.Create("SynthTone", sampleCount, 1, (int)sampleRate, false);
+            clip.SetData(data, 0);
+            return clip;
         }
 
-        private float GenerateSample(SynthVoice v, SynthWaveType type, float currentFreq, ref float phase, double sampleDur)
+        private float GenerateSample(SynthWaveType type, float currentFreq, ref float phase, double sampleDur, ref float noiseValue, float noiseLpfAlpha)
         {
             float s = 0f;
             switch (type)
@@ -198,8 +149,8 @@ namespace KillingMahjong.Managers
                     break;
                 case SynthWaveType.Noise:
                     float rawNoise = (float)(rnd.NextDouble() * 2.0 - 1.0);
-                    v.noiseValue = v.noiseValue + v.noiseLpfAlpha * (rawNoise - v.noiseValue);
-                    s = v.noiseValue;
+                    noiseValue = noiseValue + noiseLpfAlpha * (rawNoise - noiseValue);
+                    s = noiseValue;
                     break;
             }
 

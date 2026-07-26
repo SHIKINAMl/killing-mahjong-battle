@@ -106,8 +106,8 @@ namespace KillingMahjong.UI
 
         private System.Collections.IEnumerator ScrollToBottom()
         {
-            // UIのレイアウト更新を1フレーム待つ
-            yield return new WaitForEndOfFrame();
+            // UIのレイアウト更新を1フレーム待つ（WebGL互換のため yield return null を使用）
+            yield return null;
             
             if (logContainer != null)
             {
