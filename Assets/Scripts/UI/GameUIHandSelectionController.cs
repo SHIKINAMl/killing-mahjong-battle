@@ -55,7 +55,27 @@ namespace KillingMahjong.UI
             }
             _pendingHandTiles = new List<int>(BoardStateManager.Instance.CurrentHandTiles);
 
-            uiManager.SendActionToServer("is_tenpai", new KillingMahjong.Network.ActionPayload { wall_indexes = _pendingHandIndexes });
+            if (uiManager.IsTutorialMode)
+            {
+                // チュートリアル用のモックデータを直接返す（サーバー通信をスキップ）
+                var mockData = new IsTenpaiData
+                {
+                    waits = new WaitData[] 
+                    {
+                        new WaitData { 
+                            tile = 30, // 西待ち
+                            yaku = new string[] { "チュートリアル満貫" }, 
+                            han = 4, 
+                            mangan_or_more = true 
+                        }
+                    }
+                };
+                HandleIsTenpaiReceived(mockData);
+            }
+            else
+            {
+                uiManager.SendActionToServer("is_tenpai", new KillingMahjong.Network.ActionPayload { wall_indexes = _pendingHandIndexes });
+            }
         }
 
 
@@ -137,7 +157,14 @@ namespace KillingMahjong.UI
                                 BoardStateManager.Instance.SetLocalState(null, null, new System.Collections.Generic.List<int>(waitTileIds));
                                 BoardStateManager.Instance.FireRebuildEvent();
 
-                                uiManager.SendActionToServer("select", new KillingMahjong.Network.ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
+                                if (uiManager.IsTutorialMode && uiManager.TutorialManager != null)
+                                {
+                                    uiManager.TutorialManager.ConfirmHandSelectionComplete();
+                                }
+                                else
+                                {
+                                    uiManager.SendActionToServer("select", new KillingMahjong.Network.ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
+                                }
                             });
                         }
                         else
@@ -145,7 +172,14 @@ namespace KillingMahjong.UI
                             BoardStateManager.Instance.SetLocalState(null, null, new System.Collections.Generic.List<int>(waitTileIds));
                             BoardStateManager.Instance.FireRebuildEvent();
 
-                            uiManager.SendActionToServer("select", new KillingMahjong.Network.ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
+                            if (uiManager.IsTutorialMode && uiManager.TutorialManager != null)
+                            {
+                                uiManager.TutorialManager.ConfirmHandSelectionComplete();
+                            }
+                            else
+                            {
+                                uiManager.SendActionToServer("select", new KillingMahjong.Network.ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
+                            }
                         }
                     },
                     () => {

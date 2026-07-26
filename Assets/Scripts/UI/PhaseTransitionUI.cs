@@ -302,11 +302,13 @@ namespace KillingMahjong.UI
         }
         public void PlayCenterTextAnim(string text, float duration = 1.5f, Action onComplete = null)
         {
+            this.gameObject.SetActive(true);
             StartCoroutine(CenterTextAnimRoutine(text, duration, onComplete));
         }
 
         public IEnumerator PlayCenterTextAnimRoutine(string text, float duration = 1.5f, Action onComplete = null)
         {
+            this.gameObject.SetActive(true);
             yield return StartCoroutine(CenterTextAnimRoutine(text, duration, onComplete));
         }
 

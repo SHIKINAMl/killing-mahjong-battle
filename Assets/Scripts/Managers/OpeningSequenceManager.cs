@@ -57,6 +57,12 @@ namespace KillingMahjong.Managers
 
         private IEnumerator SequenceRoutine()
         {
+            // 開始時（契約書中）はBGMを止めて静かにする
+            if (KillingMahjong.Managers.AudioManager.Instance != null)
+            {
+                KillingMahjong.Managers.AudioManager.Instance.StopBGM();
+            }
+
             // 少し待ってから目を覚ます演出
             yield return new WaitForSeconds(1.0f);
 

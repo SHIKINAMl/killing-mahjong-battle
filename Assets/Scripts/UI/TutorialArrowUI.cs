@@ -59,9 +59,20 @@ namespace KillingMahjong.UI
             gameObject.SetActive(false);
         }
 
+        private Vector2? customOffset = null;
+
         public void ShowAt(RectTransform target)
         {
             targetRectTransform = target;
+            customOffset = null;
+            gameObject.SetActive(true);
+            UpdatePosition();
+        }
+
+        public void ShowAt(RectTransform target, Vector2 overrideOffset)
+        {
+            targetRectTransform = target;
+            customOffset = overrideOffset;
             gameObject.SetActive(true);
             UpdatePosition();
         }
@@ -88,18 +99,18 @@ namespace KillingMahjong.UI
             
             Vector3 topCenterWorld = (corners[1] + corners[2]) * 0.5f;
             
-            // Canvasのローカル空間に変換して配置することで、解像度やカメラの影響を吸収する
-            // 自身にCanvasがあるため、親のCanvasを取得する
+            Vector2 currentOffset = customOffset.HasValue ? customOffset.Value : offset;
+
             Canvas canvas = transform.parent != null ? transform.parent.GetComponentInParent<Canvas>() : null;
             if (canvas != null)
             {
                 RectTransform canvasRect = canvas.GetComponent<RectTransform>();
                 Vector3 localPos = canvasRect.InverseTransformPoint(topCenterWorld);
-                basePosition = (Vector2)localPos + offset;
+                basePosition = (Vector2)localPos + currentOffset;
             }
             else
             {
-                basePosition = (Vector2)topCenterWorld + offset;
+                basePosition = (Vector2)topCenterWorld + currentOffset;
             }
         }
 

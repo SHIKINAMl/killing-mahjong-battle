@@ -13,6 +13,9 @@ namespace KillingMahjong.Managers
         [SerializeField] private AudioSource voiceSource;
         private AudioSource discardSeSource; // 打牌専用のAudioSource
 
+        private AudioLowPassFilter bgmLowPassFilter; // BGMのこもり（重低音）表現用フィルター
+        private Coroutine filterFadeCoroutine;
+
         [Header("Discard Pitch Settings")]
         private float currentDiscardPitch = 1.0f;
         private float lastDiscardTime = 0f;
@@ -27,8 +30,10 @@ namespace KillingMahjong.Managers
         [Range(0f, 1f)] public float voiceVolume = 1f;
 
         [Header("Audio Clips - Setup in Inspector")]
-        [Tooltip("デフォルトのBGM")]
+        [Tooltip("デフォルトのBGM（タイトルや日常会話など）")]
         public AudioClip defaultBgm;
+        [Tooltip("対局中のBGM")]
+        public AudioClip battleBgm;
         [Tooltip("打牌した時のSE")]
         public AudioClip discardSE;
         [Tooltip("牌を選択・移動した時のSE（旧）")]
@@ -78,16 +83,7 @@ namespace KillingMahjong.Managers
             }
         }
 
-        private void InitializeSources()
-        {
-            if (bgmSource == null) bgmSource = gameObject.AddComponent<AudioSource>();
-            if (seSource == null) seSource = gameObject.AddComponent<AudioSource>();
-            if (voiceSource == null) voiceSource = gameObject.AddComponent<AudioSource>();
-            if (discardSeSource == null) discardSeSource = gameObject.AddComponent<AudioSource>();
-
-            bgmSource.loop = true;
-            ApplyVolumes();
-        }
+        private AudioSynth synth; // 追加
 
         public void ApplyVolumes()
         {
@@ -95,6 +91,114 @@ namespace KillingMahjong.Managers
             if (seSource != null) seSource.volume = seVolume * masterVolume;
             if (voiceSource != null) voiceSource.volume = voiceVolume * masterVolume;
             if (discardSeSource != null) discardSeSource.volume = seVolume * masterVolume;
+        }
+
+        private void InitializeSources()
+        {
+            // BGM専用の子オブジェクトを作成（ローパスフィルターがSEやボイスに影響しないように分離）
+            if (bgmSource == null || bgmSource.gameObject == this.gameObject)
+            {
+                GameObject bgmObj = new GameObject("BGM_Source");
+                bgmObj.transform.SetParent(this.transform);
+                AudioSource newBgmSource = bgmObj.AddComponent<AudioSource>();
+                
+                if (bgmSource != null)
+                {
+                    newBgmSource.volume = bgmSource.volume;
+                    newBgmSource.loop = bgmSource.loop;
+                    newBgmSource.playOnAwake = bgmSource.playOnAwake;
+                    newBgmSource.clip = bgmSource.clip;
+                    Destroy(bgmSource); // 元のAudioSourceを削除
+                }
+                bgmSource = newBgmSource;
+            }
+
+            if (seSource == null) seSource = gameObject.AddComponent<AudioSource>();
+            if (voiceSource == null) voiceSource = gameObject.AddComponent<AudioSource>();
+            if (discardSeSource == null) discardSeSource = gameObject.AddComponent<AudioSource>();
+
+            // BGM用のローパスフィルター設定
+            if (bgmLowPassFilter == null)
+            {
+                bgmLowPassFilter = bgmSource.gameObject.GetComponent<AudioLowPassFilter>();
+                if (bgmLowPassFilter == null) bgmLowPassFilter = bgmSource.gameObject.AddComponent<AudioLowPassFilter>();
+            }
+            // 初期状態はフィルターをかけておく（重低音のみ）
+            bgmLowPassFilter.cutoffFrequency = 1000f; // こもった音の周波数
+            bgmLowPassFilter.enabled = true;
+
+            // AudioSynth用の専用GameObjectを作成（複数AudioSourceによるOnAudioFilterReadエラー回避のため）
+            if (synth == null) 
+            {
+                GameObject synthObj = new GameObject("AudioSynthEngine");
+                synthObj.transform.SetParent(this.transform);
+                
+                synth = synthObj.AddComponent<AudioSynth>();
+                
+                // AudioSynth は AudioSource と一緒に鳴るため、専用のAudioSourceを追加
+                AudioSource synthSource = synthObj.AddComponent<AudioSource>();
+                synthSource.loop = true;
+                synthSource.playOnAwake = true;
+                // 無音のClipを設定して再生状態にする
+                synthSource.clip = AudioClip.Create("SynthDummy", 1, 1, 44100, false);
+                synthSource.Play();
+            }
+
+            bgmSource.loop = true;
+            ApplyVolumes();
+        }
+
+        // --- BGM Filter Control ---
+        public void SetBgmFilter(bool isMuffled, float fadeDuration = 1.0f)
+        {
+            if (bgmLowPassFilter == null) return;
+            if (filterFadeCoroutine != null) StopCoroutine(filterFadeCoroutine);
+            
+            float targetFreq = isMuffled ? 1000f : 22000f; // 22000fは事実上のフィルターオフ（全帯域）
+            filterFadeCoroutine = StartCoroutine(FilterFadeRoutine(targetFreq, fadeDuration));
+        }
+
+        private System.Collections.IEnumerator FilterFadeRoutine(float targetFreq, float duration)
+        {
+            float startFreq = bgmLowPassFilter.cutoffFrequency;
+            bgmLowPassFilter.enabled = true; // 確実にオンにする
+            float elapsed = 0f;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                bgmLowPassFilter.cutoffFrequency = Mathf.Lerp(startFreq, targetFreq, elapsed / duration);
+                yield return null;
+            }
+
+            bgmLowPassFilter.cutoffFrequency = targetFreq;
+            // 全帯域まで開いたらフィルター自体をオフにして負荷軽減＆音質劣化防止
+            if (targetFreq >= 22000f)
+            {
+                bgmLowPassFilter.enabled = false;
+            }
+        }
+
+        /// <summary>
+        /// プロシージャル音声（シンセサイザー）を1つの波形で再生する
+        /// </summary>
+        public void PlaySynthSound(SynthWaveType type, float startFreq, float endFreq, float duration, float volume = 1.0f)
+        {
+            if (synth != null)
+            {
+                synth.Play(type, startFreq, endFreq, duration, volume);
+            }
+        }
+
+        /// <summary>
+        /// プロシージャル音声（シンセサイザー）を2つの波形でミックスして再生する
+        /// </summary>
+        public void PlaySynthSoundDual(SynthWaveType type1, SynthWaveType type2, float startFreq, float endFreq, float duration, float volume = 1.0f)
+        {
+            if (synth != null)
+            {
+                synth.PlayDual(type1, type2, true, startFreq, endFreq, duration, volume);
+            }
         }
 
         // --- BGM Control ---

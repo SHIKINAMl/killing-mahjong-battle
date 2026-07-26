@@ -36,15 +36,41 @@ namespace KillingMahjong.UI
 
             if (dialogueText != null)
             {
-                dialogueText.text = text;
                 // セリフの折り返しを有効化
                 dialogueText.enableWordWrapping = true;
-                // 長すぎる場合は省略記号などを出さずに、単に下にはみ出させる（UI枠内に収めるための基本設定）
+                // 長すぎる場合は省略記号などを出さずに、単に下にはみ出させる
                 dialogueText.overflowMode = TextOverflowModes.Overflow;
+                
+                StartCoroutine(TypeMessageRoutine(text));
             }
             
             AddToLog(text);
             dialoguePanel.SetActive(true);
+        }
+
+        private System.Collections.IEnumerator TypeMessageRoutine(string fullText)
+        {
+            dialogueText.text = "";
+            float timePerChar = 0.03f; // 1文字あたりの表示時間
+            float nextSoundTime = 0f;
+
+            for (int i = 0; i < fullText.Length; i++)
+            {
+                dialogueText.text += fullText[i];
+
+                // 音が連続しすぎないように、一定間隔（例: 0.06秒）で鳴らす
+                if (Time.time >= nextSoundTime)
+                {
+                    if (KillingMahjong.Managers.AudioManager.Instance != null)
+                    {
+                        // タップ音のような三角波（Triangle）、330Hz、長さ30ms、ボリューム小さめ
+                        KillingMahjong.Managers.AudioManager.Instance.PlaySynthSound(KillingMahjong.Managers.SynthWaveType.Triangle, 330f, 330f, 0.03f, 0.3f);
+                    }
+                    nextSoundTime = Time.time + 0.06f;
+                }
+
+                yield return new WaitForSeconds(timePerChar);
+            }
         }
 
         public void HideText()

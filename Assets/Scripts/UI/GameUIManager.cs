@@ -263,6 +263,7 @@ namespace KillingMahjong.UI
         public DoraDisplayUI DoraDisplayUI => doraDisplayUI;
         public GameObject RonWaitPanel => ronWaitPanel;
         public OptionUI OptionUI => optionUI;
+        public AgariSelectionUI AgariSelectionUI => agariSelectionUI;
 
         public GameObject TilePrefab => tilePrefab;
         public TileResourceManager TileResourceManager => tileResourceManager;
@@ -273,6 +274,13 @@ namespace KillingMahjong.UI
         {
             currentPhaseStatus = status;
             UpdateTurnIndicatorVisibility();
+            
+            // 通常対局時、打牌フェイズ以外はBGMをくぐもらせる（ローパス）
+            if (!IsTutorialMode && KillingMahjong.Managers.AudioManager.Instance != null)
+            {
+                bool isMuffled = (status != RoundStatus.Discard);
+                KillingMahjong.Managers.AudioManager.Instance.SetBgmFilter(isMuffled, 1.5f);
+            }
         }
 
         public void SetIsTransitioning(bool value)
@@ -375,6 +383,12 @@ namespace KillingMahjong.UI
         {
             if (currentPhaseStatus != RoundStatus.HandSelection) return;
             if (handUI != null && handUI.IsSubmitted) return;
+            
+            if (IsTutorialMode && TutorialManager != null)
+            {
+                TutorialManager.ApplyMockAutoMangan();
+                return;
+            }
             
             if (KillingMahjong.Managers.AudioManager.Instance != null)
                 KillingMahjong.Managers.AudioManager.Instance.PlayPickTileSE();

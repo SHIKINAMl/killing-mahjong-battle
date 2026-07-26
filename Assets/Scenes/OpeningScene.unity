@@ -8240,6 +8240,7 @@ MonoBehaviour:
   bobbingAmount: 20
   bobbingSpeed: 5
   offset: {x: 0, y: 100}
+  arrowSprite: {fileID: 21300000, guid: 4532d57b36905d344a49a213a8fd26a4, type: 3}
 --- !u!114 &399943609
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -8260,7 +8261,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 0}
+  m_Sprite: {fileID: 21300000, guid: 4532d57b36905d344a49a213a8fd26a4, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1

@@ -20,6 +20,9 @@ namespace KillingMahjong.UI
         [Header("Buttons")]
         [SerializeField] private Button decideButton;
         [SerializeField] private Button autoManganButton;
+        
+        public RectTransform AutoManganButtonRect => autoManganButton != null ? autoManganButton.GetComponent<RectTransform>() : null;
+        public RectTransform DecideButtonRect => decideButton != null ? decideButton.GetComponent<RectTransform>() : null;
 
         private int currentSelectionIndex = 0;
 
@@ -207,7 +210,14 @@ namespace KillingMahjong.UI
 
             if (gameUIManager.CurrentPhaseStatus == RoundStatus.HandSelection)
             {
-                gameUIManager.SelectManganHand();
+                if (gameUIManager.IsTutorialMode && gameUIManager.TutorialManager != null)
+                {
+                    gameUIManager.TutorialManager.ApplyMockAutoMangan();
+                }
+                else
+                {
+                    gameUIManager.SelectManganHand();
+                }
             }
         }
         public bool IsPointInHandArea(Vector2 screenPoint)
