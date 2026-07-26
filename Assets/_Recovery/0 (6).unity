@@ -178,8 +178,7 @@ MonoBehaviour:
   increaseBetButton: {fileID: 306529788}
   decreaseBetButton: {fileID: 1042621546}
   confirmButton: {fileID: 2044738477}
-  bettingUnit: 200
-  maxBetRatio: 0.25
+  fullBetButton: {fileID: 0}
   slideDuration: 0.5
   dialogueInterval: 5
 --- !u!114 &1648168
@@ -304,8 +303,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: "\u30AD\u30E3\u30F3\u30BB\u30EB"
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
-  m_sharedMaterial: {fileID: 4198905399033987511, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
+  m_sharedMaterial: {fileID: -7116387803404704443, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -479,8 +478,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: 200
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
-  m_sharedMaterial: {fileID: 4198905399033987511, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
+  m_sharedMaterial: {fileID: -7116387803404704443, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -778,8 +777,20 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.PlayerInfoUI
   hpText: {fileID: 485330929}
+  hpFillImage: {fileID: 0}
+  boostBonusText: {fileID: 0}
+  readyBoxContainer: {fileID: 0}
+  readyCheckImage: {fileID: 0}
+  zoomTarget: {fileID: 0}
+  zoomedLocalPos: {x: 0, y: 50, z: 0}
+  zoomedScale: {x: 1.2, y: 1.2, z: 1}
+  zoomOffsetUI: {x: -1200, y: 100, z: -500}
+  zoomOffsetWorld: {x: -4, y: 1, z: -2}
+  damagePopupPrefab: {fileID: 0}
   characterRenderer: {fileID: 1355573764}
+  faceRenderer: {fileID: 0}
   characterData: {fileID: 11400000, guid: e27b2b7a25ff9eb4fa991e7ba62a93d7, type: 2}
+  timerUI: {fileID: 0}
 --- !u!1 &93588683
 GameObject:
   m_ObjectHideFlags: 0
@@ -841,8 +852,8 @@ MonoBehaviour:
 
 '
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
-  m_sharedMaterial: {fileID: 4198905399033987511, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
+  m_sharedMaterial: {fileID: -7116387803404704443, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -1604,8 +1615,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: New Text
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
-  m_sharedMaterial: {fileID: 4198905399033987511, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
+  m_sharedMaterial: {fileID: -7116387803404704443, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -1869,8 +1880,8 @@ MonoBehaviour:
 
 '
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
-  m_sharedMaterial: {fileID: 4198905399033987511, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
+  m_sharedMaterial: {fileID: -7116387803404704443, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -2076,6 +2087,9 @@ MonoBehaviour:
   doraContainer: {fileID: 2114338490}
   tilePrefab: {fileID: 3470249716998659876, guid: 665b2ddf3e8ccac4aa366c094061ee09, type: 3}
   tileResourceManager: {fileID: 11400000, guid: 26e956d32b644284b942ac0044639558, type: 2}
+  displayMode: 1
+  groundLightObject: {fileID: 0}
+  doraPanelObject: {fileID: 0}
 --- !u!114 &279540429
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2187,8 +2201,8 @@ MonoBehaviour:
   serverUrl: ws://127.0.0.1:8765
   autoConnectOnStart: 1
   sampleMessage: '{"type":"ping"}'
+  authToken: 
   verboseLog: 1
-  gameUIManager: {fileID: 536350430}
 --- !u!114 &300672386
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2752,8 +2766,8 @@ MonoBehaviour:
 
 '
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
-  m_sharedMaterial: {fileID: 4198905399033987511, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
+  m_sharedMaterial: {fileID: -7116387803404704443, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -3170,62 +3184,50 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.Managers.DialogueManager
   parsedDialogues:
   - Condition: "\u76F8\u624B\u304C\u7B2C\uFF11\u5C40\u76EE\u3067\u5148\u884C"
+    Pose: 
     Expression: "\u30AD\u30E1\u9854"
     Dialogue1: "\u307E\u3001\u521D\u56DE\u3050\u3089\u3044\u306F\u30EF\u30BF\u30B7\u304C\u624B\u672C\u3092\u898B\u305B\u3066\u3042\u3052\u307E\u3059\u308F\u306D"
     Dialogue2: 
   - Condition: "\u76F8\u624B\u304C\u7B2C\u4E00\u5C40\u76EE\u3067\u5F8C\u653B"
+    Pose: 
     Expression: "\u30D4\u30FC\u30B9\u7B11\u9854"
     Dialogue1: "\u3069\u3046\u305E\u3001\u7D33\u58EB\u7684\u306A\u4E00\u624B\u3092\u304A\u9858\u3044\u3057\u307E\u3059\u308F"
     Dialogue2: 
   - Condition: "\u76F8\u624B\u304C\u7B2C\u4E00\u5C40\u76EE\u3067\u5408\u308F\u305B(\u6575\u306E\u76F4\u524D\u306E\u6253\u724C\u540C\u3058\u724C\u3092\u6253\u3064\u3053\u3068)\u3092\u884C\u3046"
+    Pose: 
     Expression: "\u30AD\u30E1\u9854"
     Dialogue1: "\u30A2\u30CA\u30BF\u306E\u6253\u724C\u306B\u540C\u3058\u724C\u3092\u5F53\u3066\u308B\u30B3\u30C8\u2026"
     Dialogue2: "\u30B3\u30EC\u304C\u30B2\u30FC\u30E0\u306E\u57FA\u790E\u3002\u300C\u5408\u308F\u305B\u300D\u3002\u899A\u3048\u3066\u304A\u304F\u3088\u3046\u306B\u3002"
   - Condition: "\u81EA\u5206\u304C\u7B2C\u4E00\u5C40\u76EE\u3067\u521D\u3081\u3066\u5408\u308F\u305B\u3092\u884C\u3046"
+    Pose: 
     Expression: "\u30AD\u30E1\u9854"
     Dialogue1: "\u30EF\u30BF\u30B7\u306E\u6253\u724C\u306B\u5168\u304F\u540C\u3058\u724C\u3092\u5F53\u3066\u305F\u2026!"
     Dialogue2: "\u3075\u3045\u3093\u3001\u30A2\u30CA\u30BF\u300C\u5408\u308F\u305B\u300D\u3092\u308F\u304B\u3063\u3066\u308B\u306E\u306D"
   - Condition: "\u521D\u3081\u3066\u9650\u5EA6\u984D\u3044\u3063\u3071\u3044\u307E\u3067\u8CED\u3051\u305F\u6642\u306E\u958B\u5E55\u306E\u30BB\u30EA\u30D5"
+    Pose: 
     Expression: "\u30B3\u30DF\u30AB\u30EB\u9854"
     Dialogue1: "\u3042\u3089\u3042\u3089\u3002\u8840\u6C17\u76DB\u3093\u3060\u30B3\u30C8\u2026"
     Dialogue2: "\u3088\u3063\u307D\u3069\u826F\u3044\u624B\u304C\u63C3\u3063\u305F\u306E\u306D"
   - Condition: "\u521D\u3081\u3066\u6700\u5C0F\u5358\u4F4D\u3067\u8CED\u3051\u305F\u6642\u306E\u958B\u5E55\u306E\u30BB\u30EA\u30D5"
+    Pose: 
     Expression: "\u30D4\u30FC\u30B9\u717D\u308A\u9854"
     Dialogue1: "\u3075\u3075\u3075\u3002\u30A2\u30CA\u30BF\u3001\u8CED\u3051\u4E8B\u306F\u521D\u3081\u3066\uFF1F"
     Dialogue2: "\u5C0F\u9E7F\u306E\u3088\u3046\u306B\u9707\u3048\u3066\u308B\u308F"
   - Condition: "\u521D\u3081\u3066\u6D41\u5C40\u3057\u305F\u6642\u306E\u6700\u5F8C\u306E\u30BB\u30EA\u30D5"
+    Pose: 
     Expression: "\u30AD\u30E1\u9854"
     Dialogue1: "\u6D41\u5C40\u2026\u2026\u30AC\u30DE\u30F3\u6BD4\u3079\u307F\u305F\u3044\u306D\uFF1F"
     Dialogue2: "\u3055\u3042\u3001\u3082\u3046\u4E00\u5EA6\u540C\u3058\u91CF\u3092\u8CED\u3051\u306A\u3055\u3044"
   - Condition: "\u521D\u3081\u3066\u4E00\u4E5D\u5B57\u724C\u3092\u5207\u3063\u305F\u6642\u306E\u30BB\u30EA\u30D5"
+    Pose: 
     Expression: "\u717D\u308A\u9854"
     Dialogue1: "\u307E\u3041\u5B89\u30D1\u30A4\u3088\u306D\u3002\u78BA\u7387\u7684\u306B\u306F"
     Dialogue2: "\u3067\u3082\u30A2\u30BF\u30DE\u30A4\u30A4\u3001\u3060\u3051\u3058\u3083\u3042\u305C\u3093\u305C\u3093\u8DB3\u308A\u306A\u30FC\u3044"
   - Condition: "\u521D\u3081\u30662-8\u306E\u724C\u3092\u3092\u5207\u3063\u305F\u6642\u306E\u30BB\u30EA\u30D5"
+    Pose: 
     Expression: "\u717D\u308A\u9854"
     Dialogue1: "\u30ED\u30F3\u3063\u3066\u8A00\u3044\u305F\u304F\u306A\u308B\u724C\u306D\uFF1F"
     Dialogue2: 
-  expressionMappings:
-  - expressionName: "\u901A\u5E38\u9854"
-    faceSprite: {fileID: 21300000, guid: 34ce26344f6b30c4ca9493273ba73ef6, type: 3}
-  - expressionName: "\u30AD\u30E1\u9854"
-    faceSprite: {fileID: 21300000, guid: ed01d5c76cd18c640a0e353a77ef32f7, type: 3}
-  - expressionName: "\u30AD\u30EC\u7B11\u9854"
-    faceSprite: {fileID: 21300000, guid: b427fb4f7a3f70846a6bb01a3bdcc3e8, type: 3}
-  - expressionName: "\u30B3\u30DF\u30AB\u30EB\u9854"
-    faceSprite: {fileID: 21300000, guid: 64d9fd812afaeb745803d4839fd0d9a5, type: 3}
-  - expressionName: "\u6557\u5317\u9854"
-    faceSprite: {fileID: 21300000, guid: 4bbf18ff9aebc5444a12859ac9133c07, type: 3}
-  - expressionName: "\u7126\u308A\u9854"
-    faceSprite: {fileID: 21300000, guid: d42247f27969b854fb0a278dcbc55233, type: 3}
-  - expressionName: "\u7167\u308C\u9854"
-    faceSprite: {fileID: 21300000, guid: e30a0b737affc8d468ec8ebb90fcd6f3, type: 3}
-  - expressionName: "\u717D\u308A\u9854"
-    faceSprite: {fileID: 21300000, guid: cc90039260e983b48bcf9ebb159d53f7, type: 3}
-  - expressionName: "\u30D4\u30FC\u30B9\u30AD\u30E1\u9854"
-    faceSprite: {fileID: 21300000, guid: 09e2862a4135c044ab24dd19fe1b9f02, type: 3}
-  - expressionName: "\u30D4\u30FC\u30B9\u717D\u308A\u9854"
-    faceSprite: {fileID: 21300000, guid: 6154da50bf2615749ae9c8ddeca0d64c, type: 3}
 --- !u!4 &443790701
 Transform:
   m_ObjectHideFlags: 0
@@ -3362,6 +3364,7 @@ MonoBehaviour:
   turnText: {fileID: 0}
   tileWidth: 23
   tileHeight: 23
+  tileScale: 0.9
   maxPerRow: 6
   isEnemyRiver: 1
   enemyOffsetX: 160
@@ -3530,30 +3533,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5b4e2b0f70f16184bbb7e8104ae4148d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.RonAnimationUI
-  ronPanel: {fileID: 411695502}
-  yakuBackgroundPanel: {fileID: 1376948187}
+  bloodSplatterSprite: {fileID: 0}
+  customFont: {fileID: 0}
   playerRonBubbleContainer: {fileID: 1541971913}
-  cutInContainer: {fileID: 265857586}
-  cutInImage: {fileID: 69400768}
-  cutInDuration: 1.5
-  handDisplayContainer: {fileID: 1107872627}
-  handTilesParent: {fileID: 933502020}
-  ronTileSlot: {fileID: 1219001132}
   tilePrefab: {fileID: 3470249716998659876, guid: 665b2ddf3e8ccac4aa366c094061ee09, type: 3}
   tileResourceManager: {fileID: 11400000, guid: 26e956d32b644284b942ac0044639558, type: 2}
   tileSpacing: 40
   tileScale: 1.5
-  yakuContainer: {fileID: 903232556}
-  yakuTextTemplate: {fileID: 2048484995458514547, guid: a76b1de240cde3f4fbfbee734e235550, type: 3}
-  formulaContainer: {fileID: 245328076}
-  formulaText: {fileID: 530320882}
-  rankContainer: {fileID: 668446460}
-  rankText: {fileID: 758005733}
-  delayAfterHandDisplay: 1
-  delayBetweenYakus: 0.3
-  delayBeforeFormula: 1.5
-  delayBeforeRank: 1.5
-  durationBeforeClosing: 3
 --- !u!114 &484371138
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3676,8 +3662,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: New Text
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
-  m_sharedMaterial: {fileID: 4198905399033987511, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
+  m_sharedMaterial: {fileID: -7116387803404704443, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -3816,8 +3802,8 @@ MonoBehaviour:
 
 '
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
-  m_sharedMaterial: {fileID: 4198905399033987511, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
+  m_sharedMaterial: {fileID: -7116387803404704443, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -3954,8 +3940,8 @@ MonoBehaviour:
 
 '
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
-  m_sharedMaterial: {fileID: 4198905399033987511, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
+  m_sharedMaterial: {fileID: -7116387803404704443, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -4211,8 +4197,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: New Text
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
-  m_sharedMaterial: {fileID: 4198905399033987511, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
+  m_sharedMaterial: {fileID: -7116387803404704443, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -4334,6 +4320,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3cdef3845ef31d0448688b00708d567b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.GameUIManager
+  handSelectionPhaseContainer: {fileID: 0}
+  discardPhaseContainer: {fileID: 0}
+  gameEndContainer: {fileID: 0}
+  agariSelectionUI: {fileID: 0}
   handUI: {fileID: 1950104320}
   wallUI: {fileID: 1170257566}
   riverUI: {fileID: 1511801355}
@@ -4350,13 +4340,17 @@ MonoBehaviour:
   phaseTransitionUI: {fileID: 1075082340}
   confirmationDialogUI: {fileID: 1629195667}
   ronAnimationUI: {fileID: 484371137}
+  victoryUI: {fileID: 0}
   matchmakingUI: {fileID: 644427441}
   doraDisplayUI: {fileID: 279540428}
+  turnIndicatorUI: {fileID: 0}
+  ronWaitPanel: {fileID: 0}
+  optionUI: {fileID: 0}
   victoryEffectPrefab: {fileID: 0}
   damageEffectPrefab: {fileID: 0}
   tilePrefab: {fileID: 3470249716998659876, guid: 665b2ddf3e8ccac4aa366c094061ee09, type: 3}
   tileResourceManager: {fileID: 11400000, guid: 26e956d32b644284b942ac0044639558, type: 2}
-  showEnemyHandDebug: 1
+  enemyWaitUI: {fileID: 0}
 --- !u!114 &536350431
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4385,6 +4379,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.Managers.ReactionController
   reactionDisplayDuration: 0.5
+  minWaitBeforeSkip: 0.5
+  allowClickSkip: 1
   dialogueUI: {fileID: 1566128114}
   enemyInfoUI: {fileID: 603402878}
   playerInfoUI: {fileID: 74800415}
@@ -4447,8 +4443,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: Button
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
-  m_sharedMaterial: {fileID: 4198905399033987511, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
+  m_sharedMaterial: {fileID: -7116387803404704443, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -4687,8 +4683,18 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.EnemyInfoUI
   hpText: {fileID: 252598135}
+  hpFillImage: {fileID: 0}
+  boostBonusText: {fileID: 0}
+  zoomTarget: {fileID: 0}
+  zoomOffsetUI: {x: -1200, y: 100}
+  zoomOffsetWorld: {x: -4, y: 1, z: -2}
   characterRenderer: {fileID: 1355573764}
+  faceRenderer: {fileID: 0}
+  readyBoxContainer: {fileID: 0}
+  readyCheckImage: {fileID: 0}
   characterData: {fileID: 11400000, guid: b54cb2f20fc68214096f52c562338108, type: 2}
+  bounceDuration: 0.5
+  bounceHeight: 0.5
   availableEnemies: []
   enemyPanel: {fileID: 385541335}
 --- !u!1 &604324882
@@ -4746,6 +4752,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.YakuListUI
   yakuListPanel: {fileID: 268140674}
   toggleButton: {fileID: 1020557675}
+  closeButton: {fileID: 0}
+  itemPrefab: {fileID: 0}
+  contentContainer: {fileID: 0}
+  localActiveBoostTexts:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  enemyActiveBoostTexts:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
 --- !u!114 &604324885
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5061,8 +5078,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: VS
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
-  m_sharedMaterial: {fileID: 4198905399033987511, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
+  m_sharedMaterial: {fileID: -7116387803404704443, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -5197,8 +5214,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: 18000
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
-  m_sharedMaterial: {fileID: 4198905399033987511, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
+  m_sharedMaterial: {fileID: -7116387803404704443, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -5680,8 +5697,8 @@ MonoBehaviour:
 
 '
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
-  m_sharedMaterial: {fileID: 4198905399033987511, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
+  m_sharedMaterial: {fileID: -7116387803404704443, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -6442,7 +6459,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.CommentaryFlowUI
   flowSpeed: 300
-  commentLifetime: 8
   maxLanes: 5
   laneHeight: 50
   minCommentInterval: 0.5
@@ -6528,6 +6544,9 @@ MonoBehaviour:
   hiddenPosition: {x: -580, y: 0}
   showPosition: {x: -285, y: 0}
   animationDuration: 0.5
+  normalSprite: {fileID: 0}
+  pressedSprite: {fileID: 0}
+  buttonPressDuration: 0.2
   itemPrefab: {fileID: 8177643071055747811, guid: fe43f1416b233294e90ca9ba84686cac, type: 3}
   contentContainer: {fileID: 1508650623}
   closeButton: {fileID: 1660999213}
@@ -6536,16 +6555,8 @@ MonoBehaviour:
   itemOffsetY: 20
   itemHeight: 60
   itemSpacing: 5
-  mockAbilities:
-  - name: 1
-    cost: -600
-    description: testtttttttttttttttttttagdsgsagsaaaaaaaaaaaaaaaadsgdghasgsbsasnyfdsbgrew
-  - name: 2
-    cost: -400
-    description: aj jio jsbpjirasvsa
-  - name: 3
-    cost: -100
-    description: sdkjlgrjomislahisao; aegrs tenhdts
+  tooltipPanel: {fileID: 0}
+  tooltipText: {fileID: 0}
 --- !u!114 &953889644
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6649,8 +6660,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: Waiting...
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
-  m_sharedMaterial: {fileID: 4198905399033987511, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
+  m_sharedMaterial: {fileID: -7116387803404704443, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -6865,6 +6876,7 @@ MonoBehaviour:
   tileResourceManager: {fileID: 0}
   tileSpacingX: 50
   tileSpacingY: 70
+  animationSpeed: 15
 --- !u!1 &1020557673
 GameObject:
   m_ObjectHideFlags: 0
@@ -7244,6 +7256,8 @@ MonoBehaviour:
   fullScreenCheckerImage: {fileID: 1718307269}
   horizontalLineRt: {fileID: 1406324084}
   centerText: {fileID: 382878341}
+  loadingText: {fileID: 0}
+  promptText: {fileID: 0}
   hpBetContainer: {fileID: 620691446}
   enemyBetObj: {fileID: 1535654846}
   playerBetObj: {fileID: 861118039}
@@ -7253,10 +7267,10 @@ MonoBehaviour:
   textWaitDuration: 1
   checkerFadeDuration: 1
   hpDeductionDuration: 1.5
-  loadingTextPosition: {x: -235, y: 50}
-  loadingTextColor: {r: 1, g: 1, b: 1, a: 1}
   bloodSplatterSprite: {fileID: 21300000, guid: ad1bb6e518a432f45944c8b8506f56c7, type: 3}
   dimmerColor: {r: 0, g: 0, b: 0, a: 0.7}
+  playerCutinSprite: {fileID: 0}
+  playerTroubledSprite: {fileID: 0}
 --- !u!114 &1075082341
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -7879,6 +7893,7 @@ MonoBehaviour:
   gapIntervalX: 35
   rowIntervalY: 40
   maxWidthX: 500
+  animationSpeed: 15
 --- !u!114 &1170257567
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -8435,8 +8450,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: New Text
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
-  m_sharedMaterial: {fileID: 4198905399033987511, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
+  m_sharedMaterial: {fileID: -7116387803404704443, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -8787,8 +8802,8 @@ MonoBehaviour:
 
 '
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
-  m_sharedMaterial: {fileID: 4198905399033987511, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
+  m_sharedMaterial: {fileID: -7116387803404704443, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -8968,8 +8983,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.ClickableCharacter
   enemyInfoUI: {fileID: 603402878}
-  clickAreaSize: {x: 7, y: 6}
-  clickAreaOffset: {x: 0, y: 3}
+  clickAreas: []
   showDebugArea: 1
   debugAreaColor: {r: 0, g: 1, b: 0, a: 0.25}
 --- !u!1 &1376948187
@@ -9273,8 +9287,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: New Text
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
-  m_sharedMaterial: {fileID: 4198905399033987511, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
+  m_sharedMaterial: {fileID: -7116387803404704443, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -9409,8 +9423,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: 72000
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
-  m_sharedMaterial: {fileID: 4198905399033987511, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
+  m_sharedMaterial: {fileID: -7116387803404704443, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -9638,8 +9652,8 @@ MonoBehaviour:
 
 '
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
-  m_sharedMaterial: {fileID: 4198905399033987511, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
+  m_sharedMaterial: {fileID: -7116387803404704443, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -9809,6 +9823,7 @@ MonoBehaviour:
   turnText: {fileID: 1630428527}
   tileWidth: 25
   tileHeight: 23
+  tileScale: 0.9
   maxPerRow: 6
   isEnemyRiver: 0
   enemyOffsetX: 350
@@ -9935,8 +9950,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: New Text
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
-  m_sharedMaterial: {fileID: 4198905399033987511, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
+  m_sharedMaterial: {fileID: -7116387803404704443, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -10226,8 +10241,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: "\u30ED\u30F3\uFF01"
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
-  m_sharedMaterial: {fileID: 4198905399033987511, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
+  m_sharedMaterial: {fileID: -7116387803404704443, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -10520,6 +10535,11 @@ MonoBehaviour:
   messageText: {fileID: 1424438300}
   okButton: {fileID: 1335786870}
   noButton: {fileID: 1121907429}
+  explodeSound: {fileID: 0}
+  coinSound: {fileID: 0}
+  waitTilesContainer: {fileID: 0}
+  tilePrefab: {fileID: 0}
+  tileResourceManager: {fileID: 0}
 --- !u!1 &1630428525
 GameObject:
   m_ObjectHideFlags: 0
@@ -10579,8 +10599,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: New Text
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
-  m_sharedMaterial: {fileID: 4198905399033987511, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
+  m_sharedMaterial: {fileID: -7116387803404704443, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -10994,8 +11014,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: Button
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
-  m_sharedMaterial: {fileID: 4198905399033987511, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
+  m_sharedMaterial: {fileID: -7116387803404704443, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -11275,8 +11295,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: New Text
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
-  m_sharedMaterial: {fileID: 4198905399033987511, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
+  m_sharedMaterial: {fileID: -7116387803404704443, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -11488,8 +11508,8 @@ MonoBehaviour:
 
 '
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
-  m_sharedMaterial: {fileID: 4198905399033987511, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
+  m_sharedMaterial: {fileID: -7116387803404704443, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -11705,8 +11725,8 @@ MonoBehaviour:
 
 '
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
-  m_sharedMaterial: {fileID: 4198905399033987511, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
+  m_sharedMaterial: {fileID: -7116387803404704443, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -11973,8 +11993,8 @@ MonoBehaviour:
 
 '
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
-  m_sharedMaterial: {fileID: 4198905399033987511, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
+  m_sharedMaterial: {fileID: -7116387803404704443, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -12220,8 +12240,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: OK
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
-  m_sharedMaterial: {fileID: 4198905399033987511, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
+  m_sharedMaterial: {fileID: -7116387803404704443, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -12417,6 +12437,7 @@ MonoBehaviour:
   tileResourceManager: {fileID: 11400000, guid: 26e956d32b644284b942ac0044639558, type: 2}
   tileSpacingX: 25
   tileSpacingY: 35
+  animationSpeed: 15
   handAreaRect: {fileID: 231615393}
   cursor: {fileID: 1765297969}
   decideButton: {fileID: 519346419}

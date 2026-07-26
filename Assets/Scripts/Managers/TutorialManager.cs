@@ -130,15 +130,27 @@ namespace KillingMahjong.Managers
             if (arrowUI != null) arrowUI.Hide();
 
             // 対局（打牌）フェイズに移行してUIレイアウトを更新（手牌を下へ、不要なボタンを消す等）
-            gameUIManager.SetCurrentPhaseStatus(KillingMahjong.EngineData.RoundStatus.Discard);
+            if (gameUIManager.PhaseController != null)
+            {
+                gameUIManager.PhaseController.UpdatePhaseStatus(KillingMahjong.EngineData.RoundStatus.Discard);
+            }
+            else
+            {
+                gameUIManager.SetCurrentPhaseStatus(KillingMahjong.EngineData.RoundStatus.Discard);
+            }
+            
             yield return new WaitForSeconds(0.5f); // レイアウト更新と演出を少し待つ
 
-            yield return StartCoroutine(ShowDialogues("いよいよ対局スタートよ。"));
+            yield return StartCoroutine(ShowDialogues(
+                "いよいよ対局スタートよ。",
+                "あなたの番ね。まずは好きな牌をタップして捨ててみて。"
+            ));
             
             yield return new WaitForSeconds(0.5f);
 
-            // 対局進行モック
-            yield return StartCoroutine(MockBattleRoutine(5, "プレイヤーのロン"));
+            // 対局進行モック（敵が捨てる牌のリスト。5打目にアタリ牌の13=四筒を捨てる）
+            List<int> r1Discards = new List<int>() { 31, 32, 33, 34, 13 };
+            yield return StartCoroutine(MockBattleRoutine(r1Discards, "プレイヤーのロン"));
 
             yield return StartCoroutine(ShowDialogues(
                 "ロン！あなたの上がりね。",
@@ -174,8 +186,9 @@ namespace KillingMahjong.Managers
             gameUIManager.SetCurrentPhaseStatus(KillingMahjong.EngineData.RoundStatus.Discard);
             yield return new WaitForSeconds(1.0f);
 
-            // 5手で強制流局
-            yield return StartCoroutine(MockBattleRoutine(5, "流局"));
+            // 対局進行モック（流局なのでアタリ牌なし）
+            List<int> r2Discards = new List<int>() { 31, 32, 33, 34, 31 };
+            yield return StartCoroutine(MockBattleRoutine(r2Discards, "流局"));
 
             yield return StartCoroutine(ShowDialogues(
                 "流局よ。誰も上がらずに山牌がなくなると流局になるわ。",
@@ -218,8 +231,9 @@ namespace KillingMahjong.Managers
 
             // 特定の牌をブロックするなどのフラグ設定をここで行う（後で追加）
 
-            // 5手で敵がロン上がり（プレイヤーの放銃）
-            yield return StartCoroutine(MockBattleRoutine(5, "敵のロン"));
+            // 対局進行モック（敵のロン）
+            List<int> r3Discards = new List<int>() { 31, 32, 33, 34, 13 };
+            yield return StartCoroutine(MockBattleRoutine(r3Discards, "敵のロン"));
 
             yield return StartCoroutine(ShowDialogues(
                 "ロン！ふふっ、騙されたわね！",
@@ -264,8 +278,9 @@ namespace KillingMahjong.Managers
             gameUIManager.SetCurrentPhaseStatus(KillingMahjong.EngineData.RoundStatus.Discard);
             yield return new WaitForSeconds(1.0f);
 
-            // 5手で敵が放銃
-            yield return StartCoroutine(MockBattleRoutine(5, "プレイヤーのロン"));
+            // 対局進行モック（プレイヤーのロン）
+            List<int> r4Discards = new List<int>() { 31, 32, 33, 34, 13 };
+            yield return StartCoroutine(MockBattleRoutine(r4Discards, "プレイヤーのロン"));
 
             yield return StartCoroutine(ShowDialogues(
                 "きゃあああ！やられたわ……！"
@@ -274,10 +289,13 @@ namespace KillingMahjong.Managers
             yield return new WaitForSeconds(2.0f);
         }
 
-        // 共通のモック対局進行（N手進めてから指定の結末へ）
-        private IEnumerator MockBattleRoutine(int targetTurns, string resultType)
+        // 共通のモック対局進行（指定の牌を順番に捨て、結末へ）
+        private IEnumerator MockBattleRoutine(List<int> enemyDiscards, string resultType)
         {
             currentTurnCount = 0;
+            int targetTurns = enemyDiscards.Count;
+            int winningTile = 13; // チュートリアル用の仮のアタリ牌(四筒)
+
             while (currentTurnCount < targetTurns)
             {
                 KillingMahjong.Managers.BoardStateManager.Instance.SetLocalTurn(true);
@@ -290,16 +308,18 @@ namespace KillingMahjong.Managers
                 // 敵の打牌
                 if (gameUIManager != null && gameUIManager.EnemyRiverUI != null)
                 {
-                    int enemyDiscard = 10 + currentTurnCount; // 適当な牌
-
-                    // プレイヤーのロンの場合、最後のターンでアタリ牌（ここでは仮に1=一萬とする）を捨てる
-                    if (currentTurnCount == targetTurns - 1 && resultType == "プレイヤーのロン")
-                    {
-                        enemyDiscard = 1;
-                    }
+                    int enemyDiscard = enemyDiscards[currentTurnCount];
 
                     gameUIManager.EnemyRiverUI.AddTile(enemyDiscard);
                     if (AudioManager.Instance != null) AudioManager.Instance.PlayDiscardSE();
+                    yield return new WaitForSeconds(0.5f);
+
+                    // 自動ロン判定：敵がアタリ牌を捨てた場合、自動でロン選択UIを出す
+                    if (enemyDiscard == winningTile && resultType == "プレイヤーのロン")
+                    {
+                        yield return StartCoroutine(SimulateAgariFlow(enemyDiscard));
+                        yield break; // 進行を終了
+                    }
                 }
                 yield return new WaitForSeconds(0.8f);
 
@@ -307,52 +327,7 @@ namespace KillingMahjong.Managers
             }
 
             // 結末に応じた処理
-            if (resultType == "プレイヤーのロン")
-            {
-                gameUIManager.SetCurrentPhaseStatus(KillingMahjong.EngineData.RoundStatus.Agari);
-                
-                if (gameUIManager.AgariSelectionUI != null)
-                {
-                    bool agariSelected = false;
-                    gameUIManager.AgariSelectionUI.Show(
-                        () => { agariSelected = true; }, 
-                        () => { agariSelected = true; }
-                    );
-                    
-                    // ロンボタンが押されるのを待つ
-                    yield return new WaitUntil(() => agariSelected);
-                }
-                else
-                {
-                    yield return new WaitForSeconds(2.0f);
-                }
-                
-                if (gameUIManager.RonAnimationUI != null)
-                {
-                    List<int> dummyHand = new List<int> { 2, 3, 4, 5, 6, 7, 8, 8, 9, 9, 9, 31, 31 };
-                    List<string> dummyYaku = new List<string> { "満貫" };
-                    bool isPlayerWin = (resultType == "プレイヤーのロン");
-                    
-                    gameUIManager.RonAnimationUI.PlayRonSequence(
-                        dummyHand, 
-                        1, 
-                        dummyYaku, 
-                        "満貫", 
-                        "満貫", 
-                        8000, 
-                        isPlayerWin, 
-                        gameUIManager.PlayerInfoUI, 
-                        gameUIManager.EnemyInfoUI, 
-                        20000, 
-                        isPlayerWin ? 28000 : 12000, 
-                        20000, 
-                        isPlayerWin ? 12000 : 28000, 
-                        () => { }
-                    );
-                }
-                yield return new WaitForSeconds(4.0f);
-            }
-            else if (resultType == "流局")
+            if (resultType == "流局")
             {
                 gameUIManager.SetCurrentPhaseStatus(KillingMahjong.EngineData.RoundStatus.Draw);
                 yield return new WaitForSeconds(2.0f);
@@ -366,11 +341,11 @@ namespace KillingMahjong.Managers
                 {
                     List<int> dummyHand = new List<int> { 2, 3, 4, 5, 6, 7, 8, 8, 9, 9, 9, 31, 31 };
                     List<string> dummyYaku = new List<string> { "満貫" };
-                    bool isPlayerWin = (resultType == "プレイヤーのロン");
+                    bool isPlayerWin = false;
                     
                     gameUIManager.RonAnimationUI.PlayRonSequence(
                         dummyHand, 
-                        1, 
+                        13, 
                         dummyYaku, 
                         "満貫", 
                         "満貫", 
@@ -379,13 +354,51 @@ namespace KillingMahjong.Managers
                         gameUIManager.PlayerInfoUI, 
                         gameUIManager.EnemyInfoUI, 
                         20000, 
-                        isPlayerWin ? 28000 : 12000, 
+                        12000, 
                         20000, 
-                        isPlayerWin ? 12000 : 28000, 
+                        28000, 
                         () => { }
                     );
                 }
                 yield return new WaitForSeconds(4.0f); // 演出の分待機する
+            }
+        }
+
+        private IEnumerator SimulateAgariFlow(int ronTile)
+        {
+            gameUIManager.SetCurrentPhaseStatus(KillingMahjong.EngineData.RoundStatus.Agari);
+            
+            if (gameUIManager.AgariSelectionUI != null)
+            {
+                bool agariSelected = false;
+                gameUIManager.AgariSelectionUI.Show(
+                    () => { agariSelected = true; }
+                );
+                
+                // ロンボタンが押されるのを待つ
+                yield return new WaitUntil(() => agariSelected);
+                
+                if (gameUIManager.RonWaitPanel != null) gameUIManager.RonWaitPanel.SetActive(false);
+
+                // フル演出の再生
+                if (gameUIManager.RonAnimationUI != null)
+                {
+                    bool animDone = false;
+                    List<int> dummyHand = new List<int>() { 1,2,3, 4,5,6, 7,8,9, 10,11,12, 13, 13 };
+                    List<string> dummyYaku = new List<string>() { "清一色", "平和", "ドラ3" };
+                    
+                    gameUIManager.RonAnimationUI.PlayRonSequence(
+                        dummyHand, ronTile, dummyYaku, "9飜", "倍満", 16000, true,
+                        gameUIManager.PlayerInfoUI, gameUIManager.EnemyInfoUI,
+                        20000, 20000, 20000, 4000,
+                        () => { animDone = true; }
+                    );
+                    yield return new WaitUntil(() => animDone);
+                }
+            }
+            else
+            {
+                yield return new WaitForSeconds(2.0f);
             }
         }
 

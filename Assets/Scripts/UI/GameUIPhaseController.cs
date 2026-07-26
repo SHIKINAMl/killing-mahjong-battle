@@ -135,6 +135,11 @@ namespace KillingMahjong.UI
                 
                 SetMatchUIVisibility(true);
                 uiManager.SetCurrentPhaseStatus(RoundStatus.None);
+
+                if (AudioManager.Instance != null)
+                {
+                    AudioManager.Instance.PlayBGM(AudioManager.Instance.battleBgm);
+                }
             }
             catch (System.Exception ex)
             {
@@ -158,6 +163,11 @@ namespace KillingMahjong.UI
 
             uiManager.SetCurrentPhaseStatus(newStatus);
             if (PhaseManager.Instance != null) PhaseManager.Instance.ChangeRoundStatus(newStatus);
+
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.SetBgmFilter(newStatus != RoundStatus.Discard);
+            }
 
             if (newStatus == RoundStatus.HandSelection && uiManager.HandUI != null)
             {
