@@ -703,8 +703,11 @@ namespace KillingMahjong.UI
                 else if (liq.multiplier >= 2.0f) actualRank = "倍満";
                 else if (liq.multiplier >= 1.5f) actualRank = "跳満";
                 else actualRank = "満貫";
+
+                // 自分の和了なので、自己ベスト打点として通算戦績に記録する
+                KillingMahjong.Core.PlayerStatsManager.RecordScore(liq.winner_gain);
             }
-            
+
             int ronTile = BoardStateManager.Instance.LastDiscardedTileId >= 0
                 ? BoardStateManager.Instance.LastDiscardedTileId
                 : (winningHand.Count > 0 ? winningHand[winningHand.Count - 1] : 0);

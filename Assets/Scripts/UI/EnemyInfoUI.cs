@@ -36,6 +36,10 @@ namespace KillingMahjong.UI
         [Header("Enemy Panel Settings")]
         [SerializeField] private GameObject enemyPanel; // 敵パネルの参照
 
+        [Header("Prefabs")]
+        [Tooltip("HP増減のポップアップ。未設定でも実行時に簡易版が生成される。")]
+        [SerializeField] private GameObject damagePopupPrefab;
+
         private Sprite normalSprite;
         private Sprite discardSprite;
         private Sprite normalFaceSprite; // 通常時の顔画像
@@ -292,13 +296,37 @@ namespace KillingMahjong.UI
 
         public void SetHP(int hp)
         {
+            // 初回セットアップ（0 → 初期HP）ではポップアップを出さない。PlayerInfoUI と同じ判定。
+            bool isFirstSetup = (currentHp == 0 && hp > 0);
+            int diff = hp - currentHp;
+
             currentHp = hp;
             if (hpText != null) hpText.text = currentHp.ToString();
-            
+
             // 人型メーターの割合を更新する
             if (hpFillImage != null)
             {
                 hpFillImage.fillAmount = (float)hp / maxHp;
+            }
+
+            // 与えたダメージが敵側に一切表示されず、手応えが片側だけだったため追加。
+            if (!isFirstSetup && diff != 0)
+            {
+                HpPopup.Report(diff, currentHp, maxHp);
+            }
+        }
+
+        /// <summary>ロン演出中の毎フレーム更新をまとめて1回の表示にする（HpPopupPresenter 側で処理）。</summary>
+        private HpPopupPresenter hpPopup;
+        private HpPopupPresenter HpPopup
+        {
+            get
+            {
+                if (hpPopup == null)
+                {
+                    hpPopup = new HpPopupPresenter(this, transform, damagePopupPrefab, new Vector2(0, 50f), isLocalPlayer: false);
+                }
+                return hpPopup;
             }
         }
 

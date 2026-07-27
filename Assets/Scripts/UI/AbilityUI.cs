@@ -101,6 +101,17 @@ namespace KillingMahjong.UI
             HideTooltip();
         }
 
+        /// <summary>現在の所持HP（＝スキルの支払い原資）。BoardStateManager が無い場合は 0 扱い。</summary>
+        private int CurrentLocalHp =>
+            KillingMahjong.Managers.BoardStateManager.Instance != null
+                ? KillingMahjong.Managers.BoardStateManager.Instance.LocalPlayerHp
+                : 0;
+
+        private int CurrentSpecialVictoryCount =>
+            KillingMahjong.Managers.BoardStateManager.Instance != null
+                ? KillingMahjong.Managers.BoardStateManager.Instance.LocalPlayerSpecialVictoryCount
+                : 0;
+
         private void PopulateList()
         {
             if (itemPrefab == null || contentContainer == null) return;
@@ -109,21 +120,19 @@ namespace KillingMahjong.UI
             foreach(Transform child in contentContainer) Destroy(child.gameObject);
             instantiatedItems.Clear();
 
-            int svCount = 0;
-            if (KillingMahjong.Managers.BoardStateManager.Instance != null)
-            {
-                svCount = KillingMahjong.Managers.BoardStateManager.Instance.LocalPlayerSpecialVictoryCount;
-            }
+            int svCount = CurrentSpecialVictoryCount;
+            int currentHp = CurrentLocalHp;
 
             float currentY = itemOffsetY;
             for (int i = 0; i < realAbilities.Count; i++)
             {
                 var data = realAbilities[i];
                 int currentCost = GameRules.GetSkillCost(data.skillType, svCount);
-                
+                bool affordable = currentHp >= currentCost;
+
                 var itemObj = Instantiate(itemPrefab, contentContainer);
-                itemObj.Setup(this, i, data.name, currentCost, data.description);
-                
+                itemObj.Setup(this, i, data.name, currentCost, data.description, affordable);
+
                 // Manual Layout
                 RectTransform rt = itemObj.GetComponent<RectTransform>();
                 if (rt != null)
@@ -269,9 +278,34 @@ namespace KillingMahjong.UI
                     var uiMgr = FindFirstObjectByType<GameUIManager>();
                     if (uiMgr != null)
                     {
+                        // チュートリアルはサーバーに接続しないため、発動要求を送っても無反応になる。
+                        // 制約「チュートリアル中はプレイヤーの能力使用は不可」に合わせて明示的に弾く。
+                        if (uiMgr.IsTutorialMode)
+                        {
+                            if (uiMgr.DialogueUI != null)
+                                uiMgr.DialogueUI.ShowText("「今は見てるだけでいいわ。能力の使い方は後で教えてあげる」");
+                            DeselectAll();
+                            ToggleAbilityWindow(false);
+                            return;
+                        }
+
                         if (uiMgr.CurrentPhaseStatus != KillingMahjong.EngineData.RoundStatus.HandSelection)
                         {
                             if (uiMgr.DialogueUI != null) uiMgr.DialogueUI.ShowText("「今はスキルを使えないわ！」");
+                            DeselectAll();
+                            ToggleAbilityWindow(false);
+                            return;
+                        }
+
+                        // HP不足のスキルは押せてしまうと無反応で終わるため、理由を示して弾く
+                        if (!currentSelection.IsAffordable)
+                        {
+                            int requiredCost = GameRules.GetSkillCost(data.skillType, CurrentSpecialVictoryCount);
+                            if (uiMgr.DialogueUI != null)
+                            {
+                                uiMgr.DialogueUI.ShowText(
+                                    $"「{data.name}には{requiredCost}必要よ。今のあなたには{CurrentLocalHp}しかないわ」");
+                            }
                             DeselectAll();
                             ToggleAbilityWindow(false);
                             return;

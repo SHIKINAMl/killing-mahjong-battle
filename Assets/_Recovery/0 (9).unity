@@ -5590,7 +5590,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 273681792}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
   m_Name: 
@@ -13169,7 +13169,6 @@ MonoBehaviour:
   bounceHeight: 0.5
   availableEnemies: []
   enemyPanel: {fileID: 385541335}
-  damagePopupPrefab: {fileID: 0}
 --- !u!1 &604324882
 GameObject:
   m_ObjectHideFlags: 0
@@ -32993,7 +32992,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1516066766
 RectTransform:
   m_ObjectHideFlags: 0
@@ -43182,9 +43181,6 @@ MonoBehaviour:
   dialogueText: {fileID: 711026256}
   titleButton: {fileID: 229336175}
   canvasGroup: {fileID: 1987867889}
-  summaryText: {fileID: 0}
-  rematchButton: {fileID: 0}
-  autoRematchButtonOffset: {x: 0, y: 110}
   configs:
   - victoryType: 0
     image: {fileID: 0}

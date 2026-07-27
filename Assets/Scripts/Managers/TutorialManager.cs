@@ -3,30 +3,40 @@ using UnityEngine.SceneManagement;
 using System.Collections;
 using System.Collections.Generic;
 using KillingMahjong.UI;
-using KillingMahjong.Managers;
+using KillingMahjong.EngineData;
 
 namespace KillingMahjong.Managers
 {
+    /// <summary>
+    /// チュートリアルの進行管理。
+    ///
+    /// サーバーには一切接続せず、Unity 側だけで完結する。
+    /// 局ごとの内容（配牌・敵の打牌・結末・セリフ・賭け金）は TutorialScenario に外出しし、
+    /// このクラスは「台本を順に再生する」ことに専念する。
+    ///
+    /// 外部から呼ばれる API（GameUIManager / HandUI / GameUIHandSelectionController /
+    /// OpeningSequenceManager が使用）は従来と同じシグネチャを維持している:
+    ///   StartTutorial / OnTryMoveTile / OnTryCompleteHandSelection /
+    ///   ConfirmHandSelectionComplete / OnTryDiscardTile / ApplyMockAutoMangan
+    /// </summary>
     public class TutorialManager : MonoBehaviour
     {
         [Header("References")]
         [SerializeField] private GameUIManager gameUIManager;
         [SerializeField] private DialogueUI dialogueUI;
         [SerializeField] private TutorialArrowUI arrowUI;
-
         [SerializeField] private TutorialMaskUI maskUI;
 
-        [Header("Tutorial Data")]
-        // 固定の配牌（ID）
-        [SerializeField] private List<int> initialHandIds = new List<int>() { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13 };
-        
-        // チュートリアル用の山牌 (HandSelection用)
-        [SerializeField] private List<int> initialWallIds = new List<int>() { 30, 31, 32 };
-        
-        // チュートリアルのステップごとのツモ牌と、捨てるべき牌のシーケンス
-        [SerializeField] private List<int> tsumoTilesSequence = new List<int>() { 14, 15 };
-        [SerializeField] private List<int> targetDiscardTilesSequence = new List<int>() { 30, 31 };
+        [Header("Scenario")]
+        [Tooltip("未設定の場合は TutorialScenario.BuildDefault() の内容が使われる")]
+        [SerializeField] private TutorialScenario scenario;
 
+        [Header("Timing")]
+        [SerializeField] private float interruptMessageDuration = 2.0f;
+        [SerializeField] private float discardInterval = 0.5f;
+        [SerializeField] private float phaseSettleTime = 0.5f;
+
+        /// <summary>旧実装との互換のために残している局の識別子。</summary>
         public enum TutorialRound
         {
             Round1_BasicRon,
@@ -38,480 +48,693 @@ namespace KillingMahjong.Managers
 
         private TutorialRound currentRound;
         public TutorialRound CurrentRound => currentRound;
-        
-        // --- チュートリアル用の判定フラグ ---
-        public bool HasClickedAutoMangan { get; set; } = false;
-        
-        private bool isWaitingForDiscard = false;
-        private int currentTurnCount = 0;
-        private bool isWaitingForHandSelectionComplete = false;
+
+        // --- 進行状態 ---
+        private TutorialScenario _scenario;
+        private TutorialRoundData _round;
+
+        private int _playerHp;
+        private int _enemyHp;
+
+        private bool _boardVisible = true;
+        private bool _isWaitingForDiscard;
+        private bool _isWaitingForHandSelectionComplete;
+        private bool _hasRejectedFirstConfirm;
+        private int _lastPlayerDiscardBaseId = -1;
+
+        private Coroutine _scenarioRoutine;
+        private Coroutine _interruptRoutine;
+        private bool _aborted;
+
+        /// <summary>オート満貫ボタンが押されたか。局ごとにリセットされる。</summary>
+        public bool HasClickedAutoMangan { get; set; }
+
+        /// <summary>
+        /// 現在の局で打牌が禁止されている牌種（-1 でなし）。
+        /// HandUI 側でグレーアウト表示するために公開している。
+        /// </summary>
+        public int LockedTileBaseId => _round != null ? _round.lockedTileBaseId : -1;
+
+        /// <summary>チュートリアル中、プレイヤーは能力を使えない（制約）。</summary>
+        public bool IsAbilityUsableByPlayer => false;
+
+        /// <summary>
+        /// 現在の局の待ち牌（実牌ID）。オート満貫を押す前は空を返す。
+        /// サーバーに繋がないチュートリアルでは聴牌判定を持たないため、
+        /// 「台本の手牌を組んだときだけ聴牌」として扱う。
+        /// </summary>
+        public List<int> GetCurrentWaitTileIds()
+        {
+            if (_round == null || !HasClickedAutoMangan) return new List<int>();
+            return TutorialTiles.EncodeAll(_round.waitBaseIds, _round.doraBaseId);
+        }
+
+        /// <summary>台本の手牌の役名（聴牌チェックのモック応答用）。</summary>
+        public List<string> CurrentHandYaku =>
+            _round != null ? _round.manganHandYaku : new List<string>();
+
+        /// <summary>台本の手牌の翻数（聴牌チェックのモック応答用）。</summary>
+        public int CurrentHandHan => _round != null ? _round.manganHandHan : 0;
+
+        // ==================== 開始 / 中断 ====================
 
         public void StartTutorial()
         {
-            StartCoroutine(TutorialSequenceRoutine());
+            StartTutorialFrom(0);
         }
 
-        private IEnumerator TutorialSequenceRoutine()
+        public void StartTutorialFrom(int roundIndex)
         {
-            // 第1局
-            currentRound = TutorialRound.Round1_BasicRon;
-            yield return StartCoroutine(Round1Routine());
+            _scenario = scenario != null ? scenario : TutorialScenario.BuildDefault();
+            _scenario.Validate();
 
-            // 第2局
-            currentRound = TutorialRound.Round2_Draw;
-            yield return StartCoroutine(Round2Routine());
+            _playerHp = _scenario.playerStartHp;
+            _enemyHp = _scenario.enemyStartHp;
+            _aborted = false;
 
-            // 第3局
-            currentRound = TutorialRound.Round3_FakeHint;
-            yield return StartCoroutine(Round3Routine());
-
-            // 第4局
-            currentRound = TutorialRound.Round4_Ability;
-            yield return StartCoroutine(Round4Routine());
-
-            // 第5局
-            currentRound = TutorialRound.Round5_Final;
-            yield return StartCoroutine(Round5Routine());
-
-            // チュートリアル終了 -> タイトルへ
-            yield return StartCoroutine(ShowDialogues(
-                "これでチュートリアルは終了よ。",
-                "あずにゃん先輩「お疲れ様！次はマルチモードで対戦してみよう！」"
-            ));
-            SceneManager.LoadScene("タイトルシーン");
+            if (_scenarioRoutine != null) StopCoroutine(_scenarioRoutine);
+            _scenarioRoutine = StartCoroutine(ScenarioRoutine(Mathf.Max(0, roundIndex)));
         }
 
-        private IEnumerator ShowDialogues(params string[] texts)
+        /// <summary>チュートリアルを打ち切ってタイトルへ戻す（スキップボタン用）。</summary>
+        public void SkipTutorial()
         {
-            foreach (var text in texts)
-            {
-                bool nextClicked = false;
-                dialogueUI.ShowText(text);
-                dialogueUI.ShowNextRoundButton(() => nextClicked = true);
-                yield return new WaitUntil(() => nextClicked);
-                dialogueUI.HideNextRoundButton();
-            }
-        }
+            _aborted = true;
 
-        // ---------- 各ラウンドのロジック ---------- //
-
-        private IEnumerator Round1Routine()
-        {
-            List<int> allWallIds = new List<int>();
-            for (int i = 1; i <= 34; i++)
-            {
-                allWallIds.Add(i);
-            }
-            SetupMockHandAndWall(new List<int>(), allWallIds);
-            yield return null;
-
-            yield return StartCoroutine(ShowDialogues(
-                "ふふっ、無事に契約完了ね。",
-                "これでお前は私のモノ……と言いたいところだけど、まずはその腕前を見せてもらうわ。",
-                "デス麻雀のルール、ちゃんと覚えてる？",
-                "……まあいいわ。まずは基本的なやり方を教えてあげる。",
-                "今回は特別に、自動で強い手牌を作ってあげるわ。"
-            ));
-
-            // （現在チュートリアル中はBGMを鳴らさない）
-            
-            HasClickedAutoMangan = false;
-            isWaitingForHandSelectionComplete = true;
-
-            // Autoボタンを強調
-            if (gameUIManager != null && gameUIManager.HandUI != null && arrowUI != null)
-            {
-                arrowUI.ShowAt(gameUIManager.HandUI.AutoManganButtonRect, new Vector2(0, 50f));
-            }
-
-            // プレイヤーが「OK」を押すまで待機。
-            yield return new WaitUntil(() => !isWaitingForHandSelectionComplete);
+            if (_scenarioRoutine != null) { StopCoroutine(_scenarioRoutine); _scenarioRoutine = null; }
+            if (_interruptRoutine != null) { StopCoroutine(_interruptRoutine); _interruptRoutine = null; }
 
             if (arrowUI != null) arrowUI.Hide();
+            if (maskUI != null) maskUI.Hide();
+            if (dialogueUI != null) dialogueUI.HideNextRoundButton();
 
-            // 対局（打牌）フェイズに移行してUIレイアウトを更新（手牌を下へ、不要なボタンを消す等）
-            if (gameUIManager.PhaseController != null)
+            string sceneName = _scenario != null ? _scenario.titleSceneName : "タイトルシーン";
+            SceneManager.LoadScene(sceneName);
+        }
+
+        // ==================== シナリオ本体 ====================
+
+        private IEnumerator ScenarioRoutine(int startIndex)
+        {
+            for (int i = startIndex; i < _scenario.rounds.Count; i++)
             {
-                gameUIManager.PhaseController.UpdatePhaseStatus(KillingMahjong.EngineData.RoundStatus.Discard);
+                _round = _scenario.rounds[i];
+                currentRound = IndexToRound(i);
+
+                yield return StartCoroutine(RunRound(_round));
+
+                if (_aborted) yield break;
+
+                PlayerPrefs.SetInt(ProgressKey, i + 1);
+                PlayerPrefs.Save();
+            }
+
+            yield return StartCoroutine(PlayLines(_scenario.endingLines));
+            SceneManager.LoadScene(_scenario.titleSceneName);
+        }
+
+        private const string ProgressKey = "Tutorial_LastCompletedRound";
+
+        /// <summary>前回どこまで進んだか（0 = 未プレイ）。</summary>
+        public static int GetSavedProgress() => PlayerPrefs.GetInt(ProgressKey, 0);
+
+        private static TutorialRound IndexToRound(int index)
+        {
+            switch (index)
+            {
+                case 0: return TutorialRound.Round1_BasicRon;
+                case 1: return TutorialRound.Round2_Draw;
+                case 2: return TutorialRound.Round3_FakeHint;
+                case 3: return TutorialRound.Round4_Ability;
+                default: return TutorialRound.Round5_Final;
+            }
+        }
+
+        private IEnumerator RunRound(TutorialRoundData data)
+        {
+            // --- 局の初期化 ---
+            HasClickedAutoMangan = false;
+            _hasRejectedFirstConfirm = false;
+            _isWaitingForHandSelectionComplete = true;
+            _lastPlayerDiscardBaseId = -1;
+
+            // 手牌は空の状態で開始する（プレイヤーが山牌から選ぶ）
+            SetupBoard(data, null);
+
+            // 開幕は女の子とセリフだけ。盤面はイントロの途中で出す。
+            SetBoardVisible(false);
+            yield return null;
+
+            int reveal = data.revealBoardAfterLineIndex;
+            if (reveal >= 0 && reveal < data.introLines.Count - 1)
+            {
+                yield return StartCoroutine(PlayLines(data.introLines.GetRange(0, reveal + 1)));
+                SetBoardVisible(true);
+                yield return StartCoroutine(PlayLines(
+                    data.introLines.GetRange(reveal + 1, data.introLines.Count - reveal - 1)));
             }
             else
             {
-                gameUIManager.SetCurrentPhaseStatus(KillingMahjong.EngineData.RoundStatus.Discard);
+                yield return StartCoroutine(PlayLines(data.introLines));
+                SetBoardVisible(true);
             }
-            
-            yield return new WaitForSeconds(0.5f); // レイアウト更新と演出を少し待つ
 
-            yield return StartCoroutine(ShowDialogues(
-                "いよいよ対局スタートよ。",
-                "あなたの番ね。まずは好きな牌をタップして捨ててみて。"
-            ));
-            
-            yield return new WaitForSeconds(0.5f);
-
-            // 対局進行モック（敵が捨てる牌のリスト。5打目にアタリ牌の13=四筒を捨てる）
-            List<int> r1Discards = new List<int>() { 31, 32, 33, 34, 13 };
-            yield return StartCoroutine(MockBattleRoutine(r1Discards, "プレイヤーのロン"));
-
-            yield return StartCoroutine(ShowDialogues(
-                "ロン！あなたの上がりね。",
-                "上がると、相手からダメージを奪えるのよ。",
-                "獲得金も手に入るわ。これが基本ルールよ。"
-            ));
-        }
-
-        private IEnumerator Round2Routine()
-        {
-            List<int> allWallIds = new List<int>(initialHandIds);
-            allWallIds.AddRange(initialWallIds);
-            SetupMockHandAndWall(new List<int>(), allWallIds);
-            yield return null;
-
-            yield return StartCoroutine(ShowDialogues(
-                "次は流局について教えるわ。",
-                "とりあえず『自動』ボタン（オート満貫）を押してね。"
-            ));
-
-            HasClickedAutoMangan = false;
-            isWaitingForHandSelectionComplete = true;
-            
-            if (gameUIManager != null && gameUIManager.HandUI != null && arrowUI != null)
+            // --- 手牌構築フェイズ（手順①〜④ / ⑧ / ⑫ / ㉑） ---
+            if (!data.allowManualHandSelection)
             {
-                arrowUI.ShowAt(gameUIManager.HandUI.AutoManganButtonRect, new Vector2(0, 50f));
+                // 手動選択を許さない局は最初からオートへ誘導する
+                GuideTo(gameUIManager != null && gameUIManager.HandUI != null
+                    ? gameUIManager.HandUI.AutoManganButtonRect : null);
             }
-            
-            yield return new WaitUntil(() => !isWaitingForHandSelectionComplete);
-            
-            if (arrowUI != null) arrowUI.Hide();
 
-            gameUIManager.SetCurrentPhaseStatus(KillingMahjong.EngineData.RoundStatus.Discard);
-            yield return new WaitForSeconds(1.0f);
+            yield return new WaitUntil(() => !_isWaitingForHandSelectionComplete);
+            ClearGuide();
 
-            // 対局進行モック（流局なのでアタリ牌なし）
-            List<int> r2Discards = new List<int>() { 31, 32, 33, 34, 31 };
-            yield return StartCoroutine(MockBattleRoutine(r2Discards, "流局"));
+            // --- 賭け金フェイズ（固定額） ---
+            yield return StartCoroutine(PlayLines(data.beforeBetLines));
+            yield return StartCoroutine(RunBettingPhase(data));
 
-            yield return StartCoroutine(ShowDialogues(
-                "流局よ。誰も上がらずに山牌がなくなると流局になるわ。",
-                "流局時にも色々とルールがあるのよ。"
-            ));
+            // --- 打牌フェイズ ---
+            // GameUIPhaseController は IsTutorialMode のとき HP パネルを出さないので、
+            // フェイズを切り替えたあとに毎回こちらで表示し直す（手順⑦の説明に必要）。
+            SetPhase(RoundStatus.Discard);
+            ApplyHpToUI();
+            yield return new WaitForSeconds(phaseSettleTime);
+            yield return StartCoroutine(PlayLines(data.onBattleStartLines));
+
+            yield return StartCoroutine(RunBattle(data));
+
+            yield return StartCoroutine(PlayLines(data.outroLines));
         }
 
-        private IEnumerator Round3Routine()
+        // ==================== 盤面セットアップ ====================
+
+        private void SetupBoard(TutorialRoundData data, List<int> handBaseIds)
         {
-            List<int> allWallIds = new List<int>(initialHandIds);
-            allWallIds.AddRange(initialWallIds);
-            SetupMockHandAndWall(new List<int>(), allWallIds);
-            yield return null;
+            if (gameUIManager == null || gameUIManager.HandUI == null || gameUIManager.WallUI == null) return;
 
-            yield return StartCoroutine(ShowDialogues(
-                "次の局よ。今度も流局について教えるわ。",
-                "とりあえず『自動』ボタンを押してね。"
-            ));
+            gameUIManager.IsTutorialMode = true;
+            gameUIManager.TutorialManager = this;
 
-            HasClickedAutoMangan = false;
-            isWaitingForHandSelectionComplete = true;
-            
-            if (gameUIManager != null && gameUIManager.HandUI != null && arrowUI != null)
+            if (gameUIManager.PhaseTransitionUI != null)
+                gameUIManager.PhaseTransitionUI.gameObject.SetActive(false);
+
+            gameUIManager.ClearAllTiles();
+
+            var board = BoardStateManager.Instance;
+            if (board != null)
             {
-                arrowUI.ShowAt(gameUIManager.HandUI.AutoManganButtonRect, new Vector2(0, 50f));
+                board.SetLocalTurn(true);
+                board.CurrentDoraId = data.doraBaseId >= 0
+                    ? TutorialTiles.Encode(data.doraBaseId, isDora: true)
+                    : -1;
             }
-            
-            yield return new WaitUntil(() => !isWaitingForHandSelectionComplete);
-            
-            if (arrowUI != null) arrowUI.Hide();
 
-            gameUIManager.SetCurrentPhaseStatus(KillingMahjong.EngineData.RoundStatus.Discard);
-            yield return new WaitForSeconds(1.0f);
+            SetPhase(RoundStatus.HandSelection);
 
-            yield return StartCoroutine(ShowDialogues(
-                "フフフ…私、ちょっとビビっちゃったかも。",
-                "このまま延々と流局を続けようかしら。",
-                "そうそう、私の待ち牌は一萬よ。一萬だけは絶対に出さないでね。"
-            ));
+            // 牌種 → 実牌ID へ変換（ドラフラグ付与）
+            List<int> wall = TutorialTiles.EncodeAll(data.wallBaseIds, data.doraBaseId);
+            List<int> hand = handBaseIds != null
+                ? TutorialTiles.EncodeAll(handBaseIds, data.doraBaseId)
+                : new List<int>();
+            List<int> waits = TutorialTiles.EncodeAll(data.waitBaseIds, data.doraBaseId);
 
-            // 特定の牌をブロックするなどのフラグ設定をここで行う（後で追加）
-
-            // 対局進行モック（敵のロン）
-            List<int> r3Discards = new List<int>() { 31, 32, 33, 34, 13 };
-            yield return StartCoroutine(MockBattleRoutine(r3Discards, "敵のロン"));
-
-            yield return StartCoroutine(ShowDialogues(
-                "ロン！ふふっ、騙されたわね！",
-                "実は流局じゃなくて、最初からこれを狙っていたのよ！",
-                "流局のダメージと、単騎待ちのダメージを食らいなさい！"
-            ));
-        }
-
-        private IEnumerator Round4Routine()
-        {
-            yield return StartCoroutine(ShowDialogues(
-                "次は能力の使用についての説明よ。",
-                "ふふっ、私の能力を見せてあげるわ！"
-            ));
-            
-            // 敵が能力を使いまくる演出
-            yield return new WaitForSeconds(2.0f);
-
-            yield return StartCoroutine(ShowDialogues(
-                "これが能力よ。",
-                "能力を使えば、対局を有利に進められるの。",
-                "能力の強化については役一覧から確認してね。"
-            ));
-        }
-
-        private IEnumerator Round5Routine()
-        {
-            List<int> allWallIds = new List<int>(initialHandIds);
-            allWallIds.AddRange(initialWallIds);
-            SetupMockHandAndWall(new List<int>(), allWallIds);
-            yield return null;
-
-            yield return StartCoroutine(ShowDialogues(
-                "さあ、これが最後の対局よ！",
-                "今度は自分で手を組んでみてね。自動ボタンを使ってもいいわよ。"
-            ));
-
-            HasClickedAutoMangan = false;
-            isWaitingForHandSelectionComplete = true;
-            yield return new WaitUntil(() => !isWaitingForHandSelectionComplete);
-
-            gameUIManager.SetCurrentPhaseStatus(KillingMahjong.EngineData.RoundStatus.Discard);
-            yield return new WaitForSeconds(1.0f);
-
-            // 対局進行モック（プレイヤーのロン）
-            List<int> r4Discards = new List<int>() { 31, 32, 33, 34, 13 };
-            yield return StartCoroutine(MockBattleRoutine(r4Discards, "プレイヤーのロン"));
-
-            yield return StartCoroutine(ShowDialogues(
-                "きゃあああ！やられたわ……！"
-            ));
-            // 死亡演出
-            yield return new WaitForSeconds(2.0f);
-        }
-
-        // 共通のモック対局進行（指定の牌を順番に捨て、結末へ）
-        private IEnumerator MockBattleRoutine(List<int> enemyDiscards, string resultType)
-        {
-            currentTurnCount = 0;
-            int targetTurns = enemyDiscards.Count;
-            int winningTile = 13; // チュートリアル用の仮のアタリ牌(四筒)
-
-            while (currentTurnCount < targetTurns)
+            if (board != null)
             {
-                KillingMahjong.Managers.BoardStateManager.Instance.SetLocalTurn(true);
-                isWaitingForDiscard = true;
-                
-                // プレイヤーの打牌を待つ
-                yield return new WaitUntil(() => !isWaitingForDiscard);
-                yield return new WaitForSeconds(0.5f);
-                
-                // 敵の打牌
-                if (gameUIManager != null && gameUIManager.EnemyRiverUI != null)
+                // 手牌が空のときは待ち牌も出さない（まだ何も組んでいないため）
+                board.SetLocalState(wall, hand, hand.Count > 0 ? waits : new List<int>());
+            }
+
+            if (gameUIManager.VisualController != null)
+                gameUIManager.VisualController.RebuildAllTilesFromState();
+        }
+
+        private void SetPhase(RoundStatus status)
+        {
+            if (gameUIManager == null) return;
+
+            if (gameUIManager.PhaseController != null)
+                gameUIManager.PhaseController.UpdatePhaseStatus(status);
+            else
+                gameUIManager.SetCurrentPhaseStatus(status);
+        }
+
+        private void ApplyHpToUI()
+        {
+            var board = BoardStateManager.Instance;
+            if (board != null) board.UpdateHp(_playerHp, _enemyHp);
+
+            if (gameUIManager == null) return;
+
+            // 盤面がまだ隠れている段階（女の子とセリフだけの状態）では表示を戻さない
+            if (gameUIManager.PlayerInfoUI != null)
+            {
+                gameUIManager.PlayerInfoUI.gameObject.SetActive(_boardVisible);
+                gameUIManager.PlayerInfoUI.SetMaxHP(_scenario.playerStartHp);
+                gameUIManager.PlayerInfoUI.SetHP(_playerHp);
+            }
+            if (gameUIManager.EnemyInfoUI != null)
+            {
+                gameUIManager.EnemyInfoUI.SetPanelVisible(_boardVisible);
+                gameUIManager.EnemyInfoUI.SetMaxHP(_scenario.enemyStartHp);
+                gameUIManager.EnemyInfoUI.SetHP(_enemyHp);
+            }
+        }
+
+        /// <summary>
+        /// 盤面まわりの表示を一括で切り替える。
+        ///
+        /// false のとき画面に残るのは「敵の立ち絵」と「セリフ」だけ。
+        /// EnemyInfoUI.SetPanelVisible(false) はHPパネルのみを消し、立ち絵は残す。
+        /// </summary>
+        private void SetBoardVisible(bool visible)
+        {
+            _boardVisible = visible;
+            if (gameUIManager == null) return;
+
+            // 手牌 / 山牌 / 敵山牌 / 役一覧 / 待ち牌
+            if (gameUIManager.PhaseController != null)
+                gameUIManager.PhaseController.SetMatchUIVisibility(visible);
+
+            if (gameUIManager.TurnIndicatorUI != null)
+                gameUIManager.TurnIndicatorUI.gameObject.SetActive(visible);
+
+            if (gameUIManager.DoraDisplayUI != null)
+            {
+                int doraId = BoardStateManager.Instance != null
+                    ? BoardStateManager.Instance.CurrentDoraId : -1;
+
+                if (visible && doraId >= 0) gameUIManager.DoraDisplayUI.ShowDora(doraId);
+                else gameUIManager.DoraDisplayUI.Hide();
+            }
+
+            if (!visible)
+            {
+                // 河は打牌フェイズ側で出すので、隠すときだけ触る
+                if (gameUIManager.RiverUI != null)
+                    gameUIManager.RiverUI.gameObject.SetActive(false);
+                if (gameUIManager.EnemyRiverUI != null)
+                    gameUIManager.EnemyRiverUI.gameObject.SetActive(false);
+                if (gameUIManager.AbilityUI != null)
+                    gameUIManager.AbilityUI.gameObject.SetActive(false);
+                if (gameUIManager.WaitUI != null)
+                    gameUIManager.WaitUI.gameObject.SetActive(false);
+            }
+
+            ApplyHpToUI();
+        }
+
+        // ==================== 賭け金フェイズ ====================
+
+        private IEnumerator RunBettingPhase(TutorialRoundData data)
+        {
+            SetPhase(RoundStatus.Betting);
+
+            if (!string.IsNullOrEmpty(data.betPromptText))
+            {
+                var prompt = new List<TutorialLine>
                 {
-                    int enemyDiscard = enemyDiscards[currentTurnCount];
+                    new TutorialLine(string.Format(data.betPromptText, data.betAmount))
+                };
+                yield return StartCoroutine(PlayLines(prompt));
+            }
 
-                    gameUIManager.EnemyRiverUI.AddTile(enemyDiscard);
+            var betting = gameUIManager != null ? gameUIManager.BettingUI : null;
+            if (betting == null)
+            {
+                Debug.LogWarning("[TutorialManager] BettingUI が未設定のため賭け金フェイズをスキップします。");
+                yield break;
+            }
+
+            bool confirmed = false;
+            betting.ShowFixedBettingPhase(_playerHp, _playerHp, data.betAmount, _ => confirmed = true);
+
+            GuideTo(betting.ConfirmButtonRect);
+            yield return new WaitUntil(() => confirmed);
+            ClearGuide();
+
+            betting.HideBettingPhase();
+            yield return new WaitForSeconds(phaseSettleTime);
+        }
+
+        // ==================== 対局 ====================
+
+        private IEnumerator RunBattle(TutorialRoundData data)
+        {
+            var board = BoardStateManager.Instance;
+            int turns = data.enemyDiscardBaseIds.Count;
+
+            for (int turn = 1; turn <= turns; turn++)
+            {
+                // --- プレイヤーの打牌を待つ ---
+                if (board != null) board.SetLocalTurn(true);
+                _isWaitingForDiscard = true;
+                _lastPlayerDiscardBaseId = -1;
+
+                yield return new WaitUntil(() => !_isWaitingForDiscard);
+                yield return new WaitForSeconds(discardInterval);
+
+                // --- 敵のロン（プレイヤーの打牌に反応する。手順⑮） ---
+                if (data.outcome == TutorialOutcome.EnemyRon && turn >= data.enemyRonOnPlayerDiscardTurn)
+                {
+                    yield return StartCoroutine(RunEnemyRon(data, _lastPlayerDiscardBaseId));
+                    yield break;
+                }
+
+                // --- 敵の打牌 ---
+                if (board != null) board.SetLocalTurn(false);
+
+                int discardBase = data.enemyDiscardBaseIds[turn - 1];
+                int discardId = TutorialTiles.Encode(discardBase, discardBase == data.doraBaseId);
+
+                if (gameUIManager != null && gameUIManager.EnemyRiverUI != null)
+                    gameUIManager.EnemyRiverUI.AddTile(discardId);
+                if (AudioManager.Instance != null) AudioManager.Instance.PlayDiscardSE();
+
+                yield return new WaitForSeconds(discardInterval);
+
+                // --- プレイヤーのロン（手順⑥ / ㉓） ---
+                if (data.outcome == TutorialOutcome.PlayerRon && discardBase == data.playerWinningTileBaseId)
+                {
+                    yield return StartCoroutine(RunPlayerRon(data, discardId));
+                    yield break;
+                }
+
+                // --- 能力の見せ場（手順⑱） ---
+                if (data.enemyUsesAbility && turn == 2)
+                {
+                    yield return StartCoroutine(RunEnemyAbilityShowcase());
+                }
+
+                yield return new WaitForSeconds(0.4f);
+            }
+
+            if (data.outcome == TutorialOutcome.Draw)
+            {
+                yield return StartCoroutine(RunDraw(data));
+            }
+        }
+
+        private IEnumerator RunPlayerRon(TutorialRoundData data, int ronTileId)
+        {
+            SetPhase(RoundStatus.Agari);
+
+            // ロンボタンを押させる
+            if (gameUIManager != null && gameUIManager.AgariSelectionUI != null)
+            {
+                bool selected = false;
+                gameUIManager.AgariSelectionUI.Show(() => selected = true);
+                yield return new WaitUntil(() => selected);
+
+                if (gameUIManager.RonWaitPanel != null) gameUIManager.RonWaitPanel.SetActive(false);
+            }
+
+            int prevEnemyHp = _enemyHp;
+            _enemyHp = Mathf.Max(0, _enemyHp - data.score);
+
+            // RonAnimationUI は handTiles を並べたあとに ronTile を別枠で追加描画する。
+            // したがって handTiles にはアタリ牌を含めない13枚を渡すこと。
+            var hand = TutorialTiles.EncodeAll(data.manganHandBaseIds, data.doraBaseId);
+
+            yield return StartCoroutine(PlayRonAnimation(
+                hand, ronTileId, data, isLocalPlayerWin: true,
+                prevLocalHp: _playerHp, newLocalHp: _playerHp,
+                prevEnemyHp: prevEnemyHp, newEnemyHp: _enemyHp));
+
+            ApplyHpToUI();
+        }
+
+        private IEnumerator RunEnemyRon(TutorialRoundData data, int playerDiscardBaseId)
+        {
+            SetPhase(RoundStatus.Agari);
+
+            // 手順⑯: 流局のダメージと単騎待ちのダメージをまとめて受ける
+            int totalDamage = data.score + data.drawDamageToPlayer;
+            int prevPlayerHp = _playerHp;
+            _playerHp = Mathf.Max(0, _playerHp - totalDamage);
+
+            // 単騎待ちなので、実際に打たれた牌がそのままアタリ牌になる
+            int ronTileBase = playerDiscardBaseId >= 0 ? playerDiscardBaseId : TutorialTiles.Ton;
+            int ronTileId = TutorialTiles.Encode(ronTileBase, ronTileBase == data.doraBaseId);
+
+            // 単騎待ちなので、面子12枚＋単騎の1枚（= アタリ牌と同じ牌）で13枚。
+            // RonAnimationUI がアタリ牌をもう1枚追加描画し、雀頭が揃った14枚が表示される。
+            var hand = TutorialTiles.EncodeAll(data.enemyRonMeldBaseIds, data.doraBaseId);
+            hand.Add(ronTileId);
+
+            yield return StartCoroutine(PlayRonAnimation(
+                hand, ronTileId, data, isLocalPlayerWin: false,
+                prevLocalHp: prevPlayerHp, newLocalHp: _playerHp,
+                prevEnemyHp: _enemyHp, newEnemyHp: _enemyHp));
+
+            ApplyHpToUI();
+        }
+
+        private IEnumerator PlayRonAnimation(
+            List<int> handTiles, int ronTileId, TutorialRoundData data, bool isLocalPlayerWin,
+            int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp)
+        {
+            var ronUI = gameUIManager != null ? gameUIManager.RonAnimationUI : null;
+            if (ronUI == null)
+            {
+                yield return new WaitForSeconds(2.0f);
+                yield break;
+            }
+
+            bool done = false;
+            ronUI.PlayRonSequence(
+                handTiles,
+                ronTileId,
+                data.yakuList,
+                data.formulaText,
+                data.rankText,
+                data.score,
+                isLocalPlayerWin,
+                gameUIManager.PlayerInfoUI,
+                gameUIManager.EnemyInfoUI,
+                prevLocalHp, newLocalHp,
+                prevEnemyHp, newEnemyHp,
+                () => done = true);
+
+            yield return new WaitUntil(() => done);
+        }
+
+        private IEnumerator RunDraw(TutorialRoundData data)
+        {
+            SetPhase(RoundStatus.Draw);
+
+            if (data.drawDamageToPlayer > 0)
+            {
+                _playerHp = Mathf.Max(0, _playerHp - data.drawDamageToPlayer);
+                ApplyHpToUI();
+            }
+
+            yield return new WaitForSeconds(2.0f);
+        }
+
+        /// <summary>
+        /// 手順⑱: 敵が能力を使いまくる見せ場。
+        /// プレイヤーは能力を使えない制約があるため、ここでは能力UIを「見せる」だけにしている。
+        /// TODO: GameUISkillController 経由の実際のスキル演出とつなぐ。
+        /// </summary>
+        private IEnumerator RunEnemyAbilityShowcase()
+        {
+            if (gameUIManager != null && gameUIManager.AbilityUI != null)
+            {
+                gameUIManager.AbilityUI.gameObject.SetActive(true);
+                GuideTo(gameUIManager.AbilityUI.GetComponent<RectTransform>());
+            }
+
+            if (gameUIManager != null && gameUIManager.EnemyInfoUI != null)
+            {
+                for (int i = 0; i < 3; i++)
+                {
+                    gameUIManager.EnemyInfoUI.PlayBounceAnimation(0.4f);
                     if (AudioManager.Instance != null) AudioManager.Instance.PlayDiscardSE();
                     yield return new WaitForSeconds(0.5f);
-
-                    // 自動ロン判定：敵がアタリ牌を捨てた場合、自動でロン選択UIを出す
-                    if (enemyDiscard == winningTile && resultType == "プレイヤーのロン")
-                    {
-                        yield return StartCoroutine(SimulateAgariFlow(enemyDiscard));
-                        yield break; // 進行を終了
-                    }
-                }
-                yield return new WaitForSeconds(0.8f);
-
-                currentTurnCount++;
-            }
-
-            // 結末に応じた処理
-            if (resultType == "流局")
-            {
-                gameUIManager.SetCurrentPhaseStatus(KillingMahjong.EngineData.RoundStatus.Draw);
-                yield return new WaitForSeconds(2.0f);
-            }
-            else if (resultType == "敵のロン")
-            {
-                gameUIManager.SetCurrentPhaseStatus(KillingMahjong.EngineData.RoundStatus.Agari);
-                
-                // 敵のアガリ演出（ロンアニメーション）
-                if (gameUIManager.RonAnimationUI != null)
-                {
-                    List<int> dummyHand = new List<int> { 2, 3, 4, 5, 6, 7, 8, 8, 9, 9, 9, 31, 31 };
-                    List<string> dummyYaku = new List<string> { "満貫" };
-                    bool isPlayerWin = false;
-                    
-                    gameUIManager.RonAnimationUI.PlayRonSequence(
-                        dummyHand, 
-                        13, 
-                        dummyYaku, 
-                        "満貫", 
-                        "満貫", 
-                        8000, 
-                        isPlayerWin, 
-                        gameUIManager.PlayerInfoUI, 
-                        gameUIManager.EnemyInfoUI, 
-                        20000, 
-                        12000, 
-                        20000, 
-                        28000, 
-                        () => { }
-                    );
-                }
-                yield return new WaitForSeconds(4.0f); // 演出の分待機する
-            }
-        }
-
-        private IEnumerator SimulateAgariFlow(int ronTile)
-        {
-            gameUIManager.SetCurrentPhaseStatus(KillingMahjong.EngineData.RoundStatus.Agari);
-            
-            if (gameUIManager.AgariSelectionUI != null)
-            {
-                bool agariSelected = false;
-                gameUIManager.AgariSelectionUI.Show(
-                    () => { agariSelected = true; }
-                );
-                
-                // ロンボタンが押されるのを待つ
-                yield return new WaitUntil(() => agariSelected);
-                
-                if (gameUIManager.RonWaitPanel != null) gameUIManager.RonWaitPanel.SetActive(false);
-
-                // フル演出の再生
-                if (gameUIManager.RonAnimationUI != null)
-                {
-                    bool animDone = false;
-                    List<int> dummyHand = new List<int>() { 1,2,3, 4,5,6, 7,8,9, 10,11,12, 13, 13 };
-                    List<string> dummyYaku = new List<string>() { "清一色", "平和", "ドラ3" };
-                    
-                    gameUIManager.RonAnimationUI.PlayRonSequence(
-                        dummyHand, ronTile, dummyYaku, "9飜", "倍満", 16000, true,
-                        gameUIManager.PlayerInfoUI, gameUIManager.EnemyInfoUI,
-                        20000, 20000, 20000, 4000,
-                        () => { animDone = true; }
-                    );
-                    yield return new WaitUntil(() => animDone);
                 }
             }
             else
             {
-                yield return new WaitForSeconds(2.0f);
+                yield return new WaitForSeconds(1.5f);
             }
+
+            ClearGuide();
         }
 
-        // ---------- 既存のモックセットアップ処理 ---------- //
-        private void SetupMockHandAndWall(List<int> hIds, List<int> wIds)
+        // ==================== セリフ表示 ====================
+
+        /// <summary>
+        /// 台本のセリフを1行ずつ送る。シナリオ用コルーチンからのみ呼ばれるため、
+        /// 同時に複数走ることはない（旧実装の多重起動によるコルーチン残留を防いでいる）。
+        /// </summary>
+        private IEnumerator PlayLines(List<TutorialLine> lines)
         {
-            if (gameUIManager != null && gameUIManager.HandUI != null && gameUIManager.WallUI != null)
+            if (lines == null) yield break;
+
+            foreach (var line in lines)
             {
-                gameUIManager.IsTutorialMode = true;
-                gameUIManager.TutorialManager = this;
-                
-                if (gameUIManager.PhaseTransitionUI != null) gameUIManager.PhaseTransitionUI.gameObject.SetActive(false);
-                gameUIManager.ClearAllTiles();
-                
-                KillingMahjong.Managers.BoardStateManager.Instance.SetLocalTurn(true);
-                
-                // フェイズとUIレイアウトの更新を連動させる
-                if (gameUIManager.PhaseController != null)
+                if (line == null || string.IsNullOrEmpty(line.text)) continue;
+
+                bool clicked = false;
+                if (dialogueUI != null)
                 {
-                    gameUIManager.PhaseController.UpdatePhaseStatus(KillingMahjong.EngineData.RoundStatus.HandSelection);
+                    dialogueUI.gameObject.SetActive(true);
+                    dialogueUI.ShowText(Decorate(line));
+                    dialogueUI.ShowNextRoundButton(() => clicked = true);
                 }
                 else
                 {
-                    gameUIManager.SetCurrentPhaseStatus(KillingMahjong.EngineData.RoundStatus.HandSelection);
+                    clicked = true;
                 }
-                
-                List<int> handList = new List<int>(hIds);
-                List<int> fullWallList = new List<int>(hIds);
-                fullWallList.AddRange(wIds);
-                
-                KillingMahjong.Managers.BoardStateManager.Instance.SetLocalState(fullWallList, handList, new List<int>());
-                if (gameUIManager.VisualController != null) gameUIManager.VisualController.RebuildAllTilesFromState();
+
+                yield return new WaitUntil(() => clicked);
+
+                if (dialogueUI != null) dialogueUI.HideNextRoundButton();
             }
         }
 
-        // ---------- UIからのコールバック ---------- //
+        /// <summary>
+        /// 操作を弾いたときの一言。送りボタンを使わないので PlayLines と競合しない。
+        /// 連打されても直前のものを止めるだけで、コルーチンは残らない。
+        /// </summary>
+        private void ShowInterruptMessage(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return;
 
+            if (_interruptRoutine != null) StopCoroutine(_interruptRoutine);
+            _interruptRoutine = StartCoroutine(InterruptRoutine(text));
+        }
+
+        private IEnumerator InterruptRoutine(string text)
+        {
+            if (dialogueUI != null)
+            {
+                dialogueUI.gameObject.SetActive(true);
+                dialogueUI.ShowText($"「{text}」");
+            }
+            yield return new WaitForSeconds(interruptMessageDuration);
+            _interruptRoutine = null;
+        }
+
+        private static string Decorate(TutorialLine line)
+        {
+            switch (line.speaker)
+            {
+                case TutorialSpeaker.System:
+                    return line.text;
+                case TutorialSpeaker.Senpai:
+                    // TODO: 立ち絵の切り替え。現状はテキストで話者を明示するのみ。
+                    return $"あずにゃん先輩\n「{line.text}」";
+                default:
+                    return line.text.Contains("「") ? line.text : $"「{line.text}」";
+            }
+        }
+
+        // ==================== 誘導（矢印＋マスク） ====================
+
+        private void GuideTo(RectTransform target)
+        {
+            if (target == null) return;
+
+            if (arrowUI != null) arrowUI.ShowAt(target, new Vector2(0, 50f));
+            if (maskUI != null) maskUI.Show(target);
+        }
+
+        private void ClearGuide()
+        {
+            if (arrowUI != null) arrowUI.Hide();
+            if (maskUI != null) maskUI.Hide();
+        }
+
+        // ==================== UIからのコールバック ====================
+
+        /// <summary>山牌と手牌の間で牌を動かせるか（手順①）。</summary>
         public bool OnTryMoveTile(int tileId, bool toHand)
         {
-            // 第5局以外は手動での牌移動を禁止し、オート満貫ボタンを押させる
-            if (currentRound != TutorialRound.Round5_Final)
+            if (_round == null) return false;
+
+            if (!_round.allowManualHandSelection)
             {
-                StartCoroutine(ShowDialogues("今は『自動』ボタンを押してね。"));
+                ShowInterruptMessage("今は『自動』ボタンを押してね。");
                 return false;
             }
             return true;
         }
 
+        /// <summary>
+        /// 手牌決定を受け付けるか（手順②③）。
+        ///
+        /// チュートリアルはサーバーに接続しないため満貫判定を持たない。
+        /// 「最初の決定は必ず弾く」スクリプトで手順②を再現し、
+        /// 制約『満貫手以下での開始は不可』は requireAutoManganToConfirm で担保する。
+        /// </summary>
         public bool OnTryCompleteHandSelection()
         {
-            // 第1局〜第3局は、オート満貫ボタンを押さなければ弾く
-            if ((currentRound == TutorialRound.Round1_BasicRon || 
-                 currentRound == TutorialRound.Round2_Draw || 
-                 currentRound == TutorialRound.Round3_FakeHint) && !HasClickedAutoMangan)
+            if (_round == null) return false;
+
+            if (_round.rejectFirstConfirm && !_hasRejectedFirstConfirm && !HasClickedAutoMangan)
             {
-                StartCoroutine(ShowDialogues(
-                    "満貫手以上じゃないとゲームが開始できないわよ！",
-                    "『自動』ボタン（オート満貫）を押して、手牌を作ってね。"
-                ));
+                _hasRejectedFirstConfirm = true;
+                ShowInterruptMessage("その手じゃ満貫にも届かないわ。満貫手以上じゃないと始められないのよ。");
+                GuideTo(gameUIManager != null && gameUIManager.HandUI != null
+                    ? gameUIManager.HandUI.AutoManganButtonRect : null);
                 return false;
             }
 
-            // ここではまだ待機を解除しない。ConfirmationDialogUIで決定された時に解除する。
+            if (_round.requireAutoManganToConfirm && !HasClickedAutoMangan)
+            {
+                ShowInterruptMessage("『自動』ボタン（オート満貫）を押して、満貫手を作ってね。");
+                GuideTo(gameUIManager != null && gameUIManager.HandUI != null
+                    ? gameUIManager.HandUI.AutoManganButtonRect : null);
+                return false;
+            }
+
+            // 実際の待機解除は ConfirmationDialogUI での決定後（ConfirmHandSelectionComplete）
             return true;
         }
 
         public void ConfirmHandSelectionComplete()
         {
-            isWaitingForHandSelectionComplete = false;
+            _isWaitingForHandSelectionComplete = false;
         }
 
+        /// <summary>打牌を受け付けるか（手順⑭の禁止牌を含む）。</summary>
         public bool OnTryDiscardTile(int tileId)
         {
-            if (!isWaitingForDiscard) return false;
+            if (!_isWaitingForDiscard) return false;
+            if (_round == null) return false;
 
-            // 第3局で特定の牌（例：一萬 = 1）を禁止する
-            if (currentRound == TutorialRound.Round3_FakeHint && tileId == 1)
+            int baseId = TutorialTiles.BaseOf(tileId);
+
+            if (_round.lockedTileBaseId >= 0 && baseId == _round.lockedTileBaseId)
             {
-                StartCoroutine(ShowDialogues("その牌は出しちゃダメって言ったでしょ！"));
+                ShowInterruptMessage(_round.lockedTileMessage);
                 return false;
             }
 
-            isWaitingForDiscard = false;
+            _lastPlayerDiscardBaseId = baseId;
+            _isWaitingForDiscard = false;
             return true;
         }
 
+        /// <summary>オート満貫ボタン（手順④）。台本の手牌を盤面へ流し込む。</summary>
         public void ApplyMockAutoMangan()
         {
+            if (_round == null) return;
             if (HasClickedAutoMangan) return;
+
             HasClickedAutoMangan = true;
-            
-            // チュートリアル用の固定の手牌（13枚）
-            // 1〜9萬, 1〜3筒, 西
-            List<int> manganHandIds = new List<int>() { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 30 }; 
-            
-            // 残りの牌を山牌にセット（1〜34のうち、手牌に使っていないもの）
-            List<int> dummyWallIds = new List<int>();
-            for(int i = 1; i <= 34; i++)
-            {
-                if (!manganHandIds.Contains(i))
-                {
-                    dummyWallIds.Add(i);
-                }
-            }
-            
-            SetupMockHandAndWall(manganHandIds, dummyWallIds);
-            
+
+            SetupBoard(_round, _round.manganHandBaseIds);
+
             if (gameUIManager != null) gameUIManager.ClearSelection();
-            
-            if (isWaitingForHandSelectionComplete && arrowUI != null && gameUIManager != null && gameUIManager.HandUI != null)
+
+            // 次は決定ボタンへ誘導する
+            if (_isWaitingForHandSelectionComplete)
             {
-                // Autoボタンを押したら、次はDecideボタンを押すように誘導する
-                arrowUI.ShowAt(gameUIManager.HandUI.DecideButtonRect, new Vector2(0, 50f));
+                GuideTo(gameUIManager != null && gameUIManager.HandUI != null
+                    ? gameUIManager.HandUI.DecideButtonRect : null);
             }
         }
     }

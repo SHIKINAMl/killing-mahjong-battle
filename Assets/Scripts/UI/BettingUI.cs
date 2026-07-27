@@ -132,8 +132,13 @@ namespace KillingMahjong.UI
             this.maxBet = rules.BetMax;
             this.currentBet = bettingUnit; // Reset bet to minimum
             this.onConfirmAction = onConfirm;
-            
+
             if (confirmButton != null) confirmButton.interactable = true;
+
+            // 固定賭け金モード（チュートリアル）で無効化された場合に備えて毎回戻す
+            if (increaseBetButton != null) increaseBetButton.interactable = true;
+            if (decreaseBetButton != null) decreaseBetButton.interactable = true;
+            if (fullBetButton != null) fullBetButton.interactable = true;
 
             // PlayerInfoUIの背面に隠れないように、自身のCanvasのSortingOrderを引き上げる
             Canvas canvas = GetComponent<Canvas>();
@@ -160,6 +165,34 @@ namespace KillingMahjong.UI
             {
                 autoDialogueCoroutine = StartCoroutine(AutoDialogueRoutine());
             }
+        }
+
+        /// <summary>矢印UIの誘導先として使う決定ボタンの RectTransform。</summary>
+        public RectTransform ConfirmButtonRect =>
+            confirmButton != null ? confirmButton.GetComponent<RectTransform>() : null;
+
+        /// <summary>
+        /// 賭け金を固定して賭けフェイズを表示する（チュートリアル用）。
+        /// 増減・全賭けボタンを無効化し、決定ボタンだけを押せる状態にする。
+        /// 煽りの自動セリフはチュートリアル側の台本と競合するため止める。
+        /// </summary>
+        public void ShowFixedBettingPhase(int initialHp, int currentHp, int fixedBet, Action<int> onConfirm)
+        {
+            ShowBettingPhase(initialHp, currentHp, 0, onConfirm);
+
+            if (autoDialogueCoroutine != null)
+            {
+                StopCoroutine(autoDialogueCoroutine);
+                autoDialogueCoroutine = null;
+            }
+
+            currentBet = Mathf.Max(0, fixedBet);
+
+            if (increaseBetButton != null) increaseBetButton.interactable = false;
+            if (decreaseBetButton != null) decreaseBetButton.interactable = false;
+            if (fullBetButton != null) fullBetButton.interactable = false;
+
+            UpdateUI();
         }
 
         public void HideBettingPhase(bool immediate = false)
@@ -190,6 +223,23 @@ namespace KillingMahjong.UI
             }
         }
 
+        /// <summary>賭け金の「上限に対する現在値の割合」。SEのピッチに使う。</summary>
+        private float BetRatio
+        {
+            get
+            {
+                int maxAllowed = Mathf.Min(maxBet, currentMoney);
+                if (maxAllowed <= 0) return 0f;
+                return Mathf.Clamp01((float)currentBet / maxAllowed);
+            }
+        }
+
+        private void PlayBetTick()
+        {
+            var audio = Managers.AudioManager.Instance;
+            if (audio != null) audio.PlayBetTickSE(BetRatio);
+        }
+
         private void IncreaseBet()
         {
             Debug.Log($"[BettingUI] IncreaseBet Called. currentBet: {currentBet}, maxBet: {maxBet}, currentMoney: {currentMoney}");
@@ -197,6 +247,7 @@ namespace KillingMahjong.UI
             {
                 currentBet += bettingUnit;
                 UpdateUI();
+                PlayBetTick();
             }
             else
             {
@@ -211,6 +262,7 @@ namespace KillingMahjong.UI
             {
                 currentBet -= bettingUnit;
                 UpdateUI();
+                PlayBetTick();
             }
             else
             {
@@ -226,6 +278,7 @@ namespace KillingMahjong.UI
             {
                 currentBet = validMax;
                 UpdateUI();
+                PlayBetTick();
             }
         }
 
@@ -300,6 +353,9 @@ namespace KillingMahjong.UI
             if (decreaseBetButton != null) decreaseBetButton.interactable = false;
             if (fullBetButton != null) fullBetButton.interactable = false;
             if (confirmButton != null) confirmButton.interactable = false;
+
+            var audio = Managers.AudioManager.Instance;
+            if (audio != null) audio.PlayBetConfirmSE();
 
             onConfirmAction?.Invoke(currentBet);
         }

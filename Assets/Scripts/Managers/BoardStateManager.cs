@@ -87,6 +87,13 @@ namespace KillingMahjong.Managers
             }
         }
 
+        private void OnDestroy()
+        {
+            // シーン再読込時に破棄済みオブジェクトを指したままにしない。
+            // 重複インスタンスが破棄された場合に本物を消さないよう this と比較する。
+            if (Instance == this) Instance = null;
+        }
+
         public void InitializeGame(List<int> initialWall)
         {
             CurrentWallTiles = new List<int>(initialWall);

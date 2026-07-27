@@ -30,6 +30,12 @@ namespace KillingMahjong.Managers
         private Queue<Action> reactionQueue = new Queue<Action>();
         private bool isProcessingReactions = false;
 
+        // 実行中の演出コルーチンと、その完了時に必ず走らせたい後始末。
+        // 中断時に onComplete を取りこぼすと SetDiscardingState(false) が呼ばれず、
+        // 敵が打牌モーションのまま固まる。
+        private Coroutine _currentReaction;
+        private Action _pendingOnComplete;
+
         private void Awake()
         {
             if (Instance == null) {
@@ -39,6 +45,12 @@ namespace KillingMahjong.Managers
             }
         }
 
+        private void OnDestroy()
+        {
+            // シーン再読込時に破棄済みオブジェクトを指したままにしない
+            if (Instance == this) Instance = null;
+        }
+
         public void Setup(DialogueUI dialogueUI, EnemyInfoUI enemyInfoUI, PlayerInfoUI playerInfoUI)
         {
             this.dialogueUI = dialogueUI;
@@ -46,13 +58,34 @@ namespace KillingMahjong.Managers
             this.playerInfoUI = playerInfoUI;
             reactionQueue.Clear();
             isProcessingReactions = false;
+            _currentReaction = null;
+            _pendingOnComplete = null;
         }
 
+        /// <summary>
+        /// 演出キューを空にして進行中の演出を打ち切る。
+        ///
+        /// StopAllCoroutines() は使わない。演出コルーチンを問答無用で殺すと
+        /// 末尾の onComplete / ProcessNextReaction に到達せず、
+        /// 敵の打牌モーションが解除されないままキューが止まるため。
+        /// </summary>
         public void ClearReactions()
         {
             reactionQueue.Clear();
             isProcessingReactions = false;
-            StopAllCoroutines();
+
+            if (_currentReaction != null)
+            {
+                StopCoroutine(_currentReaction);
+                _currentReaction = null;
+            }
+
+            // 中断された演出の後始末は必ず実行する
+            Action pending = _pendingOnComplete;
+            _pendingOnComplete = null;
+            if (pending != null) pending.Invoke();
+
+            if (enemyInfoUI != null) enemyInfoUI.SetDiscardingState(false);
         }
 
         public void ProcessNextReaction()
@@ -137,7 +170,7 @@ namespace KillingMahjong.Managers
             }
             else
             {
-                reactionQueue.Enqueue(() => StartCoroutine(ProcessLegacyDiscardEvent(tileId, isLocalPlayer, tileName)));
+                reactionQueue.Enqueue(() => _currentReaction = StartCoroutine(ProcessLegacyDiscardEvent(tileId, isLocalPlayer, tileName)));
                 if (!isProcessingReactions)
                 {
                     ProcessNextReaction();
@@ -158,7 +191,7 @@ namespace KillingMahjong.Managers
                     string safeExpr = entry.Expression;
                     string safePose = entry.Pose;
                     bool isLast = string.IsNullOrEmpty(entry.Dialogue2);
-                    reactionQueue.Enqueue(() => StartCoroutine(ProcessCSVDialogue(safeText1, safePose, safeExpr, isLast ? onComplete : null)));
+                    reactionQueue.Enqueue(() => _currentReaction = StartCoroutine(ProcessCSVDialogue(safeText1, safePose, safeExpr, isLast ? onComplete : null)));
                 }
 
                 if (!string.IsNullOrEmpty(entry.Dialogue2))
@@ -166,7 +199,7 @@ namespace KillingMahjong.Managers
                     string safeText2 = string.Format(entry.Dialogue2, formatArg);
                     string safeExpr = entry.Expression;
                     string safePose = entry.Pose;
-                    reactionQueue.Enqueue(() => StartCoroutine(ProcessCSVDialogue(safeText2, safePose, safeExpr, onComplete)));
+                    reactionQueue.Enqueue(() => _currentReaction = StartCoroutine(ProcessCSVDialogue(safeText2, safePose, safeExpr, onComplete)));
                 }
                 
                 if (!isProcessingReactions) ProcessNextReaction();
@@ -176,7 +209,7 @@ namespace KillingMahjong.Managers
         public void EnqueueCustomDialogue(string text, string poseName = "", string expressionName = "", bool clearPrevious = true)
         {
             if (clearPrevious) ClearReactions();
-            reactionQueue.Enqueue(() => StartCoroutine(ProcessCSVDialogue(text, poseName, expressionName, null)));
+            reactionQueue.Enqueue(() => _currentReaction = StartCoroutine(ProcessCSVDialogue(text, poseName, expressionName, null)));
             if (!isProcessingReactions) ProcessNextReaction();
         }
 
@@ -187,6 +220,8 @@ namespace KillingMahjong.Managers
 
         private IEnumerator ProcessCSVDialogue(string text, string poseName, string expressionName, Action onComplete = null)
         {
+            _pendingOnComplete = onComplete;
+
             if (dialogueUI != null)
             {
                 dialogueUI.gameObject.SetActive(true);
@@ -204,13 +239,21 @@ namespace KillingMahjong.Managers
                 }
             }
 
-            yield return StartCoroutine(WaitWhileLogIsOpen(reactionDisplayDuration));
+            // StartCoroutine で包まないこと。包むと親を StopCoroutine しても
+            // 子コルーチンが生き残り、演出が二重に進む。
+            yield return WaitWhileLogIsOpen(reactionDisplayDuration);
+
+            _pendingOnComplete = null;
+            _currentReaction = null;
             onComplete?.Invoke();
             ProcessNextReaction();
         }
 
         private IEnumerator ProcessLegacyDiscardEvent(int tileId, bool isLocalPlayer, string tileName)
         {
+            // 中断されても打牌モーションが解除されるようにしておく
+            _pendingOnComplete = () => { if (enemyInfoUI != null) enemyInfoUI.SetDiscardingState(false); };
+
             if (isLocalPlayer)
             {
                 if (dialogueUI != null)
@@ -240,8 +283,10 @@ namespace KillingMahjong.Managers
                 }
             }
 
-            yield return StartCoroutine(WaitWhileLogIsOpen(reactionDisplayDuration));
+            yield return WaitWhileLogIsOpen(reactionDisplayDuration);
 
+            _pendingOnComplete = null;
+            _currentReaction = null;
             if (enemyInfoUI != null) enemyInfoUI.SetDiscardingState(false);
 
             ProcessNextReaction();

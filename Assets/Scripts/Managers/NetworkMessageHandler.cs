@@ -185,6 +185,12 @@ namespace KillingMahjong.Network
             }
         }
 
+        private void OnDestroy()
+        {
+            // シーン再読込時に破棄済みオブジェクトを指したままにしない
+            if (Instance == this) Instance = null;
+        }
+
         private void Start()
         {
             if (useDebugClient && debugWebSocketClient != null)

@@ -178,7 +178,9 @@ namespace KillingMahjong.UI
                 }
                 
                 // アガリ牌（ロン牌）を少し離して配置
-                if (ronTile > 0)
+                // 牌IDは 0 始まり（0 = 一萬）なので、0 を「無し」と誤判定しないこと。
+                // 無効値は -1 で表される。
+                if (ronTile >= 0)
                 {
                     GameObject obj = Instantiate(tilePrefab, handContainerRt);
                     InitializeTileVisual(obj, ronTile);

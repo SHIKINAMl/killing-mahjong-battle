@@ -12,7 +12,10 @@ namespace KillingMahjong.Core
 
         // --- オーディオ設定 ---
         [Header("Audio Settings")]
-        [SerializeField, Range(0f, 1f)] private float bgmVolume = 0.0f;
+        // 既定値が 0.0f だったため初回起動のプレイヤーはBGMが鳴らない状態から始まっていた。
+        // SEより控えめな 0.35f を既定にする。無音に戻したい場合はここと LoadSettings の
+        // GetFloat 第2引数を 0.0f に戻す。
+        [SerializeField, Range(0f, 1f)] private float bgmVolume = 0.35f;
         [SerializeField, Range(0f, 1f)] private float seVolume = 0.5f;
         [SerializeField, Range(0f, 1f)] private float voiceVolume = 0.5f;
 
@@ -55,11 +58,17 @@ namespace KillingMahjong.Core
             }
         }
 
+        private void OnDestroy()
+        {
+            // 破棄済みオブジェクトを指したままにしない
+            if (Instance == this) Instance = null;
+        }
+
         public void LoadSettings()
         {
             // 過去のセーブデータを引き継ぐ（通常の挙動に戻す）
-            // 初回起動時（キーがない場合）のみ、デフォルト値（BGM: 0.0f, SE: 0.5f）が採用されます
-            bgmVolume = PlayerPrefs.GetFloat("BgmVolume", 0.0f); 
+            // 初回起動時（キーがない場合）のみ、デフォルト値（BGM: 0.35f, SE: 0.5f）が採用されます
+            bgmVolume = PlayerPrefs.GetFloat("BgmVolume", 0.35f);
             seVolume = PlayerPrefs.GetFloat("SeVolume", 0.5f);
             voiceVolume = PlayerPrefs.GetFloat("VoiceVolume", 0.5f);
             

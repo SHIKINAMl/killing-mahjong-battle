@@ -33,6 +33,12 @@ namespace KillingMahjong.Managers
             }
         }
 
+        private void OnDestroy()
+        {
+            // シーン再読込時に破棄済みオブジェクトを指したままにしない
+            if (Instance == this) Instance = null;
+        }
+
         [ContextMenu("Reload CSV")]
         private void LoadCSV()
         {

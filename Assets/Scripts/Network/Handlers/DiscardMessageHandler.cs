@@ -43,7 +43,9 @@ namespace KillingMahjong.Network.Handlers
                         if (daMsg.data.is_win && !network.AgariProcessed)
                         {
                             // ロン判定時のみ、フェーズがAgariに変わる前に打牌を反映させる
-                            if (daMsg.data.tile > 0)
+                            // 牌IDは 0 始まり（0 = 一萬）。0 を「未設定」と誤判定すると
+                            // 一萬で放銃したときに打牌が河へ反映されない。
+                            if (daMsg.data.tile >= 0)
                             {
                                 network.RaiseTileDiscarded(daMsg.data.tile, true);
                             }

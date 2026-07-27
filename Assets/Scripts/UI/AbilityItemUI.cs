@@ -18,6 +18,10 @@ namespace KillingMahjong.UI
         [SerializeField] private float scrollSpeed = 30f;
         [SerializeField] private Color normalColor = Color.white;
         [SerializeField] private Color selectedColor = Color.yellow;
+        [Tooltip("HPが足りずに発動できないときの背景色")]
+        [SerializeField] private Color unaffordableColor = new Color(0.45f, 0.45f, 0.45f, 1f);
+        [Tooltip("HPが足りないときのコスト文字色")]
+        [SerializeField] private Color unaffordableCostColor = new Color(1f, 0.35f, 0.35f, 1f);
 
         private AbilityUI parentUI;
         private int abilityIndex;
@@ -25,13 +29,32 @@ namespace KillingMahjong.UI
         private float descriptionWidth;
         private float containerWidth;
 
-        public void Setup(AbilityUI parent, int index, string name, int cost, string description)
+        private Color defaultCostColor = Color.white;
+        private bool defaultCostColorCaptured = false;
+
+        /// <summary>現在のHPで発動できるか。false のときはグレーアウトして発動要求も弾く。</summary>
+        public bool IsAffordable { get; private set; } = true;
+
+        public void Setup(AbilityUI parent, int index, string name, int cost, string description, bool affordable = true)
         {
             this.parentUI = parent;
             this.abilityIndex = index;
+            this.IsAffordable = affordable;
 
             if (nameText != null) nameText.text = name;
-            if (costText != null) costText.text = $"-{cost}";
+
+            if (costText != null)
+            {
+                if (!defaultCostColorCaptured)
+                {
+                    defaultCostColor = costText.color;
+                    defaultCostColorCaptured = true;
+                }
+
+                costText.text = $"-{cost}";
+                costText.color = affordable ? defaultCostColor : unaffordableCostColor;
+            }
+
             if (descriptionText != null)
             {
                 descriptionText.text = description;
@@ -41,7 +64,7 @@ namespace KillingMahjong.UI
                 containerWidth = descriptionContainer != null ? descriptionContainer.rect.width : 0;
                 currentScrollX = 0;
             }
-            
+
             Deselect();
         }
 
@@ -93,12 +116,13 @@ namespace KillingMahjong.UI
 
         public void Select()
         {
-            if (background != null) background.color = selectedColor;
+            // 発動できないスキルは選択しても黄色くしない（押せる見た目にしないため）
+            if (background != null) background.color = IsAffordable ? selectedColor : unaffordableColor;
         }
 
         public void Deselect()
         {
-            if (background != null) background.color = normalColor;
+            if (background != null) background.color = IsAffordable ? normalColor : unaffordableColor;
         }
 
         public int AbilityIndex => abilityIndex;

@@ -216,12 +216,20 @@ namespace KillingMahjong.UI
             EnemyFinalScore = enemyScore;
         }
 
+        private bool gameResultShown = false;
+
         public void ShowGameResult()
         {
+            // 呼び出し経路が2つ（ダイアログのOKと即時分岐）あるため、二重表示を防ぐ
+            if (gameResultShown) return;
+            gameResultShown = true;
+
             bool isWin = LocalFinalScore > 0 && EnemyFinalScore <= 0;
             if (victoryUI != null)
             {
-                victoryUI.PlayAnimation(isWin ? VictoryType.NormalVictory : VictoryType.NormalDefeat);
+                victoryUI.PlayAnimation(
+                    isWin ? VictoryType.NormalVictory : VictoryType.NormalDefeat,
+                    LocalFinalScore, EnemyFinalScore);
             }
         }
 

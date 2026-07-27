@@ -248,42 +248,29 @@ namespace KillingMahjong.UI
 
             if (!isFirstSetup && diff != 0)
             {
-                ShowHpPopup(diff);
+                HpPopup.Report(diff, currentHp, maxHp);
             }
         }
-        
-        private void ShowHpPopup(int amount)
+
+        /// <summary>
+        /// HP増減のポップアップとSEをまとめる。ロン演出中は毎フレーム SetHP が呼ばれるため、
+        /// 変化が落ち着くまで溜めてから1回だけ表示する（HpPopupPresenter 側で処理）。
+        /// </summary>
+        private HpPopupPresenter hpPopup;
+        private HpPopupPresenter HpPopup
         {
-            GameObject popupObj;
-            if (damagePopupPrefab != null)
+            get
             {
-                popupObj = Instantiate(damagePopupPrefab, transform);
-            }
-            else
-            {
-                // プレハブが未設定の場合のフォールバック
-                popupObj = new GameObject("DamagePopup");
-                popupObj.transform.SetParent(transform, false);
-                var rt = popupObj.AddComponent<RectTransform>();
-                rt.sizeDelta = new Vector2(300, 100);
-                popupObj.AddComponent<DamagePopupUI>();
-            }
-
-            RectTransform popupRt = popupObj.GetComponent<RectTransform>();
-            if (popupRt != null)
-            {
-                // スマホの中心より少し上あたりに生成
-                popupRt.anchoredPosition = new Vector2(0, 50f); 
-            }
-
-            DamagePopupUI popup = popupObj.GetComponent<DamagePopupUI>();
-            if (popup != null)
-            {
-                Color c = amount > 0 ? Color.green : Color.red;
-                popup.Setup(amount, c);
+                if (hpPopup == null)
+                {
+                    // スマホの中心より少し上あたりに生成
+                    hpPopup = new HpPopupPresenter(this, transform, damagePopupPrefab, new Vector2(0, 50f), isLocalPlayer: true);
+                }
+                return hpPopup;
             }
         }
-        
+
+
         public void ReduceHp(int amount)
         {
             currentHp -= amount;

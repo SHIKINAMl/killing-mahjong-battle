@@ -66,8 +66,11 @@ namespace KillingMahjong
                 case TileCategory.Pinzu: return numbers[Number] + "筒";
                 case TileCategory.Souzu: return numbers[Number] + "索";
                 case TileCategory.Honor:
-                    string[] honors = { "", "東", "南", "西", "北", "白", "發", "中" };
-                    if (Number >= 1 && Number <= 7) return honors[Number];
+                    // このゲームの牌種は 29 種（萬子9・筒子9・索子9・字牌2）。
+                    // 字牌は id 27 = 東, id 28 = 西 の 2 種類のみ（tile_wall.py のドラ計算 55-hyouji が
+                    // 東↔西 でループすることに対応）。それ以外の Number は範囲外の不正な牌ID。
+                    string[] honors = { "", "東", "西" };
+                    if (Number >= 1 && Number <= 2) return honors[Number];
                     return "不明な字牌";
                 default:
                     return "不明な牌";

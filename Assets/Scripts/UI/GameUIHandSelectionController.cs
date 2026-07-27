@@ -57,20 +57,31 @@ namespace KillingMahjong.UI
 
             if (uiManager.IsTutorialMode)
             {
-                // チュートリアル用のモックデータを直接返す（サーバー通信をスキップ）
-                var mockData = new IsTenpaiData
+                // チュートリアル用のモックを直接返す（サーバー通信をスキップ）。
+                //
+                // 台本の手牌（オート満貫）を組んだときだけ聴牌として応答し、
+                // プレイヤーが自由に選んだ13枚に対してはノーテンを返す。
+                // これにより手順②「判定ではじかれる」が正しく成立する。
+                var tm = uiManager.TutorialManager;
+                var waitIds = tm != null ? tm.GetCurrentWaitTileIds() : new List<int>();
+
+                var waitList = new List<WaitData>();
+                if (tm != null)
                 {
-                    waits = new WaitData[] 
+                    string[] yaku = tm.CurrentHandYaku.ToArray();
+                    foreach (int tileId in waitIds)
                     {
-                        new WaitData { 
-                            tile = 30, // 西待ち
-                            yaku = new string[] { "チュートリアル満貫" }, 
-                            han = 4, 
-                            mangan_or_more = true 
-                        }
+                        waitList.Add(new WaitData
+                        {
+                            tile = tileId,
+                            yaku = yaku,
+                            han = tm.CurrentHandHan,
+                            mangan_or_more = true
+                        });
                     }
-                };
-                HandleIsTenpaiReceived(mockData);
+                }
+
+                HandleIsTenpaiReceived(new IsTenpaiData { waits = waitList.ToArray() });
             }
             else
             {

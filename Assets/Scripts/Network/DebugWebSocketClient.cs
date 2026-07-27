@@ -326,12 +326,14 @@ namespace KillingMahjong.Network
         {
             // wall_index からタイルIDを取得
             int discardTileId = -1;
+            // 牌IDは 0 始まり（0 = 一萬）で、無効値は -1。
+            // 0 を「無し」と扱うと一萬の打牌が捨て牌に記録されない。
             if (payload.wall_index >= 0 && payload.wall_index < mockLocalWall.Count)
                 discardTileId = mockLocalWall[payload.wall_index];
-            else if (payload.tile > 0)
+            else if (payload.tile >= 0)
                 discardTileId = payload.tile;
 
-            if (discardTileId > 0)
+            if (discardTileId >= 0)
                 mockLocalDiscards.Add(discardTileId);
 
             // discard_completed をブロードキャスト（Pythonの on_discarded と同じ）
