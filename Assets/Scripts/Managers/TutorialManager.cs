@@ -34,6 +34,9 @@ namespace KillingMahjong.Managers
         [Header("Timing")]
         [SerializeField] private float interruptMessageDuration = 2.0f;
         [SerializeField] private float discardInterval = 0.5f;
+
+        [Tooltip("自動で打ち進めるときの1手あたりの間隔。手動より短くしないと待たされる。")]
+        [SerializeField] private float autoDiscardInterval = 0.14f;
         [SerializeField] private float phaseSettleTime = 0.5f;
 
         /// <summary>旧実装との互換のために残している局の識別子。</summary>
@@ -68,6 +71,34 @@ namespace KillingMahjong.Managers
 
         /// <summary>オート満貫ボタンが押されたか。局ごとにリセットされる。</summary>
         public bool HasClickedAutoMangan { get; set; }
+
+        /// <summary>手牌構築フェイズで13枚とみなす枚数。</summary>
+        private const int HandSize = 13;
+
+        /// <summary>
+        /// 手牌構築フェイズのボタン開放段階。
+        /// 「13枚選ぶ（両方隠す）→ 自動だけ出す → 自動を押したら決定も出す」の順に進む。
+        /// </summary>
+        private enum HandButtonStage
+        {
+            Hidden,
+            AutoOnly,
+            AutoAndDecide
+        }
+
+        private HandButtonStage _handButtonStage = HandButtonStage.Hidden;
+
+        /// <summary>『自動』ボタンを出してよいか。HandUI.UpdateLayout から参照される。</summary>
+        public bool IsAutoButtonVisible => _handButtonStage != HandButtonStage.Hidden;
+
+        /// <summary>『決定』ボタンを出してよいか。HandUI.UpdateLayout から参照される。</summary>
+        public bool IsDecideButtonVisible => _handButtonStage == HandButtonStage.AutoAndDecide;
+
+        /// <summary>既定のセリフ。台本側の onHandFilledLines が空のときに使う。</summary>
+        private static readonly List<TutorialLine> DefaultHandFilledLines = new List<TutorialLine>
+        {
+            new TutorialLine("今回は自動で選んであげるわ。"),
+        };
 
         /// <summary>
         /// 現在の局で打牌が禁止されている牌種（-1 でなし）。
@@ -178,6 +209,9 @@ namespace KillingMahjong.Managers
             _isWaitingForHandSelectionComplete = true;
             _lastPlayerDiscardBaseId = -1;
 
+            // 13枚そろうまでは『自動』も『決定』も出さない
+            SetHandButtonStage(HandButtonStage.Hidden);
+
             // 手牌は空の状態で開始する（プレイヤーが山牌から選ぶ）
             SetupBoard(data, null);
 
@@ -200,12 +234,22 @@ namespace KillingMahjong.Managers
             }
 
             // --- 手牌構築フェイズ（手順①〜④ / ⑧ / ⑫ / ㉑） ---
-            if (!data.allowManualHandSelection)
+            // 手動で組ませる局は、13枚そろってからセリフを挟んで『自動』を開放する。
+            // 手動選択を許さない局は組みようがないので、最初から『自動』を出す。
+            if (data.allowManualHandSelection)
             {
-                // 手動選択を許さない局は最初からオートへ誘導する
-                GuideTo(gameUIManager != null && gameUIManager.HandUI != null
-                    ? gameUIManager.HandUI.AutoManganButtonRect : null);
+                yield return new WaitUntil(() =>
+                    GetHandTileCount() >= HandSize || !_isWaitingForHandSelectionComplete);
+
+                if (_isWaitingForHandSelectionComplete)
+                {
+                    yield return StartCoroutine(PlayLines(ResolveHandFilledLines(data)));
+                }
             }
+
+            SetHandButtonStage(HandButtonStage.AutoOnly);
+            GuideTo(gameUIManager != null && gameUIManager.HandUI != null
+                ? gameUIManager.HandUI.AutoManganButtonRect : null);
 
             yield return new WaitUntil(() => !_isWaitingForHandSelectionComplete);
             ClearGuide();
@@ -269,6 +313,29 @@ namespace KillingMahjong.Managers
                 gameUIManager.VisualController.RebuildAllTilesFromState();
         }
 
+        /// <summary>現在の手牌枚数。13枚そろったかの判定に使う。</summary>
+        private static int GetHandTileCount()
+        {
+            var board = BoardStateManager.Instance;
+            return board != null && board.CurrentHandTiles != null ? board.CurrentHandTiles.Count : 0;
+        }
+
+        private static List<TutorialLine> ResolveHandFilledLines(TutorialRoundData data)
+        {
+            return (data.onHandFilledLines != null && data.onHandFilledLines.Count > 0)
+                ? data.onHandFilledLines
+                : DefaultHandFilledLines;
+        }
+
+        /// <summary>ボタンの開放段階を変えて、HandUI に即座に反映させる。</summary>
+        private void SetHandButtonStage(HandButtonStage stage)
+        {
+            _handButtonStage = stage;
+
+            if (gameUIManager != null && gameUIManager.HandUI != null)
+                gameUIManager.HandUI.UpdateLayout(gameUIManager.CurrentPhaseStatus);
+        }
+
         private void SetPhase(RoundStatus status)
         {
             if (gameUIManager == null) return;
@@ -287,17 +354,20 @@ namespace KillingMahjong.Managers
             if (gameUIManager == null) return;
 
             // 盤面がまだ隠れている段階（女の子とセリフだけの状態）では表示を戻さない
+            // 「準備完了」ボックスは次局待ち合わせ用。チュートリアルには待ち合わせがないので常に隠す
             if (gameUIManager.PlayerInfoUI != null)
             {
                 gameUIManager.PlayerInfoUI.gameObject.SetActive(_boardVisible);
                 gameUIManager.PlayerInfoUI.SetMaxHP(_scenario.playerStartHp);
                 gameUIManager.PlayerInfoUI.SetHP(_playerHp);
+                gameUIManager.PlayerInfoUI.ShowReadyBox(false);
             }
             if (gameUIManager.EnemyInfoUI != null)
             {
                 gameUIManager.EnemyInfoUI.SetPanelVisible(_boardVisible);
                 gameUIManager.EnemyInfoUI.SetMaxHP(_scenario.enemyStartHp);
                 gameUIManager.EnemyInfoUI.SetHP(_enemyHp);
+                gameUIManager.EnemyInfoUI.ShowReadyBox(false);
             }
         }
 
@@ -319,14 +389,9 @@ namespace KillingMahjong.Managers
             if (gameUIManager.TurnIndicatorUI != null)
                 gameUIManager.TurnIndicatorUI.gameObject.SetActive(visible);
 
+            // ドラ表示牌（3Dグランドライト含む）はチュートリアルの説明に入らないので常に隠す
             if (gameUIManager.DoraDisplayUI != null)
-            {
-                int doraId = BoardStateManager.Instance != null
-                    ? BoardStateManager.Instance.CurrentDoraId : -1;
-
-                if (visible && doraId >= 0) gameUIManager.DoraDisplayUI.ShowDora(doraId);
-                else gameUIManager.DoraDisplayUI.Hide();
-            }
+                gameUIManager.DoraDisplayUI.Hide();
 
             if (!visible)
             {
@@ -346,10 +411,18 @@ namespace KillingMahjong.Managers
 
         // ==================== 賭け金フェイズ ====================
 
+        /// <summary>
+        /// 賭け金フェイズ。
+        ///
+        /// 賭け金を決めるのは拡大したスマホの画面なので、順番は
+        /// 「セリフを送る → スマホを拡大 → 固定額の賭け金UI → 決定ボタンへ誘導」。
+        /// GameUIPhaseController 側はチュートリアル時にこの拡大とベット開始をしない。
+        /// </summary>
         private IEnumerator RunBettingPhase(TutorialRoundData data)
         {
             SetPhase(RoundStatus.Betting);
 
+            // --- ① セリフ。OKされるまで待つ ---
             if (!string.IsNullOrEmpty(data.betPromptText))
             {
                 var prompt = new List<TutorialLine>
@@ -366,6 +439,15 @@ namespace KillingMahjong.Managers
                 yield break;
             }
 
+            // --- ② セリフのあとにスマホを拡大する ---
+            var info = gameUIManager.PlayerInfoUI;
+            if (info != null)
+            {
+                info.gameObject.SetActive(true);
+                yield return info.StartCoroutine(info.ZoomInRoutine(0.4f, 4.5f));
+            }
+
+            // --- ③ 賭け金は固定額。増減ボタンは押せないので決定するしかない ---
             bool confirmed = false;
             betting.ShowFixedBettingPhase(_playerHp, _playerHp, data.betAmount, _ => confirmed = true);
 
@@ -374,6 +456,13 @@ namespace KillingMahjong.Managers
             ClearGuide();
 
             betting.HideBettingPhase();
+
+            // --- ④ 拡大を戻す ---
+            if (info != null)
+            {
+                yield return info.StartCoroutine(info.ResetZoomRoutine(0.3f));
+            }
+
             yield return new WaitForSeconds(phaseSettleTime);
         }
 
@@ -383,16 +472,34 @@ namespace KillingMahjong.Managers
         {
             var board = BoardStateManager.Instance;
             int turns = data.enemyDiscardBaseIds.Count;
+            int autoTurns = Mathf.Clamp(data.autoDiscardTurns, 0, turns);
 
             for (int turn = 1; turn <= turns; turn++)
             {
-                // --- プレイヤーの打牌を待つ ---
-                if (board != null) board.SetLocalTurn(true);
-                _isWaitingForDiscard = true;
-                _lastPlayerDiscardBaseId = -1;
+                bool isAutoTurn = turn <= autoTurns;
 
-                yield return new WaitUntil(() => !_isWaitingForDiscard);
-                yield return new WaitForSeconds(discardInterval);
+                // 自動打牌が終わってプレイヤーの番になる境目でセリフを挟む
+                if (autoTurns > 0 && turn == autoTurns + 1)
+                {
+                    yield return StartCoroutine(PlayLines(data.beforeManualDiscardLines));
+                }
+
+                // --- プレイヤーの打牌 ---
+                if (board != null) board.SetLocalTurn(true);
+
+                if (isAutoTurn)
+                {
+                    yield return StartCoroutine(AutoDiscardForPlayer());
+                }
+                else
+                {
+                    _isWaitingForDiscard = true;
+                    _lastPlayerDiscardBaseId = -1;
+
+                    yield return new WaitUntil(() => !_isWaitingForDiscard);
+                }
+
+                yield return new WaitForSeconds(isAutoTurn ? autoDiscardInterval : discardInterval);
 
                 // --- 敵のロン（プレイヤーの打牌に反応する。手順⑮） ---
                 if (data.outcome == TutorialOutcome.EnemyRon && turn >= data.enemyRonOnPlayerDiscardTurn)
@@ -411,7 +518,7 @@ namespace KillingMahjong.Managers
                     gameUIManager.EnemyRiverUI.AddTile(discardId);
                 if (AudioManager.Instance != null) AudioManager.Instance.PlayDiscardSE();
 
-                yield return new WaitForSeconds(discardInterval);
+                yield return new WaitForSeconds(isAutoTurn ? autoDiscardInterval : discardInterval);
 
                 // --- プレイヤーのロン（手順⑥ / ㉓） ---
                 if (data.outcome == TutorialOutcome.PlayerRon && discardBase == data.playerWinningTileBaseId)
@@ -426,13 +533,46 @@ namespace KillingMahjong.Managers
                     yield return StartCoroutine(RunEnemyAbilityShowcase());
                 }
 
-                yield return new WaitForSeconds(0.4f);
+                if (!isAutoTurn) yield return new WaitForSeconds(0.4f);
             }
 
             if (data.outcome == TutorialOutcome.Draw)
             {
                 yield return StartCoroutine(RunDraw(data));
             }
+        }
+
+        /// <summary>
+        /// プレイヤーの手番を自動で1手打つ。
+        ///
+        /// チュートリアルの打牌は手牌ではなく山牌から捨てる仕組みなので、
+        /// GameUIManager.DiscardSelectedTile のチュートリアル分岐と同じ経路で山から河へ移す。
+        /// </summary>
+        private IEnumerator AutoDiscardForPlayer()
+        {
+            if (gameUIManager == null) yield break;
+
+            var wall = gameUIManager.WallUI;
+            var river = gameUIManager.RiverUI;
+            if (wall == null || river == null) yield break;
+
+            var slots = wall.GetWallSlots();
+            if (slots == null || slots.Count == 0) yield break;
+
+            var interaction = slots[0] != null ? slots[0].GetComponent<TileInteraction>() : null;
+            int tileId = interaction != null ? interaction.TileId : -1;
+            if (tileId < 0) yield break;
+
+            RectTransform tileRt = wall.GrabTileById(tileId);
+            if (tileRt != null) river.AddExistingTile(tileRt, tileId);
+            else river.AddTile(tileId);
+
+            if (BoardStateManager.Instance != null)
+                wall.UpdateWallHighlights(BoardStateManager.Instance.CurrentWaitTiles, true);
+
+            if (AudioManager.Instance != null) AudioManager.Instance.PlayDiscardSE();
+
+            yield return null;
         }
 
         private IEnumerator RunPlayerRon(TutorialRoundData data, int ronTileId)
@@ -729,6 +869,9 @@ namespace KillingMahjong.Managers
             SetupBoard(_round, _round.manganHandBaseIds);
 
             if (gameUIManager != null) gameUIManager.ClearSelection();
+
+            // ここで初めて決定ボタンを出す
+            SetHandButtonStage(HandButtonStage.AutoAndDecide);
 
             // 次は決定ボタンへ誘導する
             if (_isWaitingForHandSelectionComplete)

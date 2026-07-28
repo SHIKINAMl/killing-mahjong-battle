@@ -1,4 +1,5 @@
 using UnityEngine;
+using KillingMahjong.Common;
 
 namespace KillingMahjong.UI
 {
@@ -54,7 +55,7 @@ namespace KillingMahjong.UI
                 canvas = gameObject.AddComponent<Canvas>();
             }
             canvas.overrideSorting = true;
-            canvas.sortingOrder = 50;
+            canvas.sortingOrder = UISortingOrders.TutorialArrow;
 
             gameObject.SetActive(false);
         }

@@ -85,6 +85,9 @@ namespace KillingMahjong.Managers
         [Tooltip("敵が順番に捨てる牌（牌種）。要素数がそのまま手数になる。")]
         public List<int> enemyDiscardBaseIds = new List<int>();
 
+        [Tooltip("開始直後に自動で進める手数。ここまでは自分も相手も自動で捨てる。0 なら最初から手動。")]
+        public int autoDiscardTurns = 0;
+
         [Tooltip("プレイヤーが打てない牌（牌種）。-1 でなし。手順⑭の嘘の待ち牌。")]
         public int lockedTileBaseId = -1;
 
@@ -121,10 +124,16 @@ namespace KillingMahjong.Managers
         [Tooltip("イントロの何行目のあとに盤面（山牌・手牌・ドラ・HP）を出すか。0始まり。" +
                  "-1 ならイントロを全て流し終えたあと。それまでは女の子とセリフだけが見える。")]
         public int revealBoardAfterLineIndex = -1;
+        [Tooltip("13枚そろったあと、『自動』ボタンを開放する直前のセリフ。空なら既定文が使われる。")]
+        public List<TutorialLine> onHandFilledLines = new List<TutorialLine>();
+
         [Tooltip("手牌決定後・賭け金フェイズ前")]
         public List<TutorialLine> beforeBetLines = new List<TutorialLine>();
         [Tooltip("対局開始直後")]
         public List<TutorialLine> onBattleStartLines = new List<TutorialLine>();
+
+        [Tooltip("自動打牌が終わり、プレイヤーが自分で打つ番になる直前のセリフ")]
+        public List<TutorialLine> beforeManualDiscardLines = new List<TutorialLine>();
         [Tooltip("結末演出のあと")]
         public List<TutorialLine> outroLines = new List<TutorialLine>();
     }
@@ -235,6 +244,12 @@ namespace KillingMahjong.Managers
             int d5 = TutorialTiles.Sou(9);
             int d6 = TutorialTiles.Sha;
 
+            // 第2局（流局の説明）用: 17手ぶんの敵の捨て牌。
+            // プレイヤーの待ち 7m/8m/9m を含まないよう筒子・索子だけで組む。
+            var drawDiscards = new List<int>();
+            for (int n = 1; n <= 9; n++) drawDiscards.Add(TutorialTiles.Pin(n));
+            for (int n = 1; n <= 8; n++) drawDiscards.Add(TutorialTiles.Sou(n));
+
             // 敵の役満手（単騎待ち・面子部分12枚）: 222m 333m 444m 555m
             //
             // 単騎のアタリ牌は「プレイヤーが実際に打った牌」になるため、どの牌で放銃しても
@@ -278,6 +293,11 @@ namespace KillingMahjong.Managers
                     new TutorialLine("デス麻雀のルール、ちゃんと覚えてる？"),
                     new TutorialLine("まずは山牌から好きな13枚を選んで、手牌を作ってみなさい。"),
                 },
+                onHandFilledLines = new List<TutorialLine>
+                {
+                    new TutorialLine("13枚そろったわね。……でも、その手じゃ満貫にも届かないわ。"),
+                    new TutorialLine("今回は自動で選んであげるわ。"),
+                },
                 beforeBetLines = new List<TutorialLine>
                 {
                     new TutorialLine("手牌が決まったなら、次は賭け金よ。"),
@@ -309,7 +329,9 @@ namespace KillingMahjong.Managers
                 requireAutoManganToConfirm = true,
 
                 betAmount = 1000,
-                enemyDiscardBaseIds = new List<int> { d1, d2, d3, d4, d5, d6 },
+                // 17手ぶん。うち最初の15手は自動で流し、残り2手をプレイヤーに打たせる。
+                enemyDiscardBaseIds = new List<int>(drawDiscards),
+                autoDiscardTurns = 15,
                 outcome = TutorialOutcome.Draw,
                 drawDamageToPlayer = 1000,
 
@@ -317,6 +339,15 @@ namespace KillingMahjong.Managers
                 {
                     new TutorialLine("次は流局について教えるわ。"),
                     new TutorialLine("とりあえず『自動』ボタン（オート満貫）を押してね。"),
+                },
+                onBattleStartLines = new List<TutorialLine>
+                {
+                    new TutorialLine("しばらく黙って見ていなさい。勝手に打ち進めるわ。"),
+                },
+                beforeManualDiscardLines = new List<TutorialLine>
+                {
+                    new TutorialLine("お互い17牌捨てたら流局して、次の局に移るわ。"),
+                    new TutorialLine("あと2回よ。好きな牌を捨ててみなさい。"),
                 },
                 outroLines = new List<TutorialLine>
                 {
@@ -438,6 +469,10 @@ namespace KillingMahjong.Managers
                     // 実際には requireAutoManganToConfirm が立っていて自動ボタンが必須なので、
                     // 「自動を使ってもいい」という言い回しは実挙動と食い違っていた。
                     new TutorialLine("好きに牌を並べてみなさい。仕上げは『自動』ボタンよ。"),
+                },
+                onHandFilledLines = new List<TutorialLine>
+                {
+                    new TutorialLine("13枚そろったわね。最後だもの、今回も自動で選んであげるわ。"),
                 },
                 outroLines = new List<TutorialLine>
                 {

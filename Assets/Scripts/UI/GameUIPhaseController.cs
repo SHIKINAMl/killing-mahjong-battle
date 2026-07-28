@@ -255,16 +255,22 @@ namespace KillingMahjong.UI
             switch (status)
             {
                 case RoundStatus.Betting:
-                    SetMatchUIVisibility(true); 
+                    SetMatchUIVisibility(true);
                     if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetPanelVisible(true);
-                    if (uiManager.PlayerInfoUI != null) 
-                    {
-                        uiManager.PlayerInfoUI.gameObject.SetActive(true);
-                        uiManager.PlayerInfoUI.StartCoroutine(uiManager.PlayerInfoUI.ZoomInRoutine(0.4f, 4.5f));
-                    }
+                    if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.gameObject.SetActive(true);
                     if (uiManager.WaitUI != null) uiManager.WaitUI.gameObject.SetActive(false);
                     if (uiManager.AbilityUI != null) uiManager.AbilityUI.gameObject.SetActive(false);
-                    StartBettingPhase(Managers.BoardStateManager.Instance.LocalPlayerHp);
+
+                    // チュートリアルでは TutorialManager が「セリフ → 拡大 → 賭け金UI」の順で進める。
+                    // ここで拡大やベット開始をしてしまうと、セリフを送る前にスマホが拡大してしまう。
+                    if (!uiManager.IsTutorialMode)
+                    {
+                        if (uiManager.PlayerInfoUI != null)
+                        {
+                            uiManager.PlayerInfoUI.StartCoroutine(uiManager.PlayerInfoUI.ZoomInRoutine(0.4f, 4.5f));
+                        }
+                        StartBettingPhase(Managers.BoardStateManager.Instance.LocalPlayerHp);
+                    }
                     break;
                 case RoundStatus.Dealing:
                     _hasShownHandSelectionPrompt = false; // 次の局のためにフラグをリセット
@@ -366,10 +372,15 @@ namespace KillingMahjong.UI
                     if (uiManager.WaitUI != null) uiManager.WaitUI.gameObject.SetActive(false);
                     if (uiManager.AbilityUI != null) uiManager.AbilityUI.gameObject.SetActive(false);
                     if (uiManager.DoraDisplayUI != null) uiManager.DoraDisplayUI.Hide();
-                    if (uiManager.RonAnimationUI != null)
+
+                    // チュートリアルではロンボタンを押させてから TutorialManager が演出を出す。
+                    // ここで実行すると、ボタンを押す前にロンが走ってしまう。
+                    // （LastIsLocalWin はサーバー通信でしか更新されず、チュートリアルでは
+                    //   初期値の true のままなので、敵のロンでも自分の勝ちとして走ってしまう）
+                    if (!uiManager.IsTutorialMode && uiManager.RonAnimationUI != null)
                     {
                         bool isLocalWin = BoardStateManager.Instance.LastIsLocalWin;
-                        
+
                         if (isLocalWin)
                         {
                             uiManager.ExecuteRonAction();
@@ -395,17 +406,23 @@ namespace KillingMahjong.UI
 
         private void UpdateDoraDisplay()
         {
-            if (uiManager.DoraDisplayUI != null)
+            if (uiManager.DoraDisplayUI == null) return;
+
+            // チュートリアルではドラ表示牌を扱わないので常に隠す
+            if (uiManager.IsTutorialMode)
             {
-                int doraId = Managers.BoardStateManager.Instance.CurrentDoraId;
-                if (doraId >= 0)
-                {
-                    uiManager.DoraDisplayUI.ShowDora(doraId);
-                }
-                else
-                {
-                    uiManager.DoraDisplayUI.Hide();
-                }
+                uiManager.DoraDisplayUI.Hide();
+                return;
+            }
+
+            int doraId = Managers.BoardStateManager.Instance.CurrentDoraId;
+            if (doraId >= 0)
+            {
+                uiManager.DoraDisplayUI.ShowDora(doraId);
+            }
+            else
+            {
+                uiManager.DoraDisplayUI.Hide();
             }
         }
 

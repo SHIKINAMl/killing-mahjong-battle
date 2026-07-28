@@ -269,13 +269,22 @@ namespace KillingMahjong.UI
 
             bool showButtons = (phaseStatus == RoundStatus.HandSelection) && !isSubmitted && (gameUIManager == null || (!gameUIManager.IsMulliganSelection && !gameUIManager.IsOpponentSkillProcessing));
 
+            // チュートリアルでは「13枚選ぶ → 自動 → 決定」の順にボタンを開放する
+            bool showAuto = showButtons;
+            bool showDecide = showButtons;
+            if (showButtons && gameUIManager != null && gameUIManager.IsTutorialMode && gameUIManager.TutorialManager != null)
+            {
+                showAuto = gameUIManager.TutorialManager.IsAutoButtonVisible;
+                showDecide = gameUIManager.TutorialManager.IsDecideButtonVisible;
+            }
+
             if (decideButton != null)
             {
-                decideButton.gameObject.SetActive(showButtons);
+                decideButton.gameObject.SetActive(showDecide);
             }
             if (autoManganButton != null)
             {
-                autoManganButton.gameObject.SetActive(showButtons);
+                autoManganButton.gameObject.SetActive(showAuto);
             }
             if (reselectButton != null)
             {

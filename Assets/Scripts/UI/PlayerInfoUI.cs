@@ -28,6 +28,9 @@ namespace KillingMahjong.UI
         [Header("Prefabs")]
         [SerializeField] private GameObject damagePopupPrefab;
 
+        [Tooltip("HP増減ポップアップの出現基準。未設定なら zoomTarget（スマホ）を使う。")]
+        [SerializeField] private RectTransform damagePopupAnchor;
+
         [Header("Character Portrait")]
         [SerializeField] private SpriteRenderer characterRenderer;
         [SerializeField] private SpriteRenderer faceRenderer; // 追加：表情レイヤー用
@@ -263,8 +266,15 @@ namespace KillingMahjong.UI
             {
                 if (hpPopup == null)
                 {
-                    // スマホの中心より少し上あたりに生成
-                    hpPopup = new HpPopupPresenter(this, transform, damagePopupPrefab, new Vector2(0, 50f), isLocalPlayer: true);
+                    // このコンポーネントは全画面のルートCanvasに付いているので、
+                    // transform を基準にすると相手側と同じ画面中央に出てしまう。
+                    // HPが見えているスマホ（HPPanel）を基準にする。
+                    RectTransform anchor = damagePopupAnchor != null
+                        ? damagePopupAnchor
+                        : zoomTarget as RectTransform;
+
+                    hpPopup = new HpPopupPresenter(this, transform as RectTransform, anchor,
+                                                   damagePopupPrefab, new Vector2(0, 60f), isLocalPlayer: true);
                 }
                 return hpPopup;
             }

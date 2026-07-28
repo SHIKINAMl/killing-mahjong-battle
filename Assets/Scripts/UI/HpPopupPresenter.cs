@@ -19,9 +19,10 @@ namespace KillingMahjong.UI
         private const float SettleDelay = 0.12f;
 
         private readonly MonoBehaviour host;
-        private readonly Transform parent;
+        private readonly RectTransform canvasRoot;
+        private readonly RectTransform anchor;
         private readonly GameObject prefab;
-        private readonly Vector2 spawnPosition;
+        private readonly Vector2 offset;
         private readonly bool isLocalPlayer;
 
         private int pendingDiff;
@@ -29,16 +30,23 @@ namespace KillingMahjong.UI
         private int latestMaxHp = 1;
         private Coroutine flushCoroutine;
 
+        /// <param name="canvasRoot">ポップアップの親。Canvas のルートを渡す。</param>
+        /// <param name="anchor">
+        /// どこに出すかの基準。自分のスマホ、相手の血袋など「HPが見えている場所」を渡す。
+        /// null や canvasRoot と同じ場合は Canvas 中央基準になる。
+        /// </param>
+        /// <param name="offset">anchor の中心からのずらし量。</param>
         /// <param name="isLocalPlayer">
         /// 自分側なら被弾音（追い詰められる音）、相手側なら打撃音（当てた手応えの音）を鳴らす。
         /// </param>
-        public HpPopupPresenter(MonoBehaviour host, Transform parent, GameObject prefab,
-                                Vector2 spawnPosition, bool isLocalPlayer)
+        public HpPopupPresenter(MonoBehaviour host, RectTransform canvasRoot, RectTransform anchor,
+                                GameObject prefab, Vector2 offset, bool isLocalPlayer)
         {
             this.host = host;
-            this.parent = parent;
+            this.canvasRoot = canvasRoot;
+            this.anchor = anchor;
             this.prefab = prefab;
-            this.spawnPosition = spawnPosition;
+            this.offset = offset;
             this.isLocalPlayer = isLocalPlayer;
         }
 
@@ -97,20 +105,38 @@ namespace KillingMahjong.UI
             }
         }
 
+        /// <summary>
+        /// 出現位置を Canvas ローカル座標で返す。
+        ///
+        /// PlayerInfoUI / EnemyInfoUI はどちらも全画面サイズのルートCanvasなので、
+        /// その transform を基準にすると自分も相手も画面中央に出てしまう。
+        /// HPが見えている実際のパネル（スマホ・血袋）を基準にする。
+        /// </summary>
+        private Vector2 ResolveSpawnPosition()
+        {
+            if (anchor == null || anchor == canvasRoot) return offset;
+
+            Vector3[] corners = new Vector3[4];
+            anchor.GetWorldCorners(corners);
+            Vector3 center = (corners[0] + corners[2]) * 0.5f;
+
+            return (Vector2)canvasRoot.InverseTransformPoint(center) + offset;
+        }
+
         private void SpawnPopup(int amount)
         {
-            if (parent == null) return;
+            if (canvasRoot == null) return;
 
             GameObject popupObj;
             if (prefab != null)
             {
-                popupObj = UnityEngine.Object.Instantiate(prefab, parent);
+                popupObj = UnityEngine.Object.Instantiate(prefab, canvasRoot);
             }
             else
             {
                 // プレハブが未設定の場合のフォールバック
                 popupObj = new GameObject("DamagePopup");
-                popupObj.transform.SetParent(parent, false);
+                popupObj.transform.SetParent(canvasRoot, false);
                 var rt = popupObj.AddComponent<RectTransform>();
                 rt.sizeDelta = new Vector2(300, 100);
                 popupObj.AddComponent<DamagePopupUI>();
@@ -119,7 +145,12 @@ namespace KillingMahjong.UI
             RectTransform popupRt = popupObj.GetComponent<RectTransform>();
             if (popupRt != null)
             {
-                popupRt.anchoredPosition = spawnPosition;
+                // アンカーはCanvas中央に固定してから座標を入れる。
+                // プレハブ側のアンカー設定に結果が左右されないようにするため。
+                popupRt.anchorMin = new Vector2(0.5f, 0.5f);
+                popupRt.anchorMax = new Vector2(0.5f, 0.5f);
+                popupRt.pivot = new Vector2(0.5f, 0.5f);
+                popupRt.anchoredPosition = ResolveSpawnPosition();
             }
 
             DamagePopupUI popup = popupObj.GetComponent<DamagePopupUI>();

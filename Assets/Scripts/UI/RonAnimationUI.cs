@@ -84,6 +84,12 @@ namespace KillingMahjong.UI
 
             if (winnerSprite != null)
             {
+                // カットインと同時に「ロン！」ボイスを再生
+                if (KillingMahjong.Managers.AudioManager.Instance != null)
+                {
+                    KillingMahjong.Managers.AudioManager.Instance.PlayRonVoice();
+                }
+
                 CutinAnimationUI cutinUI = gameObject.AddComponent<CutinAnimationUI>();
                 cutinUI.PlayCutin(winnerSprite, faceSprite, customFont, cutinText, () => {
                     cutinFinished = true;
@@ -199,8 +205,14 @@ namespace KillingMahjong.UI
                 currentYakuStr += yaku;
                 yakuText.text = currentYakuStr;
                 
-                // 役を1つ表示するごとの間隔
-                yield return new WaitForSeconds(0.4f);
+                // 役名ボイスを再生（「タンヤオ」「ピンフ」等）
+                if (KillingMahjong.Managers.AudioManager.Instance != null)
+                {
+                    KillingMahjong.Managers.AudioManager.Instance.PlayYakuVoice(yaku);
+                }
+
+                // 役を1つ表示するごとの間隔（ボイスの長さに合わせて少し延長）
+                yield return new WaitForSeconds(0.6f);
             }
             
             // --- タメ（ここで役と手牌をしっかり見せる） ---
@@ -258,6 +270,12 @@ namespace KillingMahjong.UI
             rankTextRt.anchorMax = new Vector2(0.5f, 0.5f);
             rankTextRt.sizeDelta = new Vector2(1000, 300);
             rankTextRt.anchoredPosition = Vector2.zero; // 画面中央
+
+            // ランクボイスを再生（「満貫！」「跳満！」等）
+            if (KillingMahjong.Managers.AudioManager.Instance != null)
+            {
+                KillingMahjong.Managers.AudioManager.Instance.PlayRankVoice(rankName);
+            }
 
             // ドンッと出るアニメーション
             float rankAnimTime = 0.3f;

@@ -35,6 +35,12 @@ namespace KillingMahjong.Common
         /// <summary>BettingUI: ベットパネル (親の PlayerInfoUI より手前に出す)</summary>
         public const int BettingPanel = 101;
 
+        /// <summary>TutorialMaskUI: 誘導先だけを切り抜く集中マスク</summary>
+        public const int TutorialMask = 900;
+
+        /// <summary>TutorialArrowUI: 誘導矢印。穴の外にはみ出すので必ずマスクより手前に置く</summary>
+        public const int TutorialArrow = 910;
+
         /// <summary>TilePoolManager のコンテナ / GameUIVisualController の AnimationCanvas。
         /// 牌の移動アニメーションを通常UIより手前で再生するためのレイヤー</summary>
         public const int TileAnimationLayer = 999;

@@ -40,6 +40,9 @@ namespace KillingMahjong.UI
         [Tooltip("HP増減のポップアップ。未設定でも実行時に簡易版が生成される。")]
         [SerializeField] private GameObject damagePopupPrefab;
 
+        [Tooltip("HP増減ポップアップの出現基準。未設定なら zoomTarget → enemyPanel の順で使う。")]
+        [SerializeField] private RectTransform damagePopupAnchor;
+
         private Sprite normalSprite;
         private Sprite discardSprite;
         private Sprite normalFaceSprite; // 通常時の顔画像
@@ -324,7 +327,14 @@ namespace KillingMahjong.UI
             {
                 if (hpPopup == null)
                 {
-                    hpPopup = new HpPopupPresenter(this, transform, damagePopupPrefab, new Vector2(0, 50f), isLocalPlayer: false);
+                    // PlayerInfoUI と同様、transform は全画面のルートCanvas。
+                    // HPが見えている血袋（EnemyPanel）を基準にする。
+                    RectTransform anchor = damagePopupAnchor;
+                    if (anchor == null) anchor = zoomTarget as RectTransform;
+                    if (anchor == null && enemyPanel != null) anchor = enemyPanel.transform as RectTransform;
+
+                    hpPopup = new HpPopupPresenter(this, transform as RectTransform, anchor,
+                                                   damagePopupPrefab, new Vector2(0, 60f), isLocalPlayer: false);
                 }
                 return hpPopup;
             }
