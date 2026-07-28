@@ -159,6 +159,14 @@ namespace KillingMahjong.UI
         {
             if (uiManager.CurrentPhaseStatus == newStatus) return;
 
+            // フェイズ遷移時に現在のHPを戦況グラフ用に記録
+            if (Managers.BoardStateManager.Instance != null)
+            {
+                uiManager.RecordHpHistory(
+                    Managers.BoardStateManager.Instance.LocalPlayerHp,
+                    Managers.BoardStateManager.Instance.EnemyPlayerHp);
+            }
+
             _hasSentNextRoundForCurrentPhase = false;
 
             uiManager.SetCurrentPhaseStatus(newStatus);

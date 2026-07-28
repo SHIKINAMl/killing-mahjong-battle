@@ -208,12 +208,35 @@ namespace KillingMahjong.UI
 
             UpdateTurnIndicatorVisibility();
         }
+        [SerializeField] private KillingMahjongBattle.UI.Effects.MatchMomentumUI matchMomentumUI;
+
+        // --- 戦況グラフ用HP履歴 ---
+        private List<int> playerHpHistory = new List<int>();
+        private List<int> enemyHpHistory = new List<int>();
+
+        public void RecordHpHistory(int localHp, int enemyHp)
+        {
+            // 同じHPが連続する場合はスキップする（変化があった時のみ記録）
+            if (playerHpHistory.Count > 0 && enemyHpHistory.Count > 0)
+            {
+                if (playerHpHistory[playerHpHistory.Count - 1] == localHp && 
+                    enemyHpHistory[enemyHpHistory.Count - 1] == enemyHp)
+                {
+                    return;
+                }
+            }
+            playerHpHistory.Add(localHp);
+            enemyHpHistory.Add(enemyHp);
+        }
 
         private void HandleGameEnded(int localScore, int enemyScore)
         {
             IsGameOver = true;
             LocalFinalScore = localScore;
             EnemyFinalScore = enemyScore;
+            
+            // 決着時の最終HPも記録しておく
+            RecordHpHistory(localScore, enemyScore);
         }
 
         private bool gameResultShown = false;
@@ -223,6 +246,19 @@ namespace KillingMahjong.UI
             // 呼び出し経路が2つ（ダイアログのOKと即時分岐）あるため、二重表示を防ぐ
             if (gameResultShown) return;
             gameResultShown = true;
+
+            StartCoroutine(ShowGameResultRoutine());
+        }
+
+        private System.Collections.IEnumerator ShowGameResultRoutine()
+        {
+            // 戦況グラフの表示（履歴が2件以上あれば表示）
+            if (matchMomentumUI != null && playerHpHistory.Count >= 2)
+            {
+                matchMomentumUI.ShowMomentum(playerHpHistory, enemyHpHistory);
+                // グラフ演出が終わるまで待つ（表示時間2秒 + 前後フェード1秒 = 約3秒。MatchMomentumUI側の設定に合わせる）
+                yield return new WaitForSeconds(3.0f);
+            }
 
             bool isWin = LocalFinalScore > 0 && EnemyFinalScore <= 0;
             if (victoryUI != null)

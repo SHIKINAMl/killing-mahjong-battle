@@ -229,6 +229,9 @@ namespace KillingMahjong.UI
             maxHp = max;
         }
 
+        [Header("Effects")]
+        [SerializeField] private KillingMahjong.UI.Effects.HeartbeatEffect heartbeatEffect;
+
         public void SetHP(int hp)
         {
             // 初回セットアップ時はポップアップを出さないように、現在値が0かつhpがmaxHpと同じならスキップするなどの制御が必要ですが、
@@ -252,6 +255,12 @@ namespace KillingMahjong.UI
             if (!isFirstSetup && diff != 0)
             {
                 HpPopup.Report(diff, currentHp, maxHp);
+            }
+
+            // --- 瀕死ハートビートエフェクトの更新 ---
+            if (heartbeatEffect != null)
+            {
+                heartbeatEffect.UpdateHeartbeat(currentHp, maxHp);
             }
         }
 
