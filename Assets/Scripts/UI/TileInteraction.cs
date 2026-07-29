@@ -4,7 +4,7 @@ using KillingMahjong.EngineData;
 
 namespace KillingMahjong.UI
 {
-    public class TileInteraction : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerEnterHandler, IPointerExitHandler
+    public class TileInteraction : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerEnterHandler, IPointerExitHandler, ICanvasRaycastFilter
     {
         public int TileId { get; set; }
         public int PoolSlotIndex { get; set; } = -1; // ★ プールのどのスロットに属するかを記憶する
@@ -173,8 +173,54 @@ namespace KillingMahjong.UI
             if (_tileVisual != null) _tileVisual.SetHoverHighlight(false);
 
             if (_gameUIManager != null && _gameUIManager.IsTransitioning) return;
-            
+
             if (_gameUIManager != null) _gameUIManager.OnTileHoverExit(this);
+        }
+
+        /// <summary>
+        /// 「見えている部分」だけをクリック判定にする。
+        ///
+        /// 牌は幅45に対して間隔25で並べているため、隣の牌と20ほど重なっている。
+        /// 手前に描かれるのは後ろの兄弟なので、判定を牌の全幅のままにしておくと
+        /// 覆われて見えない領域まで自分が拾ってしまい、
+        /// 「乗っているのに反応しない」「隣の牌を打ってしまう」という挙動になる。
+        ///
+        /// そこで、自分より手前に描かれる牌に覆われている点は自分の判定から外す。
+        /// 判定はレイアウトの実座標から毎回求めるので、手牌・山牌・打牌フェイズの
+        /// 2段組みなど、並べ方が変わっても追従する。
+        /// </summary>
+        public bool IsRaycastLocationValid(Vector2 screenPoint, Camera eventCamera)
+        {
+            RectTransform rt = _rectTransform != null ? _rectTransform : transform as RectTransform;
+            if (rt == null) return true;
+
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(rt, screenPoint, eventCamera, out Vector2 local))
+                return false;
+
+            // 牌の外にはみ出した子要素（透視マーク等）の上は牌として扱わない
+            if (!rt.rect.Contains(local)) return false;
+
+            Transform parent = rt.parent;
+            if (parent == null) return true;
+
+            Vector3 world = rt.TransformPoint(local);
+
+            // 自分より後ろの兄弟＝手前に描かれる牌
+            for (int i = rt.GetSiblingIndex() + 1; i < parent.childCount; i++)
+            {
+                RectTransform other = parent.GetChild(i) as RectTransform;
+                if (other == null || !other.gameObject.activeInHierarchy) continue;
+                if (other.GetComponent<TileInteraction>() == null) continue;
+
+                // ドラッグ中などで入力を受け付けない牌は覆っていないものとして扱う
+                var cg = other.GetComponent<CanvasGroup>();
+                if (cg != null && !cg.blocksRaycasts) continue;
+
+                Vector2 otherLocal = other.InverseTransformPoint(world);
+                if (other.rect.Contains(otherLocal)) return false;
+            }
+
+            return true;
         }
 
         private void OnDisable()

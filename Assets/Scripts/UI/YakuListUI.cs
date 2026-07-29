@@ -55,6 +55,30 @@ namespace KillingMahjong.UI
             }
         }
 
+        /// <summary>役一覧が開いているか。チュートリアルの誘導待ちに使う。</summary>
+        public bool IsOpen => yakuListPanel != null && yakuListPanel.activeSelf;
+
+        /// <summary>役一覧を開くボタン。</summary>
+        public RectTransform ToggleButtonRect =>
+            toggleButton != null ? toggleButton.GetComponent<RectTransform>() : null;
+
+        /// <summary>
+        /// チュートリアルの誘導先。
+        /// 開くボタンは画面右上の「役一覧」画像の上に重ねてあるだけで、それ単体を指しても
+        /// どこを見ればよいか分からない。画像そのもの（親）を指して枠ごと見せる。
+        /// </summary>
+        public RectTransform GuideTargetRect
+        {
+            get
+            {
+                var buttonRect = ToggleButtonRect;
+                if (buttonRect == null) return null;
+
+                var parent = buttonRect.parent as RectTransform;
+                return parent != null && parent.GetComponent<Image>() != null ? parent : buttonRect;
+            }
+        }
+
         public void OpenYakuList()
         {
             if (yakuListPanel != null)

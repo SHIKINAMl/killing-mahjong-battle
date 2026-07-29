@@ -51,7 +51,7 @@ namespace KillingMahjong.UI
             {
                 canvas = gameObject.AddComponent<Canvas>();
                 canvas.renderMode = RenderMode.ScreenSpaceOverlay; // Force screen space
-                canvas.sortingOrder = UISortingOrders.AgariSelectionMax;
+                canvas.sortingOrder = UISortingOrders.AgariSelection;
                 
                 var scaler = gameObject.AddComponent<CanvasScaler>();
                 scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using KillingMahjong.Common;
 
 namespace KillingMahjong.Managers
 {
@@ -32,6 +33,41 @@ namespace KillingMahjong.Managers
         {
             this.text = text;
             this.speaker = speaker;
+        }
+    }
+
+    /// <summary>
+    /// 敵が1つの能力を見せる単位（手順⑱〜⑲）。
+    /// skillType は SkillNames の定数を使う。SEと能力欄の誘導はこの type から引く。
+    /// </summary>
+    [Serializable]
+    public class TutorialAbilityShowcase
+    {
+        [Tooltip("SkillNames の type（mulligan / perspective / boost_hand）")]
+        public string skillType;
+
+        [Tooltip("発動前に流すセリフ")]
+        public List<TutorialLine> beforeLines = new List<TutorialLine>();
+
+        [Tooltip("発動後に流すセリフ")]
+        public List<TutorialLine> afterLines = new List<TutorialLine>();
+
+        [Tooltip("透視(perspective)のとき、プレイヤーの牌のうち何枚に透視マークを出すか")]
+        public int perspectiveTileCount = 3;
+
+        [Tooltip("役強化(boost_hand)のとき、敵が強化する役名。役一覧に敵の強化として表示される。")]
+        public string boostYakuName = "";
+
+        [Tooltip("役強化で上乗せする翻数")]
+        public int boostHan = 1;
+
+        public TutorialAbilityShowcase() { }
+
+        public TutorialAbilityShowcase(string skillType, TutorialLine before, TutorialLine after)
+        {
+            this.skillType = skillType;
+            if (before != null) beforeLines.Add(before);
+            if (after != null) afterLines.Add(after);
         }
     }
 
@@ -81,6 +117,10 @@ namespace KillingMahjong.Managers
         [Tooltip("賭け金を促すセリフ。{0} に betAmount が入る。")]
         [TextArea(1, 2)] public string betPromptText = "{0}円賭けてちょうだい。";
 
+        [Tooltip("前局が流局で賭け金が持ち越されたときのセリフ。{0}=持ち越し額 {1}=場の総額。" +
+                 "空なら既定文が使われる。流局の次の局は賭け金を指示してはいけない（自動で同額が賭けられる仕様）。")]
+        public List<TutorialLine> inheritedBetLines = new List<TutorialLine>();
+
         [Header("打牌フェイズ")]
         [Tooltip("敵が順番に捨てる牌（牌種）。要素数がそのまま手数になる。")]
         public List<int> enemyDiscardBaseIds = new List<int>();
@@ -95,6 +135,24 @@ namespace KillingMahjong.Managers
 
         [Tooltip("敵が能力を使う演出を挟むか（手順⑱）")]
         public bool enemyUsesAbility = false;
+
+        [Tooltip("能力の実演を始める前のセリフ。能力は手牌フェイズ専用なので、このフェイズ中に流れる。")]
+        public List<TutorialLine> abilityIntroLines = new List<TutorialLine>();
+
+        [Tooltip("敵が順に見せる能力（手順⑱〜⑲）。enemyUsesAbility が true のときだけ使われる。")]
+        public List<TutorialAbilityShowcase> abilityShowcases = new List<TutorialAbilityShowcase>();
+
+        [Tooltip("手順⑲: 能力そのものの説明。能力デモのあとに流す。")]
+        public List<TutorialLine> abilityExplainLines = new List<TutorialLine>();
+
+        [Tooltip("手順⑳: 能力強化の説明。役一覧への誘導の前に流す。")]
+        public List<TutorialLine> enhanceExplainLines = new List<TutorialLine>();
+
+        [Tooltip("手順⑳: 役一覧（役表）を実際に開かせる誘導を行うか。")]
+        public bool guideToYakuList = false;
+
+        [Tooltip("役一覧を開いたあとのセリフ")]
+        public List<TutorialLine> onYakuListOpenedLines = new List<TutorialLine>();
 
         [Header("結末")]
         public TutorialOutcome outcome = TutorialOutcome.Draw;
@@ -127,6 +185,9 @@ namespace KillingMahjong.Managers
         [Tooltip("13枚そろったあと、『自動』ボタンを開放する直前のセリフ。空なら既定文が使われる。")]
         public List<TutorialLine> onHandFilledLines = new List<TutorialLine>();
 
+        [Tooltip("プレイヤーが自力で満貫手を組めたときのセリフ。この場合『自動』は出さず決定へ進ませる。空なら既定文。")]
+        public List<TutorialLine> onSelfManganLines = new List<TutorialLine>();
+
         [Tooltip("手牌決定後・賭け金フェイズ前")]
         public List<TutorialLine> beforeBetLines = new List<TutorialLine>();
         [Tooltip("対局開始直後")]
@@ -157,13 +218,19 @@ namespace KillingMahjong.Managers
         /// <summary>
         /// 台本アセットが未設定のときに使われる既定シナリオ。
         ///
-        /// HPの流れ（手順⑦⑯㉔に対応）:
-        ///   開始      P20000 / E20000
-        ///   第1局 ロン E-12000 → E 8000
-        ///   第2局 流局 P -1000 → P19000
-        ///   第3局 流局+役満 P -1000 -16000 → P 2000
-        ///   第4局 流局 P -1000 → P 1000
-        ///   第5局 ロン E-32000 → E 0（敗北・死亡。0でクランプされるので過剰打点でも破綻しない）
+        /// 血の流れ。賭け金は流局では決着せず次局へ持ち越され、次のロンでまとめて動く。
+        /// 敵は第4局で能力を3つ使い、そのコストぶん自分の血を失う。
+        ///
+        ///   開始                                    P20000 / E20000
+        ///   第1局 自分ロン  打点12000+場1000        P33000 / E 7000
+        ///   第2局 流局      流局ダメージ1000/場持越  P32000 / E 7000
+        ///   第3局 相手ロン  打点16000+場2000        P14000 / E25000
+        ///   第4局 能力コスト -12700                 P14000 / E12300
+        ///         自分ロン  打点8000+場1000         P23000 / E 3300
+        ///   第5局 自分ロン  打点32000+場1000        P26300 / E    0（決着）
+        ///
+        /// 第4局を跳満12000にすると敵の血がここで尽きて第5局が成立しない。
+        /// 数値を触るときは必ず最後まで通して確認すること。
         /// </summary>
         public static TutorialScenario BuildDefault()
         {
@@ -201,6 +268,40 @@ namespace KillingMahjong.Managers
             {
                 var w = new List<int>(hand);
                 w.AddRange(rest);
+                return w;
+            }
+
+            // --- 第4局（能力）専用の配牌 ---
+            // 第4局は敵が能力に12700もの血を払った直後なので、跳満12000で上がると
+            // 敵の血が尽きて第5局（決着）が成立しない。ここは満貫ちょうどに抑えたい。
+            //
+            // ただし制約『満貫手以下での開始は不可』があるため、安くしすぎてもいけない。
+            // 清一色（門前6飜＝跳満）ではなく、ちょうど5飜＝満貫になる構成にする。
+            //   111p 444p 777p 99p 東東 → 9p で和了すると
+            //   111p 444p 777p 999p 東東 = 対々和(2飜) + 混一色(門前3飜) = 5飜 満貫
+            // 待ちは 9p / 東 のシャンポン。
+            var abilityHand = new List<int>
+            {
+                TutorialTiles.Pin(1), TutorialTiles.Pin(1), TutorialTiles.Pin(1),
+                TutorialTiles.Pin(4), TutorialTiles.Pin(4), TutorialTiles.Pin(4),
+                TutorialTiles.Pin(7), TutorialTiles.Pin(7), TutorialTiles.Pin(7),
+                TutorialTiles.Pin(9), TutorialTiles.Pin(9),
+                TutorialTiles.Ton, TutorialTiles.Ton,
+            };
+
+            var abilityWaits = new List<int> { TutorialTiles.Pin(9), TutorialTiles.Ton };
+            int abilityWinningTile = TutorialTiles.Pin(9);
+
+            // 残り21枚。手牌の待ち（9p / 東）は1枚も含めないこと。
+            // 含めるとプレイヤーが自分の待ちを打ててしまい、フリテンの説明が必要になる。
+            List<int> AbilityWall()
+            {
+                var w = new List<int>(abilityHand);
+                for (int n = 1; n <= 9; n++) w.Add(TutorialTiles.Man(n));
+                for (int n = 1; n <= 9; n++) w.Add(TutorialTiles.Sou(n));
+                w.Add(TutorialTiles.Sha);
+                w.Add(TutorialTiles.Pin(2));
+                w.Add(TutorialTiles.Pin(5)); // ドラ表示と同じ牌。手牌には入らないので打点は動かない
                 return w;
             }
 
@@ -298,6 +399,12 @@ namespace KillingMahjong.Managers
                     new TutorialLine("13枚そろったわね。……でも、その手じゃ満貫にも届かないわ。"),
                     new TutorialLine("今回は自動で選んであげるわ。"),
                 },
+                onSelfManganLines = new List<TutorialLine>
+                {
+                    new TutorialLine("……あら。13枚そろえて、しかも満貫手じゃない。"),
+                    new TutorialLine("ふーん、麻雀は知っているのね。少し見直したわ。"),
+                    new TutorialLine("その手なら文句なしよ。『決定』を押して始めましょう。"),
+                },
                 beforeBetLines = new List<TutorialLine>
                 {
                     new TutorialLine("手牌が決まったなら、次は賭け金よ。"),
@@ -381,11 +488,18 @@ namespace KillingMahjong.Managers
                 formulaText = "役満",
                 rankText = "役満",
                 score = 16000,
-                drawDamageToPlayer = 1000, // ⑯ 流局のダメージも同時に受ける
+                // 第2局の流局で決着しなかった賭け金は場に残っており、
+                // このロンで打点と一緒に奪われる（TutorialManager が _pot として持っている）。
 
                 introLines = new List<TutorialLine>
                 {
                     new TutorialLine("次の局よ。とりあえず『自動』ボタンを押してね。"),
+                },
+                inheritedBetLines = new List<TutorialLine>
+                {
+                    new TutorialLine("前の局は流局だったわね。賭け金は決着していないから、そのまま場に残っているの。"),
+                    new TutorialLine("だから今回は{0}円が自動で賭けられて、場には合計{1}円。改めて賭ける必要はないわ。"),
+                    new TutorialLine("次にどちらかが上がったら、この分もまとめて動くのよ。"),
                 },
                 onBattleStartLines = new List<TutorialLine>
                 {
@@ -398,7 +512,7 @@ namespace KillingMahjong.Managers
                     new TutorialLine("ロン！ふふっ、騙されたわね！"),
                     new TutorialLine("待ち牌が東だなんて、一言も本当だとは言ってないわ。"),
                     new TutorialLine("単騎待ちは、たった1枚の牌を待つ代わりに打点が跳ね上がるの。"),
-                    new TutorialLine("流局のダメージと、単騎待ちのダメージ。まとめて食らいなさい！"),
+                    new TutorialLine("役満の打点と、持ち越されていた賭け金。まとめて食らいなさい！"),
                 },
             });
 
@@ -406,9 +520,11 @@ namespace KillingMahjong.Managers
             s.rounds.Add(new TutorialRoundData
             {
                 label = "第4局 能力",
-                wallBaseIds = Wall(),
-                manganHandBaseIds = new List<int>(hand),
-                waitBaseIds = new List<int>(waits),
+
+                // この局だけ専用の配牌。理由は AbilityWall の定義を参照。
+                wallBaseIds = AbilityWall(),
+                manganHandBaseIds = new List<int>(abilityHand),
+                waitBaseIds = new List<int>(abilityWaits),
                 doraBaseId = dora,
 
                 allowManualHandSelection = false,
@@ -416,26 +532,94 @@ namespace KillingMahjong.Managers
                 requireAutoManganToConfirm = true,
 
                 betAmount = 1000,
-                enemyDiscardBaseIds = new List<int> { d1, d2, d3, d4, d5, d6 },
+
+                // 2打目で放銃させる。1打目は待ちでない牌、2打目にプレイヤーの待ち(9p)を打たせる。
+                enemyDiscardBaseIds = new List<int> { TutorialTiles.Man(1), abilityWinningTile },
                 enemyUsesAbility = true, // ⑱
 
-                outcome = TutorialOutcome.Draw,
-                drawDamageToPlayer = 1000,
+                outcome = TutorialOutcome.PlayerRon,
+                playerWinningTileBaseId = abilityWinningTile,
+
+                // 対々和(2飜) + 混一色(門前3飜) = 5飜 満貫。
+                // 跳満12000にすると、敵は能力コスト12700を払った直後なので血が尽き、
+                // 第5局（決着）が成立しなくなる。
+                yakuList = new List<string> { "対々和", "混一色" },
+                formulaText = "5飜",
+                rankText = "満貫",
+                score = 8000,
 
                 introLines = new List<TutorialLine>
                 {
                     new TutorialLine("次は能力の使用についての説明よ。"),
                     new TutorialLine("まずは『自動』ボタンで手牌を作りなさい。"),
                 },
-                onBattleStartLines = new List<TutorialLine>
+
+                // 能力は手牌フェイズでしか使えないので、手牌を決めたあと・賭け金の前に実演する
+                abilityIntroLines = new List<TutorialLine>
                 {
+                    new TutorialLine("手牌が決まったわね。ここからが本番よ。"),
+                    new TutorialLine("能力は、この手牌フェイズの間だけ使えるの。打牌が始まったらもう使えないわ。"),
                     new TutorialLine("ふふっ、私の能力を見せてあげるわ！"),
                 },
+
+                onBattleStartLines = new List<TutorialLine>
+                {
+                    new TutorialLine("さあ、打牌を始めましょう。"),
+                },
+
+                // 手順⑱: 3つの能力を順に実演する
+                abilityShowcases = new List<TutorialAbilityShowcase>
+                {
+                    new TutorialAbilityShowcase(
+                        SkillNames.Perspective,
+                        new TutorialLine("まずは『透視』。相手の牌をランダムに3枚のぞけるの。"),
+                        new TutorialLine("ほら、あなたの牌に印がついたでしょう。その3枚は私に丸見えよ。")),
+
+                    new TutorialAbilityShowcase(
+                        SkillNames.Mulligan,
+                        new TutorialLine("次は『牌交換』。いらない牌を山の牌と入れ替えるのよ。"),
+                        new TutorialLine("これで私の手はぐっと良くなったわ。")),
+
+                    new TutorialAbilityShowcase(
+                        SkillNames.BoostHand,
+                        new TutorialLine("最後は『役強化』。指定した役の翻数を+1するの。"),
+                        new TutorialLine("私は『清一色』を選んだわ。同じ手でも打点が跳ね上がる。えげつないでしょう？"))
+                    {
+                        boostYakuName = "清一色",
+                        boostHan = 1,
+                    },
+                },
+
+                // 手順⑲: 能力そのものの説明
+                abilityExplainLines = new List<TutorialLine>
+                {
+                    new TutorialLine("これが能力よ。使えば対局を一気に有利にできるの。"),
+                    new TutorialLine("能力の発動には、あなたの血を支払うことになるわ。"),
+                    new TutorialLine("血は体力そのもの。使いすぎれば自分の首を絞めることになるわね。"),
+                    new TutorialLine("使えるのは手牌フェイズの間だけ。打牌が始まったら発動できないから、使うなら今のうちよ。"),
+                    new TutorialLine("能力は画面の『能力』ボタンから確認できるわ。", TutorialSpeaker.System),
+                },
+
+                // 手順⑳: 能力強化の説明 → 役一覧へ誘導
+                enhanceExplainLines = new List<TutorialLine>
+                {
+                    new TutorialLine("それと、能力は強化することもできるの。"),
+                    new TutorialLine("『役強化』で積み上げた翻数は、その役にずっと乗り続けるのよ。"),
+                    new TutorialLine("どの役がどれだけ強化されているかは、役一覧から確認できるわ。"),
+                },
+                guideToYakuList = true,
+                onYakuListOpenedLines = new List<TutorialLine>
+                {
+                    new TutorialLine("これが役一覧よ。役ごとの翻数と、強化された分が並んでいるわ。", TutorialSpeaker.System),
+                    new TutorialLine("さっき私が強化した『清一色』も、ちゃんと乗っているでしょう？"),
+                    new TutorialLine("狙う役を決めるときは、ここを見て考えることね。"),
+                },
+
                 outroLines = new List<TutorialLine>
                 {
-                    new TutorialLine("これが能力よ。使えば対局を有利に進められるの。"),
-                    new TutorialLine("能力は強化することもできるわ。"),
-                    new TutorialLine("強化の条件は役一覧から確認してね。", TutorialSpeaker.System),
+                    new TutorialLine("……ロン？ うそ、能力を使ったのにこっちが振り込むなんて。"),
+                    new TutorialLine("能力を使っても、放銃してしまえば意味がないのよ。血だけ払って損しただけね。"),
+                    new TutorialLine("能力の説明は以上よ。次で最後にしましょう。"),
                 },
             });
 
@@ -470,6 +654,11 @@ namespace KillingMahjong.Managers
                     // 「自動を使ってもいい」という言い回しは実挙動と食い違っていた。
                     new TutorialLine("好きに牌を並べてみなさい。仕上げは『自動』ボタンよ。"),
                 },
+                inheritedBetLines = new List<TutorialLine>
+                {
+                    new TutorialLine("さっきも流局だったから、賭け金はまた持ち越しよ。"),
+                    new TutorialLine("{0}円が自動で積まれて、場には{1}円。ここで決着をつけましょう。"),
+                },
                 onHandFilledLines = new List<TutorialLine>
                 {
                     new TutorialLine("13枚そろったわね。最後だもの、今回も自動で選んであげるわ。"),
@@ -481,7 +670,7 @@ namespace KillingMahjong.Managers
                 },
             });
 
-            // 第1〜4局は同じ清一色の手牌を使うので、聴牌チェックの応答も共通にしておく
+            // 第1〜3局は同じ清一色の手牌を使うので、聴牌チェックの応答も共通にしておく
             foreach (var r in s.rounds)
             {
                 r.manganHandYaku = new List<string> { "清一色" };
@@ -494,7 +683,12 @@ namespace KillingMahjong.Managers
             // 第1局は導入が長いので、「山牌から13枚選んで」と促す直前で盤面を出す
             if (s.rounds.Count > 0) s.rounds[0].revealBoardAfterLineIndex = 2;
 
-            // 決着局だけは手牌も役も違うので、共通設定のあとで上書きする
+            // 第4局と第5局は手牌も役も違うので、共通設定のあとで上書きする
+            if (s.rounds.Count > 3)
+            {
+                s.rounds[3].manganHandYaku = new List<string> { "対々和", "混一色" };
+                s.rounds[3].manganHandHan = 5;
+            }
             if (s.rounds.Count > 4)
             {
                 s.rounds[4].manganHandYaku = new List<string> { "純正九蓮宝燈" };

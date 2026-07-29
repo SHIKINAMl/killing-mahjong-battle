@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using KillingMahjong.Common;
 
 public class CustomCursor : MonoBehaviour
 {
@@ -32,7 +33,7 @@ public class CustomCursor : MonoBehaviour
         cursorCanvasObj = new GameObject("UICursorCanvas");
         Canvas canvas = cursorCanvasObj.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 32767; // 一番手前に表示
+        canvas.sortingOrder = UISortingOrders.MouseCursor; // 一番手前に表示
         
         cursorCanvasObj.AddComponent<CanvasScaler>(); // 解像度に依存しないようにする
         

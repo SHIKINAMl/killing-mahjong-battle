@@ -32,9 +32,26 @@ namespace KillingMahjongBattle.UI.Effects
 
         private void Awake()
         {
-            canvasGroup = GetComponent<CanvasGroup>();
+            EnsureCanvasGroup();
             canvasGroup.alpha = 0f;
+        }
+
+        private void Start()
+        {
+            // 初期表示を隠すのは Awake ではなく Start で行う。
+            // Awake で SetActive(false) すると、シーン上で非アクティブに置かれていた場合に
+            // ShowMomentum() の SetActive(true) が Awake を誘発し、その場で自分を非アクティブへ
+            // 戻してしまうため、直後の StartCoroutine が "game object is inactive" で失敗する。
             gameObject.SetActive(false);
+        }
+
+        private void EnsureCanvasGroup()
+        {
+            if (canvasGroup == null) canvasGroup = GetComponent<CanvasGroup>();
+
+            // 戦況グラフは見せるだけの演出なので、裏のUIの入力を奪わないようにする
+            canvasGroup.blocksRaycasts = false;
+            canvasGroup.interactable = false;
         }
 
         /// <summary>
@@ -42,9 +59,13 @@ namespace KillingMahjongBattle.UI.Effects
         /// </summary>
         public void ShowMomentum(List<int> playerHpHistory, List<int> enemyHpHistory)
         {
+            // シーン上で非アクティブに置かれていると Awake が未実行なので、ここで取得しておく
+            EnsureCanvasGroup();
+            canvasGroup.alpha = 0f;
+
             gameObject.SetActive(true);
             ClearGraph();
-            
+
             StartCoroutine(DisplayRoutine(playerHpHistory, enemyHpHistory));
         }
 
@@ -73,9 +94,19 @@ namespace KillingMahjongBattle.UI.Effects
         private void DrawGraph(List<int> pHistory, List<int> eHistory)
         {
             if (pHistory == null || eHistory == null || pHistory.Count == 0 || eHistory.Count == 0 || graphContainer == null) return;
-            
+
+            // 非アクティブ状態から出した直後はレイアウトが未確定なことがあるので確定させてから測る
+            Canvas.ForceUpdateCanvases();
+
             float width = graphContainer.rect.width;
             float height = graphContainer.rect.height;
+
+            if (width <= 0f || height <= 0f)
+            {
+                Debug.LogWarning($"[MatchMomentumUI] {graphContainer.name} のサイズが 0 です。" +
+                                 "Layout Group / Content Size Fitter を外して固定サイズにしてください。");
+                return;
+            }
             int maxPoints = Mathf.Max(pHistory.Count, eHistory.Count);
             float xStep = maxPoints > 1 ? width / (maxPoints - 1) : width;
             

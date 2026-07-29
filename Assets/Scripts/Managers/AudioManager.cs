@@ -17,10 +17,12 @@ namespace KillingMahjong.Managers
         private Coroutine filterFadeCoroutine;
 
         [Header("Discard Pitch Settings")]
+        [Tooltip("打牌1回あたり何半音ピッチを上げるか。1.0=半音ずつ、0.5=四分音ずつ（ゆっくり）")]
+        [SerializeField, Range(0.1f, 2f)] private float discardPitchStepSemitones = 0.5f;
+
         private float currentDiscardPitch = 1.0f;
         private float lastDiscardTime = 0f;
         private const float PITCH_RESET_TIME = 2.5f; // 2.5秒間打牌がなければピッチリセット
-        private const float SEMITONE_RATIO = 1.059463094359295f; // 半音の周波数比率
         private const float MAX_PITCH = 2.0f; // 1オクターブ上まで
 
         [Header("Volume Settings")]
@@ -241,8 +243,8 @@ namespace KillingMahjong.Managers
             }
             else
             {
-                // 半音上げる
-                currentDiscardPitch *= SEMITONE_RATIO;
+                // discardPitchStepSemitones 半音ぶん上げる（1オクターブ = 12半音）
+                currentDiscardPitch *= Mathf.Pow(2f, discardPitchStepSemitones / 12f);
                 if (currentDiscardPitch > MAX_PITCH)
                 {
                     currentDiscardPitch = MAX_PITCH;

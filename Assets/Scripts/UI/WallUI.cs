@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
+using KillingMahjong.Common;
 
 namespace KillingMahjong.UI
 {
@@ -82,7 +83,9 @@ namespace KillingMahjong.UI
             if (canvas != null)
             {
                 canvas.overrideSorting = true;
-                canvas.sortingOrder = isDiscardPhase ? 2 : 1;
+                canvas.sortingOrder = isDiscardPhase
+                    ? UISortingOrders.WallDiscardPhase
+                    : UISortingOrders.WallBase;
             }
         }
 
@@ -434,7 +437,7 @@ namespace KillingMahjong.UI
 
             var canvas = arrowObj.AddComponent<Canvas>();
             canvas.overrideSorting = true;
-            canvas.sortingOrder = 16;
+            canvas.sortingOrder = UISortingOrders.WallFront;
 
             // 生成直後にwallContainerの子として登録することで、牌のプール汚染を防ぐ
             Transform parent = wallContainer != null ? wallContainer : (Transform)this.transform;

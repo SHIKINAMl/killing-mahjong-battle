@@ -5368,7 +5368,7 @@ Canvas:
   m_AdditionalShaderChannelsFlag: 25
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 0
-  m_SortingOrder: 100
+  m_SortingOrder: 55
   m_TargetDisplay: 0
 --- !u!114 &268140681
 MonoBehaviour:
@@ -27033,7 +27033,7 @@ Canvas:
   m_AdditionalShaderChannelsFlag: 0
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 0
-  m_SortingOrder: 31500
+  m_SortingOrder: 92
   m_TargetDisplay: 0
 --- !u!114 &1324811543
 MonoBehaviour:
@@ -33945,7 +33945,7 @@ Canvas:
   m_AdditionalShaderChannelsFlag: 0
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 0
-  m_SortingOrder: 31000
+  m_SortingOrder: 91
   m_TargetDisplay: 0
 --- !u!1 &1609603663
 GameObject:
@@ -42467,7 +42467,7 @@ Canvas:
   m_AdditionalShaderChannelsFlag: 25
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 0
-  m_SortingOrder: 100
+  m_SortingOrder: 55
   m_TargetDisplay: 0
 --- !u!114 &1987867888
 MonoBehaviour:

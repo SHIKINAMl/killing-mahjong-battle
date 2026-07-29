@@ -95,24 +95,24 @@ namespace KillingMahjong.UI
         {
             if (targetRectTransform == null) return;
 
-            Vector3[] corners = new Vector3[4];
-            targetRectTransform.GetWorldCorners(corners);
-            
-            Vector3 topCenterWorld = (corners[1] + corners[2]) * 0.5f;
-            
             Vector2 currentOffset = customOffset.HasValue ? customOffset.Value : offset;
 
-            Canvas canvas = transform.parent != null ? transform.parent.GetComponentInParent<Canvas>() : null;
-            if (canvas != null)
-            {
-                RectTransform canvasRect = canvas.GetComponent<RectTransform>();
-                Vector3 localPos = canvasRect.InverseTransformPoint(topCenterWorld);
-                basePosition = (Vector2)localPos + currentOffset;
-            }
-            else
-            {
-                basePosition = (Vector2)topCenterWorld + currentOffset;
-            }
+            // anchoredPosition は「親の中を動く座標」なので、変換先は親の RectTransform。
+            // この矢印は Awake で自分自身にも Canvas を足しているため、
+            // GetComponentInParent<Canvas>() を自分から始めると 80x80 の自前 Canvas を拾ってしまう。
+            // 必ず親から探すこと。
+            RectTransform parentRect = transform.parent as RectTransform;
+            if (parentRect == null) return;
+
+            Canvas parentCanvas = transform.parent.GetComponentInParent<Canvas>();
+
+            // 誘導先が別 RenderMode の Canvas（役Canvas は ScreenSpaceCamera）にいることがあるため、
+            // ワールド座標を直接 InverseTransformPoint せず、スクリーン座標を経由して変換する。
+            if (!UIRectUtility.TryGetLocalRect(targetRectTransform, parentRect, parentCanvas, out Rect local)) return;
+
+            // 変換結果は親の pivot 原点。anchoredPosition は親の中心（anchor 0.5）基準なので差を引く。
+            Vector2 topCenter = new Vector2(local.center.x, local.yMax) - parentRect.rect.center;
+            basePosition = topCenter + currentOffset;
         }
 
         private void Animate()

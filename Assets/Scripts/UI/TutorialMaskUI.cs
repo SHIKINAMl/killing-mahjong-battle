@@ -178,17 +178,18 @@ namespace KillingMahjong.UI
         /// <summary>ターゲットの矩形を Canvas ローカルに変換し、余白を足した「穴」を返す。</summary>
         private Rect CalcHoleRect(RectTransform target)
         {
-            Vector3[] corners = new Vector3[4];
-            target.GetWorldCorners(corners);
-
-            Vector3 bottomLeft = _canvasRect.InverseTransformPoint(corners[0]);
-            Vector3 topRight = _canvasRect.InverseTransformPoint(corners[2]);
+            // 誘導先が別 RenderMode の Canvas（役Canvas は ScreenSpaceCamera）にいることがあるため、
+            // ワールド座標を直接 InverseTransformPoint せず、スクリーン座標を経由して変換する。
+            if (!UIRectUtility.TryGetLocalRect(target, _canvas, out Rect local))
+            {
+                return _holeRect;
+            }
 
             return Rect.MinMaxRect(
-                bottomLeft.x - padding,
-                bottomLeft.y - padding,
-                topRight.x + padding,
-                topRight.y + padding);
+                local.xMin - padding,
+                local.yMin - padding,
+                local.xMax + padding,
+                local.yMax + padding);
         }
 
         private void ApplyHole(Rect hole)

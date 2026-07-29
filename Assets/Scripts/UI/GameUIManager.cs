@@ -252,6 +252,9 @@ namespace KillingMahjong.UI
 
         private System.Collections.IEnumerator ShowGameResultRoutine()
         {
+            // 決着したら瀕死ビネットを消す（結果画面より手前に描画されるため）
+            if (playerInfoUI != null) playerInfoUI.StopHeartbeatEffect();
+
             // 戦況グラフの表示（履歴が2件以上あれば表示）
             if (matchMomentumUI != null && playerHpHistory.Count >= 2)
             {
@@ -764,7 +767,12 @@ namespace KillingMahjong.UI
             if (enemyRiverUI != null) enemyRiverUI.Clear();
             
             if (waitUI != null) waitUI.gameObject.SetActive(false);
-            
+
+            // 牌をすべてプールへ返したので、差分リビルドの前提（UIに前回の牌が残っている）が崩れる。
+            // 無効化しておかないと、返却前と牌の構成が偶然一致したときに
+            // 「変化なし＝再生成不要」と誤判定され、盤面が空のままになる。
+            if (VisualController != null) VisualController.InvalidateRebuildCache();
+
             Managers.BoardStateManager.Instance.ClearAllBoardData();
         }
 

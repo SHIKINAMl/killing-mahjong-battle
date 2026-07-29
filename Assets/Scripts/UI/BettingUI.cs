@@ -64,7 +64,7 @@ namespace KillingMahjong.UI
             
             Canvas dimmerCanvas = bettingDimmer.AddComponent<Canvas>();
             dimmerCanvas.overrideSorting = true;
-            dimmerCanvas.sortingOrder = 19; // PlayerInfoUI (20) より奥にする
+            dimmerCanvas.sortingOrder = UISortingOrders.BettingDimmer; // BettingPanel より奥にする
             
             bettingDimmer.AddComponent<UnityEngine.UI.GraphicRaycaster>();
 
@@ -145,8 +145,7 @@ namespace KillingMahjong.UI
             if (canvas != null)
             {
                 canvas.overrideSorting = true;
-                canvas.sortingLayerName = "UI";
-                canvas.sortingOrder = 20; // 敵のdialogより前にするために20に設定
+                canvas.sortingOrder = UISortingOrders.BettingPanel; // 敵のdialogより前に出す
             }
 
             gameObject.SetActive(true);

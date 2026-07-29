@@ -85,6 +85,24 @@ namespace KillingMahjong.UI
 
             animationDuration = 0.2f; // 強制的に0.2秒にする
 
+            EnsureAbilities();
+
+            // Populate List
+            PopulateList();
+
+            // 起動時にツールチップを非表示にする
+            HideTooltip();
+        }
+
+        /// <summary>
+        /// アビリティ一覧を用意する。
+        /// 非アクティブから有効化された直後に外部から開かれると Start より先に
+        /// PopulateList が走るため、生成は Start 任せにせずここで担保する。
+        /// </summary>
+        private void EnsureAbilities()
+        {
+            if (realAbilities != null) return;
+
             // Pythonの設定に合わせたアビリティ一覧
             realAbilities = new System.Collections.Generic.List<AbilityData>
             {
@@ -93,12 +111,6 @@ namespace KillingMahjong.UI
                 new AbilityData("boost_hand", "役強化", 10000, "指定した役の翻数を+1する。"),
                 new AbilityData("special_victory", "特殊勝利", 30000, "3回発動すると無条件で勝利する。")
             };
-
-            // Populate List
-            PopulateList();
-            
-            // 起動時にツールチップを非表示にする
-            HideTooltip();
         }
 
         /// <summary>現在の所持HP（＝スキルの支払い原資）。BoardStateManager が無い場合は 0 扱い。</summary>
@@ -114,6 +126,7 @@ namespace KillingMahjong.UI
 
         private void PopulateList()
         {
+            EnsureAbilities();
             if (itemPrefab == null || contentContainer == null) return;
 
             // clear existing
@@ -210,6 +223,30 @@ namespace KillingMahjong.UI
             if (isWindowVisible) ToggleAbilityWindow(cancelSkill);
         }
 
+        /// <summary>チュートリアルの実演用。閉じていれば開く。</summary>
+        public void OpenWindow()
+        {
+            if (!isWindowVisible) ToggleAbilityWindow(false);
+        }
+
+        /// <summary>
+        /// チュートリアルの誘導用。指定した skillType の行の RectTransform を返す。
+        /// ウィンドウを開く前は行が生成されていないため null を返す。
+        /// </summary>
+        public RectTransform GetAbilityItemRect(string skillType)
+        {
+            if (realAbilities == null) return null;
+
+            for (int i = 0; i < realAbilities.Count && i < instantiatedItems.Count; i++)
+            {
+                if (realAbilities[i].skillType != skillType) continue;
+                return instantiatedItems[i] != null
+                    ? instantiatedItems[i].GetComponent<RectTransform>()
+                    : null;
+            }
+            return null;
+        }
+
         public void ToggleAbilityWindow(bool cancelSkill = true)
         {
             isWindowVisible = !isWindowVisible;
@@ -233,7 +270,7 @@ namespace KillingMahjong.UI
                 Canvas rootCanvas = this.GetComponent<Canvas>();
                 if (rootCanvas != null)
                 {
-                    rootCanvas.sortingOrder = 15;
+                    rootCanvas.sortingOrder = UISortingOrders.InfoPanelNormal;
                 }
             }
 
@@ -241,8 +278,20 @@ namespace KillingMahjong.UI
             currentAnimationCoroutine = StartCoroutine(AnimateWindow(isWindowVisible ? showPosition : hiddenPosition, isWindowVisible));
         }
 
+        /// <summary>
+        /// 実演モード。チュートリアルで能力を「見せている」あいだ true にすると、
+        /// 一覧は表示されるが選択も発動もできなくなる。
+        ///
+        /// これが無いと、実演中に光っている行を押されたときに
+        /// DialogueUI.ShowText でチュートリアルのセリフが上書きされ、
+        /// 送りボタン待ちのまま進行が止まってしまう。
+        /// </summary>
+        public bool IsDisplayOnly { get; set; }
+
         public void OnAbilitySelected(AbilityItemUI item)
         {
+            if (IsDisplayOnly) return;
+
             if (currentSelection == item)
             {
                 // すでに選択されているものをもう一度クリックしたら発動とする
@@ -267,6 +316,8 @@ namespace KillingMahjong.UI
 
         private void OnActivateClicked()
         {
+            if (IsDisplayOnly) return;
+
             if (currentSelection != null)
             {
                 int index = currentSelection.AbilityIndex;
@@ -378,7 +429,6 @@ namespace KillingMahjong.UI
                     tooltipPanel.AddComponent<UnityEngine.UI.GraphicRaycaster>();
                 }
                 tooltipCanvas.overrideSorting = true;
-                tooltipCanvas.sortingLayerName = "UI";
                 tooltipCanvas.sortingOrder = UISortingOrders.AbilityTooltip;
 
                 // AbilityUI全体を最前面化するが、中身の表示順が壊れないようにルート(this)のみ設定する
@@ -389,7 +439,6 @@ namespace KillingMahjong.UI
                     this.gameObject.AddComponent<UnityEngine.UI.GraphicRaycaster>();
                 }
                 rootCanvas.overrideSorting = true;
-                rootCanvas.sortingLayerName = "UI";
                 rootCanvas.sortingOrder = UISortingOrders.InfoPanelHighlight;
                 
                 // Z座標は0
@@ -409,7 +458,7 @@ namespace KillingMahjong.UI
             Canvas rootCanvas = this.GetComponent<Canvas>();
             if (rootCanvas != null)
             {
-                rootCanvas.sortingOrder = 15;
+                rootCanvas.sortingOrder = UISortingOrders.InfoPanelNormal;
             }
         }
     }

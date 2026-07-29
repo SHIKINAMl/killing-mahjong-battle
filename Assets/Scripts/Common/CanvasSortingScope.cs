@@ -34,7 +34,8 @@ namespace KillingMahjong.Common
         /// </summary>
         /// <param name="go">前面化する対象 (この GameObject 自身の Canvas のみを操作する)</param>
         /// <param name="order">設定する sortingOrder (UISortingOrders の定数を使用すること)</param>
-        /// <param name="sortingLayerName">設定する sortingLayer 名。null の場合は変更しない</param>
+        /// <param name="sortingLayerName">設定する sortingLayer 名。null の場合は変更しない。
+        /// 本プロジェクトの Sorting Layer は Default のみなので、通常は指定しないこと</param>
         public void BringToFront(GameObject go, int order, string sortingLayerName = null)
         {
             if (go == null) return;

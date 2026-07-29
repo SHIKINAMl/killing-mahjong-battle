@@ -101,6 +101,19 @@ namespace KillingMahjong.UI
         private List<int> _lastWallIds = new List<int>();
         private List<int> _lastHandIds = new List<int>();
 
+        /// <summary>
+        /// 差分リビルドのキャッシュを捨てて、次回を必ずフルリビルドにする。
+        ///
+        /// RebuildAllTilesFromState は「前回と牌IDの構成が同じなら UI はそのままでよい」と
+        /// 判断して再生成を省く。だが盤面の牌をプールへ返却したあとは UI 側に牌が残っておらず、
+        /// この判断が成立しない。返却したら必ず呼んでキャッシュを無効化すること。
+        /// </summary>
+        public void InvalidateRebuildCache()
+        {
+            _lastWallIds.Clear();
+            _lastHandIds.Clear();
+        }
+
         public void RebuildAllTilesFromState(List<int> suppressRevealWallIndexes = null, bool forceRebuildInEndPhase = false)
         {
             // --- アニメーション競合防止 ---

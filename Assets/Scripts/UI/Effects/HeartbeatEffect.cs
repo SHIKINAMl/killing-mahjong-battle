@@ -5,41 +5,71 @@ using System.Collections;
 namespace KillingMahjong.UI.Effects
 {
     /// <summary>
-    /// HP低下時の「生きるか死ぬか」の緊張感を演出するエフェクトクラス
-    /// 赤ビネットや黒ビネットを脈動させ、鼓動音を再生する
+    /// HP低下時の「生きるか死ぬか」の緊張感を演出するエフェクトクラス。
+    ///
+    /// 明滅は目が疲れるため行わない。赤ビネットはじんわり浮かび上がって
+    /// そのまま濃さを保ち、HPの段階が変わったときだけ滑らかに濃度を変える。
+    /// 鼓動音だけは一定間隔で鳴らして緊張感を出す。
     /// </summary>
     public class HeartbeatEffect : MonoBehaviour
     {
         [Header("UI References")]
-        [Tooltip("HP30%以下で明滅する赤いビネット")]
+        [Tooltip("HP30%以下でじんわり出る赤いビネット")]
         [SerializeField] private Image redVignette;
         [Tooltip("HP10%以下で追加される黒いビネット（絶望感演出）")]
         [SerializeField] private Image blackVignette;
-        
-        [Header("Settings")]
+
+        [Header("Thresholds")]
         [Tooltip("エフェクトが開始されるHPの割合（デフォルト30%）")]
         [SerializeField] private float warningThreshold = 0.3f;
         [Tooltip("絶望エフェクトが追加されるHPの割合（デフォルト10%）")]
         [SerializeField] private float dangerThreshold = 0.1f;
-        
-        [Tooltip("通常の鼓動の長さ（秒）")]
+
+        [Header("Vignette")]
+        [Tooltip("HP30%以下で維持する赤ビネットの濃さ")]
+        [SerializeField, Range(0f, 1f)] private float warningAlpha = 0.28f;
+        [Tooltip("HP10%以下で維持する赤ビネットの濃さ")]
+        [SerializeField, Range(0f, 1f)] private float dangerAlpha = 0.45f;
+        [Tooltip("黒ビネットの濃さ（赤ビネットに対する倍率）")]
+        [SerializeField, Range(0f, 1f)] private float blackVignetteRatio = 0.6f;
+        [Tooltip("濃さが変わるときにかける時間（秒）。長いほどじんわり")]
+        [SerializeField] private float fadeDuration = 1.5f;
+
+        [Header("Heartbeat Sound")]
+        [Tooltip("通常時の鼓動音の間隔（秒）")]
         [SerializeField] private float basePulseDuration = 1.2f;
-        [Tooltip("ピンチ時の鼓動の長さ（秒）")]
+        [Tooltip("ピンチ時の鼓動音の間隔（秒）")]
         [SerializeField] private float dangerPulseDuration = 0.6f;
-        
-        private Coroutine heartbeatCoroutine;
+
+        private Coroutine vignetteCoroutine;
+        private Coroutine soundCoroutine;
         private bool isEffectActive = false;
-        private float currentPulseDuration = 1.0f;
+        private bool isDanger = false;
+
+        // 現在表示している赤ビネットの濃さ。フェード中の値を引き継ぐために保持する
+        private float currentAlpha = 0f;
 
         private void Awake()
         {
             // 初期状態では透明にしておく
-            if (redVignette != null) SetAlpha(redVignette, 0f);
-            if (blackVignette != null) SetAlpha(blackVignette, 0f);
+            InitVignette(redVignette);
+            InitVignette(blackVignette);
+        }
+
+        private void InitVignette(Image img)
+        {
+            if (img == null) return;
+
+            SetAlpha(img, 0f);
+
+            // ビネットは画面全体を覆うので、Raycast Target が有効なままだと
+            // HPが閾値を割った瞬間に打牌のタッチを全て奪ってしまう。
+            // インスペクタの設定漏れを防ぐためコード側でも必ず落とす。
+            img.raycastTarget = false;
         }
 
         /// <summary>
-        /// 外部からHPの状態を受け取り、エフェクトのON/OFFや速度を更新する
+        /// 外部からHPの状態を受け取り、エフェクトのON/OFFや濃さを更新する
         /// </summary>
         /// <param name="currentHp">現在のHP</param>
         /// <param name="maxHp">最大HP</param>
@@ -52,13 +82,16 @@ namespace KillingMahjong.UI.Effects
             // HPが閾値以下、かつ生存している場合のみエフェクトを有効化
             if (hpRatio <= warningThreshold && currentHp > 0)
             {
-                // ピンチ状態（10%以下）なら鼓動を速くする
-                currentPulseDuration = hpRatio <= dangerThreshold ? dangerPulseDuration : basePulseDuration;
-                
-                if (!isEffectActive)
-                {
-                    StartHeartbeat();
-                }
+                bool nextDanger = hpRatio <= dangerThreshold;
+
+                // 既に有効で段階も変わっていなければ何もしない（毎フレーム呼ばれるため）
+                if (isEffectActive && nextDanger == isDanger) return;
+
+                isDanger = nextDanger;
+                isEffectActive = true;
+
+                StartVignetteFade(isDanger ? dangerAlpha : warningAlpha);
+                RestartSoundLoop();
             }
             else
             {
@@ -78,83 +111,92 @@ namespace KillingMahjong.UI.Effects
             StopHeartbeat();
         }
 
-        private void StartHeartbeat()
-        {
-            if (isEffectActive) return;
-            isEffectActive = true;
-            heartbeatCoroutine = StartCoroutine(HeartbeatRoutine());
-        }
-
         private void StopHeartbeat()
         {
             isEffectActive = false;
-            
-            if (heartbeatCoroutine != null)
+            isDanger = false;
+
+            if (soundCoroutine != null)
             {
-                StopCoroutine(heartbeatCoroutine);
-                heartbeatCoroutine = null;
+                StopCoroutine(soundCoroutine);
+                soundCoroutine = null;
             }
 
-            // 透明度をリセット
-            if (redVignette != null) SetAlpha(redVignette, 0f);
-            if (blackVignette != null) SetAlpha(blackVignette, 0f);
+            // 消えるときもぶつ切りにせず、フェードアウトさせる
+            StartVignetteFade(0f);
         }
 
-        private IEnumerator HeartbeatRoutine()
+        private void StartVignetteFade(float targetAlpha)
+        {
+            if (vignetteCoroutine != null) StopCoroutine(vignetteCoroutine);
+
+            if (!gameObject.activeInHierarchy)
+            {
+                // 非アクティブではコルーチンを回せないので即座に反映する
+                ApplyAlpha(targetAlpha);
+                return;
+            }
+
+            vignetteCoroutine = StartCoroutine(FadeVignetteRoutine(targetAlpha));
+        }
+
+        private IEnumerator FadeVignetteRoutine(float targetAlpha)
+        {
+            float startAlpha = currentAlpha;
+
+            if (fadeDuration <= 0f)
+            {
+                ApplyAlpha(targetAlpha);
+                yield break;
+            }
+
+            float t = 0f;
+            while (t < fadeDuration)
+            {
+                t += Time.deltaTime;
+                float progress = Mathf.Clamp01(t / fadeDuration);
+
+                // SmoothStep でじんわり立ち上げる
+                float eased = progress * progress * (3f - 2f * progress);
+                ApplyAlpha(Mathf.Lerp(startAlpha, targetAlpha, eased));
+
+                yield return null;
+            }
+
+            ApplyAlpha(targetAlpha);
+            vignetteCoroutine = null;
+        }
+
+        private void ApplyAlpha(float alpha)
+        {
+            currentAlpha = alpha;
+
+            if (redVignette != null) SetAlpha(redVignette, alpha);
+
+            // 黒ビネットは絶望状態のときだけ薄く重ねる
+            if (blackVignette != null)
+            {
+                SetAlpha(blackVignette, isDanger ? alpha * blackVignetteRatio : 0f);
+            }
+        }
+
+        private void RestartSoundLoop()
+        {
+            if (soundCoroutine != null) StopCoroutine(soundCoroutine);
+            if (!gameObject.activeInHierarchy) return;
+
+            soundCoroutine = StartCoroutine(HeartbeatSoundRoutine());
+        }
+
+        private IEnumerator HeartbeatSoundRoutine()
         {
             while (isEffectActive)
             {
                 PlayHeartbeatSound();
-
-                float halfDuration = currentPulseDuration / 2f;
-                float t = 0f;
-
-                // Fade In (ドクン…と現れる)
-                while (t < halfDuration)
-                {
-                    t += Time.deltaTime;
-                    float progress = t / halfDuration;
-                    
-                    // イージングをかけて少し生々しい脈動感にする
-                    float easeProgress = progress * progress * (3f - 2f * progress); // SmoothStep
-                    
-                    float alpha = Mathf.Lerp(0f, 0.5f, easeProgress);
-                    
-                    if (redVignette != null) SetAlpha(redVignette, alpha);
-                    
-                    // Danger状態なら黒ビネットも混ぜて絶望感を出す
-                    if (currentPulseDuration <= dangerPulseDuration && blackVignette != null)
-                    {
-                        SetAlpha(blackVignette, alpha * 0.7f);
-                    }
-                    else if (blackVignette != null)
-                    {
-                        SetAlpha(blackVignette, 0f);
-                    }
-                    
-                    yield return null;
-                }
-
-                // Fade Out (スッと消える)
-                t = 0f;
-                while (t < halfDuration)
-                {
-                    t += Time.deltaTime;
-                    float progress = t / halfDuration;
-                    float alpha = Mathf.Lerp(0.5f, 0f, progress);
-                    
-                    if (redVignette != null) SetAlpha(redVignette, alpha);
-                    if (currentPulseDuration <= dangerPulseDuration && blackVignette != null)
-                    {
-                        SetAlpha(blackVignette, alpha * 0.7f);
-                    }
-                    
-                    yield return null;
-                }
-                
-                // 次の鼓動までのインターバル
-                yield return new WaitForSeconds(currentPulseDuration * 0.2f);
+                yield return new WaitForSeconds(isDanger ? dangerPulseDuration : basePulseDuration);
             }
+
+            soundCoroutine = null;
         }
 
         private void PlayHeartbeatSound()

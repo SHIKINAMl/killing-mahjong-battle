@@ -112,7 +112,6 @@ namespace KillingMahjong.UI
             // スマホUIなどよりも確実に最前面に表示するため、Canvasを追加
             Canvas containerCanvas = container.AddComponent<Canvas>();
             containerCanvas.overrideSorting = true;
-            containerCanvas.sortingLayerName = "UI";
             containerCanvas.sortingOrder = UISortingOrders.RonAnimation;
             container.AddComponent<UnityEngine.UI.GraphicRaycaster>();
 

@@ -3,89 +3,158 @@ namespace KillingMahjong.Common
     /// <summary>
     /// Canvas / SpriteRenderer の sortingOrder を一元管理する定数群。
     /// 数値の大小関係がそのまま画面上の重なり順（大きいほど手前）を表す。
-    /// 値を変更する際は、前後のレイヤーとの相対関係を必ず確認すること。
+    ///
+    /// 【番号体系】全て 0 - 99 に収める。10 の位が用途の区切り。
+    ///   0 -  9 : 盤面（山牌・背景パーティクル）
+    ///  10 - 19 : 常設UI（ドラ表示・情報パネルの通常状態）
+    ///  20 - 29 : 情報パネルの強調・ツールチップ
+    ///  30 - 39 : システムオーバーレイ（ローディング）
+    ///  40 - 49 : 空き
+    ///  50 - 59 : ロン待機・結果パネル・軽い演出
+    ///  60 - 69 : チュートリアル誘導
+    ///  70 - 79 : 牌アニメーション・実況
+    ///  80 - 89 : ダイアログ・最前面パネル
+    ///  90 - 99 : 全画面演出・システム最前面
+    ///
+    /// シーン上の Canvas もこの体系に従うこと。新しい値を足すときは
+    /// 該当する 10 の位の空き番号を使い、既存の値はずらさない。
+    ///
+    /// なお、このプロジェクトの Sorting Layer は Default のみ（ProjectSettings/TagManager.asset）。
+    /// 存在しないレイヤー名を sortingLayerName に代入しても無視されるだけなので、
+    /// 重なり順の調整は必ず sortingOrder で行う。
     /// </summary>
     public static class UISortingOrders
     {
-        // ---- ゲーム内 常設UI (0 - 99) ----
+        // ---- 0 - 9 盤面 ----
+
+        /// <summary>WallUI: 山牌の通常表示</summary>
+        public const int WallBase = 1;
+
+        /// <summary>WallUI: 打牌フェーズ中の山牌（通常表示より手前）</summary>
+        public const int WallDiscardPhase = 2;
+
+        /// <summary>TitleEffectCreator: タイトル画面のパーティクル（キャラ・ボタンより奥）</summary>
+        public const int TitleParticle = 5;
+
+        // ---- 10 - 19 常設UI ----
 
         /// <summary>DoraDisplayUI: ドラ表示牌 (WorldSpace Canvas)</summary>
         public const int DoraTile = 10;
 
+        /// <summary>AbilityUI / PlayerInfoUI: 強調していない通常時のパネル</summary>
+        public const int InfoPanelNormal = 15;
+
+        /// <summary>WallUI: 演出中に山牌を通常UIより手前へ出すときの値</summary>
+        public const int WallFront = 16;
+
+        /// <summary>BettingUI: ベット時の背景ディマー（BettingPanel より奥）</summary>
+        public const int BettingDimmer = 19;
+
         /// <summary>PhaseTransitionUI: フェーズ演出の基本レイヤー</summary>
         public const int PhaseTransitionBase = 19;
+
+        // ---- 20 - 29 情報パネル強調 ----
 
         /// <summary>AbilityUI ルート / PlayerInfoUI 強調表示時の共通レイヤー</summary>
         public const int InfoPanelHighlight = 20;
 
-        /// <summary>AbilityUI: ツールチップ (InfoPanelHighlight より手前)</summary>
-        public const int AbilityTooltip = 25;
-
-        /// <summary>LoadingManager: ローディング画面</summary>
-        public const int LoadingScreen = 30;
-
-        /// <summary>GameUIManager: ロン待機パネル (DialogueUI / BloodMeter より手前)</summary>
-        public const int RonWaitPanel = 50;
-
-        // ---- 強調・演出レイヤー (100 - 9999) ----
-
-        /// <summary>GameUISkillController: マリガン牌交換アニメーションのコンテナ</summary>
-        public const int MulliganSwapAnimation = 100;
-
-        /// <summary>BettingUI: ベットパネル (親の PlayerInfoUI より手前に出す)</summary>
-        public const int BettingPanel = 101;
-
-        /// <summary>TutorialMaskUI: 誘導先だけを切り抜く集中マスク</summary>
-        public const int TutorialMask = 900;
-
-        /// <summary>TutorialArrowUI: 誘導矢印。穴の外にはみ出すので必ずマスクより手前に置く</summary>
-        public const int TutorialArrow = 910;
-
-        /// <summary>TilePoolManager のコンテナ / GameUIVisualController の AnimationCanvas。
-        /// 牌の移動アニメーションを通常UIより手前で再生するためのレイヤー</summary>
-        public const int TileAnimationLayer = 999;
-
-        /// <summary>CommentaryFlowUI: 実況テキスト</summary>
-        public const int CommentaryFlow = 999;
-
-        /// <summary>GameUISkillController: マリガン中のプロンプトテキスト (ディマーより手前ではなく独立Canvas)</summary>
-        public const int MulliganPromptText = 1000;
-
-        /// <summary>ConfirmationDialogUI: 確認ダイアログ (手牌等より手前)</summary>
-        public const int ConfirmationDialog = 9999;
-
-        // ---- 最前面グループ (10000+) ----
-
-        /// <summary>WaitUI: 待ち牌表示を最前面に出す際のレイヤー</summary>
-        public const int WaitDisplayFront = 10000;
-
-        /// <summary>YakuSelectionUI: 役選択パネル</summary>
-        public const int YakuSelection = 10000;
-
-        /// <summary>RonAnimationUI: ロン演出コンテナ</summary>
-        public const int RonAnimation = 30000;
-
-        /// <summary>GameUISkillController: マリガン中の全画面ディマー</summary>
-        public const int SkillDimmer = 32000;
+        /// <summary>BettingUI: ベットパネル（敵のダイアログより手前に出す）。
+        /// InfoPanelHighlight と同値なのは意図的で、どちらも「情報パネルの強調段」に属する</summary>
+        public const int BettingPanel = 20;
 
         /// <summary>GameUISkillController: マリガン中に選択対象の手牌/山UIをディマーより手前に出すレイヤー</summary>
         public const int MulliganFocusTiles = 21;
 
+        /// <summary>AbilityUI: ツールチップ (InfoPanelHighlight より手前)</summary>
+        public const int AbilityTooltip = 25;
+
+        // ---- 30 - 39 システムオーバーレイ ----
+
+        /// <summary>LoadingManager: ローディング画面</summary>
+        public const int LoadingScreen = 30;
+
+        // ---- 50 - 59 ロン待機・結果パネル・軽い演出 ----
+
+        /// <summary>GameUIManager: ロン待機パネル (DialogueUI / BloodMeter より手前)</summary>
+        public const int RonWaitPanel = 50;
+
+        /// <summary>シーン上の 役ListPanel / 勝敗Canvas。
+        /// コードからは設定しないが、他の値との関係を把握するためここに記録する</summary>
+        public const int ResultPanel = 55;
+
+        /// <summary>MulliganSwapAnimator: マリガン牌交換アニメーションのコンテナ</summary>
+        public const int MulliganSwapAnimation = 55;
+
+        // ---- 60 - 69 チュートリアル誘導 ----
+
+        /// <summary>TutorialMaskUI: 誘導先だけを切り抜く集中マスク</summary>
+        public const int TutorialMask = 60;
+
+        /// <summary>TutorialArrowUI: 誘導矢印。穴の外にはみ出すので必ずマスクより手前に置く</summary>
+        public const int TutorialArrow = 65;
+
+        // ---- 70 - 79 牌アニメーション・実況 ----
+
+        /// <summary>TilePoolManager のコンテナ / GameUIVisualController の AnimationCanvas。
+        /// 牌の移動アニメーションを通常UIより手前で再生するためのレイヤー</summary>
+        public const int TileAnimationLayer = 70;
+
+        /// <summary>CommentaryFlowUI: 実況テキスト（飛んでいる牌に隠れないよう牌アニメより手前）</summary>
+        public const int CommentaryFlow = 74;
+
+        /// <summary>GameUISkillController: マリガン中のプロンプトテキスト (独立Canvas)</summary>
+        public const int MulliganPromptText = 78;
+
+        // ---- 80 - 89 ダイアログ・最前面パネル ----
+
+        /// <summary>ConfirmationDialogUI: 確認ダイアログ (手牌等より手前)</summary>
+        public const int ConfirmationDialog = 80;
+
+        /// <summary>WaitUI: 待ち牌表示を最前面に出す際のレイヤー</summary>
+        public const int WaitDisplayFront = 84;
+
+        /// <summary>YakuSelectionUI: 役選択パネル（モーダルなので待ち牌表示より手前）</summary>
+        public const int YakuSelection = 88;
+
+        // ---- 90 - 99 全画面演出・システム最前面 ----
+
+        /// <summary>RonAnimationUI: ロン演出コンテナ</summary>
+        public const int RonAnimation = 90;
+
+        /// <summary>HeartbeatEffect: 瀕死時の赤/黒ビネット。
+        /// シーン上の HeartbeatEffectPanel の Canvas に直接設定する（コードからは触らない）</summary>
+        public const int HeartbeatVignette = 91;
+
+        /// <summary>MatchMomentumUI: 決着時の戦況グラフ。
+        /// シーン上の MatchMomentumPanel の Canvas に直接設定する（コードからは触らない）</summary>
+        public const int MatchMomentum = 92;
+
+        /// <summary>GameUISkillController: マリガン中の全画面ディマー（現在はシーン側で設定。参照用）</summary>
+        public const int SkillDimmer = 93;
+
         /// <summary>ClickFeedbackManager: クリックエフェクト</summary>
-        public const int ClickFeedback = 32000;
+        public const int ClickFeedback = 94;
 
         /// <summary>CutinAnimationUI: カットイン演出</summary>
-        public const int CutinAnimation = 32000;
+        public const int CutinAnimation = 95;
 
         /// <summary>PhaseTransitionUI: フェーズ演出の最前面コンテナ</summary>
-        public const int PhaseTransitionTop = 32700;
+        public const int PhaseTransitionTop = 96;
 
-        /// <summary>AgariSelectionUI: 和了選択 (sortingOrder の最大値)</summary>
-        public const int AgariSelectionMax = 32767;
+        /// <summary>AgariSelectionUI: 和了選択</summary>
+        public const int AgariSelection = 97;
+
+        /// <summary>BlinkEffectUI: オープニングのまぶた。開ききるまで画面全体を覆う</summary>
+        public const int OpeningEyelid = 98;
+
+        /// <summary>CustomCusor: 自前マウスカーソル。常に全UIより手前</summary>
+        public const int MouseCursor = 99;
 
         // ---- SpriteRenderer 用 (Canvas とは別系統) ----
+        // ScreenSpace-Overlay の Canvas とは描画パスが違うため、上の値とは比較できない。
+        // 比較対象は PlayerInfoUI が触る SpriteRenderer (最大 InfoPanelHighlight) だけ。
 
         /// <summary>ClickableCharacter: デバッグ用クリック領域オーバーレイ (SpriteRenderer)</summary>
-        public const int DebugOverlaySprite = 999;
+        public const int DebugOverlaySprite = 99;
     }
 }

@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using KillingMahjong.UI;
 using KillingMahjong.EngineData;
+using KillingMahjong.Common;
 
 namespace KillingMahjong.Managers
 {
@@ -39,6 +40,9 @@ namespace KillingMahjong.Managers
         [SerializeField] private float autoDiscardInterval = 0.14f;
         [SerializeField] private float phaseSettleTime = 0.5f;
 
+        [Tooltip("能力の実演で、発動SEを鳴らしてから次のセリフに移るまでの間（秒）")]
+        [SerializeField] private float abilityShowcaseInterval = 0.8f;
+
         /// <summary>旧実装との互換のために残している局の識別子。</summary>
         public enum TutorialRound
         {
@@ -58,6 +62,13 @@ namespace KillingMahjong.Managers
 
         private int _playerHp;
         private int _enemyHp;
+
+        // --- 賭け金 ---
+        // 流局では賭け金が決着しないので、次の局へ持ち越される。
+        // 持ち越された分は、次にロンが出た局でまとめて血の移動に加算される。
+        private int _pot;              // いま場に乗っている賭け金の総額
+        private int _lastBetAmount;    // 直前に賭けた額（流局の次の局はこれと同額が自動で賭けられる）
+        private bool _prevRoundWasDraw;
 
         private bool _boardVisible = true;
         private bool _isWaitingForDiscard;
@@ -83,16 +94,23 @@ namespace KillingMahjong.Managers
         {
             Hidden,
             AutoOnly,
-            AutoAndDecide
+            AutoAndDecide,
+
+            /// <summary>自力で満貫手を組めた場合。オートは不要なので決定だけ出す。</summary>
+            DecideOnly
         }
 
         private HandButtonStage _handButtonStage = HandButtonStage.Hidden;
 
         /// <summary>『自動』ボタンを出してよいか。HandUI.UpdateLayout から参照される。</summary>
-        public bool IsAutoButtonVisible => _handButtonStage != HandButtonStage.Hidden;
+        public bool IsAutoButtonVisible =>
+            _handButtonStage == HandButtonStage.AutoOnly ||
+            _handButtonStage == HandButtonStage.AutoAndDecide;
 
         /// <summary>『決定』ボタンを出してよいか。HandUI.UpdateLayout から参照される。</summary>
-        public bool IsDecideButtonVisible => _handButtonStage == HandButtonStage.AutoAndDecide;
+        public bool IsDecideButtonVisible =>
+            _handButtonStage == HandButtonStage.AutoAndDecide ||
+            _handButtonStage == HandButtonStage.DecideOnly;
 
         /// <summary>既定のセリフ。台本側の onHandFilledLines が空のときに使う。</summary>
         private static readonly List<TutorialLine> DefaultHandFilledLines = new List<TutorialLine>
@@ -142,6 +160,10 @@ namespace KillingMahjong.Managers
             _playerHp = _scenario.playerStartHp;
             _enemyHp = _scenario.enemyStartHp;
             _aborted = false;
+
+            _pot = 0;
+            _lastBetAmount = 0;
+            _prevRoundWasDraw = false;
 
             if (_scenarioRoutine != null) StopCoroutine(_scenarioRoutine);
             _scenarioRoutine = StartCoroutine(ScenarioRoutine(Mathf.Max(0, roundIndex)));
@@ -209,6 +231,9 @@ namespace KillingMahjong.Managers
             _isWaitingForHandSelectionComplete = true;
             _lastPlayerDiscardBaseId = -1;
 
+            // 前局の透視マークがプールの牌に残らないようにする
+            ClearPerspectiveMarks();
+
             // 13枚そろうまでは『自動』も『決定』も出さない
             SetHandButtonStage(HandButtonStage.Hidden);
 
@@ -233,9 +258,28 @@ namespace KillingMahjong.Managers
                 SetBoardVisible(true);
             }
 
+            // --- 能力の実演と説明（手順⑱〜⑳） ---
+            // 能力は手牌フェイズでしか使えない仕様なので、実演もこのフェイズのうちに行う。
+            // さらに手牌を決めてしまう前（『自動』ボタンを押す前）に済ませる。
+            // 手牌が決まったあとに能力の話を始めると、説明を聞いても試す余地がなくなる。
+            if (data.enemyUsesAbility)
+            {
+                yield return StartCoroutine(PlayLines(data.abilityIntroLines));
+                yield return StartCoroutine(RunEnemyAbilityShowcase(data));
+                yield return StartCoroutine(PlayLines(data.abilityExplainLines));
+                yield return StartCoroutine(PlayLines(data.enhanceExplainLines));
+
+                if (data.guideToYakuList)
+                {
+                    yield return StartCoroutine(RunYakuListGuide(data));
+                }
+            }
+
             // --- 手牌構築フェイズ（手順①〜④ / ⑧ / ⑫ / ㉑） ---
             // 手動で組ませる局は、13枚そろってからセリフを挟んで『自動』を開放する。
             // 手動選択を許さない局は組みようがないので、最初から『自動』を出す。
+            bool selfMadeMangan = false;
+
             if (data.allowManualHandSelection)
             {
                 yield return new WaitUntil(() =>
@@ -243,20 +287,54 @@ namespace KillingMahjong.Managers
 
                 if (_isWaitingForHandSelectionComplete)
                 {
-                    yield return StartCoroutine(PlayLines(ResolveHandFilledLines(data)));
+                    selfMadeMangan = IsSelfMadeManganHand();
+
+                    yield return StartCoroutine(PlayLines(selfMadeMangan
+                        ? ResolveSelfManganLines(data)
+                        : ResolveHandFilledLines(data)));
                 }
             }
 
-            SetHandButtonStage(HandButtonStage.AutoOnly);
-            GuideTo(gameUIManager != null && gameUIManager.HandUI != null
-                ? gameUIManager.HandUI.AutoManganButtonRect : null);
+            if (selfMadeMangan)
+            {
+                // 自力で満貫手を組めたなら『自動』を挟ませる理由がない。そのまま決定へ通す。
+                // HasClickedAutoMangan は「台本の満貫手が盤面にそろっている」ことを表すフラグとして
+                // 待ち牌の公開と決定の解禁に使われているので、ここでも立てておく。
+                HasClickedAutoMangan = true;
+
+                SetHandButtonStage(HandButtonStage.DecideOnly);
+                GuideTo(gameUIManager != null && gameUIManager.HandUI != null
+                    ? gameUIManager.HandUI.DecideButtonRect : null);
+            }
+            else
+            {
+                SetHandButtonStage(HandButtonStage.AutoOnly);
+                GuideTo(gameUIManager != null && gameUIManager.HandUI != null
+                    ? gameUIManager.HandUI.AutoManganButtonRect : null);
+            }
 
             yield return new WaitUntil(() => !_isWaitingForHandSelectionComplete);
             ClearGuide();
 
-            // --- 賭け金フェイズ（固定額） ---
-            yield return StartCoroutine(PlayLines(data.beforeBetLines));
-            yield return StartCoroutine(RunBettingPhase(data));
+            // --- 賭け金フェイズ ---
+            if (_prevRoundWasDraw)
+            {
+                // 流局では賭け金が決着しない。次の局は前局と同額が自動で賭けられる仕様なので、
+                // ここでプレイヤーに賭け金を指示してはいけない。
+                int inherited = _lastBetAmount > 0 ? _lastBetAmount : data.betAmount;
+                _lastBetAmount = inherited;
+                _pot += inherited;
+
+                yield return StartCoroutine(PlayLines(ResolveInheritedBetLines(data, inherited)));
+            }
+            else
+            {
+                yield return StartCoroutine(PlayLines(data.beforeBetLines));
+                yield return StartCoroutine(RunBettingPhase(data));
+
+                _lastBetAmount = data.betAmount;
+                _pot += data.betAmount;
+            }
 
             // --- 打牌フェイズ ---
             // GameUIPhaseController は IsTutorialMode のとき HP パネルを出さないので、
@@ -268,7 +346,33 @@ namespace KillingMahjong.Managers
 
             yield return StartCoroutine(RunBattle(data));
 
+            // 流局なら賭け金は場に残したまま次局へ持ち越す
+            _prevRoundWasDraw = data.outcome == TutorialOutcome.Draw;
+
             yield return StartCoroutine(PlayLines(data.outroLines));
+        }
+
+        /// <summary>
+        /// 賭け金が持ち越されたことを伝えるセリフ。台本が空なら既定文を使う。
+        /// </summary>
+        private List<TutorialLine> ResolveInheritedBetLines(TutorialRoundData data, int inherited)
+        {
+            if (data.inheritedBetLines != null && data.inheritedBetLines.Count > 0)
+            {
+                var resolved = new List<TutorialLine>(data.inheritedBetLines.Count);
+                foreach (var line in data.inheritedBetLines)
+                {
+                    if (line == null) continue;
+                    resolved.Add(new TutorialLine(
+                        string.Format(line.text, inherited, _pot), line.speaker));
+                }
+                return resolved;
+            }
+
+            return new List<TutorialLine>
+            {
+                new TutorialLine($"前の局は流局だったから、賭け金は{inherited}円のまま持ち越しよ。改めて賭ける必要はないわ。"),
+            };
         }
 
         // ==================== 盤面セットアップ ====================
@@ -318,6 +422,49 @@ namespace KillingMahjong.Managers
         {
             var board = BoardStateManager.Instance;
             return board != null && board.CurrentHandTiles != null ? board.CurrentHandTiles.Count : 0;
+        }
+
+        /// <summary>
+        /// プレイヤーが自力で満貫以上の手を組めたか。
+        ///
+        /// チュートリアルはサーバーに繋がないので手牌を評価できない。
+        /// そこで「台本の満貫手と同じ13枚がそろっているか」で判定する。
+        /// この局の山牌は『台本の満貫手（同一色13枚）＋ 筒子9枚 ＋ 索子9枚 ＋ 字牌3枚』で、
+        /// 台本の色の牌はその13枚しか入っていない。他の色は9枚しかなく13枚に届かないので、
+        /// この山から作れる満貫以上の手は台本の13枚だけ。よってこの一致判定で過不足がない。
+        ///
+        /// 山牌の構成を変えるときは、この前提が崩れていないか確認すること。
+        /// </summary>
+        private bool IsSelfMadeManganHand()
+        {
+            if (_round == null || _round.manganHandBaseIds == null) return false;
+
+            var board = BoardStateManager.Instance;
+            if (board == null || board.CurrentHandTiles == null) return false;
+            if (board.CurrentHandTiles.Count != _round.manganHandBaseIds.Count) return false;
+
+            // 牌種で多重集合として比較する（同じ牌が複数あるので枚数まで見る）
+            var remaining = new List<int>(_round.manganHandBaseIds);
+            foreach (int tileId in board.CurrentHandTiles)
+            {
+                int idx = remaining.IndexOf(TutorialTiles.BaseOf(tileId));
+                if (idx < 0) return false;
+                remaining.RemoveAt(idx);
+            }
+            return remaining.Count == 0;
+        }
+
+        private static readonly List<TutorialLine> DefaultSelfManganLines = new List<TutorialLine>
+        {
+            new TutorialLine("あら、自分で満貫手を組めたのね。やるじゃない。"),
+            new TutorialLine("それなら『自動』は要らないわ。そのまま決定しなさい。"),
+        };
+
+        private static List<TutorialLine> ResolveSelfManganLines(TutorialRoundData data)
+        {
+            return (data.onSelfManganLines != null && data.onSelfManganLines.Count > 0)
+                ? data.onSelfManganLines
+                : DefaultSelfManganLines;
         }
 
         private static List<TutorialLine> ResolveHandFilledLines(TutorialRoundData data)
@@ -527,12 +674,6 @@ namespace KillingMahjong.Managers
                     yield break;
                 }
 
-                // --- 能力の見せ場（手順⑱） ---
-                if (data.enemyUsesAbility && turn == 2)
-                {
-                    yield return StartCoroutine(RunEnemyAbilityShowcase());
-                }
-
                 if (!isAutoTurn) yield return new WaitForSeconds(0.4f);
             }
 
@@ -589,8 +730,18 @@ namespace KillingMahjong.Managers
                 if (gameUIManager.RonWaitPanel != null) gameUIManager.RonWaitPanel.SetActive(false);
             }
 
+            // ロンは血の奪い合い。相手から減った分がそのまま自分の血になる。
+            // 流局で持ち越されてきた賭け金もここでまとめて決着する。
+            // 相手の残り血より総額が大きい場合は、実際に奪えた分だけ増える。
             int prevEnemyHp = _enemyHp;
-            _enemyHp = Mathf.Max(0, _enemyHp - data.score);
+            int prevPlayerHp = _playerHp;
+
+            int settlement = data.score + _pot;
+            _pot = 0;
+
+            int drained = Mathf.Min(settlement, prevEnemyHp);
+            _enemyHp = prevEnemyHp - drained;
+            _playerHp = prevPlayerHp + drained;
 
             // RonAnimationUI は handTiles を並べたあとに ronTile を別枠で追加描画する。
             // したがって handTiles にはアタリ牌を含めない13枚を渡すこと。
@@ -598,8 +749,9 @@ namespace KillingMahjong.Managers
 
             yield return StartCoroutine(PlayRonAnimation(
                 hand, ronTileId, data, isLocalPlayerWin: true,
-                prevLocalHp: _playerHp, newLocalHp: _playerHp,
-                prevEnemyHp: prevEnemyHp, newEnemyHp: _enemyHp));
+                prevLocalHp: prevPlayerHp, newLocalHp: _playerHp,
+                prevEnemyHp: prevEnemyHp, newEnemyHp: _enemyHp,
+                displayScore: settlement));
 
             ApplyHpToUI();
         }
@@ -608,10 +760,18 @@ namespace KillingMahjong.Managers
         {
             SetPhase(RoundStatus.Agari);
 
-            // 手順⑯: 流局のダメージと単騎待ちのダメージをまとめて受ける
-            int totalDamage = data.score + data.drawDamageToPlayer;
+            // 手順⑯: 打点に加えて、流局から持ち越された賭け金もまとめて奪われる
             int prevPlayerHp = _playerHp;
-            _playerHp = Mathf.Max(0, _playerHp - totalDamage);
+            int prevEnemyHp = _enemyHp;
+
+            int settlement = data.score + _pot;
+            _pot = 0;
+
+            // drawDamageToPlayer は賭け金とは別枠の流局ペナルティ。血の移動には含めない。
+            int totalDamage = settlement + data.drawDamageToPlayer;
+            _playerHp = Mathf.Max(0, prevPlayerHp - totalDamage);
+
+            _enemyHp = prevEnemyHp + Mathf.Min(settlement, prevPlayerHp);
 
             // 単騎待ちなので、実際に打たれた牌がそのままアタリ牌になる
             int ronTileBase = playerDiscardBaseId >= 0 ? playerDiscardBaseId : TutorialTiles.Ton;
@@ -625,14 +785,19 @@ namespace KillingMahjong.Managers
             yield return StartCoroutine(PlayRonAnimation(
                 hand, ronTileId, data, isLocalPlayerWin: false,
                 prevLocalHp: prevPlayerHp, newLocalHp: _playerHp,
-                prevEnemyHp: _enemyHp, newEnemyHp: _enemyHp));
+                prevEnemyHp: prevEnemyHp, newEnemyHp: _enemyHp,
+                displayScore: settlement));
 
             ApplyHpToUI();
         }
 
+        /// <param name="displayScore">
+        /// 演出に出す金額。持ち越された賭け金を含む「この局で動いた総額」を渡すこと。
+        /// data.score をそのまま出すと、表示額と実際のHPの増減が食い違って見える。
+        /// </param>
         private IEnumerator PlayRonAnimation(
             List<int> handTiles, int ronTileId, TutorialRoundData data, bool isLocalPlayerWin,
-            int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp)
+            int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp, int displayScore)
         {
             var ronUI = gameUIManager != null ? gameUIManager.RonAnimationUI : null;
             if (ronUI == null)
@@ -648,7 +813,7 @@ namespace KillingMahjong.Managers
                 data.yakuList,
                 data.formulaText,
                 data.rankText,
-                data.score,
+                displayScore,
                 isLocalPlayerWin,
                 gameUIManager.PlayerInfoUI,
                 gameUIManager.EnemyInfoUI,
@@ -673,33 +838,237 @@ namespace KillingMahjong.Managers
         }
 
         /// <summary>
-        /// 手順⑱: 敵が能力を使いまくる見せ場。
-        /// プレイヤーは能力を使えない制約があるため、ここでは能力UIを「見せる」だけにしている。
-        /// TODO: GameUISkillController 経由の実際のスキル演出とつなぐ。
+        /// 手順⑱: 敵が能力を順に使ってみせる。
+        ///
+        /// チュートリアルはサーバーに繋がないので実際のスキル処理は走らせない。
+        /// 能力欄を開いて対象の行を指し示し、その能力のSEと相手の反応で「使った」ことを見せる。
+        /// プレイヤーは能力を使えない制約（IsAbilityUsableByPlayer）があるため、ここは実演のみ。
         /// </summary>
-        private IEnumerator RunEnemyAbilityShowcase()
+        private IEnumerator RunEnemyAbilityShowcase(TutorialRoundData data)
         {
-            if (gameUIManager != null && gameUIManager.AbilityUI != null)
+            var ability = gameUIManager != null ? gameUIManager.AbilityUI : null;
+
+            if (ability != null)
             {
-                gameUIManager.AbilityUI.gameObject.SetActive(true);
-                GuideTo(gameUIManager.AbilityUI.GetComponent<RectTransform>());
+                ability.gameObject.SetActive(true);
+
+                // 非アクティブから有効化した直後は AbilityUI の Start() がまだ走っていない。
+                // 先に開くとウィンドウ位置の初期化と開く演出がぶつかるので1フレーム待つ。
+                yield return null;
+
+                ability.OpenWindow();
+
+                // 実演中は押しても何も起きないようにする。
+                // 押せてしまうと DialogueUI がチュートリアルのセリフを上書きし、
+                // 送りボタン待ちのまま進めなくなる。
+                ability.IsDisplayOnly = true;
+
+                // 行が生成されてレイアウトが確定するまでさらに1フレーム待つ
+                yield return null;
             }
 
-            if (gameUIManager != null && gameUIManager.EnemyInfoUI != null)
+            var showcases = data.abilityShowcases;
+            if (showcases == null || showcases.Count == 0)
             {
-                for (int i = 0; i < 3; i++)
-                {
-                    gameUIManager.EnemyInfoUI.PlayBounceAnimation(0.4f);
-                    if (AudioManager.Instance != null) AudioManager.Instance.PlayDiscardSE();
-                    yield return new WaitForSeconds(0.5f);
-                }
+                // 台本に能力が並んでいない場合は、従来どおり軽く見せるだけにする
+                yield return new WaitForSeconds(1.0f);
             }
             else
             {
-                yield return new WaitForSeconds(1.5f);
+                foreach (var showcase in showcases)
+                {
+                    if (showcase == null || string.IsNullOrEmpty(showcase.skillType)) continue;
+
+                    // どの能力の話かを矢印で指しながら説明する。
+                    // マスクは使わないこと。穴の外側のクリックを全て食べるので、
+                    // 出したままセリフ待ちに入ると送りボタンが押せなくなる。
+                    RectTransform itemRt = ability != null
+                        ? ability.GetAbilityItemRect(showcase.skillType)
+                        : null;
+                    if (itemRt != null) GuideTo(itemRt, useMask: false);
+
+                    yield return StartCoroutine(PlayLines(showcase.beforeLines));
+
+                    ClearGuide();
+                    if (ability != null) ability.CloseWindow(false);
+
+                    // ここから実際の発動。本編と同じ手順を踏む。
+                    yield return StartCoroutine(RunEnemySkillActivation(showcase));
+
+                    yield return StartCoroutine(PlayLines(showcase.afterLines));
+
+                    // 次の能力の説明のために開き直す
+                    if (ability != null && showcase != showcases[showcases.Count - 1])
+                    {
+                        ability.OpenWindow();
+                        yield return null;
+                    }
+                }
             }
 
             ClearGuide();
+            if (ability != null)
+            {
+                ability.IsDisplayOnly = false;
+                ability.CloseWindow(false);
+            }
+        }
+
+        /// <summary>
+        /// 敵が能力を1つ実際に発動する。GameUISkillController が本編で行う手順に合わせている。
+        /// カットイン → コスト（血）の支払い → 能力ごとの効果、の順。
+        /// </summary>
+        private IEnumerator RunEnemySkillActivation(TutorialAbilityShowcase showcase)
+        {
+            string skillName = SkillNames.GetDisplayName(showcase.skillType);
+
+            if (AudioManager.Instance != null)
+                AudioManager.Instance.PlaySkillSE(showcase.skillType);
+
+            // 1. カットイン演出（立ち絵＋巨大テキスト）
+            if (gameUIManager != null && gameUIManager.PhaseTransitionUI != null)
+            {
+                var cData = gameUIManager.EnemyInfoUI != null
+                    ? gameUIManager.EnemyInfoUI.CurrentCharacterData
+                    : null;
+
+                yield return gameUIManager.PhaseTransitionUI.PlaySkillCutinAnimationRoutine(
+                    skillName, isLocalPlayer: false, characterData: cData, duration: 2.0f);
+            }
+            else
+            {
+                yield return new WaitForSeconds(1.0f);
+            }
+
+            // 2. コストの支払い。能力は血を削って使うものなので、敵のHPも実際に減らす。
+            int cost = GameRules.GetSkillCost(showcase.skillType, 0);
+            if (cost > 0 && cost < 99999)
+            {
+                _enemyHp = Mathf.Max(0, _enemyHp - cost);
+                ApplyHpToUI();
+
+                if (gameUIManager != null && gameUIManager.EnemyInfoUI != null)
+                    gameUIManager.EnemyInfoUI.PlayBounceAnimation(0.4f);
+
+                // 体力が減る様子を見せるためのタメ
+                yield return new WaitForSeconds(1.0f);
+            }
+
+            // 3. 能力ごとの効果
+            if (showcase.skillType == SkillNames.Perspective)
+            {
+                ApplyPerspectiveMarks(showcase.perspectiveTileCount);
+            }
+
+            if (showcase.skillType == SkillNames.BoostHand && !string.IsNullOrEmpty(showcase.boostYakuName))
+            {
+                // 役強化は結果が役一覧に残る。直後の手順⑳でプレイヤーに確認させる。
+                var board = BoardStateManager.Instance;
+                if (board != null)
+                {
+                    if (board.EnemyBoostHandBonus == null)
+                        board.EnemyBoostHandBonus = new Dictionary<string, int>();
+                    board.EnemyBoostHandBonus[showcase.boostYakuName] = showcase.boostHan;
+
+                    if (gameUIManager != null && gameUIManager.YakuListUI != null)
+                        gameUIManager.YakuListUI.UpdateBoostData(
+                            board.LocalBoostHandBonus, board.EnemyBoostHandBonus);
+                }
+            }
+
+            yield return new WaitForSeconds(abilityShowcaseInterval);
+        }
+
+        /// <summary>今この局で透視マークを立てた牌。局が変わるときに消すために覚えておく。</summary>
+        private readonly List<TileVisual> _perspectiveMarked = new List<TileVisual>();
+
+        /// <summary>
+        /// 敵の『透視』の効果。プレイヤーの牌のうち指定枚数に透視マークを出す。
+        ///
+        /// 能力の実演は手牌を組む前に入るため、その時点では手牌が空のことがある。
+        /// その場合はプレイヤーが選ぶ対象である山牌に付ける。
+        /// </summary>
+        private void ApplyPerspectiveMarks(int count)
+        {
+            if (count <= 0 || gameUIManager == null) return;
+
+            var candidates = new List<TileVisual>();
+
+            if (gameUIManager.HandUI != null) CollectTileVisuals(gameUIManager.HandUI.GetHandSlots(), candidates);
+            if (candidates.Count < count && gameUIManager.WallUI != null)
+                CollectTileVisuals(gameUIManager.WallUI.GetWallSlots(), candidates);
+
+            if (candidates.Count == 0)
+            {
+                Debug.LogWarning("[TutorialManager] 透視マークを付ける牌が見つかりませんでした。");
+                return;
+            }
+
+            // 端に固まらないよう、候補全体に散らして選ぶ
+            int picked = Mathf.Min(count, candidates.Count);
+            int step = Mathf.Max(1, candidates.Count / picked);
+
+            for (int i = 0; i < picked; i++)
+            {
+                var visual = candidates[Mathf.Min(i * step, candidates.Count - 1)];
+                if (visual == null || _perspectiveMarked.Contains(visual)) continue;
+
+                visual.SetExposed(true);
+                _perspectiveMarked.Add(visual);
+            }
+        }
+
+        private static void CollectTileVisuals<T>(IEnumerable<T> slots, List<TileVisual> into) where T : Component
+        {
+            if (slots == null) return;
+            foreach (var slot in slots)
+            {
+                if (slot == null) continue;
+                var visual = slot.GetComponent<TileVisual>();
+                if (visual != null && !into.Contains(visual)) into.Add(visual);
+            }
+        }
+
+        /// <summary>局が切り替わるときに透視マークを消す。プールの牌に状態が残るのを防ぐ。</summary>
+        private void ClearPerspectiveMarks()
+        {
+            foreach (var visual in _perspectiveMarked)
+            {
+                if (visual != null) visual.SetExposed(false);
+            }
+            _perspectiveMarked.Clear();
+        }
+
+        /// <summary>
+        /// 手順⑳: 役一覧（役表）を実際に開かせる。
+        /// 開くボタンが見つからない場合は誘導を諦めて先へ進む（進行が止まらないようにする）。
+        /// </summary>
+        private IEnumerator RunYakuListGuide(TutorialRoundData data)
+        {
+            var yakuList = gameUIManager != null ? gameUIManager.YakuListUI : null;
+            if (yakuList == null) yield break;
+
+            yakuList.gameObject.SetActive(true);
+
+            // 画面右上の「役一覧」画像そのものを指す（開くボタン単体だと何を見ればよいか分からない）
+            RectTransform guideRt = yakuList.GuideTargetRect;
+            if (guideRt == null)
+            {
+                Debug.LogWarning("[TutorialManager] YakuListUI の開くボタンが未設定です。役一覧への誘導をスキップします。");
+                yield break;
+            }
+
+            GuideTo(guideRt);
+
+            // 開くまで待つ。すでに開いていればそのまま進む。
+            yield return new WaitUntil(() => yakuList.IsOpen || _aborted);
+            ClearGuide();
+
+            if (_aborted) yield break;
+
+            yield return StartCoroutine(PlayLines(data.onYakuListOpenedLines));
+
+            yakuList.CloseYakuList();
         }
 
         // ==================== セリフ表示 ====================
@@ -773,12 +1142,24 @@ namespace KillingMahjong.Managers
 
         // ==================== 誘導（矢印＋マスク） ====================
 
-        private void GuideTo(RectTransform target)
+        /// <param name="useMask">
+        /// false にすると矢印だけで指し示す。マスクは穴の外側のクリックを全て食べるので、
+        /// セリフ送りと併用したい場面（説明しながら指す）では必ず false にすること。
+        /// </param>
+        private void GuideTo(RectTransform target, bool useMask = true)
         {
             if (target == null) return;
 
             if (arrowUI != null) arrowUI.ShowAt(target, new Vector2(0, 50f));
-            if (maskUI != null) maskUI.Show(target);
+
+            if (useMask)
+            {
+                if (maskUI != null) maskUI.Show(target);
+            }
+            else if (maskUI != null)
+            {
+                maskUI.Hide();
+            }
         }
 
         private void ClearGuide()

@@ -77,13 +77,13 @@ namespace KillingMahjong.UI
 
         private void LateUpdate()
         {
-            // アニメーター等で強制的に10に戻されてしまうのを防ぐため、ズーム中は毎フレーム最後に20に上書きする
+            // アニメーター等で強制的に戻されてしまうのを防ぐため、ズーム中は毎フレーム最後に上書きする
             if (isZoomedIn)
             {
                 var myCanvas = GetComponent<Canvas>();
-                if (myCanvas != null && myCanvas.sortingOrder != 20)
+                if (myCanvas != null && myCanvas.sortingOrder != UISortingOrders.InfoPanelHighlight)
                 {
-                    myCanvas.sortingOrder = 20;
+                    myCanvas.sortingOrder = UISortingOrders.InfoPanelHighlight;
                 }
             }
         }
@@ -227,10 +227,15 @@ namespace KillingMahjong.UI
         public void SetMaxHP(int max)
         {
             maxHp = max;
+            // 新しい対局が始まるのでビネットの抑止を解除する
+            heartbeatSuppressed = false;
         }
 
         [Header("Effects")]
         [SerializeField] private KillingMahjong.UI.Effects.HeartbeatEffect heartbeatEffect;
+
+        // 決着後に SetHP が呼ばれてビネットが復活しないようにするフラグ
+        private bool heartbeatSuppressed = false;
 
         public void SetHP(int hp)
         {
@@ -258,9 +263,23 @@ namespace KillingMahjong.UI
             }
 
             // --- 瀕死ハートビートエフェクトの更新 ---
-            if (heartbeatEffect != null)
+            if (heartbeatEffect != null && !heartbeatSuppressed)
             {
                 heartbeatEffect.UpdateHeartbeat(currentHp, maxHp);
+            }
+        }
+
+        /// <summary>
+        /// 決着時など、HPに関係なくビネットを消したいときに呼ぶ。
+        /// ビネット(91)は勝敗Canvas(55)より手前なので、消さないと結果画面に被る。
+        /// ロン演出中は SetHP が毎フレーム呼ばれるため、次の SetMaxHP まで再開を抑止する。
+        /// </summary>
+        public void StopHeartbeatEffect()
+        {
+            heartbeatSuppressed = true;
+            if (heartbeatEffect != null)
+            {
+                heartbeatEffect.StopEffect();
             }
         }
 
@@ -380,13 +399,12 @@ namespace KillingMahjong.UI
             if (target == null) return;
 
             // ルートのCanvasのみを手前に出す（子Canvasを一律上書きすると表示順が壊れるため）
-            _sortingScope.BringToFront(target.gameObject, UISortingOrders.InfoPanelHighlight, "UI");
+            _sortingScope.BringToFront(target.gameObject, UISortingOrders.InfoPanelHighlight);
 
             // 手やスマホ本体などのSpriteRendererを手前に持ってくる
             var sprites = target.GetComponentsInChildren<SpriteRenderer>(true);
             foreach (var s in sprites)
             {
-                s.sortingLayerName = "UI";
                 s.sortingOrder = UISortingOrders.InfoPanelHighlight;
             }
         }
@@ -400,7 +418,6 @@ namespace KillingMahjong.UI
             var sprites = target.GetComponentsInChildren<SpriteRenderer>(true);
             foreach (var s in sprites)
             {
-                s.sortingLayerName = "Default";
                 s.sortingOrder = 0;
             }
         }
@@ -419,13 +436,12 @@ namespace KillingMahjong.UI
             // ズーム対象が何であれ、PlayerInfoUI全体を最前面に出す
             BringToFront(transform);
 
-            // 強制的にCanvasのSortOrderを20にする（インスペクターで10のままになる現象の回避）
+            // 強制的にCanvasのSortOrderを引き上げる（インスペクターの値のままになる現象の回避）
             var myCanvas = GetComponent<Canvas>();
             if (myCanvas != null)
             {
-                Debug.Log($"[PlayerInfoUI] Current sortingOrder was {myCanvas.sortingOrder}, setting to 20.");
                 myCanvas.overrideSorting = true;
-                myCanvas.sortingOrder = 20;
+                myCanvas.sortingOrder = UISortingOrders.InfoPanelHighlight;
             }
 
             // 0の場合の安全対策
@@ -484,11 +500,11 @@ namespace KillingMahjong.UI
             targetObj.localScale = originalScale;
             ResetSorting(transform);
 
-            // ズーム解除時に確実に15に戻す
+            // ズーム解除時に確実に通常時の値へ戻す
             var myCanvas = GetComponent<Canvas>();
             if (myCanvas != null)
             {
-                myCanvas.sortingOrder = 15;
+                myCanvas.sortingOrder = UISortingOrders.InfoPanelNormal;
             }
         }
 
@@ -524,11 +540,11 @@ namespace KillingMahjong.UI
             }
             ResetSorting(transform);
 
-            // ズーム解除時に確実に15に戻す
+            // ズーム解除時に確実に通常時の値へ戻す
             var myCanvas = GetComponent<Canvas>();
             if (myCanvas != null)
             {
-                myCanvas.sortingOrder = 15;
+                myCanvas.sortingOrder = UISortingOrders.InfoPanelNormal;
             }
         }
 

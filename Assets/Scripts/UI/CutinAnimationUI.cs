@@ -25,7 +25,6 @@ namespace KillingMahjong.UI
             
             Canvas canvas = root.AddComponent<Canvas>();
             canvas.overrideSorting = true;
-            canvas.sortingLayerName = "UI";
             canvas.sortingOrder = UISortingOrders.CutinAnimation;
 
             CanvasGroup canvasGroup = root.AddComponent<CanvasGroup>();
