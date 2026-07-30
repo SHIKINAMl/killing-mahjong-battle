@@ -311,7 +311,8 @@ namespace KillingMahjong.UI
             {
                 if (isTenpai && isManganOrMore)
                 {
-                    int reward = Mathf.FloorToInt(currentBet * expectedMultiplier);
+                    // 実際の精算と同じ計算を使う（端数処理が違うと表示と結果がずれる）
+                    int reward = GameRules.CalculateWinnerGain(currentBet, maxHan);
                     currentBetText.text = $"Bet: {currentBet}\n<size=70%>予想報酬: {reward}</size>";
                 }
                 else
@@ -324,7 +325,7 @@ namespace KillingMahjong.UI
             {
                 if (isTenpai && isManganOrMore)
                 {
-                    int reward = Mathf.FloorToInt(currentBet * expectedMultiplier);
+                    int reward = GameRules.CalculateWinnerGain(currentBet, maxHan);
                     expectedRewardText.text = $"Expected Reward: {reward}";
                 }
                 else

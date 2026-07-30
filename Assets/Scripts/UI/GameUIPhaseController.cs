@@ -99,14 +99,18 @@ namespace KillingMahjong.UI
             try
             {
                 Managers.BoardStateManager.Instance.UpdateHp(20000, 20000);
-                if (uiManager.PlayerInfoUI != null) 
+                if (uiManager.BetPotUI != null) uiManager.BetPotUI.Clear();
+                if (uiManager.PlayerInfoUI != null)
                 {
                     uiManager.PlayerInfoUI.gameObject.SetActive(true);
+                    // 前の対局で 20000 超えまで血を増やしているとメーターの分母が残るので引き直す
+                    uiManager.PlayerInfoUI.ResetHpMeter(20000);
                     uiManager.PlayerInfoUI.SetHP(20000);
                 }
-                if (uiManager.EnemyInfoUI != null) 
+                if (uiManager.EnemyInfoUI != null)
                 {
                     uiManager.EnemyInfoUI.SetPanelVisible(true);
+                    uiManager.EnemyInfoUI.ResetHpMeter(20000);
                     uiManager.EnemyInfoUI.SetHP(20000);
                     uiManager.EnemyInfoUI.ShowReadyBox(false);
                 }
@@ -487,6 +491,11 @@ namespace KillingMahjong.UI
 
         public void OnBettingCompleteFromServer(int playerBet, int enemyBet, int playerHp, int enemyHp)
         {
+            // 賭け金はここで両者の血から引かれている（BettingMessageHandler）。
+            // 流局では決着せず次の局でも同額が賭けられるので、場の表示は積み増していく。
+            // 場の血が動くのは決着したときだけなので、クリアはロン演出の完了時に行う。
+            if (uiManager.BetPotUI != null) uiManager.BetPotUI.AddStakes(playerBet, enemyBet);
+
             string roundTitle = $"第{_currentRoundIndex}局目";
             if (_isCarryOverNextRound) 
             {
@@ -892,6 +901,9 @@ namespace KillingMahjong.UI
 
         private void OnScoreSettlementComplete(bool isLocalWin)
         {
+            // 決着したので場の血は勝者へ移った。表示を空にする（流局のときはここを通らない）
+            if (uiManager.BetPotUI != null) uiManager.BetPotUI.Clear();
+
             if (uiManager.PlayerInfoUI != null)
             {
                 uiManager.PlayerInfoUI.gameObject.SetActive(true);

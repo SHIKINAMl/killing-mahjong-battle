@@ -22,6 +22,13 @@ namespace KillingMahjong.UI
         [Header("Character Portrait")]
         [SerializeField] private SpriteRenderer characterRenderer;
         [SerializeField] private SpriteRenderer faceRenderer; // 追加：表情レイヤー用
+
+        [Header("Death Animation")]
+        [Tooltip("死亡演出で体が落ちる距離（ワールド単位）。立ち絵の高さは約17.65。" +
+                 "20だと上端が画面下ぎりぎり（viewport -0.04）なので、余裕を見て24にしている")]
+        [SerializeField] private float deathFallDistance = 24f;
+        [Tooltip("死亡演出で落ち切るまでの時間（秒）")]
+        [SerializeField] private float deathFallDuration = 1.2f;
         [Header("Ready Mark")]
         [SerializeField] private GameObject readyBoxContainer;
         [SerializeField] private GameObject readyCheckImage;
@@ -77,6 +84,40 @@ namespace KillingMahjong.UI
                 StopCoroutine(blinkCoroutine);
                 blinkCoroutine = null;
             }
+        }
+
+        /// <summary>
+        /// 倒れる演出。顔が消えて、体が下へ落ちていく。
+        ///
+        /// まばたき・表情差し替え・バウンドはどれも顔と体を触るので、先に全部止める。
+        /// 止めないと落下中に顔が戻ったり、バウンドが体を元の位置へ引き戻したりする。
+        /// 呼んだあとは立ち絵が画面外にあるので、そのままシーン遷移する前提。
+        /// </summary>
+        public System.Collections.IEnumerator PlayDeathRoutine()
+        {
+            if (blinkCoroutine != null) { StopCoroutine(blinkCoroutine); blinkCoroutine = null; }
+            if (reactionCoroutine != null) { StopCoroutine(reactionCoroutine); reactionCoroutine = null; }
+            if (bounceCoroutine != null) { StopCoroutine(bounceCoroutine); bounceCoroutine = null; }
+
+            if (faceRenderer != null) faceRenderer.enabled = false;
+
+            if (characterRenderer == null) yield break;
+
+            Transform body = characterRenderer.transform;
+            Vector3 start = body.position;
+            Vector3 end = start + Vector3.down * deathFallDistance;
+
+            float duration = Mathf.Max(0.01f, deathFallDuration);
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float p = Mathf.Clamp01(elapsed / duration);
+                // 落下は加速させる（等速だと「沈んでいく」ように見えて力が抜ける）
+                body.position = Vector3.Lerp(start, end, p * p);
+                yield return null;
+            }
+            body.position = end;
         }
 
         private System.Collections.IEnumerator BlinkRoutine()
@@ -295,7 +336,20 @@ namespace KillingMahjong.UI
         public void SetMaxHP(int max)
         {
             maxHp = max;
+            // 同じ値で繰り返し呼ばれるので分母を引き下げない（PlayerInfoUI と同じ理由）
+            hpPeak = Mathf.Max(hpPeak, max);
         }
+
+        /// <summary>新しい対局の開始時に呼ぶ。メーターの分母（到達最高HP）も引き直す。</summary>
+        public void ResetHpMeter(int max)
+        {
+            maxHp = max;
+            hpPeak = max;
+        }
+
+        // PlayerInfoUI と同じ理由でメーターの分母だけ最高HPまで広げる（ダメージSEの判定は maxHp のまま）。
+        private int hpPeak;
+        private int MeterMax => Mathf.Max(1, Mathf.Max(maxHp, hpPeak));
 
         public void SetHP(int hp)
         {
@@ -307,9 +361,10 @@ namespace KillingMahjong.UI
             if (hpText != null) hpText.text = currentHp.ToString();
 
             // 人型メーターの割合を更新する
+            if (hp > hpPeak) hpPeak = hp;
             if (hpFillImage != null)
             {
-                hpFillImage.fillAmount = (float)hp / maxHp;
+                hpFillImage.fillAmount = (float)hp / MeterMax;
             }
 
             // 与えたダメージが敵側に一切表示されず、手応えが片側だけだったため追加。

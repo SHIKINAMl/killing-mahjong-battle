@@ -64,13 +64,25 @@ namespace KillingMahjong.Managers
         private int _enemyHp;
 
         // --- 賭け金 ---
-        // 流局では賭け金が決着しないので、次の局へ持ち越される。
-        // 持ち越された分は、次にロンが出た局でまとめて血の移動に加算される。
-        private int _pot;              // いま場に乗っている賭け金の総額
+        // 賭け金は確定した時点で両者の血から引かれ、場に積まれる（＝賭けた分は先に払う）。
+        // 決着したときの増減はこれとは別に GameRules の式で決まる:
+        //   勝者が得る額 = 勝者自身の賭け金 × 勝者の役の倍率
+        //   敗者が失う額 = 敗者自身の賭け金 × 勝者の役の倍率（単騎で上がられたら2倍）
+        // したがって満貫（1倍）で上がった勝者は、払った賭け金と同額が戻る＝差し引き0になる。
+        // 流局では決着しないので、賭け金は次の局へ積み増される（＝次の決着が大きくなる）。
+        // 場の表示（BetPotUI）は積まれている額の情報表示で、表示額そのものが移動するわけではない。
+        private int _playerStake;      // 自分が賭けている額
+        private int _enemyStake;       // 相手が賭けている額
+        private int Pot => _playerStake + _enemyStake;
         private int _lastBetAmount;    // 直前に賭けた額（流局の次の局はこれと同額が自動で賭けられる）
+        private int _lastConfirmedBet; // 賭け金UIで実際に確定した額
         private bool _prevRoundWasDraw;
 
         private bool _boardVisible = true;
+
+        /// <summary>セリフの送り待ち中か。待っている間は牌を触らせない。</summary>
+        private bool _isWaitingForLine;
+
         private bool _isWaitingForDiscard;
         private bool _isWaitingForHandSelectionComplete;
         private bool _hasRejectedFirstConfirm;
@@ -161,9 +173,20 @@ namespace KillingMahjong.Managers
             _enemyHp = _scenario.enemyStartHp;
             _aborted = false;
 
-            _pot = 0;
+            _playerStake = 0;
+            _enemyStake = 0;
             _lastBetAmount = 0;
             _prevRoundWasDraw = false;
+            ApplyPotToUI();
+
+            // メーターの分母（到達最高HP）は前回のプレイの値が残るので引き直す
+            if (gameUIManager != null)
+            {
+                if (gameUIManager.PlayerInfoUI != null)
+                    gameUIManager.PlayerInfoUI.ResetHpMeter(_scenario.playerStartHp);
+                if (gameUIManager.EnemyInfoUI != null)
+                    gameUIManager.EnemyInfoUI.ResetHpMeter(_scenario.enemyStartHp);
+            }
 
             if (_scenarioRoutine != null) StopCoroutine(_scenarioRoutine);
             _scenarioRoutine = StartCoroutine(ScenarioRoutine(Mathf.Max(0, roundIndex)));
@@ -202,8 +225,34 @@ namespace KillingMahjong.Managers
                 PlayerPrefs.Save();
             }
 
+            // 相手の血が尽きているなら、倒れる演出を挟んでから締めのセリフへ
+            yield return StartCoroutine(RunEnemyDeath());
+
             yield return StartCoroutine(PlayLines(_scenario.endingLines));
             SceneManager.LoadScene(_scenario.titleSceneName);
+        }
+
+        /// <summary>
+        /// 決着したあと、相手が倒れるところを見せる。
+        ///
+        /// 盤面（手牌・山牌・河・HPパネル）を先に片付けて立ち絵とセリフだけにする。
+        /// 牌が残ったまま立ち絵が落ちると何が起きたのか分からない。
+        /// </summary>
+        private IEnumerator RunEnemyDeath()
+        {
+            if (_enemyHp > 0) yield break;
+
+            var enemy = gameUIManager != null ? gameUIManager.EnemyInfoUI : null;
+            if (enemy == null) yield break;
+
+            ClearGuide();
+            SetBoardVisible(false);
+            yield return new WaitForSeconds(phaseSettleTime);
+
+            yield return StartCoroutine(enemy.PlayDeathRoutine());
+
+            // 倒れ切ってから沈黙（endingLines の「…………」）を出す
+            yield return new WaitForSeconds(0.4f);
         }
 
         private const string ProgressKey = "Tutorial_LastCompletedRound";
@@ -295,7 +344,18 @@ namespace KillingMahjong.Managers
                 }
             }
 
-            if (selfMadeMangan)
+            if (data.freeHandBuilding)
+            {
+                // 自力で組んでも『自動』に任せてもよい局。
+                // 両方のボタンを出したままにし、どちらかへ誘導もしない。
+                // 決定が押された時点でもう一度手牌を見る（OnTryCompleteHandSelection）ので、
+                // ここで満貫手が出来ていなくても、牌を入れ替えて直せる。
+                if (selfMadeMangan) HasClickedAutoMangan = true;
+
+                SetHandButtonStage(HandButtonStage.AutoAndDecide);
+                ClearGuide();
+            }
+            else if (selfMadeMangan)
             {
                 // 自力で満貫手を組めたなら『自動』を挟ませる理由がない。そのまま決定へ通す。
                 // HasClickedAutoMangan は「台本の満貫手が盤面にそろっている」ことを表すフラグとして
@@ -323,7 +383,7 @@ namespace KillingMahjong.Managers
                 // ここでプレイヤーに賭け金を指示してはいけない。
                 int inherited = _lastBetAmount > 0 ? _lastBetAmount : data.betAmount;
                 _lastBetAmount = inherited;
-                _pot += inherited;
+                PlaceBet(inherited);
 
                 yield return StartCoroutine(PlayLines(ResolveInheritedBetLines(data, inherited)));
             }
@@ -332,8 +392,10 @@ namespace KillingMahjong.Managers
                 yield return StartCoroutine(PlayLines(data.beforeBetLines));
                 yield return StartCoroutine(RunBettingPhase(data));
 
-                _lastBetAmount = data.betAmount;
-                _pot += data.betAmount;
+                // 実際に確定した額で積む（UIの表示額と場の額を必ず一致させる）
+                int bet = _lastConfirmedBet > 0 ? _lastConfirmedBet : data.betAmount;
+                _lastBetAmount = bet;
+                PlaceBet(bet);
             }
 
             // --- 打牌フェイズ ---
@@ -353,6 +415,49 @@ namespace KillingMahjong.Managers
         }
 
         /// <summary>
+        /// 賭け金を積む。確定した時点で両者の血から引く（賭けた分は先に払う）。
+        /// 決着時の増減はこれとは別に GameRules の式で決まる。
+        /// チュートリアルでは相手も同額を賭ける。
+        /// 残り血より賭け金が大きい場合は、実際に払えた分だけ場に乗る。
+        /// </summary>
+        private void PlaceBet(int amount)
+        {
+            if (amount <= 0) return;
+
+            int playerPaid = Mathf.Min(amount, _playerHp);
+            int enemyPaid = Mathf.Min(amount, _enemyHp);
+
+            _playerHp -= playerPaid;
+            _enemyHp -= enemyPaid;
+            _playerStake += playerPaid;
+            _enemyStake += enemyPaid;
+
+            ApplyHpToUI();
+            ApplyPotToUI();
+        }
+
+        /// <summary>決着したので賭け金を精算（0に戻す）する。</summary>
+        private void ClearStakes()
+        {
+            _playerStake = 0;
+            _enemyStake = 0;
+            ApplyPotToUI();
+        }
+
+        /// <summary>この局の勝者の役の飜数。倍率は GameRules.GetMultiplier がここから決める。</summary>
+        private int GetWinnerHan(TutorialRoundData data, bool isPlayerWin)
+        {
+            // プレイヤーの上がりは台本の手牌（manganHandHan）がそのまま勝者の役になる
+            return isPlayerWin ? data.manganHandHan : data.enemyWinningHan;
+        }
+
+        private void ApplyPotToUI()
+        {
+            var potUI = gameUIManager != null ? gameUIManager.BetPotUI : null;
+            if (potUI != null) potUI.SetStakes(_playerStake, _enemyStake);
+        }
+
+        /// <summary>
         /// 賭け金が持ち越されたことを伝えるセリフ。台本が空なら既定文を使う。
         /// </summary>
         private List<TutorialLine> ResolveInheritedBetLines(TutorialRoundData data, int inherited)
@@ -364,7 +469,7 @@ namespace KillingMahjong.Managers
                 {
                     if (line == null) continue;
                     resolved.Add(new TutorialLine(
-                        string.Format(line.text, inherited, _pot), line.speaker));
+                        string.Format(line.text, inherited, Pot), line.speaker));
                 }
                 return resolved;
             }
@@ -536,6 +641,10 @@ namespace KillingMahjong.Managers
             if (gameUIManager.TurnIndicatorUI != null)
                 gameUIManager.TurnIndicatorUI.gameObject.SetActive(visible);
 
+            // 場の血は額を保持したまま表示だけ消す（持ち越し分が消えて見えないように）
+            if (gameUIManager.BetPotUI != null)
+                gameUIManager.BetPotUI.SetVisible(visible);
+
             // ドラ表示牌（3Dグランドライト含む）はチュートリアルの説明に入らないので常に隠す
             if (gameUIManager.DoraDisplayUI != null)
                 gameUIManager.DoraDisplayUI.Hide();
@@ -595,8 +704,15 @@ namespace KillingMahjong.Managers
             }
 
             // --- ③ 賭け金は固定額。増減ボタンは押せないので決定するしかない ---
+            // 実際に賭ける額は UI が確定した値を使う。data.betAmount をそのまま使うと、
+            // 表示されている額と場に積まれる額が食い違う余地が残る。
             bool confirmed = false;
-            betting.ShowFixedBettingPhase(_playerHp, _playerHp, data.betAmount, _ => confirmed = true);
+            _lastConfirmedBet = data.betAmount;
+            betting.ShowFixedBettingPhase(_playerHp, _playerHp, data.betAmount, amount =>
+            {
+                _lastConfirmedBet = amount;
+                confirmed = true;
+            });
 
             GuideTo(betting.ConfirmButtonRect);
             yield return new WaitUntil(() => confirmed);
@@ -730,18 +846,20 @@ namespace KillingMahjong.Managers
                 if (gameUIManager.RonWaitPanel != null) gameUIManager.RonWaitPanel.SetActive(false);
             }
 
-            // ロンは血の奪い合い。相手から減った分がそのまま自分の血になる。
-            // 流局で持ち越されてきた賭け金もここでまとめて決着する。
-            // 相手の残り血より総額が大きい場合は、実際に奪えた分だけ増える。
+            // 増減は GameRules の式で決まる。得る額と失う額は別計算なので一致しない。
             int prevEnemyHp = _enemyHp;
             int prevPlayerHp = _playerHp;
 
-            int settlement = data.score + _pot;
-            _pot = 0;
+            int han = GetWinnerHan(data, isPlayerWin: true);
+            int gain = GameRules.CalculateWinnerGain(_playerStake, han);
+            int loss = GameRules.CalculateLoserLoss(_enemyStake, han, data.isTankiWin);
+            ClearStakes();
 
-            int drained = Mathf.Min(settlement, prevEnemyHp);
-            _enemyHp = prevEnemyHp - drained;
-            _playerHp = prevPlayerHp + drained;
+            _playerHp = prevPlayerHp + gain;
+            _enemyHp = Mathf.Max(0, prevEnemyHp - loss);
+
+            // 演出に出す額は「自分の血がどれだけ動いたか」に合わせる
+            int settlement = gain;
 
             // RonAnimationUI は handTiles を並べたあとに ronTile を別枠で追加描画する。
             // したがって handTiles にはアタリ牌を含めない13枚を渡すこと。
@@ -760,18 +878,20 @@ namespace KillingMahjong.Managers
         {
             SetPhase(RoundStatus.Agari);
 
-            // 手順⑯: 打点に加えて、流局から持ち越された賭け金もまとめて奪われる
+            // 手順⑯: 単騎で上がられると失う額が2倍になる（GameRules.CalculateLoserLoss）
             int prevPlayerHp = _playerHp;
             int prevEnemyHp = _enemyHp;
 
-            int settlement = data.score + _pot;
-            _pot = 0;
+            int han = GetWinnerHan(data, isPlayerWin: false);
+            int gain = GameRules.CalculateWinnerGain(_enemyStake, han);
+            int loss = GameRules.CalculateLoserLoss(_playerStake, han, data.isTankiWin);
+            ClearStakes();
 
-            // drawDamageToPlayer は賭け金とは別枠の流局ペナルティ。血の移動には含めない。
-            int totalDamage = settlement + data.drawDamageToPlayer;
-            _playerHp = Mathf.Max(0, prevPlayerHp - totalDamage);
+            _playerHp = Mathf.Max(0, prevPlayerHp - loss);
+            _enemyHp = prevEnemyHp + gain;
 
-            _enemyHp = prevEnemyHp + Mathf.Min(settlement, prevPlayerHp);
+            // 演出に出す額は「自分の血がどれだけ動いたか」に合わせる
+            int settlement = loss;
 
             // 単騎待ちなので、実際に打たれた牌がそのままアタリ牌になる
             int ronTileBase = playerDiscardBaseId >= 0 ? playerDiscardBaseId : TutorialTiles.Ton;
@@ -828,6 +948,9 @@ namespace KillingMahjong.Managers
         {
             SetPhase(RoundStatus.Draw);
 
+            // 流局では場の血は動かさない（決着していないので次の局へ持ち越す）。
+            // 賭け金は既に両者の血から引かれているので、流局そのもので血は減っている。
+            // drawDamageToPlayer はそれとは別枠の追加ペナルティ。既定シナリオでは 0。
             if (data.drawDamageToPlayer > 0)
             {
                 _playerHp = Mathf.Max(0, _playerHp - data.drawDamageToPlayer);
@@ -926,14 +1049,29 @@ namespace KillingMahjong.Managers
                 AudioManager.Instance.PlaySkillSE(showcase.skillType);
 
             // 1. カットイン演出（立ち絵＋巨大テキスト）
-            if (gameUIManager != null && gameUIManager.PhaseTransitionUI != null)
+            var phaseUI = gameUIManager != null ? gameUIManager.PhaseTransitionUI : null;
+            if (phaseUI != null)
             {
+                // SetupBoard がフェーズ演出を出さないよう PhaseTransitionUI を無効化している。
+                // 無効なままだと内部の StartCoroutine が失敗し、
+                // 「Coroutine couldn't be started because the game object is inactive」で進行が止まる。
+                // カットインの間だけ有効化し、終わったら元に戻す。
+                bool wasInactive = !phaseUI.gameObject.activeSelf;
+                if (wasInactive)
+                {
+                    phaseUI.gameObject.SetActive(true);
+                    // Start() で Canvas の sortingOrder を設定しているので、走らせてから使う
+                    yield return null;
+                }
+
                 var cData = gameUIManager.EnemyInfoUI != null
                     ? gameUIManager.EnemyInfoUI.CurrentCharacterData
                     : null;
 
-                yield return gameUIManager.PhaseTransitionUI.PlaySkillCutinAnimationRoutine(
+                yield return phaseUI.PlaySkillCutinAnimationRoutine(
                     skillName, isLocalPlayer: false, characterData: cData, duration: 2.0f);
+
+                if (wasInactive) phaseUI.gameObject.SetActive(false);
             }
             else
             {
@@ -1097,7 +1235,10 @@ namespace KillingMahjong.Managers
                     clicked = true;
                 }
 
+                // 送り待ちの間は牌を触らせない（OnTryMoveTile で弾く）
+                _isWaitingForLine = true;
                 yield return new WaitUntil(() => clicked);
+                _isWaitingForLine = false;
 
                 if (dialogueUI != null) dialogueUI.HideNextRoundButton();
             }
@@ -1175,6 +1316,11 @@ namespace KillingMahjong.Managers
         {
             if (_round == null) return false;
 
+            // セリフの送り待ち中は触らせない。
+            // ここで ShowInterruptMessage を出すと DialogueUI の本文を上書きして
+            // 送りボタンの行が消え、進行が止まるので黙って弾く。
+            if (_isWaitingForLine) return false;
+
             if (!_round.allowManualHandSelection)
             {
                 ShowInterruptMessage("今は『自動』ボタンを押してね。");
@@ -1194,6 +1340,13 @@ namespace KillingMahjong.Managers
         {
             if (_round == null) return false;
 
+            // 押された時点でもう一度手牌を見る。13枚そろった瞬間の判定だけだと、
+            // そのあと牌を入れ替えて満貫手に直しても決定できないままになる。
+            if (!HasClickedAutoMangan && IsSelfMadeManganHand())
+            {
+                HasClickedAutoMangan = true;
+            }
+
             if (_round.rejectFirstConfirm && !_hasRejectedFirstConfirm && !HasClickedAutoMangan)
             {
                 _hasRejectedFirstConfirm = true;
@@ -1206,8 +1359,13 @@ namespace KillingMahjong.Managers
             if (_round.requireAutoManganToConfirm && !HasClickedAutoMangan)
             {
                 ShowInterruptMessage("『自動』ボタン（オート満貫）を押して、満貫手を作ってね。");
-                GuideTo(gameUIManager != null && gameUIManager.HandUI != null
-                    ? gameUIManager.HandUI.AutoManganButtonRect : null);
+
+                // 自由に組ませる局では矢印を出さない（自力でも自動でもよいので誘導しない）
+                if (!_round.freeHandBuilding)
+                {
+                    GuideTo(gameUIManager != null && gameUIManager.HandUI != null
+                        ? gameUIManager.HandUI.AutoManganButtonRect : null);
+                }
                 return false;
             }
 
@@ -1254,8 +1412,8 @@ namespace KillingMahjong.Managers
             // ここで初めて決定ボタンを出す
             SetHandButtonStage(HandButtonStage.AutoAndDecide);
 
-            // 次は決定ボタンへ誘導する
-            if (_isWaitingForHandSelectionComplete)
+            // 次は決定ボタンへ誘導する（自由に組ませる局では誘導しない）
+            if (_isWaitingForHandSelectionComplete && !_round.freeHandBuilding)
             {
                 GuideTo(gameUIManager != null && gameUIManager.HandUI != null
                     ? gameUIManager.HandUI.DecideButtonRect : null);

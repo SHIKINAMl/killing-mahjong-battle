@@ -4,7 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 
-namespace KillingMahjongBattle.UI.Effects
+namespace KillingMahjong.UI.Effects
 {
     [RequireComponent(typeof(CanvasGroup))]
     public class MatchMomentumUI : MonoBehaviour

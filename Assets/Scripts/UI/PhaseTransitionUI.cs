@@ -28,6 +28,17 @@ namespace KillingMahjong.UI
         [SerializeField] private TextMeshProUGUI enemyHpObj;
         [SerializeField] private TextMeshProUGUI playerHpObj;
 
+        [Header("スキルカットインの描画負荷")]
+        // WebGL は塗り面積（フィルレート）が効くので、半透明で重ねる面積を絞れるようにしている。
+        // 血飛沫は 800x600 基準で 1200px にすると画面の4倍の面積を半透明で塗ることになる。
+        [SerializeField, Tooltip("血飛沫の枚数。0で無し")] private int splatterCount = 2;
+        [SerializeField, Tooltip("血飛沫の最小サイズ(px)")] private float splatterSizeMin = 500f;
+        [SerializeField, Tooltip("血飛沫の最大サイズ(px)")] private float splatterSizeMax = 800f;
+        [SerializeField, Tooltip("立ち絵にドロップシャドウを付ける。付けると立ち絵1枚ぶん塗る面積が増える")]
+        private bool portraitShadow = false;
+        [SerializeField, Tooltip("文字に色付きのズレ影を重ねる。黒影は読みやすさのため常に付く")]
+        private bool textThemeShadow = false;
+
         [Header("Animation Durations")]
         [SerializeField] private float lineInDuration = 0.5f;
         [SerializeField] private float textWaitDuration = 1.0f;
@@ -91,10 +102,8 @@ namespace KillingMahjong.UI
             PlayRoundStartFadeOut();
         }
 
-        private void Update()
-        {
-            // Removed: loadingText timer
-        }
+        // 空の Update() があると Unity から毎フレーム呼ばれるだけ無駄なので削除した。
+        // （かつての loadingText タイマー用。処理は残っていない）
 
         private void ResetVisuals()
         {
@@ -863,11 +872,11 @@ namespace KillingMahjong.UI
             bgTargetPos.Add(stripeTarget);
 
             // 追加の血飛沫（少しだけ）
-            if (bloodSplatterSprite != null)
+            if (bloodSplatterSprite != null && splatterCount > 0)
             {
-                for (int i = 0; i < 2; i++)
+                for (int i = 0; i < splatterCount; i++)
                 {
-                    GameObject splatterObj = new GameObject($"Splatter_{i}");
+                    GameObject splatterObj = new GameObject("Splatter_" + i);
                     splatterObj.transform.SetParent(containerRt, false);
                     Image spImg = splatterObj.AddComponent<Image>();
                     spImg.sprite = bloodSplatterSprite;
@@ -875,7 +884,7 @@ namespace KillingMahjong.UI
                     spImg.preserveAspect = true;
 
                     RectTransform spRt = splatterObj.GetComponent<RectTransform>();
-                    float size = UnityEngine.Random.Range(600, 1200);
+                    float size = UnityEngine.Random.Range(splatterSizeMin, splatterSizeMax);
                     spRt.sizeDelta = new Vector2(size, size);
                     spRt.localRotation = Quaternion.Euler(0, 0, UnityEngine.Random.Range(0, 360f));
                     
@@ -935,10 +944,14 @@ namespace KillingMahjong.UI
                 
                 portraitRt.anchoredPosition = portraitStartPos; 
                 
-                // 立ち絵にテーマカラーのドロップシャドウ
-                Shadow pShadow = portraitObj.AddComponent<Shadow>();
-                pShadow.effectColor = isLocalPlayer ? new Color32(0, 100, 255, 150) : new Color32(200, 0, 0, 150);
-                pShadow.effectDistance = new Vector2(20, -20);
+                // 立ち絵にテーマカラーのドロップシャドウ。
+                // Shadow は立ち絵の四角を丸ごと複製するので、半透明で塗る面積が1枚ぶん増える
+                if (portraitShadow)
+                {
+                    Shadow pShadow = portraitObj.AddComponent<Shadow>();
+                    pShadow.effectColor = isLocalPlayer ? new Color32(0, 100, 255, 150) : new Color32(200, 0, 0, 150);
+                    pShadow.effectDistance = new Vector2(20, -20);
+                }
 
                 // 顔画像も合成
                 if (faceSprite != null)
@@ -968,15 +981,19 @@ namespace KillingMahjong.UI
             mainText.alignment = TextAlignmentOptions.Right;
             if (centerText != null) mainText.font = centerText.font;
 
-            // 黒い影
+            // 黒い影（読みやすさのため常に付ける）
             Shadow txtShadow1 = mainTextObj.AddComponent<Shadow>();
             txtShadow1.effectColor = new Color(0, 0, 0, 1f);
             txtShadow1.effectDistance = new Vector2(10, -10);
-            
-            // テーマカラーの影（ズレ）
-            Shadow txtShadow2 = mainTextObj.AddComponent<Shadow>();
-            txtShadow2.effectColor = isLocalPlayer ? new Color32(0, 100, 255, 150) : new Color32(200, 0, 0, 150);
-            txtShadow2.effectDistance = new Vector2(-10, 8);
+
+            // テーマカラーの影（ズレ）。Shadow 1枚ごとに文字のメッシュが複製されるので、
+            // 文字色を毎フレーム変えている間はその枚数ぶん作り直しが走る
+            if (textThemeShadow)
+            {
+                Shadow txtShadow2 = mainTextObj.AddComponent<Shadow>();
+                txtShadow2.effectColor = isLocalPlayer ? new Color32(0, 100, 255, 150) : new Color32(200, 0, 0, 150);
+                txtShadow2.effectDistance = new Vector2(-10, 8);
+            }
 
             RectTransform mainRt = mainText.GetComponent<RectTransform>();
             mainRt.anchorMin = new Vector2(1f, 1f);
@@ -1008,9 +1025,12 @@ namespace KillingMahjong.UI
                 s1.effectColor = new Color(0, 0, 0, 1f);
                 s1.effectDistance = new Vector2(10, -10);
 
-                Shadow s2 = subObj.AddComponent<Shadow>();
-                s2.effectColor = isLocalPlayer ? new Color32(0, 100, 255, 150) : new Color32(200, 0, 0, 150);
-                s2.effectDistance = new Vector2(-10, 8);
+                if (textThemeShadow)
+                {
+                    Shadow s2 = subObj.AddComponent<Shadow>();
+                    s2.effectColor = isLocalPlayer ? new Color32(0, 100, 255, 150) : new Color32(200, 0, 0, 150);
+                    s2.effectDistance = new Vector2(-10, 8);
+                }
 
                 RectTransform subRt = subTextUI.GetComponent<RectTransform>();
                 subRt.anchorMin = new Vector2(1f, 1f);

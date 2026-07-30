@@ -104,6 +104,10 @@ namespace KillingMahjong.Managers
         [Tooltip("手動で牌を動かせるか（手順①。第1局と第5局は true）")]
         public bool allowManualHandSelection = true;
 
+        [Tooltip("13枚そろったら『自動』と『決定』の両方を出し、矢印の誘導もしない。\n" +
+                 "自力で組んでも『自動』に任せてもよい局に使う（第5局）。")]
+        public bool freeHandBuilding = false;
+
         [Tooltip("最初の決定を無条件で弾くか（手順②。満貫判定は持たずスクリプトで弾く）")]
         public bool rejectFirstConfirm = true;
 
@@ -170,7 +174,13 @@ namespace KillingMahjong.Managers
         public List<string> yakuList = new List<string>();
         public string formulaText = "";
         public string rankText = "";
-        public int score = 0;
+
+        [Tooltip("EnemyRon のとき、敵の役の飜数。倍率は GameRules.GetMultiplier がここから決める。" +
+                 "PlayerRon のときはプレイヤーの手（manganHandHan）を使うのでこの値は見ない。")]
+        public int enemyWinningHan = 13;
+
+        [Tooltip("勝者が単騎待ちで上がったか。true だと敗者の失う額が2倍になる。")]
+        public bool isTankiWin = false;
 
         [Header("ダメージ（局をまたいでHPに反映される）")]
         [Tooltip("流局によるプレイヤーへのダメージ。手順⑯の『流局のダメージ』。")]
@@ -218,19 +228,43 @@ namespace KillingMahjong.Managers
         /// <summary>
         /// 台本アセットが未設定のときに使われる既定シナリオ。
         ///
-        /// 血の流れ。賭け金は流局では決着せず次局へ持ち越され、次のロンでまとめて動く。
+        /// 血の流れ。
+        ///
+        /// 賭け金は**確定した時点で両者の血から引かれ**、場に積まれる（賭けた分は先に払う）。
+        /// 決着したときの増減はこれとは別に `GameRules` の式で決まる:
+        ///
+        ///   勝者が得る額 = 勝者自身の賭け金 × 勝者の役の倍率
+        ///   敗者が失う額 = 敗者自身の賭け金 × 勝者の役の倍率（単騎で上がられたら2倍）
+        ///   倍率: 満貫1 / 跳満1.5 / 倍満2 / 三倍満3 / 役満4 / ダブル役満8
+        ///
+        /// 満貫（1倍）は払った賭け金と同額が戻るだけなので、勝っても差し引き0になる。
+        /// 流局では決着せず、賭け金は次の局へ積み増される（＝次の決着の元手が増える）。
         /// 敵は第4局で能力を3つ使い、そのコストぶん自分の血を失う。
         ///
-        ///   開始                                    P20000 / E20000
-        ///   第1局 自分ロン  打点12000+場1000        P33000 / E 7000
-        ///   第2局 流局      流局ダメージ1000/場持越  P32000 / E 7000
-        ///   第3局 相手ロン  打点16000+場2000        P14000 / E25000
-        ///   第4局 能力コスト -12700                 P14000 / E12300
-        ///         自分ロン  打点8000+場1000         P23000 / E 3300
-        ///   第5局 自分ロン  打点32000+場1000        P26300 / E    0（決着）
+        ///   開始                                              P20000 / E20000
+        ///   第1局 賭け金2000ずつ引かれる                      P18000 / E18000
+        ///         自分ロン 清一色6飜=跳満1.5倍
+        ///           自分 +3000 / 相手 -3000                   P21000 / E15000
+        ///   第2局 賭け金600ずつ                               P20400 / E14400
+        ///         流局（場はそのまま持ち越し）                P20400 / E14400
+        ///   第3局 同額600が自動で引かれ、賭け金は各1200        P19800 / E13800
+        ///         相手ロン 四暗刻単騎13飜=役満4倍・単騎
+        ///           相手 +4800 / 自分 -9600                   P10200 / E18600
+        ///   第4局 能力コスト -12700（手牌フェイズ）           P10200 / E 5900
+        ///         賭け金1000ずつ                              P 9200 / E 4900
+        ///         自分ロン 対々和+混一色5飜=満貫1倍
+        ///           自分 +1000 / 相手 -1000                   P10200 / E 3900
+        ///   第5局 賭け金1000ずつ                              P 9200 / E 2900
+        ///         自分ロン 純正九蓮宝燈26飜=ダブル役満8倍
+        ///           自分 +8000 / 相手 -8000（残2900で死亡）   P17200 / E    0（決着）
         ///
-        /// 第4局を跳満12000にすると敵の血がここで尽きて第5局が成立しない。
-        /// 数値を触るときは必ず最後まで通して確認すること。
+        /// 数値を触るときの制約:
+        ///   - 第3局で自分が死なないこと（単騎の2倍が効くので損失が跳ね上がる）
+        ///   - 第4局の前に相手が能力コスト12700を払えること
+        ///   - 賭け金の支払いで誰も死なないこと（第4局・第5局の相手の残り血が薄い）
+        ///   - 第4局のあとも相手が生き残り、第5局で死ぬこと
+        ///   - 全局とも満貫以上（制約『満貫手以下での開始は不可』）
+        /// 数値を触ったら必ず最後まで通して確認すること。
         /// </summary>
         public static TutorialScenario BuildDefault()
         {
@@ -378,14 +412,14 @@ namespace KillingMahjong.Managers
                 rejectFirstConfirm = true,         // ② 必ず弾く
                 requireAutoManganToConfirm = true, // ④ オートへ誘導
 
-                betAmount = 1000,
+                betAmount = 2000, // 各自2000払い、跳満1.5倍で自分+3000 / 相手-3000
                 enemyDiscardBaseIds = new List<int> { d1, d2, d3, d4, TutorialTiles.Man(9) },
                 outcome = TutorialOutcome.PlayerRon,
                 playerWinningTileBaseId = TutorialTiles.Man(9),
                 yakuList = new List<string> { "清一色" },
                 formulaText = "6飜",
                 rankText = "跳満",
-                score = 12000,
+                // 清一色6飜=跳満なので倍率1.5。自分 +2000×1.5=3000 / 相手 -3000
 
                 introLines = new List<TutorialLine>
                 {
@@ -408,6 +442,8 @@ namespace KillingMahjong.Managers
                 beforeBetLines = new List<TutorialLine>
                 {
                     new TutorialLine("手牌が決まったなら、次は賭け金よ。"),
+                    new TutorialLine("決めた分の血は、その場で払うの。だから決めた瞬間に体力が減るわ。"),
+                    new TutorialLine("勝てば役の倍率をかけて返ってくる。負ければ払った上にもっと取られる。"),
                 },
                 onBattleStartLines = new List<TutorialLine>
                 {
@@ -417,8 +453,9 @@ namespace KillingMahjong.Managers
                 outroLines = new List<TutorialLine>
                 {
                     new TutorialLine("ロン！あなたの上がりね。"),
-                    new TutorialLine("上がると、相手からダメージを奪えるのよ。"),
-                    new TutorialLine("賭けた金額に応じて獲得金も手に入るわ。これが基本ルールよ。"),
+                    new TutorialLine("獲得金は『自分が賭けた額 × 役の倍率』。跳満は1.5倍よ。"),
+                    new TutorialLine("負けた方は『自分が賭けた額 × 相手の役の倍率』を失うの。"),
+                    new TutorialLine("大きく賭ければ大きく取れる。そして大きく失う。これが基本ルールよ。"),
                 },
             });
 
@@ -435,12 +472,16 @@ namespace KillingMahjong.Managers
                 rejectFirstConfirm = false,
                 requireAutoManganToConfirm = true,
 
-                betAmount = 1000,
+                // 流局ぶんは次局へ積み増されるので少額にしておく。
+                // 第3局は単騎の2倍が効くため、ここを大きくすると自分が死ぬ。
+                betAmount = 600,
                 // 17手ぶん。うち最初の15手は自動で流し、残り2手をプレイヤーに打たせる。
                 enemyDiscardBaseIds = new List<int>(drawDiscards),
                 autoDiscardTurns = 15,
                 outcome = TutorialOutcome.Draw,
-                drawDamageToPlayer = 1000,
+                // 流局では血が動かない。賭け金は決着していないので次の局へ積み増される
+                // （持ち越しぶんだけ、次に決着したときの増減が大きくなる）。
+                drawDamageToPlayer = 0,
 
                 introLines = new List<TutorialLine>
                 {
@@ -459,7 +500,8 @@ namespace KillingMahjong.Managers
                 outroLines = new List<TutorialLine>
                 {
                     new TutorialLine("流局よ。誰も上がらずに牌が尽きると流局になるわ。"),
-                    new TutorialLine("流局しても、お互い少しずつダメージを受けるの。覚えておきなさい。"),
+                    new TutorialLine("払った血は誰のものにもならない。賭け金は決着していないでしょう？"),
+                    new TutorialLine("だから次の局に積み増されるの。積まれた分だけ、次の決着が大きくなるわ。"),
                 },
             });
 
@@ -487,9 +529,10 @@ namespace KillingMahjong.Managers
                 yakuList = new List<string> { "四暗刻単騎" },
                 formulaText = "役満",
                 rankText = "役満",
-                score = 16000,
-                // 第2局の流局で決着しなかった賭け金は場に残っており、
-                // このロンで打点と一緒に奪われる（TutorialManager が _pot として持っている）。
+                enemyWinningHan = 13, // 役満 = 4倍
+                isTankiWin = true,    // 単騎で上がられるので自分の失う額は2倍
+                // 第2局の流局で決着しなかった賭け金が積み増されているため、
+                // 双方の賭け金は各1200。相手 +1200×4=4800 / 自分 -1200×4×2=9600
 
                 introLines = new List<TutorialLine>
                 {
@@ -497,9 +540,9 @@ namespace KillingMahjong.Managers
                 },
                 inheritedBetLines = new List<TutorialLine>
                 {
-                    new TutorialLine("前の局は流局だったわね。賭け金は決着していないから、そのまま場に残っているの。"),
+                    new TutorialLine("前の局は流局だったわね。賭け金は決着していないから、そのまま積まれているの。"),
                     new TutorialLine("だから今回は{0}円が自動で賭けられて、場には合計{1}円。改めて賭ける必要はないわ。"),
-                    new TutorialLine("次にどちらかが上がったら、この分もまとめて動くのよ。"),
+                    new TutorialLine("積まれた分だけ、次に上がった方の獲得金も大きくなるのよ。"),
                 },
                 onBattleStartLines = new List<TutorialLine>
                 {
@@ -511,8 +554,8 @@ namespace KillingMahjong.Managers
                 {
                     new TutorialLine("ロン！ふふっ、騙されたわね！"),
                     new TutorialLine("待ち牌が東だなんて、一言も本当だとは言ってないわ。"),
-                    new TutorialLine("単騎待ちは、たった1枚の牌を待つ代わりに打点が跳ね上がるの。"),
-                    new TutorialLine("役満の打点と、持ち越されていた賭け金。まとめて食らいなさい！"),
+                    new TutorialLine("単騎待ちは、たった1枚の牌を待つ代わりに――相手が失う額が2倍になるの。"),
+                    new TutorialLine("役満は4倍。その2倍だから、積まれた賭け金の8倍よ。持っていきなさい！"),
                 },
             });
 
@@ -531,6 +574,8 @@ namespace KillingMahjong.Managers
                 rejectFirstConfirm = false,
                 requireAutoManganToConfirm = true,
 
+                // 相手は直前に能力コスト12700を払っていて血が薄い。
+                // 賭け金の支払いで相手が死ぬと第5局が成立しないので小さめにする。
                 betAmount = 1000,
 
                 // 2打目で放銃させる。1打目は待ちでない牌、2打目にプレイヤーの待ち(9p)を打たせる。
@@ -540,13 +585,12 @@ namespace KillingMahjong.Managers
                 outcome = TutorialOutcome.PlayerRon,
                 playerWinningTileBaseId = abilityWinningTile,
 
-                // 対々和(2飜) + 混一色(門前3飜) = 5飜 満貫。
-                // 跳満12000にすると、敵は能力コスト12700を払った直後なので血が尽き、
-                // 第5局（決着）が成立しなくなる。
+                // 対々和(2飜) + 混一色(門前3飜) = 5飜 満貫 = 1倍。
+                // 敵は直前に能力コスト12700を払っているので、ここで大きく削ると
+                // 第5局（決着）が成立しなくなる。満貫の等倍がちょうどいい。
                 yakuList = new List<string> { "対々和", "混一色" },
                 formulaText = "5飜",
                 rankText = "満貫",
-                score = 8000,
 
                 introLines = new List<TutorialLine>
                 {
@@ -634,34 +678,46 @@ namespace KillingMahjong.Managers
 
                 allowManualHandSelection = true,   // ㉑ 自分で組ませる
                 rejectFirstConfirm = false,
-                requireAutoManganToConfirm = true, // 制約『満貫手以下での開始は不可』
 
+                // 自力で組んで『決定』でも、『自動』に任せてもよい。矢印の誘導はしない。
+                // requireAutoManganToConfirm は残す＝制約『満貫手以下での開始は不可』の担保。
+                // 自力で台本の手を組めていれば決定を押した時点で通る（自動を押す必要はない）。
+                freeHandBuilding = true,
+                requireAutoManganToConfirm = true,
+
+                // 相手の残りは2900程度。賭け金の支払いで死なせないこと。
+                // ダブル役満8倍なので 1000 賭けても 8000 動き、決着には十分。
                 betAmount = 1000,
                 enemyDiscardBaseIds = new List<int> { d1, d2, d3, d4, finalWinningTile },
                 outcome = TutorialOutcome.PlayerRon,
                 playerWinningTileBaseId = finalWinningTile,
 
-                // 第3局で食らった役満（16000）を、その倍の打点で返して決着する
+                // 純正九蓮宝燈は 26飜 = ダブル役満 = 8倍。
+                // 1000 × 8 = 8000 で、残り2900の相手を倒し切る
                 yakuList = new List<string> { "純正九蓮宝燈" },
                 formulaText = "26飜",
                 rankText = "役満",
-                score = 32000,
 
                 introLines = new List<TutorialLine>
                 {
                     new TutorialLine("さあ、これが最後の対局よ！"),
-                    // 実際には requireAutoManganToConfirm が立っていて自動ボタンが必須なので、
-                    // 「自動を使ってもいい」という言い回しは実挙動と食い違っていた。
-                    new TutorialLine("好きに牌を並べてみなさい。仕上げは『自動』ボタンよ。"),
+                    new TutorialLine("最後は自分で決めなさい。自分の手で組んで『決定』を押すの。"),
+                    new TutorialLine("……どうしても組めないなら『自動』に頼ってもいいわ。好きにしなさい。"),
                 },
-                inheritedBetLines = new List<TutorialLine>
-                {
-                    new TutorialLine("さっきも流局だったから、賭け金はまた持ち越しよ。"),
-                    new TutorialLine("{0}円が自動で積まれて、場には{1}円。ここで決着をつけましょう。"),
-                },
+                // 第4局は自分ロンで決着しているので流局の持ち越しは起きない。
+                // inheritedBetLines は使われないため置いていない。
                 onHandFilledLines = new List<TutorialLine>
                 {
-                    new TutorialLine("13枚そろったわね。最後だもの、今回も自動で選んであげるわ。"),
+                    new TutorialLine("13枚そろったわね。その手で本当にいいの？"),
+                    new TutorialLine("決めたなら『決定』を。迷うなら『自動』を。どちらでも構わないわ。"),
+                },
+                // 決定して打牌フェイズに入った直後。命の賭け合いだと分からせる
+                onBattleStartLines = new List<TutorialLine>
+                {
+                    new TutorialLine("……手が決まったわね。もう引き返せないわ。"),
+                    new TutorialLine("ここから先は、賭けているのはお金じゃない。あなたの血よ。"),
+                    new TutorialLine("一枚打つたびに、どちらかの命が削れていく。それがデス麻雀。"),
+                    new TutorialLine("さあ、始めましょう。あなたの番よ――震える手で、選びなさい。"),
                 },
                 outroLines = new List<TutorialLine>
                 {
@@ -680,8 +736,13 @@ namespace KillingMahjong.Managers
                 r.revealBoardAfterLineIndex = 0;
             }
 
-            // 第1局は導入が長いので、「山牌から13枚選んで」と促す直前で盤面を出す
-            if (s.rounds.Count > 0) s.rounds[0].revealBoardAfterLineIndex = 2;
+            // プレイヤーが自分で牌を選ぶ局（第1局・第5局）は、イントロを全て送り終えてから盤面を出す。
+            // 途中で出すと「13枚選んで」のセリフを送る前に牌が触れてしまい、
+            // 説明を読む前に盤面が進んでしまう。-1 = イントロを全て流し終えたあと。
+            foreach (var r in s.rounds)
+            {
+                if (r.allowManualHandSelection) r.revealBoardAfterLineIndex = -1;
+            }
 
             // 第4局と第5局は手牌も役も違うので、共通設定のあとで上書きする
             if (s.rounds.Count > 3)
@@ -695,10 +756,12 @@ namespace KillingMahjong.Managers
                 s.rounds[4].manganHandHan = 26;
             }
 
+            // 相手が倒れたあとの沈黙。これを送るとタイトルへ戻る。
+            // 話者を既定にしているので吹き出しに 「…………」 と出る。
+            // （以前あった先輩の締めセリフは、倒れた直後に出すと空気が壊れるので外した）
             s.endingLines = new List<TutorialLine>
             {
-                new TutorialLine("これでチュートリアルは終了だよ！", TutorialSpeaker.Senpai),
-                new TutorialLine("お疲れ様！次はマルチモードで対戦してみよう！", TutorialSpeaker.Senpai),
+                new TutorialLine("…………"),
             };
             s.titleSceneName = "タイトルシーン";
 

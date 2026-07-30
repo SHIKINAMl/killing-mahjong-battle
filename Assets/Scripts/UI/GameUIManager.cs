@@ -30,6 +30,7 @@ namespace KillingMahjong.UI
         [SerializeField] private AbilityUI abilityUI;
         [SerializeField] private YakuListUI yakuListUI;
         [SerializeField] private BettingUI bettingUI;
+        [SerializeField, Tooltip("場に出ている血（賭け金プール）の表示。未設定でも動作する")] private BetPotUI betPotUI;
         [SerializeField] private PhaseTransitionUI phaseTransitionUI;
         [SerializeField] private ConfirmationDialogUI confirmationDialogUI;
         [SerializeField] private RonAnimationUI ronAnimationUI;
@@ -208,7 +209,7 @@ namespace KillingMahjong.UI
 
             UpdateTurnIndicatorVisibility();
         }
-        [SerializeField] private KillingMahjongBattle.UI.Effects.MatchMomentumUI matchMomentumUI;
+        [SerializeField] private KillingMahjong.UI.Effects.MatchMomentumUI matchMomentumUI;
 
         // --- 戦況グラフ用HP履歴 ---
         private List<int> playerHpHistory = new List<int>();
@@ -301,6 +302,7 @@ namespace KillingMahjong.UI
         public AbilityUI AbilityUI => abilityUI;
         public YakuListUI YakuListUI => yakuListUI;
         public BettingUI BettingUI => bettingUI;
+        public BetPotUI BetPotUI => betPotUI;
         public DialogueUI DialogueUI => dialogueUI;
         public PhaseTransitionUI PhaseTransitionUI => phaseTransitionUI;
         public ConfirmationDialogUI ConfirmationDialogUI => confirmationDialogUI;

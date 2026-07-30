@@ -41,6 +41,10 @@ namespace KillingMahjong.Common
         /// <summary>DoraDisplayUI: ドラ表示牌 (WorldSpace Canvas)</summary>
         public const int DoraTile = 10;
 
+        /// <summary>BetPotUI: 場に出ている血（賭け金プール）の表示。
+        /// 盤面より手前・情報パネルより奥。チュートリアルのマスク(60)より奥なので誘導中は一緒に暗くなる</summary>
+        public const int BetPot = 14;
+
         /// <summary>AbilityUI / PlayerInfoUI: 強調していない通常時のパネル</summary>
         public const int InfoPanelNormal = 15;
 

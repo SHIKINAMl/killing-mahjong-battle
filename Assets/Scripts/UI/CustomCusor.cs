@@ -10,6 +10,13 @@ public class CustomCursor : MonoBehaviour
     [Tooltip("画面上でのカーソルの大きさ（ピクセル）")]
     [SerializeField] private float cursorSize = 64f;
 
+    [Header("クリック時の傾き")]
+    [Tooltip("押している間の回転角（度）。マイナスで時計回り。0で無効")]
+    [SerializeField] private float clickRotationAngle = -12f;
+    [Tooltip("回転の軸。画像に対する割合で (0,0)=左上 / (1,1)=右下。\n" +
+             "既定の (0.5, 1) は下端中央＝手首あたり。ここを軸に指先が振れる。")]
+    [SerializeField] private Vector2 rotationAnchor = new Vector2(0.5f, 1f);
+
     private GameObject cursorCanvasObj;
     private RectTransform cursorRect;
 
@@ -63,18 +70,54 @@ public class CustomCursor : MonoBehaviour
     {
         if (cursorRect != null)
         {
+            var mouse = UnityEngine.InputSystem.Mouse.current;
+
+            // 押している間だけ傾ける。補間せず、押した瞬間に角度へ飛ばす
+            bool pressed = mouse != null && mouse.leftButton.isPressed;
+            float angle = pressed ? clickRotationAngle : 0f;
+            cursorRect.localRotation = Quaternion.Euler(0f, 0f, angle);
+
             // マウス座標に追従 (新しいInput System対応)
-            if (UnityEngine.InputSystem.Mouse.current != null)
+            if (mouse != null)
             {
-                cursorRect.position = UnityEngine.InputSystem.Mouse.current.position.ReadValue();
+                cursorRect.position = mouse.position.ReadValue() + GetAnchorRotationOffset(angle);
             }
-            
+
             // エディタ等で一時的にカーソルが表示されてしまうのを防ぐ
             if (Cursor.visible)
             {
                 Cursor.visible = false;
             }
         }
+    }
+
+    /// <summary>
+    /// 回転の軸を pivot（＝ホットスポット＝指先）から rotationAnchor（＝手首）へ移すための位置補正。
+    ///
+    /// RectTransform は必ず pivot を中心に回るので、そのままでは指先が固定されて
+    /// 手の根元が振れてしまう。軸を手首側へ移したいので、
+    /// 「pivot 回りの回転」を「anchor 回りの回転」に付け替える平行移動を足す。
+    ///
+    ///   pivot 回り: x → O + R(x-O)   anchor 回り: x → A + R(x-A)
+    ///   差分       : A + R(O-A) - O = v - R·v   （v = A - O）
+    ///
+    /// この補正の結果、押している間は指先がマウス座標から少しズレて振れる（狙った演出）。
+    /// クリック判定そのものはOSのマウス座標なので影響しない。
+    /// </summary>
+    private Vector2 GetAnchorRotationOffset(float angleDeg)
+    {
+        if (Mathf.Approximately(angleDeg, 0f)) return Vector2.zero;
+
+        // pivot と同じ座標系（左下原点の割合）に直してから、ピクセルの差に変換する
+        Vector2 anchor01 = new Vector2(rotationAnchor.x, 1f - rotationAnchor.y);
+        Vector2 v = (anchor01 - cursorRect.pivot) * cursorSize;
+
+        float rad = angleDeg * Mathf.Deg2Rad;
+        float cos = Mathf.Cos(rad);
+        float sin = Mathf.Sin(rad);
+        Vector2 rotated = new Vector2(v.x * cos - v.y * sin, v.x * sin + v.y * cos);
+
+        return v - rotated;
     }
 
     // 元のマウスカーソルに戻す時の処理

@@ -227,9 +227,27 @@ namespace KillingMahjong.UI
         public void SetMaxHP(int max)
         {
             maxHp = max;
+            // TutorialManager.ApplyHpToUI から同じ値で何度も呼ばれるので、
+            // ここで到達最高HPを引き下げてはいけない（メーターの分母が戻ってしまう）。
+            hpPeak = Mathf.Max(hpPeak, max);
             // 新しい対局が始まるのでビネットの抑止を解除する
             heartbeatSuppressed = false;
         }
+
+        /// <summary>新しい対局の開始時に呼ぶ。メーターの分母（到達最高HP）も引き直す。</summary>
+        public void ResetHpMeter(int max)
+        {
+            maxHp = max;
+            hpPeak = max;
+            heartbeatSuppressed = false;
+        }
+
+        // ロンで血を奪うと開始HPを超えるため、到達した最高HPまでメーターの分母を広げる。
+        // 分母を開始HP固定にすると fillAmount が1で頭打ちになり、
+        // 33000 → 14000 のような大きな減少がメーター上で見えなくなる。
+        // 瀕死ビネットとダメージSEの判定は「絶対量としてどれだけ残っているか」なので maxHp のまま。
+        private int hpPeak;
+        private int MeterMax => Mathf.Max(1, Mathf.Max(maxHp, hpPeak));
 
         [Header("Effects")]
         [SerializeField] private KillingMahjong.UI.Effects.HeartbeatEffect heartbeatEffect;
@@ -252,9 +270,10 @@ namespace KillingMahjong.UI
             }
             
             // 人型メーターの割合を更新する
+            if (hp > hpPeak) hpPeak = hp;
             if (hpFillImage != null)
             {
-                hpFillImage.fillAmount = (float)hp / maxHp;
+                hpFillImage.fillAmount = (float)hp / MeterMax;
             }
 
             if (!isFirstSetup && diff != 0)
