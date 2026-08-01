@@ -56,13 +56,31 @@ namespace KillingMahjong.UI
             }
 
             // ドラ枠オーバーレイはスプライトの有無に関わらず常に更新する（プール再利用時の状態リーク防止）
+            bool isDoraTile = sprite != null && encodedId >= 0 && (resourceManager != null
+                ? resourceManager.IsDora(encodedId)
+                : new TileData(encodedId).IsDora || new TileData(encodedId).IsRedDora);
+
             if (doraOverlayImage != null)
             {
-                bool isDora = sprite != null && encodedId >= 0 && (resourceManager != null
-                    ? resourceManager.IsDora(encodedId)
-                    : new TileData(encodedId).IsDora || new TileData(encodedId).IsRedDora);
-                doraOverlayImage.gameObject.SetActive(isDora);
+                doraOverlayImage.gameObject.SetActive(isDoraTile);
             }
+
+            SetDoraShine(isDoraTile);
+        }
+
+        /// <summary>
+        /// ドラ牌のきらめきを入り切りする。
+        /// 牌はプールで使い回されるので、ドラでなくなったら必ず止めること。
+        /// </summary>
+        private void SetDoraShine(bool on)
+        {
+            var shine = GetComponent<DoraShine>();
+            if (shine == null)
+            {
+                if (!on) return;              // 要らないなら作らない
+                shine = gameObject.AddComponent<DoraShine>();
+            }
+            shine.enabled = on;
         }
         
         public int GetId() => _currentId;

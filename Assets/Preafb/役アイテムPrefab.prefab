@@ -211,7 +211,7 @@ MonoBehaviour:
   m_fontColor32:
     serializedVersion: 2
     rgba: 4278190335
-  m_fontColor: {r: 1, g: 0, b: 0, a: 1}
+  m_fontColor: {r: 0, g: 0.028604746, b: 1, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -366,6 +366,9 @@ MonoBehaviour:
   yakuNameText: {fileID: 8846554656160537381}
   localBoostText: {fileID: 2041713253486076762}
   enemyBoostText: {fileID: 1040287455896605154}
+  descriptionText: {fileID: 0}
+  inlineDescriptionSizePercent: 55
+  showDescription: 0
 --- !u!1 &7460510861288506577
 GameObject:
   m_ObjectHideFlags: 0
@@ -441,7 +444,7 @@ MonoBehaviour:
   m_fontColor32:
     serializedVersion: 2
     rgba: 4294903552
-  m_fontColor: {r: 0, g: 0.028604746, b: 1, a: 1}
+  m_fontColor: {r: 1, g: 0, b: 0, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:

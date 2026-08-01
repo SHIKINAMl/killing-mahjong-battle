@@ -784,9 +784,33 @@ namespace KillingMahjong.UI
             }
         }
 
+        /// <summary>
+        /// 「この牌が通った」の推理表示。無ければ実行時に作る。
+        /// 判定はサーバー任せで、こちらは見えている打牌から候補を数えるだけ。
+        /// </summary>
+        private WaitDeductionUI _waitDeduction;
+        public WaitDeductionUI WaitDeduction
+        {
+            get
+            {
+                if (_waitDeduction == null) _waitDeduction = GetComponentInChildren<WaitDeductionUI>(true);
+                if (_waitDeduction == null)
+                {
+                    var go = new GameObject("WaitDeduction");
+                    go.transform.SetParent(transform, false);
+                    _waitDeduction = go.AddComponent<WaitDeductionUI>();
+                }
+                return _waitDeduction;
+            }
+        }
+
         public void HandleDiscardEvent(int discardedTileId, bool isLocalPlayer)
         {
             BoardStateManager.Instance.LastDiscardedTileId = discardedTileId;
+
+            // 通った牌・相手が切った牌のどちらも「相手の待ちではない」情報になる。
+            // ロン成立時は局が終わって次局でリセットされるので、ここで弾く必要はない。
+            if (!IsTutorialMode) WaitDeduction.RegisterDiscard(discardedTileId, isLocalPlayer);
 
             if (KillingMahjong.Managers.AudioManager.Instance != null)
                 KillingMahjong.Managers.AudioManager.Instance.PlayDiscardSE(KillingMahjong.Managers.AudioManager.Instance.discardSE);

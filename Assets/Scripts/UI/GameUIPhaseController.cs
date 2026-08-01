@@ -236,6 +236,12 @@ namespace KillingMahjong.UI
 
             if (uiManager.RiverUI != null) uiManager.RiverUI.gameObject.SetActive(showBoardElements);
             if (uiManager.EnemyRiverUI != null) uiManager.EnemyRiverUI.gameObject.SetActive(showBoardElements);
+
+            // 待ち候補の推理は打牌中だけ意味があるので、そのときだけ出す
+            if (!uiManager.IsTutorialMode)
+            {
+                uiManager.WaitDeduction.SetVisible(status == RoundStatus.Discard);
+            }
             if (uiManager.EnemyHandUI != null)
             {
                 if (isGameEndPhase)
@@ -282,6 +288,8 @@ namespace KillingMahjong.UI
                 case RoundStatus.Dealing:
                     _hasShownHandSelectionPrompt = false; // 次の局のためにフラグをリセット
                     _hasExecutedRonAnimation = false; // ロン演出の二重再生防止フラグをリセット
+                    // 待ち候補の推理は局ごとにやり直す
+                    if (!uiManager.IsTutorialMode) uiManager.WaitDeduction.ResetForNewRound();
                     if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.ShowReadyBox(false);
                     if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.ShowReadyBox(false);
 
