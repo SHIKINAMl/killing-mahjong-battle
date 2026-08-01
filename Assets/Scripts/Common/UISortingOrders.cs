@@ -42,7 +42,9 @@ namespace KillingMahjong.Common
         public const int DoraTile = 10;
 
         /// <summary>BetPotUI: 場に出ている血（賭け金プール）の表示。
-        /// 盤面より手前・情報パネルより奥。チュートリアルのマスク(60)より奥なので誘導中は一緒に暗くなる</summary>
+        /// 盤面より手前・情報パネルより奥。チュートリアルのマスク(60)より奥なので誘導中は一緒に暗くなる。
+        /// WaitDeductionUI（相手の待ち候補）も同じ段。どちらも盤面の情報表示で、
+        /// フェーズ演出の黒帯より奥に居るべきもの</summary>
         public const int BetPot = 14;
 
         /// <summary>AbilityUI / PlayerInfoUI: 強調していない通常時のパネル</summary>
