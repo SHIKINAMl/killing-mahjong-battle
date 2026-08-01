@@ -1,4 +1,6 @@
 using UnityEngine;
+using System;
+using System.Collections;
 using System.Collections.Generic;
 using KillingMahjong.EngineData;
 using KillingMahjong.Managers;
@@ -337,6 +339,93 @@ namespace KillingMahjong.UI
             isTransitioning = value;
             UpdateTurnIndicatorVisibility();
         }
+
+        // --- 演出中に届いたサーバーイベントの保留 ---
+        //
+        // サーバーメッセージは再送されないため、演出中だからと早期 return で捨てると
+        // そのイベントは永久に失われる（流局の取りこぼしで進行が止まる等）。
+        // 捨てる代わりにここへ積み、演出が明けてから実行する。
+
+        private readonly List<KeyValuePair<string, Action>> deferredActions = new List<KeyValuePair<string, Action>>();
+        private bool isFlushWatcherRunning = false;
+        private bool ignoreBusyForForcedFlush = false;
+
+        /// <summary>
+        /// 何らかの演出が進行中で、UI を触ると壊れる状態かどうか。
+        /// </summary>
+        public bool IsBusyWithTransition =>
+            !ignoreBusyForForcedFlush
+            && (isTransitioning || (phaseTransitionUI != null && phaseTransitionUI.IsDarkenTransitioning));
+
+        /// <summary>
+        /// 演出が明けるまで処理を保留する。
+        /// 同じ key の保留は後勝ちで上書きするので、連続して届いても積み上がらない。
+        /// 上書きは元の位置で行う（末尾に付け直すと到着順が壊れるため）。
+        /// </summary>
+        public void DeferUntilIdle(string key, Action action)
+        {
+            if (action == null) return;
+
+            var entry = new KeyValuePair<string, Action>(key, action);
+            int existing = deferredActions.FindIndex(p => p.Key == key);
+            if (existing >= 0) deferredActions[existing] = entry;
+            else deferredActions.Add(entry);
+            Debug.Log($"[GameUIManager] 演出中のため '{key}' を保留しました。演出完了後に実行します。");
+
+            if (!isFlushWatcherRunning) StartCoroutine(FlushDeferredActionsRoutine());
+        }
+
+        private IEnumerator FlushDeferredActionsRoutine()
+        {
+            isFlushWatcherRunning = true;
+
+            // 演出の途中で一瞬だけ isTransitioning が false に戻る箇所があるため
+            // （TriggerBettingAnimationPhase の onMidpoint）、必ず1フレーム待ってから判定する。
+            float waited = 0f;
+            do
+            {
+                yield return null;
+                waited += Time.deltaTime;
+            }
+            while (IsBusyWithTransition && waited < DeferredActionTimeoutSeconds);
+
+            // 演出フラグが立ちっぱなしになると保留が永久に実行されず、
+            // 取りこぼしと同じ「進行停止」になる。見た目の乱れより進行を優先する。
+            bool forced = IsBusyWithTransition;
+            if (forced)
+            {
+                Debug.LogWarning($"[GameUIManager] 演出が {DeferredActionTimeoutSeconds} 秒明けませんでした。保留していた処理を強制実行します。");
+            }
+
+            var toRun = new List<KeyValuePair<string, Action>>(deferredActions);
+            deferredActions.Clear();
+            isFlushWatcherRunning = false;
+
+            // 強制実行のときはガードを一時的に無効化する。
+            // そうしないと各処理が冒頭で再び「演出中」と判定して保留し直し、
+            // 永久に実行されないまま警告だけ出し続ける。
+            ignoreBusyForForcedFlush = forced;
+            try
+            {
+                foreach (var entry in toRun)
+                {
+                    try
+                    {
+                        entry.Value?.Invoke();
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogError($"[GameUIManager] 保留処理 '{entry.Key}' の実行に失敗: {ex.Message}\n{ex.StackTrace}");
+                    }
+                }
+            }
+            finally
+            {
+                ignoreBusyForForcedFlush = false;
+            }
+        }
+
+        private const float DeferredActionTimeoutSeconds = 8f;
 
         private void UpdateTurnIndicatorVisibility()
         {

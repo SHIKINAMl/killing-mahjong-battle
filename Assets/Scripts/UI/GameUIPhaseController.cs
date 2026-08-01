@@ -15,26 +15,7 @@ namespace KillingMahjong.UI
         private bool _hasShownHandSelectionPrompt = false;
         private bool _hasSentNextRoundForCurrentPhase = false;
         private int _currentRoundIndex = 1;
-        private bool _waitingForOpponentRonAnimation = false;
         private bool _isCarryOverNextRound = false;
-        private float _fallbackTimer = 0f;
-
-        private void Update()
-        {
-            if (_waitingForOpponentRonAnimation)
-            {
-                _fallbackTimer += Time.deltaTime;
-                if (_fallbackTimer > 5f)
-                {
-                    Debug.LogWarning("[GameUIPhaseController] 相手のロン進行メッセージが届きませんでした。フォールバックで強制進行します。");
-                    HandleNextRoundWaitingReceived(null);
-                }
-            }
-            else
-            {
-                _fallbackTimer = 0f;
-            }
-        }
 
         public void Setup(GameUIManager manager)
         {
@@ -209,7 +190,21 @@ namespace KillingMahjong.UI
 
         public void HandlePhaseVisibility(RoundStatus status)
         {
-            if (uiManager.IsTransitioning) return;
+            // UpdatePhaseStatus は :176 で先に status を確定させてからここへ来るため、
+            // ここで捨てると「status だけ進んで演出が出ない」状態になる。
+            // しかも同じ status の再通知は :164 の同値ガードで弾かれるので二度と復帰しない。
+            // 保留して演出明けに実行する。
+            //
+            // キーに status を含めて畳まないこと。フェイズごとに本体の処理が違い、しかも
+            // 冪等ではない（Dealing は _hasShownHandSelectionPrompt / _hasExecutedRonAnimation の
+            // リセットと次局の暗転開始を担っている）。1つのキーで畳むと Dealing が
+            // HandSelection に上書きされて消え、次局が始まらなくなる。
+            // 到着順に積んでおけば、演出が無かった場合と同じ順序で再生される。
+            if (uiManager.IsBusyWithTransition)
+            {
+                uiManager.DeferUntilIdle($"phaseVisibility:{status}", () => HandlePhaseVisibility(status));
+                return;
+            }
 
             if (status != RoundStatus.Betting && uiManager.PlayerInfoUI != null)
             {
@@ -515,7 +510,14 @@ namespace KillingMahjong.UI
 
         public void TriggerBettingAnimationPhase(string roundString, int playerBet, int enemyBet, int playerHp, int enemyHp)
         {
-             if (uiManager.IsTransitioning) return;
+             // このメソッドは演出だけでなく進行の責務も持っている（onMidpoint で
+             // UpdatePhaseStatus(Discard) を呼ぶ）。捨てると打牌フェイズへ進めず Betting で固まる。
+             if (uiManager.IsBusyWithTransition)
+             {
+                 uiManager.DeferUntilIdle("bettingAnimation",
+                     () => TriggerBettingAnimationPhase(roundString, playerBet, enemyBet, playerHp, enemyHp));
+                 return;
+             }
 
              if (uiManager.PhaseTransitionUI != null)
              {
@@ -591,9 +593,14 @@ namespace KillingMahjong.UI
 
         public void HandleDraw(KillingMahjong.EngineData.DrawPlayerData[] drawData = null)
         {
-            if (uiManager.IsTransitioning) return;
-
-            if (uiManager.PhaseTransitionUI != null && uiManager.PhaseTransitionUI.IsDarkenTransitioning) return;
+            // 流局は「最後の打牌の直後」に届くので打牌アニメや能力演出と重なりやすい。
+            // ここで捨てると _currentRoundIndex++・流局ダイアログ・next_round 送信が全部飛び、
+            // サーバーが承認を待ち続けて対局が止まる。捨てずに演出明けまで保留する。
+            if (uiManager.IsBusyWithTransition)
+            {
+                uiManager.DeferUntilIdle("draw", () => HandleDraw(drawData));
+                return;
+            }
 
             // 待機中などの表示は消す
             if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.ShowReadyBox(false);
@@ -784,15 +791,6 @@ namespace KillingMahjong.UI
             }
         }
 
-        public void HandleGameEnded()
-        {
-            if (_waitingForOpponentRonAnimation)
-            {
-                Debug.Log("[GameUIPhaseController] ゲーム終了を受信しました。相手のロンアクション送信を待たずに即座にロン演出を開始します。");
-                HandleNextRoundWaitingReceived(null);
-            }
-        }
-        
         private bool _isStartingNextRound = false;
 
         public void HandleNextRoundWaitingReceived(NextRoundWaitingData data = null)
