@@ -8,6 +8,16 @@ namespace KillingMahjong.UI
     {
         public int TileId { get; set; }
         public int PoolSlotIndex { get; set; } = -1; // ★ プールのどのスロットに属するかを記憶する
+
+        /// <summary>
+        /// この牌が山（OriginalWallTiles）の何番目かを保持する。
+        ///
+        /// 同じ牌IDは山に複数あるため、TileId から index を引く（IndexOf など）と
+        /// **常に最初の1枚が当たってしまい、別の牌を指してしまう。**
+        /// サーバーへ index を送る操作（牌交換など）では必ずこちらを使うこと。
+        /// 山に並べていない牌では -1。
+        /// </summary>
+        public int WallIndex { get; set; } = -1;
         public bool IsInHand { get; private set; }
         public Vector3 OriginalWallPosition { get; set; } // ★ 壁の本来の座標を記憶するプロパティ追加
         public bool IsHovered { get; private set; }

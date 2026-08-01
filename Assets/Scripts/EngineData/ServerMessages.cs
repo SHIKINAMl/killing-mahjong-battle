@@ -249,7 +249,10 @@ namespace KillingMahjong.EngineData
     {
         public string winner_id;
         public string loser_id;
-        public int tile_id;
+        // サーバーは "tile" というキーで送ってくる（game_session.py の on_agari_pending）。
+        // ここを tile_id にしていると JsonUtility が対応付けられず、常に 0 のままになる。
+        // 0 は無効値ではなく一萬という正当な牌なので、エラーにならず静かに誤った牌が流れる。
+        public int tile;
     }
 
     [Serializable]

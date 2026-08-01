@@ -44,6 +44,16 @@ namespace KillingMahjong.UI
         public List<RectTransform> GetWallSlots() => wallSlots;
 
         /// <summary>
+        /// 山牌1枚ぶん。表示は種類順に並べ替えるので、
+        /// 元の山での位置（WallIndex）を一緒に持ち回るために使う。
+        /// </summary>
+        private struct WallEntry
+        {
+            public TileData Data;
+            public int WallIndex;
+        }
+
+        /// <summary>
         /// wallSlotsからtileIdが一致するRectTransformを取り出し、スロットから削除して返す
         /// </summary>
         public RectTransform GrabTileById(int tileId)
@@ -99,21 +109,23 @@ namespace KillingMahjong.UI
             UpdateContainerPosition(isDiscardPhase);
 
             // 1. Convert to TileData
-            List<TileData> allTiles = new List<TileData>();
-            foreach (var id in tileIds)
+            //    表示は種類順に並べ替えるが、山の何番目だったかは持ち回る。
+            //    これを落とすと、同じ牌IDが複数ある山で index を引き直せなくなる。
+            List<WallEntry> allTiles = new List<WallEntry>();
+            for (int idx = 0; idx < tileIds.Count; idx++)
             {
-                allTiles.Add(new TileData(id));
+                allTiles.Add(new WallEntry { Data = new TileData(tileIds[idx]), WallIndex = idx });
             }
 
             // 2. Group by Category
-            var manzu = new List<TileData>();
-            var pinzu = new List<TileData>();
-            var souzu = new List<TileData>();
-            var honors = new List<TileData>();
+            var manzu = new List<WallEntry>();
+            var pinzu = new List<WallEntry>();
+            var souzu = new List<WallEntry>();
+            var honors = new List<WallEntry>();
 
             foreach (var t in allTiles)
             {
-                switch (t.Category)
+                switch (t.Data.Category)
                 {
                     case TileCategory.Manzu: manzu.Add(t); break;
                     case TileCategory.Pinzu: pinzu.Add(t); break;
@@ -123,7 +135,7 @@ namespace KillingMahjong.UI
             }
 
             // 3. 固定順で並べる: 萬子→ピンズ→索子→字牌
-            var categoryLists = new List<List<TileData>> { manzu, pinzu, souzu, honors };
+            var categoryLists = new List<List<WallEntry>> { manzu, pinzu, souzu, honors };
             categoryLists.Sort((a, b) => GetCategoryPriority(a).CompareTo(GetCategoryPriority(b)));
 
             // 4. Layout
@@ -142,14 +154,14 @@ namespace KillingMahjong.UI
                 // Sort inside category (Number順でソート。赤ドラも正しい位置に並ぶように)
                 list.Sort((a, b) =>
                 {
-                    if (a.Number != b.Number) return a.Number.CompareTo(b.Number);
-                    return a.Id.CompareTo(b.Id); // 同じNumberならencodedIdでタイブレーク
+                    if (a.Data.Number != b.Data.Number) return a.Data.Number.CompareTo(b.Data.Number);
+                    return a.Data.Id.CompareTo(b.Data.Id); // 同じNumberならencodedIdでタイブレーク
                 });
 
                 int j = 0;
                 while (j < list.Count)
                 {
-                    int targetId = list[j].Id;
+                    int targetId = list[j].Data.Id;
                     
                     // 描画する前にmaxWidthX を超えるかチェック
                     if (currentX > startPosition.x + maxWidthX)
@@ -212,6 +224,9 @@ namespace KillingMahjong.UI
                     {
                         // anchoredPosition（アンカー基準座標）で保存する
                         interaction.OriginalWallPosition = new Vector3(anchoredPos.x, anchoredPos.y, 0);
+                        // 表示順ではなく、山の何番目かを覚えさせる。
+                        // サーバーへ index を送る操作はこれを使う。
+                        interaction.WallIndex = list[j].WallIndex;
                     }
                     
                     var visual = slot.GetComponent<TileVisual>();
@@ -259,10 +274,10 @@ namespace KillingMahjong.UI
             }
         }
 
-        private int GetCategoryPriority(List<TileData> list)
+        private int GetCategoryPriority(List<WallEntry> list)
         {
             if (list.Count == 0) return 99;
-            var cat = list[0].Category;
+            var cat = list[0].Data.Category;
             switch (cat)
             {
                 case TileCategory.Souzu: return 1;

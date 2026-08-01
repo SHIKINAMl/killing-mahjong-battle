@@ -699,22 +699,34 @@ namespace KillingMahjong.UI
 
         private void HandleAgariPendingReceived(KillingMahjong.EngineData.AgariPendingData data)
         {
-            Debug.Log($"[GameUIManager] HandleAgariPendingReceived called. winner_id: {data.winner_id}, loser_id: {data.loser_id}, tile_id: {data.tile_id}");
-            
+            Debug.Log($"[GameUIManager] HandleAgariPendingReceived called. winner_id: {data.winner_id}, loser_id: {data.loser_id}, tile: {data.tile}");
+
             if (data.winner_id == NetworkMessageHandler.Instance.LocalPlayerId)
             {
-                if (BoardStateManager.Instance.NonManganWaitTiles.Contains(data.tile_id))
+                // 保留するかどうかに関わらず、自動打牌だけは先に止める。
+                // AutoDiscardController は RonWaitPanel の表示有無でロン猶予を判定しているので、
+                // パネルを出す前に保留すると、その隙に自動で打ってロンを取り逃す。
+                var autoDiscard = GetComponent<AutoDiscardController>();
+                if (autoDiscard != null) autoDiscard.CancelAutoDiscard();
+
+                // 賭け金演出などの最中にロン猶予が届くと、演出を突き抜けてロンボタンだけが先に出る。
+                // サーバーはロン入力を待ち続ける（手番のタイムアウトは無い）ので、
+                // 演出が明けてから出しても取りこぼしにはならない。
+                if (IsBusyWithTransition)
                 {
-                    Debug.Log($"[GameUIManager] Ignored agari_pending because tile {data.tile_id} is non-mangan.");
+                    DeferUntilIdle("agariPending", () => HandleAgariPendingReceived(data));
+                    return;
+                }
+
+                if (BoardStateManager.Instance.NonManganWaitTiles.Contains(data.tile))
+                {
+                    Debug.Log($"[GameUIManager] Ignored agari_pending because tile {data.tile} is non-mangan.");
                     SendActionToServer("agari", new KillingMahjong.Network.ActionPayload { accept = false });
                     return;
                 }
 
                 Debug.Log("[GameUIManager] I am the winner! Showing RonWaitPanel.");
                 _isAgariPending = true;
-
-                var autoDiscard = GetComponent<AutoDiscardController>();
-                if (autoDiscard != null) autoDiscard.CancelAutoDiscard();
 
                 if (RonWaitPanel != null)
                 {

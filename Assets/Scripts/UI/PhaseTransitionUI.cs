@@ -39,6 +39,16 @@ namespace KillingMahjong.UI
         [SerializeField, Tooltip("文字に色付きのズレ影を重ねる。黒影は読みやすさのため常に付く")]
         private bool textThemeShadow = false;
 
+        [Header("ドット血しぶき（レトロ演出）")]
+        [Tooltip("決着演出を「血が敗者から勝者へ移る」表現にする。画面外周も赤く縁取る")]
+        [SerializeField] private bool useBloodTransfer = true;
+        [Tooltip("useBloodTransfer が OFF のときだけ有効。その場で弾ける血しぶき")]
+        [SerializeField] private bool usePixelBlood = true;
+        [Tooltip("飛ばすドットの数（弾ける方の演出用）")]
+        [SerializeField] private int pixelBloodDotCount = 90;
+        [Tooltip("座標を丸めるグリッド幅(px)。大きいほど粗くレトロになる")]
+        [SerializeField] private float pixelBloodGridSize = 6f;
+
         [Header("Animation Durations")]
         [SerializeField] private float lineInDuration = 0.5f;
         [SerializeField] private float textWaitDuration = 1.0f;
@@ -610,10 +620,10 @@ namespace KillingMahjong.UI
                     if (enemyBetObj != null) enemyBetObj.text = $"獲得: +{winnerGain}";
                 }
 
-                // 血飛沫画像の生成
+                // 血飛沫画像の生成（血の移動演出を使うときは出さない）
                 GameObject splatterObj = null;
                 Image splatterImage = null;
-                if (bloodSplatterSprite != null)
+                if (bloodSplatterSprite != null && !useBloodTransfer)
                 {
                     splatterObj = new GameObject("BloodSplatter");
                     splatterObj.transform.SetParent(transform, false);
@@ -632,10 +642,28 @@ namespace KillingMahjong.UI
 
                 // 激しい画面揺れと血飛沫表示
                 StartCoroutine(ScreenShakeRoutine(0.5f, 30f));
-                
+
                 if (splatterImage != null)
                 {
                     splatterImage.color = new Color(1, 1, 1, 0.8f);
+                }
+
+                // 敗者側の位置。isLocalWin なら相手（上）が失い、そうでなければ自分（下）が失う
+                Vector2 loserSide  = isLocalWin ? new Vector2(0, 300)  : new Vector2(0, -300);
+                Vector2 winnerSide = isLocalWin ? new Vector2(0, -300) : new Vector2(0, 300);
+
+                if (useBloodTransfer)
+                {
+                    // 血が敗者から勝者へ移る。奪い合いであることを向きで見せる
+                    KillingMahjong.Visuals.BloodTransferEffect.Play(
+                        transform as RectTransform, loserSide, winnerSide,
+                        hpDeductionDuration, pixelBloodGridSize);
+                }
+                else if (usePixelBlood)
+                {
+                    KillingMahjong.Visuals.PixelBloodEffect.Play(
+                        transform as RectTransform, loserSide,
+                        pixelBloodDotCount, pixelBloodGridSize);
                 }
 
                 // HPカウントアニメーション
@@ -867,6 +895,16 @@ namespace KillingMahjong.UI
             Vector2 stripeStart = new Vector2(0, -3000f);
             stripeRt.anchoredPosition = stripeStart;
 
+            // 濃い色の帯が背景に溶けないよう黒で縁取る。
+            // 帯はこのあと動かすので、縁も同じ動きに含める。
+            var stripeEdge = KillingMahjong.Visuals.UIEdgeOutline.AddBehind(stripeRt, 10f);
+            if (stripeEdge != null)
+            {
+                bgElements.Add(stripeEdge);
+                bgStartPos.Add(stripeStart);
+                bgTargetPos.Add(stripeTarget);
+            }
+
             bgElements.Add(stripeRt);
             bgStartPos.Add(stripeStart);
             bgTargetPos.Add(stripeTarget);
@@ -1044,11 +1082,15 @@ namespace KillingMahjong.UI
 
             // --- 暴力的なアニメーション開始 ---
             float t = 0;
-            float impactDuration = 0.15f; 
+            float impactDuration = 0.15f;
 
             // スライドを廃止し、背景要素と立ち絵は下から「ばっ！」と突き上げる
             for (int i = 0; i < bgElements.Count; i++) bgElements[i].anchoredPosition = bgStartPos[i];
             if (portraitRt != null) portraitRt.anchoredPosition = portraitStartPos;
+
+            // 最初の1フレームを空けて、生成直後の Canvas 再構築を演出の外へ出す。
+            // ここを入れないと、生成コストが演出の1フレーム目に乗って出だしが硬くなる。
+            yield return null;
 
             // 画面揺れ
             StartCoroutine(ScreenShakeRoutine(0.2f, 15f));
@@ -1056,7 +1098,12 @@ namespace KillingMahjong.UI
             while (t < impactDuration)
             {
                 float progress = t / impactDuration;
-                float easeIn = Mathf.Pow(progress, 3f);
+                // 「下からばっ！と突き上げる」ので、最初に速く動いて着地で減速するイーズアウトを使う。
+                // ここを Pow(progress, 3f) のイーズインにすると、移動距離が 3000px あるぶん
+                // 序盤は画面外でほとんど動いて見えず、最後の3割で一気に飛び込む。
+                // 「少し出て、止まって、一気に全部出る」というガクついた見え方はこれが原因だった。
+                // ロン演出のスタンプ表現（RonAnimationUI）も同じくイーズアウトで揃えてある。
+                float easeIn = 1f - Mathf.Pow(1f - progress, 3f);
 
                 // 文字が叩きつけられる演出（スケール5から1へ）
                 mainRt.localScale = Vector3.LerpUnclamped(new Vector3(5f, 5f, 1f), Vector3.one, easeIn);
@@ -1080,7 +1127,7 @@ namespace KillingMahjong.UI
                 t += Time.deltaTime;
                 yield return null;
             }
-            
+
             mainRt.localScale = Vector3.one;
             mainText.color = Color.white;
 

@@ -11,6 +11,16 @@ namespace KillingMahjong.UI
     {
         [Header("Cinematic Assets")]
         [SerializeField] private Sprite bloodSplatterSprite;
+
+        [Header("ドット血しぶき（レトロ演出）")]
+        [Tooltip("ロン時の血しぶきをドット絵風にする。切るとスプライト1枚の従来演出だけになる")]
+        [SerializeField] private bool usePixelBlood = true;
+        [Tooltip("飛ばすドットの数")]
+        [SerializeField] private int pixelBloodDotCount = 70;
+        [Tooltip("座標を丸めるグリッド幅(px)。大きいほど粗くレトロになる")]
+        [SerializeField] private float pixelBloodGridSize = 6f;
+        [Tooltip("従来のスプライト血しぶきも一緒に出すか")]
+        [SerializeField] private bool keepSpriteSplatter = true;
         [SerializeField] private TMP_FontAsset customFont;
 
         [Header("Player Ron Bubble (Pre-Animation)")]
@@ -295,8 +305,16 @@ namespace KillingMahjong.UI
             yield return new WaitForSeconds(1.0f);
 
             // 5. 血飛沫と巨大スコアのバウンド表示（ドンッ！）
+
+            // ドット絵の血しぶき。スコアが落ちてくるのと同じ瞬間に飛ばす
+            if (usePixelBlood)
+            {
+                KillingMahjong.Visuals.PixelBloodEffect.Play(
+                    containerRt, new Vector2(0, 150), pixelBloodDotCount, pixelBloodGridSize);
+            }
+
             GameObject splatterObj = null;
-            if (bloodSplatterSprite != null)
+            if (bloodSplatterSprite != null && keepSpriteSplatter)
             {
                 splatterObj = new GameObject("BloodSplatter");
                 splatterObj.transform.SetParent(containerRt, false);
@@ -323,9 +341,9 @@ namespace KillingMahjong.UI
             scoreText.alignment = TextAlignmentOptions.Center;
             scoreText.fontStyle = FontStyles.Bold;
             
-            // 白いアウトラインで文字を際立たせる
+            // 赤字は血飛沫と同系色で埋もれるため、黒フチで縁取る（役ランク表示と揃える）
             scoreText.outlineWidth = 0.2f;
-            scoreText.outlineColor = new Color32(255, 255, 255, 255);
+            scoreText.outlineColor = new Color32(0, 0, 0, 255);
             
             RectTransform scoreTextRt = scoreTextObj.GetComponent<RectTransform>();
             scoreTextRt.anchorMin = new Vector2(0.5f, 0.5f);

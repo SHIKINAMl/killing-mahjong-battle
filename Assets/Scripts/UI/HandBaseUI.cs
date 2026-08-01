@@ -153,6 +153,28 @@ namespace KillingMahjong.UI
             }
         }
 
+        /// <summary>
+        /// 追従アニメの目標座標を設定する。
+        ///
+        /// 派生クラスが独自にレイアウトして anchoredPosition を直接書く場合は、
+        /// **必ずこれも呼ぶこと。** Update() は毎フレーム targetPositions へ向けて
+        /// 補間し続けるため、更新しないと直接置いた位置が古い目標へ引き戻され、
+        /// 牌が中途半端な位置でずれる。
+        /// </summary>
+        protected void SetTargetPosition(RectTransform rt, Vector2 pos)
+        {
+            if (rt != null) targetPositions[rt] = pos;
+        }
+
+        /// <summary>
+        /// 追従の目標を捨てる。LayoutGroup に配置を任せる場合は、
+        /// 補間と取り合いにならないようこれを呼んでおく。
+        /// </summary>
+        protected void ClearTargetPositions()
+        {
+            targetPositions.Clear();
+        }
+
         public virtual void SortHandSlots()
         {
         }

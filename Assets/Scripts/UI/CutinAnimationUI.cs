@@ -71,6 +71,12 @@ namespace KillingMahjong.UI
 
             Image stripeImg = stripeObj.AddComponent<Image>();
             stripeImg.color = new Color(0.85f, 0f, 0.5f, 1f); // 派手なピンク系
+
+            // 濃いピンクが背景に溶けないよう黒で縁取る。
+            // Mask を付ける前に作ること。Mask は自分の子だけを切り抜くので、
+            // 背面の兄弟であるこの縁は影響を受けない。
+            KillingMahjong.Visuals.UIEdgeOutline.AddBehind(stripeRt, 10f);
+
             Mask stripeMask = stripeObj.AddComponent<Mask>();
             stripeMask.showMaskGraphic = true;
 
