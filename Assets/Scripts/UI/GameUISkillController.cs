@@ -383,28 +383,25 @@ namespace KillingMahjong.UI
                         Debug.Log($"[Mulligan] BEFORE wall = {Join(stateMgr.CurrentWallTiles)}");
                         Debug.Log($"[Mulligan] BEFORE orig = {Join(stateMgr.OriginalWallTiles)}");
 
+                        // サーバーが交換した「位置」を正として山を同期する。
+                        // 同じ牌IDは山に複数あるので、牌IDで探すと別の牌を書き換えてしまう。
+                        // ここを怠ると OriginalWallTiles がサーバーとズレ、
+                        // 位置で牌を特定する処理（TileInteraction.WallIndex）が次の交換で誤動作する。
+                        bool syncedByIndex = stateMgr.ReplaceWallTileAt(targetHandIndex, newTileId);
+                        if (!syncedByIndex)
+                        {
+                            // index が使えない場合だけ、従来どおり牌IDで辻褄を合わせる
+                            int wallIdx = stateMgr.CurrentWallTiles.IndexOf(oldTileId);
+                            if (wallIdx >= 0) stateMgr.CurrentWallTiles[wallIdx] = newTileId;
+                        }
+
+                        // 交換した牌が手牌に入っていた場合は、手牌側も入れ替える。
+                        // 手牌は「山から選んだ13枚」なので、山の同期とは別に持ち替えが要る。
                         if (stateMgr.CurrentHandTiles.Contains(oldTileId))
                         {
                             stateMgr.CurrentHandTiles.Remove(oldTileId);
                             stateMgr.CurrentHandTiles.Add(newTileId);
                             stateMgr.SortTileIds(stateMgr.CurrentHandTiles);
-
-                            int wallIdx = stateMgr.CurrentWallTiles.IndexOf(newTileId);
-                            if (wallIdx >= 0)
-                            {
-                                stateMgr.CurrentWallTiles[wallIdx] = oldTileId;
-                            }
-                        }
-                        else if (stateMgr.CurrentWallTiles.Contains(oldTileId))
-                        {
-                            // If oldTileId is not in hand, this might be an invalid state, but we swap it out safely
-                            int wallIdx = stateMgr.CurrentWallTiles.IndexOf(oldTileId);
-                            if (wallIdx >= 0)
-                            {
-                                stateMgr.CurrentWallTiles.RemoveAt(wallIdx);
-                                stateMgr.CurrentWallTiles.Add(newTileId);
-                                stateMgr.SortTileIds(stateMgr.CurrentWallTiles);
-                            }
                         }
 
                         Debug.Log($"[Mulligan] AFTER  wall = {Join(stateMgr.CurrentWallTiles)}");

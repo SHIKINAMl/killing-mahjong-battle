@@ -55,17 +55,14 @@ namespace KillingMahjong.Managers
                 Debug.LogWarning("[DialogueManager] Main CSV file not found in Resources!");
             }
 
-            // チュートリアル用CSVの読み込み
-            TextAsset tutorialCsvFile = Resources.Load<TextAsset>("TutorialDialogue");
-            if (tutorialCsvFile != null)
-            {
-                ParseCSV(tutorialCsvFile.text);
-            }
-            else
-            {
-                Debug.LogWarning("[DialogueManager] Tutorial CSV file not found in Resources!");
-            }
-            
+            // チュートリアルのセリフはこの CSV では管理していない。
+            // 台本は Assets/Resources/Tutorial/TutorialScenario.asset にあり、
+            // TutorialManager が直接読む（DialogueManager は経由しない）。
+            //
+            // かつて TutorialDialogue.csv を読んでいたが、中身は初期の試作3行で、
+            // そのキー（チュートリアル_開始 など）はコードから一度も参照されていなかったため削除した。
+
+
             Debug.Log($"[DialogueManager] Loaded {parsedDialogues.Count} dialogue conditions.");
         }
 

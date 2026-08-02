@@ -221,6 +221,8 @@ namespace KillingMahjong.UI
                 }
                 if (interaction != null)
                 {
+                    // WallIndex はそのまま。位置は変わらず「その位置の牌が入れ替わった」だけなので、
+                    // ここで消すと次の交換で位置を特定できなくなる。
                     interaction.TileId = inTileId;
                 }
 

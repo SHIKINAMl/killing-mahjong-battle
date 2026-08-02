@@ -133,8 +133,32 @@ namespace KillingMahjong.UI
             }
         }
 
+        /// <summary>待ち牌1枚ぶんの情報。カーソルを合わせたときのオーバーレイに使う。</summary>
+        public struct WaitInfo
+        {
+            /// <summary>待ち牌の牌ID</summary>
+            public int TileId;
+            /// <summary>その牌で和了ったときの役名（「清一色 / 平和」のように連結済み）</summary>
+            public string YakuText;
+            /// <summary>「跳満」など。満たないときは「満貫未満」</summary>
+            public string RankText;
+        }
+
+        private WaitInfo[] _waitInfos;
+
         public void ShowDialogWithWaits(string message, int[] waitTileIds, Action onConfirm, Action onCancel)
         {
+            ShowDialogWithWaits(message, null, waitTileIds, onConfirm, onCancel);
+        }
+
+        /// <summary>
+        /// 待ち牌を並べて確認を取る。
+        /// 役名は並べず、**牌にカーソルを合わせたときだけ**手牌と役をオーバーレイで出す（要望18）。
+        /// </summary>
+        public void ShowDialogWithWaits(string message, WaitInfo[] waits, int[] waitTileIds,
+                                        Action onConfirm, Action onCancel)
+        {
+            _waitInfos = waits;
             ShowDialog(message, onConfirm, onCancel);
             DisplayWaits(waitTileIds);
         }
@@ -216,7 +240,151 @@ namespace KillingMahjong.UI
 
                 var interaction = obj.GetComponent<TileInteraction>();
                 if (interaction != null) Destroy(interaction);
+
+                // カーソルを合わせたら、その牌を入れた手牌と役をオーバーレイで出す
+                int hovered = id;
+                var relay = obj.AddComponent<WaitTileHoverRelay>();
+                relay.OnEnter = () => ShowHandPreview(hovered);
+                relay.OnExit = HideHandPreview;
             }
+        }
+
+        // ==================== カーソルを合わせたときのオーバーレイ ====================
+
+        private GameObject previewObj;
+        private RectTransform previewTiles;
+        private TextMeshProUGUI previewYakuText;
+        private readonly System.Collections.Generic.List<GameObject> previewTileObjs =
+            new System.Collections.Generic.List<GameObject>();
+
+        private void ShowHandPreview(int waitTileId)
+        {
+            if (tilePrefab == null || tileResourceManager == null) return;
+
+            EnsurePreviewBuilt();
+
+            // 選んだ13枚 ＋ その待ち牌。並びは手牌と同じ昇順にして見比べやすくする
+            var hand = new System.Collections.Generic.List<int>();
+            var board = KillingMahjong.Managers.BoardStateManager.Instance;
+            if (board != null && board.CurrentHandTiles != null) hand.AddRange(board.CurrentHandTiles);
+            hand.Sort((a, b) =>
+            {
+                int ba = a & 0x1F, bb = b & 0x1F;
+                return ba != bb ? ba.CompareTo(bb) : a.CompareTo(b);
+            });
+
+            ClearPreviewTiles();
+
+            // 手牌13枚 → はっきり間を空けて → 和了牌
+            const float w = 26f, gap = 1f, extra = 18f;
+            float total = hand.Count * (w + gap) + extra + w;
+            float x = -total / 2f + w / 2f;
+
+            for (int i = 0; i < hand.Count; i++)
+            {
+                SpawnPreviewTile(hand[i], x);
+                x += w + gap;
+            }
+            x += extra;
+            SpawnPreviewTile(waitTileId, x);
+
+            string yaku = "役なし";
+            string rank = "";
+            if (_waitInfos != null)
+            {
+                foreach (var info in _waitInfos)
+                {
+                    if (info.TileId != waitTileId) continue;
+                    if (!string.IsNullOrEmpty(info.YakuText)) yaku = info.YakuText;
+                    rank = info.RankText;
+                    break;
+                }
+            }
+            if (previewYakuText != null)
+                previewYakuText.text = string.IsNullOrEmpty(rank) ? yaku : $"{yaku}　{rank}";
+
+            previewObj.SetActive(true);
+            previewObj.transform.SetAsLastSibling();
+        }
+
+        private void SpawnPreviewTile(int id, float x)
+        {
+            var obj = Instantiate(tilePrefab, previewTiles);
+            previewTileObjs.Add(obj);
+
+            var rt = obj.GetComponent<RectTransform>();
+            if (rt != null)
+            {
+                rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+                rt.pivot = new Vector2(0.5f, 0.5f);
+                rt.anchoredPosition = new Vector2(x, 0f);
+                rt.localScale = new Vector3(0.75f, 0.75f, 1f);
+            }
+
+            var visual = obj.GetComponent<TileVisual>();
+            if (visual != null) visual.SetTile(id, tileResourceManager.GetTileSprite(id));
+
+            var inter = obj.GetComponent<TileInteraction>();
+            if (inter != null) Destroy(inter);
+        }
+
+        private void HideHandPreview()
+        {
+            if (previewObj != null) previewObj.SetActive(false);
+        }
+
+        private void ClearPreviewTiles()
+        {
+            foreach (var t in previewTileObjs) if (t != null) Destroy(t);
+            previewTileObjs.Clear();
+        }
+
+        private void EnsurePreviewBuilt()
+        {
+            if (previewObj != null) return;
+
+            previewObj = new GameObject("HandPreview");
+            var rt = previewObj.AddComponent<RectTransform>();
+            rt.SetParent(transform, false);
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta = new Vector2(500f, 92f);
+            rt.anchoredPosition = new Vector2(0f, 0f);
+
+            // 下の説明文が透けると読めなくなるので、完全に塗りつぶす
+            var bg = previewObj.AddComponent<Image>();
+            bg.color = new Color(0.04f, 0.04f, 0.06f, 1f);
+            bg.raycastTarget = false; // 牌のホバー判定を邪魔しない
+
+            var ol = previewObj.AddComponent<Outline>();
+            ol.effectColor = new Color(1f, 1f, 1f, 0.55f);
+            ol.effectDistance = new Vector2(2f, -2f);
+
+            var tilesObj = new GameObject("Tiles", typeof(RectTransform));
+            previewTiles = tilesObj.GetComponent<RectTransform>();
+            previewTiles.SetParent(rt, false);
+            previewTiles.anchorMin = previewTiles.anchorMax = new Vector2(0.5f, 0.5f);
+            previewTiles.pivot = new Vector2(0.5f, 0.5f);
+            previewTiles.anchoredPosition = new Vector2(0f, 16f);
+
+            var textObj = new GameObject("Yaku", typeof(RectTransform));
+            var trt = textObj.GetComponent<RectTransform>();
+            trt.SetParent(rt, false);
+            trt.anchorMin = new Vector2(0f, 0f);
+            trt.anchorMax = new Vector2(1f, 0f);
+            trt.pivot = new Vector2(0.5f, 0f);
+            trt.offsetMin = new Vector2(6f, 4f);
+            trt.offsetMax = new Vector2(-6f, 26f);
+
+            previewYakuText = textObj.AddComponent<TextMeshProUGUI>();
+            previewYakuText.alignment = TextAlignmentOptions.Center;
+            previewYakuText.color = Color.white;
+            previewYakuText.raycastTarget = false;
+            previewYakuText.enableAutoSizing = true;
+            previewYakuText.fontSizeMin = 10f;
+            previewYakuText.fontSizeMax = 16f;
+
+            previewObj.SetActive(false);
         }
 
         private void ClearWaits()
@@ -226,6 +394,8 @@ namespace KillingMahjong.UI
                 if (t != null) Destroy(t);
             }
             activeWaitTiles.Clear();
+            ClearPreviewTiles();
+            HideHandPreview();
         }
 
         public void HideDialog()
@@ -291,5 +461,17 @@ namespace KillingMahjong.UI
             ClearWaits();
             onCancelAction?.Invoke();
         }
+    }
+
+    /// <summary>待ち牌にカーソルが乗ったかどうかを外へ流すだけの小物。</summary>
+    public class WaitTileHoverRelay : MonoBehaviour,
+        UnityEngine.EventSystems.IPointerEnterHandler,
+        UnityEngine.EventSystems.IPointerExitHandler
+    {
+        public Action OnEnter;
+        public Action OnExit;
+
+        public void OnPointerEnter(UnityEngine.EventSystems.PointerEventData e) { OnEnter?.Invoke(); }
+        public void OnPointerExit(UnityEngine.EventSystems.PointerEventData e) { OnExit?.Invoke(); }
     }
 }

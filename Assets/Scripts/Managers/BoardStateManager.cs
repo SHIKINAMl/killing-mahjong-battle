@@ -293,6 +293,36 @@ namespace KillingMahjong.Managers
             DiscardedWallIndexes.Add(wallIndex);
         }
 
+        /// <summary>
+        /// 山の指定位置の牌を差し替える（牌交換で使う）。
+        ///
+        /// サーバーは wall 内のインデックスで交換位置を指定してくる。
+        /// OriginalWallTiles は配牌時に一度作るだけだったので、交換しても更新されず
+        /// サーバーの山とズレていた。位置で牌を特定する処理（TileInteraction.WallIndex）が
+        /// 2回目以降の交換で誤動作する原因になるため、ここで必ず同期させる。
+        ///
+        /// 同じ牌IDが山に複数あるので、**牌IDで探して書き換えてはいけない。**
+        /// 必ずサーバーが指定した位置をそのまま使うこと。
+        /// </summary>
+        /// <returns>差し替えに成功したら true</returns>
+        public bool ReplaceWallTileAt(int wallIndex, int newTileId)
+        {
+            if (wallIndex < 0 || wallIndex >= OriginalWallTiles.Count)
+            {
+                Debug.LogWarning($"[BoardState] ReplaceWallTileAt: index {wallIndex} が範囲外 (山 {OriginalWallTiles.Count} 枚)");
+                return false;
+            }
+
+            int old = OriginalWallTiles[wallIndex];
+            OriginalWallTiles[wallIndex] = newTileId;
+
+            // 表示用の現在の山からも、同じ1枚だけを差し替える
+            int cur = CurrentWallTiles.IndexOf(old);
+            if (cur >= 0) CurrentWallTiles[cur] = newTileId;
+
+            return true;
+        }
+
         // --- 牌の操作ロジック ---
 
         public bool MoveTileToHand(int tileId)

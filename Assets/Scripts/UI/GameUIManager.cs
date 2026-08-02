@@ -83,6 +83,10 @@ namespace KillingMahjong.UI
             // チュートリアルモードでなければWebSocketに自動接続する
             if (!IsTutorialMode)
             {
+                // 獲得ポイントのゲージは0でも出す。ここで触っておかないと
+                // 初回の獲得までゲージ自体が作られず、対局開始時に何も見えない。
+                ScoreGauge.ResetScores();
+
                 bool isDebugMode = false;
                 if (NetworkMessageHandler.Instance != null && NetworkMessageHandler.Instance.UseDebugClient)
                 {
@@ -728,38 +732,58 @@ namespace KillingMahjong.UI
                 Debug.Log("[GameUIManager] I am the winner! Showing RonWaitPanel.");
                 _isAgariPending = true;
 
-                if (RonWaitPanel != null)
+                ShowRonWaitPanel();
+            }
+        }
+
+        /// <summary>
+        /// ロン待ちパネルを最前面に出す。
+        /// 対局とチュートリアルで同じボタンを見せたいので、両方からここを通す。
+        /// </summary>
+        private void ShowRonWaitPanel()
+        {
+            if (RonWaitPanel == null) return;
+
+            RonWaitPanel.SetActive(true);
+            RonWaitPanel.transform.SetAsLastSibling();
+
+            // 最前面に表示するためにCanvasを追加してソート順を強制する
+            Canvas canvas = RonWaitPanel.GetComponent<Canvas>();
+            if (canvas == null)
+            {
+                canvas = RonWaitPanel.AddComponent<Canvas>();
+            }
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = UISortingOrders.RonWaitPanel;
+
+            if (RonWaitPanel.GetComponent<UnityEngine.UI.GraphicRaycaster>() == null)
+            {
+                RonWaitPanel.AddComponent<UnityEngine.UI.GraphicRaycaster>();
+            }
+
+            var images = RonWaitPanel.GetComponentsInChildren<UnityEngine.UI.Image>();
+            foreach (var img in images)
+            {
+                if (img.GetComponent<UnityEngine.UI.Button>() == null &&
+                    !img.gameObject.name.ToLower().Contains("button"))
                 {
-                    RonWaitPanel.SetActive(true);
-                    RonWaitPanel.transform.SetAsLastSibling();
-
-                    // 最前面に表示するためにCanvasを追加してソート順を強制する
-                    Canvas canvas = RonWaitPanel.GetComponent<Canvas>();
-                    if (canvas == null)
-                    {
-                        canvas = RonWaitPanel.AddComponent<Canvas>();
-                    }
-                    canvas.overrideSorting = true;
-                    canvas.sortingOrder = UISortingOrders.RonWaitPanel;
-
-                    if (RonWaitPanel.GetComponent<UnityEngine.UI.GraphicRaycaster>() == null)
-                    {
-                        RonWaitPanel.AddComponent<UnityEngine.UI.GraphicRaycaster>();
-                    }
-                    
-                    var images = RonWaitPanel.GetComponentsInChildren<UnityEngine.UI.Image>();
-                    foreach (var img in images)
-                    {
-                        if (img.GetComponent<UnityEngine.UI.Button>() == null && 
-                            !img.gameObject.name.ToLower().Contains("button"))
-                        {
-                            var c = img.color;
-                            c.a = 0.1f;
-                            img.color = c;
-                        }
-                    }
+                    var c = img.color;
+                    c.a = 0.1f;
+                    img.color = c;
                 }
             }
+        }
+
+        private System.Action _tutorialRonCallback;
+
+        /// <summary>
+        /// チュートリアルで、対局とまったく同じロンボタンを出して押されるのを待つ。
+        /// サーバーには何も送らず、押されたら渡されたコールバックを呼ぶだけ。
+        /// </summary>
+        public void ShowRonWaitPanelForTutorial(System.Action onPressed)
+        {
+            _tutorialRonCallback = onPressed;
+            ShowRonWaitPanel();
         }
 
         private void HandleTurnChanged(bool isLocalTurn)
@@ -801,6 +825,26 @@ namespace KillingMahjong.UI
                     _waitDeduction = go.AddComponent<WaitDeductionUI>();
                 }
                 return _waitDeduction;
+            }
+        }
+
+        /// <summary>
+        /// 獲得ポイントのゲージ（左＝相手／右＝自分）。無ければ実行時に作る。
+        /// 「30000で勝ち」の判定自体はサーバーの担当で、ここは積み上げを見せるだけ。
+        /// </summary>
+        private ScoreGaugeUI _scoreGauge;
+        public ScoreGaugeUI ScoreGauge
+        {
+            get
+            {
+                if (_scoreGauge == null) _scoreGauge = GetComponentInChildren<ScoreGaugeUI>(true);
+                if (_scoreGauge == null)
+                {
+                    var go = new GameObject("ScoreGauge");
+                    go.transform.SetParent(transform, false);
+                    _scoreGauge = go.AddComponent<ScoreGaugeUI>();
+                }
+                return _scoreGauge;
             }
         }
 
@@ -911,6 +955,16 @@ namespace KillingMahjong.UI
             if (KillingMahjong.Managers.AudioManager.Instance != null)
             {
                 KillingMahjong.Managers.AudioManager.Instance.PlayVoice(KillingMahjong.Managers.AudioManager.Instance.ronVoice);
+            }
+
+            // チュートリアルはサーバーに繋がっていないので、進行役へ返すだけ
+            if (_tutorialRonCallback != null)
+            {
+                var cb = _tutorialRonCallback;
+                _tutorialRonCallback = null;
+                if (RonWaitPanel != null) RonWaitPanel.SetActive(false);
+                cb();
+                return;
             }
 
             if (_isAgariPending)

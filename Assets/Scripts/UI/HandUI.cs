@@ -20,6 +20,10 @@ namespace KillingMahjong.UI
         [Header("Buttons")]
         [SerializeField] private Button decideButton;
         [SerializeField] private Button autoManganButton;
+
+        [Tooltip("打牌フェイズの「自動: ON/OFF」ボタンを出すか。\n" +
+                 "現在は非表示にしている（機能自体は AutoDiscardController に残っている）")]
+        [SerializeField] private bool showAutoDiscardButton = false;
         
         public RectTransform AutoManganButtonRect => autoManganButton != null ? autoManganButton.GetComponent<RectTransform>() : null;
         public RectTransform DecideButtonRect => decideButton != null ? decideButton.GetComponent<RectTransform>() : null;
@@ -288,12 +292,19 @@ namespace KillingMahjong.UI
             }
             if (reselectButton != null)
             {
-                bool canReselect = (phaseStatus == RoundStatus.HandSelection) && isSubmitted && (gameUIManager != null && !gameUIManager.IsTransitioning && !gameUIManager.IsMulliganSelection);
+                // チュートリアルでは台本どおりに進めたいので出さない（要望15）
+                bool canReselect = (phaseStatus == RoundStatus.HandSelection) && isSubmitted
+                    && gameUIManager != null && !gameUIManager.IsTransitioning
+                    && !gameUIManager.IsMulliganSelection && !gameUIManager.IsTutorialMode;
                 reselectButton.gameObject.SetActive(canReselect);
             }
             if (autoDiscardButton != null)
             {
-                autoDiscardButton.gameObject.SetActive(phaseStatus == RoundStatus.Discard);
+                // 自動打牌ボタンは非表示にする（要望5）。
+                // 機能そのもの（AutoDiscardController）は残してあるので、
+                // showAutoDiscardButton を true に戻せば元どおり出る。
+                autoDiscardButton.gameObject.SetActive(
+                    showAutoDiscardButton && phaseStatus == RoundStatus.Discard);
             }
         }
     }

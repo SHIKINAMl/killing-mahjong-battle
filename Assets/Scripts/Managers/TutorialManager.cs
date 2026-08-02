@@ -177,6 +177,7 @@ namespace KillingMahjong.Managers
             _enemyStake = 0;
             _lastBetAmount = 0;
             _prevRoundWasDraw = false;
+            if (gameUIManager != null) gameUIManager.ScoreGauge.ResetScores();
             ApplyPotToUI();
 
             // メーターの分母（到達最高HP）は前回のプレイの値が残るので引き直す
@@ -202,7 +203,12 @@ namespace KillingMahjong.Managers
 
             if (arrowUI != null) arrowUI.Hide();
             if (maskUI != null) maskUI.Hide();
-            if (dialogueUI != null) dialogueUI.HideNextRoundButton();
+            if (dialogueUI != null)
+            {
+                dialogueUI.HideNextRoundButton();
+                // 全画面のクリック受けが残るとタイトルへ戻ったあとも操作を食う
+                dialogueUI.HideAdvanceOnAnyClick();
+            }
 
             string sceneName = _scenario != null ? _scenario.titleSceneName : "タイトルシーン";
             SceneManager.LoadScene(sceneName);
@@ -436,12 +442,15 @@ namespace KillingMahjong.Managers
             ApplyPotToUI();
         }
 
-        /// <summary>決着したので賭け金を精算（0に戻す）する。</summary>
+        /// <summary>
+        /// 決着したので賭け金を精算（0に戻す）する。
+        /// ゲージ側の数字はここでは消さない。ロン演出のあとに吸収演出で消える。
+        /// </summary>
         private void ClearStakes()
         {
             _playerStake = 0;
             _enemyStake = 0;
-            ApplyPotToUI();
+            ApplyPotToUI(includeGauge: false);
         }
 
         /// <summary>この局の勝者の役の飜数。倍率は GameRules.GetMultiplier がここから決める。</summary>
@@ -451,10 +460,18 @@ namespace KillingMahjong.Managers
             return isPlayerWin ? data.manganHandHan : data.enemyWinningHan;
         }
 
-        private void ApplyPotToUI()
+        /// <param name="includeGauge">
+        /// 上の獲得ゲージにも反映するか。決着の精算では false にすること。
+        /// ここで 0 を流し込むと、ロン演出のあとに吸い込ませる数字が先に消えてしまう。
+        /// </param>
+        private void ApplyPotToUI(bool includeGauge = true)
         {
             var potUI = gameUIManager != null ? gameUIManager.BetPotUI : null;
             if (potUI != null) potUI.SetStakes(_playerStake, _enemyStake);
+
+            // 上の獲得ゲージにも同じ額を出す。対局と同じ見た目にするため
+            if (includeGauge && gameUIManager != null)
+                gameUIManager.ScoreGauge.SetStakes(_playerStake, _enemyStake);
         }
 
         /// <summary>
@@ -638,12 +655,20 @@ namespace KillingMahjong.Managers
             if (gameUIManager.PhaseController != null)
                 gameUIManager.PhaseController.SetMatchUIVisibility(visible);
 
+            // ターン表示（YOUR TURN / ENEMY TURN）は打牌フェイズだけのもの。
+            // 盤面をまとめて出すここで無条件に付けると、手牌フェイズでも出てしまう。
             if (gameUIManager.TurnIndicatorUI != null)
-                gameUIManager.TurnIndicatorUI.gameObject.SetActive(visible);
+            {
+                bool isDiscardPhase = gameUIManager.CurrentPhaseStatus == RoundStatus.Discard;
+                gameUIManager.TurnIndicatorUI.gameObject.SetActive(visible && isDiscardPhase);
+            }
 
             // 場の血は額を保持したまま表示だけ消す（持ち越し分が消えて見えないように）
             if (gameUIManager.BetPotUI != null)
                 gameUIManager.BetPotUI.SetVisible(visible);
+
+            // 獲得ゲージも盤面と一緒に出し入れする
+            gameUIManager.ScoreGauge.SetVisible(visible);
 
             // ドラ表示牌（3Dグランドライト含む）はチュートリアルの説明に入らないので常に隠す
             if (gameUIManager.DoraDisplayUI != null)
@@ -836,14 +861,13 @@ namespace KillingMahjong.Managers
         {
             SetPhase(RoundStatus.Agari);
 
-            // ロンボタンを押させる
-            if (gameUIManager != null && gameUIManager.AgariSelectionUI != null)
+            // ロンボタンを押させる。対局と同じ RonWaitPanel を出す（要望15）。
+            // 以前は AgariSelectionUI を使っていて、本編と見た目が違っていた。
+            if (gameUIManager != null && gameUIManager.RonWaitPanel != null)
             {
                 bool selected = false;
-                gameUIManager.AgariSelectionUI.Show(() => selected = true);
+                gameUIManager.ShowRonWaitPanelForTutorial(() => selected = true);
                 yield return new WaitUntil(() => selected);
-
-                if (gameUIManager.RonWaitPanel != null) gameUIManager.RonWaitPanel.SetActive(false);
             }
 
             // 増減は GameRules の式で決まる。得る額と失う額は別計算なので一致しない。
@@ -872,6 +896,10 @@ namespace KillingMahjong.Managers
                 displayScore: settlement));
 
             ApplyHpToUI();
+
+            // 賭け金の数字がゲージへ吸い込まれ、そのあとゲージが伸びる。
+            // ロン演出のあとに呼ぶこと。演出中は盤面ごと隠れていて見えない
+            if (gameUIManager != null) gameUIManager.ScoreGauge.AbsorbStakesIntoGauge(true, gain);
         }
 
         private IEnumerator RunEnemyRon(TutorialRoundData data, int playerDiscardBaseId)
@@ -909,6 +937,10 @@ namespace KillingMahjong.Managers
                 displayScore: settlement));
 
             ApplyHpToUI();
+
+            // 相手が勝ったので、賭け金は相手側（左）のゲージへ吸い込まれる。
+            // ロン演出のあとに呼ぶこと。演出中は盤面ごと隠れていて見えない
+            if (gameUIManager != null) gameUIManager.ScoreGauge.AbsorbStakesIntoGauge(false, gain);
         }
 
         /// <param name="displayScore">
@@ -1228,7 +1260,8 @@ namespace KillingMahjong.Managers
                 {
                     dialogueUI.gameObject.SetActive(true);
                     dialogueUI.ShowText(Decorate(line));
-                    dialogueUI.ShowNextRoundButton(() => clicked = true);
+                    // 画面のどこをクリックしても進む（要望15）。小さなOKボタンは出さない
+                    dialogueUI.ShowAdvanceOnAnyClick(() => clicked = true);
                 }
                 else
                 {
@@ -1240,7 +1273,7 @@ namespace KillingMahjong.Managers
                 yield return new WaitUntil(() => clicked);
                 _isWaitingForLine = false;
 
-                if (dialogueUI != null) dialogueUI.HideNextRoundButton();
+                if (dialogueUI != null) dialogueUI.HideAdvanceOnAnyClick();
             }
         }
 

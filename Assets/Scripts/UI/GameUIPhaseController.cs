@@ -81,6 +81,8 @@ namespace KillingMahjong.UI
             {
                 Managers.BoardStateManager.Instance.UpdateHp(20000, 20000);
                 if (uiManager.BetPotUI != null) uiManager.BetPotUI.Clear();
+                // 新しい対局なので獲得も賭け金も引き直す
+                if (!uiManager.IsTutorialMode) uiManager.ScoreGauge.ResetScores();
                 if (uiManager.PlayerInfoUI != null)
                 {
                     uiManager.PlayerInfoUI.gameObject.SetActive(true);
@@ -498,6 +500,8 @@ namespace KillingMahjong.UI
             // 流局では決着せず次の局でも同額が賭けられるので、場の表示は積み増していく。
             // 場の血が動くのは決着したときだけなので、クリアはロン演出の完了時に行う。
             if (uiManager.BetPotUI != null) uiManager.BetPotUI.AddStakes(playerBet, enemyBet);
+            // 賭けている額はゲージの下にも出す。決着でゲージへ吸い込まれる
+            if (!uiManager.IsTutorialMode) uiManager.ScoreGauge.AddStakes(playerBet, enemyBet);
 
             string roundTitle = $"第{_currentRoundIndex}局目";
             if (_isCarryOverNextRound) 
@@ -909,6 +913,28 @@ namespace KillingMahjong.UI
         {
             // 決着したので場の血は勝者へ移った。表示を空にする（流局のときはここを通らない）
             if (uiManager.BetPotUI != null) uiManager.BetPotUI.Clear();
+
+            // 賭け金がゲージへ吸い込まれ、そのあとゲージが伸びる。
+            // 勝敗の判定はサーバーの担当で、ここは表示のために積むだけ。
+            // サーバーが「獲得で勝利」へ移行するまでは、この表示だけが先行する。
+            var liq = BoardStateManager.Instance.LastLiquidationData;
+            if (liq != null && liq.winner_gain > 0 && !uiManager.IsTutorialMode)
+            {
+                uiManager.ScoreGauge.AbsorbStakesIntoGauge(isLocalWin, liq.winner_gain);
+            }
+
+            // 相手の手牌を並べ直して公開する。
+            // これは流局（HandleDraw）にしか無く、ロンで決着したときは打牌フェイズのまま
+            // ＝ツモ順でバラバラ・大半が伏せたままの状態が残っていた（要望9）。
+            Managers.BoardStateManager.Instance.SortTileIds(Managers.BoardStateManager.Instance.CurrentHandTiles);
+            Managers.BoardStateManager.Instance.SortTileIds(Managers.BoardStateManager.Instance.CurrentEnemyHandTiles);
+
+            if (uiManager.HandUI != null) uiManager.HandUI.SortHandSlots();
+            if (uiManager.EnemyHandUI != null)
+            {
+                uiManager.EnemyHandUI.SortHandSlots();
+                uiManager.EnemyHandUI.RevealAllHands(uiManager.TileResourceManager);
+            }
 
             if (uiManager.PlayerInfoUI != null)
             {

@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "unity-mcp": {
+      "command": "node",
+      "args": [
+        "C:\\Users\\akira\\UnityMCP\\build\\index.js"
+      ]
+    },
+    "mcp-for-unity": {
+      "url": "http://127.0.0.1:8080"
+    }
+  }
+}

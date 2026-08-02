@@ -114,34 +114,48 @@ namespace KillingMahjong.UI
         {
             if (uiManager.CurrentPhaseStatus != RoundStatus.HandSelection) return;
 
-            string message = "【予想役・点数】\n";
+            // 役名はここには並べない。牌にカーソルを合わせたときだけ
+            // ConfirmationDialogUI がオーバーレイで出す（要望18）。
+            string message = "【待ち牌】\n";
             int[] waitTileIds = new int[0];
-            
+            ConfirmationDialogUI.WaitInfo[] waitInfos = new ConfirmationDialogUI.WaitInfo[0];
+
             if (data.waits != null && data.waits.Length > 0)
             {
-                // ConfirmationDialogUI側で待ち牌を表示するため、ここではテキストのみ構築
-                message += "待ち牌：\n\n\n\n\n"; // 改行を増やしてかぶらないように調整
-                
-                System.Collections.Generic.List<int> ids = new System.Collections.Generic.List<int>();
+                // 牌そのものは ConfirmationDialogUI が並べるので、ここは場所を空けるだけ
+                message += "\n\n\n\n";
+
+                var ids = new System.Collections.Generic.List<int>();
+                var infos = new System.Collections.Generic.List<ConfirmationDialogUI.WaitInfo>();
                 foreach (var wait in data.waits)
                 {
                     ids.Add(wait.tile);
+
                     string yakuText = (wait.yaku != null && wait.yaku.Length > 0) ? string.Join(" / ", wait.yaku) : "役なし";
-                    
-                    // 翻数(han)とmangan_or_moreに基づいて詳細なランクを決定する
+
+                    // 翻数(han)とmangan_or_moreに基づいてランクを決定する。
+                    // 「以上」は付けない（要望18）。上限の役名がそのまま出るほうが読みやすい。
                     string rankText = "満貫未満";
-                    if (wait.yaku != null && System.Array.Exists(wait.yaku, y => y.Contains("役満"))) rankText = "役満確定";
-                    else if (wait.han >= 13) rankText = "数え役満以上";
-                    else if (wait.han >= 11) rankText = "三倍満以上";
-                    else if (wait.han >= 8) rankText = "倍満以上";
-                    else if (wait.han >= 6) rankText = "跳満以上";
-                    else if (wait.han >= 5 || wait.mangan_or_more) rankText = "満貫以上";
-                    
-                    message += $"-> {yakuText} ({rankText})\n";
+                    if (wait.yaku != null && System.Array.Exists(wait.yaku, y => y.Contains("役満"))) rankText = "役満";
+                    else if (wait.han >= 13) rankText = "数え役満";
+                    else if (wait.han >= 11) rankText = "三倍満";
+                    else if (wait.han >= 8) rankText = "倍満";
+                    else if (wait.han >= 6) rankText = "跳満";
+                    else if (wait.han >= 5 || wait.mangan_or_more) rankText = "満貫";
+
+                    infos.Add(new ConfirmationDialogUI.WaitInfo
+                    {
+                        TileId = wait.tile,
+                        YakuText = yakuText,
+                        RankText = rankText,
+                    });
                 }
                 waitTileIds = ids.ToArray();
+                waitInfos = infos.ToArray();
+
+                message += "\n牌にカーソルを合わせると手牌と役が出ます";
             }
-            message += "\nこの手牌で決定しますか？";
+            message += "\n\nこの手牌で決定しますか？";
 
             // WaitUIを移動させる処理を廃止 (ConfirmationDialogUI内部で表示する)
             // if (uiManager.WaitUI != null) uiManager.WaitUI.MoveToCenter();
@@ -150,6 +164,7 @@ namespace KillingMahjong.UI
             {
                 uiManager.ConfirmationDialogUI.ShowDialogWithWaits(
                     message,
+                    waitInfos,
                     waitTileIds,
                     () => {
                         if (ReactionController.Instance != null) ReactionController.Instance.StopHandSelectionTimer(true);

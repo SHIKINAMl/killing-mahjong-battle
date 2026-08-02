@@ -27,6 +27,10 @@ namespace KillingMahjong.UI
 
         [Header("挙動")]
         [SerializeField, Tooltip("総額が0のときは表示を隠す")] private bool hideWhenEmpty = true;
+        [SerializeField, Tooltip("場の血を表示するか。\n" +
+                                 "獲得ポイントのゲージ（ScoreGaugeUI）を出すようになったので既定は非表示。\n" +
+                                 "額の積算そのものは続けているので、true に戻せば元どおり出る")]
+        private bool showPot = false;
         [SerializeField, Tooltip("自動生成したラベルの位置（画面上端中央からのオフセット）")]
         private Vector2 fallbackOffset = new Vector2(0f, -40f);
 
@@ -101,7 +105,7 @@ namespace KillingMahjong.UI
 
             if (group != null)
             {
-                bool hidden = !boardVisible || (hideWhenEmpty && total <= 0);
+                bool hidden = !showPot || !boardVisible || (hideWhenEmpty && total <= 0);
                 group.alpha = hidden ? 0f : 1f;
             }
         }

@@ -78,18 +78,18 @@ namespace KillingMahjong.Managers
     [Serializable]
     public class TutorialRoundData
     {
-        [Header("識別")]
+        [Header("■ この局の名前（Inspector の見出しになるだけ）")]
         public string label = "第N局";
 
-        [Header("配牌")]
+        [Header("■ 牌を変える ─ 配られる牌・手牌・ドラ")]
         [Tooltip("この局で配られる34枚（牌種 0〜28）。重複あり。")]
-        public List<int> wallBaseIds = new List<int>();
+        [TilePicker] public List<int> wallBaseIds = new List<int>();
 
         [Tooltip("オート満貫ボタンで組まれる13枚（牌種 0〜28）。wallBaseIds の部分集合であること。")]
-        public List<int> manganHandBaseIds = new List<int>();
+        [TilePicker] public List<int> manganHandBaseIds = new List<int>();
 
         [Tooltip("上記手牌の待ち牌（牌種）。WaitUI の表示に使う。")]
-        public List<int> waitBaseIds = new List<int>();
+        [TilePicker] public List<int> waitBaseIds = new List<int>();
 
         [Tooltip("オート満貫手の役名。聴牌チェック（is_tenpai）のモック応答に使う。")]
         public List<string> manganHandYaku = new List<string>();
@@ -98,9 +98,9 @@ namespace KillingMahjong.Managers
         public int manganHandHan = 6;
 
         [Tooltip("この局のドラ（牌種）。-1 でドラなし。")]
-        public int doraBaseId = -1;
+        [TilePicker(allowNone: true)] public int doraBaseId = -1;
 
-        [Header("手牌構築フェイズ")]
+        [Header("■ 状況を変える ─ 手牌フェイズの進み方")]
         [Tooltip("手動で牌を動かせるか（手順①。第1局と第5局は true）")]
         public bool allowManualHandSelection = true;
 
@@ -114,8 +114,10 @@ namespace KillingMahjong.Managers
         [Tooltip("オート満貫を使わないと決定できないか。制約『満貫手以下での開始は不可』を担保する。")]
         public bool requireAutoManganToConfirm = true;
 
-        [Header("賭け金フェイズ")]
-        [Tooltip("固定の賭け金。TODO: 実際の値は要決定。")]
+        [Header("▲ 数値注意 ─ 賭け金（全局のHP収支に連鎖する）")]
+        [Tooltip("固定の賭け金。\n" +
+                 "※ここを変えると以降の全局のHPが変わり、途中で誰かが死ぬと進行不能になります。\n" +
+                 "　 変更する場合は TutorialScenario.cs 冒頭の収支表を必ず確認してください。")]
         public int betAmount = 1000;
 
         [Tooltip("賭け金を促すセリフ。{0} に betAmount が入る。")]
@@ -125,15 +127,15 @@ namespace KillingMahjong.Managers
                  "空なら既定文が使われる。流局の次の局は賭け金を指示してはいけない（自動で同額が賭けられる仕様）。")]
         public List<TutorialLine> inheritedBetLines = new List<TutorialLine>();
 
-        [Header("打牌フェイズ")]
+        [Header("■ 状況を変える ─ 打牌フェイズの進み方")]
         [Tooltip("敵が順番に捨てる牌（牌種）。要素数がそのまま手数になる。")]
-        public List<int> enemyDiscardBaseIds = new List<int>();
+        [TilePicker] public List<int> enemyDiscardBaseIds = new List<int>();
 
         [Tooltip("開始直後に自動で進める手数。ここまでは自分も相手も自動で捨てる。0 なら最初から手動。")]
         public int autoDiscardTurns = 0;
 
         [Tooltip("プレイヤーが打てない牌（牌種）。-1 でなし。手順⑭の嘘の待ち牌。")]
-        public int lockedTileBaseId = -1;
+        [TilePicker(allowNone: true)] public int lockedTileBaseId = -1;
 
         [TextArea(1, 2)] public string lockedTileMessage = "その牌は出しちゃダメって言ったでしょ！";
 
@@ -158,19 +160,19 @@ namespace KillingMahjong.Managers
         [Tooltip("役一覧を開いたあとのセリフ")]
         public List<TutorialLine> onYakuListOpenedLines = new List<TutorialLine>();
 
-        [Header("結末")]
+        [Header("■ 状況を変える ─ この局の決着のしかた")]
         public TutorialOutcome outcome = TutorialOutcome.Draw;
 
         [Tooltip("PlayerRon 時、敵が捨てるアタリ牌（牌種）。enemyDiscardBaseIds の末尾と一致させること。")]
-        public int playerWinningTileBaseId = -1;
+        [TilePicker(allowNone: true)] public int playerWinningTileBaseId = -1;
 
         [Tooltip("EnemyRon 時、敵の手牌のうち面子部分12枚（牌種）。実際のアタリ牌は単騎待ちとして末尾に追加される。")]
-        public List<int> enemyRonMeldBaseIds = new List<int>();
+        [TilePicker] public List<int> enemyRonMeldBaseIds = new List<int>();
 
         [Tooltip("EnemyRon 時、何手目のプレイヤー打牌で放銃するか（1始まり）")]
         public int enemyRonOnPlayerDiscardTurn = 5;
 
-        [Header("結末の表示内容")]
+        [Header("▲ 数値注意 ─ 決着時の役と飜数（HP収支に連鎖する）")]
         public List<string> yakuList = new List<string>();
         public string formulaText = "";
         public string rankText = "";
@@ -182,11 +184,11 @@ namespace KillingMahjong.Managers
         [Tooltip("勝者が単騎待ちで上がったか。true だと敗者の失う額が2倍になる。")]
         public bool isTankiWin = false;
 
-        [Header("ダメージ（局をまたいでHPに反映される）")]
+        [Header("▲ 数値注意 ─ 流局ダメージ（局をまたいでHPに反映）")]
         [Tooltip("流局によるプレイヤーへのダメージ。手順⑯の『流局のダメージ』。")]
         public int drawDamageToPlayer = 0;
 
-        [Header("セリフ")]
+        [Header("● セリフを変える ─ ここは自由に書き換えてOK")]
         public List<TutorialLine> introLines = new List<TutorialLine>();
 
         [Tooltip("イントロの何行目のあとに盤面（山牌・手牌・ドラ・HP）を出すか。0始まり。" +
@@ -221,7 +223,7 @@ namespace KillingMahjong.Managers
 
         public List<TutorialRoundData> rounds = new List<TutorialRoundData>();
 
-        [Header("終了時")]
+        [Header("● セリフを変える ─ 全局終了後")]
         public List<TutorialLine> endingLines = new List<TutorialLine>();
         public string titleSceneName = "タイトルシーン";
 

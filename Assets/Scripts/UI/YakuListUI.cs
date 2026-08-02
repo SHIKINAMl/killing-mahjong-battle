@@ -145,14 +145,33 @@ namespace KillingMahjong.UI
                 }
             }
 
+            // Dictionary の並び順は保証されないので、翻数の大きい順に並べ直す。
+            // 枠に入りきらないときに「大きいものが落ちる」のを防ぐ意味もある。
+            activeBoosts.Sort((a, b) =>
+            {
+                if (a.Value != b.Value) return b.Value.CompareTo(a.Value);
+                return string.CompareOrdinal(a.Key, b.Key);
+            });
+
+            // 枠より多いときは、最後の枠を「あと何件あるか」に使う（要望22）。
+            // 例）枠3・強化5件 → 上位2件を並べ、最後の枠に「+3」
+            int slots = textArray.Length;
+            bool overflow = activeBoosts.Count > slots;
+            int shownCount = overflow ? slots - 1 : activeBoosts.Count;
+            int hiddenCount = activeBoosts.Count - shownCount;
+
             for (int i = 0; i < textArray.Length; i++)
             {
                 if (textArray[i] == null) continue;
 
-                if (i < activeBoosts.Count)
+                bool isOverflowSlot = overflow && i == slots - 1;
+
+                if (i < shownCount || isOverflowSlot)
                 {
-                    textArray[i].text = $"{activeBoosts[i].Key}+{activeBoosts[i].Value}";
-                    textArray[i].gameObject.SetActive(true); 
+                    textArray[i].text = isOverflowSlot
+                        ? $"+{hiddenCount}"
+                        : $"{activeBoosts[i].Key}+{activeBoosts[i].Value}";
+                    textArray[i].gameObject.SetActive(true);
                     
                     // 背景画像（親オブジェクト）がある場合はそれも表示する
                     if (textArray[i].transform.parent != null && 

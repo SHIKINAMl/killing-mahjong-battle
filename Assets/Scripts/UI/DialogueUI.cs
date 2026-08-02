@@ -215,5 +215,111 @@ namespace KillingMahjong.UI
             }
         }
 
+        // ==================== 画面クリックでセリフ送り ====================
+
+        private GameObject advanceCatcherObj;
+        private System.Action onAdvanceClicked;
+        private GameObject advanceMarkerObj;
+
+        /// <summary>
+        /// 画面のどこをクリックしてもセリフが進むようにする（要望15）。
+        /// 小さな OK ボタンを探して押させるより、読み終わったら適当に押すほうが速い。
+        ///
+        /// 透明な全画面ボタンを最前面に置くので、**待っている間は他のUIが押せなくなる。**
+        /// 「役一覧を開かせる」のようにプレイヤーへ操作させたい場面では、
+        /// セリフを送り終えてから（＝ここを閉じてから）誘導すること。
+        /// </summary>
+        public void ShowAdvanceOnAnyClick(System.Action onClick)
+        {
+            onAdvanceClicked = onClick;
+
+            var canvas = GetComponentInParent<Canvas>();
+            if (canvas == null) { onClick?.Invoke(); return; }
+
+            if (advanceCatcherObj == null)
+            {
+                advanceCatcherObj = new GameObject("DialogueAdvanceCatcher");
+                advanceCatcherObj.transform.SetParent(canvas.transform, false);
+
+                var rt = advanceCatcherObj.AddComponent<RectTransform>();
+                rt.anchorMin = Vector2.zero;
+                rt.anchorMax = Vector2.one;
+                rt.offsetMin = Vector2.zero;
+                rt.offsetMax = Vector2.zero;
+
+                // 見えないが押せる板。alpha 0 だと Raycast に当たらないので極小の値を入れる
+                var img = advanceCatcherObj.AddComponent<Image>();
+                img.color = new Color(0f, 0f, 0f, 0.001f);
+
+                var btn = advanceCatcherObj.AddComponent<Button>();
+                btn.transition = Selectable.Transition.None;
+                btn.onClick.AddListener(() =>
+                {
+                    HideAdvanceOnAnyClick();
+                    var action = onAdvanceClicked;
+                    onAdvanceClicked = null;
+                    action?.Invoke();
+                });
+            }
+
+            advanceCatcherObj.transform.SetAsLastSibling();
+            advanceCatcherObj.SetActive(true);
+
+            ShowAdvanceMarker(canvas);
+        }
+
+        public void HideAdvanceOnAnyClick()
+        {
+            if (advanceCatcherObj != null) advanceCatcherObj.SetActive(false);
+            if (advanceMarkerObj != null) advanceMarkerObj.SetActive(false);
+        }
+
+        /// <summary>吹き出しの右下で点滅する「▼」。クリック待ちだと分かるようにする。</summary>
+        private void ShowAdvanceMarker(Canvas canvas)
+        {
+            if (advanceMarkerObj == null)
+            {
+                advanceMarkerObj = new GameObject("AdvanceMarker");
+                var parent = dialoguePanel != null ? dialoguePanel.transform : canvas.transform;
+                advanceMarkerObj.transform.SetParent(parent, false);
+
+                var rt = advanceMarkerObj.AddComponent<RectTransform>();
+                rt.anchorMin = rt.anchorMax = new Vector2(1f, 0f);
+                rt.pivot = new Vector2(1f, 0f);
+                rt.anchoredPosition = new Vector2(-14f, 10f);
+                rt.sizeDelta = new Vector2(20f, 20f);
+
+                var txt = advanceMarkerObj.AddComponent<TextMeshProUGUI>();
+                txt.text = "▼";
+                txt.color = Color.white;
+                txt.fontSize = 16;
+                txt.alignment = TextAlignmentOptions.Center;
+                txt.raycastTarget = false; // クリックは全画面の板に任せる
+                txt.outlineColor = Color.black;
+                txt.outlineWidth = 0.25f;
+
+                advanceMarkerObj.AddComponent<BlinkGraphic>();
+            }
+
+            advanceMarkerObj.transform.SetAsLastSibling();
+            advanceMarkerObj.SetActive(true);
+        }
+    }
+
+    /// <summary>点滅させるだけの小物。セリフ送り待ちの「▼」に使う。</summary>
+    public class BlinkGraphic : MonoBehaviour
+    {
+        [SerializeField] private float cycle = 0.9f;
+        private Graphic target;
+
+        private void Awake() { target = GetComponent<Graphic>(); }
+
+        private void Update()
+        {
+            if (target == null) return;
+            var c = target.color;
+            c.a = Mathf.Lerp(0.25f, 1f, (Mathf.Sin(Time.unscaledTime / cycle * Mathf.PI * 2f) + 1f) * 0.5f);
+            target.color = c;
+        }
     }
 }

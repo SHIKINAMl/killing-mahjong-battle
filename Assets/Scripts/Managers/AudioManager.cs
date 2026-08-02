@@ -62,6 +62,10 @@ namespace KillingMahjong.Managers
         public int CurrentBgmTimeSamples => bgmSource != null ? bgmSource.timeSamples : 0;
         public bool IsBgmPlaying => bgmSource != null && bgmSource.isPlaying;
 
+        [Header("シーン遷移時のBGM")]
+        [Tooltip("このシーンへ移ったら BGM を自動で止める。タイトルへ戻ったとき対局のBGMが鳴り続けるのを防ぐ")]
+        [SerializeField] private string[] stopBgmOnScenes = { "タイトルシーン" };
+
         private void Awake()
         {
             if (Instance == null)
@@ -69,6 +73,11 @@ namespace KillingMahjong.Managers
                 Instance = this;
                 DontDestroyOnLoad(gameObject);
                 InitializeSources();
+                // AudioManager は DontDestroyOnLoad で生き残るため、
+                // シーンを変えても BGM は鳴り続ける。タイトルへ戻る導線は
+                // TutorialManager / InGameMenuUI / OptionUI / TitleUIManager と複数あるので、
+                // 各所で止めると必ず漏れる。ここで一括して面倒を見る。
+                UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoaded;
             }
             else
             {
@@ -76,10 +85,27 @@ namespace KillingMahjong.Managers
             }
         }
 
+        private void OnSceneLoaded(UnityEngine.SceneManagement.Scene scene, UnityEngine.SceneManagement.LoadSceneMode mode)
+        {
+            if (stopBgmOnScenes == null) return;
+            foreach (var n in stopBgmOnScenes)
+            {
+                if (!string.IsNullOrEmpty(n) && scene.name == n)
+                {
+                    StopBGM();
+                    return;
+                }
+            }
+        }
+
         private void OnDestroy()
         {
-            // 破棄済みオブジェクトを指したままにしない
-            if (Instance == this) Instance = null;
+            if (Instance == this)
+            {
+                UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnSceneLoaded;
+                // 破棄済みオブジェクトを指したままにしない
+                Instance = null;
+            }
         }
 
         private void Start()
