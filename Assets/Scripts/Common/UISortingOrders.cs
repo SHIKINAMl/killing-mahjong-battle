@@ -119,6 +119,13 @@ namespace KillingMahjong.Common
         /// <summary>WaitUI: 待ち牌表示を最前面に出す際のレイヤー</summary>
         public const int WaitDisplayFront = 84;
 
+        /// <summary>HandUI: 手牌を覗いている間の暗幕</summary>
+        public const int HandPeekDimmer = 85;
+
+        /// <summary>HandUI: 覗いている間の手牌そのもの。
+        /// 待ち牌表示(84)より手前に出さないと、覗いた手牌が隠れてしまう</summary>
+        public const int HandPeekTiles = 86;
+
         /// <summary>YakuSelectionUI: 役選択パネル（モーダルなので待ち牌表示より手前）</summary>
         public const int YakuSelection = 88;
 
