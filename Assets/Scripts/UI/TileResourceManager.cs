@@ -61,7 +61,7 @@ namespace KillingMahjong.UI
             }
 
             var tile = new TileData(encodedId);
-            int baseId = encodedId & 0x1F;
+            int baseId = Common.TileId.BaseId(encodedId);
 
             // 赤ドラ（五萬=4, 五筒=13, 五索=22）のスプライト差し替え
             if (tile.IsRedDora && redDoraSprites != null && redDoraSprites.Count == 3)
@@ -115,7 +115,7 @@ namespace KillingMahjong.UI
             }
 
             var tile = new TileData(encodedId);
-            int baseId = encodedId & 0x1F;
+            int baseId = Common.TileId.BaseId(encodedId);
 
             // 赤ドラの差し替え
             if (tile.IsRedDora && targetRedDoraSprites != null && targetRedDoraSprites.Count == 3)

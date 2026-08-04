@@ -65,7 +65,7 @@ namespace KillingMahjong.UI
                 if (i > 0) sb.Append(", ");
                 int id = list[i];
                 sb.Append(i).Append(':').Append(id);
-                int b = id & 0x1F;
+                int b = Common.TileId.BaseId(id);
                 if (b > 28) sb.Append("(範囲外!)");
             }
             return sb.ToString();

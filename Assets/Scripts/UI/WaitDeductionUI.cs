@@ -117,7 +117,7 @@ namespace KillingMahjong.UI
         public void RegisterDiscard(int tileId, bool isLocalPlayer)
         {
             if (tileId < 0) return;                 // -1 は無効値。0 は一萬なので弾かない
-            int kind = tileId & 0x1F;               // ドラ/赤ドラのビットを落として牌種にする
+            int kind = Common.TileId.BaseId(tileId);   // ドラ/赤ドラのビットを落として牌種にする
             if (kind < 0 || kind >= KindCount) return;
 
             if (!_eliminated.Add(kind)) return;     // 既に判明済みなら何もしない

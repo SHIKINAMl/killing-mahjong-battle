@@ -24,12 +24,14 @@ namespace KillingMahjong.Managers
     /// </summary>
     public static class TutorialTiles
     {
-        public const int BaseMask = 0x1F;
-        public const int DoraBit = 0x20;
-        public const int RedDoraBit = 0x40;
+        // ビットの定義は Common.TileId が唯一の持ち場。ここでは持たず、別名を張るだけにする。
+        // （以前は同じ値を別々に定義していて、Python 側が変わると2か所直す必要があった）
+        public const int BaseMask = Common.TileId.BaseIdMask;
+        public const int DoraBit = Common.TileId.DoraBit;
+        public const int RedDoraBit = Common.TileId.RedDoraBit;
 
         /// <summary>牌種の最大値（29種なので 0〜28）</summary>
-        public const int MaxKind = 28;
+        public const int MaxKind = Common.TileId.MaxBaseId;
 
         // --- 牌種のショートハンド ---
         /// <summary>萬子。number は 1〜9。</summary>
@@ -45,15 +47,10 @@ namespace KillingMahjong.Managers
 
         /// <summary>牌種とフラグから実際の牌IDを組み立てる。</summary>
         public static int Encode(int baseId, bool isDora = false, bool isRedDora = false)
-        {
-            int id = baseId & BaseMask;
-            if (isDora) id |= DoraBit;
-            if (isRedDora) id |= RedDoraBit;
-            return id;
-        }
+            => Common.TileId.Encode(baseId, isDora, isRedDora);
 
         /// <summary>牌IDから牌種（0〜28）を取り出す。</summary>
-        public static int BaseOf(int tileId) => tileId & BaseMask;
+        public static int BaseOf(int tileId) => Common.TileId.BaseId(tileId);
 
         /// <summary>
         /// 指定した牌種リストに対し、dora と一致する牌へドラフラグを立てて牌IDリストを返す。

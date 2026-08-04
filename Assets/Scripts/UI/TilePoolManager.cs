@@ -130,7 +130,7 @@ namespace KillingMahjong.UI
                     int id = i;
                     if (j == 0 && (i == 4 || i == 13 || i == 22))
                     {
-                        id |= 0x40; // 赤ドラフラグ
+                        id = Common.TileId.WithRedDora(id);
                     }
                     deck.Add(id);
                 }
@@ -146,7 +146,7 @@ namespace KillingMahjong.UI
             }
 
             // 検索時は通常ドラフラグ(0x20)を除外したIDを使う (赤ドラフラグ0x40は残す)
-            int searchId = encodedId & ~0x20;
+            int searchId = Common.TileId.WithoutDora(encodedId);
 
             for (int i = 0; i < _poolSlots.Count; i++)
             {
@@ -156,7 +156,7 @@ namespace KillingMahjong.UI
                     Transform tileTransform = slot.GetChild(0);
                     var interaction = tileTransform.GetComponent<TileInteraction>();
                     // プール内の牌は生成時にドラフラグを持たないので、searchIdと照合する
-                    if (interaction != null && (interaction.TileId & ~0x20) == searchId)
+                    if (interaction != null && Common.TileId.WithoutDora(interaction.TileId) == searchId)
                     {
                         GameObject obj = tileTransform.gameObject;
                         obj.transform.SetParent(parent, false);
@@ -263,7 +263,7 @@ namespace KillingMahjong.UI
                 }
                 else if (interaction != null)
                 {
-                    interaction.TileId &= ~0x20;
+                    interaction.TileId = Common.TileId.WithoutDora(interaction.TileId);
                 }
 
                 var visual = obj.GetComponent<TileVisual>();

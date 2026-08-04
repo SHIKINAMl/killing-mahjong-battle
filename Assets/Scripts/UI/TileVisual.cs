@@ -75,7 +75,7 @@ namespace KillingMahjong.UI
             // ドラ枠オーバーレイはスプライトの有無に関わらず常に更新する（プール再利用時の状態リーク防止）
             bool isDoraTile = sprite != null && encodedId >= 0 && !_isInvalidId && (resourceManager != null
                 ? resourceManager.IsDora(encodedId)
-                : new TileData(encodedId).IsDora || new TileData(encodedId).IsRedDora);
+                : Common.TileId.IsAnyDora(encodedId));
 
             if (doraOverlayImage != null)
             {

@@ -563,7 +563,7 @@ namespace KillingMahjong.UI
             {
                 foreach (int waitId in board.CurrentWaitTiles)
                 {
-                    waitBaseIds.Add(waitId & 0x1F);
+                    waitBaseIds.Add(Common.TileId.BaseId(waitId));
                 }
             }
 
@@ -577,7 +577,7 @@ namespace KillingMahjong.UI
                 {
                     // 壁牌のベースIDが待ち牌のベースIDに含まれていればフリテン警告対象
                     // （isDiscardPhase == false なら waitBaseIds は空なので自動的に false になる）
-                    bool isFuritenAlert = waitBaseIds.Contains(interaction.TileId & 0x1F);
+                    bool isFuritenAlert = waitBaseIds.Contains(Common.TileId.BaseId(interaction.TileId));
                     visual.SetFuritenHighlight(isFuritenAlert);
                 }
             }

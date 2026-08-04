@@ -218,8 +218,8 @@ namespace KillingMahjong.Managers
                         matchIdx = remainingHand.IndexOf(wall[i]);
                         if (matchIdx < 0)
                         {
-                            int baseId = wall[i] & 0x1F;
-                            matchIdx = remainingHand.FindIndex(t => (t & 0x1F) == baseId);
+                            int baseId = Common.TileId.BaseId(wall[i]);
+                            matchIdx = remainingHand.FindIndex(t => Common.TileId.BaseId(t) == baseId);
                         }
                     }
 
@@ -270,8 +270,8 @@ namespace KillingMahjong.Managers
                         int matchIdx = remainingHand.IndexOf(wall[i]);
                         if (matchIdx < 0)
                         {
-                            int baseId = wall[i] & 0x1F;
-                            matchIdx = remainingHand.FindIndex(t => (t & 0x1F) == baseId);
+                            int baseId = Common.TileId.BaseId(wall[i]);
+                            matchIdx = remainingHand.FindIndex(t => Common.TileId.BaseId(t) == baseId);
                         }
                         if (matchIdx >= 0)
                         {
@@ -394,8 +394,8 @@ namespace KillingMahjong.Managers
             int actualId = tileId;
             if (!CurrentWallTiles.Contains(tileId))
             {
-                int baseId = tileId & 0x1F;
-                int foundIndex = CurrentWallTiles.FindIndex(t => (t & 0x1F) == baseId);
+                int baseId = Common.TileId.BaseId(tileId);
+                int foundIndex = CurrentWallTiles.FindIndex(t => Common.TileId.BaseId(t) == baseId);
                 if (foundIndex != -1)
                 {
                     actualId = CurrentWallTiles[foundIndex];
@@ -491,13 +491,7 @@ namespace KillingMahjong.Managers
 
         public List<int> SortTileIds(List<int> ids)
         {
-            ids.Sort((a, b) =>
-            {
-                int baseA = a & 0x1F;
-                int baseB = b & 0x1F;
-                if (baseA != baseB) return baseA.CompareTo(baseB);
-                return a.CompareTo(b);
-            });
+            ids.Sort(Common.TileId.CompareForDisplay);
             return ids;
         }
     }

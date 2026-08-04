@@ -344,7 +344,7 @@ namespace KillingMahjong.UI
             {
                 foreach (int waitId in waitTiles)
                 {
-                    waitBaseIds.Add(waitId & 0x1F);
+                    waitBaseIds.Add(Common.TileId.BaseId(waitId));
                 }
             }
 
@@ -355,7 +355,7 @@ namespace KillingMahjong.UI
                 var interaction = slot.GetComponent<TileInteraction>();
                 if (visual != null && interaction != null)
                 {
-                    bool isFuritenAlert = waitBaseIds.Contains(interaction.TileId & 0x1F);
+                    bool isFuritenAlert = waitBaseIds.Contains(Common.TileId.BaseId(interaction.TileId));
                     visual.SetFuritenHighlight(isFuritenAlert);
                 }
             }

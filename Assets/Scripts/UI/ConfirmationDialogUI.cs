@@ -269,8 +269,7 @@ namespace KillingMahjong.UI
             if (board != null && board.CurrentHandTiles != null) hand.AddRange(board.CurrentHandTiles);
             hand.Sort((a, b) =>
             {
-                int ba = a & 0x1F, bb = b & 0x1F;
-                return ba != bb ? ba.CompareTo(bb) : a.CompareTo(b);
+                return KillingMahjong.Common.TileId.CompareForDisplay(a, b);
             });
 
             ClearPreviewTiles();

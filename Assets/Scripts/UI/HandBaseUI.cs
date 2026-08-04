@@ -238,11 +238,7 @@ namespace KillingMahjong.UI
                 var intB = b.GetComponent<TileInteraction>();
                 if (intA == null || intB == null) return 0;
 
-                int baseA = intA.TileId & 0x1F;
-                int baseB = intB.TileId & 0x1F;
-                if (baseA != baseB) return baseA.CompareTo(baseB);
-                
-                return intA.TileId.CompareTo(intB.TileId);
+                return KillingMahjong.Common.TileId.CompareForDisplay(intA.TileId, intB.TileId);
             });
 
             if (handSlots.Count == 0) return;

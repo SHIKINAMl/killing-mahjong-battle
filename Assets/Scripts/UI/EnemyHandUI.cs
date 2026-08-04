@@ -132,10 +132,7 @@ namespace KillingMahjong.UI
             
             pairs.Sort((a, b) =>
             {
-                int baseA = a.Item1 & 0x1F;
-                int baseB = b.Item1 & 0x1F;
-                if (baseA != baseB) return baseA.CompareTo(baseB);
-                return a.Item1.CompareTo(b.Item1);
+                return KillingMahjong.Common.TileId.CompareForDisplay(a.Item1, b.Item1);
             });
 
             handSlots.Clear();

@@ -21,14 +21,13 @@ namespace KillingMahjong
         {
             Id = encodedId;
             
-            // サーバー側のビット構造:
-            //   bit 6 (0x40): 赤ドラ (五萬・五筒・五索 最初の1枚)
-            //   bit 5 (0x20): ドラ
-            //   bit 4-0 (0x1F): 基本牌種別 (0-28)
-            IsRedDora = (encodedId & 0x40) != 0;
-            IsDora    = (encodedId & 0x20) != 0;
-            
-            int id = encodedId & 0x1F; // 下位5ビットが牌種別
+            // ビットの解釈は Common.TileId が唯一の持ち場。ここでは自前でマスクしない。
+            // （以前はここでも & 0x40 / & 0x20 / & 0x1F を書いていて、
+            //   Python 側の採番が変わると2か所直す必要があった）
+            IsRedDora = Common.TileId.IsRedDora(encodedId);
+            IsDora    = Common.TileId.IsDora(encodedId);
+
+            int id = Common.TileId.BaseId(encodedId);
 
             if (id >= 0 && id <= 8)
             {

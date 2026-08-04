@@ -506,10 +506,7 @@ namespace KillingMahjong.UI
                 int idA = (ia != null) ? ia.TileId : 0;
                 int idB = (ib != null) ? ib.TileId : 0;
 
-                int baseA = idA & 0x1F;
-                int baseB = idB & 0x1F;
-                if (baseA != baseB) return baseA.CompareTo(baseB);
-                return idA.CompareTo(idB);
+                return KillingMahjong.Common.TileId.CompareForDisplay(idA, idB);
             });
 
             for (int i = 0; i < handSlots.Count; i++)
