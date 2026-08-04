@@ -409,25 +409,74 @@ namespace KillingMahjong.UI
             }
         }
 
+        private ReadyBadge readyBadge;
+
+        /// <summary>
+        /// 「準備完了」の札。シーンの ReadyBoxContainer を実行時に組み直して使う。
+        /// 点滴（EnemyPanel）の真下に置く。
+        /// </summary>
+        private ReadyBadge EnsureReadyBadge()
+        {
+            if (readyBadge == null)
+            {
+                RectTransform anchor = (enemyPanel != null)
+                    ? enemyPanel.GetComponent<RectTransform>() : null;
+                readyBadge = ReadyBadge.Attach(
+                    readyBoxContainer, readyCheckImage, anchor, isSelf: false);
+            }
+            return readyBadge;
+        }
+
         public void ShowReadyBox(bool show)
         {
-            if (readyBoxContainer != null)
+            var badge = EnsureReadyBadge();
+            if (badge != null)
             {
-                readyBoxContainer.SetActive(show);
+                badge.SetVisible(show);
+                if (show) badge.SetReady(false); // 出した時点では未確定
+                return;
             }
-            // ボックス表示時はチェックを外す、非表示時も念のため外す
-            if (readyCheckImage != null)
-            {
-                readyCheckImage.SetActive(false);
-            }
+
+            // 札を作れなかったとき（参照未設定）は従来どおりの出し入れに落とす
+            if (readyBoxContainer != null) readyBoxContainer.SetActive(show);
+            if (readyCheckImage != null) readyCheckImage.SetActive(false);
         }
 
         public void SetReadyCheck(bool isReady)
         {
-            if (readyCheckImage != null)
+            var badge = EnsureReadyBadge();
+            if (badge != null)
             {
-                readyCheckImage.SetActive(isReady);
+                badge.SetReady(isReady);
+                return;
             }
+
+            if (readyCheckImage != null) readyCheckImage.SetActive(isReady);
+        }
+
+        /// <summary>相手の札も拡大したスマホの裏に入るので、自分側と同じタイミングで伏せる。</summary>
+        public void SetReadyBoxSuppressed(bool suppressed)
+        {
+            var badge = EnsureReadyBadge();
+            if (badge != null) badge.SetSuppressed(suppressed);
+        }
+
+        private TurnGlow turnGlow;
+
+        /// <summary>
+        /// 相手の手番のとき点滴を赤く脈打たせる。
+        /// 血袋も FloatingAnimator で揺れているので、EnemyPanel の中に影絵を敷いて
+        /// 揺れごと追従させる。血袋の形は絵そのものなので矩形の実測は要らない。
+        /// </summary>
+        public void SetTurnGlow(bool on)
+        {
+            if (turnGlow == null)
+            {
+                RectTransform panel = (enemyPanel != null)
+                    ? enemyPanel.GetComponent<RectTransform>() : null;
+                turnGlow = TurnGlow.Attach(panel, isSelf: false);
+            }
+            if (turnGlow != null) turnGlow.SetOn(on);
         }
 
         public void SetCharacterSprite(Sprite sprite)

@@ -235,10 +235,16 @@ namespace KillingMahjong.UI
             if (hpBetContainer != null)
             {
                 hpBetContainer.SetActive(true);
-                // 仮のデータアニメーション
-                // 実際はGameUIManager等からデータを引数で渡しますが、ここではモックします
-                int targetPlayerHp = dummyInitialPlayerHp - playerBetAmount;
-                int targetEnemyHp = dummyInitialEnemyHp - enemyBetAmount;
+
+                // 賭けた額のぶん血が減る様子を見せる。
+                //
+                // **サーバー値を使う設定のときは減らさない。**
+                // サーバーはベットで health を動かさないので、ここで減らして見せると
+                // 直後に届く status の値で元へ戻り、「減って戻る」ちらつきになる。
+                // 賭けた額そのものは Bet: の行に出るので、情報は失われない。
+                bool deduct = !KillingMahjong.Managers.BoardStateManager.UseServerHealth;
+                int targetPlayerHp = deduct ? dummyInitialPlayerHp - playerBetAmount : dummyInitialPlayerHp;
+                int targetEnemyHp = deduct ? dummyInitialEnemyHp - enemyBetAmount : dummyInitialEnemyHp;
 
                 if (enemyBetObj != null) enemyBetObj.text = "Enemy Bet: <color=red>" + enemyBetAmount + "</color>";
                 if (playerBetObj != null) playerBetObj.text = "Your Bet: <color=red>" + playerBetAmount + "</color>";

@@ -29,6 +29,8 @@ namespace KillingMahjong.UI
                 NetworkMessageHandler.Instance.OnIsTenpaiReceived += HandleIsTenpaiReceived;
                 NetworkMessageHandler.Instance.OnNotTenpaiReceived += HandleNotTenpaiReceived;
                 NetworkMessageHandler.Instance.OnNextRoundWaitingReceived += HandleNextRoundWaitingReceived;
+                NetworkMessageHandler.Instance.OnPhaseCompletedNotice += HandlePhaseCompletedNotice;
+                NetworkMessageHandler.Instance.OnLocalBetAccepted += HandleLocalBetAccepted;
                 NetworkMessageHandler.Instance.OnHandSelectionConfirmation += HandleHandSelectionConfirmation;
                 NetworkMessageHandler.Instance.OnHandSelectionAccepted += HandleHandSelectionAccepted;
                 NetworkMessageHandler.Instance.OnSkillCasted += HandleSkillCasted;
@@ -60,6 +62,8 @@ namespace KillingMahjong.UI
                 NetworkMessageHandler.Instance.OnIsTenpaiReceived -= HandleIsTenpaiReceived;
                 NetworkMessageHandler.Instance.OnNotTenpaiReceived -= HandleNotTenpaiReceived;
                 NetworkMessageHandler.Instance.OnNextRoundWaitingReceived -= HandleNextRoundWaitingReceived;
+                NetworkMessageHandler.Instance.OnPhaseCompletedNotice -= HandlePhaseCompletedNotice;
+                NetworkMessageHandler.Instance.OnLocalBetAccepted -= HandleLocalBetAccepted;
                 NetworkMessageHandler.Instance.OnHandSelectionConfirmation -= HandleHandSelectionConfirmation;
                 NetworkMessageHandler.Instance.OnHandSelectionAccepted -= HandleHandSelectionAccepted;
                 NetworkMessageHandler.Instance.OnSkillCasted -= HandleSkillCasted;
@@ -122,6 +126,11 @@ namespace KillingMahjong.UI
             uiManager.PhaseController?.HandleNextRoundWaitingReceived(data);
         }
 
+        private void HandlePhaseCompletedNotice(PhaseCompletedNoticeData data)
+        {
+            uiManager.PhaseController?.HandlePhaseCompletedNotice(data);
+        }
+
         private void HandleHandSelectionConfirmation(HandSelectionConfirmationData data)
         {
             uiManager.HandSelectionController?.HandleHandSelectionConfirmation(data);
@@ -130,6 +139,13 @@ namespace KillingMahjong.UI
         private void HandleHandSelectionAccepted()
         {
             uiManager.HandSelectionController?.OnHandSelectionAccepted();
+            // 自分の手牌が確定した合図。相手ぶんは phase_completed_notice を待つ
+            uiManager.PhaseController?.MarkLocalPhaseReady(RoundStatus.HandSelection);
+        }
+
+        private void HandleLocalBetAccepted()
+        {
+            uiManager.PhaseController?.MarkLocalPhaseReady(RoundStatus.Betting);
         }
 
         private void HandleSkillCasted(SkillCastedData data)

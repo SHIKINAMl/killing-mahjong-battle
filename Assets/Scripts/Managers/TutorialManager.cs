@@ -893,7 +893,8 @@ namespace KillingMahjong.Managers
                 hand, ronTileId, data, isLocalPlayerWin: true,
                 prevLocalHp: prevPlayerHp, newLocalHp: _playerHp,
                 prevEnemyHp: prevEnemyHp, newEnemyHp: _enemyHp,
-                displayScore: settlement));
+                displayScore: settlement,
+                scoreFormula: BuildScoreFormula(_playerStake, han)));
 
             ApplyHpToUI();
 
@@ -934,7 +935,9 @@ namespace KillingMahjong.Managers
                 hand, ronTileId, data, isLocalPlayerWin: false,
                 prevLocalHp: prevPlayerHp, newLocalHp: _playerHp,
                 prevEnemyHp: prevEnemyHp, newEnemyHp: _enemyHp,
-                displayScore: settlement));
+                displayScore: settlement,
+                // ここで出しているのは自分の損失なので、損失側の式にする
+                scoreFormula: BuildScoreFormula(_playerStake, han, data.isTankiWin)));
 
             ApplyHpToUI();
 
@@ -947,9 +950,32 @@ namespace KillingMahjong.Managers
         /// 演出に出す金額。持ち越された賭け金を含む「この局で動いた総額」を渡すこと。
         /// data.score をそのまま出すと、表示額と実際のHPの増減が食い違って見える。
         /// </param>
+        /// <summary>
+        /// ロン演出に出す計算式を作る。**演出に出している額と式が一致するようにすること。**
+        ///
+        ///   勝った側 … 自分の賭け金 × 自分の役の倍率
+        ///   負けた側 … 自分の賭け金 × 相手の役の倍率（相手が単騎で上がっていれば さらに ×2）
+        ///
+        /// 勝者の獲得と敗者の損失は別計算なので、どちらを出しているかで式が変わる。
+        /// 混ぜると答えが合わなくなる。
+        /// </summary>
+        private static string BuildScoreFormula(int stake, int han, bool tankiDouble = false)
+        {
+            if (stake <= 0) return null;
+
+            float mult = GameRules.GetMultiplier(han);
+            string m = mult.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+            return tankiDouble ? $"{stake} × {m} × 2" : $"{stake} × {m}";
+        }
+
+        /// <param name="scoreFormula">
+        /// 「2000 × 1.5」のような計算式。本編はサーバーの liquidation から作るが、
+        /// チュートリアルはサーバーに繋がないので GameRules の値から作って渡す。
+        /// </param>
         private IEnumerator PlayRonAnimation(
             List<int> handTiles, int ronTileId, TutorialRoundData data, bool isLocalPlayerWin,
-            int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp, int displayScore)
+            int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp, int displayScore,
+            string scoreFormula = null)
         {
             var ronUI = gameUIManager != null ? gameUIManager.RonAnimationUI : null;
             if (ronUI == null)
@@ -971,7 +997,8 @@ namespace KillingMahjong.Managers
                 gameUIManager.EnemyInfoUI,
                 prevLocalHp, newLocalHp,
                 prevEnemyHp, newEnemyHp,
-                () => done = true);
+                () => done = true,
+                scoreFormula);
 
             yield return new WaitUntil(() => done);
         }

@@ -1,0 +1,121 @@
+trigger	face	manfu	dialogue
+Bet_BluffMax	キレ笑顔	Exclamation	その程度の手でMAXベット！？ いい度胸ですわね！
+Bet_BluffMax	煽り顔	Heart	威勢だけは一人前ね。虚勢を張る小鹿は可愛いわよ♡
+Bet_BluffMax	コミカル顔	Question	即決で全賭け……？ 本当に何も考えてないのかしら
+Bet_TenpaiMax	キメ顔	None	望むところよ。その大手、粉砕してさしあげますわ
+Bet_TenpaiMax	キレ笑顔	Exclamation	いい度胸ね！ 全部まとめて頂いてあげる
+Bet_TenpaiMax	煽り顔	Heart	大きく賭けたわね。器も一緒に大きければよかったのに♡
+Bet_HesitateMax	煽り顔	Heart	散々悩んでMAX？ 迷いが顔に出すぎていてよ♡
+Bet_HesitateMax	キメ顔	None	散々迷った末の勝負……受けて立ちますわ
+Bet_HesitateMax	コミカル顔	Sweat	上げたり下げたり悩んだ割に、結局全賭けなのね……
+Bet_RevengeMax	煽り顔	Heart	カッとなって全額勝負？ カモの典型的な行動ですわ♡
+Bet_RevengeMax	キレ笑顔	Exclamation	悔しさに任せた全賭けね。返り討ちにしてあげる！
+Bet_RevengeMax	通常顔	None	熱くなったら終わりよ。冷静さを欠いた賭けね
+Bet_TenpaiMin	キメ顔	Question	そんな少額で隠れて……何か大きな罠でも仕掛けてる？
+Bet_TenpaiMin	煽り顔	Heart	自信作なのに最小ベット？ 慎重すぎて可愛いですわ♡
+Bet_TenpaiMin	コミカル顔	None	すごい気迫を感じるのに、賭け金は雀の涙なのね
+Bet_NoTenMin	煽り顔	Heart	ビビってるの？ 小鹿みたいで可愛いですわ♡
+Bet_NoTenMin	通常顔	None	安い手で小さく賭ける。堅実といえば堅実ね
+Bet_NoTenMin	コミカル顔	Question	その額、ワタシの朝食より安いのだけど？
+Bet_FidgetSpam	コミカル顔	Anger	ちょっと！ さっきから上げたり下げたり落ち着きなさい！
+Bet_FidgetSpam	煽り顔	Heart	あら、ボタンを連打して指の体操かしら？ 可愛いこと♡
+Bet_FidgetSpam	困り顔	Sweat	ピコピコうるさいわね……早く決めてくれないかしら
+Bet_ZeroGiveUp	困り顔	Sweat	最初から勝負を投げるなんて……つまらない男ね
+Bet_ZeroGiveUp	煽り顔	Heart	ゼロで逃げるの？ 賢明だけどプライドはないのかしら♡
+Bet_ZeroGiveUp	通常顔	None	血を賭けない選択……命拾いしたと思いなさい
+Skill_PlayerClairvoyance	笑顔	None	あら、ワタシの手を見たいの？ 見たところで防げるかしら
+Skill_PlayerClairvoyance	煽り顔	Heart	覗き見なんて破廉恥ね。目に焼き付けて絶望なさい♡
+Skill_PlayerClairvoyance	キメ顔	Exclamation	見られたところで痛くも痒くもないわ。かかってきなさい
+Skill_PlayerEnhance	キメ顔	Exclamation	命を削って手を強化したの……！？ いい覚悟ですわ
+Skill_PlayerEnhance	煽り顔	Heart	血を払って大勝負？ 失敗したら大惨事ですわよ♡
+Skill_PlayerEnhance	通常顔	None	そこまでして勝ちに来るのね。油断はできないわ
+Skill_PlayerSpecialWin	困り顔	Sweat	全命を賭けた一撃……本気でワタシを倒す気ね
+Skill_PlayerSpecialWin	キレ笑顔	Exclamation	すべてを賭けた必殺技ね！ 受けて立ってあげますわ！
+Skill_PlayerSpecialWin	煽り顔	Heart	イチかバチかの大博打？ 散り際としては美しいわよ♡
+Skill_EnemyClairvoyance	煽り顔	Heart	フフ……アナタの手、丸見えよ♡ 隠し事は無駄ですわ
+Skill_EnemyClairvoyance	キメ顔	Exclamation	すべて見切ったわ。アナタに逃げ場はありません
+Skill_EnemyClairvoyance	笑顔	None	あらあら、面白い手ね。じっくり料理してあげる
+Skill_HighCostPaid	困り顔	Sweat	くっ……かなりの血を払ったわ。絶対に無駄にはしない！
+Skill_HighCostPaid	キレ笑顔	Exclamation	この痛みの分、アナタには倍にして返してあげますわ！
+Skill_HighCostPaid	通常顔	None	必要な犠牲よ。これで勝利はワタシのもの
+Skill_NearDeathByCost	困り顔	Sweat	ハァ……ハァ……後がないわね。次で全てを決める！
+Skill_NearDeathByCost	キレ笑顔	Exclamation	ワタシの血が尽きる前に、アナタの息の根を止めるわ！
+Skill_NearDeathByCost	キメ顔	None	背水の陣よ。ここからが本当の勝負ですわ
+Discard_RedDora	煽り顔	None	あら、ドラを捨てるなんて。使いこなせなかったのかしら♡
+Discard_RedDora	キメ顔	Exclamation	ドラを迷わず切ったわね……勝負を急いでいるのかしら
+Discard_RedDora	コミカル顔	Question	大事なドラをポイ捨て？ 随分と余裕ですわね
+Discard_RawYakuhai	通常顔	Question	役牌切り……さて、どういう魂胆かしら
+Discard_RawYakuhai	煽り顔	Heart	生牌の字牌を切るなんて、強気なのか無謀なのかしら♡
+Discard_RawYakuhai	キメ顔	None	警戒しているのか、それとも誘っているのかしらね
+Discard_SafeTile	煽り顔	None	まずは無難な字牌から？ 退屈な打ち筋ですわね♡
+Discard_SafeTile	通常顔	None	安全そうなところから整理……教科書通りね
+Discard_SafeTile	コミカル顔	Question	そんなにワタシが怖くて、端っこばかり切ってるの？
+Discard_CenterTile	キメ顔	None	真ん中の牌を切ってきたわね。勝負に出る気かしら
+Discard_CenterTile	キレ笑顔	Exclamation	堂々と危険なところを切るなんて、いい度胸ですわ！
+Discard_CenterTile	煽り顔	Heart	真ん中から勝負？ 罠にかかるのが楽しみですわ♡
+Discard_SameTileStreak	通常顔	Question	同じ牌を連打……しのぎに来ているのかしら
+Discard_SameTileStreak	煽り顔	Heart	同じ牌ばかり切って、手詰まりかしら？ 可愛いこと♡
+Discard_SameTileStreak	コミカル顔	None	二枚連続で同じ牌……芸がない打ち方ですわね
+Discard_HonorStreak	キメ顔	None	字牌の連打……さては切るものに困っているわね？
+Discard_HonorStreak	煽り顔	Heart	字牌ばかり並べて、すっかり守勢に回ったのかしら♡
+Discard_HonorStreak	コミカル顔	Question	字牌しか切らないじゃない。山に字牌しかなかったの？
+Result_EnemyHitYakuman	困り顔	Exclamation	バカな……役満ですって！？ イカサマじゃないの！？
+Result_EnemyHitYakuman	キレ笑顔	Anger	ワタシが役満に放銃……！？ ありえないわ、認めない！
+Result_EnemyHitYakuman	コミカル顔	Sweat	な、なんという破壊力……目の前が真っ暗ですわ……
+Result_EnemyDoraBomb	キメ顔	Heart	ドラがたっぷりの極上の一撃、味わいなさい♡
+Result_EnemyDoraBomb	笑顔	None	ふふ、ドラがたくさん乗って嬉しいわ。ごちそうさま♡
+Result_EnemyDoraBomb	煽り顔	Heart	きれいにドラが集まったわ。痛かったかしら？ 小鹿さん♡
+Result_PlayerHitYakuman	キレ笑顔	Heart	役・満・よ♡ その牌、完全にとどめですわ！ 人生終了！
+Result_PlayerHitYakuman	煽り顔	Heart	最高の役満で粉砕してさしあげましたわ。お疲れ様♡
+Result_PlayerHitYakuman	キメ顔	Exclamation	ワタシの究極の手、その身に刻んで散りなさい！
+Result_PlayerNearDeath	煽り顔	None	血が残りわずかね。次のひと刺しで終わりかしら？♡
+Result_PlayerNearDeath	キレ笑顔	Exclamation	虫の息ね。楽にしてあげるから、観念しなさい！
+Result_PlayerNearDeath	通常顔	None	もう後がないわね。最後の足掻きを見せてもらうわ
+Result_EnemyKO	困り顔	Sweat	ウソ……ワタシが、負けるなんて……っ！
+Result_EnemyKO	キレ笑顔	Sweat	くっ……このワタシが……覚えていなさいよ……！
+Result_EnemyKO	コミカル顔	Sweat	こんなはずでは……ワタシの計算が……あぁぁ……
+Meta_ClickHead	コミカル顔	Anger	……気安く触らないで。髪が乱れるでしょう！
+Meta_ClickHead	煽り顔	Heart	なでても何も出ないわよ？ 小鹿に構う暇はないの♡
+Meta_ClickHead	通常顔	None	頭を触る暇があったら、次の打牌を考えなさい
+Meta_ClickChest	キレ笑顔	Blush	どこを触っているのよ！ 次は腕を折るわよ！
+Meta_ClickChest	コミカル顔	Blush	……ちょっと！ 対局中でしょう、集中なさい！
+Meta_ClickChest	煽り顔	Heart	そんなに緊張をほぐしたいのかしら？ 無駄よ♡
+Meta_ClickSpam	コミカル顔	Anger	ちょっと！ 連打しても何も出ないって言ってるでしょ！
+Meta_ClickSpam	キレ笑顔	Anger	くすぐったいわね！ ワタシを連打して楽しいの！？
+Meta_ClickSpam	コミカル顔	Question	カチカチカチカチ……壊れたオモチャみたいですわね
+Meta_ScreenClickSpam	コミカル顔	Question	画面の余白を連打して……なにを探しているの？
+Meta_ScreenClickSpam	煽り顔	Heart	画面をいくら叩いても、良い牌は湧いてこないわよ♡
+Meta_ScreenClickSpam	通常顔	None	画面を突くのはおやめなさい。落ち着きがないわね
+Meta_Idle20s	煽り顔	None	長考しても、アナタの運は良くならないわよ♡
+Meta_Idle20s	通常顔	None	ずいぶん悩むわね。どれを切っても同じですのに
+Meta_Idle20s	コミカル顔	Sweat	ねえ、まだかしら？ あくびが出ちゃいますわ
+Meta_Idle60s	コミカル顔	Anger	……寝てるの？ 起きなさい！ 対局中よ！
+Meta_Idle60s	キレ笑顔	Anger	放置する気かしら？ ワタシを待たせるなんていい度胸ね！
+Meta_Idle60s	煽り顔	Heart	あまりに怖くて、指が動かなくなっちゃったのかしら♡
+Meta_MuteAudio	キメ顔	Question	無音の静寂の中で打つのがお好み？ 不気味な人ね
+Meta_MuteAudio	煽り顔	Heart	ワタシの美しい声を聞かないなんて、損してるわよ♡
+Meta_MuteAudio	コミカル顔	None	音を消したの？ ワタシの罵倒が怖くなったのかしら
+Meta_WindowRefocus	煽り顔	Question	どこへ浮気していたのかしら？ 現実に戻る時間よ♡
+Meta_WindowRefocus	キレ笑顔	Anger	おかえりなさい。ワタシを放置して何を見ていたのかしら？
+Meta_WindowRefocus	通常顔	None	戻ったわね。さあ、勝負の続きをはじめましょう
+Tile_HoverDora	煽り顔	Heart	あら、ドラが恋しいのかしら？ 見つめても増えないわよ♡
+Tile_HoverDora	キメ顔	None	ドラを注視しているわね……手の中に欲しいのかしら
+Tile_HoverDora	コミカル顔	Question	そんなにドラを穴があくほど見つめて、どうする気？
+Tile_HoverHesitation	煽り顔	Question	山の上を行ったり来たり……迷い箸は見苦しいですわ♡
+Tile_HoverHesitation	通常顔	None	どれを切るか迷っているのね。観察させてもらうわ
+Tile_HoverHesitation	コミカル顔	Sweat	カーソルがウロウロして、落ち着きのない小鹿ね
+Tile_WallPoke	コミカル顔	Anger	山牌をツンツンしないで。並びが変わるわけじゃないのよ
+Tile_WallPoke	煽り顔	None	そんなに触れば当たりが出るとでも？ 迷信深いのね
+Tile_WallPoke	コミカル顔	Question	……なにをしているの、さっきから
+Tile_InstantDiscard	キメ顔	Exclamation	ノータイムで即座に切ったわね……迷いがないのかしら
+Tile_InstantDiscard	煽り顔	Heart	早い打牌ね！ 早くワタシに振り込みたいのかしら♡
+Tile_InstantDiscard	通常顔	None	ノータイムの打牌……あらかじめ決めていたのね
+Tile_SpamClick	コミカル顔	Anger	カチカチ連打しないで！ 牌が割れちゃうでしょうが！
+Tile_SpamClick	煽り顔	Heart	そんなに焦らなくても、逃げたりしないわよ♡
+Tile_SpamClick	コミカル顔	Sweat	連打したって早くならないわよ。深呼吸なさい
+Tile_PeekHold	煽り顔	None	チラチラ自分の手を確認しちゃって。自信がないのかしら♡
+Tile_PeekHold	通常顔	None	手牌をじっくり確認中ね。どんな手を組んでいるのやら
+Tile_PeekHold	コミカル顔	Question	さっきから何度も手牌を見てるけど、覚えられないの？
+Tile_ThinkTimeout	コミカル顔	Anger	ちょっと、時間切れになるわよ！ 早く切りなさい！
+Tile_ThinkTimeout	キレ笑顔	Exclamation	残り3秒よ！ タイムアップで自滅するつもりかしら！
+Tile_ThinkTimeout	煽り顔	Heart	焦る小鹿の顔、最高ですわ♡ 早く選ばないと消えるわよ！

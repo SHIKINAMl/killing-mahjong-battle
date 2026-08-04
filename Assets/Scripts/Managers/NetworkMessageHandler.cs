@@ -34,6 +34,15 @@ namespace KillingMahjong.Network
         public string player_id;
         public string skillType;
         public int cost;
+
+        /// <summary>
+        /// **コストを払ったあとの、発動した側の血。サーバーが正。**
+        /// 2026-08-04 にサーバーが返すようになった（それまでは無かったので
+        /// クライアントが「今の血 − cost」で自前計算していた）。
+        /// 0 のときは「入っていない」とみなし、従来どおりの引き算に落とす。
+        /// </summary>
+        public int health;
+
         public string yaku_name;
         public List<int> exposedHandIndexes;
         // manually populated
@@ -121,7 +130,9 @@ namespace KillingMahjong.Network
         public event Action<DrawPlayerData[]> OnDraw; // 流局
         public event Action<int, int> OnGameEnded; // localScore, enemyScore
         public event Action<NextRoundWaitingData> OnNextRoundWaitingReceived; // 相手からの次局待機（ロンボタン押下の合図として利用）
-        
+        public event Action<PhaseCompletedNoticeData> OnPhaseCompletedNotice; // 手牌選択・ベットを確定したプレイヤーの通知（「準備完了」表示用）
+        public event Action OnLocalBetAccepted; // 自分のベットが受理された（本人にだけ届く。「準備完了」表示用）
+
         public event Action<StatusData> OnStatusReceived;
         public event Action<AgariPendingData> OnAgariPendingReceived;
         
@@ -161,6 +172,8 @@ namespace KillingMahjong.Network
         internal void RaiseDraw(DrawPlayerData[] drawData) => OnDraw?.Invoke(drawData);
         internal void RaiseGameEnded(int localScore, int enemyScore) => OnGameEnded?.Invoke(localScore, enemyScore);
         internal void RaiseNextRoundWaitingReceived(NextRoundWaitingData data) => OnNextRoundWaitingReceived?.Invoke(data);
+        internal void RaisePhaseCompletedNotice(PhaseCompletedNoticeData data) => OnPhaseCompletedNotice?.Invoke(data);
+        internal void RaiseLocalBetAccepted() => OnLocalBetAccepted?.Invoke();
         internal void RaiseStatusReceived(StatusData data) => OnStatusReceived?.Invoke(data);
         internal void RaiseAgariPendingReceived(AgariPendingData data) => OnAgariPendingReceived?.Invoke(data);
         internal void RaiseError(string message) => OnError?.Invoke(message);
@@ -269,6 +282,7 @@ namespace KillingMahjong.Network
                 new BettingMessageHandler(),
                 new DiscardMessageHandler(),
                 new RoundLifecycleMessageHandler(),
+                new PhaseCompletedNoticeMessageHandler(),
                 new SkillMessageHandler(),
                 new ErrorMessageHandler(),
             };

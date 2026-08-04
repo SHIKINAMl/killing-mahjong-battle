@@ -178,7 +178,9 @@ namespace KillingMahjong.UI
                         var visual = obj.GetComponent<TileVisual>();
                         if (visual != null && uiManager.TileResourceManager != null)
                         {
-                            visual.SetTile(encodedId, uiManager.TileResourceManager.GetTileSprite(encodedId & 0x1F));
+                            // & 0x1F を外した。マスクするとフラグごと落ちるので、
+                            // 赤ドラが普通の牌に見えるうえ、壊れたIDまで正常な牌へ化けていた
+                            visual.SetTile(encodedId, uiManager.TileResourceManager.GetTileSprite(encodedId));
                         }
 
                         var images = obj.GetComponentsInChildren<UnityEngine.UI.Image>(true);
@@ -271,7 +273,8 @@ namespace KillingMahjong.UI
                     Sprite sprite = null;
                     if (_uiManager != null && _uiManager.TileResourceManager != null)
                     {
-                        sprite = _uiManager.TileResourceManager.GetTileSprite(interaction.TileId & 0x1F);
+                        // & 0x1F を外した（理由は上の SetTile と同じ）
+                        sprite = _uiManager.TileResourceManager.GetTileSprite(interaction.TileId);
                     }
                     visual.SetTile(interaction.TileId, sprite);
                     visual.SetHoverHighlight(false);

@@ -577,14 +577,19 @@ namespace KillingMahjong.UI
                 peekButton.gameObject.SetActive(peekPhase);
                 if (peekPhase)
                 {
-                    // 覗いた手牌より手前に出しておかないと、中央へ寄せた手牌に
-                    // ボタンが隠れて押せなくなる。
+                    // **覗いている間だけ**前面に出す。中央へ寄せた手牌(86)にボタンが
+                    // 隠れて押せなくなるのを防ぐため。
+                    //
+                    // 覗いていない間まで 87 に置いてはいけない。賭け金確定後のフェーズ演出は
+                    // PhaseTransitionBase(19) で描かれるので、ボタンが演出の前に残ってしまう。
                     // 非アクティブなうちに設定しても効かないので、表示した後に入れ直す
                     var bc = peekButton.GetComponent<Canvas>();
                     if (bc != null)
                     {
                         bc.overrideSorting = true;
-                        bc.sortingOrder = UISortingOrders.HandPeekTiles + 1;
+                        bc.sortingOrder = isPeeking
+                            ? UISortingOrders.HandPeekTiles + 1
+                            : UISortingOrders.HandPeekButtonIdle;
                     }
                 }
             }

@@ -44,6 +44,12 @@ namespace KillingMahjong.UI
 
         private int _currentId = -1;
 
+        /// <summary>不正な牌IDを表示中かどうか。着色を他の処理に消されないよう保持する。</summary>
+        private bool _isInvalidId = false;
+
+        /// <summary>不正な牌に被せる色。「テクスチャが無い」の慣例に合わせた紫。</summary>
+        private static readonly Color InvalidTint = new Color(1f, 0f, 1f, 1f);
+
         public void SetTile(int encodedId, Sprite sprite, TileResourceManager resourceManager = null)
         {
             _currentId = encodedId;
@@ -55,8 +61,19 @@ namespace KillingMahjong.UI
                 else if (meshRenderer != null) meshRenderer.material.mainTexture = sprite.texture;
             }
 
+            // **不正なIDは不正なまま見せる。**
+            // 近い牌へ丸めると壊れたIDが普通の牌として画面に出てしまい、不具合が隠れる。
+            // 紫に着色して、ひと目で「これはおかしい」と分かるようにする。
+            string problem = Common.TileId.DescribeProblem(encodedId);
+            _isInvalidId = problem != null;
+            if (_isInvalidId)
+            {
+                Debug.LogError($"[TileVisual] 不正な牌を表示しています: {problem} / obj={name}");
+            }
+            ApplyInvalidTint();
+
             // ドラ枠オーバーレイはスプライトの有無に関わらず常に更新する（プール再利用時の状態リーク防止）
-            bool isDoraTile = sprite != null && encodedId >= 0 && (resourceManager != null
+            bool isDoraTile = sprite != null && encodedId >= 0 && !_isInvalidId && (resourceManager != null
                 ? resourceManager.IsDora(encodedId)
                 : new TileData(encodedId).IsDora || new TileData(encodedId).IsRedDora);
 
@@ -66,6 +83,26 @@ namespace KillingMahjong.UI
             }
 
             SetDoraShine(isDoraTile);
+        }
+
+        /// <summary>
+        /// 不正な牌の着色を反映する。牌はプールで使い回されるので、
+        /// 正常な牌に戻ったときは必ず白へ戻すこと（アルファは触らない）。
+        /// </summary>
+        private void ApplyInvalidTint()
+        {
+            Color tint = _isInvalidId ? InvalidTint : Color.white;
+
+            if (uiImage != null)
+            {
+                tint.a = uiImage.color.a;
+                uiImage.color = tint;
+            }
+            if (spriteRenderer != null)
+            {
+                tint.a = spriteRenderer.color.a;
+                spriteRenderer.color = tint;
+            }
         }
 
         /// <summary>
@@ -117,7 +154,9 @@ namespace KillingMahjong.UI
             
             if (spriteRenderer != null)
             {
-                if (_isFuriten) spriteRenderer.color = Color.red;
+                // 不正な牌の紫は、フリテン表示より優先して残す（異常を消さない）
+                if (_isInvalidId) ApplyInvalidTint();
+                else if (_isFuriten) spriteRenderer.color = Color.red;
                 else spriteRenderer.color = Color.white;
             }
 

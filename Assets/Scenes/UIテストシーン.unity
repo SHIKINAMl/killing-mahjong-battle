@@ -9349,9 +9349,9 @@ MonoBehaviour:
   tileWidth: 18
   tileHeight: 17
   tileScale: 0.78
-  maxPerRow: 6
+  maxPerRow: 8
   isEnemyRiver: 1
-  enemyOffsetX: 160
+  enemyOffsetX: 195
   enemyOffsetY: -85
 --- !u!1001 &459612331
 PrefabInstance:
@@ -32497,7 +32497,7 @@ MonoBehaviour:
   tileWidth: 21
   tileHeight: 19
   tileScale: 0.8
-  maxPerRow: 6
+  maxPerRow: 8
   isEnemyRiver: 0
   enemyOffsetX: 350
   enemyOffsetY: -200

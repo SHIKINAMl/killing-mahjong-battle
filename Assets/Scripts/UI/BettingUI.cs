@@ -125,11 +125,16 @@ namespace KillingMahjong.UI
 
         public void ShowBettingPhase(int initialHp, int currentHp, int specialVictoryCount, Action<int> onConfirm)
         {
+            // 賭け金の上限と単位はサーバーが決める。bet_accepted で受け取った値があれば
+            // そちらを使い、まだ来ていない初回だけ GameRules の既定値に頼る
             var rules = GameRules.GetRuleSet(specialVictoryCount);
-            this.bettingUnit = rules.BetUnit;
+            var board = Managers.BoardStateManager.Instance;
+            bool useServer = board != null && board.HasServerBetRules;
+
+            this.bettingUnit = useServer ? board.ServerBetUnit : rules.BetUnit;
+            this.maxBet = useServer ? board.ServerBetMax : rules.BetMax;
             this.initialMoney = initialHp;
             this.currentMoney = currentHp;
-            this.maxBet = rules.BetMax;
             this.currentBet = bettingUnit; // Reset bet to minimum
             this.onConfirmAction = onConfirm;
 

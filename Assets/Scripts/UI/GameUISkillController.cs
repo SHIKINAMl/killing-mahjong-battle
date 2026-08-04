@@ -295,19 +295,36 @@ namespace KillingMahjong.UI
             }
 
             // 2. HP（コスト）の支払い演出
-            if (isLocalPlayer)
+            //
+            // **血はサーバーが正。** skill_casted の health（支払い後の値）をそのまま使う。
+            // health は発動した側の値なので、相手が撃ったときは相手側に入れる。
+            //
+            // 0 のときは「サーバーが返していない」とみなし、従来どおり自前で引く。
+            // 古いサーバーに繋いだときに血が 0 へ飛ぶのを防ぐため。
             {
-                int currentLocalHp = Managers.BoardStateManager.Instance.LocalPlayerHp;
-                int currentEnemyHp = Managers.BoardStateManager.Instance.EnemyPlayerHp;
-                Managers.BoardStateManager.Instance.UpdateHp(currentLocalHp - data.cost, currentEnemyHp);
-                if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.SetHP(Managers.BoardStateManager.Instance.LocalPlayerHp);
-            }
-            else
-            {
-                int currentLocalHp = Managers.BoardStateManager.Instance.LocalPlayerHp;
-                int currentEnemyHp = Managers.BoardStateManager.Instance.EnemyPlayerHp;
-                Managers.BoardStateManager.Instance.UpdateHp(currentLocalHp, currentEnemyHp - data.cost);
-                if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetHP(Managers.BoardStateManager.Instance.EnemyPlayerHp);
+                var board = Managers.BoardStateManager.Instance;
+                int localHp = board.LocalPlayerHp;
+                int enemyHp = board.EnemyPlayerHp;
+
+                if (isLocalPlayer)
+                {
+                    localHp = data.health > 0 ? data.health : localHp - data.cost;
+                }
+                else
+                {
+                    enemyHp = data.health > 0 ? data.health : enemyHp - data.cost;
+                }
+
+                board.UpdateHp(localHp, enemyHp);
+
+                if (isLocalPlayer)
+                {
+                    if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.SetHP(board.LocalPlayerHp);
+                }
+                else
+                {
+                    if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetHP(board.EnemyPlayerHp);
+                }
             }
 
             // 体力が減る様子をしっかり見せるためのタメ（待機）

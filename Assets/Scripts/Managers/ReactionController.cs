@@ -8,6 +8,23 @@ using KillingMahjong.UI;
 namespace KillingMahjong.Managers
 {
     /// <summary>
+    /// リアクションの重要度。**この区別が無いとキューが破綻する。**
+    ///
+    /// 1件あたり reactionDisplayDuration（既定5秒）を直列に消化する作りなので、
+    /// ホバーや連打のような高頻度のものまで同じキューに流すと、
+    /// キューが伸び続けて「30秒前の出来事」を今喋り出す。
+    /// </summary>
+    public enum ReactionPriority
+    {
+        /// <summary>進行に関わる。必ず出す（ロン・流局・被弾・局開始など）</summary>
+        Progress,
+        /// <summary>状況の説明。出したいが、同じものが並んでいるなら1件でよい（ベット確定・打牌傾向など）</summary>
+        Situation,
+        /// <summary>環境。出なくてもよい。**演出中は無条件で捨てる**（ホバー・連打・放置・つつき）</summary>
+        Ambient,
+    }
+
+    /// <summary>
     /// キャラクターのリアクション、ログの表示待ち、シーケンシャルな演出などを管理するクラス
     /// </summary>
     public class ReactionController : MonoBehaviour
@@ -27,8 +44,19 @@ namespace KillingMahjong.Managers
         public EnemyInfoUI enemyInfoUI;
         public PlayerInfoUI playerInfoUI;
 
+        [Header("発火制御")]
+        [Tooltip("Ambient を連発させない最短間隔(秒)。トリガー個別のクールダウンとは別に全体へ効く")]
+        [SerializeField] private float ambientGlobalCooldown = 6.0f;
+        [Tooltip("同じトリガーを再び出せるようになるまでの秒数。Progress は免除される")]
+        [SerializeField] private float perTriggerCooldown = 20.0f;
+
         private Queue<Action> reactionQueue = new Queue<Action>();
         private bool isProcessingReactions = false;
+
+        // 発火制御用。Time.unscaledTime で測る（演出で timeScale を触っても効くように）
+        private readonly Dictionary<ReactionTrigger, float> _lastFiredAt = new Dictionary<ReactionTrigger, float>();
+        private readonly HashSet<ReactionTrigger> _queuedTriggers = new HashSet<ReactionTrigger>();
+        private float _lastAmbientAt = -999f;
 
         // 実行中の演出コルーチンと、その完了時に必ず走らせたい後始末。
         // 中断時に onComplete を取りこぼすと SetDiscardingState(false) が呼ばれず、
@@ -72,6 +100,7 @@ namespace KillingMahjong.Managers
         public void ClearReactions()
         {
             reactionQueue.Clear();
+            _queuedTriggers.Clear();
             isProcessingReactions = false;
 
             if (_currentReaction != null)
@@ -139,6 +168,83 @@ namespace KillingMahjong.Managers
 
                 yield return null;
             }
+        }
+
+        /// <summary>
+        /// トリガーでリアクションを起こす。**新しいリアクションはすべてこの入口を通す。**
+        /// セリフと表情は `CharacterData.reactions`（ScriptableObject）から引く。
+        /// CSV（DialogueManager）経由の既存フローはそのまま残してある。
+        ///
+        /// 重要度で扱いが変わる:
+        ///   Progress  … 必ずキューへ積む。クールダウン免除
+        ///   Situation … 同じトリガーが既に並んでいれば捨てる
+        ///   Ambient   … **演出中・キューに何かある間は捨てる**。全体クールダウンもかかる
+        /// </summary>
+        /// <returns>実際に積んだら true。捨てたら false</returns>
+        public bool Trigger(ReactionTrigger trigger, ReactionPriority priority, string formatArg = "")
+        {
+            if (enemyInfoUI == null) return false;
+
+            float now = Time.unscaledTime;
+
+            // 同じセリフの連発を防ぐ。進行に関わるものは止めない
+            if (priority != ReactionPriority.Progress)
+            {
+                float last;
+                if (_lastFiredAt.TryGetValue(trigger, out last) && now - last < perTriggerCooldown)
+                {
+                    return false;
+                }
+            }
+
+            if (priority == ReactionPriority.Ambient)
+            {
+                // ここでキューに積んではいけない。積むと待ち時間ぶん遅れて
+                // 「もう終わった操作」に対して喋り出す
+                if (isProcessingReactions || reactionQueue.Count > 0) return false;
+                if (now - _lastAmbientAt < ambientGlobalCooldown) return false;
+            }
+            else if (priority == ReactionPriority.Situation)
+            {
+                if (_queuedTriggers.Contains(trigger)) return false;
+            }
+
+            _lastFiredAt[trigger] = now;
+            if (priority == ReactionPriority.Ambient) _lastAmbientAt = now;
+
+            _queuedTriggers.Add(trigger);
+            reactionQueue.Enqueue(() => _currentReaction = StartCoroutine(ProcessTriggerReaction(trigger, formatArg)));
+            if (!isProcessingReactions) ProcessNextReaction();
+            return true;
+        }
+
+        private IEnumerator ProcessTriggerReaction(ReactionTrigger trigger, string formatArg)
+        {
+            float duration = reactionDisplayDuration;
+            string text = enemyInfoUI.PlayReaction(trigger, duration, formatArg ?? "");
+
+            // データが無いトリガーで待ち時間を潰さない。
+            // 5秒間なにも出ないまま後続を止めてしまうため
+            if (string.IsNullOrEmpty(text))
+            {
+                _queuedTriggers.Remove(trigger);
+                _currentReaction = null;
+                ProcessNextReaction();
+                yield break;
+            }
+
+            if (dialogueUI != null)
+            {
+                dialogueUI.gameObject.SetActive(true);
+                dialogueUI.ShowText(text.Contains("「") ? text : $"「{text}」");
+            }
+
+            yield return WaitWhileLogIsOpen(duration);
+
+            _queuedTriggers.Remove(trigger);
+            _pendingOnComplete = null;
+            _currentReaction = null;
+            ProcessNextReaction();
         }
 
         public void EnqueueDiscardReaction(int tileId, bool isLocalPlayer, string tileName)

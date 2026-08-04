@@ -53,6 +53,12 @@ namespace KillingMahjong.Common
         /// <summary>WallUI: 演出中に山牌を通常UIより手前へ出すときの値</summary>
         public const int WallFront = 16;
 
+        /// <summary>HandUI: 「手牌を見る」ボタンの通常時（覗いていない間）。
+        /// 山牌(16)より手前だが、**フェーズ演出(19)より奥**に置くこと。
+        /// 覗いている間だけ HandPeekTiles+1 まで上げる（そうしないと中央へ寄せた手牌に隠れる）。
+        /// 前面に置きっぱなしにすると、賭け金確定後の演出にボタンが被る</summary>
+        public const int HandPeekButtonIdle = 17;
+
         /// <summary>BettingUI: ベット時の背景ディマー（BettingPanel より奥）</summary>
         public const int BettingDimmer = 19;
 
@@ -128,6 +134,11 @@ namespace KillingMahjong.Common
 
         /// <summary>YakuSelectionUI: 役選択パネル（モーダルなので待ち牌表示より手前）</summary>
         public const int YakuSelection = 88;
+
+        /// <summary>TurnVignette: 自分の手番を示す画面ふちの光。
+        /// **瀕死の赤ビネット(91)より必ず奥に置くこと。**
+        /// 危険の表示が手番の表示に負けてはいけない</summary>
+        public const int TurnVignette = 89;
 
         // ---- 90 - 99 全画面演出・システム最前面 ----
 

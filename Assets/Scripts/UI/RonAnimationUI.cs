@@ -56,14 +56,21 @@ namespace KillingMahjong.UI
             }
         }
 
-        public void PlayRonSequence(List<int> handTiles, int ronTile, List<string> yakuList, string formula, string rankName, int score, bool isLocalPlayerWin, 
-            PlayerInfoUI playerInfo, EnemyInfoUI enemyInfo, int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp, System.Action onComplete)
+        /// <param name="formula">「6飜」のような飜数の文字列。表示には使わず、安手かどうかの判定に使う</param>
+        /// <param name="scoreFormula">
+        /// 「200 × 1.5」のような計算式。**サーバーの liquidation から作って渡す。**
+        /// 渡さなかった場合は式を出さず、獲得額だけを見せる。
+        /// </param>
+        public void PlayRonSequence(List<int> handTiles, int ronTile, List<string> yakuList, string formula, string rankName, int score, bool isLocalPlayerWin,
+            PlayerInfoUI playerInfo, EnemyInfoUI enemyInfo, int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp, System.Action onComplete,
+            string scoreFormula = null)
         {
-            StartCoroutine(SequenceRoutine(handTiles, ronTile, yakuList, formula, rankName, score, isLocalPlayerWin, playerInfo, enemyInfo, prevLocalHp, newLocalHp, prevEnemyHp, newEnemyHp, onComplete));
+            StartCoroutine(SequenceRoutine(handTiles, ronTile, yakuList, formula, rankName, score, isLocalPlayerWin, playerInfo, enemyInfo, prevLocalHp, newLocalHp, prevEnemyHp, newEnemyHp, onComplete, scoreFormula));
         }
 
-        private IEnumerator SequenceRoutine(List<int> handTiles, int ronTile, List<string> yakuList, string formula, string rankName, int score, bool isLocalPlayerWin, 
-            PlayerInfoUI playerInfo, EnemyInfoUI enemyInfo, int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp, System.Action onComplete)
+        private IEnumerator SequenceRoutine(List<int> handTiles, int ronTile, List<string> yakuList, string formula, string rankName, int score, bool isLocalPlayerWin,
+            PlayerInfoUI playerInfo, EnemyInfoUI enemyInfo, int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp, System.Action onComplete,
+            string scoreFormula)
         {
             // 0. カットイン演出（勝者の顔と「ロン！」を表示）
             bool cutinFinished = false;
@@ -227,14 +234,19 @@ namespace KillingMahjong.UI
             // --- タメ（ここで役と手牌をしっかり見せる） ---
             yield return new WaitForSeconds(1.0f);
 
-            // 【追加】計算式の表示（ダミー）
+            // 計算式の表示
             GameObject formulaTextObj = new GameObject("FormulaText");
             formulaTextObj.transform.SetParent(containerRt, false);
             TextMeshProUGUI formulaText = formulaTextObj.AddComponent<TextMeshProUGUI>();
             if (customFont != null) formulaText.font = customFont;
-            
-            // Python側からスコアしか来ないので、ダミーの数式を表示
-            formulaText.text = $"??? × ??? = {score}";
+
+            // サーバーの liquidation から作った式を出す。
+            // かつては内訳が来ておらず「??? × ??? = 額」と伏せていたが、
+            // 現在は winner_bet / multiplier が届くので実際の値を出せる。
+            // 渡されなかったときだけ、式を伏せて額だけ見せる
+            formulaText.text = string.IsNullOrEmpty(scoreFormula)
+                ? $"{score}"
+                : $"{scoreFormula} = {score}";
             formulaText.color = new Color(1f, 1f, 0.5f); // 薄い黄色
             formulaText.fontSize = KillingMahjong.Common.UITypography.Header; 
             formulaText.alignment = TextAlignmentOptions.Center;

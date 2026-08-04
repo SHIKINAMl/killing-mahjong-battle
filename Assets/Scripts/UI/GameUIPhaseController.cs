@@ -17,6 +17,17 @@ namespace KillingMahjong.UI
         private int _currentRoundIndex = 1;
         private bool _isCarryOverNextRound = false;
 
+        // 手牌選択・ベットの「準備完了」印。phase_completed_notice で立ち、局の頭（Dealing）で落ちる。
+        // 印を状態として持っておくのは、通知が HandlePhaseVisibility の保留より先に届くことがあるため。
+        // 受け取った瞬間に SetReadyCheck するだけだと、あとから走る ShowReadyBox(true) に消される。
+        /// <summary>賭け金確定でスマホが縮むまでの秒数。OnBetConfirmed の ResetZoomRoutine と揃えること</summary>
+        private const float BetZoomOutDuration = 0.3f;
+
+        private bool _handSelectionReadyLocal = false;
+        private bool _handSelectionReadyEnemy = false;
+        private bool _betReadyLocal = false;
+        private bool _betReadyEnemy = false;
+
         public void Setup(GameUIManager manager)
         {
             this.uiManager = manager;
@@ -76,10 +87,20 @@ namespace KillingMahjong.UI
         public void OnGameStarted()
         {
             _currentRoundIndex = 1;
-            
+            ResetPhaseReadyMarks();
+
             try
             {
-                Managers.BoardStateManager.Instance.UpdateHp(20000, 20000);
+                // 血の初期値もサーバーが持っている（game_engine.py:61）。
+                // ここではつなぎの値を置くだけにして、本物は status で取り直す。
+                // つなぎを置かないと、前の対局の残り血（0 など）がゲージに残る。
+                Managers.BoardStateManager.Instance.UpdateHp(
+                    Managers.BoardStateManager.PlaceholderInitialHp,
+                    Managers.BoardStateManager.PlaceholderInitialHp);
+                if (!uiManager.IsTutorialMode)
+                {
+                    uiManager.SendActionToServer("status", null);
+                }
                 if (uiManager.BetPotUI != null) uiManager.BetPotUI.Clear();
                 // 新しい対局なので獲得も賭け金も引き直す
                 if (!uiManager.IsTutorialMode) uiManager.ScoreGauge.ResetScores();
@@ -285,6 +306,11 @@ namespace KillingMahjong.UI
                             uiManager.PlayerInfoUI.StartCoroutine(uiManager.PlayerInfoUI.ZoomInRoutine(0.4f, 4.5f));
                         }
                         StartBettingPhase(Managers.BoardStateManager.Instance.LocalPlayerHp);
+
+                        // スマホが4.5倍に拡大している間は札がその裏に入る。
+                        // 賭け金を確定してスマホが縮んでから出す（OnBetConfirmed）
+                        SetReadyBadgesSuppressed(true);
+                        ApplyPhaseReadyMarks(RoundStatus.Betting);
                     }
                     break;
                 case RoundStatus.Dealing:
@@ -294,6 +320,9 @@ namespace KillingMahjong.UI
                     if (!uiManager.IsTutorialMode) uiManager.WaitDeduction.ResetForNewRound();
                     if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.ShowReadyBox(false);
                     if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.ShowReadyBox(false);
+                    ResetPhaseReadyMarks(); // 手牌選択・ベットの印は局ごとに引き直す
+                    // 賭け金を確定しないままフェイズが進むと伏せたままになるので、局の頭で戻す
+                    SetReadyBadgesSuppressed(false);
 
                     if (_pendingDrawTransition)
                     {
@@ -315,8 +344,10 @@ namespace KillingMahjong.UI
                         if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.gameObject.SetActive(true);
                         if (uiManager.AbilityUI != null) uiManager.AbilityUI.gameObject.SetActive(true);
                         if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.StartTurnTimer(15f);
+                        SetReadyBadgesSuppressed(false); // 手牌選択ではスマホは拡大しない
+                        ApplyPhaseReadyMarks(RoundStatus.HandSelection);
                     }
-                    
+
                     if (uiManager.WaitUI != null && Managers.BoardStateManager.Instance.CurrentWaitTiles != null && Managers.BoardStateManager.Instance.CurrentWaitTiles.Count > 0)
                     {
                         uiManager.WaitUI.gameObject.SetActive(true);
@@ -341,6 +372,9 @@ namespace KillingMahjong.UI
                     }
                     break;
                 case RoundStatus.TurnDecision:
+                    // ベットの「準備完了」はここで役目を終える。
+                    // PlayerInfoUI は非表示にするだけで箱は開いたままなので、明示的に閉じる
+                    HideReadyBoxes();
                     if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetPanelVisible(false);
                     if (uiManager.PlayerInfoUI != null)
                     {
@@ -350,6 +384,8 @@ namespace KillingMahjong.UI
                     if (uiManager.WaitUI != null) uiManager.WaitUI.gameObject.SetActive(false);
                     break;
                 case RoundStatus.Discard:
+                    // TurnDecision が保留で飛ばされた場合に備えて、ここでも閉じておく
+                    HideReadyBoxes();
                     if (uiManager.DialogueUI != null) uiManager.DialogueUI.SetBackgroundRaycast(true);
                     if (uiManager.HandUI != null) uiManager.HandUI.gameObject.SetActive(true);
                     if (uiManager.WallUI != null) uiManager.WallUI.gameObject.SetActive(true);
@@ -483,9 +519,13 @@ namespace KillingMahjong.UI
                 uiManager.PlayerInfoUI.StopTurnTimer();
                 if (uiManager.PlayerInfoUI.gameObject.activeInHierarchy)
                 {
-                    uiManager.PlayerInfoUI.StartCoroutine(uiManager.PlayerInfoUI.ResetZoomRoutine(0.3f));
+                    uiManager.PlayerInfoUI.StartCoroutine(
+                        uiManager.PlayerInfoUI.ResetZoomRoutine(BetZoomOutDuration));
                 }
             }
+
+            // スマホが縮んでから「準備完了」を出す。相手が賭けるまではここで待つことになる
+            StartCoroutine(ShowReadyBadgesAfterZoomOut());
 
             if (ReactionController.Instance != null)
             {
@@ -833,6 +873,143 @@ namespace KillingMahjong.UI
             }
         }
 
+        /// <summary>
+        /// "phase_completed_notice"：手牌選択・ベットを確定したプレイヤーの通知。
+        /// 確定した本人ぶんが1通ずつ届くので、届いた側にだけ印を立てて描き直す。
+        /// </summary>
+        public void HandlePhaseCompletedNotice(PhaseCompletedNoticeData data)
+        {
+            if (data == null || uiManager == null) return;
+            // チュートリアルはサーバーに繋がず待ち合わせも無いので、印は出さない
+            if (uiManager.IsTutorialMode) return;
+
+            var net = NetworkMessageHandler.Instance;
+            string localId = (net != null) ? net.LocalPlayerId : null;
+            if (string.IsNullOrEmpty(localId))
+            {
+                Debug.LogWarning("[GameUIPhaseController] phase_completed_notice: LocalPlayerId が未設定のため自他を判別できません。");
+                return;
+            }
+            bool isLocal = (data.player_id == localId);
+
+            // "bet" が仕様だが、phase_change 側の表記は "betting"。どちらで来ても受ける
+            switch (data.phase)
+            {
+                case "hand_selection":
+                case "handselection":
+                    if (isLocal) _handSelectionReadyLocal = true;
+                    else _handSelectionReadyEnemy = true;
+                    ApplyPhaseReadyMarks(RoundStatus.HandSelection);
+                    break;
+                case "bet":
+                case "betting":
+                    if (isLocal) _betReadyLocal = true;
+                    else _betReadyEnemy = true;
+                    ApplyPhaseReadyMarks(RoundStatus.Betting);
+                    break;
+                default:
+                    Debug.LogWarning($"[GameUIPhaseController] phase_completed_notice: 未知の phase '{data.phase}'");
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// 自分ぶんの「準備完了」を立てる。
+        /// 相手ぶんは phase_completed_notice でしか分からないが、自分ぶんは
+        /// 既存の受理メッセージ（hand_selection_accepted / bet_accepted）で分かる。
+        /// </summary>
+        public void MarkLocalPhaseReady(RoundStatus phase)
+        {
+            if (uiManager == null || uiManager.IsTutorialMode) return;
+
+            if (phase == RoundStatus.HandSelection) _handSelectionReadyLocal = true;
+            else if (phase == RoundStatus.Betting) _betReadyLocal = true;
+            else return;
+
+            ApplyPhaseReadyMarks(phase);
+        }
+
+        /// <summary>
+        /// 手牌選択・ベットの「準備完了」を描き直す。
+        /// 進行中のフェイズと引数が食い違うときは何もしない（保留から遅れて来た描画で
+        /// 別フェイズの箱を出さないため）。
+        /// </summary>
+        private void ApplyPhaseReadyMarks(RoundStatus phase)
+        {
+            if (uiManager == null || uiManager.IsTutorialMode) return;
+            if (uiManager.CurrentPhaseStatus != phase) return;
+
+            bool localReady;
+            bool enemyReady;
+            if (phase == RoundStatus.HandSelection)
+            {
+                localReady = _handSelectionReadyLocal;
+                enemyReady = _handSelectionReadyEnemy;
+            }
+            else if (phase == RoundStatus.Betting)
+            {
+                localReady = _betReadyLocal;
+                enemyReady = _betReadyEnemy;
+            }
+            else
+            {
+                return;
+            }
+
+            // ShowReadyBox はチェックを外すので、必ず先に呼んでから SetReadyCheck する
+            if (uiManager.PlayerInfoUI != null)
+            {
+                uiManager.PlayerInfoUI.ShowReadyBox(true);
+                uiManager.PlayerInfoUI.SetReadyCheck(localReady);
+            }
+            if (uiManager.EnemyInfoUI != null)
+            {
+                uiManager.EnemyInfoUI.ShowReadyBox(true);
+                uiManager.EnemyInfoUI.SetReadyCheck(enemyReady);
+            }
+        }
+
+        /// <summary>局の頭で印を落とす。手牌選択とベットは1局に1回ずつなのでここだけで足りる。</summary>
+        private void ResetPhaseReadyMarks()
+        {
+            _handSelectionReadyLocal = false;
+            _handSelectionReadyEnemy = false;
+            _betReadyLocal = false;
+            _betReadyEnemy = false;
+        }
+
+        /// <summary>「準備完了」の箱を両者ぶん隠す。</summary>
+        private void HideReadyBoxes()
+        {
+            if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.ShowReadyBox(false);
+            if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.ShowReadyBox(false);
+        }
+
+        /// <summary>ベット中のスマホ拡大に隠れる間だけ、両者の札を伏せる。</summary>
+        private void SetReadyBadgesSuppressed(bool suppressed)
+        {
+            if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.SetReadyBoxSuppressed(suppressed);
+            if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetReadyBoxSuppressed(suppressed);
+        }
+
+        /// <summary>
+        /// 賭け金を確定するとスマホが縮む。縮み終わってから札を出し直す。
+        /// 拡大中は札がスマホの裏（x197..602・全高・描画順が上）に入って見えないため。
+        /// </summary>
+        private IEnumerator ShowReadyBadgesAfterZoomOut()
+        {
+            // 縮み切るのと同じ長さだけ待つと同フレームで競合し、札が「縮んでいる途中の
+            // スマホ」に合わせて置かれる（実測で x552..656。正しくは 668..772）。
+            // ReadyBadge は表示した瞬間にしか位置を測らないので、必ず後から動く
+            yield return new WaitForSeconds(BetZoomOutDuration + 0.05f);
+
+            // 待っている間に相手も賭け終えてフェイズが進んでいたら、出さずに終わる
+            if (uiManager.CurrentPhaseStatus != RoundStatus.Betting) yield break;
+
+            SetReadyBadgesSuppressed(false);
+            ApplyPhaseReadyMarks(RoundStatus.Betting);
+        }
+
         private void StartNextRoundTransitionForDealing()
         {
             if (_isStartingNextRound) return;
@@ -852,6 +1029,29 @@ namespace KillingMahjong.UI
                 uiManager.ClearAllTiles();
                 StartCoroutine(DealingRoutine());
             }
+        }
+
+        /// <summary>
+        /// ロン演出に出す計算式を、サーバーの清算結果から組み立てる。
+        ///
+        /// **勝者の獲得額の式にしている。**演出に出している数字（score）が winner_gain なので、
+        /// 式と答えを揃えるため。GameRules の定義どおり:
+        ///
+        ///   勝者が得る額 = 勝者自身の賭け金 × 勝者の役の倍率
+        ///
+        /// 敗者の損失（賭け金 × 倍率 × 単騎倍率）は、勝者の獲得とは別計算なので式が違う。
+        /// 混ぜると答えが合わなくなるのでここでは扱わない。
+        ///
+        /// 内訳が無いときは null を返す。演出側は式を伏せて額だけ見せる。
+        /// </summary>
+        private static string BuildScoreFormula(LiquidationData liq)
+        {
+            if (liq == null) return null;
+            if (liq.winner_bet <= 0 || liq.multiplier <= 0f) return null;
+
+            // 1.0 は「1」、1.5 は「1.5」と出す。末尾の 0 を引きずらない
+            string mult = liq.multiplier.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+            return $"{liq.winner_bet} × {mult}";
         }
 
         private IEnumerator PlayRonWithPreDialogue(bool isLocalWin, List<int> winningHand, int ronTile, List<string> yaku, string formula, string rank)
@@ -880,16 +1080,17 @@ namespace KillingMahjong.UI
 
                 var liq = BoardStateManager.Instance.LastLiquidationData;
                 int score = liq != null ? liq.winner_gain : 0;
-                
+
                 int newLocalHp = Managers.BoardStateManager.Instance.LocalPlayerHp;
                 int newEnemyHp = Managers.BoardStateManager.Instance.EnemyPlayerHp;
                 int loserLoss = liq != null ? liq.loser_loss : 0;
                 int prevLocalHp = isLocalWin ? (newLocalHp - score) : (newLocalHp + loserLoss);
                 int prevEnemyHp = isLocalWin ? (newEnemyHp + loserLoss) : (newEnemyHp - score);
 
-                uiManager.RonAnimationUI.PlayRonSequence(winningHand, ronTile, yaku, formula, rank, score, isLocalWin, 
+                uiManager.RonAnimationUI.PlayRonSequence(winningHand, ronTile, yaku, formula, rank, score, isLocalWin,
                     uiManager.PlayerInfoUI, uiManager.EnemyInfoUI, prevLocalHp, newLocalHp, prevEnemyHp, newEnemyHp,
-                    () => OnRonAnimationComplete(isLocalWin));
+                    () => OnRonAnimationComplete(isLocalWin),
+                    BuildScoreFormula(liq));
             }
             yield break;
         }

@@ -567,25 +567,71 @@ namespace KillingMahjong.UI
             }
         }
 
+        private ReadyBadge readyBadge;
+
+        /// <summary>
+        /// 「準備完了」の札。シーンの ReadyBoxContainer を実行時に組み直して使う。
+        /// スマホ（zoomTarget）の真下に置く。
+        /// </summary>
+        private ReadyBadge EnsureReadyBadge()
+        {
+            if (readyBadge == null)
+            {
+                readyBadge = ReadyBadge.Attach(
+                    readyBoxContainer, readyCheckImage,
+                    zoomTarget as RectTransform, isSelf: true);
+            }
+            return readyBadge;
+        }
+
         public void ShowReadyBox(bool show)
         {
-            if (readyBoxContainer != null)
+            var badge = EnsureReadyBadge();
+            if (badge != null)
             {
-                readyBoxContainer.SetActive(show);
+                badge.SetVisible(show);
+                if (show) badge.SetReady(false); // 出した時点では未確定
+                return;
             }
-            // ボックス表示時はチェックを外す、非表示時も念のため外す
-            if (readyCheckImage != null)
-            {
-                readyCheckImage.SetActive(false);
-            }
+
+            // 札を作れなかったとき（参照未設定）は従来どおりの出し入れに落とす
+            if (readyBoxContainer != null) readyBoxContainer.SetActive(show);
+            if (readyCheckImage != null) readyCheckImage.SetActive(false);
         }
 
         public void SetReadyCheck(bool isReady)
         {
-            if (readyCheckImage != null)
+            var badge = EnsureReadyBadge();
+            if (badge != null)
             {
-                readyCheckImage.SetActive(isReady);
+                badge.SetReady(isReady);
+                return;
             }
+
+            if (readyCheckImage != null) readyCheckImage.SetActive(isReady);
+        }
+
+        /// <summary>ベット中のスマホ拡大に隠れるので、拡大している間だけ札を伏せる。</summary>
+        public void SetReadyBoxSuppressed(bool suppressed)
+        {
+            var badge = EnsureReadyBadge();
+            if (badge != null) badge.SetSuppressed(suppressed);
+        }
+
+        private TurnGlow turnGlow;
+
+        /// <summary>
+        /// 自分の手番のときスマホを青く脈打たせる。
+        /// スマホ（zoomTarget = HPPanel）は FloatingAnimator で揺れているので、
+        /// その中に影絵を敷いて揺れごと追従させる。
+        /// </summary>
+        public void SetTurnGlow(bool on)
+        {
+            if (turnGlow == null)
+            {
+                turnGlow = TurnGlow.Attach(zoomTarget as RectTransform, isSelf: true);
+            }
+            if (turnGlow != null) turnGlow.SetOn(on);
         }
     }
 }

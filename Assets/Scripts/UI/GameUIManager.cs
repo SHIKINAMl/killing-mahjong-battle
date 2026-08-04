@@ -433,11 +433,27 @@ namespace KillingMahjong.UI
 
         private void UpdateTurnIndicatorVisibility()
         {
+            // 打牌フェイズで、かつ演出中（先行・後攻演出など）ではない時だけ表示する
+            bool shouldShow = (currentPhaseStatus == RoundStatus.Discard) && !IsTransitioning;
+
             if (turnIndicatorUI != null)
             {
-                // 打牌フェイズで、かつ演出中（先行・後攻演出など）ではない時だけ表示する
-                bool shouldShow = (currentPhaseStatus == RoundStatus.Discard) && !IsTransitioning;
                 turnIndicatorUI.SetVisible(shouldShow);
+            }
+
+            // 文字だけでは「YOUR / ENEMY」を読むまで分からないので、
+            // 手番の側の体力表示（自分＝スマホ／相手＝点滴）も光らせて位置で示す
+            bool isLocalTurn = KillingMahjong.Managers.BoardStateManager.Instance != null
+                            && KillingMahjong.Managers.BoardStateManager.Instance.IsLocalTurn;
+            if (playerInfoUI != null) playerInfoUI.SetTurnGlow(shouldShow && isLocalTurn);
+            if (enemyInfoUI != null) enemyInfoUI.SetTurnGlow(shouldShow && !isLocalTurn);
+
+            // 体力表示の光だけでは気づきにくい、という指摘への対応。
+            // 画面のふちを光らせて、盤面のどこを見ていても視界に入るようにする。
+            // **自分の手番のときだけ。**相手の番まで光らせると常時点灯になり意味が薄れる
+            if (!IsTutorialMode)
+            {
+                TurnVignette.Ensure().SetOn(shouldShow && isLocalTurn, isSelf: true);
             }
         }
 
@@ -806,6 +822,11 @@ namespace KillingMahjong.UI
                     playerInfoUI.StopTurnTimer();
                 }
             }
+
+            // 手番の側の体力表示を光らせ直す。
+            // UpdateTurnIndicatorVisibility はフェイズ・演出の切り替えでしか呼ばれないので、
+            // 打牌フェイズ中の手番交代はここで拾う
+            UpdateTurnIndicatorVisibility();
         }
 
         /// <summary>
