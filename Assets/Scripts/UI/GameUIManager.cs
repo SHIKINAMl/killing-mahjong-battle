@@ -442,19 +442,13 @@ namespace KillingMahjong.UI
             }
 
             // 文字だけでは「YOUR / ENEMY」を読むまで分からないので、
-            // 手番の側の体力表示（自分＝スマホ／相手＝点滴）も光らせて位置で示す
+            // 手番の側の体力表示（自分＝スマホ／相手＝点滴）も光らせて位置で示す。
+            // 相手の番は、あわせて女の子の立ち絵も赤く光る（EnemyInfoUI.SetTurnGlow の中）。
+            // 以前あった画面ふちの枠（TurnVignette）は、盤面が狭く見えるのでやめた
             bool isLocalTurn = KillingMahjong.Managers.BoardStateManager.Instance != null
                             && KillingMahjong.Managers.BoardStateManager.Instance.IsLocalTurn;
             if (playerInfoUI != null) playerInfoUI.SetTurnGlow(shouldShow && isLocalTurn);
             if (enemyInfoUI != null) enemyInfoUI.SetTurnGlow(shouldShow && !isLocalTurn);
-
-            // 体力表示の光だけでは気づきにくい、という指摘への対応。
-            // 画面のふちを光らせて、盤面のどこを見ていても視界に入るようにする。
-            // **自分の手番のときだけ。**相手の番まで光らせると常時点灯になり意味が薄れる
-            if (!IsTutorialMode)
-            {
-                TurnVignette.Ensure().SetOn(shouldShow && isLocalTurn, isSelf: true);
-            }
         }
 
         // --- Entry points from external classes / old API ---

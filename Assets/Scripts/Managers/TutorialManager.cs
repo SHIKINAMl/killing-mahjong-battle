@@ -1333,9 +1333,6 @@ namespace KillingMahjong.Managers
             {
                 case TutorialSpeaker.System:
                     return line.text;
-                case TutorialSpeaker.Senpai:
-                    // TODO: 立ち絵の切り替え。現状はテキストで話者を明示するのみ。
-                    return $"あずにゃん先輩\n「{line.text}」";
                 default:
                     return line.text.Contains("「") ? line.text : $"「{line.text}」";
             }

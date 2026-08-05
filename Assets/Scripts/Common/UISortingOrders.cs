@@ -135,10 +135,13 @@ namespace KillingMahjong.Common
         /// <summary>YakuSelectionUI: 役選択パネル（モーダルなので待ち牌表示より手前）</summary>
         public const int YakuSelection = 88;
 
-        /// <summary>TurnVignette: 自分の手番を示す画面ふちの光。
-        /// **瀕死の赤ビネット(91)より必ず奥に置くこと。**
-        /// 危険の表示が手番の表示に負けてはいけない</summary>
-        public const int TurnVignette = 89;
+        /// <summary>HpDamageGlitch: 体力が減った瞬間のノイズ。
+        /// 元は手番の画面ふち（TurnVignette）が使っていた空き番。
+        ///
+        /// **ロン演出(90)や瀕死ビネット(91)より奥にいる。**
+        /// ノイズが撮っているのは合成後の画面なので、それらも帯の中には写っている。
+        /// 手前に出すと決着の演出そのものを覆ってしまうため、あえて奥に置いた</summary>
+        public const int DamageGlitch = 89;
 
         // ---- 90 - 99 全画面演出・システム最前面 ----
 

@@ -30,9 +30,54 @@ namespace KillingMahjong.UI
             logPanel.SetActive(false);
         }
 
+        // セリフの影の設定。対局シーンが2つ（UIテストシーン / OpeningScene）あるので
+        // SerializeField にせずコードに持つ。シーンに焼くと片方だけ古い値になる。
+        private const float UnderlayOffsetX = 1f;
+        private const float UnderlayOffsetY = -1f;
+        private const float UnderlayDilate = 0.25f;
+        private const float UnderlaySoftness = 0f;
+
+        private bool shadowApplied = false;
+
+        /// <summary>
+        /// セリフを背景から浮かせて、吹き出しと重なっても読めるようにする。
+        ///
+        /// 使えるのは TMP の Underlay だけ。ほかの2つは実測で駄目だった:
+        /// ・`UnityEngine.UI.Shadow` / `Outline` は TMP が無視する（付けても画素が1つも変わらない）
+        /// ・SDF の輪郭（_OutlineWidth）は、このフォントアセットが pointSize 90 / padding 9 で
+        ///   焼かれているため fontSize 15 では padding 全体でも 1.5px しかない。0.2 では黒画素が
+        ///   1つも出ず、見える太さ（0.5〜）にすると先に字の面が食われて潰れる。_FaceDilate で
+        ///   面を太らせて補正しても駄目だった
+        ///
+        /// Start() ではなく ShowText() から呼ぶ。DialogueUI は非アクティブで置かれていて
+        /// SetActive(true) の直後に ShowText() が来るため、Start() は**まだ走っていない**。
+        ///
+        /// マテリアルを触ると TMP がインスタンスを作るので、一度当てたら使い回す。
+        /// </summary>
+        private void ApplyShadow()
+        {
+            if (shadowApplied || dialogueText == null) return;
+            shadowApplied = true;
+
+            var mat = dialogueText.fontMaterial;
+            if (mat == null) return;
+
+            // キーワードを立てないと、値は入っているのに影が一切描かれない。
+            mat.EnableKeyword("UNDERLAY_ON");
+            mat.SetColor("_UnderlayColor", Color.black);
+            mat.SetFloat("_UnderlayOffsetX", UnderlayOffsetX);
+            mat.SetFloat("_UnderlayOffsetY", UnderlayOffsetY);
+            mat.SetFloat("_UnderlayDilate", UnderlayDilate);
+            mat.SetFloat("_UnderlaySoftness", UnderlaySoftness);
+
+            dialogueText.UpdateMeshPadding();
+        }
+
         public void ShowText(string text)
         {
             StopAllCoroutines(); // 既存の文字送り演出などがあれば即座にキャンセルする
+
+            ApplyShadow();
 
             if (dialogueText != null)
             {

@@ -206,6 +206,11 @@ namespace KillingMahjong.UI
         private void Start()
         {
             InitializeOriginalTransform();
+
+            // **ここで先に作っておく。** ダメージを受けてから作ったのでは、
+            // 混ぜるための「過去の画面」が1枚も溜まっていない。
+            // 作った時点から保存が始まるので、最初の一撃から効く
+            HpDamageGlitch.Ensure();
         }
 
         public void StartTurnTimer(float duration)
@@ -279,6 +284,12 @@ namespace KillingMahjong.UI
             if (!isFirstSetup && diff != 0)
             {
                 HpPopup.Report(diff, currentHp, maxHp);
+            }
+
+            // 減ったときだけノイズを走らせる。増えた（勝った）ときは出さない
+            if (!isFirstSetup && diff < 0)
+            {
+                HpDamageGlitch.Play(diff, maxHp);
             }
 
             // --- 瀕死ハートビートエフェクトの更新 ---

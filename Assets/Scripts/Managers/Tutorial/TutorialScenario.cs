@@ -13,12 +13,17 @@ namespace KillingMahjong.Managers
         Draw
     }
 
-    /// <summary>セリフの話者。立ち絵の出し分けに使う。</summary>
+    /// <summary>
+    /// セリフの話者。立ち絵の出し分けに使う。
+    ///
+    /// **1 は欠番。** 以前あった「あずにゃん先輩」の跡。
+    /// TutorialScenario.asset には地の文が `speaker: 2` で保存済みなので、
+    /// System を 1 に詰めると保存された行が別の話者になってしまう。
+    /// </summary>
     public enum TutorialSpeaker
     {
-        Enemy,   // 対戦相手の女の子
-        Senpai,  // あずにゃん先輩
-        System   // 地の文・ルール説明
+        Enemy = 0,   // 対戦相手の女の子
+        System = 2   // 地の文・ルール説明
     }
 
     [Serializable]
@@ -423,41 +428,62 @@ namespace KillingMahjong.Managers
                 rankText = "跳満",
                 // 清一色6飜=跳満なので倍率1.5。自分 +2000×1.5=3000 / 相手 -3000
 
+                betPromptText = "{0}円。それがあなたの言い値ね。",
+
                 introLines = new List<TutorialLine>
                 {
-                    new TutorialLine("ふふっ、無事に契約完了ね。"),
-                    new TutorialLine("これでお前は私のモノ……と言いたいところだけど、まずはその腕前を見せてもらうわ。"),
-                    new TutorialLine("デス麻雀のルール、ちゃんと覚えてる？"),
-                    new TutorialLine("まずは山牌から好きな13枚を選んで、手牌を作ってみなさい。"),
+                    new TutorialLine("契約は済んだわね。"),
+                    new TutorialLine("その契約書、まだ乾いていないでしょう。"),
+                    new TutorialLine("……インク？ 違うわ。あなたの色よ。"),
+                    new TutorialLine("名前を書いた指、まだ痛む？"),
+                    new TutorialLine("ねえ、その血。あなたは \"払った\" つもり？"),
+                    new TutorialLine("買い物なら、対価。詫びなら、誠意。契約なら、証。"),
+                    new TutorialLine("どれも、自分で差し出したものよね。"),
+                    new TutorialLine("それとも \"抜かれた\" と思っているのかしら。"),
+                    new TutorialLine("献血なら、腕を出しただけ。虫になら、気づかぬうちに。"),
+                    new TutorialLine("悪魔になら……断れなかったから。"),
+                    new TutorialLine("ふふ。どちらでも、減った量は同じよ。"),
+                    new TutorialLine("違うのは、誰が決めたかだけ。"),
+                    new TutorialLine("さあ、始めましょう。"),
+                    new TutorialLine("山牌から13枚選びなさい。それがあなたの命の値段になるわ。"),
                 },
                 onHandFilledLines = new List<TutorialLine>
                 {
-                    new TutorialLine("13枚そろったわね。……でも、その手じゃ満貫にも届かないわ。"),
-                    new TutorialLine("今回は自動で選んであげるわ。"),
+                    new TutorialLine("13枚ね。……その手、満貫にも届いていないわ。"),
+                    new TutorialLine("安い手で座るのは許さない。死ぬ値打ちがないもの。"),
+                    new TutorialLine("今回は組んであげる。『自動』を押しなさい。"),
                 },
                 onSelfManganLines = new List<TutorialLine>
                 {
-                    new TutorialLine("……あら。13枚そろえて、しかも満貫手じゃない。"),
-                    new TutorialLine("ふーん、麻雀は知っているのね。少し見直したわ。"),
-                    new TutorialLine("その手なら文句なしよ。『決定』を押して始めましょう。"),
+                    new TutorialLine("……あら。ちゃんと満貫に届いてる。"),
+                    new TutorialLine("麻雀を知っている手ね。少し楽しくなってきたわ。"),
+                    new TutorialLine("文句はないわ。『決定』を押しなさい。"),
                 },
                 beforeBetLines = new List<TutorialLine>
                 {
-                    new TutorialLine("手牌が決まったなら、次は賭け金よ。"),
-                    new TutorialLine("決めた分の血は、その場で払うの。だから決めた瞬間に体力が減るわ。"),
-                    new TutorialLine("勝てば役の倍率をかけて返ってくる。負ければ払った上にもっと取られる。"),
+                    new TutorialLine("次は賭け金よ。"),
+                    new TutorialLine("言っておくけど、決めた分の血はその場で抜かれるわ。"),
+                    new TutorialLine("勝ってから払うんじゃない。賭けた瞬間に、もう減っているの。"),
+                    new TutorialLine("体力ゲージ、決めた瞬間に減るのを見ていなさい。"),
+                    new TutorialLine("戻ってくるかどうかは、まだ何も決まっていないけれど。"),
+                    new TutorialLine("勝てば役の倍率をかけて返る。負ければ、払った上にもっと持っていかれる。"),
+                    new TutorialLine("いくら出す？ 自分で決めていいのよ。"),
                 },
                 onBattleStartLines = new List<TutorialLine>
                 {
-                    new TutorialLine("いよいよ対局スタートよ。"),
-                    new TutorialLine("あなたの番ね。まずは好きな牌をタップして捨ててみて。"),
+                    new TutorialLine("対局開始よ。"),
+                    new TutorialLine("あなたの番。好きな牌を捨ててごらんなさい。"),
+                    new TutorialLine("一枚捨てるたびに、どちらかが近づくの。"),
                 },
                 outroLines = new List<TutorialLine>
                 {
-                    new TutorialLine("ロン！あなたの上がりね。"),
-                    new TutorialLine("獲得金は『自分が賭けた額 × 役の倍率』。跳満は1.5倍よ。"),
-                    new TutorialLine("負けた方は『自分が賭けた額 × 相手の役の倍率』を失うの。"),
-                    new TutorialLine("大きく賭ければ大きく取れる。そして大きく失う。これが基本ルールよ。"),
+                    new TutorialLine("ロン。あなたの上がりね。"),
+                    new TutorialLine("獲得は『自分が賭けた額 × 役の倍率』。跳満なら1.5倍。"),
+                    new TutorialLine("負けたほうは『自分が賭けた額 × 相手の倍率』を失う。"),
+                    new TutorialLine("……それでね。満貫は、1倍なの。"),
+                    new TutorialLine("勝っても、払った分が戻ってくるだけ。"),
+                    new TutorialLine("気づいた？ 満貫で勝っても、あなたは1滴も増えていないの。"),
+                    new TutorialLine("大きく賭けて、大きく獲る。それしか増える道はないわ。"),
                 },
             });
 
@@ -487,23 +513,28 @@ namespace KillingMahjong.Managers
 
                 introLines = new List<TutorialLine>
                 {
-                    new TutorialLine("次は流局について教えるわ。"),
-                    new TutorialLine("とりあえず『自動』ボタン（オート満貫）を押してね。"),
+                    new TutorialLine("次は、誰も死なない局を見せてあげる。"),
+                    new TutorialLine("『自動』を押しなさい。"),
                 },
                 onBattleStartLines = new List<TutorialLine>
                 {
-                    new TutorialLine("しばらく黙って見ていなさい。勝手に打ち進めるわ。"),
+                    new TutorialLine("しばらく黙って見ていなさい。勝手に進めるわ。"),
                 },
                 beforeManualDiscardLines = new List<TutorialLine>
                 {
-                    new TutorialLine("お互い17牌捨てたら流局して、次の局に移るわ。"),
-                    new TutorialLine("あと2回よ。好きな牌を捨ててみなさい。"),
+                    new TutorialLine("お互い17牌捨てたら、その局は流れる。"),
+                    new TutorialLine("あと2回よ。好きなのを捨てなさい。"),
                 },
                 outroLines = new List<TutorialLine>
                 {
-                    new TutorialLine("流局よ。誰も上がらずに牌が尽きると流局になるわ。"),
-                    new TutorialLine("払った血は誰のものにもならない。賭け金は決着していないでしょう？"),
-                    new TutorialLine("だから次の局に積み増されるの。積まれた分だけ、次の決着が大きくなるわ。"),
+                    new TutorialLine("流局。誰も上がらないまま牌が尽きたわ。"),
+                    new TutorialLine("誰も死ななかったわね。"),
+                    new TutorialLine("それでも、抜かれた血は卓の上にあるのよ。"),
+                    new TutorialLine("決着していないんだから、賭け金は誰のものにもならない。"),
+                    new TutorialLine("だから次の局に積まれるの。"),
+                    new TutorialLine("……いい？ 延ばした分だけ、次に決まるときが重くなるのよ。"),
+                    new TutorialLine("流局は、助かったんじゃないわ。"),
+                    new TutorialLine("支払いを、先に延ばしただけ。"),
                 },
             });
 
@@ -523,7 +554,7 @@ namespace KillingMahjong.Managers
                 betAmount = 1000,
                 enemyDiscardBaseIds = new List<int> { d1, d2, d3, d4, d5 },
                 lockedTileBaseId = TutorialTiles.Ton, // ⑭ 嘘の待ち牌。触れないようにする
-                lockedTileMessage = "その牌は出しちゃダメって言ったでしょ！",
+                lockedTileMessage = "その牌は出しちゃダメって言ったでしょう！",
 
                 outcome = TutorialOutcome.EnemyRon,
                 enemyRonMeldBaseIds = ankoMelds,
@@ -538,26 +569,35 @@ namespace KillingMahjong.Managers
 
                 introLines = new List<TutorialLine>
                 {
-                    new TutorialLine("次の局よ。とりあえず『自動』ボタンを押してね。"),
+                    new TutorialLine("次の局よ。『自動』を押して。"),
                 },
                 inheritedBetLines = new List<TutorialLine>
                 {
-                    new TutorialLine("前の局は流局だったわね。賭け金は決着していないから、そのまま積まれているの。"),
-                    new TutorialLine("だから今回は{0}円が自動で賭けられて、場には合計{1}円。改めて賭ける必要はないわ。"),
-                    new TutorialLine("積まれた分だけ、次に上がった方の獲得金も大きくなるのよ。"),
+                    new TutorialLine("前の局は流れたわね。賭けたぶんは、まだ卓の上にあるの。"),
+                    new TutorialLine("今回は{0}円が自動で積まれて、場には合計{1}円。改めて賭ける必要はないわ。"),
+                    new TutorialLine("誰も勝っていないのに、卓の上の血だけが増えていくのよ。"),
+                    new TutorialLine("積まれた分だけ、次に上がったほうの取り分が大きくなる。"),
                 },
                 onBattleStartLines = new List<TutorialLine>
                 {
-                    new TutorialLine("フフフ…私、ちょっとビビっちゃったかも。"),
-                    new TutorialLine("このまま延々と流局を続けようかしら。"),
-                    new TutorialLine("そうそう、私の待ち牌は東よ。東だけは絶対に出さないでね。"),
+                    new TutorialLine("……ふふ。正直に言うとね、ちょっと怖いの。"),
+                    new TutorialLine("このまま流局を続けていたいくらい。"),
+                    new TutorialLine("だから教えてあげる。私の待ちは東よ。"),
+                    new TutorialLine("東だけは絶対に出さないでね。"),
+                    new TutorialLine("……ほら。ちゃんと目を見て言ったでしょう？"),
                 },
                 outroLines = new List<TutorialLine>
                 {
-                    new TutorialLine("ロン！ふふっ、騙されたわね！"),
-                    new TutorialLine("待ち牌が東だなんて、一言も本当だとは言ってないわ。"),
-                    new TutorialLine("単騎待ちは、たった1枚の牌を待つ代わりに――相手が失う額が2倍になるの。"),
-                    new TutorialLine("役満は4倍。その2倍だから、積まれた賭け金の8倍よ。持っていきなさい！"),
+                    new TutorialLine("ロン。"),
+                    new TutorialLine("……ふふっ、信じたの？"),
+                    new TutorialLine("待ちが東だなんて、本当だとは一度も言っていないわ。"),
+                    new TutorialLine("さっき言ったわよね。自分で決めて払った、って。"),
+                    new TutorialLine("違うわ。決めさせられていたの。"),
+                    new TutorialLine("単騎待ちは、たった1枚を待つ代わりに――相手の失う額が2倍になるの。"),
+                    new TutorialLine("役満は4倍。その2倍だから、積まれた血の8倍ね。"),
+                    new TutorialLine("全部いただくわ。"),
+                    new TutorialLine("あら、契約書に垂れちゃった。"),
+                    new TutorialLine("署名の隣に、点がひとつ増えただけね。"),
                 },
             });
 
@@ -596,21 +636,20 @@ namespace KillingMahjong.Managers
 
                 introLines = new List<TutorialLine>
                 {
-                    new TutorialLine("次は能力の使用についての説明よ。"),
-                    new TutorialLine("まずは『自動』ボタンで手牌を作りなさい。"),
+                    new TutorialLine("次は能力の話よ。『自動』で手牌を作りなさい。"),
                 },
 
                 // 能力は手牌フェイズでしか使えないので、手牌を決めたあと・賭け金の前に実演する
                 abilityIntroLines = new List<TutorialLine>
                 {
-                    new TutorialLine("手牌が決まったわね。ここからが本番よ。"),
-                    new TutorialLine("能力は、この手牌フェイズの間だけ使えるの。打牌が始まったらもう使えないわ。"),
-                    new TutorialLine("ふふっ、私の能力を見せてあげるわ！"),
+                    new TutorialLine("手牌が決まったわね。ここからが本番。"),
+                    new TutorialLine("能力が使えるのはこの手牌フェイズの間だけ。打牌が始まったら、もう使えないわ。"),
+                    new TutorialLine("見せてあげる。よく見ていなさい。"),
                 },
 
                 onBattleStartLines = new List<TutorialLine>
                 {
-                    new TutorialLine("さあ、打牌を始めましょう。"),
+                    new TutorialLine("さあ、打ちましょう。"),
                 },
 
                 // 手順⑱: 3つの能力を順に実演する
@@ -618,18 +657,18 @@ namespace KillingMahjong.Managers
                 {
                     new TutorialAbilityShowcase(
                         SkillNames.Perspective,
-                        new TutorialLine("まずは『透視』。相手の牌をランダムに3枚のぞけるの。"),
-                        new TutorialLine("ほら、あなたの牌に印がついたでしょう。その3枚は私に丸見えよ。")),
+                        new TutorialLine("まずは『透視』。あなたの牌を3枚、勝手に覗くの。"),
+                        new TutorialLine("ほら、印がついたでしょう。その3枚は私に丸見えよ。")),
 
                     new TutorialAbilityShowcase(
                         SkillNames.Mulligan,
-                        new TutorialLine("次は『牌交換』。いらない牌を山の牌と入れ替えるのよ。"),
-                        new TutorialLine("これで私の手はぐっと良くなったわ。")),
+                        new TutorialLine("次は『牌交換』。要らない牌を山と入れ替えるわ。"),
+                        new TutorialLine("これで私の手はずいぶん良くなった。")),
 
                     new TutorialAbilityShowcase(
                         SkillNames.BoostHand,
-                        new TutorialLine("最後は『役強化』。指定した役の翻数を+1するの。"),
-                        new TutorialLine("私は『清一色』を選んだわ。同じ手でも打点が跳ね上がる。えげつないでしょう？"))
+                        new TutorialLine("最後は『役強化』。決めた役の翻数を+1するの。"),
+                        new TutorialLine("『清一色』を選んだわ。同じ手でも打点が跳ね上がる。"))
                     {
                         boostYakuName = "清一色",
                         boostHan = 1,
@@ -639,33 +678,39 @@ namespace KillingMahjong.Managers
                 // 手順⑲: 能力そのものの説明
                 abilityExplainLines = new List<TutorialLine>
                 {
-                    new TutorialLine("これが能力よ。使えば対局を一気に有利にできるの。"),
-                    new TutorialLine("能力の発動には、あなたの血を支払うことになるわ。"),
-                    new TutorialLine("血は体力そのもの。使いすぎれば自分の首を絞めることになるわね。"),
-                    new TutorialLine("使えるのは手牌フェイズの間だけ。打牌が始まったら発動できないから、使うなら今のうちよ。"),
-                    new TutorialLine("能力は画面の『能力』ボタンから確認できるわ。", TutorialSpeaker.System),
+                    new TutorialLine("これが能力よ。使えば対局を一気にひっくり返せる。"),
+                    new TutorialLine("代償はあなたの血。体力そのものよ。"),
+                    new TutorialLine("私のゲージ、見てごらんなさい。"),
+                    new TutorialLine("……さっきの半分も残っていないでしょう？"),
+                    new TutorialLine("なあに、その顔。"),
+                    new TutorialLine("強くなるのに何も払わない方法があると思った？"),
+                    new TutorialLine("使えるのは手牌フェイズの間だけ。使うなら今よ。"),
+                    new TutorialLine("能力は画面の『能力』ボタンから確認できるわ。"),
                 },
 
                 // 手順⑳: 能力強化の説明 → 役一覧へ誘導
                 enhanceExplainLines = new List<TutorialLine>
                 {
-                    new TutorialLine("それと、能力は強化することもできるの。"),
-                    new TutorialLine("『役強化』で積み上げた翻数は、その役にずっと乗り続けるのよ。"),
-                    new TutorialLine("どの役がどれだけ強化されているかは、役一覧から確認できるわ。"),
+                    new TutorialLine("それと、能力そのものを強化することもできるの。"),
+                    new TutorialLine("『役強化』で積んだ翻数は、その役にずっと乗り続けるわ。"),
+                    new TutorialLine("どの役がどれだけ育っているかは、役一覧で見なさい。"),
                 },
                 guideToYakuList = true,
                 onYakuListOpenedLines = new List<TutorialLine>
                 {
-                    new TutorialLine("これが役一覧よ。役ごとの翻数と、強化された分が並んでいるわ。", TutorialSpeaker.System),
-                    new TutorialLine("さっき私が強化した『清一色』も、ちゃんと乗っているでしょう？"),
-                    new TutorialLine("狙う役を決めるときは、ここを見て考えることね。"),
+                    new TutorialLine("これが役一覧よ。役ごとの翻数と、強化された分が並んでいるわ。"),
+                    new TutorialLine("さっき私が強化した『清一色』も乗っているでしょう？"),
+                    new TutorialLine("狙う役を決めるときは、ここを見ること。"),
                 },
 
                 outroLines = new List<TutorialLine>
                 {
-                    new TutorialLine("……ロン？ うそ、能力を使ったのにこっちが振り込むなんて。"),
-                    new TutorialLine("能力を使っても、放銃してしまえば意味がないのよ。血だけ払って損しただけね。"),
-                    new TutorialLine("能力の説明は以上よ。次で最後にしましょう。"),
+                    new TutorialLine("……ロン？"),
+                    new TutorialLine("うそ。あれだけ払って、こっちが振り込むの？"),
+                    new TutorialLine("能力を使っても、放銃すれば意味がない。血だけ捨てたのと同じね。"),
+                    new TutorialLine("……ねえ、気づいてる？"),
+                    new TutorialLine("私のゲージ、あなたより短いのよ。"),
+                    new TutorialLine("……次で最後にしましょう。"),
                 },
             });
 
@@ -702,29 +747,37 @@ namespace KillingMahjong.Managers
 
                 introLines = new List<TutorialLine>
                 {
-                    new TutorialLine("さあ、これが最後の対局よ！"),
-                    new TutorialLine("最後は自分で決めなさい。自分の手で組んで『決定』を押すの。"),
-                    new TutorialLine("……どうしても組めないなら『自動』に頼ってもいいわ。好きにしなさい。"),
+                    new TutorialLine("最後の局よ。"),
+                    new TutorialLine("今度は自分で組みなさい。13枚、自分の手で選んで『決定』を押すの。"),
+                    new TutorialLine("……どうしても組めないなら『自動』に頼ってもいいわ。好きになさい。"),
                 },
                 // 第4局は自分ロンで決着しているので流局の持ち越しは起きない。
                 // inheritedBetLines は使われないため置いていない。
                 onHandFilledLines = new List<TutorialLine>
                 {
                     new TutorialLine("13枚そろったわね。その手で本当にいいの？"),
-                    new TutorialLine("決めたなら『決定』を。迷うなら『自動』を。どちらでも構わないわ。"),
+                    new TutorialLine("決めたなら『決定』を。迷うなら『自動』を。"),
                 },
                 // 決定して打牌フェイズに入った直後。命の賭け合いだと分からせる
                 onBattleStartLines = new List<TutorialLine>
                 {
-                    new TutorialLine("……手が決まったわね。もう引き返せないわ。"),
-                    new TutorialLine("ここから先は、賭けているのはお金じゃない。あなたの血よ。"),
-                    new TutorialLine("一枚打つたびに、どちらかの命が削れていく。それがデス麻雀。"),
-                    new TutorialLine("さあ、始めましょう。あなたの番よ――震える手で、選びなさい。"),
+                    new TutorialLine("手が決まった。もう引き返せないわ。"),
+                    new TutorialLine("ここから先に賭かっているのは、お金じゃない。"),
+                    new TutorialLine("一枚打つたびに、どちらかが減るのよ。"),
+                    new TutorialLine("……ねえ。"),
+                    new TutorialLine("ひとつだけ教えてあげる。"),
+                    new TutorialLine("私も、あなたと同じだけ抜かれているのよ。"),
+                    new TutorialLine("さあ、始めましょう。震える手で選びなさい。"),
                 },
                 outroLines = new List<TutorialLine>
                 {
-                    new TutorialLine("……九蓮宝燈？しかも九面待ちですって……！？"),
-                    new TutorialLine("きゃあああ！やられたわ……！"),
+                    new TutorialLine("……九蓮宝燈。"),
+                    new TutorialLine("しかも九面待ちですって……！？"),
+                    new TutorialLine("きゃあああ……！"),
+                    new TutorialLine("……ねえ。"),
+                    new TutorialLine("この血は、\"払った\" のかしら。"),
+                    new TutorialLine("それとも、\"抜かれた\" のかしら……"),
+                    new TutorialLine("決めるのは……あなたなのね。"),
                 },
             });
 

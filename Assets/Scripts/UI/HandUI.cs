@@ -175,8 +175,9 @@ namespace KillingMahjong.UI
         {
             if (!HideHandUntilPeek) return false;
             if (phaseStatus != RoundStatus.Discard) return false;
-            // チュートリアルは台本どおりに手牌を見せる場面があるので触らない
-            if (gameUIManager != null && gameUIManager.IsTutorialMode) return false;
+            // チュートリアルも本編と同じ挙動にする。
+            // 台本が手牌を見せるのは手牌フェイズ（能力の実演・透視の印）だけで、
+            // 打牌フェイズで手牌を指す誘導は無いため、ここで隠しても台本は壊れない
             return true;
         }
 

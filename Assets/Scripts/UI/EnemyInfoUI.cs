@@ -462,11 +462,15 @@ namespace KillingMahjong.UI
         }
 
         private TurnGlow turnGlow;
+        private TurnCharacterGlow characterGlow;
 
         /// <summary>
         /// 相手の手番のとき点滴を赤く脈打たせる。
         /// 血袋も FloatingAnimator で揺れているので、EnemyPanel の中に影絵を敷いて
         /// 揺れごと追従させる。血袋の形は絵そのものなので矩形の実測は要らない。
+        ///
+        /// 女の子（立ち絵）も同時に光らせる。点滴は画面の隅にあって気づきにくいため。
+        /// 以前は画面のふちに枠を出していたが、盤面が狭く見えるのでこちらへ替えた。
         /// </summary>
         public void SetTurnGlow(bool on)
         {
@@ -477,6 +481,12 @@ namespace KillingMahjong.UI
                 turnGlow = TurnGlow.Attach(panel, isSelf: false);
             }
             if (turnGlow != null) turnGlow.SetOn(on);
+
+            if (characterGlow == null)
+            {
+                characterGlow = TurnCharacterGlow.Attach(characterRenderer);
+            }
+            if (characterGlow != null) characterGlow.SetOn(on);
         }
 
         public void SetCharacterSprite(Sprite sprite)
