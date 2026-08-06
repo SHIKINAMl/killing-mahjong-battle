@@ -29,17 +29,57 @@ namespace KillingMahjong.UI
             if (meshRenderer == null) meshRenderer = GetComponent<MeshRenderer>();
         }
 
+        // ---- 牌の影（調整値。シーンではなくここを触る）----
+        //
+        // 牌が並ぶと境目が分からなくなるので、セリフに付けた影と同じ考え方で
+        // 一枚ずつ落とす。**牌のプレハブは複数あり、対局シーンも2つある**ので
+        // プレハブに直接付けず、実行時に足す。
+
+        /// <summary>影を付けるか。切りたくなったらここを false に</summary>
+        private const bool AddTileShadow = true;
+
+        /// <summary>影のずれ幅。牌の大きさに対する割合ではなく、牌のローカル座標。
+        /// 牌は場所によって縮尺が違う（河 0.8 / 手牌 等倍）ので、
+        /// 縮尺に応じて影も一緒に縮む</summary>
+        private static readonly Vector2 TileShadowDistance = new Vector2(3f, -3f);
+
+        /// <summary>影の色。真っ黒だと牌の間が線で埋まって重くなる</summary>
+        private static readonly Color TileShadowColor = new Color(0f, 0f, 0f, 0.55f);
+
         private void Awake()
         {
             // Runtime fallback if not assigned in Inspector
             if (spriteRenderer == null) spriteRenderer = GetComponent<SpriteRenderer>();
             if (uiImage == null) uiImage = GetComponent<Image>();
             if (meshRenderer == null) meshRenderer = GetComponent<MeshRenderer>();
-            
+
             // デフォルトでアウトラインはオフにする（Prefab設定漏れ対策）
             SetFuritenHighlight(false);
             SetHoverHighlight(false);
             SetExposed(false);
+
+            EnsureShadow();
+        }
+
+        /// <summary>
+        /// 牌の下に影を敷いて、隣の牌との境目を出す。
+        ///
+        /// `UnityEngine.UI.Shadow` は牌の絵をそのまま複製してずらすので、
+        /// 牌の形（角の丸みなど）に沿った影になる。矩形を別に用意する必要はない。
+        ///
+        /// **SpriteRenderer 版の牌には付かない。** Graphic の効果なので
+        /// Canvas 配下でないと何も起きない（DoraShine で同じ罠を踏んでいる）。
+        /// </summary>
+        private void EnsureShadow()
+        {
+            if (!AddTileShadow || uiImage == null) return;
+            if (GetComponentInParent<Canvas>() == null) return;
+            if (uiImage.GetComponent<Shadow>() != null) return;
+
+            var shadow = uiImage.gameObject.AddComponent<Shadow>();
+            shadow.effectColor = TileShadowColor;
+            shadow.effectDistance = TileShadowDistance;
+            shadow.useGraphicAlpha = true;
         }
 
         private int _currentId = -1;

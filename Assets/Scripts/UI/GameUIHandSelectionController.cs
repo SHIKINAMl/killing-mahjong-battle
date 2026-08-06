@@ -16,6 +16,15 @@ namespace KillingMahjong.UI
         private List<int> _pendingHandIndexes;
         private List<int> _pendingHandTiles;
 
+        /// <summary>
+        /// もう取り下げられないか。**相手を待っている間は取り下げてよい**（`select_cancel` は
+        /// そのためにある）。手遅れになるのは相手も確定して掛け金フェイズへ移る直前だけ。
+        /// 判定は `phase_completed_notice` で両者の確定を知る PhaseController に持たせている。
+        /// </summary>
+        public bool IsSelectionLockedIn =>
+            uiManager != null && uiManager.PhaseController != null
+            && uiManager.PhaseController.IsHandSelectionSettledForBoth;
+
         public void Setup(GameUIManager manager)
         {
             this.uiManager = manager;
@@ -93,26 +102,37 @@ namespace KillingMahjong.UI
         public void CancelHandSelection()
         {
             if (uiManager.CurrentPhaseStatus != RoundStatus.HandSelection) return;
-            if (uiManager.IsTransitioning) return; 
+            if (uiManager.IsTransitioning) return;
+            // ボタン側でも隠しているが、連打で滑り込まれると手牌が消えるのでここでも弾く
+            if (IsSelectionLockedIn) return;
 
             if (uiManager.HandUI != null) uiManager.HandUI.SetSubmittedState(false);
             if (uiManager.WaitUI != null) uiManager.WaitUI.gameObject.SetActive(false);
             KillingMahjong.Managers.BoardStateManager.Instance.ClearWaitTiles();
             if (uiManager.PhaseController != null) uiManager.PhaseController.SetMatchUIVisibility(true);
 
-            // 手牌をすべて選んでいない状態（山牌に戻す）
-            var tilesToReturn = new System.Collections.Generic.List<int>(KillingMahjong.Managers.BoardStateManager.Instance.CurrentHandTiles);
-            foreach (var t in tilesToReturn)
-            {
-                KillingMahjong.Managers.BoardStateManager.Instance.MoveTileToWall(t);
-            }
-
+            // **手牌はそのまま残す。** 「選び直す」は確定を取り下げるだけで、
+            // 選んだ牌まで捨てさせると、13枚を一から選び直すことになる。
+            // 取り下げると SetSubmittedState(false) で IsSubmitted が false に戻るので、
+            // ここから手牌の牌をクリックして山に返す／別の牌を足す、という調整ができる。
+            //
+            // **サーバーの select_cancel は player.hand を空にするが、それで問題ない。**
+            // 選択中の増減はクライアント内だけの話で、サーバーに手牌が伝わるのは
+            // 「決定」で select / select_confirm を送るときにまとめて一度だけ。
+            // 次の決定で全13枚を送り直すので、ここで空になっていても食い違わない。
             uiManager.SendActionToServer("select_cancel", new KillingMahjong.Network.ActionPayload());
         }
 
         public void HandleIsTenpaiReceived(IsTenpaiData data)
         {
             if (uiManager.CurrentPhaseStatus != RoundStatus.HandSelection) return;
+
+            // **応答を待っている間に「選び直す」を押されていたら、もう出さない。**
+            // `is_tenpai` はサーバーとの往復なので、その間も取り下げは押せる。
+            // ここで確認ダイアログを出すと、取り下げ済みの
+            // `_pendingHandIndexes`（＝画面の手牌とは違うかもしれない）を
+            // OK が送ってしまう。
+            if (uiManager.HandUI != null && !uiManager.HandUI.IsSubmitted) return;
 
             // 役名はここには並べない。牌にカーソルを合わせたときだけ
             // ConfirmationDialogUI がオーバーレイで出す（要望18）。

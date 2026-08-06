@@ -27,6 +27,13 @@ namespace KillingMahjong.UI
     {
         // ---- 調整値（シーンではなくここを触る）----
 
+        /// <summary>
+        /// ノイズを出すか。**2026-08-06 にいったん off。**
+        /// 雰囲気に合わないという判断で止めているだけで、実装は残してある。
+        /// true に戻せばそのまま復活する（毎フレームの画面保存もここで止まる）。
+        /// </summary>
+        private const bool EffectEnabled = false;
+
         /// <summary>走っている時間。長いと「演出」になってしまうので短く</summary>
         private const float Duration = 0.45f;
 
@@ -74,6 +81,8 @@ namespace KillingMahjong.UI
         /// </summary>
         public static HpDamageGlitch Ensure()
         {
+            // 器ごと作らない。作ると毎フレーム画面を保存し続けるため
+            if (!EffectEnabled) return null;
             if (_instance != null) return _instance;
 
             var go = new GameObject("HpDamageGlitch", typeof(RectTransform));
@@ -99,6 +108,7 @@ namespace KillingMahjong.UI
         public static void Play(int lostAmount, int maxHp)
         {
             var g = Ensure();
+            if (g == null) return;
             float ratio = (maxHp > 0) ? Mathf.Abs(lostAmount) / (float)maxHp : 1f;
             g._strength = Mathf.Clamp01(ratio / FullStrengthDamageRatio);
             g._remain = Duration;

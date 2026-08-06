@@ -8,6 +8,13 @@ namespace KillingMahjong.UI
     {
         [Header("HP Display")]
         [SerializeField] private TextMeshProUGUI hpText;
+
+        /// <summary>
+        /// 体力の数字に添える「自分／相手」の大きさ（数字に対する割合）。
+        /// 実機で合わせた値。これ以上大きいと点滴の管に、小さいと実表示で潰れる。
+        /// EnemyInfoUI 側と揃えること。
+        /// </summary>
+        internal const string HpOwnerLabelScale = "65%";
         [SerializeField] private UnityEngine.UI.Image hpFillImage; // 追加: 人型のHPメーター用画像
         private int maxHp = 20000; // 最大HP（割合計算用）
 
@@ -270,8 +277,11 @@ namespace KillingMahjong.UI
             currentHp = hp;
             if (hpText != null)
             {
-                // 数字のみ表示する
-                hpText.text = currentHp.ToString();
+                // **誰の血かを必ず添える。** 自分＝右／相手＝左という置き場所の約束だけでは、
+                // 点滴とスマホのどちらが自分なのか画面から確定できなかった
+                // （両者の賭け金が同額だと数字まで一致して見分けが付かない）。
+                // 別オブジェクトを足すと絵に重なるので、同じテキストの中に小さく入れる。
+                hpText.text = $"<size={HpOwnerLabelScale}>自分 </size>{currentHp}";
             }
             
             // 人型メーターの割合を更新する

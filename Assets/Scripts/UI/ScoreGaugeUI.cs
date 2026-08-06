@@ -364,11 +364,17 @@ namespace KillingMahjong.UI
             SetStakes(_selfStakeValue + player, _enemyStakeValue + enemy);
         }
 
+        /// <summary>
+        /// 数字に添える「自分／相手」の大きさ。**色と左右だけでは持ち主が伝わらない**ため、
+        /// 帯の中の数字にも文字で持ち主を入れる。体力表示（PlayerInfoUI）と同じ考え方。
+        /// </summary>
+        private const string OwnerLabelScale = "70%";
+
         private void RefreshStakes()
         {
             // 枠は常に出しておく。賭けていないときは 0 と出す（ゲージの数字と同じ扱い）
-            if (_selfStake != null) _selfStake.text = _selfStakeValue.ToString();
-            if (_enemyStake != null) _enemyStake.text = _enemyStakeValue.ToString();
+            if (_selfStake != null) _selfStake.text = $"<size={OwnerLabelScale}>自分 </size>{_selfStakeValue}";
+            if (_enemyStake != null) _enemyStake.text = $"<size={OwnerLabelScale}>相手 </size>{_enemyStakeValue}";
         }
 
         /// <summary>
@@ -459,14 +465,15 @@ namespace KillingMahjong.UI
 
         private void Refresh(bool immediate)
         {
-            SetGauge(ref _selfAnim, _selfFill, _selfText, _selfScore, immediate);
-            SetGauge(ref _enemyAnim, _enemyFill, _enemyText, _enemyScore, immediate);
+            SetGauge(ref _selfAnim, _selfFill, _selfText, _selfScore, immediate, "自分");
+            SetGauge(ref _enemyAnim, _enemyFill, _enemyText, _enemyScore, immediate, "相手");
         }
 
-        private void SetGauge(ref Coroutine anim, RectTransform fill, TextMeshProUGUI label, int score, bool immediate)
+        private void SetGauge(ref Coroutine anim, RectTransform fill, TextMeshProUGUI label, int score, bool immediate, string owner)
         {
             if (fill == null) return;
-            if (label != null) label.text = score.ToString();
+            // 帯の左右の数字は 0 のまま動かないことが多く、何の数字か手がかりが無かった
+            if (label != null) label.text = $"<size={OwnerLabelScale}>{owner} </size>{score}";
 
             float ratio = targetScore > 0 ? Mathf.Clamp01(score / (float)targetScore) : 0f;
             float target = HalfWidth * ratio;

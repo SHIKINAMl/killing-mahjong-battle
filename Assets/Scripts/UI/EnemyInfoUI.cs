@@ -358,7 +358,8 @@ namespace KillingMahjong.UI
             int diff = hp - currentHp;
 
             currentHp = hp;
-            if (hpText != null) hpText.text = currentHp.ToString();
+            // 誰の血かを添える。理由と大きさの根拠は PlayerInfoUI.HpOwnerLabelScale を参照
+            if (hpText != null) hpText.text = $"<size={PlayerInfoUI.HpOwnerLabelScale}>相手 </size>{currentHp}";
 
             // 人型メーターの割合を更新する
             if (hp > hpPeak) hpPeak = hp;

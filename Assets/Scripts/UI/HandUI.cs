@@ -93,6 +93,13 @@ namespace KillingMahjong.UI
             autoManganButton.onClick.AddListener(OnAutoManganClicked);
             UpdateCursorPosition();
 
+            // シーンの表記は "Decide" / "Auto" のままなので、実行時に日本語へ直す。
+            // **複製より先に直す**（reselect などは decideButton を Instantiate して作るため、
+            // ここで直しておかないと英語のまま複製される）。
+            // シーンを触らないのは、対局シーンが2つあって片方だけ直す事故を避けるため。
+            SetButtonLabel(decideButton, "決定");
+            SetButtonLabel(autoManganButton, "おまかせ");
+
             if (decideButton != null)
             {
                 reselectButton = Instantiate(decideButton, decideButton.transform.parent);
@@ -363,6 +370,177 @@ namespace KillingMahjong.UI
             }
         }
 
+        // ---- 進行の案内（調整値。シーンではなくここを触る）----
+        //
+        // このゲームは「山牌から13枚選んで手牌を組む」「打牌フェイズで切るのは手牌ではなく山牌」
+        // という独自ルールなのに、画面のどこにもそれが書いていなかった。
+        // **麻雀の常識では画面最下段＝自分の手牌**なので、初見はまず取り違える。
+
+        /// <summary>案内を出すか。うるさければ false に</summary>
+        private const bool ShowPhaseGuide = true;
+
+        /// <summary>
+        /// 山牌の上端から、どれだけ上に置くか。
+        ///
+        /// **固定の高さにはできない。** 手牌選択では山牌が2段に積まれて背が高く、
+        /// 打牌フェイズでは減って低くなるので、決め打ちだと片方で牌に重なる。
+        /// 毎回いまの山牌の上端を測って、そこから持ち上げる。
+        /// </summary>
+        private const float PhaseGuideLift = 22f;
+
+        /// <summary>山牌が見つからないときの逃げ場（画面下端からの高さ）</summary>
+        private const float PhaseGuideFallbackY = 118f;
+
+        private const float PhaseGuideFontSize = 15f;
+        private static readonly Color PhaseGuideColor = new Color(1f, 1f, 1f, 0.92f);
+
+        private TMPro.TextMeshProUGUI _phaseGuide;
+        private int _lastGuideHandCount = -1;
+        private RoundStatus _lastGuidePhase = (RoundStatus)(-1);
+
+        /// <summary>案内の器。シーンには置かない（対局シーンが2つあるため）</summary>
+        private TMPro.TextMeshProUGUI EnsurePhaseGuide()
+        {
+            if (_phaseGuide != null) return _phaseGuide;
+
+            var canvas = GetComponentInParent<Canvas>();
+            if (canvas == null) return null;
+
+            var go = new GameObject("PhaseGuideText", typeof(RectTransform));
+            go.transform.SetParent(canvas.rootCanvas.transform, false);
+
+            var rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta = new Vector2(560f, 26f);
+            rt.anchoredPosition = new Vector2(0f, PhaseGuideFallbackY);
+
+            var tmp = go.AddComponent<TMPro.TextMeshProUGUI>();
+            tmp.fontSize = PhaseGuideFontSize;
+            tmp.color = PhaseGuideColor;
+            tmp.alignment = TMPro.TextAlignmentOptions.Center;
+            tmp.raycastTarget = false;
+            tmp.overflowMode = TMPro.TextOverflowModes.Overflow;
+            // 卓の緑にも暗い床にも載るので、縁を付けて背景から切り離す
+            tmp.fontMaterial.EnableKeyword("OUTLINE_ON");
+            tmp.outlineColor = Color.black;
+            tmp.outlineWidth = 0.25f;
+
+            _phaseGuide = tmp;
+            return _phaseGuide;
+        }
+
+        /// <summary>
+        /// 「いま何をすればいいか」を1行で出す。手牌選択では選んだ枚数も添える。
+        /// **チュートリアルでは出さない**（台本が同じことを順番に喋るため）。
+        /// </summary>
+        private void UpdatePhaseGuide(RoundStatus phaseStatus)
+        {
+            if (!ShowPhaseGuide) return;
+
+            bool tutorial = gameUIManager != null && gameUIManager.IsTutorialMode;
+            bool wanted = !tutorial &&
+                (phaseStatus == RoundStatus.HandSelection || phaseStatus == RoundStatus.Discard);
+
+            if (!wanted)
+            {
+                if (_phaseGuide != null) _phaseGuide.gameObject.SetActive(false);
+                _lastGuidePhase = (RoundStatus)(-1);
+                _lastGuideHandCount = -1;
+                return;
+            }
+
+            var guide = EnsurePhaseGuide();
+            if (guide == null) return;
+
+            int handCount = (Managers.BoardStateManager.Instance != null &&
+                             Managers.BoardStateManager.Instance.CurrentHandTiles != null)
+                            ? Managers.BoardStateManager.Instance.CurrentHandTiles.Count : 0;
+
+            // 毎フレーム text を代入するとそのたびに文字が組み直されるので、変わったときだけ
+            if (phaseStatus != _lastGuidePhase || handCount != _lastGuideHandCount)
+            {
+                if (phaseStatus == RoundStatus.HandSelection)
+                {
+                    string count = (handCount == HandSize)
+                        ? $"<color=#7CE07C>{handCount} / {HandSize}</color>"
+                        : $"<color=#FFD24A>{handCount} / {HandSize}</color>";
+                    // **短く保つこと。** 卓の右手前に置物があり、長いと右端が隠れる
+                    guide.text = $"山牌から{HandSize}枚えらぶ　{count}";
+                }
+                else
+                {
+                    guide.text = "山牌から1枚切る";
+                }
+
+                _lastGuidePhase = phaseStatus;
+                _lastGuideHandCount = handCount;
+            }
+
+            PlaceGuideAboveWall(guide);
+            guide.gameObject.SetActive(true);
+        }
+
+        /// <summary>手牌の枚数。ルール上13枚で固定</summary>
+        private const int HandSize = 13;
+
+        private RectTransform _wallRect;
+
+        /// <summary>
+        /// 案内を山牌のすぐ上に置く。
+        ///
+        /// 案内は ScreenSpace-Overlay の Canvas に下端中央アンカーで置いてあるので、
+        /// 画面座標を scaleFactor で割れば、そのまま anchoredPosition.y になる。
+        /// </summary>
+        private void PlaceGuideAboveWall(TMPro.TextMeshProUGUI guide)
+        {
+            if (_wallRect == null)
+            {
+                var go = GameObject.Find("WallContainer");
+                if (go != null) _wallRect = go.transform as RectTransform;
+            }
+            if (_wallRect == null) return;
+
+            var canvas = guide.canvas;
+            if (canvas == null) return;
+
+            var corners = new Vector3[4];
+            _wallRect.GetWorldCorners(corners);
+            float topScreenY = RectTransformUtility.WorldToScreenPoint(null, corners[1]).y;
+
+            float scale = Mathf.Approximately(canvas.scaleFactor, 0f) ? 1f : canvas.scaleFactor;
+            float y = topScreenY / scale + PhaseGuideLift;
+
+            var rt = guide.rectTransform;
+            if (!Mathf.Approximately(rt.anchoredPosition.y, y))
+            {
+                rt.anchoredPosition = new Vector2(0f, y);
+            }
+        }
+
+        /// <summary>
+        /// **必ず base を呼ぶこと。** 基底の Update は牌を目標座標へ毎フレーム補間しており、
+        /// ここで隠すと牌がアニメーションしなくなる（`new` で隠すと基底は呼ばれない）。
+        /// </summary>
+        protected override void Update()
+        {
+            base.Update();
+
+            // 牌をクリックしても UpdateLayout が呼ばれるとは限らないので、
+            // 枚数の表示だけはここで追う（変化が無ければ何もしない）
+            if (gameUIManager != null) UpdatePhaseGuide(gameUIManager.CurrentPhaseStatus);
+        }
+
+        /// <summary>ボタンの文字を差し替える。TMP と旧 Text の両方に対応する</summary>
+        private static void SetButtonLabel(Button button, string label)
+        {
+            if (button == null) return;
+            var tmp = button.GetComponentInChildren<TMPro.TextMeshProUGUI>(true);
+            if (tmp != null) tmp.text = label;
+            var txt = button.GetComponentInChildren<UnityEngine.UI.Text>(true);
+            if (txt != null) txt.text = label;
+        }
+
         private void OnReselectClicked()
         {
             if (gameUIManager != null && gameUIManager.CurrentPhaseStatus == RoundStatus.HandSelection)
@@ -536,6 +714,21 @@ namespace KillingMahjong.UI
             if (decideButton != null)
             {
                 decideButton.gameObject.SetActive(showDecide);
+
+                // **13枚そろうまで押せなくする。** 足りないまま押しても
+                // サーバーに弾かれるだけで、何が悪いのか画面からは分からなかった。
+                // チュートリアルは台本が開放の順番を決めているので触らない。
+                if (showDecide && (gameUIManager == null || !gameUIManager.IsTutorialMode))
+                {
+                    int handCount = (Managers.BoardStateManager.Instance != null &&
+                                     Managers.BoardStateManager.Instance.CurrentHandTiles != null)
+                                    ? Managers.BoardStateManager.Instance.CurrentHandTiles.Count : 0;
+                    decideButton.interactable = (handCount == HandSize);
+                }
+                else if (decideButton != null)
+                {
+                    decideButton.interactable = true;
+                }
             }
             if (autoManganButton != null)
             {
@@ -544,11 +737,20 @@ namespace KillingMahjong.UI
             if (reselectButton != null)
             {
                 // チュートリアルでは台本どおりに進めたいので出さない（要望15）
+                //
+                // **相手を待っている間は出したままでよい**（取り下げは仕様）。
+                // 引っ込めるのは相手も確定して掛け金フェイズへ移る直前だけ。
+                // ここが無いと phase_change が届くまでの隙間を連打で抜けられ、
+                // 受理済みの手牌に select_cancel が飛んでしまう。
                 bool canReselect = (phaseStatus == RoundStatus.HandSelection) && isSubmitted
                     && gameUIManager != null && !gameUIManager.IsTransitioning
-                    && !gameUIManager.IsMulliganSelection && !gameUIManager.IsTutorialMode;
+                    && !gameUIManager.IsMulliganSelection && !gameUIManager.IsTutorialMode
+                    && (gameUIManager.HandSelectionController == null
+                        || !gameUIManager.HandSelectionController.IsSelectionLockedIn);
                 reselectButton.gameObject.SetActive(canReselect);
             }
+            UpdatePhaseGuide(phaseStatus);
+
             if (autoDiscardButton != null)
             {
                 // 自動打牌ボタンは非表示にする（要望5）。

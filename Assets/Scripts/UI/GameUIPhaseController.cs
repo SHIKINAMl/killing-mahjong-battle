@@ -28,6 +28,15 @@ namespace KillingMahjong.UI
         private bool _betReadyLocal = false;
         private bool _betReadyEnemy = false;
 
+        /// <summary>
+        /// 両者とも手牌を確定し終えたか。**掛け金フェイズへ移る直前**がこの状態。
+        ///
+        /// 「選び直す」は相手を待っている間は押せてよいが、ここまで来たら手遅れで、
+        /// 押されると受理済みの手牌に `select_cancel` が飛んでしまう。
+        /// `phase_change` が届くまでの隙間を連打で抜けられるのを、これで塞ぐ。
+        /// </summary>
+        public bool IsHandSelectionSettledForBoth => _handSelectionReadyLocal && _handSelectionReadyEnemy;
+
         public void Setup(GameUIManager manager)
         {
             this.uiManager = manager;
@@ -966,6 +975,13 @@ namespace KillingMahjong.UI
             {
                 uiManager.EnemyInfoUI.ShowReadyBox(true);
                 uiManager.EnemyInfoUI.SetReadyCheck(enemyReady);
+            }
+
+            // 両者そろった瞬間に「選び直す」を引っ込める。ここで描き直さないと、
+            // phase_change が届くまでボタンが残って連打で押せてしまう。
+            if (phase == RoundStatus.HandSelection && uiManager.HandUI != null)
+            {
+                uiManager.HandUI.UpdateLayout(uiManager.CurrentPhaseStatus);
             }
         }
 
