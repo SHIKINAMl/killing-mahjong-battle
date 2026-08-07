@@ -100,6 +100,10 @@ namespace KillingMahjong.UI
             SetButtonLabel(decideButton, "決定");
             SetButtonLabel(autoManganButton, "おまかせ");
 
+            // **複製より先に整える。** 以降の reselect / autoDiscard / peek は
+            // decideButton の Instantiate なので、ここで揃えておけば全部が揃った形で複製される。
+            NormalizeActionButtons();
+
             if (decideButton != null)
             {
                 reselectButton = Instantiate(decideButton, decideButton.transform.parent);
@@ -149,13 +153,10 @@ namespace KillingMahjong.UI
             if (tmp != null)
             {
                 tmp.text = PeekButtonLabel;
-                // 複製元の「決定」は2文字ぶんの幅しかないので、そのままだと
-                // 「手牌を見る」の末尾が切れる。幅に収まるまで縮める
-                tmp.enableAutoSizing = true;
-                tmp.fontSizeMin = 10f;
-                tmp.fontSizeMax = tmp.fontSize;
-                tmp.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
-                tmp.overflowMode = TMPro.TextOverflowModes.Overflow;
+                // 幅に収まるまで縮める設定は NormalizeActionButtons が複製元に入れてあるので、
+                // ここでは触らない。**特に `fontSizeMax = tmp.fontSize` を書かないこと。**
+                // 自動縮小が有効なとき `fontSize` は「今の縮んだ値」を返すので、
+                // それを上限に代入すると小さいまま固定されてしまう。
             }
             var txt = peekButton.GetComponentInChildren<Text>();
             if (txt != null)
@@ -532,6 +533,94 @@ namespace KillingMahjong.UI
         }
 
         /// <summary>ボタンの文字を差し替える。TMP と旧 Text の両方に対応する</summary>
+        // --- 手牌フェイズの操作ボタンの見た目基準 ---
+        //
+        // シーンの値は「決定」が 100x35 / x=+265.1、「おまかせ」が 100x50 / x=-270.5 と
+        // バラバラで、高さも左右の余白も揃っていなかった。しかも「おまかせ」は
+        // 文字の必要幅がちょうど 100 でボタン幅と同じ＝左右の余白がゼロだった。
+        //
+        // **シーンではなくここで揃える。** 対局シーンが2つ（UIテストシーン / OpeningScene）
+        // あるため、シーンを直すと片方だけ直す事故が起きる。ラベルの差し替えと同じ方針。
+
+        private const float ActionButtonWidth = 120f;
+        private const float ActionButtonHeight = 40f;
+
+        /// <summary>ボタンの外側に空ける画面端からの余白。左右で同じ値を使うので対称になる。</summary>
+        private const float ActionButtonEdgeMargin = 65f;
+
+        /// <summary>文字がボタンの縁に触れないようにする内側の余白。</summary>
+        private const float ActionButtonTextPadding = 14f;
+
+        /// <summary>
+        /// 「決定」と「おまかせ」を同じ大きさにし、画面中心に対して左右対称に置く。
+        ///
+        /// 親（HandPanel）自体が画面中心から x=+10 ずれているため、単に ±同値 を入れても
+        /// 画面上では対称にならない。親のずれを引いてから左右を決める。
+        /// </summary>
+        private void NormalizeActionButtons()
+        {
+            var decideRect = decideButton != null ? decideButton.GetComponent<RectTransform>() : null;
+            var autoRect = autoManganButton != null ? autoManganButton.GetComponent<RectTransform>() : null;
+            if (decideRect == null || autoRect == null) return;
+
+            var parent = decideRect.parent as RectTransform;
+            var canvas = GetComponentInParent<Canvas>();
+            if (parent == null || canvas == null) return;
+
+            var canvasRect = canvas.rootCanvas.GetComponent<RectTransform>();
+            if (canvasRect == null) return;
+
+            // 親が引き伸ばしアンカーだと anchoredPosition が中心からのずれを表さない。
+            // その場合はずれを 0 とみなす（少なくとも大きさと高さは揃う）。
+            bool parentIsPointAnchored = Mathf.Approximately(parent.anchorMin.x, parent.anchorMax.x);
+            float parentOffsetX = parentIsPointAnchored ? parent.anchoredPosition.x : 0f;
+
+            float halfCanvasWidth = canvasRect.rect.width * 0.5f;
+            float centerFromMiddle = halfCanvasWidth - ActionButtonEdgeMargin - ActionButtonWidth * 0.5f;
+
+            ApplyActionButtonStyle(decideRect, centerFromMiddle - parentOffsetX);
+            ApplyActionButtonStyle(autoRect, -centerFromMiddle - parentOffsetX);
+        }
+
+        private static void ApplyActionButtonStyle(RectTransform rect, float anchoredX)
+        {
+            rect.sizeDelta = new Vector2(ActionButtonWidth, ActionButtonHeight);
+            rect.anchoredPosition = new Vector2(anchoredX, rect.anchoredPosition.y);
+
+            foreach (var tmp in rect.GetComponentsInChildren<TMPro.TextMeshProUGUI>(true))
+            {
+                var textRect = tmp.rectTransform;
+
+                // **TMP の margin を必ず 0 に戻す。** シーンの「おまかせ」には
+                // `margin = (0, 1.24, 0, -30.30)` が入っていた。下マージンが負の値だと
+                // 中央揃えでも文字が約15px下へ押し出され、枠から落ちて見える。
+                // これが「おまかせだけ変」の正体で、矩形や位置をいくら揃えても直らない。
+                tmp.margin = Vector4.zero;
+
+                // 文字はボタンいっぱいに広げたうえで内側に余白を取る。
+                // 「おまかせ」は等倍だと必要幅がボタン幅と同じで、縁に文字が触れていた。
+                textRect.anchorMin = Vector2.zero;
+                textRect.anchorMax = Vector2.one;
+                textRect.offsetMin = new Vector2(ActionButtonTextPadding, 0f);
+                textRect.offsetMax = new Vector2(-ActionButtonTextPadding, 0f);
+
+                // 「手牌を見る」「選び直す」など長いラベルの複製もここから作られるので、
+                // 収まらないときは縮むようにしておく。折り返すと2行になって崩れる
+                tmp.enableAutoSizing = true;
+                tmp.fontSizeMax = tmp.fontSize;
+                tmp.fontSizeMin = 10f;
+                tmp.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
+                tmp.overflowMode = TMPro.TextOverflowModes.Overflow;
+                tmp.alignment = TMPro.TextAlignmentOptions.Center;
+            }
+
+            foreach (var txt in rect.GetComponentsInChildren<UnityEngine.UI.Text>(true))
+            {
+                txt.resizeTextForBestFit = true;
+                txt.alignment = TextAnchor.MiddleCenter;
+            }
+        }
+
         private static void SetButtonLabel(Button button, string label)
         {
             if (button == null) return;

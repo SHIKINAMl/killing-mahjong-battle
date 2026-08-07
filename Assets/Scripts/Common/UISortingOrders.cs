@@ -174,6 +174,14 @@ namespace KillingMahjong.Common
         /// <summary>BlinkEffectUI: オープニングのまぶた。開ききるまで画面全体を覆う</summary>
         public const int OpeningEyelid = 98;
 
+        /// <summary>ScreenFlash: 場面の切り替わりを示す一瞬の全画面フラッシュ。
+        ///
+        /// フェーズ演出(96)や和了選択(97)の**手前**に出す必要がある。
+        /// それらの直前に光らせるためのもので、奥に置くと肝心の演出に隠れて見えない。
+        /// OpeningEyelid と同値だが、まぶたはオープニング専用で対局シーンには存在しないため衝突しない。
+        /// カーソル(99)より奥なのは意図的で、光っている間もカーソルは見えていてよい。</summary>
+        public const int ScreenFlash = 98;
+
         /// <summary>CustomCusor: 自前マウスカーソル。常に全UIより手前</summary>
         public const int MouseCursor = 99;
 

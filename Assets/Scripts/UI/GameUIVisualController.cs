@@ -406,7 +406,18 @@ namespace KillingMahjong.UI
 
             if (uiManager.WaitUI != null && (uiManager.CurrentPhaseStatus == RoundStatus.Discard || uiManager.CurrentPhaseStatus == RoundStatus.HandSelection))
             {
-                if (board.CurrentWaitTiles != null && board.CurrentWaitTiles.Count > 0)
+                // **チュートリアルの手牌選択中は、決定を押すまで待ち牌UIを出さない。**
+                // 『おまかせ』は待ち牌を盤面に入れてからここ（牌の再構築）を通るため、
+                // 素直に出すと押した瞬間に左下へ現れ、手牌確認のUIと重なる。
+                // 決定後は TutorialManager.ConfirmHandSelectionComplete が出す。
+                //
+                // 出す条件は GameUIPhaseController の手牌選択ケースにもある。
+                // **経路が2つあるので、片方だけ塞いでも直らない**（実際にここを見落として空振りした）。
+                bool blockedByTutorial = uiManager.IsTutorialMode
+                    && uiManager.CurrentPhaseStatus == RoundStatus.HandSelection
+                    && (uiManager.TutorialManager == null || !uiManager.TutorialManager.IsHandSelectionConfirmed);
+
+                if (!blockedByTutorial && board.CurrentWaitTiles != null && board.CurrentWaitTiles.Count > 0)
                 {
                     uiManager.WaitUI.gameObject.SetActive(true);
                     uiManager.WaitUI.DisplayWaits(board.CurrentWaitTiles);

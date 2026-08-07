@@ -217,8 +217,18 @@ namespace KillingMahjong.UI
                 }
             }
             
+            // ここは :177 の同値ガードを抜けた先＝本当に段が進んだときだけ通る。
+            // フラッシュの可否をここで決め、実際に光らせるのは表示が切り替わる瞬間に任せる。
+            _flashOnNextPhaseVisibility = true;
+
             HandlePhaseVisibility(newStatus);
         }
+
+        /// <summary>
+        /// 次の HandlePhaseVisibility でフラッシュを出すか。UpdatePhaseStatus だけが立てる。
+        /// 表示の作り直し目的の呼び出しでは立たないので、透視の公開後などには光らない。
+        /// </summary>
+        private bool _flashOnNextPhaseVisibility = false;
 
         public void HandlePhaseVisibility(RoundStatus status)
         {
@@ -236,6 +246,32 @@ namespace KillingMahjong.UI
             {
                 uiManager.DeferUntilIdle($"phaseVisibility:{status}", () => HandlePhaseVisibility(status));
                 return;
+            }
+
+            // フェイズが切り替わる合図として一瞬だけ光らせる。
+            //
+            // **このメソッドは「フェイズが変わった」ときだけでなく「今のフェイズの表示を
+            // 作り直す」ときにも呼ばれる**（透視演出の後の ExposedTileEffectPlayer:91、
+            // 手牌決定後の GameUIHandSelectionController:345 など）。
+            // 無条件に光らせると、透視で3枚公開したあとにも光ってしまう。
+            // 実際に段が進んだときだけ立つ印を見て、その場合に限って光らせる。
+            //
+            // 印はフラグで持ち、引数では渡さない。保留は同じ key で後勝ちに上書きされるので、
+            // ラムダに焼き込むと「進行」の保留が後から来た「作り直し」の保留に潰される。
+            //
+            // **保留から復帰した場合も、捨てずにここで光らせる。** 上の分岐より前に置くと
+            // 別の演出で画面が覆われている最中に光ることになり、何の合図か分からなくなる。
+            if (_flashOnNextPhaseVisibility)
+            {
+                _flashOnNextPhaseVisibility = false;
+
+                // 決着系（Agari / Ron / Result / Draw）は除く。それぞれロン演出・流局演出という
+                // 専用の入りを持っていて、そちらでも光らせるため、ここで光らせると二度光る。
+                bool isSettlementPhase = status == RoundStatus.Agari ||
+                                         status == RoundStatus.Ron ||
+                                         status == RoundStatus.Result ||
+                                         status == RoundStatus.Draw;
+                if (!isSettlementPhase) Effects.ScreenFlash.Play();
             }
 
             if (status != RoundStatus.Betting && uiManager.PlayerInfoUI != null)
@@ -357,7 +393,16 @@ namespace KillingMahjong.UI
                         ApplyPhaseReadyMarks(RoundStatus.HandSelection);
                     }
 
-                    if (uiManager.WaitUI != null && Managers.BoardStateManager.Instance.CurrentWaitTiles != null && Managers.BoardStateManager.Instance.CurrentWaitTiles.Count > 0)
+                    // **チュートリアルでは決定を押すまで待ち牌UIを出さない。**
+                    // 『おまかせ』は待ち牌を盤面に入れたうえで SetPhase(HandSelection) を通るため、
+                    // 素直に書くと押した瞬間に左下へ出て、手牌確認のUIと重なる。
+                    // 決定後は TutorialManager.ConfirmHandSelectionComplete が出す。
+                    bool waitUiAllowed = !uiManager.IsTutorialMode
+                        || (uiManager.TutorialManager != null && uiManager.TutorialManager.IsHandSelectionConfirmed);
+
+                    if (uiManager.WaitUI != null && waitUiAllowed
+                        && Managers.BoardStateManager.Instance.CurrentWaitTiles != null
+                        && Managers.BoardStateManager.Instance.CurrentWaitTiles.Count > 0)
                     {
                         uiManager.WaitUI.gameObject.SetActive(true);
                         uiManager.WaitUI.DisplayWaits(Managers.BoardStateManager.Instance.CurrentWaitTiles);
@@ -813,8 +858,28 @@ namespace KillingMahjong.UI
             int ronTile = BoardStateManager.Instance.LastDiscardedTileId >= 0
                 ? BoardStateManager.Instance.LastDiscardedTileId
                 : (winningHand.Count > 0 ? winningHand[winningHand.Count - 1] : 0);
-            
+
+            // **ronTile を決めたあとに並べ替えること。** 上のフォールバックは
+            // 「最後に引いた牌」を取る前提なので、先に並べ替えると別の牌になる。
+            SortHandForRonAnimation(winningHand);
+
             StartCoroutine(PlayRonWithPreDialogue(isLocalWin, winningHand, ronTile, actualYaku, actualFormula, actualRank));
+        }
+
+        /// <summary>
+        /// ロン演出に出す手牌を並べ替える。**渡す複製だけを並べ替え、盤面の実体には触らない。**
+        ///
+        /// 演出は受け取った配列をそのままの順で並べる（RonAnimationUI はソートしない）。
+        /// 盤面側の並べ替えは OnScoreSettlementComplete で行うが、それが走るのは
+        /// 演出が終わったあとなので、ここで揃えないと演出の中だけツモ順のまま出る。
+        /// 自分の和了は CurrentHandTiles がたまたま整列しているだけなので、
+        /// 両方の経路で明示的に揃えておく。
+        /// </summary>
+        private static void SortHandForRonAnimation(List<int> hand)
+        {
+            if (hand == null || hand.Count == 0) return;
+            if (BoardStateManager.Instance == null) return;
+            BoardStateManager.Instance.SortTileIds(hand);
         }
 
         public void HandleAgari(bool isLocalWin)
@@ -847,7 +912,10 @@ namespace KillingMahjong.UI
                 int ronTile = BoardStateManager.Instance.LastDiscardedTileId >= 0
                     ? BoardStateManager.Instance.LastDiscardedTileId
                     : (winningHand.Count > 0 ? winningHand[winningHand.Count - 1] : 0);
-                
+
+                // 相手の手牌はツモ順のまま届く。ここで揃えないと演出中だけバラバラに見える
+                SortHandForRonAnimation(winningHand);
+
                 StartCoroutine(PlayRonWithPreDialogue(isLocalWin, winningHand, ronTile, actualYaku, actualFormula, actualRank));
             }
         }
@@ -1072,6 +1140,10 @@ namespace KillingMahjong.UI
 
         private IEnumerator PlayRonWithPreDialogue(bool isLocalWin, List<int> winningHand, int ronTile, List<string> yaku, string formula, string rank)
         {
+            // ロンの一撃を予感させる合図。自分のロン（ExecuteRonAction）も
+            // 相手のロン（HandleAgari）もここを通るので、1箇所で両方に効く。
+            Effects.ScreenFlash.Play();
+
             if (ReactionController.Instance != null)
             {
                 ReactionController.Instance.ClearReactions();

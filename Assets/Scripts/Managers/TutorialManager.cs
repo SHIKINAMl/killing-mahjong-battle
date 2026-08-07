@@ -1430,9 +1430,39 @@ namespace KillingMahjong.Managers
             return true;
         }
 
+        /// <summary>
+        /// 手牌の決定（確認ダイアログの「決定」）まで済んだか。
+        ///
+        /// 待ち牌UIを出してよいかの判定に使う。`おまかせ` を押した時点では false のままにしたい。
+        /// </summary>
+        public bool IsHandSelectionConfirmed => !_isWaitingForHandSelectionComplete;
+
         public void ConfirmHandSelectionComplete()
         {
             _isWaitingForHandSelectionComplete = false;
+
+            // **ここで初めて待ち牌UIを出す。**
+            // 手牌選択フェイズのままなので、この後フェイズ変化は起きない。
+            // GameUIPhaseController 側の表示処理は決定前に一度走って抑止されているため、
+            // 誰かが明示的に出さないと打牌フェイズまで出ないままになる。
+            ShowWaitUiIfReady();
+        }
+
+        /// <summary>
+        /// 待ち牌が分かっていれば待ち牌UIを出す。
+        ///
+        /// `おまかせ` を押した直後に出すと、手牌確認のUIと左下で重なる。
+        /// 決定を押したあとまで待たせるため、表示のきっかけをここに集約している。
+        /// </summary>
+        private void ShowWaitUiIfReady()
+        {
+            if (gameUIManager == null || gameUIManager.WaitUI == null) return;
+
+            var board = BoardStateManager.Instance;
+            if (board == null || board.CurrentWaitTiles == null || board.CurrentWaitTiles.Count == 0) return;
+
+            gameUIManager.WaitUI.gameObject.SetActive(true);
+            gameUIManager.WaitUI.DisplayWaits(board.CurrentWaitTiles);
         }
 
         /// <summary>打牌を受け付けるか（手順⑭の禁止牌を含む）。</summary>

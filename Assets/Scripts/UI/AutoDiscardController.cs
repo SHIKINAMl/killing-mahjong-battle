@@ -46,7 +46,12 @@ namespace KillingMahjong.UI
             {
                 if (uiManager.CurrentPhaseStatus == RoundStatus.Discard && BoardStateManager.Instance.IsLocalTurn)
                 {
-                    if (IsAgariPending()) 
+                    // **演出中は打たない。** 人間は画面が覆われて牌を押せないので、
+                    // ここを見ないと自動打牌だけが人間に不可能な速度で打ててしまう。
+                    // 実際それでロン猶予が演出中に届き、保留されたまま対局が止まった。
+                    if (uiManager.IsBusyWithTransition) return;
+
+                    if (IsAgariPending())
                     {
                         handUI.IsAutoDiscardEnabled = false;
                         return;
@@ -72,12 +77,18 @@ namespace KillingMahjong.UI
             _isAutoDiscarding = true;
             yield return new WaitForSeconds(0.5f); // Simulate human delay
             
-            if (uiManager.CurrentPhaseStatus != RoundStatus.Discard || !BoardStateManager.Instance.IsLocalTurn) 
+            if (uiManager.CurrentPhaseStatus != RoundStatus.Discard || !BoardStateManager.Instance.IsLocalTurn)
             {
                 _isAutoDiscarding = false;
                 yield break;
             }
-            if (IsAgariPending()) 
+            // 待っている 0.5 秒の間に演出が始まることがあるので、ここでも見る
+            if (uiManager.IsBusyWithTransition)
+            {
+                _isAutoDiscarding = false;
+                yield break;
+            }
+            if (IsAgariPending())
             {
                 CancelAutoDiscard();
                 _isAutoDiscarding = false;

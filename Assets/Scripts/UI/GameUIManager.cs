@@ -351,8 +351,19 @@ namespace KillingMahjong.UI
         // 捨てる代わりにここへ積み、演出が明けてから実行する。
 
         private readonly List<KeyValuePair<string, Action>> deferredActions = new List<KeyValuePair<string, Action>>();
-        private bool isFlushWatcherRunning = false;
         private bool ignoreBusyForForcedFlush = false;
+
+        /// <summary>
+        /// 保留を流す見張り。**bool ではなく Coroutine のハンドルで持つ。**
+        ///
+        /// 以前は `isFlushWatcherRunning` という bool で二重起動を防いでいたが、
+        /// コルーチンが外から止められると true のまま取り残され、
+        /// `if (!isFlushWatcherRunning)` が二度と通らなくなる。
+        /// そうなると保留は永久に実行されず、8秒の強制実行という安全網ごと死ぬ
+        /// （実際にロン猶予が保留されたまま対局が停止した）。
+        /// ハンドルなら StopCoroutine されても null 判定と併せて張り直せる。
+        /// </summary>
+        private Coroutine flushWatcher;
 
         /// <summary>
         /// 何らかの演出が進行中で、UI を触ると壊れる状態かどうか。
@@ -376,12 +387,28 @@ namespace KillingMahjong.UI
             else deferredActions.Add(entry);
             Debug.Log($"[GameUIManager] 演出中のため '{key}' を保留しました。演出完了後に実行します。");
 
-            if (!isFlushWatcherRunning) StartCoroutine(FlushDeferredActionsRoutine());
+            EnsureFlushWatcher();
+        }
+
+        /// <summary>
+        /// 見張りが動いていなければ張り直す。保留がある限り、何度呼んでも安全。
+        /// </summary>
+        private void EnsureFlushWatcher()
+        {
+            if (flushWatcher != null) return;
+            if (!isActiveAndEnabled) return;
+            flushWatcher = StartCoroutine(FlushDeferredActionsRoutine());
+        }
+
+        private void Update()
+        {
+            // コルーチンが外から止められても、保留が残っていれば必ず拾い直す。
+            // これが最後の砦で、ここが無いと「進行が止まったまま何も起きない」に戻る。
+            if (deferredActions.Count > 0) EnsureFlushWatcher();
         }
 
         private IEnumerator FlushDeferredActionsRoutine()
         {
-            isFlushWatcherRunning = true;
 
             // 演出の途中で一瞬だけ isTransitioning が false に戻る箇所があるため
             // （TriggerBettingAnimationPhase の onMidpoint）、必ず1フレーム待ってから判定する。
@@ -403,7 +430,7 @@ namespace KillingMahjong.UI
 
             var toRun = new List<KeyValuePair<string, Action>>(deferredActions);
             deferredActions.Clear();
-            isFlushWatcherRunning = false;
+            flushWatcher = null;
 
             // 強制実行のときはガードを一時的に無効化する。
             // そうしないと各処理が冒頭で再び「演出中」と判定して保留し直し、

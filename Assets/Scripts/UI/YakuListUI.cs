@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using System.Collections;
 using System.Collections.Generic;
 
 namespace KillingMahjong.UI
@@ -34,6 +35,8 @@ namespace KillingMahjong.UI
 
         private void Start()
         {
+            // 文字を読めるようにするのは、データを入れるより先。
+            ApplyActiveBoostReadability();
 
             if (yakuListPanel != null)
                 yakuListPanel.SetActive(false); // 最初は非表示
@@ -85,6 +88,8 @@ namespace KillingMahjong.UI
             {
                 yakuListPanel.SetActive(true);
             }
+
+            CenterYakuGrid();
         }
 
         public void CloseYakuList()
@@ -93,6 +98,74 @@ namespace KillingMahjong.UI
             {
                 yakuListPanel.SetActive(false);
             }
+        }
+
+        /// <summary>
+        /// 全役一覧のボックスを表示領域の中央へ寄せる。
+        ///
+        /// グリッドは `padding` が全て 0 の左揃えで、2列ぶんの幅（100×2 + 間隔5 = 205）に対して
+        /// 表示領域が 233 あった。余りの 28 が全部右側に出て、ボックスが左に寄って見えていた。
+        ///
+        /// 余りを左右へ半分ずつ振り分ける。値を直に書かないのは、セルの大きさや列数を
+        /// 変えたときに勝手に追従してほしいから。
+        ///
+        /// `childAlignment` を中央にする手もあるが、それだと**最終行が1個だけのとき
+        /// その1個が中央に来て段がずれる**ので使わない。padding なら行の左揃えは保たれる。
+        ///
+        /// **シーンではなくここで直す。** 対局シーンが2つあるため、シーンを直すと
+        /// 片方だけ直す事故が起きる。
+        /// </summary>
+        private void CenterYakuGrid()
+        {
+            var content = contentContainer as RectTransform;
+            if (content == null) return;
+
+            var grid = content.GetComponent<GridLayoutGroup>();
+            var viewport = content.parent as RectTransform;
+            if (grid == null || viewport == null) return;
+
+            float viewportWidth = ResolveWidth(viewport);
+            if (viewportWidth <= 0f) return;
+
+            int columns = grid.constraint == GridLayoutGroup.Constraint.FixedColumnCount
+                ? Mathf.Max(1, grid.constraintCount)
+                : 1;
+
+            float used = columns * grid.cellSize.x + (columns - 1) * grid.spacing.x;
+            float slack = viewportWidth - used;
+            if (slack <= 0f) return;            // 入りきっている。寄せる余地が無い
+
+            int left = Mathf.RoundToInt(slack * 0.5f);
+            if (grid.padding.left == left) return;
+
+            // RectOffset は中の値を書き換えても再計算されないことがあるので、入れ替える
+            grid.padding = new RectOffset(left, grid.padding.right, grid.padding.top, grid.padding.bottom);
+            LayoutRebuilder.ForceRebuildLayoutImmediate(content);
+        }
+
+        /// <summary>
+        /// 幅を求める。**`rect.width` を待たない。**
+        ///
+        /// 開いた直後は `rect.width` が 0 で、`Canvas.ForceUpdateCanvases()` では直らない
+        /// （あれは描画の更新で、レイアウトの再計算は走らない）。
+        /// フレームを待つ方式も試したが、このパネルは開いた直後に別の都合で閉じられることがあり、
+        /// 待っている間に条件が崩れて空振りする。
+        ///
+        /// 引き伸ばしアンカーなら幅は「親の幅 × アンカー幅 + sizeDelta」で決まるので、
+        /// 0 のときは親をたどって計算する。レイアウトの実行順に依存しない。
+        /// </summary>
+        private static float ResolveWidth(RectTransform rect)
+        {
+            if (rect == null) return 0f;
+
+            float width = rect.rect.width;
+            if (width > 0f) return width;
+
+            var parent = rect.parent as RectTransform;
+            if (parent == null) return 0f;
+
+            float anchorSpan = rect.anchorMax.x - rect.anchorMin.x;
+            return anchorSpan * ResolveWidth(parent) + rect.sizeDelta.x;
         }
 
         private void InitializeItems()
@@ -127,7 +200,78 @@ namespace KillingMahjong.UI
 
             UpdateActiveBoosts(localBoost, localActiveBoostTexts);
             UpdateActiveBoosts(enemyBoost, enemyActiveBoostTexts);
+
+            // **文字を入れて枠を表示させた「後」に当て直す。**
+            // Start の時点では枠がまだ非アクティブで TMP が初期化されておらず、
+            // `fontSharedMaterial` が null のためマテリアルの差し替えだけ空振りする
+            // （自動縮小など他の設定は効くので、直ったように見えて輪郭だけ残る）。
+            ApplyActiveBoostReadability();
         }
+
+        /// <summary>常時表示の強化役（自3枠・敵3枠）の文字を読めるようにする。</summary>
+        private void ApplyActiveBoostReadability()
+        {
+            ApplyActiveBoostReadability(localActiveBoostTexts);
+            ApplyActiveBoostReadability(enemyActiveBoostTexts);
+        }
+
+        /// <summary>
+        /// 常時表示の強化役が読みにくかった原因を潰す。
+        ///
+        /// 読みにくさの主犯だった**白い輪郭はマテリアル側で消してある**
+        /// （`Assets/Resources/PixelMplus-20130602/PixelMplus-20130602/YakuChip_Outline.mat`
+        /// の `_OutlineWidth` を 0.1 → 0）。このマテリアルは各シーンで6箇所＝チップ専用なので、
+        /// 資産を直せば両シーンに一度で効く。
+        ///
+        /// **コードから `text.outlineWidth = 0` で消そうとしても効かない。** 輪郭の実体は
+        /// マテリアルの `_OutlineWidth` で、プロパティ側を 0 にしても値が残る。
+        /// マテリアルを実行時に差し替える手もあるが、`Start` の時点では枠が非アクティブで
+        /// TMP が未初期化＝`fontSharedMaterial` が null のため空振りする。ここでは扱わない。
+        ///
+        /// このメソッドが持つのは、輪郭以外の読みやすさ（色と、枠に収める縮小）だけ。
+        /// </summary>
+        private void ApplyActiveBoostReadability(TextMeshProUGUI[] textArray)
+        {
+            if (textArray == null) return;
+
+            foreach (var text in textArray)
+            {
+                if (text == null) continue;
+
+                // 背景は自＝水色・敵＝赤で、どちらも明るい。黒で十分な差が出る
+                text.color = Color.black;
+
+                // **文字の矩形をチップに合わせる。** シーンでは文字が 200 幅で、
+                // チップ(100幅)の倍あった。自動縮小は文字の矩形を基準にするので、
+                // チップからはみ出していても縮まない（実際に「三色同順+1」が溢れていた）。
+                var rect = text.rectTransform;
+                rect.anchorMin = Vector2.zero;
+                rect.anchorMax = Vector2.one;
+                rect.offsetMin = new Vector2(ActiveBoostTextPadding, 0f);
+                rect.offsetMax = new Vector2(-ActiveBoostTextPadding, 0f);
+
+                // margin が残っていると中央揃えでも上下にずれる（おまかせボタンで踏んだ罠）
+                text.margin = Vector4.zero;
+                text.alignment = TextAlignmentOptions.Center;
+
+                // 「混全帯么九+1」のような長い名前でも枠に収まるように縮める。
+                // 折り返すと2行になって枠からはみ出すので、折り返しはさせない。
+                text.enableAutoSizing = true;
+                text.fontSizeMax = ActiveBoostFontSize;
+                text.fontSizeMin = ActiveBoostMinFontSize;
+                text.textWrappingMode = TextWrappingModes.NoWrap;
+                text.overflowMode = TextOverflowModes.Overflow;
+            }
+        }
+
+        /// <summary>常時表示の強化役の基本サイズ。シーンの値と同じ。</summary>
+        private const float ActiveBoostFontSize = 20f;
+
+        /// <summary>これ以上小さくすると読めなくなる下限。</summary>
+        private const float ActiveBoostMinFontSize = 14f;
+
+        /// <summary>文字がチップの縁に触れないようにする内側の余白（チップ幅100に対して）。</summary>
+        private const float ActiveBoostTextPadding = 4f;
 
         private void UpdateActiveBoosts(Dictionary<string, int> boostDict, TextMeshProUGUI[] textArray)
         {
