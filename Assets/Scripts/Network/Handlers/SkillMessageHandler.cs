@@ -25,6 +25,23 @@ namespace KillingMahjong.Network.Handlers
                     if (scMsg != null && scMsg.data != null)
                     {
                         scMsg.data.exposedHandIndexesByPlayer = ServerJsonParser.ParseExposedHandIndexesByPlayer(jsonString);
+
+                        // 実際に引かれた額をサーバーから教わる唯一の機会。控えておくと、
+                        // 次から能力一覧が複製の表ではなく本物の額を出せる。
+                        //
+                        // **自分の発動だけを覚える。** コストは特殊勝利の回数で段が変わるが、
+                        // 相手が何回使ったかは分からないので、相手のぶんを自分の回数で覚えると
+                        // 違う段の額を混ぜてしまう。
+                        //
+                        // ここは status で回数が更新される前なので、
+                        // LocalPlayerSpecialVictoryCount は発動時点の回数のまま
+                        // （特殊勝利そのものを撃ったときも、支払ったのは増える前の段の額）。
+                        if (scMsg.data.player_id == network.LocalPlayerId && board != null)
+                        {
+                            GameRules.SetServerSkillCost(
+                                scMsg.data.skillType, board.LocalPlayerSpecialVictoryCount, scMsg.data.cost);
+                        }
+
                         network.RaiseSkillCasted(scMsg.data);
 
                         // スキル使用直後に、役の強化状況や最新のHPを確実に取り寄せる

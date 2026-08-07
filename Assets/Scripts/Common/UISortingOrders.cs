@@ -122,6 +122,22 @@ namespace KillingMahjong.Common
         /// <summary>ConfirmationDialogUI: 確認ダイアログ (手牌等より手前)</summary>
         public const int ConfirmationDialog = 80;
 
+        /// <summary>
+        /// TitleMultiMenuUI: タイトルの「マルチ」で出す対戦相手の探し方メニュー。
+        ///
+        /// **専用の Canvas と GraphicRaycaster を持たせること。**
+        /// 2026-08-07 に、既存の Canvas を探して間借りする作りで「見えているのに押せない」
+        /// 不具合を出した。原因は取り付け先が `UICursorCanvas`（自前マウスカーソル・
+        /// sortingOrder 99）になっていたこと。**あの Canvas は GraphicRaycaster が
+        /// 意図的に disabled** で（カーソルの絵がクリックを食わないように）、
+        /// 配下の UI はすべて当たり判定を失う。描画は最前面なので見た目だけは正しく、
+        /// 原因が見えにくい。
+        ///
+        /// タイトルシーンには 80 番台の住人が他に居ないのでここを使う。
+        /// カーソル(99)より奥なのは意図どおりで、カーソルはメニューの上に出てよい。
+        /// </summary>
+        public const int TitleMenuOverlay = 81;
+
         /// <summary>WaitUI: 待ち牌表示を最前面に出す際のレイヤー</summary>
         public const int WaitDisplayFront = 84;
 

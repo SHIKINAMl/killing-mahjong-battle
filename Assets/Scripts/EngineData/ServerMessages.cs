@@ -28,6 +28,13 @@ namespace KillingMahjong.EngineData
     ///   単騎倍率 … loser_loss_multiplier（単騎待ちなら2、それ以外1。敗者の支払いにだけ掛かる）
     /// 勝者の獲得 = winner_bet × multiplier
     /// 敗者の損失 = loser_bet × multiplier × loser_loss_multiplier
+    ///
+    /// **強襲（assault）を撃っていた局はこの式が崩れる**（2026-08-04 にサーバーへ追加）。
+    /// 勝者の獲得が 0 になり、得るはずだった額がそのまま敗者への追加ダメージへ回る:
+    ///   winner_gain          … 0
+    ///   winner_original_gain … 強襲が無ければ得ていた額
+    ///   loser_loss           … 上の式 ＋ assault_bonus_damage
+    /// 内訳を出すときは assault_applied を先に見ること。
     /// </summary>
     [Serializable]
     public class LiquidationData
@@ -41,6 +48,16 @@ namespace KillingMahjong.EngineData
         public int winner_bet;   // = winner_effective_bet（持ち越し込みの素点）
         public int loser_bet;    // = loser_effective_bet
         public int winner_gain;
+
+        /// <summary>強襲が無ければ勝者が得ていた額。強襲していなければ winner_gain と同じ。</summary>
+        public int winner_original_gain;
+
+        /// <summary>この局、勝者が強襲を撃っていたか。</summary>
+        public bool assault_applied;
+
+        /// <summary>強襲で敗者へ上乗せされたダメージ（＝ winner_original_gain）。</summary>
+        public int assault_bonus_damage;
+
         public int loser_loss;
         public int loser_loss_multiplier; // 単騎倍率
         public bool is_tanki_wait;
@@ -70,6 +87,37 @@ namespace KillingMahjong.EngineData
     public class ConnectedData
     {
         public string client_id;
+    }
+
+    /// <summary>
+    /// "matching_waiting": 待機列に入った／プライベート部屋を作った合図。
+    /// **2026-08-03 の `addf82e` で中身が増えた**（それまでは type だけを見て捨てていた）。
+    /// </summary>
+    [Serializable]
+    public class MatchingWaitingMessage
+    {
+        public string type;
+        public MatchingWaitingData data;
+    }
+
+    [Serializable]
+    public class MatchingWaitingData
+    {
+        /// <summary>
+        /// `public`（野良の待機列に入った）か `private_host`（部屋を作って相手を待っている）。
+        /// 合言葉で入った側は待機を経ずに即マッチするので、このメッセージ自体が来ない。
+        /// </summary>
+        public string mode;
+
+        /// <summary>
+        /// `private_host` のときだけ入る**5文字の合言葉**（英大文字と数字）。
+        /// 相手に伝えるためのものなので、画面に出さないと部屋の意味がない。
+        /// </summary>
+        public string password;
+
+        public int queue_position;
+        public int queue_size;
+        public int need_players;
     }
 
     [Serializable]

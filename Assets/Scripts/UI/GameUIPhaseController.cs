@@ -42,12 +42,39 @@ namespace KillingMahjong.UI
             this.uiManager = manager;
         }
 
-        public void ShowMatchmakingWaiting()
+        public void ShowMatchmakingWaiting(KillingMahjong.EngineData.MatchingWaitingData data = null)
         {
             Debug.Log("[GameUIPhaseController] ShowMatchmakingWaiting called.");
             if (uiManager != null && uiManager.IsTutorialMode) return; // チュートリアル中は非表示
 
-            if (uiManager.MatchmakingUI != null) uiManager.MatchmakingUI.ShowWaiting();
+            if (uiManager.MatchmakingUI != null) uiManager.MatchmakingUI.ShowWaiting(BuildWaitingMessage(data));
+            ShowMatchmakingWaitingBody();
+        }
+
+        /// <summary>
+        /// 待機画面に出す文言を組む。
+        ///
+        /// **部屋を作った側（private_host）は合言葉を出さないと意味がない。**
+        /// 相手はこの5文字を打ち込んで入ってくる。
+        /// 合言葉で入った側にはそもそもこのメッセージが来ない（即マッチするため）。
+        /// </summary>
+        private static string BuildWaitingMessage(KillingMahjong.EngineData.MatchingWaitingData data)
+        {
+            const string DefaultMessage = "Waiting for Opponent\n対戦相手を待っています...";
+
+            if (data == null) return DefaultMessage;
+
+            if (data.mode == "private_host" && !string.IsNullOrEmpty(data.password))
+            {
+                return $"あいことば\n<size=150%>{data.password}</size>\n\nこの5文字を相手に伝えてください";
+            }
+
+            return DefaultMessage;
+        }
+
+        /// <summary>待機中に盤面を片付ける。文言だけ差し替えたいときと分けている。</summary>
+        private void ShowMatchmakingWaitingBody()
+        {
             SetMatchUIVisibility(false);
             
             if (uiManager.RiverUI != null) uiManager.RiverUI.gameObject.SetActive(false);
@@ -97,6 +124,9 @@ namespace KillingMahjong.UI
         {
             _currentRoundIndex = 1;
             ResetPhaseReadyMarks();
+
+            // 前の対局で覚えたスキルコストは持ち越さない（特殊勝利の回数が 0 に戻るため）
+            GameRules.ClearServerSkillCosts();
 
             try
             {

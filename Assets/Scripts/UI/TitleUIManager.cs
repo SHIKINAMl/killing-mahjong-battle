@@ -16,13 +16,36 @@ namespace KillingMahjong.UI
             // CanvasScalerの強制上書きは、OptionUIでの解像度設定とコンフリクトするため削除
         }
 
+        private TitleMultiMenuUI multiMenu;
+
         /// <summary>
-        /// 1つ目のボタン（ゲームスタートなど）が押された時の処理
+        /// 「マルチ」が押された時の処理。
+        ///
+        /// **シーンの `onClick` はこのメソッド名で配線済みなので、名前は変えないこと。**
+        /// 作り直すと配線が外れて「押しても何も起きない」状態になる。
+        /// 中身だけを差し替えて、対戦相手の探し方（野良／部屋を作る／あいことば）を
+        /// 先に選ばせるようにしている。
         /// </summary>
         public void OnClickStartButton()
         {
-            Debug.Log("ゲーム開始！ " + nextSceneName + " に遷移します。");
-            
+            if (multiMenu == null)
+            {
+                multiMenu = gameObject.AddComponent<TitleMultiMenuUI>();
+            }
+
+            multiMenu.Open(mode =>
+            {
+                Debug.Log($"マルチ開始（{mode}）。{nextSceneName} に遷移します。");
+                StartMultiplayScene();
+            });
+        }
+
+        /// <summary>
+        /// 対局シーンへ移る。`MatchJoinRequest` は呼ぶ前に設定しておくこと
+        /// （`join` は接続直後に自動で飛ぶので、シーンに入ってからでは間に合わない）。
+        /// </summary>
+        private void StartMultiplayScene()
+        {
             if (KillingMahjong.UI.LoadingManager.Instance != null)
             {
                 KillingMahjong.UI.LoadingManager.Instance.FadeOutScreen(() => 

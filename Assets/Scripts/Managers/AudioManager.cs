@@ -195,6 +195,7 @@ namespace KillingMahjong.Managers
             synth.Prewarm(SynthWaveType.Triangle, SynthWaveType.Square, true, 880f, 1174f, 0.18f);
             synth.Prewarm(SynthWaveType.Sine, SynthWaveType.Noise, true, 300f, 1800f, 0.55f);
             synth.Prewarm(SynthWaveType.Sawtooth, SynthWaveType.Square, true, 160f, 640f, 0.6f);
+            synth.Prewarm(SynthWaveType.Sawtooth, SynthWaveType.Noise, true, 220f, 1760f, 0.28f);
             synth.Prewarm(SynthWaveType.Square, SynthWaveType.Noise, true, 1200f, 90f, 0.9f);
 
             // 賭け金確定・回復
@@ -416,6 +417,12 @@ namespace KillingMahjong.Managers
                     // 役強化：どっしり上昇する重い音
                     PlaySynthSoundDual(SynthWaveType.Sawtooth, SynthWaveType.Square,
                         160f, 640f, 0.6f, 1.0f);
+                    break;
+
+                case KillingMahjong.Common.SkillNames.Assault:
+                    // 強襲：獲得を捨てて殴りにいく。短く鋭い、刺すような上昇音
+                    PlaySynthSoundDual(SynthWaveType.Sawtooth, SynthWaveType.Noise,
+                        220f, 1760f, 0.28f, 1.0f);
                     break;
 
                 case KillingMahjong.Common.SkillNames.SpecialVictory:

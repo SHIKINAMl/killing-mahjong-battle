@@ -43,19 +43,22 @@ namespace KillingMahjong.UI
         private AbilityItemUI currentSelection;
 
         // Real Data Class matching Python
+        //
+        // コストはここに持たない。額はサーバーが決めるものなので、
+        // 表示のたびに GameRules.GetSkillCost() から取り直す（PopulateList / OnActivateClicked）。
+        // 以前はここにも 1200 などの実数が書いてあったが、実際には使われておらず、
+        // 「Unity 側にもコスト表がある」と誤解させるだけだった。
         [System.Serializable]
         public class AbilityData
         {
             public string skillType;
             public string name;
-            public int cost;
             public string description;
-            
-            public AbilityData(string type, string n, int c, string d)
+
+            public AbilityData(string type, string n, string d)
             {
                 skillType = type;
                 name = n;
-                cost = c;
                 description = d;
             }
         }
@@ -103,13 +106,20 @@ namespace KillingMahjong.UI
         {
             if (realAbilities != null) return;
 
-            // Pythonの設定に合わせたアビリティ一覧
+            // スキルの種類（skillType）はサーバーの SkillType enum と対になっている。
+            // 表示名は SkillNames に一本化してあるので、ここでは文字列を書かない。
             realAbilities = new System.Collections.Generic.List<AbilityData>
             {
-                new AbilityData("mulligan", "牌交換", 1200, "手牌か山牌から不要な牌を選び、山札と交換する。"),
-                new AbilityData("perspective", "透視", 1500, "相手の手牌をランダムに3枚公開する。"),
-                new AbilityData("boost_hand", "役強化", 10000, "指定した役の翻数を+1する。"),
-                new AbilityData("special_victory", "特殊勝利", 30000, "3回発動すると無条件で勝利する。")
+                new AbilityData(SkillNames.Mulligan, SkillNames.GetDisplayName(SkillNames.Mulligan),
+                    "手牌か山牌から不要な牌を選び、山札と交換する。"),
+                new AbilityData(SkillNames.Perspective, SkillNames.GetDisplayName(SkillNames.Perspective),
+                    "相手の手牌をランダムに3枚公開する。"),
+                new AbilityData(SkillNames.BoostHand, SkillNames.GetDisplayName(SkillNames.BoostHand),
+                    "指定した役の翻数を+1する。"),
+                new AbilityData(SkillNames.Assault, SkillNames.GetDisplayName(SkillNames.Assault),
+                    "この局は上がっても点を得ない。代わりに、得るはずだった額を相手への追加ダメージにする。1局1回。"),
+                new AbilityData(SkillNames.SpecialVictory, SkillNames.GetDisplayName(SkillNames.SpecialVictory),
+                    "3回発動すると無条件で勝利する。")
             };
         }
 
@@ -324,7 +334,9 @@ namespace KillingMahjong.UI
                 if (index >= 0 && index < realAbilities.Count)
                 {
                     var data = realAbilities[index];
-                    Debug.Log($"Activting Ability: {data.name} (Cost: {data.cost}, Type: {data.skillType})");
+                    Debug.Log($"Activting Ability: {data.name} " +
+                              $"(Cost: {GameRules.GetSkillCost(data.skillType, CurrentSpecialVictoryCount)}, " +
+                              $"Type: {data.skillType})");
                     
                     var uiMgr = FindFirstObjectByType<GameUIManager>();
                     if (uiMgr != null)

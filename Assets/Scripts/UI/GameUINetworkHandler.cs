@@ -83,10 +83,10 @@ namespace KillingMahjong.UI
             uiManager.PhaseController?.OnGameStarted();
         }
 
-        private void HandleMatchmakingWaiting()
+        private void HandleMatchmakingWaiting(KillingMahjong.EngineData.MatchingWaitingData data)
         {
             Debug.Log("[GameUINetworkHandler] HandleMatchmakingWaiting called.");
-            
+
             // 暗転を明けさせつつ、マッチング待機画面を出す
             if (KillingMahjong.UI.LoadingManager.Instance != null)
             {
@@ -97,7 +97,7 @@ namespace KillingMahjong.UI
                 });
             }
             
-            uiManager.PhaseController?.ShowMatchmakingWaiting();
+            uiManager.PhaseController?.ShowMatchmakingWaiting(data);
         }
 
         private void HandleMatchCancelled(string reason)

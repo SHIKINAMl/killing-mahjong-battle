@@ -17,8 +17,11 @@ namespace KillingMahjong.Network.Handlers
             switch (messageType)
             {
                 case "matching_waiting":
-                    Debug.Log("[MatchLifecycleMessageHandler] matching_waiting received.");
-                    network.RaiseMatchmakingWaiting();
+                    MatchingWaitingMessage waitMsg = JsonUtility.FromJson<MatchingWaitingMessage>(jsonString);
+                    MatchingWaitingData waitData = waitMsg != null ? waitMsg.data : null;
+                    Debug.Log("[MatchLifecycleMessageHandler] matching_waiting received. " +
+                              $"mode={waitData?.mode} queue={waitData?.queue_position}/{waitData?.queue_size}");
+                    network.RaiseMatchmakingWaiting(waitData);
                     break;
 
                 case "match_cancelled":

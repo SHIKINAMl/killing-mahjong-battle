@@ -113,6 +113,24 @@ namespace KillingMahjong.Network
 
         [Header("Client References")]
         [SerializeField] private WebSocketGameClientSample webSocketClient;
+
+        /// <summary>
+        /// 実際に送信に使うクライアント。
+        ///
+        /// **シリアライズ参照だけを見てはいけない。**
+        /// 接続はシーンをまたいで1つだけ生かす作りになったので（合言葉で入るとき、
+        /// 対局シーンへ移る前に接続して結果を見る必要があるため）、
+        /// タイトルで作った実体が居ると、このシーンに置かれている実体は
+        /// `WebSocketGameClientSample.Awake` が破棄する。
+        /// するとこの参照は「破棄済みオブジェクト」になり、Unity の == で null 判定に落ちる。
+        /// 気づかずに使うと **送信だけが黙って捨てられ**、受信はできているので
+        /// 「対局に入れたのに何をしても反応しない」という分かりにくい壊れ方をする
+        /// （2026-08-07 に強襲が撃てない形で発覚）。
+        ///
+        /// 生きている実体は必ず Instance にあるので、そちらを優先する。
+        /// </summary>
+        private WebSocketGameClientSample ActiveClient =>
+            WebSocketGameClientSample.Instance != null ? WebSocketGameClientSample.Instance : webSocketClient;
         
         [SerializeField] private bool useDebugClient;
         public bool UseDebugClient => useDebugClient;
@@ -120,7 +138,8 @@ namespace KillingMahjong.Network
         [SerializeField] private KillingMahjong.Network.DebugWebSocketClient debugWebSocketClient;
 
         // イベントルーティング
-        public event Action OnMatchmakingWaiting;
+        /// <summary>待機に入った合図。data は届かないこともあるので null を許す。</summary>
+        public event Action<MatchingWaitingData> OnMatchmakingWaiting;
         public event Action<string> OnMatchCancelled;
         public event Action OnGameStarted;
         public event Action<int, int, int, int> OnBettingComplete;
@@ -162,7 +181,7 @@ namespace KillingMahjong.Network
         /// <summary>ロン二重発火防止フラグ (round_end / discard_accepted 間で共有)</summary>
         internal bool AgariProcessed { get { return agariProcessed; } set { agariProcessed = value; } }
 
-        internal void RaiseMatchmakingWaiting() => OnMatchmakingWaiting?.Invoke();
+        internal void RaiseMatchmakingWaiting(MatchingWaitingData data) => OnMatchmakingWaiting?.Invoke(data);
         internal void RaiseMatchCancelled(string reason) => OnMatchCancelled?.Invoke(reason);
         internal void RaiseGameStarted() => OnGameStarted?.Invoke();
         internal void RaiseBettingComplete(int playerBet, int enemyBet, int playerHp, int enemyHp) => OnBettingComplete?.Invoke(playerBet, enemyBet, playerHp, enemyHp);
@@ -225,7 +244,13 @@ namespace KillingMahjong.Network
                 return;
             }
 
-            if (webSocketClient == null) return;
+            var client = ActiveClient;
+            if (client == null)
+            {
+                // 黙って捨てると「押しても何も起きない」だけが残り、原因が追えない
+                Debug.LogError($"[Network] 送信先のクライアントが居ないため action '{actionType}' を送れませんでした");
+                return;
+            }
 
             var msg = new ActionMessage
             {
@@ -238,7 +263,7 @@ namespace KillingMahjong.Network
             };
 
             string json = JsonUtility.ToJson(msg);
-            await webSocketClient.SendAsync(json);
+            await client.SendAsync(json);
         }
 
         public void ProcessServerMessage(string jsonString)

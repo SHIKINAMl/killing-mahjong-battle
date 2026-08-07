@@ -485,6 +485,20 @@ namespace KillingMahjong.UI
                     uiManager.VisualController?.RebuildAllTilesFromState();
                 }
             }
+
+            // **どのスキルでも必ずロックを解除する。**
+            //
+            // 上の分岐は透視とマリガンしか見ておらず、役強化・特殊勝利・強襲は
+            // 198行目で立てた IsTransitioning を誰も倒さないまま抜けていた。
+            // 立ったままだと入力が固まるだけでなく、演出中に届いたサーバーイベントが
+            // DeferUntilIdle に積まれたまま流れないため、手牌選択が永久に完了せず
+            // **相手も巻き添えで止まる**（2026-08-07 に強襲で発覚。実際には元からある不具合で、
+            // 役強化 10000・特殊勝利 30000 は滅多に撃たれないので表に出ていなかっただけ）。
+            //
+            // 透視・マリガンの分岐は演出を yield で待ち切ってから解除しているので、
+            // ここに来た時点では既に false。二重に倒しても害はない。
+            uiManager.SetIsTransitioning(false);
+            uiManager.VisualController?.RebuildAllTilesFromState();
         }
     }
 }

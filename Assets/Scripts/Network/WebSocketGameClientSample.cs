@@ -50,16 +50,89 @@ public class WebSocketGameClientSample : MonoBehaviour
     private WebSocket webSocket;
 
     /// <summary>
+    /// 生きている接続。**シーンをまたいで1つだけ**。
+    ///
+    /// 合言葉で部屋に入るときは、対局シーンへ移る前に接続して結果を見る必要がある。
+    /// サーバーは合言葉が当たった瞬間にその接続で対局を成立させ、部屋を消してしまうので、
+    /// 「タイトルで確かめて、繋ぎ直して本番」ができない
+    /// （`websocket_server.py` の `_join_private_room`）。
+    /// そのため接続そのものを持ち越す。
+    /// </summary>
+    public static WebSocketGameClientSample Instance { get; private set; }
+
+    /// <summary>join を二度送らないための印。</summary>
+    private bool hasSentJoin;
+
+    /// <summary>接続を張っている最中。ConnectAsync の再入を弾くのに使う。</summary>
+    private bool isConnecting;
+
+    /// <summary>
+    /// UI がまだ居ないうちに届いたメッセージ。
+    /// タイトルで `private_join` が通ると、対局シーンを読み込む前に `game_started` が届く。
+    /// 捨てると対局が始まらないので、貯めておいて UI が現れたら流す。
+    /// </summary>
+    private readonly System.Collections.Generic.List<string> pendingMessages =
+        new System.Collections.Generic.List<string>();
+
+    /// <summary>サーバーからの error。タイトルが合言葉の失敗を知るために使う。</summary>
+    public event Action<string> OnServerError;
+
+    /// <summary>対局が成立した合図（game_started）。</summary>
+    public event Action OnMatchStarted;
+
+    /// <summary>
     /// 接続中かどうか。
     /// </summary>
     public bool IsConnected => webSocket != null && webSocket.State == WebSocketState.Open;
+
+    private void Awake()
+    {
+        // タイトルで作った接続が既に居るなら、対局シーン側の実体は要らない。
+        // 破棄しないと二重に繋いで join を二度送ってしまう
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        Instance = this;
+        transform.SetParent(null);
+        DontDestroyOnLoad(gameObject);
+        UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoaded;
+    }
+
+    /// <summary>
+    /// **対局のあるシーン以外へ移ったら接続を畳む。**
+    ///
+    /// 接続がシーンをまたいで生き残るようになったので、対局を抜けてタイトルへ戻っても
+    /// 繋がったままになる。サーバー側では対局中の扱いが残るため、次に対戦を始めようとすると
+    /// `Already in a match` で弾かれる。
+    ///
+    /// 判定は「新しいシーンに GameUIManager が居るか」。sceneLoaded は
+    /// そのシーンの Awake が全部済んでから呼ばれるので、ここで見れば確実。
+    /// タイトルで合言葉を確認している最中はシーンを読み込まないので、巻き添えにはならない。
+    /// </summary>
+    private async void OnSceneLoaded(UnityEngine.SceneManagement.Scene scene,
+                                     UnityEngine.SceneManagement.LoadSceneMode mode)
+    {
+        if (Instance != this) return;
+        if (FindFirstObjectByType<KillingMahjong.UI.GameUIManager>() != null) return;
+
+        Log($"[WebSocket] 対局シーンを離れたので接続を閉じます (scene={scene.name})");
+        await ResetConnectionAsync();
+    }
 
     /// <summary>
     /// 起動時。必要なら自動接続する。
     /// </summary>
     private async void Start()
     {
-        if (!autoConnectOnStart)
+        if (Instance != this)
+        {
+            return;
+        }
+
+        if (!autoConnectOnStart || IsConnected)
         {
             return;
         }
@@ -80,6 +153,7 @@ public class WebSocketGameClientSample : MonoBehaviour
 #if !UNITY_WEBGL || UNITY_EDITOR
         webSocket?.DispatchMessageQueue();
 #endif
+        FlushPendingIfUIReady();
     }
 
     /// <summary>
@@ -87,6 +161,26 @@ public class WebSocketGameClientSample : MonoBehaviour
     /// </summary>
     private async void OnDestroy()
     {
+        if (Instance != this)
+        {
+            // Awake で弾かれた重複。生きている接続を巻き添えに切らないこと
+            return;
+        }
+
+        Instance = null;
+        UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnSceneLoaded;
+        await DisconnectAsync();
+    }
+
+    /// <summary>
+    /// 接続を捨てて、次の join をやり直せる状態に戻す。
+    /// 合言葉を間違えてタイトルに留まったときに使う。
+    /// </summary>
+    public async Task ResetConnectionAsync()
+    {
+        hasSentJoin = false;
+        isConnecting = false;
+        pendingMessages.Clear();
         await DisconnectAsync();
     }
 
@@ -107,6 +201,18 @@ public class WebSocketGameClientSample : MonoBehaviour
         {
             return;
         }
+
+        // **接続中の再入を弾く。**
+        // タイトルから合言葉で入るときは、こちらから ConnectAsync を呼んだ直後に
+        // Prefab の Start（autoConnectOnStart）が走る。IsConnected はまだ false なので、
+        // この番人が無いと張りかけの接続を DisconnectAsync で切って張り直してしまい、
+        // 最初の connected と join が宙に浮く
+        if (isConnecting)
+        {
+            return;
+        }
+
+        isConnecting = true;
 
         // 既存インスタンスが残っていれば破棄
         if (webSocket != null)
@@ -159,6 +265,11 @@ public class WebSocketGameClientSample : MonoBehaviour
         catch (Exception ex)
         {
             Debug.LogError($"WebSocket connect failed: {ex.Message}");
+        }
+        finally
+        {
+            // Connect() は閉じるまで戻らないので、ここに来た時点で接続は終わっている
+            isConnecting = false;
         }
     }
 
@@ -244,18 +355,93 @@ public class WebSocketGameClientSample : MonoBehaviour
                     myClientId = connectedMsg.data.client_id ?? "";
                 }
                 Log($"[WebSocket] Connection confirmed! Client ID: {myClientId}");
-                await SendAsync("{\"type\":\"join\"}");
+
+                // 野良か、部屋を作るか、合言葉で入るか。タイトル側が MatchJoinRequest に入れておく。
+                // 繋ぎ直し（match_cancelled のあとなど）で二度送らないよう印を立てる
+                if (!hasSentJoin)
+                {
+                    hasSentJoin = true;
+                    string joinJson = KillingMahjong.Network.MatchJoinRequest.BuildJoinJson();
+                    Log($"[WebSocket] join mode={KillingMahjong.Network.MatchJoinRequest.Mode}");
+                    await SendAsync(joinJson);
+                }
+                return;
             }
 
-            var gameUIManager = FindFirstObjectByType<KillingMahjong.UI.GameUIManager>();
-            if (gameUIManager != null && msgType != "connected")
+            if (msgType == "error")
             {
-                gameUIManager.ApplyGameStateFromJSON(raw, myClientId);
+                // 合言葉が無い部屋、既に対局中、など。タイトルが受けて画面に留まる
+                var errMsg = UnityEngine.JsonUtility.FromJson<KillingMahjong.EngineData.ErrorMessage>(raw);
+                string text = errMsg != null && !string.IsNullOrEmpty(errMsg.message) ? errMsg.message : "サーバーエラー";
+                Debug.LogWarning($"[WebSocket] server error: {text}");
+
+                // 弾かれたので join はまだ成立していない。次の試行で送り直せるようにする
+                hasSentJoin = false;
+                OnServerError?.Invoke(text);
             }
+
+            if (msgType == "game_started")
+            {
+                OnMatchStarted?.Invoke();
+            }
+
+            DeliverToUI(raw);
         }
         catch (Exception ex)
         {
             Debug.LogError($"[WebSocket] Failed to parse message: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 受信メッセージを UI へ渡す。
+    ///
+    /// **UI がまだ居ないときは捨てずに貯める。** タイトルで合言葉が通ると、
+    /// 対局シーンを読み込むより先に `game_started` や `phase_change` が届く。
+    /// 捨てると盤面が初期化されないまま対局だけが進む。
+    /// </summary>
+    private void DeliverToUI(string raw)
+    {
+        var gameUIManager = FindFirstObjectByType<KillingMahjong.UI.GameUIManager>();
+        if (gameUIManager == null)
+        {
+            pendingMessages.Add(raw);
+            return;
+        }
+
+        if (pendingMessages.Count > 0)
+        {
+            // 貯めた順に流してから今の1件を渡す。順番が入れ替わるとフェーズが飛ぶ
+            var queued = pendingMessages.ToArray();
+            pendingMessages.Clear();
+            Log($"[WebSocket] UI が現れたので保留 {queued.Length} 件を流します");
+            foreach (var q in queued)
+            {
+                gameUIManager.ApplyGameStateFromJSON(q, myClientId);
+            }
+        }
+
+        gameUIManager.ApplyGameStateFromJSON(raw, myClientId);
+    }
+
+    /// <summary>
+    /// 貯めたメッセージを、UI が現れたタイミングで流す。
+    /// シーン読み込みの直後は GameUIManager がまだ Awake していないことがあるため、
+    /// 受信が無い間も毎フレーム見にいく。
+    /// </summary>
+    private void FlushPendingIfUIReady()
+    {
+        if (pendingMessages.Count == 0) return;
+
+        var gameUIManager = FindFirstObjectByType<KillingMahjong.UI.GameUIManager>();
+        if (gameUIManager == null) return;
+
+        var queued = pendingMessages.ToArray();
+        pendingMessages.Clear();
+        Log($"[WebSocket] UI が現れたので保留 {queued.Length} 件を流します");
+        foreach (var q in queued)
+        {
+            gameUIManager.ApplyGameStateFromJSON(q, myClientId);
         }
     }
 

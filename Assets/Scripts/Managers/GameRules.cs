@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using UnityEngine;
 
 namespace KillingMahjong
 {
@@ -11,7 +12,69 @@ namespace KillingMahjong
             public Dictionary<string, int> SkillCosts;
         }
 
-        private static readonly RuleSet[] CostTable = new RuleSet[]
+        // --- スキルコスト（サーバーが正） -------------------------------------
+        //
+        // 額を決めているのは Python の `mahjong_engine/engine/game_state.py` の
+        // `HP_COST_TABLE`。**この表はそちらの複製であって、正ではない。**
+        //
+        // ところがサーバーは、コストを「発動した後」にしか送ってこない
+        // （`skill_accepted` / `skill_casted` の `cost`）。能力一覧は発動する前に
+        // 「-1200」と出す必要があるため、それまでの繋ぎとしてこの表が要る。
+        //
+        // 実際に 2026-08-07 の時点で3箇所ズレていた（特殊勝利2回以降の段で
+        // 透視 5000/4500・特殊勝利 30000/45000・賭け金上限 30000/50000）。
+        // 複製がある限り同じことが起きるので、下記の方針で運用する:
+        //
+        //   1. サーバーから本物の額が届いたら `SetServerSkillCost` で覚え、以降そちらを使う
+        //   2. 届いていないぶんだけ、この表を使う
+        //   3. サーバーが発動前にコスト表を送るようになったら（SERVER_REQUESTS の A-7）、
+        //      `FallbackCostTable` ごと削除する。それがこのファイルの最終形
+        //
+        // 賭け金の上限・単位も同じ扱い。こちらは `BoardStateManager.SetServerBetRules`
+        // （`bet_accepted` で届く）が先に同じ仕組みを持っている。
+
+        /// <summary>
+        /// サーバーから実際に届いたスキルコスト。キーは「skillType の後ろに特殊勝利の回数」。
+        /// 届いたぶんだけ入るので、入っていないものは <see cref="FallbackCostTable"/> に落とす。
+        /// </summary>
+        private static readonly Dictionary<string, int> ServerSkillCosts = new Dictionary<string, int>();
+
+        private static string ServerCostKey(string skillType, int specialVictoryCount)
+        {
+            int index = ClampCostIndex(specialVictoryCount);
+            return skillType + "@" + index;
+        }
+
+        /// <summary>
+        /// サーバーが送ってきた本物のスキルコストを控える。
+        /// `skill_casted` / `skill_accepted` を受けたときに、**自分が発動したぶんだけ**呼ぶこと。
+        /// 相手の発動を自分の特殊勝利回数で覚えると、段が違う額を混ぜてしまう。
+        /// </summary>
+        public static void SetServerSkillCost(string skillType, int specialVictoryCount, int cost)
+        {
+            if (string.IsNullOrEmpty(skillType) || cost <= 0) return;
+
+            // 複製とズレていたら気づけるようにしておく。黙って動くと、
+            // 一覧の表示額と実際に引かれる額が静かに食い違う
+            int fallback = GetFallbackSkillCost(skillType, specialVictoryCount);
+            if (fallback != cost)
+            {
+                Debug.LogWarning(
+                    $"[GameRules] スキルコストがサーバーと違います。" +
+                    $"サーバー {skillType}={cost} / 複製={fallback}" +
+                    $"（特殊勝利 {specialVictoryCount} 回）。GameRules 側を直してください");
+            }
+
+            ServerSkillCosts[ServerCostKey(skillType, specialVictoryCount)] = cost;
+        }
+
+        /// <summary>対局をまたいで持ち越さないよう、開始時に捨てる。</summary>
+        public static void ClearServerSkillCosts()
+        {
+            ServerSkillCosts.Clear();
+        }
+
+        private static readonly RuleSet[] FallbackCostTable = new RuleSet[]
         {
             // Count 0
             new RuleSet
@@ -23,6 +86,7 @@ namespace KillingMahjong
                     { "mulligan", 1200 },
                     { "perspective", 1500 },
                     { "boost_hand", 10000 },
+                    { "assault", 3000 },
                     { "special_victory", 30000 }
                 }
             },
@@ -36,36 +100,58 @@ namespace KillingMahjong
                     { "mulligan", 1000 },
                     { "perspective", 3000 },
                     { "boost_hand", 9000 },
+                    { "assault", 3000 },
                     { "special_victory", 30000 }
                 }
             },
             // Count 2+
             new RuleSet
             {
-                BetMax = 30000,
+                BetMax = 50000,
                 BetUnit = 3000,
                 SkillCosts = new Dictionary<string, int>
                 {
                     { "mulligan", 800 },
-                    { "perspective", 5000 },
+                    { "perspective", 4500 },
                     { "boost_hand", 8000 },
-                    { "special_victory", 30000 }
+                    { "assault", 3000 }, // 強襲だけは段が上がっても額が変わらない
+                    { "special_victory", 45000 }
                 }
             }
         };
 
-        public static RuleSet GetRuleSet(int specialVictoryCount)
+        private static int ClampCostIndex(int specialVictoryCount)
         {
             int index = specialVictoryCount;
             if (index < 0) index = 0;
-            if (index >= CostTable.Length) index = CostTable.Length - 1;
-            return CostTable[index];
+            if (index >= FallbackCostTable.Length) index = FallbackCostTable.Length - 1;
+            return index;
         }
 
+        public static RuleSet GetRuleSet(int specialVictoryCount)
+        {
+            return FallbackCostTable[ClampCostIndex(specialVictoryCount)];
+        }
+
+        /// <summary>
+        /// スキルの血のコスト。**サーバーから届いた実額があればそれを返す。**
+        /// まだ一度も発動していないスキルだけ、複製の表に落ちる。
+        /// </summary>
         public static int GetSkillCost(string skillType, int specialVictoryCount)
         {
+            if (!string.IsNullOrEmpty(skillType) &&
+                ServerSkillCosts.TryGetValue(ServerCostKey(skillType, specialVictoryCount), out int serverCost))
+            {
+                return serverCost;
+            }
+
+            return GetFallbackSkillCost(skillType, specialVictoryCount);
+        }
+
+        private static int GetFallbackSkillCost(string skillType, int specialVictoryCount)
+        {
             var rules = GetRuleSet(specialVictoryCount);
-            if (rules.SkillCosts.TryGetValue(skillType, out int cost))
+            if (skillType != null && rules.SkillCosts.TryGetValue(skillType, out int cost))
             {
                 return cost;
             }
