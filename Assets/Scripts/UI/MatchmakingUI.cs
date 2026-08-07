@@ -10,12 +10,16 @@ namespace KillingMahjong.UI
 
         public void ShowWaiting(string message = "Waiting for Opponent\n対戦相手を待っています...")
         {
+            Debug.Log($"[MatchmakingUI] ShowWaiting called with message: {message}");
             gameObject.SetActive(true);
             if (statusText != null)
             {
                 statusText.text = message;
             }
-            if (loadingIcon != null) loadingIcon.SetActive(true);
+            else
+            {
+                Debug.LogError("[MatchmakingUI] statusText is null!");
+            }
         }
 
         public void Hide()

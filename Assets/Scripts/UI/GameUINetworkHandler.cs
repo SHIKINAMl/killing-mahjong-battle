@@ -8,14 +8,17 @@ namespace KillingMahjong.UI
     public class GameUINetworkHandler : MonoBehaviour
     {
         private GameUIManager uiManager;
+        private bool isEventsRegistered = false;
 
         public void Setup(GameUIManager manager)
         {
             this.uiManager = manager;
+            RegisterEvents();
         }
 
-        private void Start()
+        private void RegisterEvents()
         {
+            if (isEventsRegistered) return;
             if (NetworkMessageHandler.Instance != null)
             {
                 NetworkMessageHandler.Instance.OnGameStarted += HandleGameStarted;
@@ -26,6 +29,8 @@ namespace KillingMahjong.UI
                 NetworkMessageHandler.Instance.OnIsTenpaiReceived += HandleIsTenpaiReceived;
                 NetworkMessageHandler.Instance.OnNotTenpaiReceived += HandleNotTenpaiReceived;
                 NetworkMessageHandler.Instance.OnNextRoundWaitingReceived += HandleNextRoundWaitingReceived;
+                NetworkMessageHandler.Instance.OnPhaseCompletedNotice += HandlePhaseCompletedNotice;
+                NetworkMessageHandler.Instance.OnLocalBetAccepted += HandleLocalBetAccepted;
                 NetworkMessageHandler.Instance.OnHandSelectionConfirmation += HandleHandSelectionConfirmation;
                 NetworkMessageHandler.Instance.OnHandSelectionAccepted += HandleHandSelectionAccepted;
                 NetworkMessageHandler.Instance.OnSkillCasted += HandleSkillCasted;
@@ -34,14 +39,20 @@ namespace KillingMahjong.UI
                 NetworkMessageHandler.Instance.OnDraw += HandleDraw;
                 NetworkMessageHandler.Instance.OnBettingComplete += HandleBettingComplete;
                 NetworkMessageHandler.Instance.OnError += HandleError;
-                NetworkMessageHandler.Instance.OnGameEnded += HandleGameEnded;
                 NetworkMessageHandler.Instance.OnSpecialVictoryWon += HandleSpecialVictoryWon;
+                isEventsRegistered = true;
             }
+        }
+
+        private void Start()
+        {
+            // Setup()が呼ばれなかった場合のフェイルセーフとしてここでも呼ぶ
+            RegisterEvents();
         }
 
         private void OnDestroy()
         {
-            if (NetworkMessageHandler.Instance != null)
+            if (NetworkMessageHandler.Instance != null && isEventsRegistered)
             {
                 NetworkMessageHandler.Instance.OnGameStarted -= HandleGameStarted;
                 NetworkMessageHandler.Instance.OnMatchmakingWaiting -= HandleMatchmakingWaiting;
@@ -51,6 +62,8 @@ namespace KillingMahjong.UI
                 NetworkMessageHandler.Instance.OnIsTenpaiReceived -= HandleIsTenpaiReceived;
                 NetworkMessageHandler.Instance.OnNotTenpaiReceived -= HandleNotTenpaiReceived;
                 NetworkMessageHandler.Instance.OnNextRoundWaitingReceived -= HandleNextRoundWaitingReceived;
+                NetworkMessageHandler.Instance.OnPhaseCompletedNotice -= HandlePhaseCompletedNotice;
+                NetworkMessageHandler.Instance.OnLocalBetAccepted -= HandleLocalBetAccepted;
                 NetworkMessageHandler.Instance.OnHandSelectionConfirmation -= HandleHandSelectionConfirmation;
                 NetworkMessageHandler.Instance.OnHandSelectionAccepted -= HandleHandSelectionAccepted;
                 NetworkMessageHandler.Instance.OnSkillCasted -= HandleSkillCasted;
@@ -59,27 +72,31 @@ namespace KillingMahjong.UI
                 NetworkMessageHandler.Instance.OnDraw -= HandleDraw;
                 NetworkMessageHandler.Instance.OnBettingComplete -= HandleBettingComplete;
                 NetworkMessageHandler.Instance.OnError -= HandleError;
-                NetworkMessageHandler.Instance.OnGameEnded -= HandleGameEnded;
                 NetworkMessageHandler.Instance.OnSpecialVictoryWon -= HandleSpecialVictoryWon;
-            }
-        }
-
-        private void HandleGameEnded(int localScore, int enemyScore)
-        {
-            if (uiManager.PhaseController != null)
-            {
-                uiManager.PhaseController.HandleGameEnded();
             }
         }
 
         private void HandleGameStarted()
         {
+            Debug.Log("[GameUINetworkHandler] HandleGameStarted called.");
             KillingMahjong.UI.LoadingManager.Instance.ForceHide();
             uiManager.PhaseController?.OnGameStarted();
         }
 
         private void HandleMatchmakingWaiting()
         {
+            Debug.Log("[GameUINetworkHandler] HandleMatchmakingWaiting called.");
+            
+            // 暗転を明けさせつつ、マッチング待機画面を出す
+            if (KillingMahjong.UI.LoadingManager.Instance != null)
+            {
+                // 暗転中（フェード）を徐々に透明にして解除する
+                KillingMahjong.UI.LoadingManager.Instance.FadeInScreen(() => 
+                {
+                    // 必要ならコールバック内で追加処理
+                });
+            }
+            
             uiManager.PhaseController?.ShowMatchmakingWaiting();
         }
 
@@ -109,6 +126,11 @@ namespace KillingMahjong.UI
             uiManager.PhaseController?.HandleNextRoundWaitingReceived(data);
         }
 
+        private void HandlePhaseCompletedNotice(PhaseCompletedNoticeData data)
+        {
+            uiManager.PhaseController?.HandlePhaseCompletedNotice(data);
+        }
+
         private void HandleHandSelectionConfirmation(HandSelectionConfirmationData data)
         {
             uiManager.HandSelectionController?.HandleHandSelectionConfirmation(data);
@@ -117,6 +139,13 @@ namespace KillingMahjong.UI
         private void HandleHandSelectionAccepted()
         {
             uiManager.HandSelectionController?.OnHandSelectionAccepted();
+            // 自分の手牌が確定した合図。相手ぶんは phase_completed_notice を待つ
+            uiManager.PhaseController?.MarkLocalPhaseReady(RoundStatus.HandSelection);
+        }
+
+        private void HandleLocalBetAccepted()
+        {
+            uiManager.PhaseController?.MarkLocalPhaseReady(RoundStatus.Betting);
         }
 
         private void HandleSkillCasted(SkillCastedData data)
@@ -141,6 +170,10 @@ namespace KillingMahjong.UI
 
         private void HandleError(string message)
         {
+            if (KillingMahjong.UI.LoadingManager.Instance != null)
+            {
+                KillingMahjong.UI.LoadingManager.Instance.ForceHide();
+            }
             if (uiManager.DialogueUI != null)
             {
                 uiManager.DialogueUI.ShowText($"エラー: {message}");

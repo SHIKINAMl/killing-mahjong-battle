@@ -52,9 +52,72 @@ namespace KillingMahjong.Managers
         public int LastDiscardedTileId { get; set; } = -1;
         public int CurrentDoraId { get; set; } = -1;
         
-        public int LocalPlayerHp { get; private set; } = 20000;
-        public int EnemyPlayerHp { get; private set; } = 20000;
+        /// <summary>
+        /// 血の初期値。**サーバーが本物を持っている**（game_engine.py:61 の `health=20000`）。
+        ///
+        /// ここの値は、対局が始まってサーバーの health が届くまでの**つなぎ**でしかない。
+        /// 前の対局の残り血（0 など）がゲージに残ったまま見えるのを防ぐためだけに使う。
+        /// 対局開始時に status を投げて取り直すので、サーバーが値を変えればそちらが勝つ。
+        /// </summary>
+        public const int PlaceholderInitialHp = 20000;
+
+        public int LocalPlayerHp { get; private set; } = PlaceholderInitialHp;
+        public int EnemyPlayerHp { get; private set; } = PlaceholderInitialHp;
         public int LocalPlayerSpecialVictoryCount { get; set; } = 0;
+
+        /// <summary>
+        /// 血をサーバーの値で扱うか。**2026-08-04 の検証用スイッチ。**
+        ///
+        /// true  … `status` の `health` をそのまま採用し、ベットでは引かない。
+        ///         サーバーの実装（ベットでは health を減らさず、賭け金は別枠で持つ）に合わせる形。
+        /// false … 従来どおりクライアントが賭け金を血から引く。
+        ///         チュートリアルの説明・ベット演出のHP減少アニメと辻褄が合う形。
+        ///
+        /// **2026-08-04 に true で確定。サーバーの health をそのまま演出へ流す。**
+        ///
+        /// クライアントで賭け金を引き算して辻褄を合わせると、サーバー側の誤りが
+        /// 画面に出なくなり、ズレたまま気づけない。**おかしさをそのまま見せるため**、
+        /// 血はサーバーが送ってきた値だけで動かす。クライアントは一切計算しない。
+        ///
+        /// 現状こう見える（サーバーが A-8 に対応するまで）:
+        ///   ベット確定 … 血は減らない。賭け金だけが場の表示に出る
+        ///   スキル     … 減る（skill_casted の health）
+        ///   決着       … 減る（liquidation の winner_health / loser_health）
+        ///
+        /// A-8 で「血が動く場面すべてで引き、health を返す」よう依頼済み。
+        /// 対応が入れば、この定数ごと消して常時サーバー値にしてよい。
+        /// </summary>
+        public const bool UseServerHealth = true;
+
+        // --- 賭け金のルール（サーバーが正） ---
+        //
+        // 同じ表が GameRules にもあるが、あちらはクライアント側の複製。
+        // bet_accepted で本物が届くので、届いた後はこちらを使う。
+        // 0 のうちは「まだ受け取っていない」の意味で、GameRules の既定値に頼る。
+
+        public int ServerBetMax { get; private set; } = 0;
+        public int ServerBetUnit { get; private set; } = 0;
+        public bool HasServerBetRules => ServerBetMax > 0 && ServerBetUnit > 0;
+
+        /// <summary>bet_accepted で届いた賭け金の上限・単位を控える。</summary>
+        public void SetServerBetRules(int maxBet, int betUnit)
+        {
+            if (maxBet <= 0 || betUnit <= 0) return;
+
+            // クライアント側の複製とズレていたら気づけるようにしておく。
+            // ズレたまま黙って動くと、予想報酬や上限表示が静かに嘘になる
+            var rules = GameRules.GetRuleSet(LocalPlayerSpecialVictoryCount);
+            if (rules.BetMax != maxBet || rules.BetUnit != betUnit)
+            {
+                Debug.LogWarning(
+                    $"[BoardState] 賭け金ルールがサーバーと違います。" +
+                    $"サーバー max={maxBet} unit={betUnit} / GameRules max={rules.BetMax} unit={rules.BetUnit}" +
+                    $"（特殊勝利 {LocalPlayerSpecialVictoryCount} 回）。GameRules 側を直してください");
+            }
+
+            ServerBetMax = maxBet;
+            ServerBetUnit = betUnit;
+        }
 
         public void SetLocalTurn(bool isLocalTurn)
         {
@@ -87,12 +150,19 @@ namespace KillingMahjong.Managers
             }
         }
 
+        private void OnDestroy()
+        {
+            // シーン再読込時に破棄済みオブジェクトを指したままにしない。
+            // 重複インスタンスが破棄された場合に本物を消さないよう this と比較する。
+            if (Instance == this) Instance = null;
+        }
+
         public void InitializeGame(List<int> initialWall)
         {
             CurrentWallTiles = new List<int>(initialWall);
             ClearAllBoardData();
-            LocalPlayerHp = 20000;
-            EnemyPlayerHp = 20000;
+            LocalPlayerHp = PlaceholderInitialHp;
+            EnemyPlayerHp = PlaceholderInitialHp;
             OnBoardStateRebuilt?.Invoke();
         }
 
@@ -148,8 +218,8 @@ namespace KillingMahjong.Managers
                         matchIdx = remainingHand.IndexOf(wall[i]);
                         if (matchIdx < 0)
                         {
-                            int baseId = wall[i] & 0x1F;
-                            matchIdx = remainingHand.FindIndex(t => (t & 0x1F) == baseId);
+                            int baseId = Common.TileId.BaseId(wall[i]);
+                            matchIdx = remainingHand.FindIndex(t => Common.TileId.BaseId(t) == baseId);
                         }
                     }
 
@@ -200,8 +270,8 @@ namespace KillingMahjong.Managers
                         int matchIdx = remainingHand.IndexOf(wall[i]);
                         if (matchIdx < 0)
                         {
-                            int baseId = wall[i] & 0x1F;
-                            matchIdx = remainingHand.FindIndex(t => (t & 0x1F) == baseId);
+                            int baseId = Common.TileId.BaseId(wall[i]);
+                            matchIdx = remainingHand.FindIndex(t => Common.TileId.BaseId(t) == baseId);
                         }
                         if (matchIdx >= 0)
                         {
@@ -286,6 +356,36 @@ namespace KillingMahjong.Managers
             DiscardedWallIndexes.Add(wallIndex);
         }
 
+        /// <summary>
+        /// 山の指定位置の牌を差し替える（牌交換で使う）。
+        ///
+        /// サーバーは wall 内のインデックスで交換位置を指定してくる。
+        /// OriginalWallTiles は配牌時に一度作るだけだったので、交換しても更新されず
+        /// サーバーの山とズレていた。位置で牌を特定する処理（TileInteraction.WallIndex）が
+        /// 2回目以降の交換で誤動作する原因になるため、ここで必ず同期させる。
+        ///
+        /// 同じ牌IDが山に複数あるので、**牌IDで探して書き換えてはいけない。**
+        /// 必ずサーバーが指定した位置をそのまま使うこと。
+        /// </summary>
+        /// <returns>差し替えに成功したら true</returns>
+        public bool ReplaceWallTileAt(int wallIndex, int newTileId)
+        {
+            if (wallIndex < 0 || wallIndex >= OriginalWallTiles.Count)
+            {
+                Debug.LogWarning($"[BoardState] ReplaceWallTileAt: index {wallIndex} が範囲外 (山 {OriginalWallTiles.Count} 枚)");
+                return false;
+            }
+
+            int old = OriginalWallTiles[wallIndex];
+            OriginalWallTiles[wallIndex] = newTileId;
+
+            // 表示用の現在の山からも、同じ1枚だけを差し替える
+            int cur = CurrentWallTiles.IndexOf(old);
+            if (cur >= 0) CurrentWallTiles[cur] = newTileId;
+
+            return true;
+        }
+
         // --- 牌の操作ロジック ---
 
         public bool MoveTileToHand(int tileId)
@@ -294,8 +394,8 @@ namespace KillingMahjong.Managers
             int actualId = tileId;
             if (!CurrentWallTiles.Contains(tileId))
             {
-                int baseId = tileId & 0x1F;
-                int foundIndex = CurrentWallTiles.FindIndex(t => (t & 0x1F) == baseId);
+                int baseId = Common.TileId.BaseId(tileId);
+                int foundIndex = CurrentWallTiles.FindIndex(t => Common.TileId.BaseId(t) == baseId);
                 if (foundIndex != -1)
                 {
                     actualId = CurrentWallTiles[foundIndex];
@@ -391,13 +491,7 @@ namespace KillingMahjong.Managers
 
         public List<int> SortTileIds(List<int> ids)
         {
-            ids.Sort((a, b) =>
-            {
-                int baseA = a & 0x1F;
-                int baseB = b & 0x1F;
-                if (baseA != baseB) return baseA.CompareTo(baseB);
-                return a.CompareTo(b);
-            });
+            ids.Sort(Common.TileId.CompareForDisplay);
             return ids;
         }
     }

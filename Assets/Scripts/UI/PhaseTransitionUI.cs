@@ -28,6 +28,27 @@ namespace KillingMahjong.UI
         [SerializeField] private TextMeshProUGUI enemyHpObj;
         [SerializeField] private TextMeshProUGUI playerHpObj;
 
+        [Header("スキルカットインの描画負荷")]
+        // WebGL は塗り面積（フィルレート）が効くので、半透明で重ねる面積を絞れるようにしている。
+        // 血飛沫は 800x600 基準で 1200px にすると画面の4倍の面積を半透明で塗ることになる。
+        [SerializeField, Tooltip("血飛沫の枚数。0で無し")] private int splatterCount = 2;
+        [SerializeField, Tooltip("血飛沫の最小サイズ(px)")] private float splatterSizeMin = 500f;
+        [SerializeField, Tooltip("血飛沫の最大サイズ(px)")] private float splatterSizeMax = 800f;
+        [SerializeField, Tooltip("立ち絵にドロップシャドウを付ける。付けると立ち絵1枚ぶん塗る面積が増える")]
+        private bool portraitShadow = false;
+        [SerializeField, Tooltip("文字に色付きのズレ影を重ねる。黒影は読みやすさのため常に付く")]
+        private bool textThemeShadow = false;
+
+        [Header("ドット血しぶき（レトロ演出）")]
+        [Tooltip("決着演出を「血が敗者から勝者へ移る」表現にする。画面外周も赤く縁取る")]
+        [SerializeField] private bool useBloodTransfer = true;
+        [Tooltip("useBloodTransfer が OFF のときだけ有効。その場で弾ける血しぶき")]
+        [SerializeField] private bool usePixelBlood = true;
+        [Tooltip("飛ばすドットの数（弾ける方の演出用）")]
+        [SerializeField] private int pixelBloodDotCount = 90;
+        [Tooltip("座標を丸めるグリッド幅(px)。大きいほど粗くレトロになる")]
+        [SerializeField] private float pixelBloodGridSize = 6f;
+
         [Header("Animation Durations")]
         [SerializeField] private float lineInDuration = 0.5f;
         [SerializeField] private float textWaitDuration = 1.0f;
@@ -91,10 +112,8 @@ namespace KillingMahjong.UI
             PlayRoundStartFadeOut();
         }
 
-        private void Update()
-        {
-            // Removed: loadingText timer
-        }
+        // 空の Update() があると Unity から毎フレーム呼ばれるだけ無駄なので削除した。
+        // （かつての loadingText タイマー用。処理は残っていない）
 
         private void ResetVisuals()
         {
@@ -216,10 +235,16 @@ namespace KillingMahjong.UI
             if (hpBetContainer != null)
             {
                 hpBetContainer.SetActive(true);
-                // 仮のデータアニメーション
-                // 実際はGameUIManager等からデータを引数で渡しますが、ここではモックします
-                int targetPlayerHp = dummyInitialPlayerHp - playerBetAmount;
-                int targetEnemyHp = dummyInitialEnemyHp - enemyBetAmount;
+
+                // 賭けた額のぶん血が減る様子を見せる。
+                //
+                // **サーバー値を使う設定のときは減らさない。**
+                // サーバーはベットで health を動かさないので、ここで減らして見せると
+                // 直後に届く status の値で元へ戻り、「減って戻る」ちらつきになる。
+                // 賭けた額そのものは Bet: の行に出るので、情報は失われない。
+                bool deduct = !KillingMahjong.Managers.BoardStateManager.UseServerHealth;
+                int targetPlayerHp = deduct ? dummyInitialPlayerHp - playerBetAmount : dummyInitialPlayerHp;
+                int targetEnemyHp = deduct ? dummyInitialEnemyHp - enemyBetAmount : dummyInitialEnemyHp;
 
                 if (enemyBetObj != null) enemyBetObj.text = "Enemy Bet: <color=red>" + enemyBetAmount + "</color>";
                 if (playerBetObj != null) playerBetObj.text = "Your Bet: <color=red>" + playerBetAmount + "</color>";
@@ -302,11 +327,13 @@ namespace KillingMahjong.UI
         }
         public void PlayCenterTextAnim(string text, float duration = 1.5f, Action onComplete = null)
         {
+            this.gameObject.SetActive(true);
             StartCoroutine(CenterTextAnimRoutine(text, duration, onComplete));
         }
 
         public IEnumerator PlayCenterTextAnimRoutine(string text, float duration = 1.5f, Action onComplete = null)
         {
+            this.gameObject.SetActive(true);
             yield return StartCoroutine(CenterTextAnimRoutine(text, duration, onComplete));
         }
 
@@ -599,10 +626,10 @@ namespace KillingMahjong.UI
                     if (enemyBetObj != null) enemyBetObj.text = $"獲得: +{winnerGain}";
                 }
 
-                // 血飛沫画像の生成
+                // 血飛沫画像の生成（血の移動演出を使うときは出さない）
                 GameObject splatterObj = null;
                 Image splatterImage = null;
-                if (bloodSplatterSprite != null)
+                if (bloodSplatterSprite != null && !useBloodTransfer)
                 {
                     splatterObj = new GameObject("BloodSplatter");
                     splatterObj.transform.SetParent(transform, false);
@@ -621,10 +648,28 @@ namespace KillingMahjong.UI
 
                 // 激しい画面揺れと血飛沫表示
                 StartCoroutine(ScreenShakeRoutine(0.5f, 30f));
-                
+
                 if (splatterImage != null)
                 {
                     splatterImage.color = new Color(1, 1, 1, 0.8f);
+                }
+
+                // 敗者側の位置。isLocalWin なら相手（上）が失い、そうでなければ自分（下）が失う
+                Vector2 loserSide  = isLocalWin ? new Vector2(0, 300)  : new Vector2(0, -300);
+                Vector2 winnerSide = isLocalWin ? new Vector2(0, -300) : new Vector2(0, 300);
+
+                if (useBloodTransfer)
+                {
+                    // 血が敗者から勝者へ移る。奪い合いであることを向きで見せる
+                    KillingMahjong.Visuals.BloodTransferEffect.Play(
+                        transform as RectTransform, loserSide, winnerSide,
+                        hpDeductionDuration, pixelBloodGridSize);
+                }
+                else if (usePixelBlood)
+                {
+                    KillingMahjong.Visuals.PixelBloodEffect.Play(
+                        transform as RectTransform, loserSide,
+                        pixelBloodDotCount, pixelBloodGridSize);
                 }
 
                 // HPカウントアニメーション
@@ -856,16 +901,26 @@ namespace KillingMahjong.UI
             Vector2 stripeStart = new Vector2(0, -3000f);
             stripeRt.anchoredPosition = stripeStart;
 
+            // 濃い色の帯が背景に溶けないよう黒で縁取る。
+            // 帯はこのあと動かすので、縁も同じ動きに含める。
+            var stripeEdge = KillingMahjong.Visuals.UIEdgeOutline.AddBehind(stripeRt, 10f);
+            if (stripeEdge != null)
+            {
+                bgElements.Add(stripeEdge);
+                bgStartPos.Add(stripeStart);
+                bgTargetPos.Add(stripeTarget);
+            }
+
             bgElements.Add(stripeRt);
             bgStartPos.Add(stripeStart);
             bgTargetPos.Add(stripeTarget);
 
             // 追加の血飛沫（少しだけ）
-            if (bloodSplatterSprite != null)
+            if (bloodSplatterSprite != null && splatterCount > 0)
             {
-                for (int i = 0; i < 2; i++)
+                for (int i = 0; i < splatterCount; i++)
                 {
-                    GameObject splatterObj = new GameObject($"Splatter_{i}");
+                    GameObject splatterObj = new GameObject("Splatter_" + i);
                     splatterObj.transform.SetParent(containerRt, false);
                     Image spImg = splatterObj.AddComponent<Image>();
                     spImg.sprite = bloodSplatterSprite;
@@ -873,7 +928,7 @@ namespace KillingMahjong.UI
                     spImg.preserveAspect = true;
 
                     RectTransform spRt = splatterObj.GetComponent<RectTransform>();
-                    float size = UnityEngine.Random.Range(600, 1200);
+                    float size = UnityEngine.Random.Range(splatterSizeMin, splatterSizeMax);
                     spRt.sizeDelta = new Vector2(size, size);
                     spRt.localRotation = Quaternion.Euler(0, 0, UnityEngine.Random.Range(0, 360f));
                     
@@ -933,10 +988,14 @@ namespace KillingMahjong.UI
                 
                 portraitRt.anchoredPosition = portraitStartPos; 
                 
-                // 立ち絵にテーマカラーのドロップシャドウ
-                Shadow pShadow = portraitObj.AddComponent<Shadow>();
-                pShadow.effectColor = isLocalPlayer ? new Color32(0, 100, 255, 150) : new Color32(200, 0, 0, 150);
-                pShadow.effectDistance = new Vector2(20, -20);
+                // 立ち絵にテーマカラーのドロップシャドウ。
+                // Shadow は立ち絵の四角を丸ごと複製するので、半透明で塗る面積が1枚ぶん増える
+                if (portraitShadow)
+                {
+                    Shadow pShadow = portraitObj.AddComponent<Shadow>();
+                    pShadow.effectColor = isLocalPlayer ? new Color32(0, 100, 255, 150) : new Color32(200, 0, 0, 150);
+                    pShadow.effectDistance = new Vector2(20, -20);
+                }
 
                 // 顔画像も合成
                 if (faceSprite != null)
@@ -966,15 +1025,19 @@ namespace KillingMahjong.UI
             mainText.alignment = TextAlignmentOptions.Right;
             if (centerText != null) mainText.font = centerText.font;
 
-            // 黒い影
+            // 黒い影（読みやすさのため常に付ける）
             Shadow txtShadow1 = mainTextObj.AddComponent<Shadow>();
             txtShadow1.effectColor = new Color(0, 0, 0, 1f);
             txtShadow1.effectDistance = new Vector2(10, -10);
-            
-            // テーマカラーの影（ズレ）
-            Shadow txtShadow2 = mainTextObj.AddComponent<Shadow>();
-            txtShadow2.effectColor = isLocalPlayer ? new Color32(0, 100, 255, 150) : new Color32(200, 0, 0, 150);
-            txtShadow2.effectDistance = new Vector2(-10, 8);
+
+            // テーマカラーの影（ズレ）。Shadow 1枚ごとに文字のメッシュが複製されるので、
+            // 文字色を毎フレーム変えている間はその枚数ぶん作り直しが走る
+            if (textThemeShadow)
+            {
+                Shadow txtShadow2 = mainTextObj.AddComponent<Shadow>();
+                txtShadow2.effectColor = isLocalPlayer ? new Color32(0, 100, 255, 150) : new Color32(200, 0, 0, 150);
+                txtShadow2.effectDistance = new Vector2(-10, 8);
+            }
 
             RectTransform mainRt = mainText.GetComponent<RectTransform>();
             mainRt.anchorMin = new Vector2(1f, 1f);
@@ -1006,9 +1069,12 @@ namespace KillingMahjong.UI
                 s1.effectColor = new Color(0, 0, 0, 1f);
                 s1.effectDistance = new Vector2(10, -10);
 
-                Shadow s2 = subObj.AddComponent<Shadow>();
-                s2.effectColor = isLocalPlayer ? new Color32(0, 100, 255, 150) : new Color32(200, 0, 0, 150);
-                s2.effectDistance = new Vector2(-10, 8);
+                if (textThemeShadow)
+                {
+                    Shadow s2 = subObj.AddComponent<Shadow>();
+                    s2.effectColor = isLocalPlayer ? new Color32(0, 100, 255, 150) : new Color32(200, 0, 0, 150);
+                    s2.effectDistance = new Vector2(-10, 8);
+                }
 
                 RectTransform subRt = subTextUI.GetComponent<RectTransform>();
                 subRt.anchorMin = new Vector2(1f, 1f);
@@ -1022,11 +1088,15 @@ namespace KillingMahjong.UI
 
             // --- 暴力的なアニメーション開始 ---
             float t = 0;
-            float impactDuration = 0.15f; 
+            float impactDuration = 0.15f;
 
             // スライドを廃止し、背景要素と立ち絵は下から「ばっ！」と突き上げる
             for (int i = 0; i < bgElements.Count; i++) bgElements[i].anchoredPosition = bgStartPos[i];
             if (portraitRt != null) portraitRt.anchoredPosition = portraitStartPos;
+
+            // 最初の1フレームを空けて、生成直後の Canvas 再構築を演出の外へ出す。
+            // ここを入れないと、生成コストが演出の1フレーム目に乗って出だしが硬くなる。
+            yield return null;
 
             // 画面揺れ
             StartCoroutine(ScreenShakeRoutine(0.2f, 15f));
@@ -1034,7 +1104,12 @@ namespace KillingMahjong.UI
             while (t < impactDuration)
             {
                 float progress = t / impactDuration;
-                float easeIn = Mathf.Pow(progress, 3f);
+                // 「下からばっ！と突き上げる」ので、最初に速く動いて着地で減速するイーズアウトを使う。
+                // ここを Pow(progress, 3f) のイーズインにすると、移動距離が 3000px あるぶん
+                // 序盤は画面外でほとんど動いて見えず、最後の3割で一気に飛び込む。
+                // 「少し出て、止まって、一気に全部出る」というガクついた見え方はこれが原因だった。
+                // ロン演出のスタンプ表現（RonAnimationUI）も同じくイーズアウトで揃えてある。
+                float easeIn = 1f - Mathf.Pow(1f - progress, 3f);
 
                 // 文字が叩きつけられる演出（スケール5から1へ）
                 mainRt.localScale = Vector3.LerpUnclamped(new Vector3(5f, 5f, 1f), Vector3.one, easeIn);
@@ -1058,7 +1133,7 @@ namespace KillingMahjong.UI
                 t += Time.deltaTime;
                 yield return null;
             }
-            
+
             mainRt.localScale = Vector3.one;
             mainText.color = Color.white;
 

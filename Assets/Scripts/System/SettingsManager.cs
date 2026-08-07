@@ -12,7 +12,10 @@ namespace KillingMahjong.Core
 
         // --- オーディオ設定 ---
         [Header("Audio Settings")]
-        [SerializeField, Range(0f, 1f)] private float bgmVolume = 0.5f;
+        // 既定値が 0.0f だったため初回起動のプレイヤーはBGMが鳴らない状態から始まっていた。
+        // SEより控えめな 0.35f を既定にする。無音に戻したい場合はここと LoadSettings の
+        // GetFloat 第2引数を 0.0f に戻す。
+        [SerializeField, Range(0f, 1f)] private float bgmVolume = 0.35f;
         [SerializeField, Range(0f, 1f)] private float seVolume = 0.5f;
         [SerializeField, Range(0f, 1f)] private float voiceVolume = 0.5f;
 
@@ -32,7 +35,7 @@ namespace KillingMahjong.Core
 
         // --- ウィンドウ（解像度）設定 ---
         [Header("Window Settings")]
-        [SerializeField] private int resolutionIndex = 0; // デフォルトは1920x1080
+        [SerializeField] private int resolutionIndex = 4; // デフォルトは 800x600
         [SerializeField] private bool isFullScreen = false;
 
         public int ResolutionIndex => resolutionIndex;
@@ -55,14 +58,19 @@ namespace KillingMahjong.Core
             }
         }
 
-        /// <summary>
-        /// PlayerPrefsから設定を読み込む
-        /// </summary>
+        private void OnDestroy()
+        {
+            // 破棄済みオブジェクトを指したままにしない
+            if (Instance == this) Instance = null;
+        }
+
         public void LoadSettings()
         {
-            bgmVolume = PlayerPrefs.GetFloat("BgmVolume", bgmVolume);
-            seVolume = PlayerPrefs.GetFloat("SeVolume", seVolume);
-            voiceVolume = PlayerPrefs.GetFloat("VoiceVolume", voiceVolume);
+            // 過去のセーブデータを引き継ぐ（通常の挙動に戻す）
+            // 初回起動時（キーがない場合）のみ、デフォルト値（BGM: 0.35f, SE: 0.5f）が採用されます
+            bgmVolume = PlayerPrefs.GetFloat("BgmVolume", 0.35f);
+            seVolume = PlayerPrefs.GetFloat("SeVolume", 0.5f);
+            voiceVolume = PlayerPrefs.GetFloat("VoiceVolume", 0.5f);
             
             isHighSpeedMode = PlayerPrefs.GetInt("IsHighSpeedMode", isHighSpeedMode ? 1 : 0) == 1;
             isEffectEnabled = PlayerPrefs.GetInt("IsEffectEnabled", isEffectEnabled ? 1 : 0) == 1;
@@ -95,9 +103,35 @@ namespace KillingMahjong.Core
         }
 
         // --- 設定値の変更メソッド ---
-        public void SetBgmVolume(float volume) { bgmVolume = volume; }
-        public void SetSeVolume(float volume) { seVolume = volume; }
-        public void SetVoiceVolume(float volume) { voiceVolume = volume; }
+        public void SetBgmVolume(float volume) 
+        { 
+            bgmVolume = volume; 
+            if (KillingMahjong.Managers.AudioManager.Instance != null) 
+            {
+                KillingMahjong.Managers.AudioManager.Instance.bgmVolume = volume;
+                KillingMahjong.Managers.AudioManager.Instance.ApplyVolumes();
+            }
+        }
+        
+        public void SetSeVolume(float volume) 
+        { 
+            seVolume = volume; 
+            if (KillingMahjong.Managers.AudioManager.Instance != null) 
+            {
+                KillingMahjong.Managers.AudioManager.Instance.seVolume = volume;
+                KillingMahjong.Managers.AudioManager.Instance.ApplyVolumes();
+            }
+        }
+        
+        public void SetVoiceVolume(float volume) 
+        { 
+            voiceVolume = volume; 
+            if (KillingMahjong.Managers.AudioManager.Instance != null) 
+            {
+                KillingMahjong.Managers.AudioManager.Instance.voiceVolume = volume;
+                KillingMahjong.Managers.AudioManager.Instance.ApplyVolumes();
+            }
+        }
         public void SetHighSpeedMode(bool isHighSpeed) { isHighSpeedMode = isHighSpeed; }
         public void SetEffectEnabled(bool isEnabled) { isEffectEnabled = isEnabled; }
         public void SetResolutionIndex(int index) { resolutionIndex = index; }
@@ -134,17 +168,8 @@ namespace KillingMahjong.Core
 
         private void ApplyResolution()
         {
-            int width = 1920;
-            int height = 1080;
-            switch(resolutionIndex)
-            {
-                case 0: width = 1920; height = 1080; break;
-                case 1: width = 1600; height = 900; break;
-                case 2: width = 1280; height = 720; break;
-                case 3: width = 1024; height = 576; break;
-                case 4: width = 800; height = 600; break;
-                default: width = 1920; height = 1080; break;
-            }
+            int width = 800;
+            int height = 600;
 #if !UNITY_WEBGL
             Screen.SetResolution(width, height, isFullScreen);
 #endif

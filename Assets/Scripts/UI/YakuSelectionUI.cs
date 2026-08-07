@@ -89,9 +89,10 @@ namespace KillingMahjong.UI
             contentRt.offsetMin = Vector2.zero; contentRt.offsetMax = Vector2.zero;
 
             var grid = contentObj.AddComponent<GridLayoutGroup>();
-            grid.cellSize = new Vector2(160, 50); // 幅と高さを少し狭く
-            grid.spacing = new Vector2(10, 15);
-            grid.padding = new RectOffset(10, 10, 20, 20);
+            // 役名の下に成立条件を1行入れるため、以前の (160, 50) から高さを広げている
+            grid.cellSize = new Vector2(190, 72);
+            grid.spacing = new Vector2(8, 12);
+            grid.padding = new RectOffset(8, 8, 16, 16);
             grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             grid.constraintCount = 3; // 3列に固定
 
@@ -124,10 +125,31 @@ namespace KillingMahjong.UI
                 txt.font = fontToUse;
                 txt.fontSize = (int)KillingMahjong.Common.UITypography.BodySmall; // 枠に合わせて少し文字を小さく
                 txt.color = Color.black;
-                txt.alignment = TextAnchor.MiddleCenter;
+                txt.alignment = TextAnchor.LowerCenter;
                 var txtRt = txtObj.GetComponent<RectTransform>();
-                txtRt.anchorMin = Vector2.zero; txtRt.anchorMax = Vector2.one;
+                // 上側に役名、下側に成立条件を置く
+                txtRt.anchorMin = new Vector2(0, 0.55f); txtRt.anchorMax = Vector2.one;
                 txtRt.offsetMin = Vector2.zero; txtRt.offsetMax = Vector2.zero;
+
+                // 役名だけでは「どれを強化すべきか」が初見で判断できないため、条件を併記する
+                string yakuDesc = KillingMahjong.Common.YakuInfo.GetDescription(y);
+                if (!string.IsNullOrEmpty(yakuDesc))
+                {
+                    GameObject descObj = new GameObject("Desc");
+                    descObj.transform.SetParent(btnObj.transform, false);
+                    var descTxt = descObj.AddComponent<Text>();
+                    descTxt.text = yakuDesc;
+                    descTxt.font = fontToUse;
+                    descTxt.fontSize = Mathf.Max(9, (int)(KillingMahjong.Common.UITypography.BodySmall * 0.6f));
+                    descTxt.color = new Color(0.25f, 0.25f, 0.25f);
+                    descTxt.alignment = TextAnchor.UpperCenter;
+                    descTxt.horizontalOverflow = HorizontalWrapMode.Wrap;
+                    descTxt.verticalOverflow = VerticalWrapMode.Truncate;
+                    descTxt.raycastTarget = false; // ボタンのクリック判定を奪わない
+                    var descRt = descObj.GetComponent<RectTransform>();
+                    descRt.anchorMin = new Vector2(0, 0); descRt.anchorMax = new Vector2(1, 0.55f);
+                    descRt.offsetMin = new Vector2(4, 2); descRt.offsetMax = new Vector2(-4, 0);
+                }
 
                 string yakuName = y;
                 btn.onClick.AddListener(() => {

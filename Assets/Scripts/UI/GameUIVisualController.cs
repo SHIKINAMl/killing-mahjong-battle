@@ -101,6 +101,19 @@ namespace KillingMahjong.UI
         private List<int> _lastWallIds = new List<int>();
         private List<int> _lastHandIds = new List<int>();
 
+        /// <summary>
+        /// 差分リビルドのキャッシュを捨てて、次回を必ずフルリビルドにする。
+        ///
+        /// RebuildAllTilesFromState は「前回と牌IDの構成が同じなら UI はそのままでよい」と
+        /// 判断して再生成を省く。だが盤面の牌をプールへ返却したあとは UI 側に牌が残っておらず、
+        /// この判断が成立しない。返却したら必ず呼んでキャッシュを無効化すること。
+        /// </summary>
+        public void InvalidateRebuildCache()
+        {
+            _lastWallIds.Clear();
+            _lastHandIds.Clear();
+        }
+
         public void RebuildAllTilesFromState(List<int> suppressRevealWallIndexes = null, bool forceRebuildInEndPhase = false)
         {
             // --- アニメーション競合防止 ---
@@ -393,7 +406,18 @@ namespace KillingMahjong.UI
 
             if (uiManager.WaitUI != null && (uiManager.CurrentPhaseStatus == RoundStatus.Discard || uiManager.CurrentPhaseStatus == RoundStatus.HandSelection))
             {
-                if (board.CurrentWaitTiles != null && board.CurrentWaitTiles.Count > 0)
+                // **チュートリアルの手牌選択中は、決定を押すまで待ち牌UIを出さない。**
+                // 『おまかせ』は待ち牌を盤面に入れてからここ（牌の再構築）を通るため、
+                // 素直に出すと押した瞬間に左下へ現れ、手牌確認のUIと重なる。
+                // 決定後は TutorialManager.ConfirmHandSelectionComplete が出す。
+                //
+                // 出す条件は GameUIPhaseController の手牌選択ケースにもある。
+                // **経路が2つあるので、片方だけ塞いでも直らない**（実際にここを見落として空振りした）。
+                bool blockedByTutorial = uiManager.IsTutorialMode
+                    && uiManager.CurrentPhaseStatus == RoundStatus.HandSelection
+                    && (uiManager.TutorialManager == null || !uiManager.TutorialManager.IsHandSelectionConfirmed);
+
+                if (!blockedByTutorial && board.CurrentWaitTiles != null && board.CurrentWaitTiles.Count > 0)
                 {
                     uiManager.WaitUI.gameObject.SetActive(true);
                     uiManager.WaitUI.DisplayWaits(board.CurrentWaitTiles);
@@ -550,7 +574,7 @@ namespace KillingMahjong.UI
             {
                 foreach (int waitId in board.CurrentWaitTiles)
                 {
-                    waitBaseIds.Add(waitId & 0x1F);
+                    waitBaseIds.Add(Common.TileId.BaseId(waitId));
                 }
             }
 
@@ -564,7 +588,7 @@ namespace KillingMahjong.UI
                 {
                     // 壁牌のベースIDが待ち牌のベースIDに含まれていればフリテン警告対象
                     // （isDiscardPhase == false なら waitBaseIds は空なので自動的に false になる）
-                    bool isFuritenAlert = waitBaseIds.Contains(interaction.TileId & 0x1F);
+                    bool isFuritenAlert = waitBaseIds.Contains(Common.TileId.BaseId(interaction.TileId));
                     visual.SetFuritenHighlight(isFuritenAlert);
                 }
             }

@@ -15,10 +15,23 @@ namespace KillingMahjong.UI
         [SerializeField] private float tileWidth = 50.0f;
         [SerializeField] private float tileHeight = 70.0f;
         [SerializeField] private float tileScale = 0.9f;
-        [SerializeField] private int maxPerRow = 6;
+
         [SerializeField] private bool isEnemyRiver = false; // 相手の河として扱う場合、180度回転させる
         [SerializeField] private float enemyOffsetX = 350f; // 敵の河の位置手前寄せ調整X（ユーザー要望: 350）
         [SerializeField] private float enemyOffsetY = -200f; // 敵の河の位置手前寄せ調整Y（ユーザー要望: -200）
+
+        /// <summary>
+        /// 1行に並べる枚数。
+        ///
+        /// **9 は仕様から決まる値で、好みではない。** 河は1人あたり最大17牌なので、
+        /// 9 なら 9+8 でちょうど2行に収まる。8 以下だと17牌目だけが3行目に落ちる。
+        ///
+        /// **ここは意図的に SerializeField にしていない。**
+        /// 対局シーンが UIテストシーン と OpeningScene の2つあり、河も自分・相手で
+        /// 2つずつあるので、シーンに持たせると4か所を直すことになる
+        /// （実際、コードの既定値 6 に対してシーンには 8 が焼かれていた）。
+        /// </summary>
+        private const int MaxPerRow = 9;
 
         private List<Transform> discardedTiles = new List<Transform>();
 
@@ -87,8 +100,8 @@ namespace KillingMahjong.UI
         private void ApplyRiverLayout(RectTransform rt)
         {
             int index = discardedTiles.Count;
-            int row = index / maxPerRow;
-            int col = index % maxPerRow;
+            int row = index / MaxPerRow;
+            int col = index % MaxPerRow;
 
             float targetX = col * tileWidth;
             float targetY = -row * tileHeight; 
@@ -127,7 +140,7 @@ namespace KillingMahjong.UI
 
             for (int i = 0; i < discardedTiles.Count; i++)
             {
-                int rowIdx = i / maxPerRow;
+                int rowIdx = i / MaxPerRow;
                 while (rows.Count <= rowIdx)
                 {
                     rows.Add(new List<Transform>());

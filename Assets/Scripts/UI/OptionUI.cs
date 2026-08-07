@@ -121,6 +121,11 @@ namespace KillingMahjong.UI
 
             _rectTransform.DOKill();
             _canvasGroup.DOKill();
+            
+            if (KillingMahjong.Managers.AudioManager.Instance != null)
+            {
+                KillingMahjong.Managers.AudioManager.Instance.PlayPaperSlideSE();
+            }
 
             // 確実に画面中央に配置
             _rectTransform.anchoredPosition = Vector2.zero;
@@ -149,6 +154,11 @@ namespace KillingMahjong.UI
 
             _rectTransform.DOKill();
             _canvasGroup.DOKill();
+            
+            if (KillingMahjong.Managers.AudioManager.Instance != null)
+            {
+                KillingMahjong.Managers.AudioManager.Instance.PlayPaperSlideSE();
+            }
 
             _rectTransform.DOScale(Vector3.one * 0.9f, 0.15f).SetEase(Ease.InQuad).SetUpdate(true);
             _canvasGroup.DOFade(0f, 0.15f).SetEase(Ease.InQuad).SetUpdate(true).OnComplete(() => 
@@ -162,6 +172,12 @@ namespace KillingMahjong.UI
         /// </summary>
         private void InitializeUI()
         {
+            if (resolutionDropdown != null)
+            {
+                resolutionDropdown.ClearOptions();
+                resolutionDropdown.AddOptions(new System.Collections.Generic.List<string> { "800x600" });
+            }
+
             if (Core.SettingsManager.Instance != null)
             {
                 var settings = Core.SettingsManager.Instance;
@@ -173,7 +189,7 @@ namespace KillingMahjong.UI
                 if (highSpeedToggle != null) highSpeedToggle.isOn = settings.IsHighSpeedMode;
                 if (effectToggle != null) effectToggle.isOn = settings.IsEffectEnabled;
                 
-                if (resolutionDropdown != null) resolutionDropdown.value = settings.ResolutionIndex;
+                if (resolutionDropdown != null) resolutionDropdown.value = 0;
                 if (fullscreenToggle != null) fullscreenToggle.isOn = settings.IsFullScreen;
             }
         }

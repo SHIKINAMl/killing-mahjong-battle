@@ -11,6 +11,16 @@ namespace KillingMahjong.UI
     {
         [Header("Cinematic Assets")]
         [SerializeField] private Sprite bloodSplatterSprite;
+
+        [Header("ドット血しぶき（レトロ演出）")]
+        [Tooltip("ロン時の血しぶきをドット絵風にする。切るとスプライト1枚の従来演出だけになる")]
+        [SerializeField] private bool usePixelBlood = true;
+        [Tooltip("飛ばすドットの数")]
+        [SerializeField] private int pixelBloodDotCount = 70;
+        [Tooltip("座標を丸めるグリッド幅(px)。大きいほど粗くレトロになる")]
+        [SerializeField] private float pixelBloodGridSize = 6f;
+        [Tooltip("従来のスプライト血しぶきも一緒に出すか")]
+        [SerializeField] private bool keepSpriteSplatter = true;
         [SerializeField] private TMP_FontAsset customFont;
 
         [Header("Player Ron Bubble (Pre-Animation)")]
@@ -46,14 +56,21 @@ namespace KillingMahjong.UI
             }
         }
 
-        public void PlayRonSequence(List<int> handTiles, int ronTile, List<string> yakuList, string formula, string rankName, int score, bool isLocalPlayerWin, 
-            PlayerInfoUI playerInfo, EnemyInfoUI enemyInfo, int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp, System.Action onComplete)
+        /// <param name="formula">「6飜」のような飜数の文字列。表示には使わず、安手かどうかの判定に使う</param>
+        /// <param name="scoreFormula">
+        /// 「200 × 1.5」のような計算式。**サーバーの liquidation から作って渡す。**
+        /// 渡さなかった場合は式を出さず、獲得額だけを見せる。
+        /// </param>
+        public void PlayRonSequence(List<int> handTiles, int ronTile, List<string> yakuList, string formula, string rankName, int score, bool isLocalPlayerWin,
+            PlayerInfoUI playerInfo, EnemyInfoUI enemyInfo, int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp, System.Action onComplete,
+            string scoreFormula = null)
         {
-            StartCoroutine(SequenceRoutine(handTiles, ronTile, yakuList, formula, rankName, score, isLocalPlayerWin, playerInfo, enemyInfo, prevLocalHp, newLocalHp, prevEnemyHp, newEnemyHp, onComplete));
+            StartCoroutine(SequenceRoutine(handTiles, ronTile, yakuList, formula, rankName, score, isLocalPlayerWin, playerInfo, enemyInfo, prevLocalHp, newLocalHp, prevEnemyHp, newEnemyHp, onComplete, scoreFormula));
         }
 
-        private IEnumerator SequenceRoutine(List<int> handTiles, int ronTile, List<string> yakuList, string formula, string rankName, int score, bool isLocalPlayerWin, 
-            PlayerInfoUI playerInfo, EnemyInfoUI enemyInfo, int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp, System.Action onComplete)
+        private IEnumerator SequenceRoutine(List<int> handTiles, int ronTile, List<string> yakuList, string formula, string rankName, int score, bool isLocalPlayerWin,
+            PlayerInfoUI playerInfo, EnemyInfoUI enemyInfo, int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp, System.Action onComplete,
+            string scoreFormula)
         {
             // 0. カットイン演出（勝者の顔と「ロン！」を表示）
             bool cutinFinished = false;
@@ -84,6 +101,12 @@ namespace KillingMahjong.UI
 
             if (winnerSprite != null)
             {
+                // カットインと同時に「ロン！」ボイスを再生
+                if (KillingMahjong.Managers.AudioManager.Instance != null)
+                {
+                    KillingMahjong.Managers.AudioManager.Instance.PlayRonVoice();
+                }
+
                 CutinAnimationUI cutinUI = gameObject.AddComponent<CutinAnimationUI>();
                 cutinUI.PlayCutin(winnerSprite, faceSprite, customFont, cutinText, () => {
                     cutinFinished = true;
@@ -106,7 +129,6 @@ namespace KillingMahjong.UI
             // スマホUIなどよりも確実に最前面に表示するため、Canvasを追加
             Canvas containerCanvas = container.AddComponent<Canvas>();
             containerCanvas.overrideSorting = true;
-            containerCanvas.sortingLayerName = "UI";
             containerCanvas.sortingOrder = UISortingOrders.RonAnimation;
             container.AddComponent<UnityEngine.UI.GraphicRaycaster>();
 
@@ -178,7 +200,9 @@ namespace KillingMahjong.UI
                 }
                 
                 // アガリ牌（ロン牌）を少し離して配置
-                if (ronTile > 0)
+                // 牌IDは 0 始まり（0 = 一萬）なので、0 を「無し」と誤判定しないこと。
+                // 無効値は -1 で表される。
+                if (ronTile >= 0)
                 {
                     GameObject obj = Instantiate(tilePrefab, handContainerRt);
                     InitializeTileVisual(obj, ronTile);
@@ -197,21 +221,32 @@ namespace KillingMahjong.UI
                 currentYakuStr += yaku;
                 yakuText.text = currentYakuStr;
                 
-                // 役を1つ表示するごとの間隔
-                yield return new WaitForSeconds(0.4f);
+                // 役名ボイスを再生（「タンヤオ」「ピンフ」等）
+                if (KillingMahjong.Managers.AudioManager.Instance != null)
+                {
+                    KillingMahjong.Managers.AudioManager.Instance.PlayYakuVoice(yaku);
+                }
+
+                // 役を1つ表示するごとの間隔（ボイスの長さに合わせて少し延長）
+                yield return new WaitForSeconds(0.6f);
             }
             
             // --- タメ（ここで役と手牌をしっかり見せる） ---
             yield return new WaitForSeconds(1.0f);
 
-            // 【追加】計算式の表示（ダミー）
+            // 計算式の表示
             GameObject formulaTextObj = new GameObject("FormulaText");
             formulaTextObj.transform.SetParent(containerRt, false);
             TextMeshProUGUI formulaText = formulaTextObj.AddComponent<TextMeshProUGUI>();
             if (customFont != null) formulaText.font = customFont;
-            
-            // Python側からスコアしか来ないので、ダミーの数式を表示
-            formulaText.text = $"??? × ??? = {score}";
+
+            // サーバーの liquidation から作った式を出す。
+            // かつては内訳が来ておらず「??? × ??? = 額」と伏せていたが、
+            // 現在は winner_bet / multiplier が届くので実際の値を出せる。
+            // 渡されなかったときだけ、式を伏せて額だけ見せる
+            formulaText.text = string.IsNullOrEmpty(scoreFormula)
+                ? $"{score}"
+                : $"{scoreFormula} = {score}";
             formulaText.color = new Color(1f, 1f, 0.5f); // 薄い黄色
             formulaText.fontSize = KillingMahjong.Common.UITypography.Header; 
             formulaText.alignment = TextAlignmentOptions.Center;
@@ -257,6 +292,12 @@ namespace KillingMahjong.UI
             rankTextRt.sizeDelta = new Vector2(1000, 300);
             rankTextRt.anchoredPosition = Vector2.zero; // 画面中央
 
+            // ランクボイスを再生（「満貫！」「跳満！」等）
+            if (KillingMahjong.Managers.AudioManager.Instance != null)
+            {
+                KillingMahjong.Managers.AudioManager.Instance.PlayRankVoice(rankName);
+            }
+
             // ドンッと出るアニメーション
             float rankAnimTime = 0.3f;
             Vector3 initialRankScale = new Vector3(3f, 3f, 1f);
@@ -276,8 +317,16 @@ namespace KillingMahjong.UI
             yield return new WaitForSeconds(1.0f);
 
             // 5. 血飛沫と巨大スコアのバウンド表示（ドンッ！）
+
+            // ドット絵の血しぶき。スコアが落ちてくるのと同じ瞬間に飛ばす
+            if (usePixelBlood)
+            {
+                KillingMahjong.Visuals.PixelBloodEffect.Play(
+                    containerRt, new Vector2(0, 150), pixelBloodDotCount, pixelBloodGridSize);
+            }
+
             GameObject splatterObj = null;
-            if (bloodSplatterSprite != null)
+            if (bloodSplatterSprite != null && keepSpriteSplatter)
             {
                 splatterObj = new GameObject("BloodSplatter");
                 splatterObj.transform.SetParent(containerRt, false);
@@ -304,9 +353,9 @@ namespace KillingMahjong.UI
             scoreText.alignment = TextAlignmentOptions.Center;
             scoreText.fontStyle = FontStyles.Bold;
             
-            // 白いアウトラインで文字を際立たせる
+            // 赤字は血飛沫と同系色で埋もれるため、黒フチで縁取る（役ランク表示と揃える）
             scoreText.outlineWidth = 0.2f;
-            scoreText.outlineColor = new Color32(255, 255, 255, 255);
+            scoreText.outlineColor = new Color32(0, 0, 0, 255);
             
             RectTransform scoreTextRt = scoreTextObj.GetComponent<RectTransform>();
             scoreTextRt.anchorMin = new Vector2(0.5f, 0.5f);

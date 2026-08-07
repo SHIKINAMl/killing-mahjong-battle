@@ -31,6 +31,9 @@ namespace KillingMahjong.UI
         [Tooltip("2D表示の際の背景パネル（3D表示の時は非表示にします）")]
         [SerializeField] private GameObject doraPanelObject;
 
+        [Tooltip("卓上の「ドラ」ラベル。未設定なら名前 DoraText でシーンから検索する")]
+        [SerializeField] private GameObject doraLabelObject;
+
         private List<GameObject> activeDoraTiles = new List<GameObject>();
         private int currentDoraId = -1;
         private GameObject currentCyberEffectInstance;
@@ -103,6 +106,8 @@ namespace KillingMahjong.UI
 
         private void SetCyberEffectActive(bool isActive, int doraId)
         {
+            SetDoraLabelActive(isActive);
+
             // インスペクターで設定されている場合の処理
             if (currentCyberEffectInstance == null && groundLightObject != null)
             {
@@ -242,6 +247,33 @@ namespace KillingMahjong.UI
         }
 
 
+
+        /// <summary>
+        /// 卓上の「ドラ」ラベルの表示を切り替える。
+        /// シーン直下に置かれていてインスペクター未設定のことがあるため、
+        /// DoraCyberEffect_MCP と同じく名前検索のフォールバックを持つ。
+        /// </summary>
+        private void SetDoraLabelActive(bool isActive)
+        {
+            if (doraLabelObject == null)
+            {
+                doraLabelObject = GameObject.Find("DoraText");
+                if (doraLabelObject == null)
+                {
+                    var allObjs = Resources.FindObjectsOfTypeAll<GameObject>();
+                    foreach (var go in allObjs)
+                    {
+                        if (go.name == "DoraText" && go.scene.isLoaded)
+                        {
+                            doraLabelObject = go;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (doraLabelObject != null) doraLabelObject.SetActive(isActive);
+        }
 
         private void ClearDoraTiles()
         {

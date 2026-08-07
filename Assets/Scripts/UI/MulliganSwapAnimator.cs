@@ -221,8 +221,17 @@ namespace KillingMahjong.UI
                 }
                 if (interaction != null)
                 {
+                    // WallIndex はそのまま。位置は変わらず「その位置の牌が入れ替わった」だけなので、
+                    // ここで消すと次の交換で位置を特定できなくなる。
                     interaction.TileId = inTileId;
                 }
+
+                // ここで交換ぶんの見た目はもう反映済み。
+                // 差分リビルドのキャッシュを盤面状態に合わせておかないと、
+                // 「oldId が newId になった」ともう一度判定され、
+                // TileId で検索された**別の同じ牌**が巻き添えで書き換わる。
+                // （状態は1枚しか変わっていないので、次の完全リビルドで戻る＝一時的に絵だけ化ける）
+                uiManager.VisualController?.SyncRebuildCache();
             }
 
             // スライドアニメーションを実行（VisualControllerで定義）

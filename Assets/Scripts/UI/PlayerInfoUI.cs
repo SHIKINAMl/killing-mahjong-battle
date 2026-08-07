@@ -8,6 +8,13 @@ namespace KillingMahjong.UI
     {
         [Header("HP Display")]
         [SerializeField] private TextMeshProUGUI hpText;
+
+        /// <summary>
+        /// 体力の数字に添える「自分／相手」の大きさ（数字に対する割合）。
+        /// 実機で合わせた値。これ以上大きいと点滴の管に、小さいと実表示で潰れる。
+        /// EnemyInfoUI 側と揃えること。
+        /// </summary>
+        internal const string HpOwnerLabelScale = "65%";
         [SerializeField] private UnityEngine.UI.Image hpFillImage; // 追加: 人型のHPメーター用画像
         private int maxHp = 20000; // 最大HP（割合計算用）
 
@@ -28,12 +35,16 @@ namespace KillingMahjong.UI
         [Header("Prefabs")]
         [SerializeField] private GameObject damagePopupPrefab;
 
+        [Tooltip("HP増減ポップアップの出現基準。未設定なら zoomTarget（スマホ）を使う。")]
+        [SerializeField] private RectTransform damagePopupAnchor;
+
         [Header("Character Portrait")]
         [SerializeField] private SpriteRenderer characterRenderer;
         [SerializeField] private SpriteRenderer faceRenderer; // 追加：表情レイヤー用
         [SerializeField] private CharacterData characterData; // キャラクター管理データ
 
-        private TimerUI timerUI; // 追加：タイマーUI
+        [Header("Timer UI")]
+        [SerializeField] private TimerUI timerUI; // インスペクターからセットする
 
         public CharacterData CurrentCharacterData => characterData;
 
@@ -73,13 +84,13 @@ namespace KillingMahjong.UI
 
         private void LateUpdate()
         {
-            // アニメーター等で強制的に10に戻されてしまうのを防ぐため、ズーム中は毎フレーム最後に20に上書きする
+            // アニメーター等で強制的に戻されてしまうのを防ぐため、ズーム中は毎フレーム最後に上書きする
             if (isZoomedIn)
             {
                 var myCanvas = GetComponent<Canvas>();
-                if (myCanvas != null && myCanvas.sortingOrder != 20)
+                if (myCanvas != null && myCanvas.sortingOrder != UISortingOrders.InfoPanelHighlight)
                 {
-                    myCanvas.sortingOrder = 20;
+                    myCanvas.sortingOrder = UISortingOrders.InfoPanelHighlight;
                 }
             }
         }
@@ -202,34 +213,11 @@ namespace KillingMahjong.UI
         private void Start()
         {
             InitializeOriginalTransform();
-            InitializeTimerUI();
-        }
 
-        private void InitializeTimerUI()
-        {
-            if (timerUI == null)
-            {
-                GameObject timerObj = new GameObject("TimerUI");
-                timerUI = timerObj.AddComponent<TimerUI>();
-                timerUI.Initialize();
-                timerUI.SetSize(60f); // 懐中時計のサイズ
-
-                // スマホ全体（hpFillImageの親）を親にして、スマホ枠に追従させる
-                Transform parentTransform = (hpFillImage != null && hpFillImage.transform.parent != null) 
-                                            ? hpFillImage.transform.parent 
-                                            : this.transform;
-                timerObj.transform.SetParent(parentTransform, false);
-
-                // 配置をスマホパネルの下部中央にする
-                RectTransform rt = timerUI.GetComponent<RectTransform>();
-                if (rt != null)
-                {
-                    rt.anchorMin = new Vector2(0.5f, 0f);
-                    rt.anchorMax = new Vector2(0.5f, 0f);
-                    rt.pivot = new Vector2(0.5f, 1f);
-                    rt.anchoredPosition = new Vector2(0, -30f); // スマホ枠の少し下
-                }
-            }
+            // **ここで先に作っておく。** ダメージを受けてから作ったのでは、
+            // 混ぜるための「過去の画面」が1枚も溜まっていない。
+            // 作った時点から保存が始まるので、最初の一撃から効く
+            HpDamageGlitch.Ensure();
         }
 
         public void StartTurnTimer(float duration)
@@ -251,7 +239,33 @@ namespace KillingMahjong.UI
         public void SetMaxHP(int max)
         {
             maxHp = max;
+            // TutorialManager.ApplyHpToUI から同じ値で何度も呼ばれるので、
+            // ここで到達最高HPを引き下げてはいけない（メーターの分母が戻ってしまう）。
+            hpPeak = Mathf.Max(hpPeak, max);
+            // 新しい対局が始まるのでビネットの抑止を解除する
+            heartbeatSuppressed = false;
         }
+
+        /// <summary>新しい対局の開始時に呼ぶ。メーターの分母（到達最高HP）も引き直す。</summary>
+        public void ResetHpMeter(int max)
+        {
+            maxHp = max;
+            hpPeak = max;
+            heartbeatSuppressed = false;
+        }
+
+        // ロンで血を奪うと開始HPを超えるため、到達した最高HPまでメーターの分母を広げる。
+        // 分母を開始HP固定にすると fillAmount が1で頭打ちになり、
+        // 33000 → 14000 のような大きな減少がメーター上で見えなくなる。
+        // 瀕死ビネットとダメージSEの判定は「絶対量としてどれだけ残っているか」なので maxHp のまま。
+        private int hpPeak;
+        private int MeterMax => Mathf.Max(1, Mathf.Max(maxHp, hpPeak));
+
+        [Header("Effects")]
+        [SerializeField] private KillingMahjong.UI.Effects.HeartbeatEffect heartbeatEffect;
+
+        // 決着後に SetHP が呼ばれてビネットが復活しないようにするフラグ
+        private bool heartbeatSuppressed = false;
 
         public void SetHP(int hp)
         {
@@ -263,54 +277,78 @@ namespace KillingMahjong.UI
             currentHp = hp;
             if (hpText != null)
             {
-                // 数字のみ表示する
-                hpText.text = currentHp.ToString();
+                // **誰の血かを必ず添える。** 自分＝右／相手＝左という置き場所の約束だけでは、
+                // 点滴とスマホのどちらが自分なのか画面から確定できなかった
+                // （両者の賭け金が同額だと数字まで一致して見分けが付かない）。
+                // 別オブジェクトを足すと絵に重なるので、同じテキストの中に小さく入れる。
+                hpText.text = $"<size={HpOwnerLabelScale}>自分 </size>{currentHp}";
             }
             
             // 人型メーターの割合を更新する
+            if (hp > hpPeak) hpPeak = hp;
             if (hpFillImage != null)
             {
-                hpFillImage.fillAmount = (float)hp / maxHp;
+                hpFillImage.fillAmount = (float)hp / MeterMax;
             }
 
             if (!isFirstSetup && diff != 0)
             {
-                ShowHpPopup(diff);
+                HpPopup.Report(diff, currentHp, maxHp);
+            }
+
+            // 減ったときだけノイズを走らせる。増えた（勝った）ときは出さない
+            if (!isFirstSetup && diff < 0)
+            {
+                HpDamageGlitch.Play(diff, maxHp);
+            }
+
+            // --- 瀕死ハートビートエフェクトの更新 ---
+            if (heartbeatEffect != null && !heartbeatSuppressed)
+            {
+                heartbeatEffect.UpdateHeartbeat(currentHp, maxHp);
             }
         }
-        
-        private void ShowHpPopup(int amount)
+
+        /// <summary>
+        /// 決着時など、HPに関係なくビネットを消したいときに呼ぶ。
+        /// ビネット(91)は勝敗Canvas(55)より手前なので、消さないと結果画面に被る。
+        /// ロン演出中は SetHP が毎フレーム呼ばれるため、次の SetMaxHP まで再開を抑止する。
+        /// </summary>
+        public void StopHeartbeatEffect()
         {
-            GameObject popupObj;
-            if (damagePopupPrefab != null)
+            heartbeatSuppressed = true;
+            if (heartbeatEffect != null)
             {
-                popupObj = Instantiate(damagePopupPrefab, transform);
-            }
-            else
-            {
-                // プレハブが未設定の場合のフォールバック
-                popupObj = new GameObject("DamagePopup");
-                popupObj.transform.SetParent(transform, false);
-                var rt = popupObj.AddComponent<RectTransform>();
-                rt.sizeDelta = new Vector2(300, 100);
-                popupObj.AddComponent<DamagePopupUI>();
-            }
-
-            RectTransform popupRt = popupObj.GetComponent<RectTransform>();
-            if (popupRt != null)
-            {
-                // スマホの中心より少し上あたりに生成
-                popupRt.anchoredPosition = new Vector2(0, 50f); 
-            }
-
-            DamagePopupUI popup = popupObj.GetComponent<DamagePopupUI>();
-            if (popup != null)
-            {
-                Color c = amount > 0 ? Color.green : Color.red;
-                popup.Setup(amount, c);
+                heartbeatEffect.StopEffect();
             }
         }
-        
+
+        /// <summary>
+        /// HP増減のポップアップとSEをまとめる。ロン演出中は毎フレーム SetHP が呼ばれるため、
+        /// 変化が落ち着くまで溜めてから1回だけ表示する（HpPopupPresenter 側で処理）。
+        /// </summary>
+        private HpPopupPresenter hpPopup;
+        private HpPopupPresenter HpPopup
+        {
+            get
+            {
+                if (hpPopup == null)
+                {
+                    // このコンポーネントは全画面のルートCanvasに付いているので、
+                    // transform を基準にすると相手側と同じ画面中央に出てしまう。
+                    // HPが見えているスマホ（HPPanel）を基準にする。
+                    RectTransform anchor = damagePopupAnchor != null
+                        ? damagePopupAnchor
+                        : zoomTarget as RectTransform;
+
+                    hpPopup = new HpPopupPresenter(this, transform as RectTransform, anchor,
+                                                   damagePopupPrefab, new Vector2(0, 60f), isLocalPlayer: true);
+                }
+                return hpPopup;
+            }
+        }
+
+
         public void ReduceHp(int amount)
         {
             currentHp -= amount;
@@ -401,13 +439,12 @@ namespace KillingMahjong.UI
             if (target == null) return;
 
             // ルートのCanvasのみを手前に出す（子Canvasを一律上書きすると表示順が壊れるため）
-            _sortingScope.BringToFront(target.gameObject, UISortingOrders.InfoPanelHighlight, "UI");
+            _sortingScope.BringToFront(target.gameObject, UISortingOrders.InfoPanelHighlight);
 
             // 手やスマホ本体などのSpriteRendererを手前に持ってくる
             var sprites = target.GetComponentsInChildren<SpriteRenderer>(true);
             foreach (var s in sprites)
             {
-                s.sortingLayerName = "UI";
                 s.sortingOrder = UISortingOrders.InfoPanelHighlight;
             }
         }
@@ -421,7 +458,6 @@ namespace KillingMahjong.UI
             var sprites = target.GetComponentsInChildren<SpriteRenderer>(true);
             foreach (var s in sprites)
             {
-                s.sortingLayerName = "Default";
                 s.sortingOrder = 0;
             }
         }
@@ -440,13 +476,12 @@ namespace KillingMahjong.UI
             // ズーム対象が何であれ、PlayerInfoUI全体を最前面に出す
             BringToFront(transform);
 
-            // 強制的にCanvasのSortOrderを20にする（インスペクターで10のままになる現象の回避）
+            // 強制的にCanvasのSortOrderを引き上げる（インスペクターの値のままになる現象の回避）
             var myCanvas = GetComponent<Canvas>();
             if (myCanvas != null)
             {
-                Debug.Log($"[PlayerInfoUI] Current sortingOrder was {myCanvas.sortingOrder}, setting to 20.");
                 myCanvas.overrideSorting = true;
-                myCanvas.sortingOrder = 20;
+                myCanvas.sortingOrder = UISortingOrders.InfoPanelHighlight;
             }
 
             // 0の場合の安全対策
@@ -505,11 +540,11 @@ namespace KillingMahjong.UI
             targetObj.localScale = originalScale;
             ResetSorting(transform);
 
-            // ズーム解除時に確実に15に戻す
+            // ズーム解除時に確実に通常時の値へ戻す
             var myCanvas = GetComponent<Canvas>();
             if (myCanvas != null)
             {
-                myCanvas.sortingOrder = 15;
+                myCanvas.sortingOrder = UISortingOrders.InfoPanelNormal;
             }
         }
 
@@ -545,33 +580,79 @@ namespace KillingMahjong.UI
             }
             ResetSorting(transform);
 
-            // ズーム解除時に確実に15に戻す
+            // ズーム解除時に確実に通常時の値へ戻す
             var myCanvas = GetComponent<Canvas>();
             if (myCanvas != null)
             {
-                myCanvas.sortingOrder = 15;
+                myCanvas.sortingOrder = UISortingOrders.InfoPanelNormal;
             }
+        }
+
+        private ReadyBadge readyBadge;
+
+        /// <summary>
+        /// 「準備完了」の札。シーンの ReadyBoxContainer を実行時に組み直して使う。
+        /// スマホ（zoomTarget）の真下に置く。
+        /// </summary>
+        private ReadyBadge EnsureReadyBadge()
+        {
+            if (readyBadge == null)
+            {
+                readyBadge = ReadyBadge.Attach(
+                    readyBoxContainer, readyCheckImage,
+                    zoomTarget as RectTransform, isSelf: true);
+            }
+            return readyBadge;
         }
 
         public void ShowReadyBox(bool show)
         {
-            if (readyBoxContainer != null)
+            var badge = EnsureReadyBadge();
+            if (badge != null)
             {
-                readyBoxContainer.SetActive(show);
+                badge.SetVisible(show);
+                if (show) badge.SetReady(false); // 出した時点では未確定
+                return;
             }
-            // ボックス表示時はチェックを外す、非表示時も念のため外す
-            if (readyCheckImage != null)
-            {
-                readyCheckImage.SetActive(false);
-            }
+
+            // 札を作れなかったとき（参照未設定）は従来どおりの出し入れに落とす
+            if (readyBoxContainer != null) readyBoxContainer.SetActive(show);
+            if (readyCheckImage != null) readyCheckImage.SetActive(false);
         }
 
         public void SetReadyCheck(bool isReady)
         {
-            if (readyCheckImage != null)
+            var badge = EnsureReadyBadge();
+            if (badge != null)
             {
-                readyCheckImage.SetActive(isReady);
+                badge.SetReady(isReady);
+                return;
             }
+
+            if (readyCheckImage != null) readyCheckImage.SetActive(isReady);
+        }
+
+        /// <summary>ベット中のスマホ拡大に隠れるので、拡大している間だけ札を伏せる。</summary>
+        public void SetReadyBoxSuppressed(bool suppressed)
+        {
+            var badge = EnsureReadyBadge();
+            if (badge != null) badge.SetSuppressed(suppressed);
+        }
+
+        private TurnGlow turnGlow;
+
+        /// <summary>
+        /// 自分の手番のときスマホを青く脈打たせる。
+        /// スマホ（zoomTarget = HPPanel）は FloatingAnimator で揺れているので、
+        /// その中に影絵を敷いて揺れごと追従させる。
+        /// </summary>
+        public void SetTurnGlow(bool on)
+        {
+            if (turnGlow == null)
+            {
+                turnGlow = TurnGlow.Attach(zoomTarget as RectTransform, isSelf: true);
+            }
+            if (turnGlow != null) turnGlow.SetOn(on);
         }
     }
 }

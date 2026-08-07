@@ -20,6 +20,43 @@ namespace KillingMahjong.Network.Handlers
             bool shouldRebuild = false;
             var board = Managers.BoardStateManager.Instance;
 
+            // --- 血はサーバー値をそのまま採用する（2026-08-04 に決定）---
+            //
+            // クライアントで引き算して辻褄を合わせると、サーバー側の誤りが画面に出なくなる。
+            // **おかしさをそのまま演出に映すため**、ここで素直に代入する。
+            //
+            // 現状サーバーはベットで health を減らさない（賭け金は別枠 bet で持ち、決着時に清算）。
+            // なので賭けても血が動かないように見えるが、それが今のサーバーの実際の挙動。
+            // 「血が動く場面すべてで引いてほしい」は SERVER_REQUESTS の A-8 で依頼済み。
+            if (statusMsg.data.player_state != null && statusMsg.data.opponent_player_state != null)
+            {
+                int localHp = statusMsg.data.player_state.health;
+                int enemyHp = statusMsg.data.opponent_player_state.health;
+
+                // health が両方 0 のときは「まだ埋まっていない」とみなして触らない。
+                // 素直に代入すると、フィールドが無いレスポンスで血が 0 に飛ぶ
+                if (localHp > 0 || enemyHp > 0)
+                {
+                    bool differs = localHp != board.LocalPlayerHp || enemyHp != board.EnemyPlayerHp;
+
+                    if (Managers.BoardStateManager.UseServerHealth)
+                    {
+                        if (differs)
+                        {
+                            Debug.Log($"[Status] 血をサーバー値へ同期: 自分 {board.LocalPlayerHp}→{localHp} / 相手 {board.EnemyPlayerHp}→{enemyHp}");
+                        }
+                        board.UpdateHp(localHp, enemyHp);
+                    }
+                    else if (differs)
+                    {
+                        Debug.LogWarning(
+                            $"[Status] 血がサーバーとズレています。" +
+                            $"サーバー 自分{localHp} 相手{enemyHp} / 手元 自分{board.LocalPlayerHp} 相手{board.EnemyPlayerHp}" +
+                            $"（UseServerHealth=false のため上書きしていません）");
+                    }
+                }
+            }
+
             // 文字列抽出による boost_hand_bonus の簡単な取得 (JsonUtility制約回避用)
             if (statusMsg.data.player_state != null)
             {

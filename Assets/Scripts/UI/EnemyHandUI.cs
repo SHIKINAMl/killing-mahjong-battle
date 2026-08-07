@@ -132,10 +132,7 @@ namespace KillingMahjong.UI
             
             pairs.Sort((a, b) =>
             {
-                int baseA = a.Item1 & 0x1F;
-                int baseB = b.Item1 & 0x1F;
-                if (baseA != baseB) return baseA.CompareTo(baseB);
-                return a.Item1.CompareTo(b.Item1);
+                return KillingMahjong.Common.TileId.CompareForDisplay(a.Item1, b.Item1);
             });
 
             handSlots.Clear();
@@ -178,7 +175,11 @@ namespace KillingMahjong.UI
             if (!isBoardActivePhase)
             {
                 if (layoutGroup != null) layoutGroup.enabled = true;
-                
+
+                // 配置は LayoutGroup が持つので、追従アニメの目標は捨てる。
+                // 残しておくと補間と LayoutGroup が毎フレーム取り合って牌が震える。
+                ClearTargetPositions();
+
                 foreach (var st in handSlots)
                 {
                     if (st.parent != activeContainer) 
@@ -233,7 +234,11 @@ namespace KillingMahjong.UI
                 var rt = handSlots[i];
                 rt.anchoredPosition3D = new Vector3(xPos, yPos, 0f);
                 rt.localPosition = new Vector3(rt.localPosition.x, rt.localPosition.y, 0f); // 念のためローカルZも0に
-                
+
+                // 基底クラスの追従アニメが古い目標へ引き戻すのを防ぐ。
+                // これが無いと、直接置いた1段配置が 2段レイアウト時の目標へ引かれて上下にずれる。
+                SetTargetPosition(rt, new Vector2(xPos, yPos));
+
                 rt.SetSiblingIndex(i);
             }
         }

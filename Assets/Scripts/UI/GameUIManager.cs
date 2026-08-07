@@ -1,4 +1,6 @@
 using UnityEngine;
+using System;
+using System.Collections;
 using System.Collections.Generic;
 using KillingMahjong.EngineData;
 using KillingMahjong.Managers;
@@ -30,6 +32,7 @@ namespace KillingMahjong.UI
         [SerializeField] private AbilityUI abilityUI;
         [SerializeField] private YakuListUI yakuListUI;
         [SerializeField] private BettingUI bettingUI;
+        [SerializeField, Tooltip("場に出ている血（賭け金プール）の表示。未設定でも動作する")] private BetPotUI betPotUI;
         [SerializeField] private PhaseTransitionUI phaseTransitionUI;
         [SerializeField] private ConfirmationDialogUI confirmationDialogUI;
         [SerializeField] private RonAnimationUI ronAnimationUI;
@@ -73,11 +76,6 @@ namespace KillingMahjong.UI
 
         private void Start()
         {
-            if (KillingMahjong.UI.LoadingManager.Instance != null)
-            {
-                KillingMahjong.UI.LoadingManager.Instance.ForceHide();
-            }
-
             SetupManagers();
             SetupControllers();
             SetupUI();
@@ -85,11 +83,34 @@ namespace KillingMahjong.UI
             // チュートリアルモードでなければWebSocketに自動接続する
             if (!IsTutorialMode)
             {
-                var wsClient = UnityEngine.Object.FindFirstObjectByType<WebSocketGameClientSample>();
-                if (wsClient != null)
+                // 獲得ポイントのゲージは0でも出す。ここで触っておかないと
+                // 初回の獲得までゲージ自体が作られず、対局開始時に何も見えない。
+                ScoreGauge.ResetScores();
+
+                bool isDebugMode = false;
+                if (NetworkMessageHandler.Instance != null && NetworkMessageHandler.Instance.UseDebugClient)
                 {
-                    _ = wsClient.ConnectAsync();
+                    isDebugMode = true;
                 }
+
+                if (!isDebugMode)
+                {
+                    var wsClient = UnityEngine.Object.FindFirstObjectByType<WebSocketGameClientSample>();
+                    if (wsClient != null)
+                    {
+                        // UIの初期化が完全に終わった次のフレームで接続を開始する
+                        StartCoroutine(ConnectWebSocketNextFrame(wsClient));
+                    }
+                }
+            }
+        }
+
+        private System.Collections.IEnumerator ConnectWebSocketNextFrame(WebSocketGameClientSample wsClient)
+        {
+            yield return null; // 1フレーム待機
+            if (wsClient != null)
+            {
+                _ = wsClient.ConnectAsync();
             }
         }
 
@@ -194,20 +215,67 @@ namespace KillingMahjong.UI
 
             UpdateTurnIndicatorVisibility();
         }
+        [SerializeField] private KillingMahjong.UI.Effects.MatchMomentumUI matchMomentumUI;
+
+        // --- 戦況グラフ用HP履歴 ---
+        private List<int> playerHpHistory = new List<int>();
+        private List<int> enemyHpHistory = new List<int>();
+
+        public void RecordHpHistory(int localHp, int enemyHp)
+        {
+            // 同じHPが連続する場合はスキップする（変化があった時のみ記録）
+            if (playerHpHistory.Count > 0 && enemyHpHistory.Count > 0)
+            {
+                if (playerHpHistory[playerHpHistory.Count - 1] == localHp && 
+                    enemyHpHistory[enemyHpHistory.Count - 1] == enemyHp)
+                {
+                    return;
+                }
+            }
+            playerHpHistory.Add(localHp);
+            enemyHpHistory.Add(enemyHp);
+        }
 
         private void HandleGameEnded(int localScore, int enemyScore)
         {
             IsGameOver = true;
             LocalFinalScore = localScore;
             EnemyFinalScore = enemyScore;
+            
+            // 決着時の最終HPも記録しておく
+            RecordHpHistory(localScore, enemyScore);
         }
+
+        private bool gameResultShown = false;
 
         public void ShowGameResult()
         {
+            // 呼び出し経路が2つ（ダイアログのOKと即時分岐）あるため、二重表示を防ぐ
+            if (gameResultShown) return;
+            gameResultShown = true;
+
+            StartCoroutine(ShowGameResultRoutine());
+        }
+
+        private System.Collections.IEnumerator ShowGameResultRoutine()
+        {
+            // 決着したら瀕死ビネットを消す（結果画面より手前に描画されるため）
+            if (playerInfoUI != null) playerInfoUI.StopHeartbeatEffect();
+
+            // 戦況グラフの表示（履歴が2件以上あれば表示）
+            if (matchMomentumUI != null && playerHpHistory.Count >= 2)
+            {
+                matchMomentumUI.ShowMomentum(playerHpHistory, enemyHpHistory);
+                // グラフ演出が終わるまで待つ（表示時間2秒 + 前後フェード1秒 = 約3秒。MatchMomentumUI側の設定に合わせる）
+                yield return new WaitForSeconds(3.0f);
+            }
+
             bool isWin = LocalFinalScore > 0 && EnemyFinalScore <= 0;
             if (victoryUI != null)
             {
-                victoryUI.PlayAnimation(isWin ? VictoryType.NormalVictory : VictoryType.NormalDefeat);
+                victoryUI.PlayAnimation(
+                    isWin ? VictoryType.NormalVictory : VictoryType.NormalDefeat,
+                    LocalFinalScore, EnemyFinalScore);
             }
         }
 
@@ -240,6 +308,7 @@ namespace KillingMahjong.UI
         public AbilityUI AbilityUI => abilityUI;
         public YakuListUI YakuListUI => yakuListUI;
         public BettingUI BettingUI => bettingUI;
+        public BetPotUI BetPotUI => betPotUI;
         public DialogueUI DialogueUI => dialogueUI;
         public PhaseTransitionUI PhaseTransitionUI => phaseTransitionUI;
         public ConfirmationDialogUI ConfirmationDialogUI => confirmationDialogUI;
@@ -249,6 +318,7 @@ namespace KillingMahjong.UI
         public DoraDisplayUI DoraDisplayUI => doraDisplayUI;
         public GameObject RonWaitPanel => ronWaitPanel;
         public OptionUI OptionUI => optionUI;
+        public AgariSelectionUI AgariSelectionUI => agariSelectionUI;
 
         public GameObject TilePrefab => tilePrefab;
         public TileResourceManager TileResourceManager => tileResourceManager;
@@ -259,6 +329,13 @@ namespace KillingMahjong.UI
         {
             currentPhaseStatus = status;
             UpdateTurnIndicatorVisibility();
+            
+            // 通常対局時、打牌フェイズ以外はBGMをくぐもらせる（ローパス）
+            if (!IsTutorialMode && KillingMahjong.Managers.AudioManager.Instance != null)
+            {
+                bool isMuffled = (status != RoundStatus.Discard);
+                KillingMahjong.Managers.AudioManager.Instance.SetBgmFilter(isMuffled, 1.5f);
+            }
         }
 
         public void SetIsTransitioning(bool value)
@@ -267,14 +344,138 @@ namespace KillingMahjong.UI
             UpdateTurnIndicatorVisibility();
         }
 
+        // --- 演出中に届いたサーバーイベントの保留 ---
+        //
+        // サーバーメッセージは再送されないため、演出中だからと早期 return で捨てると
+        // そのイベントは永久に失われる（流局の取りこぼしで進行が止まる等）。
+        // 捨てる代わりにここへ積み、演出が明けてから実行する。
+
+        private readonly List<KeyValuePair<string, Action>> deferredActions = new List<KeyValuePair<string, Action>>();
+        private bool ignoreBusyForForcedFlush = false;
+
+        /// <summary>
+        /// 保留を流す見張り。**bool ではなく Coroutine のハンドルで持つ。**
+        ///
+        /// 以前は `isFlushWatcherRunning` という bool で二重起動を防いでいたが、
+        /// コルーチンが外から止められると true のまま取り残され、
+        /// `if (!isFlushWatcherRunning)` が二度と通らなくなる。
+        /// そうなると保留は永久に実行されず、8秒の強制実行という安全網ごと死ぬ
+        /// （実際にロン猶予が保留されたまま対局が停止した）。
+        /// ハンドルなら StopCoroutine されても null 判定と併せて張り直せる。
+        /// </summary>
+        private Coroutine flushWatcher;
+
+        /// <summary>
+        /// 何らかの演出が進行中で、UI を触ると壊れる状態かどうか。
+        /// </summary>
+        public bool IsBusyWithTransition =>
+            !ignoreBusyForForcedFlush
+            && (isTransitioning || (phaseTransitionUI != null && phaseTransitionUI.IsDarkenTransitioning));
+
+        /// <summary>
+        /// 演出が明けるまで処理を保留する。
+        /// 同じ key の保留は後勝ちで上書きするので、連続して届いても積み上がらない。
+        /// 上書きは元の位置で行う（末尾に付け直すと到着順が壊れるため）。
+        /// </summary>
+        public void DeferUntilIdle(string key, Action action)
+        {
+            if (action == null) return;
+
+            var entry = new KeyValuePair<string, Action>(key, action);
+            int existing = deferredActions.FindIndex(p => p.Key == key);
+            if (existing >= 0) deferredActions[existing] = entry;
+            else deferredActions.Add(entry);
+            Debug.Log($"[GameUIManager] 演出中のため '{key}' を保留しました。演出完了後に実行します。");
+
+            EnsureFlushWatcher();
+        }
+
+        /// <summary>
+        /// 見張りが動いていなければ張り直す。保留がある限り、何度呼んでも安全。
+        /// </summary>
+        private void EnsureFlushWatcher()
+        {
+            if (flushWatcher != null) return;
+            if (!isActiveAndEnabled) return;
+            flushWatcher = StartCoroutine(FlushDeferredActionsRoutine());
+        }
+
+        private void Update()
+        {
+            // コルーチンが外から止められても、保留が残っていれば必ず拾い直す。
+            // これが最後の砦で、ここが無いと「進行が止まったまま何も起きない」に戻る。
+            if (deferredActions.Count > 0) EnsureFlushWatcher();
+        }
+
+        private IEnumerator FlushDeferredActionsRoutine()
+        {
+
+            // 演出の途中で一瞬だけ isTransitioning が false に戻る箇所があるため
+            // （TriggerBettingAnimationPhase の onMidpoint）、必ず1フレーム待ってから判定する。
+            float waited = 0f;
+            do
+            {
+                yield return null;
+                waited += Time.deltaTime;
+            }
+            while (IsBusyWithTransition && waited < DeferredActionTimeoutSeconds);
+
+            // 演出フラグが立ちっぱなしになると保留が永久に実行されず、
+            // 取りこぼしと同じ「進行停止」になる。見た目の乱れより進行を優先する。
+            bool forced = IsBusyWithTransition;
+            if (forced)
+            {
+                Debug.LogWarning($"[GameUIManager] 演出が {DeferredActionTimeoutSeconds} 秒明けませんでした。保留していた処理を強制実行します。");
+            }
+
+            var toRun = new List<KeyValuePair<string, Action>>(deferredActions);
+            deferredActions.Clear();
+            flushWatcher = null;
+
+            // 強制実行のときはガードを一時的に無効化する。
+            // そうしないと各処理が冒頭で再び「演出中」と判定して保留し直し、
+            // 永久に実行されないまま警告だけ出し続ける。
+            ignoreBusyForForcedFlush = forced;
+            try
+            {
+                foreach (var entry in toRun)
+                {
+                    try
+                    {
+                        entry.Value?.Invoke();
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogError($"[GameUIManager] 保留処理 '{entry.Key}' の実行に失敗: {ex.Message}\n{ex.StackTrace}");
+                    }
+                }
+            }
+            finally
+            {
+                ignoreBusyForForcedFlush = false;
+            }
+        }
+
+        private const float DeferredActionTimeoutSeconds = 8f;
+
         private void UpdateTurnIndicatorVisibility()
         {
+            // 打牌フェイズで、かつ演出中（先行・後攻演出など）ではない時だけ表示する
+            bool shouldShow = (currentPhaseStatus == RoundStatus.Discard) && !IsTransitioning;
+
             if (turnIndicatorUI != null)
             {
-                // 打牌フェイズで、かつ演出中（先行・後攻演出など）ではない時だけ表示する
-                bool shouldShow = (currentPhaseStatus == RoundStatus.Discard) && !IsTransitioning;
                 turnIndicatorUI.SetVisible(shouldShow);
             }
+
+            // 文字だけでは「YOUR / ENEMY」を読むまで分からないので、
+            // 手番の側の体力表示（自分＝スマホ／相手＝点滴）も光らせて位置で示す。
+            // 相手の番は、あわせて女の子の立ち絵も赤く光る（EnemyInfoUI.SetTurnGlow の中）。
+            // 以前あった画面ふちの枠（TurnVignette）は、盤面が狭く見えるのでやめた
+            bool isLocalTurn = KillingMahjong.Managers.BoardStateManager.Instance != null
+                            && KillingMahjong.Managers.BoardStateManager.Instance.IsLocalTurn;
+            if (playerInfoUI != null) playerInfoUI.SetTurnGlow(shouldShow && isLocalTurn);
+            if (enemyInfoUI != null) enemyInfoUI.SetTurnGlow(shouldShow && !isLocalTurn);
         }
 
         // --- Entry points from external classes / old API ---
@@ -301,11 +502,16 @@ namespace KillingMahjong.UI
                 return;
             }
             
+            if (IsTutorialMode && TutorialManager != null)
+            {
+                if (!TutorialManager.OnTryMoveTile(tileId, toHand: true)) return;
+            }
+            
             Debug.Log($"[GameUIManager] Executing BoardStateManager.MoveTileToHand({tileId})");
             BoardStateManager.Instance.TargetHandIndexes = null;
 
             if (KillingMahjong.Managers.AudioManager.Instance != null)
-                KillingMahjong.Managers.AudioManager.Instance.PlaySE(KillingMahjong.Managers.AudioManager.Instance.selectTileSE);
+                KillingMahjong.Managers.AudioManager.Instance.PlayPickTileSE();
 
             if (VisualController != null)
             {
@@ -326,10 +532,16 @@ namespace KillingMahjong.UI
         {
             if (currentPhaseStatus != RoundStatus.HandSelection) return;
             if (handUI != null && handUI.IsSubmitted) return;
+            
+            if (IsTutorialMode && TutorialManager != null)
+            {
+                if (!TutorialManager.OnTryMoveTile(tileId, toHand: false)) return;
+            }
+            
             BoardStateManager.Instance.TargetHandIndexes = null;
             
             if (KillingMahjong.Managers.AudioManager.Instance != null)
-                KillingMahjong.Managers.AudioManager.Instance.PlaySE(KillingMahjong.Managers.AudioManager.Instance.selectTileSE);
+                KillingMahjong.Managers.AudioManager.Instance.PlayPickTileSE();
 
             if (VisualController != null)
             {
@@ -351,8 +563,14 @@ namespace KillingMahjong.UI
             if (currentPhaseStatus != RoundStatus.HandSelection) return;
             if (handUI != null && handUI.IsSubmitted) return;
             
+            if (IsTutorialMode && TutorialManager != null)
+            {
+                TutorialManager.ApplyMockAutoMangan();
+                return;
+            }
+            
             if (KillingMahjong.Managers.AudioManager.Instance != null)
-                KillingMahjong.Managers.AudioManager.Instance.PlaySE(KillingMahjong.Managers.AudioManager.Instance.selectTileSE);
+                KillingMahjong.Managers.AudioManager.Instance.PlayPickTileSE();
 
             if (VisualController != null)
             {
@@ -373,7 +591,7 @@ namespace KillingMahjong.UI
             if (handUI != null && handUI.IsSubmitted) return;
             
             if (KillingMahjong.Managers.AudioManager.Instance != null)
-                KillingMahjong.Managers.AudioManager.Instance.PlaySE(KillingMahjong.Managers.AudioManager.Instance.selectTileSE);
+                KillingMahjong.Managers.AudioManager.Instance.PlayPickTileSE();
 
             if (VisualController != null)
             {
@@ -436,14 +654,18 @@ namespace KillingMahjong.UI
                 ClearSelection();
 
                 // 疑似的に河へ移動
-                if (handUI != null)
+                if (wallUI != null)
                 {
-                    RectTransform tileRt = handUI.GetTileSlotRectTransform(tileToDiscard);
+                    RectTransform tileRt = wallUI.GrabTileById(tileToDiscard);
                     if (tileRt != null)
                     {
-                        handUI.RemoveTileFromHand(tileRt, tileToDiscard);
                         if (riverUI != null) riverUI.AddExistingTile(tileRt, tileToDiscard);
                     }
+                    else
+                    {
+                        if (riverUI != null) riverUI.AddTile(tileToDiscard);
+                    }
+                    wallUI.UpdateWallHighlights(BoardStateManager.Instance.CurrentWaitTiles, currentPhaseStatus == RoundStatus.Discard);
                 }
 
                 if (KillingMahjong.Managers.AudioManager.Instance != null)
@@ -466,6 +688,10 @@ namespace KillingMahjong.UI
 
         public void CompleteHandSelection()
         {
+            if (IsTutorialMode && TutorialManager != null)
+            {
+                if (!TutorialManager.OnTryCompleteHandSelection()) return;
+            }
             HandSelectionController?.CompleteHandSelection();
         }
 
@@ -514,13 +740,28 @@ namespace KillingMahjong.UI
 
         private void HandleAgariPendingReceived(KillingMahjong.EngineData.AgariPendingData data)
         {
-            Debug.Log($"[GameUIManager] HandleAgariPendingReceived called. winner_id: {data.winner_id}, loser_id: {data.loser_id}, tile_id: {data.tile_id}");
-            
+            Debug.Log($"[GameUIManager] HandleAgariPendingReceived called. winner_id: {data.winner_id}, loser_id: {data.loser_id}, tile: {data.tile}");
+
             if (data.winner_id == NetworkMessageHandler.Instance.LocalPlayerId)
             {
-                if (BoardStateManager.Instance.NonManganWaitTiles.Contains(data.tile_id))
+                // 保留するかどうかに関わらず、自動打牌だけは先に止める。
+                // AutoDiscardController は RonWaitPanel の表示有無でロン猶予を判定しているので、
+                // パネルを出す前に保留すると、その隙に自動で打ってロンを取り逃す。
+                var autoDiscard = GetComponent<AutoDiscardController>();
+                if (autoDiscard != null) autoDiscard.CancelAutoDiscard();
+
+                // 賭け金演出などの最中にロン猶予が届くと、演出を突き抜けてロンボタンだけが先に出る。
+                // サーバーはロン入力を待ち続ける（手番のタイムアウトは無い）ので、
+                // 演出が明けてから出しても取りこぼしにはならない。
+                if (IsBusyWithTransition)
                 {
-                    Debug.Log($"[GameUIManager] Ignored agari_pending because tile {data.tile_id} is non-mangan.");
+                    DeferUntilIdle("agariPending", () => HandleAgariPendingReceived(data));
+                    return;
+                }
+
+                if (BoardStateManager.Instance.NonManganWaitTiles.Contains(data.tile))
+                {
+                    Debug.Log($"[GameUIManager] Ignored agari_pending because tile {data.tile} is non-mangan.");
                     SendActionToServer("agari", new KillingMahjong.Network.ActionPayload { accept = false });
                     return;
                 }
@@ -528,41 +769,58 @@ namespace KillingMahjong.UI
                 Debug.Log("[GameUIManager] I am the winner! Showing RonWaitPanel.");
                 _isAgariPending = true;
 
-                var autoDiscard = GetComponent<AutoDiscardController>();
-                if (autoDiscard != null) autoDiscard.CancelAutoDiscard();
+                ShowRonWaitPanel();
+            }
+        }
 
-                if (RonWaitPanel != null)
+        /// <summary>
+        /// ロン待ちパネルを最前面に出す。
+        /// 対局とチュートリアルで同じボタンを見せたいので、両方からここを通す。
+        /// </summary>
+        private void ShowRonWaitPanel()
+        {
+            if (RonWaitPanel == null) return;
+
+            RonWaitPanel.SetActive(true);
+            RonWaitPanel.transform.SetAsLastSibling();
+
+            // 最前面に表示するためにCanvasを追加してソート順を強制する
+            Canvas canvas = RonWaitPanel.GetComponent<Canvas>();
+            if (canvas == null)
+            {
+                canvas = RonWaitPanel.AddComponent<Canvas>();
+            }
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = UISortingOrders.RonWaitPanel;
+
+            if (RonWaitPanel.GetComponent<UnityEngine.UI.GraphicRaycaster>() == null)
+            {
+                RonWaitPanel.AddComponent<UnityEngine.UI.GraphicRaycaster>();
+            }
+
+            var images = RonWaitPanel.GetComponentsInChildren<UnityEngine.UI.Image>();
+            foreach (var img in images)
+            {
+                if (img.GetComponent<UnityEngine.UI.Button>() == null &&
+                    !img.gameObject.name.ToLower().Contains("button"))
                 {
-                    RonWaitPanel.SetActive(true);
-                    RonWaitPanel.transform.SetAsLastSibling();
-
-                    // 最前面に表示するためにCanvasを追加してソート順を強制する
-                    Canvas canvas = RonWaitPanel.GetComponent<Canvas>();
-                    if (canvas == null)
-                    {
-                        canvas = RonWaitPanel.AddComponent<Canvas>();
-                    }
-                    canvas.overrideSorting = true;
-                    canvas.sortingOrder = UISortingOrders.RonWaitPanel;
-
-                    if (RonWaitPanel.GetComponent<UnityEngine.UI.GraphicRaycaster>() == null)
-                    {
-                        RonWaitPanel.AddComponent<UnityEngine.UI.GraphicRaycaster>();
-                    }
-                    
-                    var images = RonWaitPanel.GetComponentsInChildren<UnityEngine.UI.Image>();
-                    foreach (var img in images)
-                    {
-                        if (img.GetComponent<UnityEngine.UI.Button>() == null && 
-                            !img.gameObject.name.ToLower().Contains("button"))
-                        {
-                            var c = img.color;
-                            c.a = 0.1f;
-                            img.color = c;
-                        }
-                    }
+                    var c = img.color;
+                    c.a = 0.1f;
+                    img.color = c;
                 }
             }
+        }
+
+        private System.Action _tutorialRonCallback;
+
+        /// <summary>
+        /// チュートリアルで、対局とまったく同じロンボタンを出して押されるのを待つ。
+        /// サーバーには何も送らず、押されたら渡されたコールバックを呼ぶだけ。
+        /// </summary>
+        public void ShowRonWaitPanelForTutorial(System.Action onPressed)
+        {
+            _tutorialRonCallback = onPressed;
+            ShowRonWaitPanel();
         }
 
         private void HandleTurnChanged(bool isLocalTurn)
@@ -585,11 +843,60 @@ namespace KillingMahjong.UI
                     playerInfoUI.StopTurnTimer();
                 }
             }
+
+            // 手番の側の体力表示を光らせ直す。
+            // UpdateTurnIndicatorVisibility はフェイズ・演出の切り替えでしか呼ばれないので、
+            // 打牌フェイズ中の手番交代はここで拾う
+            UpdateTurnIndicatorVisibility();
+        }
+
+        /// <summary>
+        /// 「この牌が通った」の推理表示。無ければ実行時に作る。
+        /// 判定はサーバー任せで、こちらは見えている打牌から候補を数えるだけ。
+        /// </summary>
+        private WaitDeductionUI _waitDeduction;
+        public WaitDeductionUI WaitDeduction
+        {
+            get
+            {
+                if (_waitDeduction == null) _waitDeduction = GetComponentInChildren<WaitDeductionUI>(true);
+                if (_waitDeduction == null)
+                {
+                    var go = new GameObject("WaitDeduction");
+                    go.transform.SetParent(transform, false);
+                    _waitDeduction = go.AddComponent<WaitDeductionUI>();
+                }
+                return _waitDeduction;
+            }
+        }
+
+        /// <summary>
+        /// 獲得ポイントのゲージ（左＝相手／右＝自分）。無ければ実行時に作る。
+        /// 「30000で勝ち」の判定自体はサーバーの担当で、ここは積み上げを見せるだけ。
+        /// </summary>
+        private ScoreGaugeUI _scoreGauge;
+        public ScoreGaugeUI ScoreGauge
+        {
+            get
+            {
+                if (_scoreGauge == null) _scoreGauge = GetComponentInChildren<ScoreGaugeUI>(true);
+                if (_scoreGauge == null)
+                {
+                    var go = new GameObject("ScoreGauge");
+                    go.transform.SetParent(transform, false);
+                    _scoreGauge = go.AddComponent<ScoreGaugeUI>();
+                }
+                return _scoreGauge;
+            }
         }
 
         public void HandleDiscardEvent(int discardedTileId, bool isLocalPlayer)
         {
             BoardStateManager.Instance.LastDiscardedTileId = discardedTileId;
+
+            // 通った牌・相手が切った牌のどちらも「相手の待ちではない」情報になる。
+            // ロン成立時は局が終わって次局でリセットされるので、ここで弾く必要はない。
+            if (!IsTutorialMode) WaitDeduction.RegisterDiscard(discardedTileId, isLocalPlayer);
 
             if (KillingMahjong.Managers.AudioManager.Instance != null)
                 KillingMahjong.Managers.AudioManager.Instance.PlayDiscardSE(KillingMahjong.Managers.AudioManager.Instance.discardSE);
@@ -673,7 +980,12 @@ namespace KillingMahjong.UI
             if (enemyRiverUI != null) enemyRiverUI.Clear();
             
             if (waitUI != null) waitUI.gameObject.SetActive(false);
-            
+
+            // 牌をすべてプールへ返したので、差分リビルドの前提（UIに前回の牌が残っている）が崩れる。
+            // 無効化しておかないと、返却前と牌の構成が偶然一致したときに
+            // 「変化なし＝再生成不要」と誤判定され、盤面が空のままになる。
+            if (VisualController != null) VisualController.InvalidateRebuildCache();
+
             Managers.BoardStateManager.Instance.ClearAllBoardData();
         }
 
@@ -685,6 +997,16 @@ namespace KillingMahjong.UI
             if (KillingMahjong.Managers.AudioManager.Instance != null)
             {
                 KillingMahjong.Managers.AudioManager.Instance.PlayVoice(KillingMahjong.Managers.AudioManager.Instance.ronVoice);
+            }
+
+            // チュートリアルはサーバーに繋がっていないので、進行役へ返すだけ
+            if (_tutorialRonCallback != null)
+            {
+                var cb = _tutorialRonCallback;
+                _tutorialRonCallback = null;
+                if (RonWaitPanel != null) RonWaitPanel.SetActive(false);
+                cb();
+                return;
             }
 
             if (_isAgariPending)

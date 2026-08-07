@@ -57,6 +57,12 @@ namespace KillingMahjong.Managers
 
         private IEnumerator SequenceRoutine()
         {
+            // 開始時（契約書中）はBGMを止めて静かにする
+            if (KillingMahjong.Managers.AudioManager.Instance != null)
+            {
+                KillingMahjong.Managers.AudioManager.Instance.StopBGM();
+            }
+
             // 少し待ってから目を覚ます演出
             yield return new WaitForSeconds(1.0f);
 
@@ -101,6 +107,10 @@ namespace KillingMahjong.Managers
 
         private IEnumerator SlideInLargePaperRoutine()
         {
+            if (KillingMahjong.Managers.AudioManager.Instance != null)
+            {
+                KillingMahjong.Managers.AudioManager.Instance.PlayPaperSlideSE();
+            }
             largePaperUI.SetActive(true);
             RectTransform rt = largePaperUI.GetComponent<RectTransform>();
             
@@ -132,6 +142,10 @@ namespace KillingMahjong.Managers
 
         private IEnumerator SlideOutLargePaperRoutine()
         {
+            if (KillingMahjong.Managers.AudioManager.Instance != null)
+            {
+                KillingMahjong.Managers.AudioManager.Instance.PlayPaperSlideSE();
+            }
             largePaperNextButton.interactable = false; // 連打防止
 
             RectTransform rt = largePaperUI.GetComponent<RectTransform>();
@@ -209,28 +223,9 @@ namespace KillingMahjong.Managers
 
         private IEnumerator ConversationRoutine()
         {
-            // チュートリアル用のセリフリストを直接定義するか、DialogueManagerから取得する。
-            // チュートリアルCSVを用意するのであれば、DialogueManagerで専用のものを読み込む。
-            // 今回はDialogueUIを使ってセリフを順に表示する簡易制御を実装。
-            
-            string[] dialogues = new string[]
-            {
-                "よく来たわね。私が相手をしてあげる。",
-                "ルールは簡単よ。麻雀で私を殺せばいいの。",
-                "まずはやり方を教えてあげるわ。"
-            };
+            // 会話はTutorialManager側で行うため、ここではすぐに遷移する
+            yield return null;
 
-            for (int i = 0; i < dialogues.Length; i++)
-            {
-                bool isNextClicked = false;
-                dialogueUI.ShowText(dialogues[i]);
-                dialogueUI.ShowNextRoundButton(() => isNextClicked = true);
-                
-                yield return new WaitUntil(() => isNextClicked);
-            }
-
-            // 会話終了、チュートリアル開始
-            dialogueUI.HideNextRoundButton();
             if (tutorialManager != null)
             {
                 tutorialManager.StartTutorial();

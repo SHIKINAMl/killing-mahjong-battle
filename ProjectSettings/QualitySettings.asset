@@ -62,6 +62,4 @@ QualitySettings:
     - Android
     - iPhone
   m_TextureMipmapLimitGroupNames: []
-  m_PerPlatformDefaultQuality:
-    Standalone: 0
-    WebGL: 0
+  m_PerPlatformDefaultQuality: {}

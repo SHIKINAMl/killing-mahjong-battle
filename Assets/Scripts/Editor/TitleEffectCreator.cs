@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEditor;
+using KillingMahjong.Common;
 
 namespace KillingMahjong.Editor
 {
@@ -12,9 +13,8 @@ namespace KillingMahjong.Editor
             var ps = effectObj.AddComponent<ParticleSystem>();
             var psRenderer = effectObj.GetComponent<ParticleSystemRenderer>();
             
-            // UIレイヤーの奥、または手前に描画させる設定
-            psRenderer.sortingLayerName = "UI"; // 既存のUIレイヤー
-            psRenderer.sortingOrder = 5; // 女の子やボタンの後ろにしたい場合は小さめの数字にする
+            // 女の子やボタンの後ろに描画させる
+            psRenderer.sortingOrder = UISortingOrders.TitleParticle;
             
             // メイン設定
             var main = ps.main;

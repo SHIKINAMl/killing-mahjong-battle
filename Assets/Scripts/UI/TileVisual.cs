@@ -29,20 +29,66 @@ namespace KillingMahjong.UI
             if (meshRenderer == null) meshRenderer = GetComponent<MeshRenderer>();
         }
 
+        // ---- 牌の影（調整値。シーンではなくここを触る）----
+        //
+        // 牌が並ぶと境目が分からなくなるので、セリフに付けた影と同じ考え方で
+        // 一枚ずつ落とす。**牌のプレハブは複数あり、対局シーンも2つある**ので
+        // プレハブに直接付けず、実行時に足す。
+
+        /// <summary>影を付けるか。切りたくなったらここを false に</summary>
+        private const bool AddTileShadow = true;
+
+        /// <summary>影のずれ幅。牌の大きさに対する割合ではなく、牌のローカル座標。
+        /// 牌は場所によって縮尺が違う（河 0.8 / 手牌 等倍）ので、
+        /// 縮尺に応じて影も一緒に縮む</summary>
+        private static readonly Vector2 TileShadowDistance = new Vector2(3f, -3f);
+
+        /// <summary>影の色。真っ黒だと牌の間が線で埋まって重くなる</summary>
+        private static readonly Color TileShadowColor = new Color(0f, 0f, 0f, 0.55f);
+
         private void Awake()
         {
             // Runtime fallback if not assigned in Inspector
             if (spriteRenderer == null) spriteRenderer = GetComponent<SpriteRenderer>();
             if (uiImage == null) uiImage = GetComponent<Image>();
             if (meshRenderer == null) meshRenderer = GetComponent<MeshRenderer>();
-            
+
             // デフォルトでアウトラインはオフにする（Prefab設定漏れ対策）
             SetFuritenHighlight(false);
             SetHoverHighlight(false);
             SetExposed(false);
+
+            EnsureShadow();
+        }
+
+        /// <summary>
+        /// 牌の下に影を敷いて、隣の牌との境目を出す。
+        ///
+        /// `UnityEngine.UI.Shadow` は牌の絵をそのまま複製してずらすので、
+        /// 牌の形（角の丸みなど）に沿った影になる。矩形を別に用意する必要はない。
+        ///
+        /// **SpriteRenderer 版の牌には付かない。** Graphic の効果なので
+        /// Canvas 配下でないと何も起きない（DoraShine で同じ罠を踏んでいる）。
+        /// </summary>
+        private void EnsureShadow()
+        {
+            if (!AddTileShadow || uiImage == null) return;
+            if (GetComponentInParent<Canvas>() == null) return;
+            if (uiImage.GetComponent<Shadow>() != null) return;
+
+            var shadow = uiImage.gameObject.AddComponent<Shadow>();
+            shadow.effectColor = TileShadowColor;
+            shadow.effectDistance = TileShadowDistance;
+            shadow.useGraphicAlpha = true;
         }
 
         private int _currentId = -1;
+
+        /// <summary>不正な牌IDを表示中かどうか。着色を他の処理に消されないよう保持する。</summary>
+        private bool _isInvalidId = false;
+
+        /// <summary>不正な牌に被せる色。「テクスチャが無い」の慣例に合わせた紫。</summary>
+        private static readonly Color InvalidTint = new Color(1f, 0f, 1f, 1f);
 
         public void SetTile(int encodedId, Sprite sprite, TileResourceManager resourceManager = null)
         {
@@ -55,14 +101,63 @@ namespace KillingMahjong.UI
                 else if (meshRenderer != null) meshRenderer.material.mainTexture = sprite.texture;
             }
 
+            // **不正なIDは不正なまま見せる。**
+            // 近い牌へ丸めると壊れたIDが普通の牌として画面に出てしまい、不具合が隠れる。
+            // 紫に着色して、ひと目で「これはおかしい」と分かるようにする。
+            string problem = Common.TileId.DescribeProblem(encodedId);
+            _isInvalidId = problem != null;
+            if (_isInvalidId)
+            {
+                Debug.LogError($"[TileVisual] 不正な牌を表示しています: {problem} / obj={name}");
+            }
+            ApplyInvalidTint();
+
             // ドラ枠オーバーレイはスプライトの有無に関わらず常に更新する（プール再利用時の状態リーク防止）
+            bool isDoraTile = sprite != null && encodedId >= 0 && !_isInvalidId && (resourceManager != null
+                ? resourceManager.IsDora(encodedId)
+                : Common.TileId.IsAnyDora(encodedId));
+
             if (doraOverlayImage != null)
             {
-                bool isDora = sprite != null && encodedId >= 0 && (resourceManager != null
-                    ? resourceManager.IsDora(encodedId)
-                    : new TileData(encodedId).IsDora || new TileData(encodedId).IsRedDora);
-                doraOverlayImage.gameObject.SetActive(isDora);
+                doraOverlayImage.gameObject.SetActive(isDoraTile);
             }
+
+            SetDoraShine(isDoraTile);
+        }
+
+        /// <summary>
+        /// 不正な牌の着色を反映する。牌はプールで使い回されるので、
+        /// 正常な牌に戻ったときは必ず白へ戻すこと（アルファは触らない）。
+        /// </summary>
+        private void ApplyInvalidTint()
+        {
+            Color tint = _isInvalidId ? InvalidTint : Color.white;
+
+            if (uiImage != null)
+            {
+                tint.a = uiImage.color.a;
+                uiImage.color = tint;
+            }
+            if (spriteRenderer != null)
+            {
+                tint.a = spriteRenderer.color.a;
+                spriteRenderer.color = tint;
+            }
+        }
+
+        /// <summary>
+        /// ドラ牌のきらめきを入り切りする。
+        /// 牌はプールで使い回されるので、ドラでなくなったら必ず止めること。
+        /// </summary>
+        private void SetDoraShine(bool on)
+        {
+            var shine = GetComponent<DoraShine>();
+            if (shine == null)
+            {
+                if (!on) return;              // 要らないなら作らない
+                shine = gameObject.AddComponent<DoraShine>();
+            }
+            shine.enabled = on;
         }
         
         public int GetId() => _currentId;
@@ -99,7 +194,9 @@ namespace KillingMahjong.UI
             
             if (spriteRenderer != null)
             {
-                if (_isFuriten) spriteRenderer.color = Color.red;
+                // 不正な牌の紫は、フリテン表示より優先して残す（異常を消さない）
+                if (_isInvalidId) ApplyInvalidTint();
+                else if (_isFuriten) spriteRenderer.color = Color.red;
                 else spriteRenderer.color = Color.white;
             }
 

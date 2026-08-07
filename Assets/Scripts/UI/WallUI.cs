@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
+using KillingMahjong.Common;
 
 namespace KillingMahjong.UI
 {
@@ -10,7 +11,7 @@ namespace KillingMahjong.UI
         
         [Header("Layout Settings")]
         [SerializeField] private Vector2 normalContainerPos = new Vector2(0, 0);       // 通常時のコンテナ位置
-        [SerializeField] private Vector2 discardContainerPos = new Vector2(0, -100);   // 打牌フェイズ時のコンテナ位置
+        [SerializeField] private Vector2 discardContainerPos = new Vector2(0, -350);   // 打牌フェイズ時のコンテナ位置 (より手前に)
         [SerializeField] private Vector2 startPosition = new Vector2(40, 150);         // コンテナ内での牌の基点
         [SerializeField] private float tileIntervalX = 55f;
         [SerializeField] private float gapIntervalX = 80f;
@@ -41,6 +42,16 @@ namespace KillingMahjong.UI
 
         private List<RectTransform> wallSlots = new List<RectTransform>();
         public List<RectTransform> GetWallSlots() => wallSlots;
+
+        /// <summary>
+        /// 山牌1枚ぶん。表示は種類順に並べ替えるので、
+        /// 元の山での位置（WallIndex）を一緒に持ち回るために使う。
+        /// </summary>
+        private struct WallEntry
+        {
+            public TileData Data;
+            public int WallIndex;
+        }
 
         /// <summary>
         /// wallSlotsからtileIdが一致するRectTransformを取り出し、スロットから削除して返す
@@ -82,7 +93,9 @@ namespace KillingMahjong.UI
             if (canvas != null)
             {
                 canvas.overrideSorting = true;
-                canvas.sortingOrder = isDiscardPhase ? 2 : 1;
+                canvas.sortingOrder = isDiscardPhase
+                    ? UISortingOrders.WallDiscardPhase
+                    : UISortingOrders.WallBase;
             }
         }
 
@@ -96,21 +109,23 @@ namespace KillingMahjong.UI
             UpdateContainerPosition(isDiscardPhase);
 
             // 1. Convert to TileData
-            List<TileData> allTiles = new List<TileData>();
-            foreach (var id in tileIds)
+            //    表示は種類順に並べ替えるが、山の何番目だったかは持ち回る。
+            //    これを落とすと、同じ牌IDが複数ある山で index を引き直せなくなる。
+            List<WallEntry> allTiles = new List<WallEntry>();
+            for (int idx = 0; idx < tileIds.Count; idx++)
             {
-                allTiles.Add(new TileData(id));
+                allTiles.Add(new WallEntry { Data = new TileData(tileIds[idx]), WallIndex = idx });
             }
 
             // 2. Group by Category
-            var manzu = new List<TileData>();
-            var pinzu = new List<TileData>();
-            var souzu = new List<TileData>();
-            var honors = new List<TileData>();
+            var manzu = new List<WallEntry>();
+            var pinzu = new List<WallEntry>();
+            var souzu = new List<WallEntry>();
+            var honors = new List<WallEntry>();
 
             foreach (var t in allTiles)
             {
-                switch (t.Category)
+                switch (t.Data.Category)
                 {
                     case TileCategory.Manzu: manzu.Add(t); break;
                     case TileCategory.Pinzu: pinzu.Add(t); break;
@@ -120,7 +135,7 @@ namespace KillingMahjong.UI
             }
 
             // 3. 固定順で並べる: 萬子→ピンズ→索子→字牌
-            var categoryLists = new List<List<TileData>> { manzu, pinzu, souzu, honors };
+            var categoryLists = new List<List<WallEntry>> { manzu, pinzu, souzu, honors };
             categoryLists.Sort((a, b) => GetCategoryPriority(a).CompareTo(GetCategoryPriority(b)));
 
             // 4. Layout
@@ -139,14 +154,14 @@ namespace KillingMahjong.UI
                 // Sort inside category (Number順でソート。赤ドラも正しい位置に並ぶように)
                 list.Sort((a, b) =>
                 {
-                    if (a.Number != b.Number) return a.Number.CompareTo(b.Number);
-                    return a.Id.CompareTo(b.Id); // 同じNumberならencodedIdでタイブレーク
+                    if (a.Data.Number != b.Data.Number) return a.Data.Number.CompareTo(b.Data.Number);
+                    return a.Data.Id.CompareTo(b.Data.Id); // 同じNumberならencodedIdでタイブレーク
                 });
 
                 int j = 0;
                 while (j < list.Count)
                 {
-                    int targetId = list[j].Id;
+                    int targetId = list[j].Data.Id;
                     
                     // 描画する前にmaxWidthX を超えるかチェック
                     if (currentX > startPosition.x + maxWidthX)
@@ -209,6 +224,9 @@ namespace KillingMahjong.UI
                     {
                         // anchoredPosition（アンカー基準座標）で保存する
                         interaction.OriginalWallPosition = new Vector3(anchoredPos.x, anchoredPos.y, 0);
+                        // 表示順ではなく、山の何番目かを覚えさせる。
+                        // サーバーへ index を送る操作はこれを使う。
+                        interaction.WallIndex = list[j].WallIndex;
                     }
                     
                     var visual = slot.GetComponent<TileVisual>();
@@ -256,10 +274,10 @@ namespace KillingMahjong.UI
             }
         }
 
-        private int GetCategoryPriority(List<TileData> list)
+        private int GetCategoryPriority(List<WallEntry> list)
         {
             if (list.Count == 0) return 99;
-            var cat = list[0].Category;
+            var cat = list[0].Data.Category;
             switch (cat)
             {
                 case TileCategory.Souzu: return 1;
@@ -326,7 +344,7 @@ namespace KillingMahjong.UI
             {
                 foreach (int waitId in waitTiles)
                 {
-                    waitBaseIds.Add(waitId & 0x1F);
+                    waitBaseIds.Add(Common.TileId.BaseId(waitId));
                 }
             }
 
@@ -337,7 +355,7 @@ namespace KillingMahjong.UI
                 var interaction = slot.GetComponent<TileInteraction>();
                 if (visual != null && interaction != null)
                 {
-                    bool isFuritenAlert = waitBaseIds.Contains(interaction.TileId & 0x1F);
+                    bool isFuritenAlert = waitBaseIds.Contains(Common.TileId.BaseId(interaction.TileId));
                     visual.SetFuritenHighlight(isFuritenAlert);
                 }
             }
@@ -434,7 +452,7 @@ namespace KillingMahjong.UI
 
             var canvas = arrowObj.AddComponent<Canvas>();
             canvas.overrideSorting = true;
-            canvas.sortingOrder = 16;
+            canvas.sortingOrder = UISortingOrders.WallFront;
 
             // 生成直後にwallContainerの子として登録することで、牌のプール汚染を防ぐ
             Transform parent = wallContainer != null ? wallContainer : (Transform)this.transform;

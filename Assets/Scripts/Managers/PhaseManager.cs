@@ -35,6 +35,12 @@ namespace KillingMahjong.Managers
             }
         }
 
+        private void OnDestroy()
+        {
+            // シーン再読込時に破棄済みオブジェクトを指したままにしない
+            if (Instance == this) Instance = null;
+        }
+
         public void ChangeGameStatus(GameStatus newStatus)
         {
             if (currentGameStatus != newStatus)

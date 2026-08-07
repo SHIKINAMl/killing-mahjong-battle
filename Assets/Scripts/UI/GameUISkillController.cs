@@ -55,6 +55,31 @@ namespace KillingMahjong.UI
 
         private RectTransform _lastMulliganOutSlotRt;
 
+        /// <summary>診断用。牌IDの並びを「id(牌名)」形式で連結する。</summary>
+        private static string Join(System.Collections.Generic.List<int> list)
+        {
+            if (list == null) return "(null)";
+            var sb = new System.Text.StringBuilder();
+            for (int i = 0; i < list.Count; i++)
+            {
+                if (i > 0) sb.Append(", ");
+                int id = list[i];
+                sb.Append(i).Append(':').Append(id);
+                int b = Common.TileId.BaseId(id);
+                if (b > 28) sb.Append("(範囲外!)");
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>診断用。リスト内に同じ牌IDが何枚あるかを数える。</summary>
+        private static int CountOf(System.Collections.Generic.List<int> list, int tileId)
+        {
+            if (list == null) return 0;
+            int n = 0;
+            foreach (var v in list) if (v == tileId) n++;
+            return n;
+        }
+
         public void OnMulliganTileSelected(int tileId, RectTransform slotRt)
         {
             IsMulliganSelection = false;
@@ -66,7 +91,20 @@ namespace KillingMahjong.UI
             var wallTiles = BoardStateManager.Instance.OriginalWallTiles;
             if (wallTiles != null)
             {
-                int targetIndex = wallTiles.IndexOf(tileId);
+                // クリックされた牌そのものの山index を使う。
+                // ここで wallTiles.IndexOf(tileId) を使うと、同じ牌IDが山に複数あるとき
+                // **常に最初の1枚の index が返り、別の牌が交換されてしまう**
+                // （同じ絵柄の別の牌が入れ替わって見える不具合の原因だった）。
+                int targetIndex = -1;
+                var clicked = slotRt != null ? slotRt.GetComponent<TileInteraction>() : null;
+                if (clicked != null) targetIndex = clicked.WallIndex;
+
+                // 山に並べていない牌など WallIndex が無い場合だけ、従来どおり牌IDから引く
+                if (targetIndex < 0 || targetIndex >= wallTiles.Count || wallTiles[targetIndex] != tileId)
+                {
+                    targetIndex = wallTiles.IndexOf(tileId);
+                }
+
                 if (targetIndex != -1)
                 {
                     _lastMulliganOutTileId = tileId;
@@ -158,6 +196,13 @@ namespace KillingMahjong.UI
         private System.Collections.IEnumerator HandleSkillCastedRoutine(SkillCastedData data)
         {
             uiManager.SetIsTransitioning(true); // ★ アニメーション中の非同期Rebuildを防ぐ
+
+            // 発動の合図として一瞬だけ光らせる。カットインが出る前に置くこと
+            Effects.ScreenFlash.Play();
+
+            // 能力麻雀の核であるスキル発動が完全に無音だったため、種類別の音を鳴らす
+            var audioMgr = Managers.AudioManager.Instance;
+            if (audioMgr != null) audioMgr.PlaySkillSE(data.skillType);
 
             string localPlayerId = KillingMahjong.Network.NetworkMessageHandler.Instance.LocalPlayerId;
             bool isLocalPlayer = (data.player_id == localPlayerId);
@@ -253,19 +298,36 @@ namespace KillingMahjong.UI
             }
 
             // 2. HP（コスト）の支払い演出
-            if (isLocalPlayer)
+            //
+            // **血はサーバーが正。** skill_casted の health（支払い後の値）をそのまま使う。
+            // health は発動した側の値なので、相手が撃ったときは相手側に入れる。
+            //
+            // 0 のときは「サーバーが返していない」とみなし、従来どおり自前で引く。
+            // 古いサーバーに繋いだときに血が 0 へ飛ぶのを防ぐため。
             {
-                int currentLocalHp = Managers.BoardStateManager.Instance.LocalPlayerHp;
-                int currentEnemyHp = Managers.BoardStateManager.Instance.EnemyPlayerHp;
-                Managers.BoardStateManager.Instance.UpdateHp(currentLocalHp - data.cost, currentEnemyHp);
-                if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.SetHP(Managers.BoardStateManager.Instance.LocalPlayerHp);
-            }
-            else
-            {
-                int currentLocalHp = Managers.BoardStateManager.Instance.LocalPlayerHp;
-                int currentEnemyHp = Managers.BoardStateManager.Instance.EnemyPlayerHp;
-                Managers.BoardStateManager.Instance.UpdateHp(currentLocalHp, currentEnemyHp - data.cost);
-                if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetHP(Managers.BoardStateManager.Instance.EnemyPlayerHp);
+                var board = Managers.BoardStateManager.Instance;
+                int localHp = board.LocalPlayerHp;
+                int enemyHp = board.EnemyPlayerHp;
+
+                if (isLocalPlayer)
+                {
+                    localHp = data.health > 0 ? data.health : localHp - data.cost;
+                }
+                else
+                {
+                    enemyHp = data.health > 0 ? data.health : enemyHp - data.cost;
+                }
+
+                board.UpdateHp(localHp, enemyHp);
+
+                if (isLocalPlayer)
+                {
+                    if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.SetHP(board.LocalPlayerHp);
+                }
+                else
+                {
+                    if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetHP(board.EnemyPlayerHp);
+                }
             }
 
             // 体力が減る様子をしっかり見せるためのタメ（待機）
@@ -328,31 +390,42 @@ namespace KillingMahjong.UI
                         int oldTileId = data.mulliganResult.oldTile;
                         int newTileId = data.mulliganResult.newTile;
                         int targetHandIndex = data.mulliganResult.targetHandIndex;
-                        
+
                         var stateMgr = Managers.BoardStateManager.Instance;
+
+                        // 同じ牌IDが複数あるときに別の牌が巻き添えになる不具合を追うための診断。
+                        // 状態更新は Remove/IndexOf に頼っており、いずれも「最初の1枚」しか見ない。
+                        Debug.Log($"[Mulligan] old={oldTileId} new={newTileId} serverIndex={targetHandIndex}"
+                            + $" clickedWallIndex={_lastMulliganTargetIndex}"
+                            + $" / oldTileの枚数: hand={CountOf(stateMgr.CurrentHandTiles, oldTileId)}"
+                            + $" wall={CountOf(stateMgr.CurrentWallTiles, oldTileId)}"
+                            + $" originalWall={CountOf(stateMgr.OriginalWallTiles, oldTileId)}");
+                        Debug.Log($"[Mulligan] BEFORE wall = {Join(stateMgr.CurrentWallTiles)}");
+                        Debug.Log($"[Mulligan] BEFORE orig = {Join(stateMgr.OriginalWallTiles)}");
+
+                        // サーバーが交換した「位置」を正として山を同期する。
+                        // 同じ牌IDは山に複数あるので、牌IDで探すと別の牌を書き換えてしまう。
+                        // ここを怠ると OriginalWallTiles がサーバーとズレ、
+                        // 位置で牌を特定する処理（TileInteraction.WallIndex）が次の交換で誤動作する。
+                        bool syncedByIndex = stateMgr.ReplaceWallTileAt(targetHandIndex, newTileId);
+                        if (!syncedByIndex)
+                        {
+                            // index が使えない場合だけ、従来どおり牌IDで辻褄を合わせる
+                            int wallIdx = stateMgr.CurrentWallTiles.IndexOf(oldTileId);
+                            if (wallIdx >= 0) stateMgr.CurrentWallTiles[wallIdx] = newTileId;
+                        }
+
+                        // 交換した牌が手牌に入っていた場合は、手牌側も入れ替える。
+                        // 手牌は「山から選んだ13枚」なので、山の同期とは別に持ち替えが要る。
                         if (stateMgr.CurrentHandTiles.Contains(oldTileId))
                         {
                             stateMgr.CurrentHandTiles.Remove(oldTileId);
                             stateMgr.CurrentHandTiles.Add(newTileId);
                             stateMgr.SortTileIds(stateMgr.CurrentHandTiles);
+                        }
 
-                            int wallIdx = stateMgr.CurrentWallTiles.IndexOf(newTileId);
-                            if (wallIdx >= 0)
-                            {
-                                stateMgr.CurrentWallTiles[wallIdx] = oldTileId;
-                            }
-                        }
-                        else if (stateMgr.CurrentWallTiles.Contains(oldTileId))
-                        {
-                            // If oldTileId is not in hand, this might be an invalid state, but we swap it out safely
-                            int wallIdx = stateMgr.CurrentWallTiles.IndexOf(oldTileId);
-                            if (wallIdx >= 0)
-                            {
-                                stateMgr.CurrentWallTiles.RemoveAt(wallIdx);
-                                stateMgr.CurrentWallTiles.Add(newTileId);
-                                stateMgr.SortTileIds(stateMgr.CurrentWallTiles);
-                            }
-                        }
+                        Debug.Log($"[Mulligan] AFTER  wall = {Join(stateMgr.CurrentWallTiles)}");
+                        Debug.Log($"[Mulligan] AFTER  orig = {Join(stateMgr.OriginalWallTiles)}");
 
                         // アニメーション用のスロットを取得（直前の操作時の記録があればそれを使う、無ければデフォルト）
                         RectTransform targetSlot = _lastMulliganOutSlotRt;

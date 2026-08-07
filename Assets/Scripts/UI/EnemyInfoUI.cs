@@ -22,6 +22,13 @@ namespace KillingMahjong.UI
         [Header("Character Portrait")]
         [SerializeField] private SpriteRenderer characterRenderer;
         [SerializeField] private SpriteRenderer faceRenderer; // 追加：表情レイヤー用
+
+        [Header("Death Animation")]
+        [Tooltip("死亡演出で体が落ちる距離（ワールド単位）。立ち絵の高さは約17.65。" +
+                 "20だと上端が画面下ぎりぎり（viewport -0.04）なので、余裕を見て24にしている")]
+        [SerializeField] private float deathFallDistance = 24f;
+        [Tooltip("死亡演出で落ち切るまでの時間（秒）")]
+        [SerializeField] private float deathFallDuration = 1.2f;
         [Header("Ready Mark")]
         [SerializeField] private GameObject readyBoxContainer;
         [SerializeField] private GameObject readyCheckImage;
@@ -35,6 +42,13 @@ namespace KillingMahjong.UI
 
         [Header("Enemy Panel Settings")]
         [SerializeField] private GameObject enemyPanel; // 敵パネルの参照
+
+        [Header("Prefabs")]
+        [Tooltip("HP増減のポップアップ。未設定でも実行時に簡易版が生成される。")]
+        [SerializeField] private GameObject damagePopupPrefab;
+
+        [Tooltip("HP増減ポップアップの出現基準。未設定なら zoomTarget → enemyPanel の順で使う。")]
+        [SerializeField] private RectTransform damagePopupAnchor;
 
         private Sprite normalSprite;
         private Sprite discardSprite;
@@ -70,6 +84,40 @@ namespace KillingMahjong.UI
                 StopCoroutine(blinkCoroutine);
                 blinkCoroutine = null;
             }
+        }
+
+        /// <summary>
+        /// 倒れる演出。顔が消えて、体が下へ落ちていく。
+        ///
+        /// まばたき・表情差し替え・バウンドはどれも顔と体を触るので、先に全部止める。
+        /// 止めないと落下中に顔が戻ったり、バウンドが体を元の位置へ引き戻したりする。
+        /// 呼んだあとは立ち絵が画面外にあるので、そのままシーン遷移する前提。
+        /// </summary>
+        public System.Collections.IEnumerator PlayDeathRoutine()
+        {
+            if (blinkCoroutine != null) { StopCoroutine(blinkCoroutine); blinkCoroutine = null; }
+            if (reactionCoroutine != null) { StopCoroutine(reactionCoroutine); reactionCoroutine = null; }
+            if (bounceCoroutine != null) { StopCoroutine(bounceCoroutine); bounceCoroutine = null; }
+
+            if (faceRenderer != null) faceRenderer.enabled = false;
+
+            if (characterRenderer == null) yield break;
+
+            Transform body = characterRenderer.transform;
+            Vector3 start = body.position;
+            Vector3 end = start + Vector3.down * deathFallDistance;
+
+            float duration = Mathf.Max(0.01f, deathFallDuration);
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float p = Mathf.Clamp01(elapsed / duration);
+                // 落下は加速させる（等速だと「沈んでいく」ように見えて力が抜ける）
+                body.position = Vector3.Lerp(start, end, p * p);
+                yield return null;
+            }
+            body.position = end;
         }
 
         private System.Collections.IEnumerator BlinkRoutine()
@@ -288,17 +336,63 @@ namespace KillingMahjong.UI
         public void SetMaxHP(int max)
         {
             maxHp = max;
+            // 同じ値で繰り返し呼ばれるので分母を引き下げない（PlayerInfoUI と同じ理由）
+            hpPeak = Mathf.Max(hpPeak, max);
         }
+
+        /// <summary>新しい対局の開始時に呼ぶ。メーターの分母（到達最高HP）も引き直す。</summary>
+        public void ResetHpMeter(int max)
+        {
+            maxHp = max;
+            hpPeak = max;
+        }
+
+        // PlayerInfoUI と同じ理由でメーターの分母だけ最高HPまで広げる（ダメージSEの判定は maxHp のまま）。
+        private int hpPeak;
+        private int MeterMax => Mathf.Max(1, Mathf.Max(maxHp, hpPeak));
 
         public void SetHP(int hp)
         {
+            // 初回セットアップ（0 → 初期HP）ではポップアップを出さない。PlayerInfoUI と同じ判定。
+            bool isFirstSetup = (currentHp == 0 && hp > 0);
+            int diff = hp - currentHp;
+
             currentHp = hp;
-            if (hpText != null) hpText.text = currentHp.ToString();
-            
+            // 誰の血かを添える。理由と大きさの根拠は PlayerInfoUI.HpOwnerLabelScale を参照
+            if (hpText != null) hpText.text = $"<size={PlayerInfoUI.HpOwnerLabelScale}>相手 </size>{currentHp}";
+
             // 人型メーターの割合を更新する
+            if (hp > hpPeak) hpPeak = hp;
             if (hpFillImage != null)
             {
-                hpFillImage.fillAmount = (float)hp / maxHp;
+                hpFillImage.fillAmount = (float)hp / MeterMax;
+            }
+
+            // 与えたダメージが敵側に一切表示されず、手応えが片側だけだったため追加。
+            if (!isFirstSetup && diff != 0)
+            {
+                HpPopup.Report(diff, currentHp, maxHp);
+            }
+        }
+
+        /// <summary>ロン演出中の毎フレーム更新をまとめて1回の表示にする（HpPopupPresenter 側で処理）。</summary>
+        private HpPopupPresenter hpPopup;
+        private HpPopupPresenter HpPopup
+        {
+            get
+            {
+                if (hpPopup == null)
+                {
+                    // PlayerInfoUI と同様、transform は全画面のルートCanvas。
+                    // HPが見えている血袋（EnemyPanel）を基準にする。
+                    RectTransform anchor = damagePopupAnchor;
+                    if (anchor == null) anchor = zoomTarget as RectTransform;
+                    if (anchor == null && enemyPanel != null) anchor = enemyPanel.transform as RectTransform;
+
+                    hpPopup = new HpPopupPresenter(this, transform as RectTransform, anchor,
+                                                   damagePopupPrefab, new Vector2(0, 60f), isLocalPlayer: false);
+                }
+                return hpPopup;
             }
         }
 
@@ -316,25 +410,84 @@ namespace KillingMahjong.UI
             }
         }
 
+        private ReadyBadge readyBadge;
+
+        /// <summary>
+        /// 「準備完了」の札。シーンの ReadyBoxContainer を実行時に組み直して使う。
+        /// 点滴（EnemyPanel）の真下に置く。
+        /// </summary>
+        private ReadyBadge EnsureReadyBadge()
+        {
+            if (readyBadge == null)
+            {
+                RectTransform anchor = (enemyPanel != null)
+                    ? enemyPanel.GetComponent<RectTransform>() : null;
+                readyBadge = ReadyBadge.Attach(
+                    readyBoxContainer, readyCheckImage, anchor, isSelf: false);
+            }
+            return readyBadge;
+        }
+
         public void ShowReadyBox(bool show)
         {
-            if (readyBoxContainer != null)
+            var badge = EnsureReadyBadge();
+            if (badge != null)
             {
-                readyBoxContainer.SetActive(show);
+                badge.SetVisible(show);
+                if (show) badge.SetReady(false); // 出した時点では未確定
+                return;
             }
-            // ボックス表示時はチェックを外す、非表示時も念のため外す
-            if (readyCheckImage != null)
-            {
-                readyCheckImage.SetActive(false);
-            }
+
+            // 札を作れなかったとき（参照未設定）は従来どおりの出し入れに落とす
+            if (readyBoxContainer != null) readyBoxContainer.SetActive(show);
+            if (readyCheckImage != null) readyCheckImage.SetActive(false);
         }
 
         public void SetReadyCheck(bool isReady)
         {
-            if (readyCheckImage != null)
+            var badge = EnsureReadyBadge();
+            if (badge != null)
             {
-                readyCheckImage.SetActive(isReady);
+                badge.SetReady(isReady);
+                return;
             }
+
+            if (readyCheckImage != null) readyCheckImage.SetActive(isReady);
+        }
+
+        /// <summary>相手の札も拡大したスマホの裏に入るので、自分側と同じタイミングで伏せる。</summary>
+        public void SetReadyBoxSuppressed(bool suppressed)
+        {
+            var badge = EnsureReadyBadge();
+            if (badge != null) badge.SetSuppressed(suppressed);
+        }
+
+        private TurnGlow turnGlow;
+        private TurnCharacterGlow characterGlow;
+
+        /// <summary>
+        /// 相手の手番のとき点滴を赤く脈打たせる。
+        /// 血袋も FloatingAnimator で揺れているので、EnemyPanel の中に影絵を敷いて
+        /// 揺れごと追従させる。血袋の形は絵そのものなので矩形の実測は要らない。
+        ///
+        /// 女の子（立ち絵）も同時に光らせる。点滴は画面の隅にあって気づきにくいため。
+        /// 以前は画面のふちに枠を出していたが、盤面が狭く見えるのでこちらへ替えた。
+        /// </summary>
+        public void SetTurnGlow(bool on)
+        {
+            if (turnGlow == null)
+            {
+                RectTransform panel = (enemyPanel != null)
+                    ? enemyPanel.GetComponent<RectTransform>() : null;
+                turnGlow = TurnGlow.Attach(panel, isSelf: false);
+            }
+            if (turnGlow != null) turnGlow.SetOn(on);
+
+            if (characterGlow == null)
+            {
+                characterGlow = TurnCharacterGlow.Attach(characterRenderer);
+            }
+            if (characterGlow != null) characterGlow.SetOn(on);
         }
 
         public void SetCharacterSprite(Sprite sprite)

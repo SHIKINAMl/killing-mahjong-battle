@@ -1,12 +1,11 @@
 using System;
-using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
+using NativeWebSocket;
 using UnityEngine;
-using NativeWebSocket; // 導入したWebGL対応WebSocketライブラリ
 
 /// <summary>
-/// Unity 用の最小 WebSocket クライアントサンプル（NativeWebSocket版）
+/// Unity 用の最小 WebSocket クライアントサンプル。
 ///
 /// 目的:
 /// - 接続
@@ -14,32 +13,40 @@ using NativeWebSocket; // 導入したWebGL対応WebSocketライブラリ
 /// - 受信
 /// - 切断
 /// の基本フローだけを確認するためのコンポーネントです。
+///
+/// 通信ライブラリには NativeWebSocket（com.endel.nativewebsocket）を使用します。
+/// これによりエディタ / Windows / WebGL のすべてで同一 API で動作します。
+/// （標準の System.Net.WebSockets.ClientWebSocket は WebGL では動作しません）
+///
+/// 使い方:
+/// 1) GameObject にアタッチ
+/// 2) Inspector の serverUrl を設定
+/// 3) autoConnectOnStart を ON にするか、ContextMenu の Connect を実行
+/// 4) sampleMessage を設定して ContextMenu の Send Sample を実行
 /// </summary>
 public class WebSocketGameClientSample : MonoBehaviour
 {
-    // 接続先 URL（例: ws://127.0.0.1:8765）
+    // 接続先 URL（例: wss://jongpire.onrender.com/ws）
     [Header("Connection")]
-    [SerializeField] private string serverUrl = "ws://localhost:8765";
-    [SerializeField] private bool autoConnectOnStart = false; // 手動でGameUIManagerなどから接続するように変更
-    [SerializeField] private int autoReconnectDelayMs = 3000;
+    [SerializeField] private string serverUrl = "wss://jongpire.onrender.com/ws";
+    private string myClientId = "";
+
+    // true の場合、Start 時に自動接続
+    [SerializeField] private bool autoConnectOnStart = true;
 
     // ContextMenu の「Send Sample」で送るテキスト
     [Header("Send")]
     [SerializeField] private string sampleMessage = "{\"type\":\"ping\"}";
 
     [Header("Auth")]
-    [SerializeField, Tooltip("トークンを直接入力します")]
+    [SerializeField, Tooltip("認証トークンを直接入力します。接続 URL に ?token=... として付与されます（全プラットフォーム対応）")]
     private string authToken = "";
 
     // true の場合、送受信ログを Console に表示
     [Header("Debug")]
     [SerializeField] private bool verboseLog = true;
 
-    [Header("Game Reference")]
-    [SerializeField] private KillingMahjong.UI.GameUIManager gameUIManager;
-    private string myClientId = "";
-
-    // NativeWebSocket の WebSocket クライアント
+    // NativeWebSocket のクライアント（全プラットフォーム共通）
     private WebSocket webSocket;
 
     /// <summary>
@@ -47,18 +54,11 @@ public class WebSocketGameClientSample : MonoBehaviour
     /// </summary>
     public bool IsConnected => webSocket != null && webSocket.State == WebSocketState.Open;
 
-    private bool isConnecting = false;
-
     /// <summary>
     /// 起動時。必要なら自動接続する。
     /// </summary>
     private async void Start()
     {
-        if (gameUIManager == null)
-        {
-            gameUIManager = FindFirstObjectByType<KillingMahjong.UI.GameUIManager>();
-        }
-
         if (!autoConnectOnStart)
         {
             return;
@@ -68,113 +68,98 @@ public class WebSocketGameClientSample : MonoBehaviour
     }
 
     /// <summary>
-    /// メインスレッド側で受信キューを処理する。
+    /// メインスレッド側で受信メッセージのディスパッチを行う。
+    ///
+    /// 注意: DispatchMessageQueue() は NativeWebSocket の「非WebGL版」にしか
+    /// 存在しないメソッドです（WebGL ではブラウザが受信コールバックを自動で呼ぶため不要）。
+    /// そのため、この 1 行だけは #if で分岐しないと WebGL ビルドがコンパイルできません。
+    /// これは通信を「WebGLで除外する」のではなく、WebGLで正しく動かすための公式パターンです。
     /// </summary>
     private void Update()
     {
-        if (webSocket != null)
-        {
 #if !UNITY_WEBGL || UNITY_EDITOR
-            // WebGL以外の環境では、メインスレッドでキューを処理するためにこれを呼ぶ必要があります
-            webSocket.DispatchMessageQueue();
+        webSocket?.DispatchMessageQueue();
 #endif
-        }
     }
 
     /// <summary>
-    /// サーバーへ接続して、受信ループを開始する。
+    /// 破棄時に安全に切断する。
+    /// </summary>
+    private async void OnDestroy()
+    {
+        await DisconnectAsync();
+    }
+
+    /// <summary>
+    /// アプリ終了時にも安全に切断する。
+    /// </summary>
+    private async void OnApplicationQuit()
+    {
+        await DisconnectAsync();
+    }
+
+    /// <summary>
+    /// サーバーへ接続して、受信コールバックを開始する。
     /// </summary>
     public async Task ConnectAsync()
     {
-        if (IsConnected || isConnecting)
+        if (IsConnected)
         {
             return;
         }
 
-        isConnecting = true;
-
-        // 古い接続があれば確実にキャンセル・解放する
+        // 既存インスタンスが残っていれば破棄
         if (webSocket != null)
         {
-            await webSocket.Close();
-            webSocket = null;
+            await DisconnectAsync();
         }
 
         string normalizedUrl = NormalizeServerUrl(serverUrl);
-        
-#if UNITY_WEBGL && !UNITY_EDITOR
-        // WebGL環境（ブラウザ）では、JavaScriptの標準WebSocket APIの仕様上、
-        // 接続時のカスタムヘッダー（Authorization等）の付与が禁止されています。
-        // クエリパラメータを付与するとサーバー側で404になるため、ヘッダー・パラメータなしで接続します。
-        webSocket = new WebSocket(normalizedUrl);
-#else
-        // ヘッダー（認証トークン）の設定 (PC/エディタ環境用)
-        var headers = new Dictionary<string, string>();
+
+        // 認証トークンはクエリパラメータ ?token= で渡す。
+        // ブラウザ(WebGL)は WebSocket にヘッダーを付けられないが、URL のクエリなら
+        // 全プラットフォーム（エディタ / Windows / WebGL）で送れる。
+        // 本番サーバーは ?token= でのトークン受付に対応済み。
+        string connectUrl = normalizedUrl;
         if (!string.IsNullOrEmpty(authToken))
         {
-            headers.Add("Authorization", $"Bearer {authToken}");
-            headers.Add("X-Token", authToken);
+            string separator = normalizedUrl.Contains("?") ? "&" : "?";
+            connectUrl = $"{normalizedUrl}{separator}token={Uri.EscapeDataString(authToken)}";
         }
 
-        // NativeWebSocket のインスタンス化
-        webSocket = new WebSocket(normalizedUrl, headers);
-#endif
+        webSocket = new WebSocket(connectUrl);
 
-        // --- イベントの登録 ---
         webSocket.OnOpen += () =>
         {
             Log($"Connected: {normalizedUrl}");
         };
 
-        webSocket.OnError += (e) =>
+        webSocket.OnError += (errMsg) =>
         {
-            Debug.LogError($"WebSocket Error: {e}");
+            Debug.LogError($"WebSocket error: {errMsg}");
         };
 
-        webSocket.OnClose += (e) =>
+        webSocket.OnClose += (closeCode) =>
         {
-            Log("WebSocket Closed!");
+            Log($"Closed: {closeCode}");
         };
 
         webSocket.OnMessage += (bytes) =>
         {
-            // 受信したバイナリデータを文字列に変換して処理
+            // NativeWebSocket はメインスレッドでコールバックするため直接処理して問題ない
             var message = Encoding.UTF8.GetString(bytes);
             HandleServerMessage(message);
         };
 
         try
         {
-            KillingMahjong.UI.LoadingManager.Instance.Show();
-            
-            // WebSocket 接続開始
+            // Connect() は接続がクローズされるまで完了しない（ネイティブ）ので await しっぱなしにする
             await webSocket.Connect();
         }
         catch (Exception ex)
         {
             Debug.LogError($"WebSocket connect failed: {ex.Message}");
         }
-        finally
-        {
-            isConnecting = false;
-            KillingMahjong.UI.LoadingManager.Instance.Hide();
-        }
-    }
-
-    private string NormalizeServerUrl(string url)
-    {
-        if (string.IsNullOrEmpty(url)) return url;
-
-        if (url.EndsWith("/"))
-        {
-            url = url.TrimEnd('/');
-        }
-        if (!url.EndsWith("/ws", StringComparison.OrdinalIgnoreCase))
-        {
-            url += "/ws";
-        }
-
-        return url;
     }
 
     /// <summary>
@@ -187,34 +172,20 @@ public class WebSocketGameClientSample : MonoBehaviour
             return;
         }
 
+        var socket = webSocket;
+        webSocket = null;
+
         try
         {
-            if (webSocket.State == WebSocketState.Open)
+            if (socket.State == WebSocketState.Open || socket.State == WebSocketState.Connecting)
             {
-                await webSocket.Close();
+                await socket.Close();
             }
         }
         catch (Exception ex)
         {
             Debug.LogWarning($"WebSocket close warning: {ex.Message}");
         }
-        finally
-        {
-            webSocket = null;
-        }
-    }
-
-    /// <summary>
-    /// アプリ終了/エディタ再生停止時に確実に切断する。
-    /// </summary>
-    private async void OnApplicationQuit()
-    {
-        await DisconnectAsync();
-    }
-    
-    private async void OnDestroy()
-    {
-        await DisconnectAsync();
     }
 
     /// <summary>
@@ -250,7 +221,6 @@ public class WebSocketGameClientSample : MonoBehaviour
 
     /// <summary>
     /// 受信メッセージの処理。
-    /// 簡単なJSONパースを行い、GameUIManagerに流し込みます。
     /// </summary>
     private async void HandleServerMessage(string raw)
     {
@@ -258,20 +228,27 @@ public class WebSocketGameClientSample : MonoBehaviour
 
         try
         {
-            ServerMessage msg = JsonUtility.FromJson<ServerMessage>(raw);
-
-            if (msg == null || string.IsNullOrEmpty(msg.type)) return;
-
-            if (msg.type == "connected")
+            var baseMsg = UnityEngine.JsonUtility.FromJson<KillingMahjong.EngineData.ServerMessageBase>(raw);
+            if (baseMsg == null || string.IsNullOrEmpty(baseMsg.type))
             {
-                myClientId = msg.data.client_id;
+                return;
+            }
+
+            string msgType = baseMsg.type;
+
+            if (msgType == "connected")
+            {
+                var connectedMsg = UnityEngine.JsonUtility.FromJson<KillingMahjong.EngineData.ConnectedMessage>(raw);
+                if (connectedMsg != null && connectedMsg.data != null)
+                {
+                    myClientId = connectedMsg.data.client_id ?? "";
+                }
                 Log($"[WebSocket] Connection confirmed! Client ID: {myClientId}");
-                // "join" を送信してマッチングキューに入る
                 await SendAsync("{\"type\":\"join\"}");
             }
 
-            // Route all messages to GameUIManager for phase updates and UI logic
-            if (gameUIManager != null)
+            var gameUIManager = FindFirstObjectByType<KillingMahjong.UI.GameUIManager>();
+            if (gameUIManager != null && msgType != "connected")
             {
                 gameUIManager.ApplyGameStateFromJSON(raw, myClientId);
             }
@@ -282,24 +259,34 @@ public class WebSocketGameClientSample : MonoBehaviour
         }
     }
 
-    [Serializable]
-    private class ServerMessage
+    private string NormalizeServerUrl(string rawUrl)
     {
-        public string type;
-        public string message;
-        public ServerMessageData data;
-    }
+        if (string.IsNullOrWhiteSpace(rawUrl))
+        {
+            return "wss://jongpire.onrender.com/ws";
+        }
 
-    [Serializable]
-    private class ServerMessageData
-    {
-        public string client_id;
-        // The game state JSON mapping fields 
-        public string status;
-        public int round;
-        public int honba;
-        public string current_player;
-        public System.Collections.Generic.List<KillingMahjong.EngineData.PlayerStateData> players;
+        string url = rawUrl.Trim();
+
+        if (url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            url = "wss://" + url.Substring("https://".Length);
+        }
+        else if (url.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+        {
+            url = "ws://" + url.Substring("http://".Length);
+        }
+
+        if (url.EndsWith("/"))
+        {
+            url = url.TrimEnd('/');
+        }
+        if (!url.EndsWith("/ws", StringComparison.OrdinalIgnoreCase))
+        {
+            url += "/ws";
+        }
+
+        return url;
     }
 
     /// <summary>

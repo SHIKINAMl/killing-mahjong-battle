@@ -16,6 +16,15 @@ namespace KillingMahjong.UI
         private List<int> _pendingHandIndexes;
         private List<int> _pendingHandTiles;
 
+        /// <summary>
+        /// もう取り下げられないか。**相手を待っている間は取り下げてよい**（`select_cancel` は
+        /// そのためにある）。手遅れになるのは相手も確定して掛け金フェイズへ移る直前だけ。
+        /// 判定は `phase_completed_notice` で両者の確定を知る PhaseController に持たせている。
+        /// </summary>
+        public bool IsSelectionLockedIn =>
+            uiManager != null && uiManager.PhaseController != null
+            && uiManager.PhaseController.IsHandSelectionSettledForBoth;
+
         public void Setup(GameUIManager manager)
         {
             this.uiManager = manager;
@@ -55,27 +64,62 @@ namespace KillingMahjong.UI
             }
             _pendingHandTiles = new List<int>(BoardStateManager.Instance.CurrentHandTiles);
 
-            uiManager.SendActionToServer("is_tenpai", new KillingMahjong.Network.ActionPayload { wall_indexes = _pendingHandIndexes });
+            if (uiManager.IsTutorialMode)
+            {
+                // チュートリアル用のモックを直接返す（サーバー通信をスキップ）。
+                //
+                // 台本の手牌（オート満貫）を組んだときだけ聴牌として応答し、
+                // プレイヤーが自由に選んだ13枚に対してはノーテンを返す。
+                // これにより手順②「判定ではじかれる」が正しく成立する。
+                var tm = uiManager.TutorialManager;
+                var waitIds = tm != null ? tm.GetCurrentWaitTileIds() : new List<int>();
+
+                var waitList = new List<WaitData>();
+                if (tm != null)
+                {
+                    string[] yaku = tm.CurrentHandYaku.ToArray();
+                    foreach (int tileId in waitIds)
+                    {
+                        waitList.Add(new WaitData
+                        {
+                            tile = tileId,
+                            yaku = yaku,
+                            han = tm.CurrentHandHan,
+                            mangan_or_more = true
+                        });
+                    }
+                }
+
+                HandleIsTenpaiReceived(new IsTenpaiData { waits = waitList.ToArray() });
+            }
+            else
+            {
+                uiManager.SendActionToServer("is_tenpai", new KillingMahjong.Network.ActionPayload { wall_indexes = _pendingHandIndexes });
+            }
         }
 
 
         public void CancelHandSelection()
         {
             if (uiManager.CurrentPhaseStatus != RoundStatus.HandSelection) return;
-            if (uiManager.IsTransitioning) return; 
+            if (uiManager.IsTransitioning) return;
+            // ボタン側でも隠しているが、連打で滑り込まれると手牌が消えるのでここでも弾く
+            if (IsSelectionLockedIn) return;
 
             if (uiManager.HandUI != null) uiManager.HandUI.SetSubmittedState(false);
             if (uiManager.WaitUI != null) uiManager.WaitUI.gameObject.SetActive(false);
             KillingMahjong.Managers.BoardStateManager.Instance.ClearWaitTiles();
             if (uiManager.PhaseController != null) uiManager.PhaseController.SetMatchUIVisibility(true);
 
-            // 手牌をすべて選んでいない状態（山牌に戻す）
-            var tilesToReturn = new System.Collections.Generic.List<int>(KillingMahjong.Managers.BoardStateManager.Instance.CurrentHandTiles);
-            foreach (var t in tilesToReturn)
-            {
-                KillingMahjong.Managers.BoardStateManager.Instance.MoveTileToWall(t);
-            }
-
+            // **手牌はそのまま残す。** 「選び直す」は確定を取り下げるだけで、
+            // 選んだ牌まで捨てさせると、13枚を一から選び直すことになる。
+            // 取り下げると SetSubmittedState(false) で IsSubmitted が false に戻るので、
+            // ここから手牌の牌をクリックして山に返す／別の牌を足す、という調整ができる。
+            //
+            // **サーバーの select_cancel は player.hand を空にするが、それで問題ない。**
+            // 選択中の増減はクライアント内だけの話で、サーバーに手牌が伝わるのは
+            // 「決定」で select / select_confirm を送るときにまとめて一度だけ。
+            // 次の決定で全13枚を送り直すので、ここで空になっていても食い違わない。
             uiManager.SendActionToServer("select_cancel", new KillingMahjong.Network.ActionPayload());
         }
 
@@ -83,34 +127,55 @@ namespace KillingMahjong.UI
         {
             if (uiManager.CurrentPhaseStatus != RoundStatus.HandSelection) return;
 
-            string message = "【予想役・点数】\n";
+            // **応答を待っている間に「選び直す」を押されていたら、もう出さない。**
+            // `is_tenpai` はサーバーとの往復なので、その間も取り下げは押せる。
+            // ここで確認ダイアログを出すと、取り下げ済みの
+            // `_pendingHandIndexes`（＝画面の手牌とは違うかもしれない）を
+            // OK が送ってしまう。
+            if (uiManager.HandUI != null && !uiManager.HandUI.IsSubmitted) return;
+
+            // 役名はここには並べない。牌にカーソルを合わせたときだけ
+            // ConfirmationDialogUI がオーバーレイで出す（要望18）。
+            string message = "【待ち牌】\n";
             int[] waitTileIds = new int[0];
-            
+            ConfirmationDialogUI.WaitInfo[] waitInfos = new ConfirmationDialogUI.WaitInfo[0];
+
             if (data.waits != null && data.waits.Length > 0)
             {
-                // ConfirmationDialogUI側で待ち牌を表示するため、ここではテキストのみ構築
-                message += "待ち牌：\n\n\n\n"; // 改行を1つ増やしてかぶらないように調整
-                
-                System.Collections.Generic.List<int> ids = new System.Collections.Generic.List<int>();
+                // 牌そのものは ConfirmationDialogUI が並べるので、ここは場所を空けるだけ
+                message += "\n\n\n\n";
+
+                var ids = new System.Collections.Generic.List<int>();
+                var infos = new System.Collections.Generic.List<ConfirmationDialogUI.WaitInfo>();
                 foreach (var wait in data.waits)
                 {
                     ids.Add(wait.tile);
+
                     string yakuText = (wait.yaku != null && wait.yaku.Length > 0) ? string.Join(" / ", wait.yaku) : "役なし";
-                    
-                    // 翻数(han)とmangan_or_moreに基づいて詳細なランクを決定する
+
+                    // 翻数(han)とmangan_or_moreに基づいてランクを決定する。
+                    // 「以上」は付けない（要望18）。上限の役名がそのまま出るほうが読みやすい。
                     string rankText = "満貫未満";
-                    if (wait.yaku != null && System.Array.Exists(wait.yaku, y => y.Contains("役満"))) rankText = "役満確定";
-                    else if (wait.han >= 13) rankText = "数え役満以上";
-                    else if (wait.han >= 11) rankText = "三倍満以上";
-                    else if (wait.han >= 8) rankText = "倍満以上";
-                    else if (wait.han >= 6) rankText = "跳満以上";
-                    else if (wait.han >= 5 || wait.mangan_or_more) rankText = "満貫以上";
-                    
-                    message += $"-> {yakuText} ({rankText})\n";
+                    if (wait.yaku != null && System.Array.Exists(wait.yaku, y => y.Contains("役満"))) rankText = "役満";
+                    else if (wait.han >= 13) rankText = "数え役満";
+                    else if (wait.han >= 11) rankText = "三倍満";
+                    else if (wait.han >= 8) rankText = "倍満";
+                    else if (wait.han >= 6) rankText = "跳満";
+                    else if (wait.han >= 5 || wait.mangan_or_more) rankText = "満貫";
+
+                    infos.Add(new ConfirmationDialogUI.WaitInfo
+                    {
+                        TileId = wait.tile,
+                        YakuText = yakuText,
+                        RankText = rankText,
+                    });
                 }
                 waitTileIds = ids.ToArray();
+                waitInfos = infos.ToArray();
+
+                message += "\n牌にカーソルを合わせると手牌と役が出ます";
             }
-            message += "\nこの手牌で決定しますか？";
+            message += "\n\nこの手牌で決定しますか？";
 
             // WaitUIを移動させる処理を廃止 (ConfirmationDialogUI内部で表示する)
             // if (uiManager.WaitUI != null) uiManager.WaitUI.MoveToCenter();
@@ -119,6 +184,7 @@ namespace KillingMahjong.UI
             {
                 uiManager.ConfirmationDialogUI.ShowDialogWithWaits(
                     message,
+                    waitInfos,
                     waitTileIds,
                     () => {
                         if (ReactionController.Instance != null) ReactionController.Instance.StopHandSelectionTimer(true);
@@ -137,7 +203,14 @@ namespace KillingMahjong.UI
                                 BoardStateManager.Instance.SetLocalState(null, null, new System.Collections.Generic.List<int>(waitTileIds));
                                 BoardStateManager.Instance.FireRebuildEvent();
 
-                                uiManager.SendActionToServer("select", new KillingMahjong.Network.ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
+                                if (uiManager.IsTutorialMode && uiManager.TutorialManager != null)
+                                {
+                                    uiManager.TutorialManager.ConfirmHandSelectionComplete();
+                                }
+                                else
+                                {
+                                    uiManager.SendActionToServer("select", new KillingMahjong.Network.ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
+                                }
                             });
                         }
                         else
@@ -145,7 +218,14 @@ namespace KillingMahjong.UI
                             BoardStateManager.Instance.SetLocalState(null, null, new System.Collections.Generic.List<int>(waitTileIds));
                             BoardStateManager.Instance.FireRebuildEvent();
 
-                            uiManager.SendActionToServer("select", new KillingMahjong.Network.ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
+                            if (uiManager.IsTutorialMode && uiManager.TutorialManager != null)
+                            {
+                                uiManager.TutorialManager.ConfirmHandSelectionComplete();
+                            }
+                            else
+                            {
+                                uiManager.SendActionToServer("select", new KillingMahjong.Network.ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
+                            }
                         }
                     },
                     () => {

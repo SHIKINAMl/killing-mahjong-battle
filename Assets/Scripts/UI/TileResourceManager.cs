@@ -49,8 +49,19 @@ namespace KillingMahjong.UI
                 return backTileSprite;
             }
 
+            // **壊れたIDを近い牌へ丸めない。**
+            // 以前は baseId>=29 を「念のため」西へ倒していたが、そのせいで
+            // 存在しない牌種が普通の西として表示され、不具合が画面から消えていた。
+            // 異常なら裏牌を返し、TileVisual 側で紫に着色して見えるようにする。
+            string problem = Common.TileId.DescribeProblem(encodedId);
+            if (problem != null)
+            {
+                Debug.LogError($"[TileResourceManager] サーバーから不正な牌IDが届きました: {problem}");
+                return backTileSprite;
+            }
+
             var tile = new TileData(encodedId);
-            int baseId = encodedId & 0x1F;
+            int baseId = Common.TileId.BaseId(encodedId);
 
             // 赤ドラ（五萬=4, 五筒=13, 五索=22）のスプライト差し替え
             if (tile.IsRedDora && redDoraSprites != null && redDoraSprites.Count == 3)
@@ -60,22 +71,13 @@ namespace KillingMahjong.UI
                 if (baseId == 22) return redDoraSprites[2]; // 赤五索
             }
 
-            // サーバーのIDとUnity側の画像配列（29種）のマッピング補正
-            int spriteIndex = baseId;
-            if (baseId >= 27)
+            // 0-26=数牌 / 27=東 / 28=西（Python側の採番と一致）
+            if (baseId >= tileSprites.Count)
             {
-                if (baseId == 27) spriteIndex = 27; // 東
-                else if (baseId == 28) spriteIndex = 28; // 西 (Python側ではID 28が西)
-                else if (baseId >= 29) spriteIndex = 28; // その他は無いが念のため西でフォールバック
+                Debug.LogError($"[TileResourceManager] 牌画像が足りません: baseId={baseId} / 登録数={tileSprites.Count}");
+                return backTileSprite;
             }
-
-            // 通常スプライト
-            if (spriteIndex < 0 || spriteIndex >= tileSprites.Count)
-            {
-                Debug.LogWarning($"[TileResourceManager] Tile base ID {baseId} (encoded: {encodedId}, index: {spriteIndex}) is out of range.");
-                return backTileSprite; // エラーで透明になるのを防ぐため裏面を返す
-            }
-            return tileSprites[spriteIndex];
+            return tileSprites[baseId];
         }
 
         /// <summary>
@@ -106,8 +108,14 @@ namespace KillingMahjong.UI
                 }
             }
 
+            // 河でも同じ。壊れたIDは丸めずに裏牌へ落とす（ログは GetTileSprite が出す）
+            if (!Common.TileId.IsValid(encodedId))
+            {
+                return GetTileSprite(encodedId);
+            }
+
             var tile = new TileData(encodedId);
-            int baseId = encodedId & 0x1F;
+            int baseId = Common.TileId.BaseId(encodedId);
 
             // 赤ドラの差し替え
             if (tile.IsRedDora && targetRedDoraSprites != null && targetRedDoraSprites.Count == 3)

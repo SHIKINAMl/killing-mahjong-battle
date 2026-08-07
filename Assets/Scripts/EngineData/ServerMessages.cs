@@ -21,17 +21,30 @@ namespace KillingMahjong.EngineData
     [Serializable]
     public class PlayerRef { public string client_id; }
 
+    /// <summary>
+    /// round_end の清算内訳。点数内訳の表示に使う対応は以下（キー名に注意）:
+    ///   素点     … winner_bet   （サーバー内部名は winner_effective_bet。賭け金 × 流局持ち越し回数）
+    ///   翻数倍率 … multiplier   （満貫1 / 跳満1.5 / 倍満2 / 三倍満3 / 役満4 / 26飜8）
+    ///   単騎倍率 … loser_loss_multiplier（単騎待ちなら2、それ以外1。敗者の支払いにだけ掛かる）
+    /// 勝者の獲得 = winner_bet × multiplier
+    /// 敗者の損失 = loser_bet × multiplier × loser_loss_multiplier
+    /// </summary>
     [Serializable]
     public class LiquidationData
     {
         public string winner_id;
         public string loser_id;
+        public int base_han;
+        public int bonus_han;
         public int han;
         public float multiplier;
-        public int winner_bet;
-        public int loser_bet;
+        public int winner_bet;   // = winner_effective_bet（持ち越し込みの素点）
+        public int loser_bet;    // = loser_effective_bet
         public int winner_gain;
         public int loser_loss;
+        public int loser_loss_multiplier; // 単騎倍率
+        public bool is_tanki_wait;
+        public int carry_over_draw_count;
         public int winner_health;
         public int loser_health;
         public string[] yaku;
@@ -189,6 +202,27 @@ namespace KillingMahjong.EngineData
         public int bet;
     }
 
+
+    /// <summary>
+    /// "phase_completed_notice": 手牌選択・ベットを確定したプレイヤーの通知。
+    /// 確定した本人ぶんだけが1通ずつ届く（両者ぶんがまとめて来るわけではない）。
+    /// </summary>
+    [Serializable]
+    public class PhaseCompletedNoticeMessage
+    {
+        public string type;
+        public PhaseCompletedNoticeData data;
+    }
+    [Serializable]
+    public class PhaseCompletedNoticeData
+    {
+        /// <summary>"hand_selection" または "bet"</summary>
+        public string phase;
+        public string player_id;
+        /// <summary>phase == "bet" のときのみ入る</summary>
+        public int bet_amount;
+    }
+
     [Serializable]
     public class DiscardPhaseStartedMessage
     {
@@ -249,7 +283,10 @@ namespace KillingMahjong.EngineData
     {
         public string winner_id;
         public string loser_id;
-        public int tile_id;
+        // サーバーは "tile" というキーで送ってくる（game_session.py の on_agari_pending）。
+        // ここを tile_id にしていると JsonUtility が対応付けられず、常に 0 のままになる。
+        // 0 は無効値ではなく一萬という正当な牌なので、エラーにならず静かに誤った牌が流れる。
+        public int tile;
     }
 
     [Serializable]
@@ -307,6 +344,11 @@ namespace KillingMahjong.EngineData
         public HandData data; // サーバーの仕様では単一HandDataが返る
     }
 
+    /// <summary>
+    /// "bet_accepted": 自分のベットが受理された合図（送った本人にだけ届く）。
+    /// **賭け金の上限と単位はサーバーが決めている。**同じ表が GameRules にもあるが、
+    /// あちらはクライアント側の複製で、正はこちら。
+    /// </summary>
     [Serializable]
     public class BetAcceptedMessage
     {
