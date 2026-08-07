@@ -326,6 +326,28 @@ namespace KillingMahjong.UI
             Refresh(false);
         }
 
+        /// <summary>
+        /// 累計獲得をサーバーの値で置き直す。
+        ///
+        /// **勝利条件（30000到達）を判定しているのはサーバー**なので、
+        /// ゲージが指す数字もサーバーの `cumulative_earned_points` に合わせる。
+        /// クライアントが `winner_gain` を足し込むと、取りこぼしや二重加算で
+        /// 静かにズレ、「ゲージは届いていないのに対局が終わる」ことが起きる。
+        ///
+        /// 強襲を撃った局は `winner_gain` が 0 なので、上がってもここは増えない。
+        /// それがサーバーの扱いどおり（撃つほど30000勝利から遠ざかる）。
+        /// </summary>
+        public void SetScoresFromServer(int selfTotal, int enemyTotal)
+        {
+            EnsureBuilt();
+            if (selfTotal < 0 || enemyTotal < 0) return;
+            if (_selfScore == selfTotal && _enemyScore == enemyTotal) return;
+
+            _selfScore = selfTotal;
+            _enemyScore = enemyTotal;
+            Refresh(false);
+        }
+
         /// <summary>対局のやり直しなどで積み上げを捨てる。賭け金の表示も戻す。</summary>
         public void ResetScores()
         {
@@ -381,6 +403,12 @@ namespace KillingMahjong.UI
         /// 決着したときに呼ぶ。場に出ている賭け金が勝者のゲージへ吸い込まれ、
         /// 吸い終わってからゲージが伸びる。
         /// gain は liquidation の winner_gain（勝者が実際に受け取る額）。
+        ///
+        /// **ここで足す値は演出用の一時的なもので、正ではない。**
+        /// 累計の正は `SetScoresFromServer`（`status` の `cumulative_earned_points`）。
+        /// あちらは「足す」ではなく「置き直す」ので、こちらが先に足していても
+        /// 二重加算にはならず、次の同期で必ずサーバーの値へ揃う。
+        /// **強襲を撃った局は winner_gain が 0 なので、ここも 0 のまま増えない。**
         /// </summary>
         public void AbsorbStakesIntoGauge(bool winnerIsSelf, int gain)
         {

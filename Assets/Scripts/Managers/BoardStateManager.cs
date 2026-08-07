@@ -322,6 +322,24 @@ namespace KillingMahjong.Managers
             }
         }
 
+        /// <summary>
+        /// 清算で血が動く直前の値。**ロン演出の「減る前」に使う。**
+        ///
+        /// 演出は「前の血 → 後の血」を見せるが、後の血はサーバーが確定値で送ってくる
+        /// （`liquidation.winner_health` / `loser_health`）ので、前の血を
+        /// 「後の血 − 獲得」のように逆算する必要はない。**覚えておけば済む。**
+        /// 逆算していた頃は、獲得と損失が非対称になる仕様（強襲）が入ると式が崩れた。
+        /// </summary>
+        public int HpBeforeLiquidationLocal { get; private set; } = PlaceholderInitialHp;
+        public int HpBeforeLiquidationEnemy { get; private set; } = PlaceholderInitialHp;
+
+        /// <summary>清算を適用する直前に呼ぶ。今の血を「減る前」として控える。</summary>
+        public void RememberHpBeforeLiquidation()
+        {
+            HpBeforeLiquidationLocal = LocalPlayerHp;
+            HpBeforeLiquidationEnemy = EnemyPlayerHp;
+        }
+
         public void UpdateHp(int localHp, int enemyHp)
         {
             LocalPlayerHp = localHp;

@@ -57,6 +57,20 @@ namespace KillingMahjong.Network.Handlers
                 }
             }
 
+            // 獲得ゲージの数字もサーバーが正。**クライアントで足し込まない。**
+            // 30000到達の勝利判定をしているのはサーバーなので、
+            // 自前で積むとズレて「ゲージは届いていないのに対局が終わる」ことが起きる
+            if (statusMsg.data.player_state != null && statusMsg.data.opponent_player_state != null)
+            {
+                var gauge = UnityEngine.Object.FindFirstObjectByType<KillingMahjong.UI.ScoreGaugeUI>();
+                if (gauge != null)
+                {
+                    gauge.SetScoresFromServer(
+                        statusMsg.data.player_state.cumulative_earned_points,
+                        statusMsg.data.opponent_player_state.cumulative_earned_points);
+                }
+            }
+
             // 文字列抽出による boost_hand_bonus の簡単な取得 (JsonUtility制約回避用)
             if (statusMsg.data.player_state != null)
             {

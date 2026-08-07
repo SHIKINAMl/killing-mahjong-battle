@@ -65,6 +65,12 @@ namespace KillingMahjong.Network.Handlers
                                 board.LastIsLocalWin = isLocalWin;
                                 board.LastLiquidationData = liq;
 
+                                // 演出は「減る前 → 減った後」を見せる。後はサーバーの確定値だが、
+                                // 前は上書きしてしまうと分からなくなるので、ここで控えておく。
+                                // 逆算（後 − 獲得）に頼ると、強襲のように獲得と損失が
+                                // 非対称になる仕様が入ったときに静かにずれる
+                                board.RememberHpBeforeLiquidation();
+
                                 int newLocalHp = isLocalWin ? liq.winner_health : liq.loser_health;
                                 int newEnemyHp = isLocalWin ? liq.loser_health : liq.winner_health;
                                 board.UpdateHp(newLocalHp, newEnemyHp);

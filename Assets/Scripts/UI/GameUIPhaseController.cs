@@ -1148,24 +1148,34 @@ namespace KillingMahjong.UI
         /// <summary>
         /// ロン演出に出す計算式を、サーバーの清算結果から組み立てる。
         ///
-        /// **勝者の獲得額の式にしている。**演出に出している数字（score）が winner_gain なので、
-        /// 式と答えを揃えるため。GameRules の定義どおり:
+        /// **数値はサーバーが出したものだけを並べる。掛け算をやり直さないこと。**
+        /// 以前は `winner_bet × multiplier` を自分で組んでいたが、強襲を撃った局は
+        /// 獲得が 0 に潰されるため「5000 × 1 = 0」という嘘の式が出ていた（2026-08-07 に実機で確認）。
         ///
-        ///   勝者が得る額 = 勝者自身の賭け金 × 勝者の役の倍率
-        ///
-        /// 敗者の損失（賭け金 × 倍率 × 単騎倍率）は、勝者の獲得とは別計算なので式が違う。
-        /// 混ぜると答えが合わなくなるのでここでは扱わない。
+        /// 強襲の局は式の意味自体が変わる。獲得ではなく、相手への追加ダメージになるので
+        /// そのまま伝える。`assault_applied` を先に見ること。
         ///
         /// 内訳が無いときは null を返す。演出側は式を伏せて額だけ見せる。
         /// </summary>
         private static string BuildScoreFormula(LiquidationData liq)
         {
             if (liq == null) return null;
+
+            if (liq.assault_applied)
+            {
+                // 得るはずだった額がそのまま相手への追加ダメージへ回る。
+                // 獲得は 0 なので「= 0」を出さず、何が起きたかを文で見せる
+                if (liq.assault_bonus_damage <= 0) return null;
+                return $"強襲 → 相手へ {liq.assault_bonus_damage} の追加ダメージ";
+            }
+
             if (liq.winner_bet <= 0 || liq.multiplier <= 0f) return null;
 
             // 1.0 は「1」、1.5 は「1.5」と出す。末尾の 0 を引きずらない
             string mult = liq.multiplier.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
-            return $"{liq.winner_bet} × {mult}";
+
+            // 答えもサーバーの winner_gain をそのまま置く。掛け算し直さない
+            return $"{liq.winner_bet} × {mult} = {liq.winner_gain}";
         }
 
         private IEnumerator PlayRonWithPreDialogue(bool isLocalWin, List<int> winningHand, int ronTile, List<string> yaku, string formula, string rank)
@@ -1199,11 +1209,18 @@ namespace KillingMahjong.UI
                 var liq = BoardStateManager.Instance.LastLiquidationData;
                 int score = liq != null ? liq.winner_gain : 0;
 
-                int newLocalHp = Managers.BoardStateManager.Instance.LocalPlayerHp;
-                int newEnemyHp = Managers.BoardStateManager.Instance.EnemyPlayerHp;
-                int loserLoss = liq != null ? liq.loser_loss : 0;
-                int prevLocalHp = isLocalWin ? (newLocalHp - score) : (newLocalHp + loserLoss);
-                int prevEnemyHp = isLocalWin ? (newEnemyHp + loserLoss) : (newEnemyHp - score);
+                // **血はどちらもサーバー由来。掛け算も引き算もしない。**
+                //   減った後 … liquidation の winner_health / loser_health を
+                //              RoundLifecycleMessageHandler が既に反映済み
+                //   減る前   … 反映する直前に控えたもの
+                //
+                // 以前は「後 − 獲得」「後 ＋ 損失」で前を逆算していたが、
+                // 強襲のように獲得と損失が非対称になる仕様が入ると式が崩れる。
+                var board = Managers.BoardStateManager.Instance;
+                int newLocalHp = board.LocalPlayerHp;
+                int newEnemyHp = board.EnemyPlayerHp;
+                int prevLocalHp = board.HpBeforeLiquidationLocal;
+                int prevEnemyHp = board.HpBeforeLiquidationEnemy;
 
                 uiManager.RonAnimationUI.PlayRonSequence(winningHand, ronTile, yaku, formula, rank, score, isLocalWin,
                     uiManager.PlayerInfoUI, uiManager.EnemyInfoUI, prevLocalHp, newLocalHp, prevEnemyHp, newEnemyHp,

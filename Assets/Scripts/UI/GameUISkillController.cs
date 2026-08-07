@@ -309,13 +309,19 @@ namespace KillingMahjong.UI
                 int localHp = board.LocalPlayerHp;
                 int enemyHp = board.EnemyPlayerHp;
 
-                if (isLocalPlayer)
+                // **引き算はしない。** サーバーが払ったあとの血を送ってくる。
+                // 以前は health が無いときに `血 − cost` で自前計算していたが、
+                // クライアントが辻褄を合わせるとサーバー側の誤りが画面に出なくなる。
+                // 届かないときは動かさず、警告だけ出して次の status に任せる
+                if (data.health > 0)
                 {
-                    localHp = data.health > 0 ? data.health : localHp - data.cost;
+                    if (isLocalPlayer) localHp = data.health;
+                    else enemyHp = data.health;
                 }
                 else
                 {
-                    enemyHp = data.health > 0 ? data.health : enemyHp - data.cost;
+                    Debug.LogWarning($"[Skill] skill_casted に health が入っていません（{data.skillType}）。" +
+                                     "血はここでは動かさず、status の同期に任せます");
                 }
 
                 board.UpdateHp(localHp, enemyHp);

@@ -244,9 +244,11 @@ namespace KillingMahjong.UI
             // かつては内訳が来ておらず「??? × ??? = 額」と伏せていたが、
             // 現在は winner_bet / multiplier が届くので実際の値を出せる。
             // 渡されなかったときだけ、式を伏せて額だけ見せる
-            formulaText.text = string.IsNullOrEmpty(scoreFormula)
-                ? $"{score}"
-                : $"{scoreFormula} = {score}";
+            // **scoreFormula は完成した文字列。ここで答えを足さないこと。**
+            // 以前は "{式} = {score}" と連結していたが、強襲を撃った局は獲得が 0 に潰されるので
+            // 「5000 × 1 = 0」という嘘の式が出ていた。式の組み立ては
+            // GameUIPhaseController.BuildScoreFormula に一本化してある
+            formulaText.text = string.IsNullOrEmpty(scoreFormula) ? $"{score}" : scoreFormula;
             formulaText.color = new Color(1f, 1f, 0.5f); // 薄い黄色
             formulaText.fontSize = KillingMahjong.Common.UITypography.Header; 
             formulaText.alignment = TextAlignmentOptions.Center;
