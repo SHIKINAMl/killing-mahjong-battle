@@ -428,31 +428,32 @@ namespace KillingMahjong.UI
             return readyBadge;
         }
 
+        /// <summary>
+        /// **相手の「準備完了」は出さない（2026-08-14 の指示）。**
+        ///
+        /// 相手が手牌を決めた瞬間が画面から読めると、**そこを狙って透視を撃てば必ず
+        /// 完成手を覗ける**ので能力が強すぎる。自分側の札（<see cref="PlayerInfoUI"/>）は残す。
+        ///
+        /// 呼び出し側（<see cref="GameUIPhaseController"/>）は10箇所以上あるので、
+        /// 個々の呼び出しを消すのではなくここで受け止めて常に伏せる。
+        /// **消し忘れの経路が残らないのが利点。** 復活させたくなったらこのメソッドだけ戻す。
+        /// </summary>
         public void ShowReadyBox(bool show)
         {
             var badge = EnsureReadyBadge();
             if (badge != null)
             {
-                badge.SetVisible(show);
-                if (show) badge.SetReady(false); // 出した時点では未確定
+                badge.SetVisible(false);
                 return;
             }
 
-            // 札を作れなかったとき（参照未設定）は従来どおりの出し入れに落とす
-            if (readyBoxContainer != null) readyBoxContainer.SetActive(show);
+            if (readyBoxContainer != null) readyBoxContainer.SetActive(false);
             if (readyCheckImage != null) readyCheckImage.SetActive(false);
         }
 
+        /// <summary>相手の札は出さないので、チェックの受け口も何もしない。</summary>
         public void SetReadyCheck(bool isReady)
         {
-            var badge = EnsureReadyBadge();
-            if (badge != null)
-            {
-                badge.SetReady(isReady);
-                return;
-            }
-
-            if (readyCheckImage != null) readyCheckImage.SetActive(isReady);
         }
 
         /// <summary>相手の札も拡大したスマホの裏に入るので、自分側と同じタイミングで伏せる。</summary>
@@ -473,21 +474,32 @@ namespace KillingMahjong.UI
         /// 女の子（立ち絵）も同時に光らせる。点滴は画面の隅にあって気づきにくいため。
         /// 以前は画面のふちに枠を出していたが、盤面が狭く見えるのでこちらへ替えた。
         /// </summary>
+        /// <summary>
+        /// **相手の手番の光り物は出さない（2026-08-14 の指示）。**
+        ///
+        /// 立ち絵を赤く染める <see cref="TurnCharacterGlow"/> も、点滴の後ろに影絵を敷く
+        /// <see cref="TurnGlow"/> も、どちらも「敵の色が変わる」ように見えて違和感があった。
+        /// 相手の手番の合図は「ENEMY TURN」の文字に任せる。
+        ///
+        /// **自分側（<see cref="PlayerInfoUI"/>）の青い縁取りは残してある。**
+        /// 自分の番が分かることは操作に直結するため。
+        ///
+        /// 呼び出し元は <c>GameUIManager.UpdateTurnIndicator</c> の1箇所だが、
+        /// 「相手側は光らせない」という判断はこちら側の都合なのでここで受け止める。
+        /// 戻したくなったらこのメソッドの中身だけ復元すればよい（両クラスとも残してある）。
+        /// </summary>
         public void SetTurnGlow(bool on)
         {
-            if (turnGlow == null)
-            {
-                RectTransform panel = (enemyPanel != null)
-                    ? enemyPanel.GetComponent<RectTransform>() : null;
-                turnGlow = TurnGlow.Attach(panel, isSelf: false);
-            }
-            if (turnGlow != null) turnGlow.SetOn(on);
+        }
 
-            if (characterGlow == null)
-            {
-                characterGlow = TurnCharacterGlow.Attach(characterRenderer);
-            }
-            if (characterGlow != null) characterGlow.SetOn(on);
+        /// <summary>
+        /// 点滴（体力表示）だけ出し入れする。**立ち絵と表情は触らない。**
+        /// チュートリアル第1局で「牌を選ぶUI以外を伏せる」のに使う。
+        /// `gameObject` ごと消すと女の子まで消えてセリフの相手がいなくなる。
+        /// </summary>
+        public void SetVitalsVisible(bool visible)
+        {
+            if (enemyPanel != null) enemyPanel.SetActive(visible);
         }
 
         public void SetCharacterSprite(Sprite sprite)

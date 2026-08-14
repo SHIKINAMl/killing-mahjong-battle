@@ -335,6 +335,20 @@ namespace KillingMahjong.Managers
             // 手動選択を許さない局は組みようがないので、最初から『自動』を出す。
             bool selfMadeMangan = false;
 
+            // 第1局の牌選択中だけ、牌以外を伏せる。賭け金フェイズの直前で戻す
+            bool hideChrome = _scenario != null && _scenario.rounds != null
+                              && _scenario.rounds.Count > 0 && _scenario.rounds[0] == data;
+            if (hideChrome) SetFirstRoundChromeVisible(false);
+
+            // **自由に組ませる局は、13枚そろう前から『おまかせ』を出す。**
+            // この局の『おまかせ』は「自分で組むのが大変なら任せてよい」という逃げ道なのに、
+            // 13枚そろうまで隠していると、組み終えてからしか現れない＝逃げ道にならなかった。
+            // 誘導する局（第1局など）は今までどおり「13枚 → セリフ → おまかせ → 決定」の順のまま。
+            if (data.allowManualHandSelection && data.freeHandBuilding)
+            {
+                SetHandButtonStage(HandButtonStage.AutoOnly);
+            }
+
             if (data.allowManualHandSelection)
             {
                 yield return new WaitUntil(() =>
@@ -381,6 +395,10 @@ namespace KillingMahjong.Managers
 
             yield return new WaitUntil(() => !_isWaitingForHandSelectionComplete);
             ClearGuide();
+
+            // **賭け金フェイズの前に必ず戻す。** 賭け金はスマホ（体力表示）を拡大して
+            // 見せる演出なので、伏せたままだと何も出ない
+            if (hideChrome) SetFirstRoundChromeVisible(true);
 
             // --- 賭け金フェイズ ---
             if (_prevRoundWasDraw)
@@ -646,6 +664,43 @@ namespace KillingMahjong.Managers
         /// false のとき画面に残るのは「敵の立ち絵」と「セリフ」だけ。
         /// EnemyInfoUI.SetPanelVisible(false) はHPパネルのみを消し、立ち絵は残す。
         /// </summary>
+        /// <summary>
+        /// **第1局の牌を選んでいる間だけ、牌以外の表示物を伏せる（2026-08-14 の指示）。**
+        ///
+        /// 最初の画面で必要なのは「山牌から13枚選ぶ」ことだけなのに、
+        /// 体力・点滴・獲得ゲージ・場の血・役一覧・待ち牌まで一度に出ていて、
+        /// 何を見ればいいのか分からなかった。
+        ///
+        /// **立ち絵とセリフ枠は伏せない。** 説明しているのは女の子なので、
+        /// これを消すと誰の話を聞いているのか分からなくなる。
+        /// 手牌・山牌・おまかせ・決定もそのまま残す。
+        ///
+        /// ドラは `SetBoardVisible` が常に隠しているのでここでは触らない。
+        /// </summary>
+        private void SetFirstRoundChromeVisible(bool visible)
+        {
+            if (gameUIManager == null) return;
+
+            if (gameUIManager.PlayerInfoUI != null)
+                gameUIManager.PlayerInfoUI.SetVitalsVisible(visible);
+            if (gameUIManager.EnemyInfoUI != null)
+                gameUIManager.EnemyInfoUI.SetVitalsVisible(visible);
+
+            if (gameUIManager.YakuListUI != null)
+            {
+                if (!visible) gameUIManager.YakuListUI.CloseYakuList();
+                gameUIManager.YakuListUI.gameObject.SetActive(visible);
+            }
+
+            if (!visible && gameUIManager.WaitUI != null)
+                gameUIManager.WaitUI.gameObject.SetActive(false);
+
+            gameUIManager.ScoreGauge.SetVisible(visible);
+
+            if (gameUIManager.BetPotUI != null)
+                gameUIManager.BetPotUI.SetVisible(visible);
+        }
+
         private void SetBoardVisible(bool visible)
         {
             _boardVisible = visible;

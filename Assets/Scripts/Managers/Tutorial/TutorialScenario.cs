@@ -820,7 +820,29 @@ namespace KillingMahjong.Managers
             };
             s.titleSceneName = "タイトルシーン";
 
+            // **セリフだけ、外の表で差し替えられるようにしてある。**
+            // `Assets/Resources/TutorialLines.asset` があれば、ID が一致した行の文字列で
+            // 上書きする。表が無い／IDが無い行は、ここに書いた文字列がそのまま使われる。
+            // 表の作り方は Tools/チュートリアル/台本TSVの書き出し・取り込み。
+            //
+            // 構造（局数・実演・ボタンの開放順）はここが正で、文字だけ外。
+            // 台本ごとアセットへ移すと BuildDefault と二重管理になる（A-7 と同じ罠）。
+            ApplyLineTable(s);
+
             return s;
+        }
+
+        /// <summary>
+        /// `Resources/TutorialLines` があればセリフを差し替える。無ければ何もしない。
+        /// </summary>
+        private static void ApplyLineTable(TutorialScenario s)
+        {
+            var table = Resources.Load<Tutorial.TutorialLineTable>(
+                Tutorial.TutorialLineTable.ResourcePath);
+            if (table == null) return;
+
+            table.ApplyTo(s);
+            Debug.Log($"[TutorialScenario] セリフ表を適用しました（{table.rows.Count} 行）。");
         }
 
         /// <summary>

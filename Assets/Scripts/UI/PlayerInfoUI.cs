@@ -632,6 +632,15 @@ namespace KillingMahjong.UI
             if (readyCheckImage != null) readyCheckImage.SetActive(isReady);
         }
 
+        /// <summary>
+        /// スマホ（体力表示）だけ出し入れする。**立ち絵は触らない。**
+        /// チュートリアル第1局で「牌を選ぶUI以外を伏せる」のに使う。
+        /// </summary>
+        public void SetVitalsVisible(bool visible)
+        {
+            if (zoomTarget != null) zoomTarget.gameObject.SetActive(visible);
+        }
+
         /// <summary>ベット中のスマホ拡大に隠れるので、拡大している間だけ札を伏せる。</summary>
         public void SetReadyBoxSuppressed(bool suppressed)
         {
