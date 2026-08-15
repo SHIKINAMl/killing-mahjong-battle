@@ -20,6 +20,55 @@ public class CustomCursor : MonoBehaviour
     private GameObject cursorCanvasObj;
     private RectTransform cursorRect;
 
+    /// <summary>
+    /// OS のカーソルを消してよいか。
+    ///
+    /// **エディタでは既定で消さない（2026-08-15 の要望）。**
+    /// ゲームビューをクリックすると本物のカーソルまで消えてしまい、
+    /// 開発中はどこを指しているのか分からなくなるため。
+    /// 手の絵（UICursorCanvas）はそのまま出るので、見た目の確認自体はできる。
+    ///
+    /// **ビルドの挙動は変えない。** `#if UNITY_EDITOR` の外では常に true。
+    /// 本番と同じ見た目を確かめたいときは
+    /// `Tools/開発用/ゲーム中も OS のカーソルを表示` で切り替える。
+    /// </summary>
+    private static bool ShouldHideOsCursor
+    {
+#if UNITY_EDITOR
+        get { return !KeepOsCursorInEditor; }
+#else
+        get { return true; }
+#endif
+    }
+
+#if UNITY_EDITOR
+    public const string KeepCursorPrefKey = "KillingMahjong.KeepOsCursorInEditor";
+
+    // **EditorPrefs を毎フレーム読まない。** Update から呼ばれるので、
+    // 一度だけ読んでキャッシュし、メニュー側が書き換えたときに更新する
+    private static bool _keepCached;
+    private static bool _keepLoaded;
+
+    public static bool KeepOsCursorInEditor
+    {
+        get
+        {
+            if (!_keepLoaded)
+            {
+                _keepCached = UnityEditor.EditorPrefs.GetBool(KeepCursorPrefKey, true);
+                _keepLoaded = true;
+            }
+            return _keepCached;
+        }
+        set
+        {
+            _keepCached = value;
+            _keepLoaded = true;
+            UnityEditor.EditorPrefs.SetBool(KeepCursorPrefKey, value);
+        }
+    }
+#endif
+
     void Start()
     {
         // 既存のハードウェアカーソル設定をリセット
@@ -33,8 +82,8 @@ public class CustomCursor : MonoBehaviour
 
     private void CreateUICursor()
     {
-        // OS標準のカーソルを消す
-        Cursor.visible = false;
+        // OS標準のカーソルを消す（エディタでは既定で消さない。ShouldHideOsCursor を見よ）
+        if (ShouldHideOsCursor) Cursor.visible = false;
 
         // 全てのUIの上に描画するための専用Canvasを作成
         cursorCanvasObj = new GameObject("UICursorCanvas");
@@ -83,10 +132,16 @@ public class CustomCursor : MonoBehaviour
                 cursorRect.position = mouse.position.ReadValue() + GetAnchorRotationOffset(angle);
             }
 
-            // エディタ等で一時的にカーソルが表示されてしまうのを防ぐ
-            if (Cursor.visible)
+            // 何かの拍子にカーソルが出てしまうのを毎フレーム押さえ込む。
+            // **エディタで「表示したまま」にしているときは逆に出し続ける。**
+            // ここを素通りさせるだけだと、他所の Cursor.visible = false に負けて消える
+            if (ShouldHideOsCursor)
             {
-                Cursor.visible = false;
+                if (Cursor.visible) Cursor.visible = false;
+            }
+            else
+            {
+                if (!Cursor.visible) Cursor.visible = true;
             }
         }
     }
