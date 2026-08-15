@@ -39,8 +39,13 @@ namespace KillingMahjong.UI
             if (timeText != null)
             {
                 originalTextColor = timeText.color;
+                timeText.text = "";   // 動いていない間は空
             }
-            gameObject.SetActive(false);
+
+            // **消さない（2026-08-14）。** 懐中時計の絵は新しいスマホ（HPUI0heart）に
+            // 描き込まれていて常に見えている。数字だけをその文字盤に載せる作りにしたので、
+            // ここで GameObject を消すと文字盤が空のまま数字が出なくなる。
+            // 動いていない間は文字を空にして、絵だけ見せる。
         }
 
         public void SetSize(float size)
@@ -83,7 +88,14 @@ namespace KillingMahjong.UI
                 StopCoroutine(flashCoroutine);
                 flashCoroutine = null;
             }
-            gameObject.SetActive(false);
+
+            // 絵は出したまま、数字だけ消す。止まった数字が残っていると
+            // 「まだ時間がある」と読めてしまう
+            if (timeText != null)
+            {
+                timeText.color = originalTextColor;
+                timeText.text = "";
+            }
         }
 
         private void Update()

@@ -605,31 +605,37 @@ namespace KillingMahjong.UI
             return readyBadge;
         }
 
+        /// <summary>
+        /// **「準備完了」の札は出さない（2026-08-14 の指示）。**
+        ///
+        /// 相手側は透視を狙い撃ちできてしまうため先に消していた。
+        /// 自分側も、確定したことは手牌が伏せられて操作を受け付けなくなることで分かるので、
+        /// 札まで出すと画面の情報が増えるだけだった。
+        ///
+        /// **シーンの `ReadyBoxContainer` を直しても意味がない。** 見た目は
+        /// <see cref="ReadyBadge"/> が実行時に作り直す（文字も大きさも位置も定数で上書きする）。
+        /// 出す出さないの判断だけがここにある。
+        ///
+        /// 呼び出し元は <c>GameUIPhaseController</c> に10箇所以上あるので、
+        /// 個々の呼び出しを消すのではなくここで受け止めて常に伏せる。
+        /// 戻したくなったらこの2つのメソッドの中身だけ復元すればよい。
+        /// </summary>
         public void ShowReadyBox(bool show)
         {
             var badge = EnsureReadyBadge();
             if (badge != null)
             {
-                badge.SetVisible(show);
-                if (show) badge.SetReady(false); // 出した時点では未確定
+                badge.SetVisible(false);
                 return;
             }
 
-            // 札を作れなかったとき（参照未設定）は従来どおりの出し入れに落とす
-            if (readyBoxContainer != null) readyBoxContainer.SetActive(show);
+            if (readyBoxContainer != null) readyBoxContainer.SetActive(false);
             if (readyCheckImage != null) readyCheckImage.SetActive(false);
         }
 
+        /// <summary>札を出さないので、チェックの受け口も何もしない。</summary>
         public void SetReadyCheck(bool isReady)
         {
-            var badge = EnsureReadyBadge();
-            if (badge != null)
-            {
-                badge.SetReady(isReady);
-                return;
-            }
-
-            if (readyCheckImage != null) readyCheckImage.SetActive(isReady);
         }
 
         /// <summary>
