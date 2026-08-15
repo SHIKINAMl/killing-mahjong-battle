@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEditor;
 using UnityEngine.UI;
 using System.IO;
@@ -7,7 +7,10 @@ namespace KillingMahjong.Editor
 {
     public class SilhouetteCreator : MonoBehaviour
     {
+        // 一時的に非表示。Player Settings の Scripting Define Symbols に KM_ALL_TOOLS を足すと戻る
+#if KM_ALL_TOOLS
         [MenuItem("Tools/UI/選択した画像の白シルエットを背面に作成する")]
+#endif
         public static void CreateSilhouette()
         {
             GameObject selected = Selection.activeGameObject;

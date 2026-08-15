@@ -1,9 +1,12 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEditor;
 
 public class DoraEffectCreator
 {
+    // 一時的に非表示。Player Settings の Scripting Define Symbols に KM_ALL_TOOLS を足すと戻る
+#if KM_ALL_TOOLS
     [MenuItem("Tools/Create Dora Cyber Effect Prefab")]
+#endif
     public static void CreatePrefab()
     {
         // 1. ルートオブジェクトの作成

@@ -161,6 +161,11 @@ namespace KillingMahjong.UI
                 return;
             }
 
+            // 連打への反応（Meta_ClickSpam）は部位より先。
+            // 出せたなら普通のセリフは出さない。二重に喋らせないため
+            var watcher = Managers.PlayerActivityWatcher.Instance;
+            if (watcher != null && watcher.NotifyCharacterClick(areaName)) return;
+
             int randomIdx = Random.Range(1, 21); // 1〜20
             
             // 部位名が設定されている場合は、プレフィックスとして追加
@@ -189,6 +194,11 @@ namespace KillingMahjong.UI
             }
             else
             {
+                // 部位専用の番号が埋まっていなかった。
+                // 全体のセリフへ落ちる前に、部位のトリガー（Meta_ClickHead / Meta_ClickChest）を試す。
+                // CSV の部位セリフは1〜5しか無く、抽選は1〜20なので、ここへは 75% 落ちてくる
+                if (watcher != null && watcher.TryPartReaction(areaName)) return;
+
                 // エントリーが見つからなかった場合のフォールバック
                 // 部位専用のセリフが無い場合は、従来の全体用条件で再検索を試みる
                 string fallbackCondition = $"クリックされた時{randomIdx}";

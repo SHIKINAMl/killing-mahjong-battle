@@ -1,4 +1,4 @@
-using UnityEditor;
+﻿using UnityEditor;
 using UnityEngine;
 using System.IO;
 using System.Linq;
@@ -7,7 +7,10 @@ namespace KillingMahjong.Editor
 {
     public class GitHubPagesBuilder
     {
+        // 一時的に非表示。Player Settings の Scripting Define Symbols に KM_ALL_TOOLS を足すと戻る
+#if KM_ALL_TOOLS
         [MenuItem("Tools/Build/GitHub Pages向けにビルド (WebGL)")]
+#endif
         public static void BuildForGitHubPages()
         {
             // プロジェクト直下の docs フォルダに出力する

@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -53,7 +53,10 @@ namespace KillingMahjong.Editor
 
         private const string SparkleAssetPath = "Assets/Resources/Title/TitleSparkle.png";
 
+        // 一時的に非表示。Player Settings の Scripting Define Symbols に KM_ALL_TOOLS を足すと戻る
+#if KM_ALL_TOOLS
         [MenuItem("Tools/UI/タイトル画面を組み直す（じゃんぱいあ）")]
+#endif
         public static void Build()
         {
             var scene = EditorSceneManager.GetActiveScene();

@@ -711,6 +711,11 @@ namespace KillingMahjong.UI
             if (currentPhaseStatus == RoundStatus.Discard && BoardStateManager.Instance.IsLocalTurn && !interaction.IsInHand && interaction.TileId != -1)
             {
                 if (wallUI != null) wallUI.SetActiveDiscardTile(interaction);
+
+                // 牌の上を行ったり来たりしている（Tile_HoverHesitation）。
+                // 自分の手番の打牌フェイズだけ数える。それ以外は普通にカーソルが通るだけ
+                var watcher = KillingMahjong.Managers.PlayerActivityWatcher.Instance;
+                if (watcher != null) watcher.NotifyTileHover();
             }
         }
 
@@ -947,6 +952,14 @@ namespace KillingMahjong.UI
                         enemyRiverUI.AddTile(discardedTileId); // fallback
                     }
                 }
+            }
+
+            // 手番が来てから切るまでの速さを見る（Tile_InstantDiscard）。
+            // CheckDiscardConditions より先に伝えて、判定に間に合わせる
+            if (isLocalPlayer)
+            {
+                var watcher = KillingMahjong.Managers.PlayerActivityWatcher.Instance;
+                if (watcher != null) watcher.NotifyLocalDiscard();
             }
 
             ReactionController.Instance.CheckDiscardConditions(discardedTileId, isLocalPlayer);

@@ -235,6 +235,20 @@ namespace KillingMahjong.UI
             }
         }
 
+        /// <summary>
+        /// そのトリガーに喋れるセリフが1本でもあるか。
+        ///
+        /// **`ReactionController` が「トリガーを試して、無ければ CSV に落とす」ために要る。**
+        /// 実際に `PlayReaction` を呼んでみるまで分からないままだと、
+        /// 空振りしたことに気づけず、CSV に書いてあるセリフまで出なくなる。
+        /// </summary>
+        public bool HasReaction(ReactionTrigger trigger)
+        {
+            if (characterData == null || characterData.reactions == null) return false;
+            return characterData.reactions.Exists(
+                r => r != null && r.trigger == trigger && !string.IsNullOrEmpty(r.dialogueText));
+        }
+
         public string PlayReaction(ReactionTrigger trigger, float duration = 3.0f, string formatArg = "")
         {
             if (characterData == null || characterData.reactions == null || characterData.reactions.Count == 0)

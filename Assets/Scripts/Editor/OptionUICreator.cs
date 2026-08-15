@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEditor;
 using UnityEngine.UI;
 using TMPro;
@@ -8,7 +8,10 @@ namespace KillingMahjong.Editor
 {
     public class OptionUICreator : MonoBehaviour
     {
+        // 一時的に非表示。Player Settings の Scripting Define Symbols に KM_ALL_TOOLS を足すと戻る
+#if KM_ALL_TOOLS
         [MenuItem("Tools/UI/OptionUIプレハブにすりガラスを適用")]
+#endif
         public static void ApplyBlurToPrefab()
         {
             string prefabPath = "Assets/Prefabs/OptionUI.prefab";
@@ -47,7 +50,10 @@ namespace KillingMahjong.Editor
             }
         }
 
+        // 一時的に非表示。Player Settings の Scripting Define Symbols に KM_ALL_TOOLS を足すと戻る
+#if KM_ALL_TOOLS
         [MenuItem("Tools/UI/オプション画面（OptionUI）を作成")]
+#endif
         public static void CreateOptionUI()
         {
             // 既存のOptionUIがあれば削除

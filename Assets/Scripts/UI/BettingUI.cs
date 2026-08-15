@@ -357,6 +357,7 @@ namespace KillingMahjong.UI
                 currentBet += bettingUnit;
                 UpdateUI();
                 PlayBetTick();
+                NotifyBetChanged();
             }
             else
             {
@@ -372,6 +373,7 @@ namespace KillingMahjong.UI
                 currentBet -= bettingUnit;
                 UpdateUI();
                 PlayBetTick();
+                NotifyBetChanged();
             }
             else
             {
@@ -388,7 +390,19 @@ namespace KillingMahjong.UI
                 currentBet = validMax;
                 UpdateUI();
                 PlayBetTick();
+                NotifyBetChanged();
             }
+        }
+
+        /// <summary>
+        /// 賭け金をいじったことを反応側へ伝える。
+        /// 「散々迷った末のMAX」（Bet_HesitateMax）と「上げ下げ連打」（Bet_FidgetSpam）は
+        /// 確定後の額だけでは区別が付かないので、操作の回数をここで数えてもらう。
+        /// </summary>
+        private void NotifyBetChanged()
+        {
+            var rc = Managers.ReactionController.Instance;
+            if (rc != null) rc.NotifyBetAmountChanged();
         }
 
         private void UpdateUI()

@@ -1,4 +1,4 @@
-using UnityEditor;
+﻿using UnityEditor;
 using UnityEngine;
 using UnityEngine.UI;
 using KillingMahjong.UI;
@@ -7,7 +7,10 @@ namespace KillingMahjong.Editor
 {
     public class FixContainerBackgrounds : EditorWindow
     {
+        // 一時的に非表示。Player Settings の Scripting Define Symbols に KM_ALL_TOOLS を足すと戻る
+#if KM_ALL_TOOLS
         [MenuItem("Tools/UI/邪魔な青ブロック(透明コンテナの背景)を削除")]
+#endif
         public static void FixContainers()
         {
             // 本来透明であるべきUIコンテナのリスト

@@ -1,4 +1,4 @@
-#if UNITY_EDITOR
+﻿#if UNITY_EDITOR
 using UnityEngine;
 using UnityEditor;
 using System.Linq;
@@ -7,7 +7,10 @@ namespace KillingMahjong.Editor
 {
     public class RemoveMissingScripts
     {
+        // 一時的に非表示。Player Settings の Scripting Define Symbols に KM_ALL_TOOLS を足すと戻る
+#if KM_ALL_TOOLS
         [MenuItem("Tools/Remove Missing Scripts")]
+#endif
         public static void CleanupMissingScripts()
         {
             var gameObjects = GameObject.FindObjectsByType<GameObject>(FindObjectsInactive.Include, FindObjectsSortMode.None);

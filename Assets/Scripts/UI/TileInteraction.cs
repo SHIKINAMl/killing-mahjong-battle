@@ -52,27 +52,34 @@ namespace KillingMahjong.UI
             
             if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard)
             {
-                if (!IsInHand)
+                // 打牌フェイズで手牌側を押しても何も起きない。「山牌をつついた」扱いにする
+                if (IsInHand)
                 {
-                    if (eventData.button == PointerEventData.InputButton.Left)
+                    var poked = KillingMahjong.Managers.PlayerActivityWatcher.Instance;
+                    if (poked != null) poked.NotifyWallPoke();
+                    return;
+                }
+
+                NotifyTileClicked();
+
+                if (eventData.button == PointerEventData.InputButton.Left)
+                {
+                    // 既に選択されていたら（浮いている状態なら）捨てる
+                    if (_gameUIManager.IsTileSelected(TileId))
                     {
-                        // 既に選択されていたら（浮いている状態なら）捨てる
-                        if (_gameUIManager.IsTileSelected(TileId))
-                        {
-                            _gameUIManager.DiscardSelectedTile();
-                        }
-                        else
-                        {
-                            // 左クリック：選択（または選択解除）
-                            _gameUIManager.SelectTile(TileId, IsInHand, false);
-                        }
-                    }
-                    else if (eventData.button == PointerEventData.InputButton.Right)
-                    {
-                        // 右クリック：選択して即座に打牌
-                        _gameUIManager.SelectTile(TileId, IsInHand, false);
                         _gameUIManager.DiscardSelectedTile();
                     }
+                    else
+                    {
+                        // 左クリック：選択（または選択解除）
+                        _gameUIManager.SelectTile(TileId, IsInHand, false);
+                    }
+                }
+                else if (eventData.button == PointerEventData.InputButton.Right)
+                {
+                    // 右クリック：選択して即座に打牌
+                    _gameUIManager.SelectTile(TileId, IsInHand, false);
+                    _gameUIManager.DiscardSelectedTile();
                 }
                 return;
             }
@@ -91,6 +98,8 @@ namespace KillingMahjong.UI
             // Any Click -> Move (Left or Right) or Select for Mulligan
             IsHovered = false;
             if (_tileVisual != null) _tileVisual.SetHoverHighlight(false);
+
+            NotifyTileClicked();
 
             if (IsInHand)
             {
@@ -115,6 +124,16 @@ namespace KillingMahjong.UI
                     _gameUIManager.MoveTileToHand(TileId);
                 }
             }
+        }
+
+        /// <summary>
+        /// 牌を押したことを反応側へ伝える。連打（Tile_SpamClick）の判定に使う。
+        /// **何かが起きたクリックだけ**を数える。空振りは `NotifyWallPoke` の担当。
+        /// </summary>
+        private static void NotifyTileClicked()
+        {
+            var watcher = KillingMahjong.Managers.PlayerActivityWatcher.Instance;
+            if (watcher != null) watcher.NotifyTileClick();
         }
 
         public void OnBeginDrag(PointerEventData eventData)

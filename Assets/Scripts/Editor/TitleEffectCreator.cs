@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEditor;
 using KillingMahjong.Common;
 
@@ -6,7 +6,10 @@ namespace KillingMahjong.Editor
 {
     public class TitleEffectCreator : MonoBehaviour
     {
+        // 一時的に非表示。Player Settings の Scripting Define Symbols に KM_ALL_TOOLS を足すと戻る
+#if KM_ALL_TOOLS
         [MenuItem("Tools/UI/タイトル用の可愛いキラキラエフェクトを作成")]
+#endif
         public static void CreateTitleEffect()
         {
             GameObject effectObj = new GameObject("TitleSparkleParticles");

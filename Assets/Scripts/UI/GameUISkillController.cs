@@ -309,6 +309,10 @@ namespace KillingMahjong.UI
                 int localHp = board.LocalPlayerHp;
                 int enemyHp = board.EnemyPlayerHp;
 
+                // 払った血の量は「支払い前」を控えないと出せない。
+                // 反応（Skill_HighCostPaid / Skill_NearDeathByCost）の判定に使う
+                int hpBeforeCast = isLocalPlayer ? localHp : enemyHp;
+
                 // **引き算はしない。** サーバーが払ったあとの血を送ってくる。
                 // 以前は health が無いときに `血 − cost` で自前計算していたが、
                 // クライアントが辻褄を合わせるとサーバー側の誤りが画面に出なくなる。
@@ -333,6 +337,16 @@ namespace KillingMahjong.UI
                 else
                 {
                     if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetHP(board.EnemyPlayerHp);
+                }
+
+                // スキルへの反応。カットインと血の演出が終わってから喋らせたいので、
+                // ここ（血を反映したあと）で積む。実際に出るのは下の待機のあと
+                var reaction = Managers.ReactionController.Instance;
+                if (reaction != null)
+                {
+                    int hpAfterCast = isLocalPlayer ? board.LocalPlayerHp : board.EnemyPlayerHp;
+                    int costPaid = Mathf.Max(0, hpBeforeCast - hpAfterCast);
+                    reaction.HandleSkillCast(data.skillType, isLocalPlayer, costPaid, hpAfterCast);
                 }
             }
 

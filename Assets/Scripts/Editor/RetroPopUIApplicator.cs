@@ -1,4 +1,4 @@
-using UnityEditor;
+﻿using UnityEditor;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -15,7 +15,10 @@ namespace KillingMahjong.Editor
 
         private string fontAssetPath = "Assets/Resources/PixelMplus-20130602/PixelMplus-20130602/PixelMplus10-Bold SDF.asset";
 
+        // 一時的に非表示。Player Settings の Scripting Define Symbols に KM_ALL_TOOLS を足すと戻る
+#if KM_ALL_TOOLS
         [MenuItem("Tools/UI/レトロポップ風スタイルを一括適用 (Retro Pop)")]
+#endif
         public static void ShowWindow()
         {
             GetWindow<RetroPopUIApplicator>("Retro Pop UI");

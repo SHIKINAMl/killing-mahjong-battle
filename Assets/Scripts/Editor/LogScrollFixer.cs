@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEditor;
 using UnityEngine.UI;
 
@@ -6,7 +6,10 @@ namespace KillingMahjong.Editor
 {
     public class LogScrollFixer : EditorWindow
     {
+        // 一時的に非表示。Player Settings の Scripting Define Symbols に KM_ALL_TOOLS を足すと戻る
+#if KM_ALL_TOOLS
         [MenuItem("Tools/UI/ログ画面のスクロールを修正")]
+#endif
         public static void FixLogScroll()
         {
             // DialogueUIを探す

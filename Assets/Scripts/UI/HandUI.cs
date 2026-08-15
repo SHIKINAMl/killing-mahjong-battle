@@ -195,6 +195,13 @@ namespace KillingMahjong.UI
             isPeeking = on;
             ApplyPeekVisual(on);
 
+            // 何度も手牌を覗いている（Tile_PeekHold）。開いたときだけ数える
+            if (on)
+            {
+                var watcher = KillingMahjong.Managers.PlayerActivityWatcher.Instance;
+                if (watcher != null) watcher.NotifyPeek();
+            }
+
             // 手牌を実際に表示させるのは UpdateLayout。
             // **重なり順の設定も中央寄せも、その後でなければならない。**
             // 非アクティブなオブジェクトの Canvas は overrideSorting が入らず、

@@ -1,10 +1,13 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEditor;
 using TMPro;
 
 public class FontAutoFixer
 {
+    // 一時的に非表示。Player Settings の Scripting Define Symbols に KM_ALL_TOOLS を足すと戻る
+#if KM_ALL_TOOLS
     [MenuItem("Tools/Auto Fix Missing Fonts (Dynamic)")]
+#endif
     public static void FixFonts()
     {
         // 1. 元のTTFフォントをロード

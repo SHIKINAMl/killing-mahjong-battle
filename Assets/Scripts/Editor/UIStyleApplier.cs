@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEditor;
 using UnityEngine.UI;
 
@@ -10,7 +10,10 @@ namespace KillingMahjong.Editor
         private Color outlineColor = new Color(0f, 0f, 0f, 1f);       // 黒の境界線
         private Vector2 outlineThickness = new Vector2(3f, -3f);
 
+        // 一時的に非表示。Player Settings の Scripting Define Symbols に KM_ALL_TOOLS を足すと戻る
+#if KM_ALL_TOOLS
         [MenuItem("Tools/UI/Apply Panel Style")]
+#endif
         public static void ShowWindow()
         {
             GetWindow<UIStyleApplier>("UI Style Applier");

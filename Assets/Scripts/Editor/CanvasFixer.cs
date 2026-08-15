@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEditor;
 using UnityEngine.UI;
 
@@ -6,7 +6,10 @@ namespace KillingMahjong.Editor
 {
     public class CanvasFixer
     {
+        // 一時的に非表示。Player Settings の Scripting Define Symbols に KM_ALL_TOOLS を足すと戻る
+#if KM_ALL_TOOLS
         [MenuItem("Tools/UI/全てのCanvasを 800x600 (Scale With Screen Size) に修正")]
+#endif
         public static void FixAllCanvases()
         {
             // 1. 現在のシーン内の全てのCanvasScalerを取得

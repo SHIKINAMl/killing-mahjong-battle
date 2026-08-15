@@ -1,11 +1,14 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using TMPro;
 
 public class GlobalFontFixer
 {
+    // 一時的に非表示。Player Settings の Scripting Define Symbols に KM_ALL_TOOLS を足すと戻る
+#if KM_ALL_TOOLS
     [MenuItem("Tools/Global Fix All Fonts (All Scenes & Prefabs)")]
+#endif
     public static void FixAllFontsGlobal()
     {
         // 1. 新しい安全なDynamicフォントアセットを生成

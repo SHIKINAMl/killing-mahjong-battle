@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem; // 追加: 新しいInputSystem用
 using KillingMahjong.UI;
+using KillingMahjong.Managers.Reactions;
 
 namespace KillingMahjong.Managers
 {
@@ -56,6 +57,7 @@ namespace KillingMahjong.Managers
         // 発火制御用。Time.unscaledTime で測る（演出で timeScale を触っても効くように）
         private readonly Dictionary<ReactionTrigger, float> _lastFiredAt = new Dictionary<ReactionTrigger, float>();
         private readonly HashSet<ReactionTrigger> _queuedTriggers = new HashSet<ReactionTrigger>();
+        private readonly HashSet<ReactionRule> _queuedRules = new HashSet<ReactionRule>();
         private float _lastAmbientAt = -999f;
 
         // 実行中の演出コルーチンと、その完了時に必ず走らせたい後始末。
@@ -68,6 +70,9 @@ namespace KillingMahjong.Managers
         {
             if (Instance == null) {
                 Instance = this;
+                // 放置・連打・迷いを見る監視役。**シーンには置かない**
+                // （対局シーンが2つあり、片方だけに置く事故が起きる）
+                PlayerActivityWatcher.Create(transform);
             } else {
                 Destroy(gameObject);
             }
@@ -101,6 +106,7 @@ namespace KillingMahjong.Managers
         {
             reactionQueue.Clear();
             _queuedTriggers.Clear();
+            _queuedRules.Clear();
             isProcessingReactions = false;
 
             if (_currentReaction != null)
@@ -184,6 +190,12 @@ namespace KillingMahjong.Managers
         public bool Trigger(ReactionTrigger trigger, ReactionPriority priority, string formatArg = "")
         {
             if (enemyInfoUI == null) return false;
+
+            // **セリフが1本も無いトリガーはここで断る。**
+            // 積んでしまうと ProcessTriggerReaction が空振りして即 Dequeue するだけなのに、
+            // 呼び出し側には true が返る。すると「トリガーで喋ったから CSV は要らない」と
+            // 誤解して、CSV に書いてあるセリフまで出なくなる
+            if (!enemyInfoUI.HasReaction(trigger)) return false;
 
             float now = Time.unscaledTime;
 
@@ -412,6 +424,32 @@ namespace KillingMahjong.Managers
         
         private int _currentRound = 1;
 
+        // --- 2026-08-15 追加。CharacterData のトリガーを発火させるための状態 ---
+        //
+        // ここまで `ReactionTrigger` は 48 種のうち 5 種しか鳴っていなかった。
+        // `Trigger()` は実装済みで呼び出し元が無いだけだったので、判定に要る材料を
+        // ここへ足して繋いでいる。**CSV を消していない**のがこの実装の要点で、
+        // トリガーにセリフが無ければ従来どおり CSV のセリフが出る（`PlayOrFallback`）。
+
+        [Header("トリガーの発火条件")]
+        [Tooltip("この額以上を賭けたら「限度額」とみなす")]
+        [SerializeField] private int maxBetThreshold = 5000;
+        [Tooltip("この額以下を賭けたら「最小」とみなす")]
+        [SerializeField] private int minBetThreshold = 500;
+        [Tooltip("賭け金をこの回数以上いじったら「散々迷った」とみなす")]
+        [SerializeField] private int betHesitateCount = 4;
+        [Tooltip("賭けフェイズ中に上げ下げがこの回数を超えたら Bet_FidgetSpam を出す")]
+        [SerializeField] private int betFidgetCount = 8;
+        [Tooltip("スキルのコストがこの額以上なら Skill_HighCostPaid")]
+        [SerializeField] private int highSkillCost = 3000;
+        [Tooltip("この血以下なら瀕死とみなす（Skill_NearDeathByCost / Result_PlayerNearDeath）")]
+        [SerializeField] private int nearDeathHp = 3000;
+
+        /// <summary>賭けフェイズ中に賭け金をいじった回数。`StartBetPhaseTimer` で 0 に戻る</summary>
+        private int _betChangeCount = 0;
+        /// <summary>Result_PlayerNearDeath を1局に1回だけにするための記録</summary>
+        private bool _playerNearDeathPlayed = false;
+
         // --- New State Tracking Variables ---
         private int _drawCount = 0;
         private int _playerConsecutiveHonorCount = 0;
@@ -425,12 +463,19 @@ namespace KillingMahjong.Managers
         private List<int> _playerDiscardHistory = new List<int>();
         private List<int> _enemyDiscardHistory = new List<int>();
 
+        /// <summary>いま何局目か。ルールの共通変数として配るために公開している</summary>
+        public int CurrentRound { get { return _currentRound; } }
+
         public void SetCurrentRound(int round)
         {
             _currentRound = round;
         }
 
-        public void SetPlayerHp(int hp) { _playerHp = hp; }
+        public void SetPlayerHp(int hp)
+        {
+            _playerHp = hp;
+            CheckPlayerNearDeath();
+        }
         public void SetEnemyHp(int hp) { _enemyHp = hp; }
         public void SetPlayerLostLastRound(bool lost) { _playerLostLastRound = lost; }
 
@@ -456,55 +501,277 @@ namespace KillingMahjong.Managers
             _playerLostLastRound = false;
             _playerDiscardHistory.Clear();
             _enemyDiscardHistory.Clear();
+
+            _betChangeCount = 0;
+            _playerNearDeathPlayed = false;
+
+            // ルールの「1対局に1回」と クールダウンもここで白紙に戻す
+            ReactionRuleEngine.ResetMatch(ReactionRuleSet.Load());
+
+            if (PlayerActivityWatcher.Instance != null)
+                PlayerActivityWatcher.Instance.ResetForNewRound();
+        }
+
+        /// <summary>
+        /// プランナーが作ったルール（`ReactionRuleSet`）を試す。**すべての反応の最初の関門。**
+        ///
+        /// 3層のうちの1層目で、順番は **ルール → トリガー → CSV**。
+        /// ルールが当たればそこで終わり、当たらなければ従来どおりの動きに落ちる。
+        /// **アセットが無くても動く**ので、ルールを1つも作っていない状態でも今までと同じ。
+        ///
+        /// 出す・出さないの間引き（優先度）はトリガー側と同じ考え方で揃えてある。
+        /// </summary>
+        /// <returns>実際に積んだら true</returns>
+        public bool Publish(ReactionEvent ev, ReactionContext ctx)
+        {
+            if (enemyInfoUI == null) return false;
+
+            var set = ReactionRuleSet.Load();
+            if (set == null) return false;
+
+            var rule = ReactionRuleEngine.Match(set, ev, ctx);
+            if (rule == null) return false;
+
+            var line = ReactionRuleEngine.PickLine(rule);
+            if (line == null) return false;
+
+            float now = Time.unscaledTime;
+
+            if (rule.priority == ReactionPriority.Ambient)
+            {
+                // 積むと待ち時間ぶん遅れて「もう終わった操作」に対して喋り出す
+                if (isProcessingReactions || reactionQueue.Count > 0) return false;
+                if (now - _lastAmbientAt < ambientGlobalCooldown) return false;
+                _lastAmbientAt = now;
+            }
+            else if (rule.priority == ReactionPriority.Situation)
+            {
+                if (_queuedRules.Contains(rule)) return false;
+            }
+
+            ReactionRuleEngine.MarkFired(rule);
+            _queuedRules.Add(rule);
+
+            var captured = rule;
+            string text = line.text;
+            string face = line.faceId;
+            reactionQueue.Enqueue(() => _currentReaction = StartCoroutine(ProcessRuleLine(captured, text, face)));
+            if (!isProcessingReactions) ProcessNextReaction();
+            return true;
+        }
+
+        private IEnumerator ProcessRuleLine(ReactionRule rule, string text, string faceId)
+        {
+            if (dialogueUI != null)
+            {
+                dialogueUI.gameObject.SetActive(true);
+                dialogueUI.ShowText(text.Contains("「") ? text : $"「{text}」");
+            }
+            if (enemyInfoUI != null && !string.IsNullOrEmpty(faceId))
+            {
+                enemyInfoUI.PlayReactionWithVisualId("", faceId, reactionDisplayDuration);
+            }
+
+            yield return WaitWhileLogIsOpen(reactionDisplayDuration);
+
+            _queuedRules.Remove(rule);
+            _pendingOnComplete = null;
+            _currentReaction = null;
+            ProcessNextReaction();
+        }
+
+        /// <summary>共通の値を詰めた入れ物を作る。呼び出し側はここに固有の値を足す</summary>
+        private ReactionContext NewContext()
+        {
+            return new ReactionContext().WithCommon();
+        }
+
+        /// <summary>
+        /// トリガーを試して、セリフが無ければ CSV に落とす。
+        ///
+        /// **この順番でなければならない。** 逆にすると `EnqueueCSVDialogue` が
+        /// 既定で `ClearReactions()` を呼ぶため、先に積んだトリガーが消える。
+        /// </summary>
+        /// <returns>どちらかを流したら true</returns>
+        private bool PlayOrFallback(ReactionTrigger trigger, ReactionPriority priority, string csvCondition)
+        {
+            if (Trigger(trigger, priority)) return true;
+            if (string.IsNullOrEmpty(csvCondition)) return false;
+            EnqueueCSVDialogue(csvCondition);
+            return true;
+        }
+
+        /// <summary>
+        /// 自分がテンパイしているか。**サーバーが返した `is_tenpai` が正**なので、
+        /// 待ちの一覧が空でないかで見る（`BettingUI.UpdateUI` と同じ判定）。
+        ///
+        /// これは**自分の手の情報**なので、反応に出しても駆け引きは壊れない。
+        /// 相手の手や待ちを使う反応は `CharacterData` のコメントどおり入れていない。
+        /// </summary>
+        private static bool IsLocalTenpai()
+        {
+            var b = BoardStateManager.Instance;
+            return b != null && b.LocalWaitDataList != null && b.LocalWaitDataList.Count > 0;
+        }
+
+        /// <summary>
+        /// 賭け金を上げ下げするたびに呼ぶ。`Bet_FidgetSpam` と `Bet_HesitateMax` の材料。
+        /// **確定ではなく操作のたび**に呼ばれるので、ここで喋らせるのは Ambient に限る。
+        /// </summary>
+        public void NotifyBetAmountChanged()
+        {
+            _betChangeCount++;
+            if (_betChangeCount == betFidgetCount)
+            {
+                Trigger(ReactionTrigger.Bet_FidgetSpam, ReactionPriority.Ambient);
+            }
         }
 
         public void CheckAndPlayBetReaction(int betAmount, int maxHp, bool isLocalPlayer)
         {
+            bool max = betAmount >= maxBetThreshold;
+            bool min = betAmount > 0 && betAmount <= minBetThreshold;
+
+            if (Publish(ReactionEvent.BetConfirmed, NewContext()
+                    .Set(ReactionVars.IsMyBet, isLocalPlayer)
+                    .Set(ReactionVars.BetAmount, betAmount)
+                    .Set(ReactionVars.BetMax, maxBetThreshold)
+                    .Set(ReactionVars.IsMaxBet, max)
+                    .Set(ReactionVars.IsMinBet, min)
+                    .Set(ReactionVars.IsTenpai, IsLocalTenpai())
+                    .Set(ReactionVars.BetChangeCount, _betChangeCount)
+                    .Set(ReactionVars.BetDecideSeconds,
+                         _betPhaseTimerActive ? Time.time - _betPhaseStartTime : 0f)))
+            {
+                // 「初めて」の記録だけは進めておく。次に CSV へ落ちたとき辻褄が合うように
+                if (isLocalPlayer)
+                {
+                    if (max) _firstMaxBetPlayed = true;
+                    if (min) _firstMinBetPlayed = true;
+                }
+                _betPhaseTimerActive = false;
+                return;
+            }
+
             if (isLocalPlayer)
             {
-                if (betAmount >= 5000)
+                // 「初めて」の記録はトリガーが喋ったかに関わらず進める。
+                // ここを分岐の中に置くと、トリガーで喋った局が数えられず、
+                // あとから「初めて限度額」の CSV が場違いなタイミングで出る
+                bool isMax = betAmount >= maxBetThreshold;
+                bool isMin = betAmount > 0 && betAmount <= minBetThreshold;
+                bool firstMax = isMax && !_firstMaxBetPlayed;
+                bool firstMin = isMin && !_firstMinBetPlayed;
+                if (isMax) _firstMaxBetPlayed = true;
+                if (isMin) _firstMinBetPlayed = true;
+
+                bool instant = _betPhaseTimerActive && (Time.time - _betPhaseStartTime) < 2.0f;
+
+                if (betAmount <= 0)
                 {
-                    if (_betPhaseTimerActive && (Time.time - _betPhaseStartTime) < 2.0f)
-                    {
-                        EnqueueCSVDialogue("プレイヤーが即座に限度額を賭けた時");
-                    }
-                    else if (_playerLostLastRound)
-                    {
-                        EnqueueCSVDialogue("プレイヤーが前の局で負けたのに限度額を賭けた時");
-                    }
-                    else if (!_firstMaxBetPlayed)
-                    {
-                        _firstMaxBetPlayed = true;
-                        EnqueueCSVDialogue("初めて限度額いっぱいまで賭けた時の開幕のセリフ");
-                    }
+                    // 現状 BettingUI は最小でも1単位を賭けるので、ここには来ない。
+                    // サーバーが 0 を許すようになったときのために残してある
+                    Trigger(ReactionTrigger.Bet_ZeroGiveUp, ReactionPriority.Situation);
                 }
-                else if (betAmount <= 500)
+                else if (isMax)
                 {
-                    if (!_firstMinBetPlayed)
-                    {
-                        _firstMinBetPlayed = true;
-                        EnqueueCSVDialogue("初めて最小単位で賭けた時の開幕のセリフ");
-                    }
-                    else
-                    {
-                        EnqueueCSVDialogue("プレイヤーが少額しか賭けなかった時");
-                    }
+                    // 強い順に見る。仕返し > 迷った末 > テンパイ > ハッタリ。
+                    // 落ちる先の CSV は元の分岐をそのまま残している
+                    string csv = instant ? "プレイヤーが即座に限度額を賭けた時"
+                               : _playerLostLastRound ? "プレイヤーが前の局で負けたのに限度額を賭けた時"
+                               : firstMax ? "初めて限度額いっぱいまで賭けた時の開幕のセリフ"
+                               : null;
+
+                    if (_playerLostLastRound) PlayOrFallback(ReactionTrigger.Bet_RevengeMax, ReactionPriority.Situation, csv);
+                    else if (_betChangeCount >= betHesitateCount) PlayOrFallback(ReactionTrigger.Bet_HesitateMax, ReactionPriority.Situation, csv);
+                    else if (IsLocalTenpai()) PlayOrFallback(ReactionTrigger.Bet_TenpaiMax, ReactionPriority.Situation, csv);
+                    else PlayOrFallback(ReactionTrigger.Bet_BluffMax, ReactionPriority.Situation, csv);
                 }
+                else if (isMin)
+                {
+                    string csv = firstMin ? "初めて最小単位で賭けた時の開幕のセリフ"
+                                          : "プレイヤーが少額しか賭けなかった時";
+
+                    if (IsLocalTenpai()) PlayOrFallback(ReactionTrigger.Bet_TenpaiMin, ReactionPriority.Situation, csv);
+                    else PlayOrFallback(ReactionTrigger.Bet_NoTenMin, ReactionPriority.Situation, csv);
+                }
+                // 501〜4999 は元から無言。ここに反応を足すと毎局喋ることになるので触らない
             }
             else
             {
-                if (betAmount >= 5000)
+                if (betAmount >= maxBetThreshold)
                 {
                     EnqueueCSVDialogue("自分が限度額を賭けた時");
                 }
             }
-            
+
             _betPhaseTimerActive = false;
+        }
+
+        /// <summary>
+        /// スキルが発動したときの反応。`GameUISkillController.HandleSkillCastedRoutine` から呼ぶ。
+        ///
+        /// **`costPaid` は「発動した側が払った血」**で、`hpAfter` はその後の血。
+        /// どちらもサーバー由来の値をそのまま渡してもらう（クライアントで逆算しない）。
+        ///
+        /// 相手（女の子）が撃った場合は、スキルの種類より**自分の消耗を優先**する。
+        /// 瀕死なのに余裕のある透視のセリフが出ると、演出と血の残量が食い違って見えるため。
+        /// </summary>
+        public void HandleSkillCast(string skillType, bool isLocalPlayer, int costPaid, int hpAfter)
+        {
+            if (Publish(ReactionEvent.SkillCast, NewContext()
+                    .Set(ReactionVars.SkillType, skillType)
+                    .Set(ReactionVars.IsMySkill, isLocalPlayer)
+                    .Set(ReactionVars.SkillCost, costPaid)
+                    .Set(ReactionVars.HpAfterSkill, hpAfter))) return;
+
+            if (isLocalPlayer)
+            {
+                switch (skillType)
+                {
+                    case "perspective":
+                        Trigger(ReactionTrigger.Skill_PlayerClairvoyance, ReactionPriority.Situation);
+                        break;
+                    case "boost_hand":
+                        Trigger(ReactionTrigger.Skill_PlayerEnhance, ReactionPriority.Situation);
+                        break;
+                    case "special_victory":
+                        Trigger(ReactionTrigger.Skill_PlayerSpecialWin, ReactionPriority.Progress);
+                        break;
+                }
+                return;
+            }
+
+            if (hpAfter > 0 && hpAfter <= nearDeathHp
+                && Trigger(ReactionTrigger.Skill_NearDeathByCost, ReactionPriority.Progress)) return;
+            if (costPaid >= highSkillCost
+                && Trigger(ReactionTrigger.Skill_HighCostPaid, ReactionPriority.Situation)) return;
+            if (skillType == "perspective")
+                Trigger(ReactionTrigger.Skill_EnemyClairvoyance, ReactionPriority.Situation);
+        }
+
+        /// <summary>
+        /// 血が更新されたときに呼ぶ。プレイヤーが瀕死になった瞬間だけ、**1 対局に 1 回**喋る。
+        /// 局ごとに戻すと、瀕死のまま何局か続いたときに毎局同じことを言い出す。
+        /// `SetPlayerHp` から呼ばれるので、呼び出し側に追加の配線は要らない。
+        /// </summary>
+        private void CheckPlayerNearDeath()
+        {
+            if (_playerNearDeathPlayed) return;
+            if (_playerHp <= 0 || _playerHp > nearDeathHp) return;
+            if (Trigger(ReactionTrigger.Result_PlayerNearDeath, ReactionPriority.Situation))
+            {
+                _playerNearDeathPlayed = true;
+            }
         }
 
         public void CheckAndPlayDrawReaction()
         {
             _drawCount++;
+
+            if (Publish(ReactionEvent.Draw, NewContext()
+                    .Set(ReactionVars.DrawCount, _drawCount))) return;
+
             if (_drawCount >= 2)
             {
                 EnqueueCSVDialogue("流局が2回以上続いた時");
@@ -524,6 +791,15 @@ namespace KillingMahjong.Managers
         public void HandleRoundStart(int round)
         {
             SetCurrentRound(round);
+
+            // 局が変わったので「1局に1回」の枠を戻す
+            ReactionRuleEngine.ResetRound(ReactionRuleSet.Load());
+
+            if (Publish(ReactionEvent.RoundStart, NewContext()
+                    .Set(ReactionVars.PrevWasDraw, _drawCount > 0 && round > 1)
+                    .Set(ReactionVars.PrevWasLoss, _playerLostLastRound)))
+                return;
+
             if (round == 1)
             {
                 EnqueueCSVDialogue("1局目のゲーム開始時");
@@ -549,6 +825,14 @@ namespace KillingMahjong.Managers
             if (isLocalPlayer && _handSelectionTimerActive)
             {
                 float duration = Time.time - _handSelectionStartTime;
+
+                if (Publish(ReactionEvent.HandConfirmed, NewContext()
+                        .Set(ReactionVars.HandDecideSeconds, duration)))
+                {
+                    _handSelectionTimerActive = false;
+                    return;
+                }
+
                 if (duration > 15.0f) EnqueueCSVDialogue("プレイヤーが手牌決定に時間をかけている時");
                 else if (duration < 3.0f) EnqueueCSVDialogue("プレイヤーが手牌を即決した時");
             }
@@ -559,6 +843,8 @@ namespace KillingMahjong.Managers
         {
             _betPhaseStartTime = Time.time;
             _betPhaseTimerActive = true;
+            // 迷った回数は局ごとに数え直す。持ち越すと2局目以降が必ず「散々迷った」になる
+            _betChangeCount = 0;
         }
 
         public void HandleEnemyHandSelection(bool isYakuman, bool isMangan, bool isCheap)
@@ -568,18 +854,35 @@ namespace KillingMahjong.Managers
             else if (isCheap) EnqueueCSVDialogue("敵の手が安い時");
         }
 
+        /// <summary>
+        /// 局の決着。
+        ///
+        /// **`Result_*` の名前は「誰が撃ったか」ではなく「誰が食らったか」で付いている。**
+        /// 名前だけ見ると逆に読めるので、セリフから読み取った対応をここに残す:
+        ///   Result_EnemyHitYakuman  … 女の子が役満に放銃（「バカな……役満ですって!?」）
+        ///   Result_PlayerHitYakuman … 女の子が役満で和了（「役・満・よ♡ …人生終了！」）
+        ///   Result_EnemyDoraBomb    … 女の子がドラ爆で和了（「ドラがたっぷりの極上の一撃」）
+        /// 並べ替えるときは REACTION_LINES.tsv のセリフを読んでからにすること。
+        /// </summary>
         public void HandleAgari(bool isLocalPlayerWin, bool isYakuman, bool isDoraBaku, bool isCheap)
         {
+            if (Publish(ReactionEvent.Agari, NewContext()
+                    .Set(ReactionVars.IsMyWin, isLocalPlayerWin)
+                    .Set(ReactionVars.IsYakuman, isYakuman)
+                    .Set(ReactionVars.IsDoraBomb, isDoraBaku)
+                    .Set(ReactionVars.IsCheapHand, isCheap))) return;
+
             if (isLocalPlayerWin)
             {
-                if (isYakuman) EnqueueCSVDialogue("敵が役満に放銃した時");
+                if (isYakuman) PlayOrFallback(ReactionTrigger.Result_EnemyHitYakuman, ReactionPriority.Progress, "敵が役満に放銃した時");
                 else if (isDoraBaku) EnqueueCSVDialogue("ドラ爆でアガった時");
                 else if (isCheap) EnqueueCSVDialogue("敵が安い手に放銃した時");
                 else EnqueueCSVDialogue("敵が放銃した時");
             }
             else
             {
-                if (isYakuman) EnqueueCSVDialogue("プレイヤーが役満に放銃した時");
+                if (isYakuman) PlayOrFallback(ReactionTrigger.Result_PlayerHitYakuman, ReactionPriority.Progress, "プレイヤーが役満に放銃した時");
+                else if (isDoraBaku) PlayOrFallback(ReactionTrigger.Result_EnemyDoraBomb, ReactionPriority.Progress, "プレイヤーが放銃した時");
                 else if (isCheap) EnqueueCSVDialogue("プレイヤーが安い手に放銃した時");
                 else EnqueueCSVDialogue("プレイヤーが放銃した時");
             }
@@ -587,8 +890,31 @@ namespace KillingMahjong.Managers
 
         public void HandleGameEnd(bool isLocalPlayerWin)
         {
-            if (isLocalPlayerWin) EnqueueCSVDialogue("敵のHPが0になった時");
-            else EnqueueCSVDialogue("プレイヤーのHPが0になった時");
+            if (Publish(ReactionEvent.MatchEnd, NewContext()
+                    .Set(ReactionVars.IsMyWin, isLocalPlayerWin))) return;
+
+            if (isLocalPlayerWin)
+            {
+                // 女の子が倒れる場面。Result_EnemyKO が無ければ旧 Lose、それも無ければ CSV
+                if (Trigger(ReactionTrigger.Result_EnemyKO, ReactionPriority.Progress)) return;
+                PlayOrFallback(ReactionTrigger.Lose, ReactionPriority.Progress, "敵のHPが0になった時");
+            }
+            else
+            {
+                PlayOrFallback(ReactionTrigger.Win, ReactionPriority.Progress, "プレイヤーのHPが0になった時");
+            }
+        }
+
+        /// <summary>牌の種類をルールの条件で使う日本語名にする（`ReactionVariableCatalog` の選択肢と揃える）</summary>
+        private static string SuitName(KillingMahjong.TileCategory category)
+        {
+            switch (category)
+            {
+                case KillingMahjong.TileCategory.Manzu: return "萬子";
+                case KillingMahjong.TileCategory.Pinzu: return "筒子";
+                case KillingMahjong.TileCategory.Souzu: return "索子";
+                default: return "字牌";
+            }
         }
 
         public void CheckDiscardConditions(int tileId, bool isLocalPlayer)
@@ -617,7 +943,10 @@ namespace KillingMahjong.Managers
             bool isMiddle = !isHonor && tData.Number >= 4 && tData.Number <= 6;
             bool isTerminalOrHonor = isHonor || tData.Number == 1 || tData.Number == 9;
             bool isSuji = false;
+            bool isSameAsBefore = false;
 
+            // **スジと同一牌の判定を、分岐の外へ出してある。**
+            // ルールへ渡すには Publish の前に値が要るため。中身は元の計算そのまま
             if (isLocalPlayer)
             {
                 if (!isHonor)
@@ -633,28 +962,64 @@ namespace KillingMahjong.Managers
                         }
                     }
                 }
-                
-                bool isSameAsBefore = _playerDiscardHistory.Count > 0 && 
-                                      new KillingMahjong.TileData(_playerDiscardHistory[_playerDiscardHistory.Count - 1]).Category == tData.Category && 
-                                      new KillingMahjong.TileData(_playerDiscardHistory[_playerDiscardHistory.Count - 1]).Number == tData.Number;
 
-                if (tData.IsRedDora) { playedSpecial = true; EnqueueCSVDialogue("プレイヤーが赤ドラを切った時"); }
-                else if (isHonor && tData.Number >= 1 && tData.Number <= 4) { playedSpecial = true; EnqueueCSVDialogue("プレイヤーがオタ風を切った時"); }
-                else if (isHonor && tData.Number >= 5 && tData.Number <= 7) { playedSpecial = true; EnqueueCSVDialogue("プレイヤーが役牌を切った時"); }
-                else if (isMiddle) { playedSpecial = true; EnqueueCSVDialogue("プレイヤーがド真ん中の牌を切った時"); }
-                else if (isSameAsBefore) { playedSpecial = true; EnqueueCSVDialogue("プレイヤーが前の捨て牌と同じ牌を切った時"); }
-                else if (isSuji) { playedSpecial = true; EnqueueCSVDialogue("プレイヤーがスジ牌を切った時"); }
+                isSameAsBefore = _playerDiscardHistory.Count > 0 &&
+                                 new KillingMahjong.TileData(_playerDiscardHistory[_playerDiscardHistory.Count - 1]).Category == tData.Category &&
+                                 new KillingMahjong.TileData(_playerDiscardHistory[_playerDiscardHistory.Count - 1]).Number == tData.Number;
+            }
+
+            // 字牌の連続数は「この牌を数に入れた」値で渡す。
+            // 実際の加算は下で行うので、ここでは1つ先を読んでいる
+            int honorStreakForRule = isLocalPlayer
+                ? (isHonor ? _playerConsecutiveHonorCount + 1 : 0)
+                : 0;
+
+            float turnElapsed = 0f;
+            if (isLocalPlayer && PlayerActivityWatcher.Instance != null)
+                turnElapsed = PlayerActivityWatcher.Instance.TurnElapsedSeconds;
+
+            bool ruleHandled = Publish(ReactionEvent.Discard, NewContext()
+                .Set(ReactionVars.IsMyDiscard, isLocalPlayer)
+                .Set(ReactionVars.TileSuit, SuitName(tData.Category))
+                .Set(ReactionVars.TileNumber, tData.Number)
+                .Set(ReactionVars.IsRedDora, tData.IsRedDora)
+                .Set(ReactionVars.IsYakuhai, isHonor && tData.Number >= 5 && tData.Number <= 7)
+                .Set(ReactionVars.IsOtakaze, isHonor && tData.Number >= 1 && tData.Number <= 4)
+                .Set(ReactionVars.IsCenterTile, isMiddle)
+                .Set(ReactionVars.IsSameAsPrev, isSameAsBefore)
+                .Set(ReactionVars.IsSuji, isSuji)
+                .Set(ReactionVars.HonorStreak, honorStreakForRule)
+                .Set(ReactionVars.TurnElapsedSeconds, turnElapsed));
+
+            if (ruleHandled) playedSpecial = true;
+
+            if (isLocalPlayer)
+            {
+                // Discard_* のトリガーを先に試し、無ければ従来の CSV へ落とす。
+                // 対応は REACTION_LINES.tsv のセリフから読み取ったもの:
+                //   Discard_SafeTile … 「まずは無難な字牌から？」→ オタ風
+                //   Discard_RawYakuhai … 「生牌の字牌を切るなんて」→ 役牌
+                // スジ牌に対応するトリガーは無いので CSV のまま
+                if (!ruleHandled)
+                {
+                    if (tData.IsRedDora) { playedSpecial = true; PlayOrFallback(ReactionTrigger.Discard_RedDora, ReactionPriority.Situation, "プレイヤーが赤ドラを切った時"); }
+                    else if (isHonor && tData.Number >= 1 && tData.Number <= 4) { playedSpecial = true; PlayOrFallback(ReactionTrigger.Discard_SafeTile, ReactionPriority.Situation, "プレイヤーがオタ風を切った時"); }
+                    else if (isHonor && tData.Number >= 5 && tData.Number <= 7) { playedSpecial = true; PlayOrFallback(ReactionTrigger.Discard_RawYakuhai, ReactionPriority.Situation, "プレイヤーが役牌を切った時"); }
+                    else if (isMiddle) { playedSpecial = true; PlayOrFallback(ReactionTrigger.Discard_CenterTile, ReactionPriority.Situation, "プレイヤーがド真ん中の牌を切った時"); }
+                    else if (isSameAsBefore) { playedSpecial = true; PlayOrFallback(ReactionTrigger.Discard_SameTileStreak, ReactionPriority.Situation, "プレイヤーが前の捨て牌と同じ牌を切った時"); }
+                    else if (isSuji) { playedSpecial = true; EnqueueCSVDialogue("プレイヤーがスジ牌を切った時"); }
+                }
 
                 if (isHonor) _playerConsecutiveHonorCount++;
                 else _playerConsecutiveHonorCount = 0;
 
-                if (_playerConsecutiveHonorCount >= 3) { playedSpecial = true; EnqueueCSVDialogue("プレイヤーが字牌を連続で切った時"); }
-                
+                if (!ruleHandled && _playerConsecutiveHonorCount >= 3) { playedSpecial = true; PlayOrFallback(ReactionTrigger.Discard_HonorStreak, ReactionPriority.Situation, "プレイヤーが字牌を連続で切った時"); }
+
                 _playerDiscardHistory.Add(tileId);
             }
             else
             {
-                if (tData.IsRedDora) { playedSpecial = true; EnqueueCSVDialogue("敵が赤ドラを切る時"); }
+                if (!ruleHandled && tData.IsRedDora) { playedSpecial = true; EnqueueCSVDialogue("敵が赤ドラを切る時"); }
                 
                 bool isTsumogiri = _enemyDiscardHistory.Count > 0 && tileId == _lastDiscardedTileId; // 厳密なツモ切り判定はサーバーから来る情報に依存するため簡易化
                 

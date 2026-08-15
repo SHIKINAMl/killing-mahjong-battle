@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEditor;
 using TMPro;
 
@@ -6,7 +6,10 @@ public class FontReplacer : EditorWindow
 {
     private TMP_FontAsset targetFont;
 
+    // 一時的に非表示。Player Settings の Scripting Define Symbols に KM_ALL_TOOLS を足すと戻る
+#if KM_ALL_TOOLS
     [MenuItem("Tools/Replace Missing Fonts")]
+#endif
     public static void ShowWindow()
     {
         GetWindow<FontReplacer>("Replace Fonts");

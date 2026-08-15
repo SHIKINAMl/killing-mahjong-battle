@@ -1,11 +1,14 @@
-using UnityEditor;
+﻿using UnityEditor;
 using UnityEngine;
 
 namespace KillingMahjong.Editor
 {
     public class CasinoLightingSetup : EditorWindow
     {
+        // 一時的に非表示。Player Settings の Scripting Define Symbols に KM_ALL_TOOLS を足すと戻る
+#if KM_ALL_TOOLS
         [MenuItem("Tools/Lighting/カジノ風スポットライトを配置")]
+#endif
         public static void SetupCasinoLighting()
         {
             // 既存のDirectional Lightがあれば少し暗くする（消してしまっていてもOK）

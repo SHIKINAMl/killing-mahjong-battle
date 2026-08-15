@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -31,7 +31,10 @@ namespace KillingMahjong.EditorTools
         /// <summary>タイトルから読み込むときのパス（Resources 基準・拡張子なし）。</summary>
         public const string ResourcesPath = "Network/GameClient";
 
+        // 一時的に非表示。Player Settings の Scripting Define Symbols に KM_ALL_TOOLS を足すと戻る
+#if KM_ALL_TOOLS
         [MenuItem("Tools/Network/通信クライアントのPrefabを作る")]
+#endif
         public static void Build()
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode)
