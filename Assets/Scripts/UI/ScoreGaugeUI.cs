@@ -47,11 +47,14 @@ namespace KillingMahjong.UI
         [Tooltip("賭け金がゲージへ吸い込まれるまでの秒数")]
         [SerializeField] private float absorbDuration = 0.45f;
 
+        // 色は「デスゲームの卓」に馴染む暗さに落としてある。
+        // 彩度の高い青赤（70,140,255 / 230,60,55）だと格闘ゲームの体力バーのように健全で、
+        // 背景の暗い室内から浮いていた。左右の判別は色より数字に添えた「自分／相手」が担う。
         [Header("色")]
         [Tooltip("自分（右）")]
-        [SerializeField] private Color selfColor = new Color32(70, 140, 255, 255);
+        [SerializeField] private Color selfColor = new Color32(46, 86, 150, 255);
         [Tooltip("相手（左）")]
-        [SerializeField] private Color enemyColor = new Color32(230, 60, 55, 255);
+        [SerializeField] private Color enemyColor = new Color32(150, 32, 30, 255);
         [SerializeField] private Color backColor = new Color(0.06f, 0.06f, 0.08f, 0.85f);
         [SerializeField] private Color crownColor = new Color32(255, 190, 40, 255);
 

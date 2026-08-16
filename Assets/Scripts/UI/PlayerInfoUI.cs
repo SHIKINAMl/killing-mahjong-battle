@@ -463,6 +463,55 @@ namespace KillingMahjong.UI
         }
 
 
+        // ---- 賭け金フェイズのスマホの寄せ方（調整値。シーンではなくここを触る）----
+        //
+        // 狙いは「スマホの画面だけが見えていて、下がっている懐中時計は画面の外」。
+        // **懐中時計は独立した GameObject ではなく `HPUI0heart` に描き込まれている**ので、
+        // 何かを SetActive(false) しても消せない。倍率と位置で画面の外へ送るしかない。
+        // （`時計` の GameObject は数字を文字盤に載せるための入れ物で、絵は持っていない）
+
+        /// <summary>`メーター` の矩形の高さ。絵はこの矩形いっぱいに引き伸ばされる</summary>
+        private const float MeterRectHeight = 280f;
+
+        /// <summary>キャンバス（800x600）の高さの半分</summary>
+        private const float CanvasHalfHeight = 300f;
+
+        /// <summary>
+        /// 絵のどこを画面の下端に合わせるか（スプライト上端からの割合）。
+        ///
+        /// `HPUI0heart`（880x1600）は **y=1139 でスマホ本体が終わり、y=1170 から懐中時計の輪が始まる**。
+        /// その隙間の 1160 を画面の下端に置くと、本体は下まで見えたまま時計だけが画面の外へ落ちる。
+        /// 絵を差し替えたら、この2つの境界を測り直すこと。
+        /// </summary>
+        private const float BettingZoomBottomCut = 1160f / 1600f;
+
+        /// <summary>
+        /// 賭け金フェイズでスマホ（zoomTarget = HPPanel）を拡大する倍率。
+        ///
+        /// **スマホの画像を差し替えたら必ずここを見直すこと。** 倍率は矩形ではなく
+        /// 「絵が画面上で何pxになるか」に効くので、絵の縦横比が変わると勝手にずれる。
+        /// 元の 4.5 は 1600x1600 の旧画像（`HPUI0haert` / メーターの矩形 170x186）に
+        /// 合わせた値で、2026-08-14 の差し替え（`HPUI0heart` 880x1600・矩形 170x280）により
+        /// 画面上の実寸が 631x779 → 747x1040 へ育ち、800x600 の画面から縦が大きくはみ出していた。
+        /// 3.8 はスマホ本体が画面の縦にちょうど収まり（上端 y=21・下端 y=586）、
+        /// 続く懐中時計が下端の外（y=607〜）へ出る値。
+        ///
+        /// 呼び出し側（GameUIPhaseController / TutorialManager）で同じ数値を書かないこと。
+        /// 2か所に散っていたのが、差し替え時に見落とされた原因そのものだった。
+        /// </summary>
+        public const float BettingZoomScale = 3.8f;
+
+        /// <summary>
+        /// 拡大時にスマホを持ち上げる量(px)。負なら下げる。
+        ///
+        /// `BettingZoomBottomCut` の位置が画面の下端に来るよう、矩形の中心からのずれを打ち消す。
+        /// **矩形の中心で止めてはいけない。** 絵は矩形の中で下に寄っている（上に 260/1600 の
+        /// 透明余白があるのに下は 20/1600 しかない）ため、矩形が画面内でも絵の下だけがはみ出す。
+        /// 矩形を見ていても気付けない類のずれなので、必ず絵の側の比率から出すこと。
+        /// </summary>
+        public static float BettingZoomLift =>
+            MeterRectHeight * BettingZoomScale * (BettingZoomBottomCut - 0.5f) - CanvasHalfHeight;
+
         // --- ズーム演出（指定したオブジェクトを巨大化し、少し手前・上に浮かせる） ---
         public System.Collections.IEnumerator ZoomInRoutine(float duration = 0.4f, float targetScaleMulti = 2.5f)
         {
@@ -499,7 +548,8 @@ namespace KillingMahjong.UI
             Vector3 targetPos;
             if (rt != null)
             {
-                targetPos = Vector3.zero;
+                // 矩形の中心ではなく「絵の中心」を画面の中心に合わせる（BettingZoomLift 参照）
+                targetPos = new Vector3(0f, BettingZoomLift, 0f);
             }
             else
             {

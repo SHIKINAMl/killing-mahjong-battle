@@ -780,7 +780,8 @@ namespace KillingMahjong.Managers
             if (info != null)
             {
                 info.gameObject.SetActive(true);
-                yield return info.StartCoroutine(info.ZoomInRoutine(0.4f, 4.5f));
+                yield return info.StartCoroutine(
+                    info.ZoomInRoutine(0.4f, UI.PlayerInfoUI.BettingZoomScale));
             }
 
             // --- ③ 賭け金は固定額。増減ボタンは押せないので決定するしかない ---

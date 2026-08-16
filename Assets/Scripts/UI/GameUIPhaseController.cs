@@ -378,11 +378,12 @@ namespace KillingMahjong.UI
                     {
                         if (uiManager.PlayerInfoUI != null)
                         {
-                            uiManager.PlayerInfoUI.StartCoroutine(uiManager.PlayerInfoUI.ZoomInRoutine(0.4f, 4.5f));
+                            uiManager.PlayerInfoUI.StartCoroutine(
+                                uiManager.PlayerInfoUI.ZoomInRoutine(0.4f, PlayerInfoUI.BettingZoomScale));
                         }
                         StartBettingPhase(Managers.BoardStateManager.Instance.LocalPlayerHp);
 
-                        // スマホが4.5倍に拡大している間は札がその裏に入る。
+                        // スマホが拡大している間は札がその裏に入る。
                         // 賭け金を確定してスマホが縮んでから出す（OnBetConfirmed）
                         SetReadyBadgesSuppressed(true);
                         ApplyPhaseReadyMarks(RoundStatus.Betting);

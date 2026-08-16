@@ -143,11 +143,31 @@ namespace KillingMahjong.UI
         /// シーンに直接置かないのは、対局シーンが2つ（UIテストシーン / OpeningScene）あり
         /// 両方に同じ物を置くと片方だけ直し忘れるため。既存の「選び直す」等と同じやり方。
         /// </summary>
+        /// <summary>
+        /// 「手牌を見る」を「決定」の位置からどれだけ下げるか(px)。
+        ///
+        /// 山牌の下段の下端は画面 y=550（矩形）、複製したままのボタン上端は y=545 で 5px 食い込む。
+        /// 8 下げると矩形で 3px、絵で約 10px 空く（牌の絵は 40px の矩形の中で下に 8px 余白がある）。
+        /// これ以上下げると画面の下端に貼り付くので、増やすならボタンの高さごと見直すこと。
+        /// </summary>
+        private const float PeekButtonDropY = 8f;
+
         private void CreatePeekButton()
         {
             peekButton = Instantiate(decideButton, decideButton.transform.parent);
             peekButton.name = "HandPeekButton";
             peekButton.onClick.RemoveAllListeners();   // 押しっぱなしで見るので click は使わない
+
+            // **「決定」と同じ高さには置けない。** 打牌フェイズでは山牌が下へ降りてくるので
+            // （WallUI の discardContainerPos。手牌選択の -190 に対し -255）、複製したままの高さだと
+            // 山牌の下段と 5px 重なり、絵としても牌にくっついて見える。その分だけ下げる。
+            var peekRect = peekButton.GetComponent<RectTransform>();
+            if (peekRect != null)
+            {
+                peekRect.anchoredPosition = new Vector2(
+                    peekRect.anchoredPosition.x,
+                    peekRect.anchoredPosition.y - PeekButtonDropY);
+            }
 
             var tmp = peekButton.GetComponentInChildren<TMPro.TextMeshProUGUI>();
             if (tmp != null)
@@ -429,10 +449,21 @@ namespace KillingMahjong.UI
             tmp.alignment = TMPro.TextAlignmentOptions.Center;
             tmp.raycastTarget = false;
             tmp.overflowMode = TMPro.TextOverflowModes.Overflow;
-            // 卓の緑にも暗い床にも載るので、縁を付けて背景から切り離す
-            tmp.fontMaterial.EnableKeyword("OUTLINE_ON");
-            tmp.outlineColor = Color.black;
-            tmp.outlineWidth = 0.25f;
+            // 卓の緑にも暗い床にも載るので、縁を付けて背景から切り離す。
+            //
+            // **SDF の輪郭（OUTLINE_ON）はこの大きさでは黒画素が1つも出ない。**
+            // 輪郭の太さは padding × (fontSize / pointSize) に比例し、
+            // pointSize 90 / padding 9 のアトラスを 15px で使うと padding 全体でも 1.5px しかない。
+            // outlineWidth 0.25 では 0.4px ＝ 1画素も塗られない（実測で暗い画素 0 個）。
+            // 効くのは Underlay なので、オフセット 0 のまま全周へ膨らませて縁取りにする
+            // （同条件で暗い画素 221 個。`UnityEngine.UI.Outline` は TMP には最初から効かない）。
+            var guideMat = tmp.fontMaterial;
+            guideMat.EnableKeyword("UNDERLAY_ON");
+            guideMat.SetColor(TMPro.ShaderUtilities.ID_UnderlayColor, Color.black);
+            guideMat.SetFloat(TMPro.ShaderUtilities.ID_UnderlayOffsetX, 0f);
+            guideMat.SetFloat(TMPro.ShaderUtilities.ID_UnderlayOffsetY, 0f);
+            guideMat.SetFloat(TMPro.ShaderUtilities.ID_UnderlayDilate, 1f);
+            guideMat.SetFloat(TMPro.ShaderUtilities.ID_UnderlaySoftness, 0f);
 
             _phaseGuide = tmp;
             return _phaseGuide;
@@ -552,8 +583,14 @@ namespace KillingMahjong.UI
         private const float ActionButtonWidth = 120f;
         private const float ActionButtonHeight = 40f;
 
-        /// <summary>ボタンの外側に空ける画面端からの余白。左右で同じ値を使うので対称になる。</summary>
-        private const float ActionButtonEdgeMargin = 65f;
+        /// <summary>
+        /// ボタンの外側に空ける画面端からの余白。左右で同じ値を使うので対称になる。
+        ///
+        /// 65 だと「決定」の右上に手前のスマホUI（懐中時計の絵）が 8px まで迫り、
+        /// 押し間違いを誘う詰まり方になっていた。90 まで広げて両方を内側へ寄せている
+        /// （左右で同じ値なので対称は保たれる。片側だけ動かすとこの対称が崩れる）。
+        /// </summary>
+        private const float ActionButtonEdgeMargin = 90f;
 
         /// <summary>文字がボタンの縁に触れないようにする内側の余白。</summary>
         private const float ActionButtonTextPadding = 14f;
