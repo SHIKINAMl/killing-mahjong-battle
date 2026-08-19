@@ -391,6 +391,12 @@ namespace KillingMahjong.UI
                     // 矢印は常にwallContainerの子として保持し、牌スロットへの依存を断ちプール汚染を防ぐ
                     Transform arrowParent = wallContainer != null ? wallContainer : (Transform)this.transform;
                     arrowIndicator.SetParent(arrowParent, false);
+                    // **SetParent だけでは前に出ない。** 既に同じ親の子だった場合、
+                    // SetParent は兄弟順を変えないので生成時の位置に居座る。
+                    // 山牌は LayoutWallTiles のたびに末尾へ追加されるので、
+                    // 放っておくと矢印が常に牌の後ろに回る（2026-08-19 に実機で sib=0/20 を確認）
+                    arrowIndicator.SetAsLastSibling();
+                    EnsureArrowSorting();
                     arrowIndicator.anchoredPosition = new Vector2(
                         currentActiveInteraction.OriginalWallPosition.x,
                         currentActiveInteraction.OriginalWallPosition.y + 8f + 25f
@@ -433,11 +439,34 @@ namespace KillingMahjong.UI
             }
         }
 
+        /// <summary>
+        /// 矢印を山牌より手前に出す Canvas 設定を当て直す。
+        ///
+        /// **親が決まっていないうちに呼んではいけない。**
+        /// 親 Canvas の無い GameObject の Canvas はルート扱いになり、
+        /// overrideSorting を true にしても保持されない（あとから SetParent しても false のまま）。
+        /// </summary>
+        private void EnsureArrowSorting()
+        {
+            if (arrowIndicator == null) return;
+            var canvas = arrowIndicator.GetComponent<Canvas>();
+            if (canvas == null) canvas = arrowIndicator.gameObject.AddComponent<Canvas>();
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = UISortingOrders.WallFront;
+        }
+
         private void CreateArrowIndicator()
         {
             GameObject arrowObj = new GameObject("DiscardArrowIndicator");
             arrowIndicator = arrowObj.AddComponent<RectTransform>();
             arrowIndicator.sizeDelta = new Vector2(50, 50);
+
+            // **Canvas を付ける前に親を決める。**
+            // 親無しで AddComponent<Canvas>() するとルート Canvas になり、
+            // overrideSorting が落ちて山牌と同じ sortingOrder を引き継いでしまう。
+            // 生成直後にwallContainerの子として登録するのは、牌のプール汚染を防ぐ目的も兼ねる
+            Transform parent = wallContainer != null ? wallContainer : (Transform)this.transform;
+            arrowIndicator.SetParent(parent, false);
 
             var text = arrowObj.AddComponent<UnityEngine.UI.Text>();
             text.text = "▼";
@@ -450,13 +479,7 @@ namespace KillingMahjong.UI
             outline.effectColor = Color.black;
             outline.effectDistance = new Vector2(2, -2);
 
-            var canvas = arrowObj.AddComponent<Canvas>();
-            canvas.overrideSorting = true;
-            canvas.sortingOrder = UISortingOrders.WallFront;
-
-            // 生成直後にwallContainerの子として登録することで、牌のプール汚染を防ぐ
-            Transform parent = wallContainer != null ? wallContainer : (Transform)this.transform;
-            arrowIndicator.SetParent(parent, false);
+            EnsureArrowSorting();
             arrowIndicator.gameObject.SetActive(false);
         }
     }

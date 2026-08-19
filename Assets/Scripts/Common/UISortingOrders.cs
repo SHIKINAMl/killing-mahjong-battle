@@ -65,6 +65,16 @@ namespace KillingMahjong.Common
         /// <summary>PhaseTransitionUI: フェーズ演出の基本レイヤー</summary>
         public const int PhaseTransitionBase = 19;
 
+        /// <summary>
+        /// AbilityUI: フェーズ演出中の退避先。**フェーズ演出(19)より必ず下**であること。
+        ///
+        /// 能力パネルは通常 20、説明ツールチップは 25 なので、
+        /// 「決定！」などの帯(19)が出ている間は構造上かならず帯の上に乗ってしまう
+        /// （2026-08-19 にプランナーから指摘。実機の動画で確認済み）。
+        /// GameUIManager.SetIsTransitioning から AbilityUI.SetSuppressedForTransition 経由で当てる。
+        /// </summary>
+        public const int AbilityDuringTransition = 18;
+
         // ---- 20 - 29 情報パネル強調 ----
 
         /// <summary>AbilityUI ルート / PlayerInfoUI 強調表示時の共通レイヤー</summary>

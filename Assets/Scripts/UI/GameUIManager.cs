@@ -342,6 +342,10 @@ namespace KillingMahjong.UI
         {
             isTransitioning = value;
             UpdateTurnIndicatorVisibility();
+
+            // 能力パネルと説明ツールチップは通常 20/25 で、フェーズ演出の帯(19)より手前に出る。
+            // 演出のあいだだけ帯より下へ退避させる（2026-08-19 のプランナー要望 R-2）。
+            if (abilityUI != null) abilityUI.SetSuppressedForTransition(value);
         }
 
         // --- 演出中に届いたサーバーイベントの保留 ---

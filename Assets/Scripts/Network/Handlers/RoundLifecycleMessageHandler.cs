@@ -116,6 +116,14 @@ namespace KillingMahjong.Network.Handlers
                     {
                         network.RaiseGameEnded(localScore, enemyScore);
                     }
+                    else
+                    {
+                        // **黙って捨てない。** final_scores を解釈できないと決着処理がまるごと落ち、
+                        // 「HPが0でも敗北しない」ように見える（2026-08-19 の不具合報告 R-4 の候補）。
+                        // サーバーが game_end を送っていないのか、形が変わって読めないだけなのかを
+                        // 切り分けられるよう、受信した本文ごと必ず記録する。
+                        Debug.LogWarning("[Network] game_end を受信したが final_scores を解釈できず、決着処理を行わなかった: " + jsonString);
+                    }
                     break;
             }
         }

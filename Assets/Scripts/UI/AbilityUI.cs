@@ -302,7 +302,7 @@ namespace KillingMahjong.UI
                 Canvas rootCanvas = this.GetComponent<Canvas>();
                 if (rootCanvas != null)
                 {
-                    rootCanvas.sortingOrder = UISortingOrders.InfoPanelNormal;
+                    rootCanvas.sortingOrder = _transitionSuppressed ? UISortingOrders.AbilityDuringTransition : UISortingOrders.InfoPanelNormal;
                 }
             }
 
@@ -545,7 +545,7 @@ namespace KillingMahjong.UI
                     tooltipPanel.AddComponent<UnityEngine.UI.GraphicRaycaster>();
                 }
                 tooltipCanvas.overrideSorting = true;
-                tooltipCanvas.sortingOrder = UISortingOrders.AbilityTooltip;
+                tooltipCanvas.sortingOrder = _transitionSuppressed ? UISortingOrders.AbilityDuringTransition : UISortingOrders.AbilityTooltip;
 
                 // AbilityUI全体を最前面化するが、中身の表示順が壊れないようにルート(this)のみ設定する
                 Canvas rootCanvas = this.GetComponent<Canvas>();
@@ -555,13 +555,48 @@ namespace KillingMahjong.UI
                     this.gameObject.AddComponent<UnityEngine.UI.GraphicRaycaster>();
                 }
                 rootCanvas.overrideSorting = true;
-                rootCanvas.sortingOrder = UISortingOrders.InfoPanelHighlight;
+                rootCanvas.sortingOrder = _transitionSuppressed ? UISortingOrders.AbilityDuringTransition : UISortingOrders.InfoPanelHighlight;
                 
                 // Z座標は0
                 Vector3 localPos = tooltipPanel.transform.localPosition;
                 tooltipPanel.transform.localPosition = new Vector3(localPos.x, localPos.y, 0f);
 
                 tooltipPanel.SetActive(true);
+            }
+        }
+
+        // ---- フェーズ演出中の退避 ----
+        //
+        // 「決定！」などの帯（PhaseTransitionCanvas）は sortingOrder 19 なのに、
+        // 能力パネルは 20、説明ツールチップは 25 で、**構造上かならず帯の上に出る**。
+        // 演出のあいだだけ 18 へ落とし、明けたら元へ戻す。
+        // 演出中に ShowTooltip が走っても 20/25 へ戻らないよう、
+        // sortingOrder を書く箇所はすべてこのフラグを見ている。
+        private bool _transitionSuppressed;
+
+        /// <summary>フェーズ演出中だけ帯より下へ退避する。GameUIManager.SetIsTransitioning から呼ぶ。</summary>
+        public void SetSuppressedForTransition(bool suppressed)
+        {
+            if (_transitionSuppressed == suppressed) return;
+            _transitionSuppressed = suppressed;
+
+            Canvas rootCanvas = this.GetComponent<Canvas>();
+            if (rootCanvas != null)
+            {
+                rootCanvas.sortingOrder = suppressed
+                    ? UISortingOrders.AbilityDuringTransition
+                    : (isWindowVisible ? UISortingOrders.InfoPanelHighlight : UISortingOrders.InfoPanelNormal);
+            }
+
+            if (tooltipPanel != null)
+            {
+                var tipCanvas = tooltipPanel.GetComponent<Canvas>();
+                if (tipCanvas != null)
+                {
+                    tipCanvas.sortingOrder = suppressed
+                        ? UISortingOrders.AbilityDuringTransition
+                        : UISortingOrders.AbilityTooltip;
+                }
             }
         }
 
@@ -574,7 +609,7 @@ namespace KillingMahjong.UI
             Canvas rootCanvas = this.GetComponent<Canvas>();
             if (rootCanvas != null)
             {
-                rootCanvas.sortingOrder = UISortingOrders.InfoPanelNormal;
+                rootCanvas.sortingOrder = _transitionSuppressed ? UISortingOrders.AbilityDuringTransition : UISortingOrders.InfoPanelNormal;
             }
         }
     }
