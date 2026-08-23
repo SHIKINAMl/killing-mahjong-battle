@@ -147,7 +147,7 @@ namespace KillingMahjong.Network
         public event Action<int, bool> OnTileDiscarded; // tileId, isLocalPlayer
         public event Action<bool> OnAgari; // isLocalWin
         public event Action<DrawPlayerData[]> OnDraw; // 流局
-        public event Action<int, int> OnGameEnded; // localScore, enemyScore
+        public event Action<GameEndInfo> OnGameEnded; // 決着情報（HP・ID一致の可否・決着理由）
         public event Action<NextRoundWaitingData> OnNextRoundWaitingReceived; // 相手からの次局待機（ロンボタン押下の合図として利用）
         public event Action<PhaseCompletedNoticeData> OnPhaseCompletedNotice; // 手牌選択・ベットを確定したプレイヤーの通知（「準備完了」表示用）
         public event Action OnLocalBetAccepted; // 自分のベットが受理された（本人にだけ届く。「準備完了」表示用）
@@ -189,7 +189,7 @@ namespace KillingMahjong.Network
         internal void RaiseTileDiscarded(int tileId, bool isLocalPlayer) => OnTileDiscarded?.Invoke(tileId, isLocalPlayer);
         internal void RaiseAgari(bool isLocalWin) => OnAgari?.Invoke(isLocalWin);
         internal void RaiseDraw(DrawPlayerData[] drawData) => OnDraw?.Invoke(drawData);
-        internal void RaiseGameEnded(int localScore, int enemyScore) => OnGameEnded?.Invoke(localScore, enemyScore);
+        internal void RaiseGameEnded(GameEndInfo info) => OnGameEnded?.Invoke(info);
         internal void RaiseNextRoundWaitingReceived(NextRoundWaitingData data) => OnNextRoundWaitingReceived?.Invoke(data);
         internal void RaisePhaseCompletedNotice(PhaseCompletedNoticeData data) => OnPhaseCompletedNotice?.Invoke(data);
         internal void RaiseLocalBetAccepted() => OnLocalBetAccepted?.Invoke();

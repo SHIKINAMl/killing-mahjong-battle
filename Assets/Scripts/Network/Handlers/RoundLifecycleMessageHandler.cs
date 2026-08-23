@@ -112,9 +112,19 @@ namespace KillingMahjong.Network.Handlers
                     break;
 
                 case "game_end":
-                    if (ServerJsonParser.TryParseFinalScores(jsonString, network.LocalPlayerId, out int localScore, out int enemyScore))
+                    if (ServerJsonParser.TryParseGameEnd(jsonString, network.LocalPlayerId, out GameEndInfo endInfo))
                     {
-                        network.RaiseGameEnded(localScore, enemyScore);
+                        if (!endInfo.LocalScoreFound || !endInfo.EnemyScoreFound)
+                        {
+                            // **ここが「勝ったのに敗北画面」の入口だった。**
+                            // 自分の client_id が final_scores のキーと一致しないと両者 0 のまま
+                            // 決着処理に流れ、HP の大小で勝敗を決められなくなる。
+                            // 決着そのものは捨てず、後段が最後に届いた HP で補えるよう記録だけ残す。
+                            Debug.LogWarning(
+                                $"[Network] game_end の final_scores に ID が見つかりません。" +
+                                $"local={network.LocalPlayerId} 自分={endInfo.LocalScoreFound} 相手={endInfo.EnemyScoreFound}: " + jsonString);
+                        }
+                        network.RaiseGameEnded(endInfo);
                     }
                     else
                     {

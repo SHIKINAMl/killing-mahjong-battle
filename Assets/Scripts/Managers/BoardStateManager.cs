@@ -66,6 +66,27 @@ namespace KillingMahjong.Managers
         public int LocalPlayerSpecialVictoryCount { get; set; } = 0;
 
         /// <summary>
+        /// 累計獲得点（`status` の `cumulative_earned_points`）。**サーバーが正。**
+        ///
+        /// これまで ScoreGaugeUI の private フィールドにしか無く、外から読めなかった。
+        /// `game_end` には勝者 ID が無いため、決着理由が `cumulative_earned_points` のとき
+        /// **どちらが 30000 に届いたのかはこの値でしか分からない**（2026-08-23 に追加）。
+        /// </summary>
+        public int LocalCumulativeEarnedPoints { get; private set; } = 0;
+        public int EnemyCumulativeEarnedPoints { get; private set; } = 0;
+
+        /// <summary>累計獲得点の到達で決着する境目。サーバー側は game_session.py の 30000。</summary>
+        public const int CumulativeVictoryPoints = 30000;
+
+        /// <summary>status で届いた累計獲得点を控える。負の値は「未受信」として捨てる。</summary>
+        public void SetCumulativeEarnedPoints(int local, int enemy)
+        {
+            if (local < 0 || enemy < 0) return;
+            LocalCumulativeEarnedPoints = local;
+            EnemyCumulativeEarnedPoints = enemy;
+        }
+
+        /// <summary>
         /// 血をサーバーの値で扱うか。**2026-08-04 の検証用スイッチ。**
         ///
         /// true  … `status` の `health` をそのまま採用し、ベットでは引かない。

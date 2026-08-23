@@ -1183,7 +1183,11 @@ namespace KillingMahjong.UI
         {
             // ロンの一撃を予感させる合図。自分のロン（ExecuteRonAction）も
             // 相手のロン（HandleAgari）もここを通るので、1箇所で両方に効く。
-            Effects.ScreenFlash.Play();
+            // **白フラッシュは止めた（2026-08-20 の演出削減バッチ1）。**
+            // 同じフレームにカットインの黒幕(α0.7)が生成されるため、白は黒の上で合成されて
+            // 灰色の一拍にしかなっておらず、「盤面が白く飛ぶ」体験になっていなかった。
+            // フェイズ切替の ScreenFlash（このファイルの上方）はそのまま残す。
+            // Effects.ScreenFlash.Play();
 
             if (ReactionController.Instance != null)
             {

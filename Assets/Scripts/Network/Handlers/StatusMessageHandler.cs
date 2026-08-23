@@ -62,6 +62,12 @@ namespace KillingMahjong.Network.Handlers
             // 自前で積むとズレて「ゲージは届いていないのに対局が終わる」ことが起きる
             if (statusMsg.data.player_state != null && statusMsg.data.opponent_player_state != null)
             {
+                // 決着時に「どちらが 30000 に届いたか」を見分けるため、盤面状態にも控える。
+                // ゲージ（表示）だけが持っていると、勝敗判定から読めない
+                board.SetCumulativeEarnedPoints(
+                    statusMsg.data.player_state.cumulative_earned_points,
+                    statusMsg.data.opponent_player_state.cumulative_earned_points);
+
                 var gauge = UnityEngine.Object.FindFirstObjectByType<KillingMahjong.UI.ScoreGaugeUI>();
                 if (gauge != null)
                 {

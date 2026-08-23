@@ -198,8 +198,8 @@ namespace KillingMahjong.UI
                 }
             }
 
-            UpdateActiveBoosts(localBoost, localActiveBoostTexts);
-            UpdateActiveBoosts(enemyBoost, enemyActiveBoostTexts);
+            UpdateActiveBoosts(localBoost, localActiveBoostTexts, true);
+            UpdateActiveBoosts(enemyBoost, enemyActiveBoostTexts, false);
 
             // **文字を入れて枠を表示させた「後」に当て直す。**
             // Start の時点では枠がまだ非アクティブで TMP が初期化されておらず、
@@ -211,8 +211,8 @@ namespace KillingMahjong.UI
         /// <summary>常時表示の強化役（自3枠・敵3枠）の文字を読めるようにする。</summary>
         private void ApplyActiveBoostReadability()
         {
-            ApplyActiveBoostReadability(localActiveBoostTexts);
-            ApplyActiveBoostReadability(enemyActiveBoostTexts);
+            ApplyActiveBoostReadability(localActiveBoostTexts, true);
+            ApplyActiveBoostReadability(enemyActiveBoostTexts, false);
         }
 
         /// <summary>
@@ -230,7 +230,7 @@ namespace KillingMahjong.UI
         ///
         /// このメソッドが持つのは、輪郭以外の読みやすさ（色と、枠に収める縮小）だけ。
         /// </summary>
-        private void ApplyActiveBoostReadability(TextMeshProUGUI[] textArray)
+        private void ApplyActiveBoostReadability(TextMeshProUGUI[] textArray, bool isLocal)
         {
             if (textArray == null) return;
 
@@ -238,17 +238,19 @@ namespace KillingMahjong.UI
             {
                 if (text == null) continue;
 
-                // 背景は自＝水色・敵＝赤で、どちらも明るい。黒で十分な差が出る
+                // 面は自＝水色・敵＝橙で、どちらも明るい。黒で十分な差が出る
                 text.color = Color.black;
+
+                // 縁と面と帯を用意する（足りない子だけ作るので何度呼んでも増えない）
+                BuildTile(text, isLocal);
 
                 // **文字の矩形をチップに合わせる。** シーンでは文字が 200 幅で、
                 // チップ(100幅)の倍あった。自動縮小は文字の矩形を基準にするので、
                 // チップからはみ出していても縮まない（実際に「三色同順+1」が溢れていた）。
-                var rect = text.rectTransform;
-                rect.anchorMin = Vector2.zero;
-                rect.anchorMax = Vector2.one;
-                rect.offsetMin = new Vector2(ActiveBoostTextPadding, 0f);
-                rect.offsetMax = new Vector2(-ActiveBoostTextPadding, 0f);
+                // 帯を出しているぶんだけ下辺を持ち上げる。
+                var chipRt = text.transform.parent as RectTransform;
+                var stripT = chipRt != null ? chipRt.Find(TileStripName) : null;
+                ApplyNameTextRect(text, stripT != null && stripT.gameObject.activeSelf);
 
                 // margin が残っていると中央揃えでも上下にずれる（おまかせボタンで踏んだ罠）
                 text.margin = Vector4.zero;
@@ -264,16 +266,178 @@ namespace KillingMahjong.UI
             }
         }
 
-        /// <summary>常時表示の強化役の基本サイズ。シーンの値と同じ。</summary>
-        private const float ActiveBoostFontSize = 20f;
+        // ==================== 強化チップの見た目（タイル） ====================
+        //
+        // **参考は「スイスイ株式会社」のアップグレードタイル**（2026-08-23 に本人が提示）。
+        // 作りは「濃い縁 → 原色の面 → 下に小さい帯で数値」。飾りは足さない。
+        //
+        // **寸法はすべて 1ドット＝2UI単位の格子に乗せる。** チップは 80x32（＝40x16ドット）で、
+        // 縁2＝1ドット、帯10＝5ドット。半端な値を入れるとドットの目が合わなくなる。
+        //
+        // 枠（自強化1〜3・敵強化1〜3）はシーンに置いてあるが、**面・帯・翻数の文字は実行時に作る**。
+        // シーンに置くと本編とチュートリアルの両方に同じ手を入れることになり、片方だけ直す事故が起きる。
+
+        /// <summary>チップの縁の太さ。1ドット。</summary>
+        private const float TileBorder = 2f;
+
+        /// <summary>翻数を出す帯の高さ。5ドット。</summary>
+        private const float TileStripHeight = 10f;
+
+        /// <summary>縁の色。紙の上に置くので、面より充分濃くする。</summary>
+        private static readonly Color TileBorderColor = new Color32(0x1E, 0x25, 0x40, 0xFF);
+
+        /// <summary>自分の強化の面。参考の水色寄り。</summary>
+        private static readonly Color TileFillLocal = new Color32(0x57, 0xC7, 0xE8, 0xFF);
+
+        /// <summary>相手の強化の面。参考の橙寄り。</summary>
+        private static readonly Color TileFillEnemy = new Color32(0xF2, 0x70, 0x5A, 0xFF);
+
+        /// <summary>帯の中の翻数。参考でも数値だけ黄色になっている。</summary>
+        private static readonly Color TileBonusColor = new Color32(0xFF, 0xD3, 0x4D, 0xFF);
+
+        /// <summary>子オブジェクトの名前。作り直しを避けるため、これで在庫を探す。</summary>
+        private const string TileFillName = "TileFill";
+        private const string TileStripName = "TileStrip";
+        private const string TileBonusName = "TileBonus";
+
+        /// <summary>常時表示の強化役の基本サイズ。帯を引いた残り（18）に収まる大きさ。</summary>
+        private const float ActiveBoostFontSize = 15f;
 
         /// <summary>これ以上小さくすると読めなくなる下限。</summary>
-        private const float ActiveBoostMinFontSize = 14f;
+        private const float ActiveBoostMinFontSize = 8f;
 
-        /// <summary>文字がチップの縁に触れないようにする内側の余白（チップ幅100に対して）。</summary>
+        /// <summary>翻数の文字。帯（高さ10）に収まる大きさ。</summary>
+        private const float TileBonusFontSize = 10f;
+        private const float TileBonusMinFontSize = 8f;
+
+        /// <summary>文字がチップの縁に触れないようにする内側の余白。</summary>
         private const float ActiveBoostTextPadding = 4f;
 
-        private void UpdateActiveBoosts(Dictionary<string, int> boostDict, TextMeshProUGUI[] textArray)
+        /// <summary>
+        /// 強化チップをタイルに仕立てる。**足りない子だけ作るので、何度呼んでも増えない。**
+        ///
+        /// 枠そのもの（`Image`）を縁の色にして、内側に面を1枚敷く。Unity の `Image` に
+        /// 枠線は無いので、9スライスの素材を用意するより子を1枚置く方が軽くて確実。
+        /// </summary>
+        private void BuildTile(TextMeshProUGUI nameText, bool isLocal)
+        {
+            if (nameText == null) return;
+
+            var chip = nameText.transform.parent as RectTransform;
+            if (chip == null) return;
+
+            var chipImage = chip.GetComponent<Image>();
+            if (chipImage != null)
+            {
+                chipImage.color = TileBorderColor;
+                chipImage.sprite = null;
+            }
+
+            // 面（縁の内側）
+            var fill = FindOrCreateGraphic<Image>(chip, TileFillName);
+            fill.color = isLocal ? TileFillLocal : TileFillEnemy;
+            var fillRect = fill.rectTransform;
+            fillRect.anchorMin = Vector2.zero;
+            fillRect.anchorMax = Vector2.one;
+            fillRect.offsetMin = new Vector2(TileBorder, TileBorder);
+            fillRect.offsetMax = new Vector2(-TileBorder, -TileBorder);
+            fillRect.SetAsFirstSibling();
+
+            // 翻数の帯（面の下辺に沿わせる）
+            var strip = FindOrCreateGraphic<Image>(chip, TileStripName);
+            strip.color = TileBorderColor;
+            var stripRect = strip.rectTransform;
+            stripRect.anchorMin = new Vector2(0f, 0f);
+            stripRect.anchorMax = new Vector2(1f, 0f);
+            stripRect.offsetMin = new Vector2(TileBorder, TileBorder);
+            stripRect.offsetMax = new Vector2(-TileBorder, TileBorder + TileStripHeight);
+            stripRect.SetSiblingIndex(1);
+
+            // 帯の中の翻数
+            var bonus = FindOrCreateGraphic<TextMeshProUGUI>(stripRect, TileBonusName);
+            if (bonus.font == null) bonus.font = nameText.font;
+            bonus.color = TileBonusColor;
+            bonus.alignment = TextAlignmentOptions.Center;
+            bonus.margin = Vector4.zero;
+            bonus.enableAutoSizing = true;
+            bonus.fontSizeMax = TileBonusFontSize;
+            bonus.fontSizeMin = TileBonusMinFontSize;
+            bonus.textWrappingMode = TextWrappingModes.NoWrap;
+            bonus.overflowMode = TextOverflowModes.Overflow;
+            var bonusRect = bonus.rectTransform;
+            bonusRect.anchorMin = Vector2.zero;
+            bonusRect.anchorMax = Vector2.one;
+            bonusRect.offsetMin = new Vector2(2f, 0f);
+            bonusRect.offsetMax = new Vector2(-2f, 0f);
+
+            // 役名は帯の上に載せる。文字がいちばん手前
+            nameText.transform.SetAsLastSibling();
+        }
+
+        /// <summary>子を名前で探し、無ければ作る。**作り直さない**のが肝心。</summary>
+        private static T FindOrCreateGraphic<T>(RectTransform parent, string childName) where T : Graphic
+        {
+            var existing = parent.Find(childName);
+            if (existing != null)
+            {
+                var found = existing.GetComponent<T>();
+                if (found != null) return found;
+            }
+
+            var go = new GameObject(childName, typeof(RectTransform), typeof(T));
+            var rt = (RectTransform)go.transform;
+            rt.SetParent(parent, false);
+            rt.localScale = Vector3.one;
+            var graphic = go.GetComponent<T>();
+            graphic.raycastTarget = false;
+            return graphic;
+        }
+
+        /// <summary>
+        /// `役名+翻数` の1本の文字列を、役名と翻数に分けてタイルへ流す。
+        ///
+        /// 枠が足りないときの `+3`（あと何件あるか）は役名が無いので、
+        /// **帯を隠して1行で出す**。数字だけが帯に入っていると意味が変わってしまう。
+        /// </summary>
+        private void ApplyTileText(TextMeshProUGUI nameText, string combined)
+        {
+            if (nameText == null) return;
+
+            var chip = nameText.transform.parent as RectTransform;
+            var stripRt = chip != null ? chip.Find(TileStripName) as RectTransform : null;
+            var bonusRt = stripRt != null ? stripRt.Find(TileBonusName) as RectTransform : null;
+            var bonusText = bonusRt != null ? bonusRt.GetComponent<TextMeshProUGUI>() : null;
+
+            int plus = string.IsNullOrEmpty(combined) ? -1 : combined.LastIndexOf('+');
+            bool hasName = plus > 0;
+
+            if (hasName)
+            {
+                nameText.text = combined.Substring(0, plus);
+                if (bonusText != null) bonusText.text = combined.Substring(plus);
+            }
+            else
+            {
+                nameText.text = combined;
+                if (bonusText != null) bonusText.text = "";
+            }
+
+            if (stripRt != null) stripRt.gameObject.SetActive(hasName);
+            ApplyNameTextRect(nameText, hasName);
+        }
+
+        /// <summary>役名の矩形を、帯があるときだけ帯のぶん持ち上げる。</summary>
+        private static void ApplyNameTextRect(TextMeshProUGUI nameText, bool hasStrip)
+        {
+            var rect = nameText.rectTransform;
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            float bottom = TileBorder + (hasStrip ? TileStripHeight : 0f);
+            rect.offsetMin = new Vector2(ActiveBoostTextPadding, bottom);
+            rect.offsetMax = new Vector2(-ActiveBoostTextPadding, -TileBorder);
+        }
+
+        private void UpdateActiveBoosts(Dictionary<string, int> boostDict, TextMeshProUGUI[] textArray, bool isLocal)
         {
             if (textArray == null || textArray.Length == 0) return;
 
@@ -312,9 +476,12 @@ namespace KillingMahjong.UI
 
                 if (i < shownCount || isOverflowSlot)
                 {
-                    textArray[i].text = isOverflowSlot
+                    // 役名と翻数を分けて、翻数だけ下の帯に入れる。
+                    // 枠が足りないときの「+3」は役名が無いので、帯を隠して1行で出る
+                    BuildTile(textArray[i], isLocal);
+                    ApplyTileText(textArray[i], isOverflowSlot
                         ? $"+{hiddenCount}"
-                        : $"{activeBoosts[i].Key}+{activeBoosts[i].Value}";
+                        : $"{activeBoosts[i].Key}+{activeBoosts[i].Value}");
                     textArray[i].gameObject.SetActive(true);
                     
                     // 背景画像（親オブジェクト）がある場合はそれも表示する
@@ -329,7 +496,7 @@ namespace KillingMahjong.UI
                 else
                 {
                     textArray[i].gameObject.SetActive(false);
-                    textArray[i].text = "";
+                    ApplyTileText(textArray[i], "");
                     
                     // 背景画像（親オブジェクト）がある場合は非表示にする
                     // ただし、それが親パネル（yakuListPanel）全体を包むものでないことを確認する

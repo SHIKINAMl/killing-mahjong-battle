@@ -198,7 +198,9 @@ namespace KillingMahjong.UI
             uiManager.SetIsTransitioning(true); // ★ アニメーション中の非同期Rebuildを防ぐ
 
             // 発動の合図として一瞬だけ光らせる。カットインが出る前に置くこと
-            Effects.ScreenFlash.Play();
+            // **白フラッシュは止めた（2026-08-20 の演出削減バッチ1）。**
+            // ロンと同じ理由で、直後に出るカットインの黒幕(α0.5)に埋もれて効いていない。
+            // Effects.ScreenFlash.Play();
 
             // 能力麻雀の核であるスキル発動が完全に無音だったため、種類別の音を鳴らす
             var audioMgr = Managers.AudioManager.Instance;

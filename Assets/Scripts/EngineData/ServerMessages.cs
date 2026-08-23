@@ -444,4 +444,31 @@ namespace KillingMahjong.EngineData
         public string type;
         // Parsing of final_scores dictionary is handled manually via string operations
     }
+
+    /// <summary>
+    /// game_end で届いた決着情報。**勝敗の判定材料はこれで全部**（2026-08-23 に追加）。
+    ///
+    /// サーバーは `final_scores` / `player_healths` / `health_zero_players` / `victory_method` を
+    /// 送っているのに、クライアントは `final_scores` の大小しか見ていなかった。
+    /// JsonUtility は Dictionary を読めないので、ServerJsonParser が手で組む。
+    /// </summary>
+    public class GameEndInfo
+    {
+        /// <summary>final_scores の値。**HP そのもの**（game_session.py の final_scores[key] = p.health）。</summary>
+        public int LocalScore;
+        public int EnemyScore;
+
+        /// <summary>
+        /// final_scores の中に自分／相手の client_id が実在したか。
+        /// **false のときスコアは 0 のままなので、そのまま勝敗に使ってはいけない。**
+        /// </summary>
+        public bool LocalScoreFound;
+        public bool EnemyScoreFound;
+
+        /// <summary>
+        /// なぜ終わったか。`hp_zero` / `cumulative_earned_points` / `max_rounds` / `unknown`。
+        /// **実際にいちばん多いのは `unknown`**（最低賭け金を払えなくなった決着がここに落ちる）。
+        /// </summary>
+        public string VictoryMethod = "";
+    }
 }

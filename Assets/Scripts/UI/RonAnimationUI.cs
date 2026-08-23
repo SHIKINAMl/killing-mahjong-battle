@@ -20,7 +20,7 @@ namespace KillingMahjong.UI
         [Tooltip("座標を丸めるグリッド幅(px)。大きいほど粗くレトロになる")]
         [SerializeField] private float pixelBloodGridSize = 6f;
         [Tooltip("従来のスプライト血しぶきも一緒に出すか")]
-        [SerializeField] private bool keepSpriteSplatter = true;
+        [SerializeField] private bool keepSpriteSplatter = false;
         [SerializeField] private TMP_FontAsset customFont;
 
         [Header("Player Ron Bubble (Pre-Animation)")]
@@ -136,7 +136,9 @@ namespace KillingMahjong.UI
             GameObject dimmer = new GameObject("Dimmer");
             dimmer.transform.SetParent(containerRt, false);
             Image dimmerImg = dimmer.AddComponent<Image>();
-            dimmerImg.color = new Color(0, 0, 0, 0.65f);
+            // **カットインの黒幕(α0.7)の直後にもう1枚重なるため、濃いと「暗転が明けない」感覚になる。**
+            // 盤面が透けるくらいに落として、対局が続いていることを見せる（2026-08-20 の演出削減バッチ1）。
+            dimmerImg.color = new Color(0, 0, 0, 0.35f);
             RectTransform dimmerRt = dimmer.GetComponent<RectTransform>();
             dimmerRt.anchorMin = Vector2.zero;
             dimmerRt.anchorMax = Vector2.one;
@@ -396,8 +398,12 @@ namespace KillingMahjong.UI
             yield return new WaitForSeconds(0.5f);
 
             // 【追加】勝者へのキラキラエフェクトと敗者へのダメージエフェクト（点数画面が消えた後に発生）
-            PlayWinnerSparkleEffect(isLocalPlayerWin);
-            PlayLoserDamageEffect(isLocalPlayerWin);
+            // **キラキラ星と赤フラッシュは止めた（2026-08-20 の演出削減バッチ1）。**
+            // 決着後は HPポップアップ・HPメーター・ゲージ吸い込みが同じ「勝敗」を既に伝えており、
+            // 星20個と半画面の赤点滅3回は情報を足さないまま画面を埋めていた。
+            // メソッド本体は残してあるので、戻すならこの2行のコメントを外すだけでよい。
+            // PlayWinnerSparkleEffect(isLocalPlayerWin);
+            // PlayLoserDamageEffect(isLocalPlayerWin);
 
             // 画面中央から勝者のHPゲージへパーティクルが吸い込まれる演出
             Transform winnerTransform = isLocalPlayerWin ? playerInfo?.transform : enemyInfo?.transform;

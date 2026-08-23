@@ -237,13 +237,17 @@ namespace KillingMahjong.Network
         }
 
         /// <summary>
-        /// game_end JSON の "final_scores" から自分と相手のスコアを抽出する。
-        /// 抽出に成功した場合 true を返す（切り出し元 ParseGameEnd のイベント発火条件と同一）。
+        /// game_end JSON を読む。**勝敗の判定に要るものはここで全部拾う**（2026-08-23 に追加）。
+        ///
+        /// 旧 TryParseFinalScores は「`"final_scores"` という文字列さえ在れば、中身を1件も
+        /// 解釈できなくても true」だった。そのため **ID が一致しないと両者 0 のまま
+        /// 「あなたの負け」が出る**（勝った側の画面にも敗北が出る、の正体のひとつ）。
+        /// ここでは「見つかったか」を別に返し、呼び出し側が気づけるようにする。
         /// </summary>
-        public static bool TryParseFinalScores(string jsonString, string localPlayerId, out int localScore, out int enemyScore)
+        public static bool TryParseGameEnd(string jsonString, string localPlayerId, out GameEndInfo info)
         {
-            localScore = 0;
-            enemyScore = 0;
+            info = new GameEndInfo();
+            info.VictoryMethod = ExtractStringField(jsonString, "victory_method");
 
             int scoresStart = jsonString.IndexOf("\"final_scores\"");
             if (scoresStart < 0) return false;
@@ -253,23 +257,52 @@ namespace KillingMahjong.Network
             if (dictStart < 0 || dictEnd <= dictStart) return false;
 
             string dictStr = jsonString.Substring(dictStart + 1, dictEnd - dictStart - 1);
-            string[] pairs = dictStr.Split(',');
-
-            foreach (var pair in pairs)
+            foreach (var pair in dictStr.Split(','))
             {
                 string[] kvp = pair.Split(':');
-                if (kvp.Length == 2)
+                if (kvp.Length != 2) continue;
+
+                string key = kvp[0].Replace("\"", "").Trim();
+                if (!int.TryParse(kvp[1].Trim(), out int score)) continue;
+
+                if (key == localPlayerId)
                 {
-                    string key = kvp[0].Replace("\"", "").Trim();
-                    string val = kvp[1].Trim();
-                    if (int.TryParse(val, out int score))
-                    {
-                        if (key == localPlayerId) localScore = score;
-                        else enemyScore = score;
-                    }
+                    info.LocalScore = score;
+                    info.LocalScoreFound = true;
+                }
+                else
+                {
+                    // 相手は 1 人しかいない前提。**自分の ID が空のときは他人扱いしない**
+                    // （空文字はどのキーとも一致しないので、両方が相手になってしまう）
+                    info.EnemyScore = score;
+                    info.EnemyScoreFound = true;
                 }
             }
+
             return true;
+        }
+
+        /// <summary>
+        /// トップレベルの文字列フィールドを1つ取り出す。見つからなければ空文字。
+        /// JsonUtility を通さない軽い抽出なので、ネストした同名キーがあると先に当たった方を拾う。
+        /// </summary>
+        private static string ExtractStringField(string jsonString, string fieldName)
+        {
+            if (string.IsNullOrEmpty(jsonString)) return "";
+
+            int keyIndex = jsonString.IndexOf("\"" + fieldName + "\"");
+            if (keyIndex < 0) return "";
+
+            int colon = jsonString.IndexOf(':', keyIndex);
+            if (colon < 0) return "";
+
+            int open = jsonString.IndexOf('"', colon);
+            if (open < 0) return "";
+
+            int close = jsonString.IndexOf('"', open + 1);
+            if (close <= open) return "";
+
+            return jsonString.Substring(open + 1, close - open - 1);
         }
 
         /// <summary>

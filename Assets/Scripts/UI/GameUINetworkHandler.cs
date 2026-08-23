@@ -174,6 +174,18 @@ namespace KillingMahjong.UI
             {
                 KillingMahjong.UI.LoadingManager.Instance.ForceHide();
             }
+
+            // **エラーで戻ってきたときは必ず操作ロックを解除する（2026-08-23）。**
+            //
+            // スキルは送信の直前に IsTransitioning を立てるが、倒すのは skill_casted だけだった。
+            // サーバーに弾かれると error しか返らないため、フラグが立ちっぱなしになり
+            // TileInteraction が全経路で早期 return して**盤面が二度と押せなくなる**
+            // （強襲の「1局1回」はサーバー側だけの制限で、クライアントに同じ制限が無いので
+            // 2発目を押すと確実に踏む）。
+            // 手牌選択・打牌側も送信前にロックを立てるので、同じ事故はスキル以外でも起きうる。
+            // 演出の途中で倒すことになっても、押せないまま固まるより軽い。
+            uiManager.SetIsTransitioning(false);
+
             if (uiManager.DialogueUI != null)
             {
                 uiManager.DialogueUI.ShowText($"エラー: {message}");
