@@ -163,9 +163,9 @@ namespace KillingMahjong.UI
             uiManager.PhaseController?.HandleDraw(drawData);
         }
 
-        private void HandleBettingComplete(int playerBet, int enemyBet, int playerHp, int enemyHp)
+        private void HandleBettingComplete(KillingMahjong.EngineData.BettingCompletedInfo info)
         {
-            uiManager.PhaseController?.OnBettingCompleteFromServer(playerBet, enemyBet, playerHp, enemyHp);
+            uiManager.PhaseController?.OnBettingCompleteFromServer(info);
         }
 
         private void HandleError(string message)

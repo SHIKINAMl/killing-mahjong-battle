@@ -218,31 +218,76 @@ namespace KillingMahjong.Managers
         }
 
         // --- BGM Filter Control ---
-        public void SetBgmFilter(bool isMuffled, float fadeDuration = 1.0f)
+        //
+        // 打牌フェイズだけ BGM のこもりを外して前に出す。
+        //
+        // **カットオフは Hz で直線に動かしてはいけない（2026-08-24）。**
+        // 1000→22000 を直線で 1.5 秒かけても、0.15 秒で 3100Hz、0.4 秒で 6600Hz まで開く。
+        // こもりが取れて聞こえるのはこのあたりまでなので、**残りの1秒は耳に何も起きない**。
+        // 結果、「いきなりクリアになった」という聞こえ方になる。
+        //
+        // 人の耳は周波数を対数（オクターブ）で聞くので、**log 空間で補間する**。
+        // 1000→22000 は約 4.5 オクターブで、これを均等に配れば端から端まで動き続けて聞こえる。
+
+        /// <summary>こもった状態のカットオフ。</summary>
+        private const float MuffledCutoff = 1000f;
+
+        /// <summary>開き切った状態。事実上フィルターオフ（48kHz のナイキストは 24000）。</summary>
+        private const float OpenCutoff = 22000f;
+
+        /// <summary>打牌フェイズに入るとき、こもりが取れるまでの秒数。</summary>
+        public const float FilterOpenDuration = 2.0f;
+
+        /// <summary>打牌フェイズを抜けるとき、こもるまでの秒数。</summary>
+        public const float FilterMuffleDuration = 1.5f;
+
+        public void SetBgmFilter(bool isMuffled, float fadeDuration = -1f)
         {
             if (bgmLowPassFilter == null) return;
-            if (filterFadeCoroutine != null) StopCoroutine(filterFadeCoroutine);
-            
-            float targetFreq = isMuffled ? 1000f : 22000f; // 22000fは事実上のフィルターオフ（全帯域）
+
+            float targetFreq = isMuffled ? MuffledCutoff : OpenCutoff;
+            if (fadeDuration < 0f) fadeDuration = isMuffled ? FilterMuffleDuration : FilterOpenDuration;
+
+            // 同じ行き先へ改めて頼まれただけなら、進行中のフェードを潰さない。
+            // 潰すと**フェードが毎回やり直しになって伸びる**（フェーズ変更で2か所から呼ばれていた）
+            if (filterFadeCoroutine != null)
+            {
+                if (Mathf.Approximately(_filterTargetFreq, targetFreq)) return;
+                StopCoroutine(filterFadeCoroutine);
+            }
+
             filterFadeCoroutine = StartCoroutine(FilterFadeRoutine(targetFreq, fadeDuration));
         }
 
+        /// <summary>いま向かっている先。同じ行き先の再依頼を無視するために持つ。</summary>
+        private float _filterTargetFreq = float.NaN;
+
         private System.Collections.IEnumerator FilterFadeRoutine(float targetFreq, float duration)
         {
-            float startFreq = bgmLowPassFilter.cutoffFrequency;
-            bgmLowPassFilter.enabled = true; // 確実にオンにする
-            float elapsed = 0f;
+            _filterTargetFreq = targetFreq;
 
+            float startFreq = Mathf.Max(bgmLowPassFilter.enabled ? bgmLowPassFilter.cutoffFrequency : OpenCutoff, 20f);
+            bgmLowPassFilter.enabled = true; // 確実にオンにする
+
+            float logStart = Mathf.Log(startFreq);
+            float logTarget = Mathf.Log(targetFreq);
+
+            float elapsed = 0f;
             while (elapsed < duration)
             {
                 elapsed += Time.deltaTime;
-                bgmLowPassFilter.cutoffFrequency = Mathf.Lerp(startFreq, targetFreq, elapsed / duration);
+                float t = Mathf.Clamp01(elapsed / duration);
+                // 端をなめらかにする。始まりと終わりの「動き出し・止まり」が耳に付きにくくなる
+                t = t * t * (3f - 2f * t);
+                bgmLowPassFilter.cutoffFrequency = Mathf.Exp(Mathf.Lerp(logStart, logTarget, t));
                 yield return null;
             }
 
             bgmLowPassFilter.cutoffFrequency = targetFreq;
+            filterFadeCoroutine = null;
+
             // 全帯域まで開いたらフィルター自体をオフにして負荷軽減＆音質劣化防止
-            if (targetFreq >= 22000f)
+            if (targetFreq >= OpenCutoff)
             {
                 bgmLowPassFilter.enabled = false;
             }

@@ -25,11 +25,9 @@ namespace KillingMahjong.UI
         [SerializeField] private Button closeButton; // The ▼ button
         [SerializeField] private Button activateButton; // The Activate button
         
-        [Header("Layout Settings")]
-        [SerializeField] private float itemOffsetX = 0f; 
-        [SerializeField] private float itemOffsetY = 0f; 
-        [SerializeField] private float itemHeight = 70f; // デフォルト100から縮小
-        [SerializeField] private float itemSpacing = 5f;
+        // 行の寸法（itemOffsetX / itemOffsetY / itemHeight / itemSpacing）は
+        // 2026-08-24 に削除。**巻物の紙の面を実測して求めた定数**（下の RowWidth ほか）に
+        // 一本化した。シーンの値はプレハブと食い違っていて、どちらが効いているか読めなかった。
 
         [Header("Tooltip Settings")]
         [SerializeField] private GameObject tooltipPanel;
@@ -97,7 +95,12 @@ namespace KillingMahjong.UI
             if (closeButton != null)
                 closeButton.onClick.AddListener(() => CloseWindow());
 
-            if (activateButton != null)
+            // **閉じるボタンと同じ物なら発動を繋がない。**
+            // 両シーンとも `activateButton` に `CloseButton` が入っていて、X を押すと
+            // `CloseWindow` → `DeselectAll` → `OnActivateClicked` の順に走っていた。
+            // 選択が消えたあとなので発動は空振りだが、繋がっていること自体が誤解のもと。
+            // 発動は「選んだ行をもう一度押す」（OnAbilitySelected）に一本化してある。
+            if (activateButton != null && activateButton != closeButton)
                 activateButton.onClick.AddListener(OnActivateClicked);
 
             if (abilityWindow != null)
@@ -106,6 +109,8 @@ namespace KillingMahjong.UI
             animationDuration = 0.2f; // 強制的に0.2秒にする
 
             EnsureAbilities();
+
+            StyleCloseButton();
 
             // Populate List
             PopulateList();
@@ -156,6 +161,32 @@ namespace KillingMahjong.UI
                 ? KillingMahjong.Managers.BoardStateManager.Instance.LocalPlayerSpecialVictoryCount
                 : 0;
 
+        // ---- パネルの内側の寸法（実測値。シーンではなくここを触る）----
+        //
+        // 枠の絵 `UI_Anim10` は 1010x1570 を 202x314 で表示している＝**1ドット＝2UI単位**。
+        // 絵の中で「紙の面」になっているのは元画像の x 140..939 / y 250..1459 で、
+        // UI 単位に直すと **160 x 242、中心は矩形の中心から (+7, -14)**。
+        // 行をこの内側に収める。はみ出すと巻物の枠に食い込む。
+
+        private const float PanelInnerWidth = 160f;
+        private const float PanelInnerHeight = 242f;
+        private static readonly Vector2 PanelInnerCenter = new Vector2(7f, -14f);
+
+        /// <summary>行の幅。内枠 160 の左右に 12 ずつ余白（6ドット）。</summary>
+        private const float RowWidth = 136f;
+
+        /// <summary>行の高さ。20ドット。名前の段＋コストの帯が収まる最小。</summary>
+        private const float RowHeight = 40f;
+
+        /// <summary>行と行の間。3ドット。</summary>
+        private const float RowSpacing = 6f;
+
+        /// <summary>内枠の上端から一覧までの余白。2ドット。</summary>
+        private const float ListTopMargin = 4f;
+
+        /// <summary>説明欄の高さ。4行の一覧を引いた残り。</summary>
+        private const float DescBoxHeight = 50f;
+
         private void PopulateList()
         {
             EnsureAbilities();
@@ -165,10 +196,16 @@ namespace KillingMahjong.UI
             foreach(Transform child in contentContainer) Destroy(child.gameObject);
             instantiatedItems.Clear();
 
+            // **選択は行と一緒に消える。** 行を作り直しているので、
+            // 参照を残すと破棄済みのオブジェクトを掴んだままになる
+            currentSelection = null;
+
+            LayoutContentContainer();
+
             int svCount = CurrentSpecialVictoryCount;
             int currentHp = CurrentLocalHp;
 
-            float currentY = itemOffsetY;
+            float currentY = 0f;
             for (int i = 0; i < realAbilities.Count; i++)
             {
                 var data = realAbilities[i];
@@ -178,52 +215,58 @@ namespace KillingMahjong.UI
                 var itemObj = Instantiate(itemPrefab, contentContainer);
                 itemObj.Setup(this, i, data.name, currentCost, data.description, affordable);
 
-                // Manual Layout
+                // 行の寸法と位置はここで決め切る。
+                //
+                // **プレハブの値は当てにしない。** 行の器は 138x40 なのに中の板は
+                // 120x45 で、縦が 2.5 ずつはみ出して `RectMask2D` に切られていた。
+                // 器そのものを板として使い、子は器いっぱいに張る（AbilityItemUI.BuildTile）。
                 RectTransform rt = itemObj.GetComponent<RectTransform>();
                 if (rt != null)
                 {
-                    // はみ出した子要素（巨大な背景やテキスト枠など）が他のボタンのクリック判定を奪うのを防ぐため、
-                    // RectMask2Dを追加して、指定サイズ（itemHeight）外の描画とクリック判定を完全にカットします。
+                    // 行からはみ出した子が隣の行のクリック判定を奪うのを防ぐ
                     if (itemObj.GetComponent<RectMask2D>() == null)
                     {
                         itemObj.gameObject.AddComponent<RectMask2D>();
                     }
 
-                    // Force Top-Stretch Layout horizontally
                     rt.localRotation = Quaternion.identity;
                     rt.localScale = Vector3.one;
 
-                    // Set Anchors to Top-Stretch
-                    rt.anchorMin = new Vector2(0, 1);
-                    rt.anchorMax = new Vector2(1, 1);
-                    
-                    // 以前は pivot を (0.5, 1) に強制変更していましたが、
-                    // これによりPrefab内の子要素（背景など）がズレてはみ出し、クリック判定が重なる原因になっていました。
-                    // pivot はPrefabの設定をそのまま維持し、位置計算で補正します。
-
-                    // Set SizeDelta (X=0 means stretch to fill width, Y=Height)
-                    rt.sizeDelta = new Vector2(0, itemHeight);
-
-                    // Set Position based on the existing pivot
-                    float posY = -currentY - (1f - rt.pivot.y) * itemHeight;
-                    rt.anchoredPosition3D = new Vector3(itemOffsetX, posY, 0);
-
-                    currentY += itemHeight + itemSpacing;
-                }
-                else
-                {
-                    currentY += itemHeight + itemSpacing;
+                    // 上端そろえ。pivot も固定する（プレハブ任せにすると
+                    // 位置の式が pivot に依存して読めなくなる）
+                    rt.anchorMin = new Vector2(0.5f, 1f);
+                    rt.anchorMax = new Vector2(0.5f, 1f);
+                    rt.pivot = new Vector2(0.5f, 1f);
+                    rt.sizeDelta = new Vector2(RowWidth, RowHeight);
+                    rt.anchoredPosition3D = new Vector3(0f, -currentY, 0f);
                 }
 
+                currentY += RowHeight + RowSpacing;
                 instantiatedItems.Add(itemObj);
             }
+        }
 
-            // Resize Container
-            RectTransform contentRect = contentContainer.GetComponent<RectTransform>();
-            if (contentRect != null)
-            {
-                 contentRect.sizeDelta = new Vector2(contentRect.sizeDelta.x, currentY);
-            }
+        /// <summary>
+        /// 一覧の器を、巻物の紙の面（内枠）の上側へ合わせる。
+        ///
+        /// シーンの値は 138x186 @(6.5,112) で、幅が内枠より 22 狭く、
+        /// 上端が内枠より 4 だけ外に出ていた。両シーンあるのでコードから当てる。
+        /// </summary>
+        private void LayoutContentContainer()
+        {
+            var rect = contentContainer as RectTransform;
+            if (rect == null) return;
+
+            float listHeight = PanelInnerHeight - DescBoxHeight - ListTopMargin;
+
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.sizeDelta = new Vector2(PanelInnerWidth, listHeight);
+            rect.anchoredPosition = new Vector2(
+                PanelInnerCenter.x,
+                PanelInnerCenter.y + PanelInnerHeight * 0.5f - ListTopMargin);
+            rect.localScale = Vector3.one;
         }
 
         private void OnTriggerClicked()
@@ -286,12 +329,7 @@ namespace KillingMahjong.UI
             if (isWindowVisible)
             {
                 PopulateList();
-
-                // ウィンドウが開いた瞬間に説明文のスクロール位置を中央にリセットする
-                foreach (var item in instantiatedItems)
-                {
-                    item.ResetScrollPosition();
-                }
+                HideTooltip();
             }
             else
             {
@@ -334,6 +372,12 @@ namespace KillingMahjong.UI
                 if (currentSelection != null) currentSelection.Deselect();
                 currentSelection = item;
                 currentSelection.Select();
+
+                // **選んだら説明を出したままにする。**
+                // 説明欄はホバーで出し引きしているので、これが無いと
+                // 選んだ直後にカーソルを外しただけで、いま何を選んでいるのかの
+                // 説明が読めなくなる（説明文を行から追い出したぶんの穴）
+                ShowTooltip(currentSelection.Description);
             }
         }
 
@@ -344,6 +388,7 @@ namespace KillingMahjong.UI
                 currentSelection.Deselect();
                 currentSelection = null;
             }
+            HideTooltip();
         }
 
         private void OnActivateClicked()
@@ -515,14 +560,22 @@ namespace KillingMahjong.UI
 
         private void SetContentsVisible(bool visible)
         {
+            // 説明欄は一覧と一緒に出し入れする
+            var box = abilityWindow != null ? abilityWindow.Find(DescBoxName) : null;
+            if (box != null && box.gameObject.activeSelf != visible) box.gameObject.SetActive(visible);
+
             if (contentsShownWhenOpen == null) return;
             for (int i = 0; i < contentsShownWhenOpen.Length; i++)
             {
-                if (contentsShownWhenOpen[i] != null &&
-                    contentsShownWhenOpen[i].activeSelf != visible)
-                {
-                    contentsShownWhenOpen[i].SetActive(visible);
-                }
+                var go = contentsShownWhenOpen[i];
+                if (go == null) continue;
+
+                // **旧ツールチップはここで出さない。**
+                // シーンの `contentsShownWhenOpen` に `TooltipPanel` が入っているため、
+                // 巻物が開き切るたびにダミー文字列の箱が盤面の上に出ていた（2026-08-24 に判明）。
+                if (tooltipPanel != null && go == tooltipPanel) continue;
+
+                if (go.activeSelf != visible) go.SetActive(visible);
             }
         }
 
@@ -531,38 +584,196 @@ namespace KillingMahjong.UI
             Debug.Log("Ability Triggered: Opponent's Ready State Cancelled!");
         }
 
+        // ==================== 説明欄 ====================
+        //
+        // **浮いていたツールチップは使わない。**
+        // シーンの `TooltipPanel` は 150x100 をメニューの右 176 に置いた固定の箱で、
+        // 盤面の上に単独で浮いていた。しかも `contentsShownWhenOpen` に入っているので
+        // **開くたびに勝手に出て**、中身は編集時のダミー文字列 "aaaa…" のままだった。
+        //
+        // 代わりに、巻物の紙の面の下側に説明欄を作って全文をそこへ出す。
+        // 行の中を流れていたマーキーも、この欄があるので要らなくなった。
+
+        private const string DescBoxName = "AbilityDescriptionBox";
+        private const string DescFillName = "AbilityDescriptionFill";
+        private const string DescTextName = "AbilityDescriptionText";
+
+        /// <summary>説明欄の面。行のタイルと同じ暗い紺。</summary>
+        private static readonly Color DescBoxColor = new Color32(0x1B, 0x23, 0x38, 0xE6);
+
+        /// <summary>説明欄の縁。**行と同じ色にする。**
+        /// 4行が縁を持つと、縁の有無が「一覧の仲間かどうか」の合図になる。
+        /// 説明欄だけ縁が無いと、別の透明なパネルが割り込んで見える。</summary>
+        private static readonly Color DescBorderColor = new Color32(0x35, 0x42, 0x70, 0xFF);
+
+        /// <summary>縁の太さ。行のタイルと同じ1ドット。</summary>
+        private const float DescBorder = 2f;
+
+        /// <summary>閉じるボタンの縁。他の赤（コスト・HPバッジ）と同じ赤に揃える。</summary>
+        private static readonly Color CloseBorderColor = new Color32(0xFF, 0x59, 0x59, 0xFF);
+
+        private TMPro.TextMeshProUGUI _descText;
+
+        /// <summary>何も選んでいないときの案内。空欄にすると欄が壊れて見える。</summary>
+        private const string DescPlaceholder = "能力にカーソルを合わせると説明が出ます";
+
+        /// <summary>説明欄を用意する。**シーンには置かない**（対局シーンが2つあるため）。</summary>
+        private TMPro.TextMeshProUGUI EnsureDescriptionBox()
+        {
+            if (_descText != null) return _descText;
+            if (abilityWindow == null) return null;
+
+            var boxTr = abilityWindow.Find(DescBoxName) as RectTransform;
+            if (boxTr == null)
+            {
+                var go = new GameObject(DescBoxName, typeof(RectTransform), typeof(Image));
+                boxTr = (RectTransform)go.transform;
+                boxTr.SetParent(abilityWindow, false);
+            }
+
+            // 縁は箱そのものの地の色。内側に面を1枚敷く（行のタイルと同じ作り）
+            var boxImg = boxTr.GetComponent<Image>();
+            boxImg.sprite = null;
+            boxImg.color = DescBorderColor;
+            boxImg.raycastTarget = false;
+
+            var fillTr = boxTr.Find(DescFillName) as RectTransform;
+            if (fillTr == null)
+            {
+                var fillGo = new GameObject(DescFillName, typeof(RectTransform), typeof(Image));
+                fillTr = (RectTransform)fillGo.transform;
+                fillTr.SetParent(boxTr, false);
+            }
+            var fillImg = fillTr.GetComponent<Image>();
+            fillImg.sprite = null;
+            fillImg.color = DescBoxColor;
+            fillImg.raycastTarget = false;
+            fillTr.anchorMin = Vector2.zero;
+            fillTr.anchorMax = Vector2.one;
+            fillTr.offsetMin = new Vector2(DescBorder, DescBorder);
+            fillTr.offsetMax = new Vector2(-DescBorder, -DescBorder);
+            fillTr.localScale = Vector3.one;
+            fillTr.SetAsFirstSibling();
+
+            boxTr.anchorMin = new Vector2(0.5f, 0.5f);
+            boxTr.anchorMax = new Vector2(0.5f, 0.5f);
+            boxTr.pivot = new Vector2(0.5f, 0f);
+            boxTr.sizeDelta = new Vector2(RowWidth, DescBoxHeight);
+            boxTr.anchoredPosition = new Vector2(
+                PanelInnerCenter.x,
+                PanelInnerCenter.y - PanelInnerHeight * 0.5f + ListTopMargin);
+            boxTr.localScale = Vector3.one;
+
+            var textTr = boxTr.Find(DescTextName) as RectTransform;
+            TMPro.TextMeshProUGUI text;
+            if (textTr == null)
+            {
+                var go = new GameObject(DescTextName, typeof(RectTransform));
+                textTr = (RectTransform)go.transform;
+                textTr.SetParent(boxTr, false);
+                text = go.AddComponent<TMPro.TextMeshProUGUI>();
+                if (tooltipText != null && tooltipText.font != null) text.font = tooltipText.font;
+            }
+            else
+            {
+                text = textTr.GetComponent<TMPro.TextMeshProUGUI>();
+            }
+
+            textTr.anchorMin = Vector2.zero;
+            textTr.anchorMax = Vector2.one;
+            textTr.offsetMin = new Vector2(4f, 3f);
+            textTr.offsetMax = new Vector2(-4f, -3f);
+            textTr.localScale = Vector3.one;
+
+            // **折り返して全文を出す。** 46文字の「強襲」が最長で、
+            // 128 幅・44 高に 9px で 4 行なら収まる。収まらない分は自動で縮む。
+            //
+            // **`Overflow` にしないこと。** 自動縮小の下限(7px)でも入らない文言を
+            // 足したとき、はみ出した行が巻物の枠を突き抜けて盤面に出てしまう。
+            // `Truncate` なら最悪でも欄の中で切れて止まる。
+            text.margin = Vector4.zero;
+            text.color = Color.white;
+            text.alignment = TMPro.TextAlignmentOptions.TopLeft;
+            text.textWrappingMode = TMPro.TextWrappingModes.Normal;
+            text.overflowMode = TMPro.TextOverflowModes.Truncate;
+            text.enableAutoSizing = true;
+            text.fontSizeMax = 10f;
+            text.fontSizeMin = 7f;
+            text.raycastTarget = false;
+
+            _descText = text;
+            return _descText;
+        }
+
+        /// <summary>
+        /// 説明欄に全文を出す。名前はホバーの経路（`AbilityItemUI`）に合わせて残している。
+        /// </summary>
         public void ShowTooltip(string description)
         {
-            if (tooltipPanel != null && tooltipText != null)
+            HideLegacyTooltip();
+
+            var text = EnsureDescriptionBox();
+            if (text == null) return;
+            text.text = string.IsNullOrEmpty(description) ? DescPlaceholder : description;
+
+            // AbilityUI 全体を最前面化する。中身の表示順が壊れないようルート(this)のみ設定する
+            Canvas rootCanvas = this.GetComponent<Canvas>();
+            if (rootCanvas == null)
             {
-                tooltipText.text = description;
-                
-                // tooltipPanel自身にCanvasが無ければ追加
-                Canvas tooltipCanvas = tooltipPanel.GetComponent<Canvas>();
-                if (tooltipCanvas == null)
-                {
-                    tooltipCanvas = tooltipPanel.AddComponent<Canvas>();
-                    tooltipPanel.AddComponent<UnityEngine.UI.GraphicRaycaster>();
-                }
-                tooltipCanvas.overrideSorting = true;
-                tooltipCanvas.sortingOrder = _transitionSuppressed ? UISortingOrders.AbilityDuringTransition : UISortingOrders.AbilityTooltip;
-
-                // AbilityUI全体を最前面化するが、中身の表示順が壊れないようにルート(this)のみ設定する
-                Canvas rootCanvas = this.GetComponent<Canvas>();
-                if (rootCanvas == null)
-                {
-                    rootCanvas = this.gameObject.AddComponent<Canvas>();
-                    this.gameObject.AddComponent<UnityEngine.UI.GraphicRaycaster>();
-                }
-                rootCanvas.overrideSorting = true;
-                rootCanvas.sortingOrder = _transitionSuppressed ? UISortingOrders.AbilityDuringTransition : UISortingOrders.InfoPanelHighlight;
-                
-                // Z座標は0
-                Vector3 localPos = tooltipPanel.transform.localPosition;
-                tooltipPanel.transform.localPosition = new Vector3(localPos.x, localPos.y, 0f);
-
-                tooltipPanel.SetActive(true);
+                rootCanvas = this.gameObject.AddComponent<Canvas>();
+                this.gameObject.AddComponent<UnityEngine.UI.GraphicRaycaster>();
             }
+            rootCanvas.overrideSorting = true;
+            rootCanvas.sortingOrder = _transitionSuppressed ? UISortingOrders.AbilityDuringTransition : UISortingOrders.InfoPanelHighlight;
+        }
+
+        /// <summary>
+        /// シーンに残っている旧ツールチップを畳む。**出番はもう無い。**
+        ///
+        /// 中身も空にしておく。シーンには編集時のダミー文字列（`aaaa…`）が
+        /// 入ったままで、**別の経路がうっかりこのパネルを出すと同じ事故が再発する**。
+        /// </summary>
+        private void HideLegacyTooltip()
+        {
+            if (tooltipText != null && !string.IsNullOrEmpty(tooltipText.text)) tooltipText.text = "";
+            if (tooltipPanel != null && tooltipPanel.activeSelf) tooltipPanel.SetActive(false);
+        }
+
+        private const string CloseFillName = "CloseButtonFill";
+
+        /// <summary>
+        /// 閉じるボタンを行のタイルと同じ2層（縁＋面）に揃える。
+        ///
+        /// 単色のベタ赤 22x22 のままだと、右上のHPの赤いバッジと**同じ形・同じ意味**に見える。
+        /// 内側に紺の面を覗かせて「メニューの部品」であることを出す。
+        /// </summary>
+        private void StyleCloseButton()
+        {
+            if (closeButton == null) return;
+            var img = closeButton.GetComponent<Image>();
+            if (img == null) return;
+
+            img.sprite = null;
+            img.color = CloseBorderColor;
+
+            var rt = img.rectTransform;
+            var fillTr = rt.Find(CloseFillName) as RectTransform;
+            if (fillTr == null)
+            {
+                var go = new GameObject(CloseFillName, typeof(RectTransform), typeof(Image));
+                fillTr = (RectTransform)go.transform;
+                fillTr.SetParent(rt, false);
+            }
+            var fill = fillTr.GetComponent<Image>();
+            fill.sprite = null;
+            fill.color = DescBoxColor;
+            fill.raycastTarget = false;
+            fillTr.anchorMin = Vector2.zero;
+            fillTr.anchorMax = Vector2.one;
+            fillTr.offsetMin = new Vector2(DescBorder, DescBorder);
+            fillTr.offsetMax = new Vector2(-DescBorder, -DescBorder);
+            fillTr.localScale = Vector3.one;
+            fillTr.SetAsFirstSibling();
         }
 
         // ---- フェーズ演出中の退避 ----
@@ -588,24 +799,30 @@ namespace KillingMahjong.UI
                     : (isWindowVisible ? UISortingOrders.InfoPanelHighlight : UISortingOrders.InfoPanelNormal);
             }
 
-            if (tooltipPanel != null)
-            {
-                var tipCanvas = tooltipPanel.GetComponent<Canvas>();
-                if (tipCanvas != null)
-                {
-                    tipCanvas.sortingOrder = suppressed
-                        ? UISortingOrders.AbilityDuringTransition
-                        : UISortingOrders.AbilityTooltip;
-                }
-            }
+            // 旧ツールチップ用の Canvas 退避はここにあったが、2026-08-24 に削除。
+            // 説明欄はパネルの中に入ったので、ルートの sortingOrder だけで前後が決まる。
         }
 
+        /// <summary>
+        /// 説明欄を案内文に戻す。**欄そのものは消さない。**
+        /// カーソルを外すたびに欄が消えると、一覧の下でパネルがちらつく。
+        ///
+        /// **選んでいる行があるときは、その説明に戻す。**
+        /// ホバーより選択を優先しないと、選んだ能力の説明がカーソルを外した
+        /// 瞬間に読めなくなる。
+        /// </summary>
         public void HideTooltip()
         {
-            if (tooltipPanel != null)
+            HideLegacyTooltip();
+
+            var text = EnsureDescriptionBox();
+            if (text != null)
             {
-                tooltipPanel.SetActive(false);
+                text.text = currentSelection != null && !string.IsNullOrEmpty(currentSelection.Description)
+                    ? currentSelection.Description
+                    : DescPlaceholder;
             }
+
             Canvas rootCanvas = this.GetComponent<Canvas>();
             if (rootCanvas != null)
             {

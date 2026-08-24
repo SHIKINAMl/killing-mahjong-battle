@@ -33,29 +33,61 @@ namespace KillingMahjong.Network.Handlers
             var board = Managers.BoardStateManager.Instance;
 
             int pBet = 0; int eBet = 0;
+            int pServerHp = 0; int eServerHp = 0;
             foreach (var b in bMsg.data.bets)
             {
-                if (b.client_id == network.LocalPlayerId) pBet = b.bet;
-                else eBet = b.bet;
+                if (b.client_id == network.LocalPlayerId) { pBet = b.bet; pServerHp = b.health; }
+                else                                     { eBet = b.bet; eServerHp = b.health; }
             }
-            int currentLocalHp = board.LocalPlayerHp;
-            int currentEnemyHp = board.EnemyPlayerHp;
 
-            // **クライアントでは血を引かない（2026-08-04 決定）。**
-            // 血はサーバーが送ってきた値だけで動かす。詳細は BoardStateManager.UseServerHealth。
-            //
-            // サーバーは今のところベットで health を減らさないので、賭けても血は動かない。
-            // それを隠さずそのまま出す、というのが今の方針（SERVER_REQUESTS の A-8 で依頼中）。
-            if (!Managers.BoardStateManager.UseServerHealth)
+            var info = new BettingCompletedInfo
             {
-                board.UpdateHp(currentLocalHp - pBet, currentEnemyHp - eBet);
+                LocalBet = pBet,
+                EnemyBet = eBet,
+                LocalHpBefore = board.LocalPlayerHp,
+                EnemyHpBefore = board.EnemyPlayerHp,
+            };
+
+            // **血はサーバーが送ってきた値だけで動かす（2026-08-04 決定）。**
+            // クライアントで賭け金を引き算して辻褄を合わせると、サーバー側の誤りが
+            // 画面に出なくなる。詳細は BoardStateManager.UseServerHealth。
+            //
+            // サーバーはベットの時点で引いて（`game_engine.py: place_bet`）、
+            // 引いた後の値を送ってきている（`game_session.py: on_bet` の `bets[].health`）。
+            // **2026-08-24 まで `PlayerBetData` に health が無く、JsonUtility が捨てていた。**
+            //
+            // 両方 0 は「入っていない」の意味に取る（`StatusMessageHandler` と同じ約束）。
+            // 素直に信じると、送ってこない相手と喋ったときに血が 0 へ飛ぶ。
+            info.HasServerHealth = pServerHp > 0 || eServerHp > 0;
+
+            if (info.HasServerHealth)
+            {
+                info.LocalHpAfter = pServerHp;
+                info.EnemyHpAfter = eServerHp;
+            }
+            else if (Managers.BoardStateManager.UseServerHealth)
+            {
+                // 届かなかったときは動かさない。下の status の返事で追いつく
+                info.LocalHpAfter = info.LocalHpBefore;
+                info.EnemyHpAfter = info.EnemyHpBefore;
+            }
+            else
+            {
+                info.LocalHpAfter = info.LocalHpBefore - pBet;
+                info.EnemyHpAfter = info.EnemyHpBefore - eBet;
             }
 
-            network.RaiseBettingComplete(pBet, eBet, currentLocalHp, currentEnemyHp);
+            // 盤面のHPは先に合わせておく。**演出には Before / After の両方を渡す**ので、
+            // ここで動かしても「減る様子」は失われない
+            if (info.HasServerHealth || !Managers.BoardStateManager.UseServerHealth)
+            {
+                board.UpdateHp(info.LocalHpAfter, info.EnemyHpAfter);
+            }
 
-            // サーバー値を使うなら、決済後の血を取り寄せる。
-            // bet_completed 自体には health が入っていないため（SERVER_REQUESTS の A-8 で依頼済み）
-            if (Managers.BoardStateManager.UseServerHealth)
+            network.RaiseBettingComplete(info);
+
+            // health が届かなかったときだけ、決済後の血を取り寄せる
+            if (Managers.BoardStateManager.UseServerHealth && !info.HasServerHealth)
             {
                 network.SendActionToServer("status", null);
             }

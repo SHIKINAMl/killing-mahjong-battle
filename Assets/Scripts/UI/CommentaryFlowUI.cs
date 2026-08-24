@@ -329,9 +329,9 @@ namespace KillingMahjong.UI
             SpawnComment(RandomPick(DrawComments), normalColor, 1.2f);
         }
 
-        private void OnBettingComplete(int playerBet, int enemyBet, int playerHp, int enemyHp)
+        private void OnBettingComplete(KillingMahjong.EngineData.BettingCompletedInfo info)
         {
-            SpawnComment($"賭け金決定！ {playerBet} vs {enemyBet}", excitedColor);
+            SpawnComment($"賭け金決定！ {info.LocalBet} vs {info.EnemyBet}", excitedColor);
         }
 
         private void OnHandSelectionAccepted()

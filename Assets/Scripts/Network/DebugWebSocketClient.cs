@@ -301,10 +301,12 @@ namespace KillingMahjong.Network
             localPlayerHp -= lastLocalBet;
             enemyPlayerHp -= lastEnemyBet;
 
-            // bet_completed ブロードキャスト
+            // bet_completed ブロードキャスト。
+            // **health も入れる**（本物の `game_session.py: on_bet` が入れているため）。
+            // 抜くとベット演出のHPが動かず、本番と挙動が変わる
             string json = $"{{\"type\":\"bet_completed\",\"data\":{{\"bets\":[" +
-                          $"{{\"client_id\":\"{localPlayerId}\",\"bet\":{lastLocalBet}}}," +
-                          $"{{\"client_id\":\"{enemyPlayerId}\",\"bet\":{lastEnemyBet}}}" +
+                          $"{{\"client_id\":\"{localPlayerId}\",\"bet\":{lastLocalBet},\"health\":{localPlayerHp}}}," +
+                          $"{{\"client_id\":\"{enemyPlayerId}\",\"bet\":{lastEnemyBet},\"health\":{enemyPlayerHp}}}" +
                           $"]}}}}";
             SendRawJson(json);
             Debug.Log($"[Debug Client] bet_completed 送信: local={lastLocalBet}, enemy={lastEnemyBet}");

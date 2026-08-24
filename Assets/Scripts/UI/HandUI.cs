@@ -478,8 +478,17 @@ namespace KillingMahjong.UI
             if (!ShowPhaseGuide) return;
 
             bool tutorial = gameUIManager != null && gameUIManager.IsTutorialMode;
+
+            // **「山牌から1枚切る」は自分の手番だけ。**
+            // 打牌フェイズは相手の番でも続いているので、条件を phaseStatus だけにすると
+            // 自分では何もできない間ずっと「切れ」と言い続けることになる。
+            // 手牌選択は**両者が同時に選ぶ**ので手番の概念が無く、ここでは見ない。
+            bool localTurn = Managers.BoardStateManager.Instance != null &&
+                             Managers.BoardStateManager.Instance.IsLocalTurn;
+
             bool wanted = !tutorial &&
-                (phaseStatus == RoundStatus.HandSelection || phaseStatus == RoundStatus.Discard);
+                (phaseStatus == RoundStatus.HandSelection ||
+                 (phaseStatus == RoundStatus.Discard && localTurn));
 
             if (!wanted)
             {

@@ -240,6 +240,9 @@ namespace KillingMahjong.UI
                 TileVisual visual = obj.GetComponent<TileVisual>();
                 if (visual != null && tileResourceManager != null)
                 {
+                    // 待ち牌は枠に収めるため隙間を詰めて（時には重ねて）並べるので、
+                    // 影が隣の牌の上に落ちて牌そのものが汚れて見える。ここだけ影を切る。
+                    visual.SetShadowEnabled(false);
                     visual.SetTile(id, tileResourceManager.GetTileSprite(id));
                     visual.SetExposed(false);
                     visual.SetFuritenHighlight(false);

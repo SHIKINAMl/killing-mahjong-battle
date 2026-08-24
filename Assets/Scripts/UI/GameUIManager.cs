@@ -203,6 +203,11 @@ namespace KillingMahjong.UI
                 agariSelectionUI.Hide();
             }
 
+            // 2つの河を同じ中心線に乗せる。**シーンではなくここから当てる**
+            // （対局シーンが2つあり、河も自分・相手で2つずつあるため）。
+            // 詳しくは RiverUI.AlignToOpponentRiver のコメント。
+            if (enemyRiverUI != null && riverUI != null) enemyRiverUI.AlignToOpponentRiver(riverUI);
+
             if (PhaseController != null) PhaseController.SetMatchUIVisibility(false);
             if (riverUI != null) riverUI.gameObject.SetActive(false);
             if (enemyRiverUI != null) enemyRiverUI.gameObject.SetActive(false);
@@ -390,11 +395,13 @@ namespace KillingMahjong.UI
             currentPhaseStatus = status;
             UpdateTurnIndicatorVisibility();
             
-            // 通常対局時、打牌フェイズ以外はBGMをくぐもらせる（ローパス）
+            // 通常対局時、打牌フェイズ以外はBGMをくぐもらせる（ローパス）。
+            // 開くとき・こもるときの秒数は AudioManager 側の既定に任せる
+            // （開く 2.0 秒 / こもる 1.5 秒。log 補間なので端から端まで動いて聞こえる）
             if (!IsTutorialMode && KillingMahjong.Managers.AudioManager.Instance != null)
             {
                 bool isMuffled = (status != RoundStatus.Discard);
-                KillingMahjong.Managers.AudioManager.Instance.SetBgmFilter(isMuffled, 1.5f);
+                KillingMahjong.Managers.AudioManager.Instance.SetBgmFilter(isMuffled);
             }
         }
 

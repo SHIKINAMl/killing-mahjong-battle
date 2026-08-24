@@ -156,6 +156,8 @@ namespace KillingMahjong.UI
 
         private void Awake()
         {
+            ApplyHpLayer();
+
             if (characterData != null)
             {
                 ApplyCharacterData(characterData);
@@ -165,6 +167,22 @@ namespace KillingMahjong.UI
                 normalSprite = characterRenderer.sprite;
                 if (faceRenderer != null) normalFaceSprite = faceRenderer.sprite;
             }
+        }
+
+        /// <summary>
+        /// 敵HP（点滴の血袋）を盤面の牌より奥へ回す。
+        ///
+        /// 血袋から下に伸びるチューブが敵の牌に重なるので、牌の裏へ落とす。
+        /// **シーンではなくここで当てる。** 対局シーンが2つ（`OpeningScene` /
+        /// `UIテストシーン`）あるので、シーンを直すと片方だけ直す事故が起きる。
+        /// 値の根拠は <see cref="Common.UISortingOrders.EnemyHpMeter"/> のコメント。
+        /// </summary>
+        private void ApplyHpLayer()
+        {
+            var canvas = GetComponent<Canvas>();
+            if (canvas == null) return;
+
+            canvas.sortingOrder = Common.UISortingOrders.EnemyHpMeter;
         }
 
         private void Start()

@@ -142,7 +142,7 @@ namespace KillingMahjong.Network
         public event Action<MatchingWaitingData> OnMatchmakingWaiting;
         public event Action<string> OnMatchCancelled;
         public event Action OnGameStarted;
-        public event Action<int, int, int, int> OnBettingComplete;
+        public event Action<BettingCompletedInfo> OnBettingComplete; // ベット結果（賭け金・賭ける前後の血）
         public event Action<RoundStatus> OnPhaseStatusChanged;
         public event Action<int, bool> OnTileDiscarded; // tileId, isLocalPlayer
         public event Action<bool> OnAgari; // isLocalWin
@@ -184,7 +184,7 @@ namespace KillingMahjong.Network
         internal void RaiseMatchmakingWaiting(MatchingWaitingData data) => OnMatchmakingWaiting?.Invoke(data);
         internal void RaiseMatchCancelled(string reason) => OnMatchCancelled?.Invoke(reason);
         internal void RaiseGameStarted() => OnGameStarted?.Invoke();
-        internal void RaiseBettingComplete(int playerBet, int enemyBet, int playerHp, int enemyHp) => OnBettingComplete?.Invoke(playerBet, enemyBet, playerHp, enemyHp);
+        internal void RaiseBettingComplete(BettingCompletedInfo info) => OnBettingComplete?.Invoke(info);
         internal void RaisePhaseStatusChanged(RoundStatus status) => OnPhaseStatusChanged?.Invoke(status);
         internal void RaiseTileDiscarded(int tileId, bool isLocalPlayer) => OnTileDiscarded?.Invoke(tileId, isLocalPlayer);
         internal void RaiseAgari(bool isLocalWin) => OnAgari?.Invoke(isLocalWin);

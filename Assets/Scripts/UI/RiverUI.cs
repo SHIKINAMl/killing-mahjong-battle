@@ -35,6 +35,94 @@ namespace KillingMahjong.UI
 
         private List<Transform> discardedTiles = new List<Transform>();
 
+        // ---- 2つの河を同じ中心線に乗せる（2026-08-24）----
+        //
+        // 同じ11枚でも、敵 x332..511（幅179）／自分 x339..543（幅204）と揃っていなかった。
+        // 送り幅 `tileWidth` が **敵18 / 自分21** で 14% 違うのが原因で、牌の絵の大きさは
+        // 35.1 と 36.0 でほとんど同じ。つまり遠近感ではなく、敵側だけ詰まって並んでいた。
+        //
+        // **幅の差はそのまま残す**（奥の河が少し短いのは卓の遠近に合う）。
+        // 揃えるのは**中心線と、縦の重なり**の2つだけ。
+        //
+        // 縦は 敵141..190 / 自分97..148 で **7px 重なっていた**（敵の河は上へ、
+        // 自分の河は下へ伸びるので、境目でぶつかる）。同じ 7px を隙間にして離す。
+
+        /// <summary>敵の河と自分の河のあいだに空ける隙間。</summary>
+        private const float RiverGapY = 7f;
+
+        /// <summary>
+        /// 敵の河を自分の河と同じ中心線に乗せ、縦の重なりを隙間に変える。
+        ///
+        /// **シーンの `enemyOffsetX` / `enemyOffsetY` を直値で書き換えない。**
+        /// 対局シーンが2つあるうえ、片方だけ直すと次に牌の大きさを変えたときに
+        /// また食い違う。自分の河の実寸から毎回計算する。
+        ///
+        /// `GameUIManager` の初期化から1回だけ呼ぶ。
+        /// </summary>
+        public void AlignToOpponentRiver(RiverUI localRiver)
+        {
+            if (!isEnemyRiver || localRiver == null) return;
+            if (riverContainer == null || localRiver.riverContainer == null) return;
+
+            var selfRect = riverContainer as RectTransform;
+            var otherRect = localRiver.riverContainer as RectTransform;
+            if (selfRect == null || otherRect == null) return;
+
+            float selfTileW = TileVisualWidth();
+            float otherTileW = localRiver.TileVisualWidth();
+
+            // 牌のピボットは左上なので、1行はどちらも「先頭の位置」から右へ伸びる。
+            // 自分: [left, left + 8*tileWidth + 牌幅]
+            // 敵  : [left + offsetX - 8*tileWidth, left + offsetX + 牌幅]
+            float otherLeft = otherRect.anchoredPosition.x - otherRect.rect.width * otherRect.pivot.x;
+            float otherCenter = otherLeft + (RowSpan(localRiver.tileWidth, otherTileW)) * 0.5f;
+
+            float selfLeft = selfRect.anchoredPosition.x - selfRect.rect.width * selfRect.pivot.x;
+            enemyOffsetX = otherCenter - selfLeft + (8f * tileWidth - selfTileW) * 0.5f;
+
+            // **縦は動かさない。**
+            //
+            // 一度、自分の河との重なり(7px)を隙間に変えようとして敵の河を13px上げたが、
+            // **敵の手牌に8px食い込んだ**（2026-08-24 に実測して差し戻し）。盤面の縦はこう詰まっている:
+            //
+            //   自分の山牌 y 10..128 ／ 自分の河 97..148 ／ 敵の河 141..190 ／ 敵の手牌 195..235
+            //
+            // 自分の河の上端(148)から敵の手牌の下端(195)までは **47px しかなく、敵の河は48px**。
+            // どこかと必ず重なるので、**重なる相手を選ぶ**しかない。牌が伏せてある敵の手牌より、
+            // 同じ河同士で少し重なる方が読み違えが少ないため、縦はシーンの値のまま置く。
+            //
+            // 直すなら河ではなく、自分の山牌・河・敵の手牌の縦位置を引き直す話になる。
+
+            // すでに並んでいる牌にも当て直す（局の途中で呼ばれても崩れないように）
+            for (int i = 0; i < discardedTiles.Count; i++)
+            {
+                var rt = discardedTiles[i] as RectTransform;
+                if (rt != null) ApplyRiverLayoutAt(rt, i);
+            }
+        }
+
+        /// <summary>1行（MaxPerRow 枚）が占める横幅。</summary>
+        private static float RowSpan(float step, float tileVisualWidth)
+        {
+            return (MaxPerRow - 1) * step + tileVisualWidth;
+        }
+
+        /// <summary>牌1枚の見た目の幅。プレハブの矩形に `tileScale` を掛けたもの。</summary>
+        private float TileVisualWidth()
+        {
+            var prefabRect = tilePrefab != null ? tilePrefab.GetComponent<RectTransform>() : null;
+            float w = prefabRect != null && prefabRect.sizeDelta.x > 0f ? prefabRect.sizeDelta.x : 45f;
+            return w * tileScale;
+        }
+
+        /// <summary>牌1枚の見た目の高さ。</summary>
+        private float TileVisualHeight()
+        {
+            var prefabRect = tilePrefab != null ? tilePrefab.GetComponent<RectTransform>() : null;
+            float h = prefabRect != null && prefabRect.sizeDelta.y > 0f ? prefabRect.sizeDelta.y : 40f;
+            return h * tileScale;
+        }
+
         // 既存のタイル(Wallなどから)をRiverに入れるための新しいメソッド
         public void AddExistingTile(RectTransform rt, int tileId)
         {
@@ -99,7 +187,12 @@ namespace KillingMahjong.UI
 
         private void ApplyRiverLayout(RectTransform rt)
         {
-            int index = discardedTiles.Count;
+            // 追加する牌は、いま入っている枚数がそのまま並び順になる
+            ApplyRiverLayoutAt(rt, discardedTiles.Count);
+        }
+
+        private void ApplyRiverLayoutAt(RectTransform rt, int index)
+        {
             int row = index / MaxPerRow;
             int col = index % MaxPerRow;
 

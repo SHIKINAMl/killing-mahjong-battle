@@ -27,6 +27,29 @@ namespace KillingMahjong.Common
     {
         // ---- 0 - 9 盤面 ----
 
+        /// <summary>
+        /// EnemyInfoUI: 敵HP（点滴の血袋）の Canvas。**盤面の牌より必ず奥**。
+        ///
+        /// 血袋から下へ伸びるチューブが敵の牌に重なるので、牌の裏へ回す。
+        /// 盤面の Canvas は実測でこう並んでいる（2026-08-24・全て ScreenSpaceOverlay）:
+        ///
+        ///   **敵HP -1** ／ RiverCanvs・EnemyRiverCanvas・WallCanvas・EnemyWallUI 0 ／
+        ///   HandCanvas 1 ／ EnemyHandCanvas 3
+        ///
+        /// **0 ではなく -1 にしてある。** 0 だと山牌・河と同値になり、
+        /// 前後がシーン内の並び順という**書いていない規則**で決まってしまう。
+        ///
+        /// 卓や背景に沈む心配は無い。`マージャン卓`(-1) と `背景Canvas`(-3) は
+        /// **ScreenSpaceCamera** で、Overlay の Canvas は sortingOrder に関係なく
+        /// 必ずその手前に出る（同じ -1 でも競合しない）。
+        /// 同値の Overlay は `役Canvas2` だけで、中身は overrideSorting で 55 に上がっている。
+        ///
+        /// 2026-08-20 の R-1 では `EnemyHandCanvas` を 0→3 に上げたが、
+        /// **敵の山牌・河（0）は敵HP(1)より奥のまま**だったので直り切っていなかった。
+        /// 8/16 のスクショで血袋のチューブが横切っていた2段の牌は、手牌ではなく**山牌**。
+        /// </summary>
+        public const int EnemyHpMeter = -1;
+
         /// <summary>WallUI: 山牌の通常表示</summary>
         public const int WallBase = 1;
 

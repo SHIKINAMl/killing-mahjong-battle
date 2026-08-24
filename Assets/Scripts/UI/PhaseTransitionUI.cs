@@ -157,13 +157,13 @@ namespace KillingMahjong.UI
 
         private PlayerInfoUI targetPlayerInfoUI;
 
-        public void PlayTransition(string roundName, PlayerInfoUI playerInfoUI, int playerBet, int enemyBet, int playerInitialHp, int enemyInitialHp, Action onMidpoint, Action onComplete)
+        public void PlayTransition(string roundName, PlayerInfoUI playerInfoUI, KillingMahjong.EngineData.BettingCompletedInfo bet, Action onMidpoint, Action onComplete)
         {
             this.targetPlayerInfoUI = playerInfoUI;
-            StartCoroutine(SequenceRoutine(roundName, playerBet, enemyBet, playerInitialHp, enemyInitialHp, onMidpoint, onComplete));
+            StartCoroutine(SequenceRoutine(roundName, bet, onMidpoint, onComplete));
         }
 
-        private IEnumerator SequenceRoutine(string roundName, int playerBetAmount, int enemyBetAmount, int dummyInitialPlayerHp, int dummyInitialEnemyHp, Action onMidpoint, Action onComplete)
+        private IEnumerator SequenceRoutine(string roundName, KillingMahjong.EngineData.BettingCompletedInfo bet, Action onMidpoint, Action onComplete)
         {
             ResetVisuals();
 
@@ -238,22 +238,23 @@ namespace KillingMahjong.UI
 
                 // 賭けた額のぶん血が減る様子を見せる。
                 //
-                // **サーバー値を使う設定のときは減らさない。**
-                // サーバーはベットで health を動かさないので、ここで減らして見せると
-                // 直後に届く status の値で元へ戻り、「減って戻る」ちらつきになる。
-                // 賭けた額そのものは Bet: の行に出るので、情報は失われない。
-                bool deduct = !KillingMahjong.Managers.BoardStateManager.UseServerHealth;
-                int targetPlayerHp = deduct ? dummyInitialPlayerHp - playerBetAmount : dummyInitialPlayerHp;
-                int targetEnemyHp = deduct ? dummyInitialEnemyHp - enemyBetAmount : dummyInitialEnemyHp;
+                // **数字はクライアントで計算しない。** 引くのはサーバーで、
+                // 引いたあとの値が `bet_completed` の `bets[].health` で届いている
+                // （`BettingMessageHandler` が `BettingCompletedInfo` に詰めて渡してくる）。
+                // 届かなかったときは Before と同じ値が入っていて、この演出は動かない。
+                int startPlayerHp = bet.LocalHpBefore;
+                int startEnemyHp = bet.EnemyHpBefore;
+                int targetPlayerHp = bet.LocalHpAfter;
+                int targetEnemyHp = bet.EnemyHpAfter;
 
-                if (enemyBetObj != null) enemyBetObj.text = "Enemy Bet: <color=red>" + enemyBetAmount + "</color>";
-                if (playerBetObj != null) playerBetObj.text = "Your Bet: <color=red>" + playerBetAmount + "</color>";
+                if (enemyBetObj != null) enemyBetObj.text = "Enemy Bet: <color=red>" + bet.EnemyBet + "</color>";
+                if (playerBetObj != null) playerBetObj.text = "Your Bet: <color=red>" + bet.LocalBet + "</color>";
 
                 float tHp = 0;
                 while (tHp < hpDeductionDuration)
                 {
-                    int currentPlayerAnimHp = Mathf.RoundToInt(Mathf.Lerp(dummyInitialPlayerHp, targetPlayerHp, tHp / hpDeductionDuration));
-                    int currentEnemyAnimHp = Mathf.RoundToInt(Mathf.Lerp(dummyInitialEnemyHp, targetEnemyHp, tHp / hpDeductionDuration));
+                    int currentPlayerAnimHp = Mathf.RoundToInt(Mathf.Lerp(startPlayerHp, targetPlayerHp, tHp / hpDeductionDuration));
+                    int currentEnemyAnimHp = Mathf.RoundToInt(Mathf.Lerp(startEnemyHp, targetEnemyHp, tHp / hpDeductionDuration));
                     if (enemyHpObj != null) enemyHpObj.text = "Enemy HP: " + currentEnemyAnimHp;
                     if (playerHpObj != null) playerHpObj.text = "Your HP: " + currentPlayerAnimHp;
                     tHp += Time.deltaTime;

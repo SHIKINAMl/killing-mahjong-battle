@@ -248,6 +248,41 @@ namespace KillingMahjong.EngineData
     {
         public string client_id;
         public int bet;
+
+        /// <summary>
+        /// 賭け金を引いたあとの血。**サーバーは最初から送っている**
+        /// （`game_session.py: on_bet` の `bets[] = { client_id, bet, health }`）。
+        /// 2026-08-24 まで、このフィールドが無いせいで JsonUtility が黙って捨てていた。
+        ///
+        /// 両者とも 0 のときは「入っていない」とみなすこと。
+        /// 素直に信じると、フィールドの無い相手と喋ったときに血が 0 へ飛ぶ
+        /// （`StatusMessageHandler` と同じ約束）。
+        /// </summary>
+        public int health;
+    }
+
+    /// <summary>
+    /// bet_completed で届いたベット結果。**演出は「賭ける前」と「賭けた後」の両方を要る**ので、
+    /// 4つの数字を1つにまとめて運ぶ（2026-08-24 に追加）。
+    /// </summary>
+    public class BettingCompletedInfo
+    {
+        public int LocalBet;
+        public int EnemyBet;
+
+        /// <summary>賭ける前の血。演出のカウントダウンの開始値</summary>
+        public int LocalHpBefore;
+        public int EnemyHpBefore;
+
+        /// <summary>賭けたあとの血（サーバー値）。演出の到達点</summary>
+        public int LocalHpAfter;
+        public int EnemyHpAfter;
+
+        /// <summary>
+        /// サーバーが health を送ってきたか。**false のとき After は Before と同じ値**が入っている。
+        /// 古いサーバーと喋っても、演出が 0 へ落ちないようにするための目印。
+        /// </summary>
+        public bool HasServerHealth;
     }
 
 

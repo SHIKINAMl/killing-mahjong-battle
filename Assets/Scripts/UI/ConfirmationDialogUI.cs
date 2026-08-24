@@ -226,8 +226,10 @@ namespace KillingMahjong.UI
                 TileVisual visual = obj.GetComponent<TileVisual>();
                 if (visual != null && tileResourceManager != null)
                 {
+                    // WaitUI 側と同じ理由で、待ち牌には影を落とさない
+                    visual.SetShadowEnabled(false);
                     visual.SetTile(id, tileResourceManager.GetTileSprite(id));
-                    if (KillingMahjong.Managers.BoardStateManager.Instance != null && 
+                    if (KillingMahjong.Managers.BoardStateManager.Instance != null &&
                         KillingMahjong.Managers.BoardStateManager.Instance.NonManganWaitTiles.Contains(id))
                     {
                         visual.SetAlpha(0.3f);

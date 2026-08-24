@@ -46,6 +46,28 @@ namespace KillingMahjong.UI
         /// <summary>影の色。真っ黒だと牌の間が線で埋まって重くなる</summary>
         private static readonly Color TileShadowColor = new Color(0f, 0f, 0f, 0.55f);
 
+        /// <summary>実行時に足した影。**`Outline` は `Shadow` を継承している**ので
+        /// `GetComponent&lt;Shadow&gt;()` で拾うとフリテンの赤枠を掴んでしまう。
+        /// 自分で足したものだけを覚えておいて、それだけを触る</summary>
+        private Shadow _tileShadow;
+
+        /// <summary>この牌に影を付けるか。<see cref="SetShadowEnabled"/> で個別に切れる</summary>
+        private bool _shadowWanted = AddTileShadow;
+
+        /// <summary>
+        /// この1枚だけ影を切る／戻す。
+        ///
+        /// 待ち牌の一覧のように**小さい牌を隙間なく詰めて並べる場所**では、
+        /// 隣の牌に影が落ちて牌そのものが汚れて見えるので落とす。
+        /// <see cref="Awake"/> より先に呼ばれても効くように、意思だけ先に持っておく。
+        /// </summary>
+        public void SetShadowEnabled(bool enabled)
+        {
+            _shadowWanted = enabled;
+            if (_tileShadow != null) _tileShadow.enabled = enabled;
+            else if (enabled) EnsureShadow();
+        }
+
         private void Awake()
         {
             // Runtime fallback if not assigned in Inspector
@@ -72,14 +94,25 @@ namespace KillingMahjong.UI
         /// </summary>
         private void EnsureShadow()
         {
-            if (!AddTileShadow || uiImage == null) return;
+            if (!_shadowWanted || uiImage == null) return;
             if (GetComponentInParent<Canvas>() == null) return;
-            if (uiImage.GetComponent<Shadow>() != null) return;
+            if (_tileShadow != null) return;
+
+            // 既に素の Shadow が付いているならそれを使う。
+            // **Outline は除く**（Shadow を継承しているだけで役目が違う）。
+            foreach (var existing in uiImage.GetComponents<Shadow>())
+            {
+                if (existing is Outline) continue;
+                _tileShadow = existing;
+                _tileShadow.enabled = true;
+                return;
+            }
 
             var shadow = uiImage.gameObject.AddComponent<Shadow>();
             shadow.effectColor = TileShadowColor;
             shadow.effectDistance = TileShadowDistance;
             shadow.useGraphicAlpha = true;
+            _tileShadow = shadow;
         }
 
         private int _currentId = -1;

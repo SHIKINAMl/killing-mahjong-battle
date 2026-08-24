@@ -219,10 +219,10 @@ namespace KillingMahjong.UI
             uiManager.SetCurrentPhaseStatus(newStatus);
             if (PhaseManager.Instance != null) PhaseManager.Instance.ChangeRoundStatus(newStatus);
 
-            if (AudioManager.Instance != null)
-            {
-                AudioManager.Instance.SetBgmFilter(newStatus != RoundStatus.Discard);
-            }
+            // BGM のこもりは上の `SetCurrentPhaseStatus` が当てている。
+            // **ここで二重に呼ばない（2026-08-24 に削除）。**
+            // duration が 1.5 と 1.0 で食い違ううえ、あちらにある
+            // 「チュートリアル中はかけない」の条件をこちらは持っていなかった。
 
             if (newStatus == RoundStatus.HandSelection && uiManager.HandUI != null)
             {
@@ -619,9 +619,11 @@ namespace KillingMahjong.UI
             uiManager.SendActionToServer("bet", new ActionPayload { bet_amount = betAmount, amount = betAmount });
         }
 
-        public void OnBettingCompleteFromServer(int playerBet, int enemyBet, int playerHp, int enemyHp)
+        public void OnBettingCompleteFromServer(KillingMahjong.EngineData.BettingCompletedInfo info)
         {
-            // 賭け金はここで両者の血から引かれている（BettingMessageHandler）。
+            int playerBet = info.LocalBet;
+            int enemyBet = info.EnemyBet;
+
             // 流局では決着せず次の局でも同額が賭けられるので、場の表示は積み増していく。
             // 場の血が動くのは決着したときだけなので、クリアはロン演出の完了時に行う。
             if (uiManager.BetPotUI != null) uiManager.BetPotUI.AddStakes(playerBet, enemyBet);
@@ -634,25 +636,31 @@ namespace KillingMahjong.UI
                 roundTitle += "\n自動ベット";
             }
 
+            // セリフの条件は「いま何を持っているか」なので、賭けたあとの血を使う
             if (ReactionController.Instance != null)
             {
-                ReactionController.Instance.CheckAndPlayBetReaction(enemyBet, enemyHp, false);
-                ReactionController.Instance.SetPlayerHp(playerHp);
-                ReactionController.Instance.SetEnemyHp(enemyHp);
+                ReactionController.Instance.CheckAndPlayBetReaction(enemyBet, info.EnemyHpAfter, false);
+                ReactionController.Instance.SetPlayerHp(info.LocalHpAfter);
+                ReactionController.Instance.SetEnemyHp(info.EnemyHpAfter);
             }
-            
-            TriggerBettingAnimationPhase(roundTitle, playerBet, enemyBet, playerHp, enemyHp); 
+
+            TriggerBettingAnimationPhase(roundTitle, info);
             _isCarryOverNextRound = false;
         }
 
-        public void TriggerBettingAnimationPhase(string roundString, int playerBet, int enemyBet, int playerHp, int enemyHp)
+        /// <summary>
+        /// ベット確定の演出。**演出は `info` の「賭ける前」から「賭けたあと」へ数字を動かす。**
+        /// 演出が後回し（`DeferUntilIdle`）になっても値がずれないよう、
+        /// そのとき盤面を見に行くのではなく、届いた時点の値をそのまま持ち回す。
+        /// </summary>
+        public void TriggerBettingAnimationPhase(string roundString, KillingMahjong.EngineData.BettingCompletedInfo info)
         {
              // このメソッドは演出だけでなく進行の責務も持っている（onMidpoint で
              // UpdatePhaseStatus(Discard) を呼ぶ）。捨てると打牌フェイズへ進めず Betting で固まる。
              if (uiManager.IsBusyWithTransition)
              {
                  uiManager.DeferUntilIdle("bettingAnimation",
-                     () => TriggerBettingAnimationPhase(roundString, playerBet, enemyBet, playerHp, enemyHp));
+                     () => TriggerBettingAnimationPhase(roundString, info));
                  return;
              }
 
@@ -670,7 +678,7 @@ namespace KillingMahjong.UI
                  if (uiManager.AbilityUI != null) uiManager.AbilityUI.gameObject.SetActive(false);
                  if (uiManager.DialogueUI != null) uiManager.DialogueUI.gameObject.SetActive(false);
 
-                 uiManager.PhaseTransitionUI.PlayTransition(roundString, uiManager.PlayerInfoUI, playerBet, enemyBet, playerHp, enemyHp,
+                 uiManager.PhaseTransitionUI.PlayTransition(roundString, uiManager.PlayerInfoUI, info,
                     onMidpoint: () => {
                          uiManager.SetIsTransitioning(false);
                          
