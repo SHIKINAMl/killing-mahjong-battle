@@ -398,11 +398,49 @@ namespace KillingMahjong.UI
             // 通常対局時、打牌フェイズ以外はBGMをくぐもらせる（ローパス）。
             // 開くとき・こもるときの秒数は AudioManager 側の既定に任せる
             // （開く 2.0 秒 / こもる 1.5 秒。log 補間なので端から端まで動いて聞こえる）
+            //
+            // **開くのは演出が明けてから（2026-08-26）。**
+            //
+            // `UpdatePhaseStatus` はここを呼んだ直後に `HandlePhaseVisibility` を呼ぶが、
+            // あちらは演出中なら `DeferUntilIdle` で演出明けまで保留される。
+            // ここで即座にフェードを始めると、**2秒のフェードが暗転に覆われている
+            // あいだに走り切ってしまい**、プレイヤーが盤面を見たときには既に開き切っている。
+            // log 補間にしても「フェイズが変わった瞬間にクリアになった」と聞こえていたのはこれが理由。
+            //
+            // **こもらせる方は待たない。** 打牌フェイズを抜ける先はロン・流局などの
+            // 決着演出で、プレイヤーはその演出の開始をもってフェイズの変化を認識する。
+            // ここで待つと、演出が終わるまでBGMが開いたままになる。
             if (!IsTutorialMode && KillingMahjong.Managers.AudioManager.Instance != null)
             {
-                bool isMuffled = (status != RoundStatus.Discard);
-                KillingMahjong.Managers.AudioManager.Instance.SetBgmFilter(isMuffled);
+                bool willOpen = (status == RoundStatus.Discard);
+                if (willOpen && IsBusyWithTransition)
+                {
+                    DeferUntilIdle(BgmFilterDeferKey, ApplyBgmFilterForCurrentPhase);
+                }
+                else
+                {
+                    ApplyBgmFilterForCurrentPhase();
+                }
             }
+        }
+
+        /// <summary>保留キューでの識別名。後勝ちで畳みたいので固定の1本にする。</summary>
+        private const string BgmFilterDeferKey = "bgmFilter";
+
+        /// <summary>
+        /// 今のフェイズに合わせてBGMのこもりを当てる。
+        ///
+        /// **引数を取らず、実行した時点の `currentPhaseStatus` を読む。**
+        /// 保留したあとに更にフェイズが進むことがあるので、保留した時点の値を
+        /// 焼き込むと古い行き先へ開いてしまう。読み直せば、置き去りになった保留が
+        /// 後から流れても「今のフェイズ」に落ち着く。
+        /// </summary>
+        private void ApplyBgmFilterForCurrentPhase()
+        {
+            var audio = KillingMahjong.Managers.AudioManager.Instance;
+            if (IsTutorialMode || audio == null) return;
+
+            audio.SetBgmFilter(currentPhaseStatus != RoundStatus.Discard);
         }
 
         public void SetIsTransitioning(bool value)

@@ -66,6 +66,26 @@ namespace KillingMahjong.Managers
         public int LocalPlayerSpecialVictoryCount { get; set; } = 0;
 
         /// <summary>
+        /// この局で自分が強襲（`assault`）を撃ったか。**1局1回**の制限をクライアント側でも守るため。
+        ///
+        /// サーバー（`game_engine.py:392`）にしか制限が無く、クライアントは何度でも送れていた。
+        /// 2発目は `error` しか返らないので、送信直前に立てた `IsTransitioning` が倒れず
+        /// **盤面が二度と押せなくなる**（2026-08-23 に `HandleError` 側で倒すようにしたが、
+        /// そもそも送らせないのが筋）。
+        ///
+        /// 立てるのはサーバーが `skill_casted` を返したときだけ。送信時に立てると、
+        /// 別の理由で弾かれたときに撃っていないのに使用済みになる。
+        /// 倒すのは <see cref="ClearAllBoardData"/>（局の開始ごとに呼ばれる）。
+        /// </summary>
+        public bool LocalAssaultUsedThisRound { get; private set; } = false;
+
+        /// <summary>強襲が実際に通った（`skill_casted` が返った）ときに呼ぶ。</summary>
+        public void MarkLocalAssaultUsed()
+        {
+            LocalAssaultUsedThisRound = true;
+        }
+
+        /// <summary>
         /// 累計獲得点（`status` の `cumulative_earned_points`）。**サーバーが正。**
         ///
         /// これまで ScoreGaugeUI の private フィールドにしか無く、外から読めなかった。
@@ -206,6 +226,9 @@ namespace KillingMahjong.Managers
             ExposedEnemyHandWallIndexes.Clear();
             ExposedLocalHandWallIndexes.Clear();
             LocalWaitDataList.Clear();
+
+            // 強襲の「1局1回」は局をまたいだら戻す
+            LocalAssaultUsedThisRound = false;
         }
 
         public void ClearBoosts()

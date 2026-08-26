@@ -161,6 +161,27 @@ namespace KillingMahjong.UI
                 ? KillingMahjong.Managers.BoardStateManager.Instance.LocalPlayerSpecialVictoryCount
                 : 0;
 
+        /// <summary>
+        /// HP以外の理由で今は撃てないなら、その説明を返す（撃てるなら null）。
+        ///
+        /// **強襲の「1局1回」はサーバー側にしか制限が無かった**（`game_engine.py:392`）。
+        /// クライアントは何度でも送れてしまい、2発目は `error` しか返らないので
+        /// 送信直前に立てた `IsTransitioning` が倒れず盤面が固まっていた
+        /// （2026-08-23 に `GameUINetworkHandler.HandleError` 側でも倒すようにしたが、
+        /// **そもそも送らせない**のがここの役目）。
+        ///
+        /// 使用済みかどうかは `skill_casted` を受けた時点で `BoardStateManager` が覚えている。
+        /// </summary>
+        private string GetUnusableReason(string skillType)
+        {
+            if (skillType != SkillNames.Assault) return null;
+
+            var board = KillingMahjong.Managers.BoardStateManager.Instance;
+            if (board == null || !board.LocalAssaultUsedThisRound) return null;
+
+            return $"「{SkillNames.GetDisplayName(SkillNames.Assault)}はこの局でもう使ったわ。次の局まで待ちなさい」";
+        }
+
         // ---- パネルの内側の寸法（実測値。シーンではなくここを触る）----
         //
         // 枠の絵 `UI_Anim10` は 1010x1570 を 202x314 で表示している＝**1ドット＝2UI単位**。
@@ -211,9 +232,10 @@ namespace KillingMahjong.UI
                 var data = realAbilities[i];
                 int currentCost = GameRules.GetSkillCost(data.skillType, svCount);
                 bool affordable = currentHp >= currentCost;
+                string unusableReason = GetUnusableReason(data.skillType);
 
                 var itemObj = Instantiate(itemPrefab, contentContainer);
-                itemObj.Setup(this, i, data.name, currentCost, data.description, affordable);
+                itemObj.Setup(this, i, data.name, currentCost, data.description, affordable, unusableReason);
 
                 // 行の寸法と位置はここで決め切る。
                 //
@@ -422,6 +444,17 @@ namespace KillingMahjong.UI
                         if (uiMgr.CurrentPhaseStatus != KillingMahjong.EngineData.RoundStatus.HandSelection)
                         {
                             if (uiMgr.DialogueUI != null) uiMgr.DialogueUI.ShowText("「今はスキルを使えないわ！」");
+                            DeselectAll();
+                            ToggleAbilityWindow(false);
+                            return;
+                        }
+
+                        // 1局1回などHP以外の制限。**HP不足の判定より先に見る**
+                        // （血が足りていても撃てないので、後ろに置くと嘘の理由が出る）
+                        if (!string.IsNullOrEmpty(currentSelection.UnusableReason))
+                        {
+                            if (uiMgr.DialogueUI != null)
+                                uiMgr.DialogueUI.ShowText(currentSelection.UnusableReason);
                             DeselectAll();
                             ToggleAbilityWindow(false);
                             return;

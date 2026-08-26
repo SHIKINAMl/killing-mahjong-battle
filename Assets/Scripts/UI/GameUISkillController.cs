@@ -209,6 +209,16 @@ namespace KillingMahjong.UI
             string localPlayerId = KillingMahjong.Network.NetworkMessageHandler.Instance.LocalPlayerId;
             bool isLocalPlayer = (data.player_id == localPlayerId);
             string skillName = SkillNames.GetDisplayName(data.skillType);
+
+            // **強襲の「1局1回」を覚えておく（2026-08-26）。**
+            // サーバーが受け付けた（skill_casted が返った）ときだけ立てる。
+            // 送信時に立てると、別の理由で弾かれたときに撃っていないのに使用済みになる。
+            // 倒すのは局頭の BoardStateManager.ClearAllBoardData()。
+            if (isLocalPlayer && data.skillType == SkillNames.Assault)
+            {
+                Managers.BoardStateManager.Instance?.MarkLocalAssaultUsed();
+            }
+
             string subText = null;
 
             if (data.skillType == "boost_hand")

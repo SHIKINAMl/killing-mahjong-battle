@@ -50,12 +50,34 @@ namespace KillingMahjong.Core
             {
                 Instance = this;
                 DontDestroyOnLoad(gameObject); // シーンをまたいでも破棄されないようにする
+
+                // **グローバル音量は必ず全開に戻す（2026-08-26）。**
+                // 以前はここの ApplySettings が AudioManager 不在時に
+                // `AudioListener.volume = bgmVolume` を代用していた。0 が入ると
+                // BGMだけでなくSEもボイスも全部消え、スライダーをいくら上げても
+                // 誰も戻さないので二度と鳴らなかった。エディタでは Play をまたいで
+                // 値が残ることがあるため、既に 0 で固まっている環境をここで治す。
+                AudioListener.volume = 1f;
+
                 LoadSettings();
             }
             else
             {
                 Destroy(gameObject);
             }
+        }
+
+        /// <summary>
+        /// 設定を当て直す。
+        ///
+        /// **`Awake` の実行順は保証されない。** `AudioManager` が後に起きると
+        /// `LoadSettings()` の時点では `AudioManager.Instance` が null で、
+        /// 保存した音量がどこにも当たらないまま終わる。
+        /// `Start` は全ての `Awake` の後に走るので、ここで必ず一度当て直す。
+        /// </summary>
+        private void Start()
+        {
+            ApplySettings();
         }
 
         private void OnDestroy()
@@ -158,10 +180,11 @@ namespace KillingMahjong.Core
                 KillingMahjong.Managers.AudioManager.Instance.voiceVolume = voiceVolume;
                 KillingMahjong.Managers.AudioManager.Instance.ApplyVolumes();
             }
-            else
-            {
-                AudioListener.volume = bgmVolume; // Fallback
-            }
+            // **`AudioListener.volume` を代用してはいけない。**
+            // あれはゲーム全体のマスターで、BGMの値を入れるとSEもボイスも巻き添えになる。
+            // 0 が入ると全ての音が消え、スライダー（SetBgmVolume）は AudioManager しか
+            // 触らないので、上げ直しても二度と戻らなかった。
+            // `AudioManager` がまだ居ないだけなら、`Start()` の当て直しで拾える。
 
             ApplyResolution();
         }

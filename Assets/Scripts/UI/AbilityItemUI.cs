@@ -88,16 +88,29 @@ namespace KillingMahjong.UI
         /// <summary>この行の説明文。親の説明欄に出すために持っておく。</summary>
         public string Description { get; private set; } = "";
 
-        /// <summary>現在のHPで発動できるか。false のときはグレーアウトして発動要求も弾く。</summary>
+        /// <summary>現在のHPで発動できるか。false のときはコストを赤くして発動要求も弾く。</summary>
         public bool IsAffordable { get; private set; } = true;
+
+        /// <summary>
+        /// HP以外の理由で今は撃てないときの説明（空なら制限なし）。
+        ///
+        /// **HP不足とは分けて持つ。** 一緒くたにすると
+        /// 「今のあなたには◯◯しかないわ」という嘘の理由が出る
+        /// （強襲の「1局1回」は血が足りていても撃てない）。
+        /// </summary>
+        public string UnusableReason { get; private set; } = "";
+
+        /// <summary>今この行を発動できるか。見た目の沈め方はこちらで決める。</summary>
+        public bool IsUsable => IsAffordable && string.IsNullOrEmpty(UnusableReason);
 
         private bool isSelected;
 
-        public void Setup(AbilityUI parent, int index, string name, int cost, string description, bool affordable = true)
+        public void Setup(AbilityUI parent, int index, string name, int cost, string description, bool affordable = true, string unusableReason = null)
         {
             this.parentUI = parent;
             this.abilityIndex = index;
             this.IsAffordable = affordable;
+            this.UnusableReason = unusableReason ?? "";
             this.Description = description ?? "";
 
             BuildTile();
@@ -268,9 +281,9 @@ namespace KillingMahjong.UI
 
             // **帯の色は状態で変えない。** 選択の色（黄）を帯にも塗ると、
             // 同じ黄のコストの数字が帯に溶けて消える。変えるのは外の縁だけ。
-            Color strip = IsAffordable ? TileBorderColor : TileBorderDim;
+            Color strip = IsUsable ? TileBorderColor : TileBorderDim;
 
-            if (!IsAffordable)
+            if (!IsUsable)
             {
                 border = isSelected ? unaffordableCostColor : TileBorderDim;
                 fill = TileFillDim;
@@ -290,7 +303,10 @@ namespace KillingMahjong.UI
             if (tileFill != null) tileFill.color = fill;
             if (tileStrip != null) tileStrip.color = strip;
 
-            if (nameText != null) nameText.color = IsAffordable ? NameColor : NameDimColor;
+            if (nameText != null) nameText.color = IsUsable ? NameColor : NameDimColor;
+
+            // **コストが赤いのは「血が足りない」ときだけ。** 1局1回で沈んでいる行は
+            // 額そのものは払えるので、黄色のまま残して理由を取り違えさせない。
             if (costText != null) costText.color = IsAffordable ? CostAffordableColor : unaffordableCostColor;
         }
 
