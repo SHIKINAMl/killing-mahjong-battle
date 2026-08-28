@@ -61,16 +61,20 @@ namespace KillingMahjong.UI
         /// 「200 × 1.5」のような計算式。**サーバーの liquidation から作って渡す。**
         /// 渡さなかった場合は式を出さず、獲得額だけを見せる。
         /// </param>
+        /// <param name="settlement">
+        /// 清算パネルの内容。**渡すと「式 → ランク → 巨大な数字」の代わりに1枚のパネルを出す。**
+        /// null なら従来の見せ方に落ちる（チュートリアルなど内訳を持たない経路のため）。
+        /// </param>
         public void PlayRonSequence(List<int> handTiles, int ronTile, List<string> yakuList, string formula, string rankName, int score, bool isLocalPlayerWin,
             PlayerInfoUI playerInfo, EnemyInfoUI enemyInfo, int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp, System.Action onComplete,
-            string scoreFormula = null)
+            string scoreFormula = null, RonSettlementInfo settlement = null)
         {
-            StartCoroutine(SequenceRoutine(handTiles, ronTile, yakuList, formula, rankName, score, isLocalPlayerWin, playerInfo, enemyInfo, prevLocalHp, newLocalHp, prevEnemyHp, newEnemyHp, onComplete, scoreFormula));
+            StartCoroutine(SequenceRoutine(handTiles, ronTile, yakuList, formula, rankName, score, isLocalPlayerWin, playerInfo, enemyInfo, prevLocalHp, newLocalHp, prevEnemyHp, newEnemyHp, onComplete, scoreFormula, settlement));
         }
 
         private IEnumerator SequenceRoutine(List<int> handTiles, int ronTile, List<string> yakuList, string formula, string rankName, int score, bool isLocalPlayerWin,
             PlayerInfoUI playerInfo, EnemyInfoUI enemyInfo, int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp, System.Action onComplete,
-            string scoreFormula)
+            string scoreFormula, RonSettlementInfo settlement = null)
         {
             // 0. カットイン演出（勝者の顔と「ロン！」を表示）
             bool cutinFinished = false;
@@ -233,6 +237,20 @@ namespace KillingMahjong.UI
                 yield return new WaitForSeconds(0.6f);
             }
             
+            // --- ここから先が「点数の説明」 ---
+            //
+            // **役の宣言（上のカットインと帯）はそのまま残す。** 置き換えたのはこの後ろだけ。
+            // 内訳が渡ってきていれば清算パネルへ、渡ってきていなければ従来の
+            // 「式 → ランク → 巨大な数字」へ落ちる（チュートリアルなどはこちらを通る）。
+            if (settlement != null)
+            {
+                yield return SettlementRoutine(containerRt, container, settlement,
+                    playerInfo, enemyInfo, prevLocalHp, newLocalHp, prevEnemyHp, newEnemyHp);
+
+                onComplete?.Invoke();
+                yield break;
+            }
+
             // --- タメ（ここで役と手牌をしっかり見せる） ---
             yield return new WaitForSeconds(1.0f);
 
@@ -433,6 +451,334 @@ namespace KillingMahjong.UI
 
             // 終了処理
             onComplete?.Invoke();
+        }
+
+        // ============================================================
+        //  清算パネル
+        //
+        //  考え方は「**枠を先に完成させ、中の数字だけ後から入れる**」。
+        //  以前は 式 → ランク → 巨大な数字 を順に「生成」していたので、後から出た大きい文字が
+        //  先の文字を物理的に覆い、**4つが揃った瞬間には役名がもう読めなかった**
+        //  （2026-08-27 の計測で、因果を目で追える時間は 0 秒）。
+        //  枠が動かなければ、覆う問題そのものが起きない。
+        // ============================================================
+
+        private static readonly Color PanelLine  = new Color32(0x3A, 0x44, 0x68, 0xFF);
+        private static readonly Color PanelBg    = new Color32(0x0F, 0x13, 0x26, 0xF2);
+        private static readonly Color PanelInk   = new Color32(0xE8, 0xE4, 0xF0, 0xFF);
+        private static readonly Color PanelFaint = new Color32(0x97, 0xA0, 0xC0, 0xFF);
+        private static readonly Color AccentGold = new Color32(0xFF, 0xD3, 0x4D, 0xFF); // 翻数
+        private static readonly Color AccentMine = new Color32(0x57, 0xC7, 0xE8, 0xFF); // 自分
+        private static readonly Color AccentThem = new Color32(0xF2, 0x70, 0x5A, 0xFF); // 相手
+
+        private const float PanelWidth = 560f;
+        private const float ValueColumn = 150f;
+
+        private IEnumerator SettlementRoutine(RectTransform containerRt, GameObject container, RonSettlementInfo s,
+            PlayerInfoUI playerInfo, EnemyInfoUI enemyInfo, int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp)
+        {
+            // 役の帯は役目を終えている。パネルが同じ役名を翻数つきで出し直すので、
+            // 情報を落とさずに場所を空けられる。**宣言そのもの（1つずつ出る所）は上でやり終えている。**
+            var ribbon = containerRt.Find("YakuRibbon");
+            CanvasGroup ribbonGroup = null;
+            if (ribbon != null)
+            {
+                ribbonGroup = ribbon.gameObject.GetComponent<CanvasGroup>();
+                if (ribbonGroup == null) ribbonGroup = ribbon.gameObject.AddComponent<CanvasGroup>();
+            }
+
+            var hanTexts = new List<TextMeshProUGUI>();
+            TextMeshProUGUI totalHanText, multiplierText;
+            TextMeshProUGUI myBetText, theirBetText, myMultText, theirMultText;
+            TextMeshProUGUI tankiMine, tankiTheirs;
+            TextMeshProUGUI myDeltaText, theirDeltaText, myHpText, theirHpText;
+
+            CanvasGroup panelGroup = BuildSettlementPanel(containerRt, s,
+                hanTexts, out totalHanText, out multiplierText,
+                out myBetText, out theirBetText, out myMultText, out theirMultText,
+                out tankiMine, out tankiTheirs,
+                out myDeltaText, out theirDeltaText, out myHpText, out theirHpText);
+
+            // 枠がフェードインする。ここではまだ数字は入っていない
+            const float fadeIn = 0.3f;
+            for (float t = 0; t < fadeIn; t += Time.deltaTime)
+            {
+                float p = t / fadeIn;
+                panelGroup.alpha = p;
+                if (ribbonGroup != null) ribbonGroup.alpha = 1f - p;
+                yield return null;
+            }
+            panelGroup.alpha = 1f;
+            if (ribbonGroup != null) ribbonGroup.alpha = 0f;
+
+            // ① 役ごとの翻数が上から入る
+            for (int i = 0; i < hanTexts.Count && i < s.Rows.Count; i++)
+            {
+                // **`飜`(U+98BB) は PixelMplus に入っていない。** 使うと □ になる。
+                // ゲームの他の表示テキスト（AbilityUI・チュートリアル）は `翻`(U+7FFB) を使っているので揃える。
+                // コード中のコメントや Tooltip には `飜` が残っているが、あれは画面に出ない。
+                hanTexts[i].text = s.ShowPerRowHan ? $"{s.Rows[i].Han}翻" : "";
+                yield return new WaitForSeconds(0.12f);
+            }
+
+            // ② 合計と倍率
+            totalHanText.text = $"{s.TotalHan}翻";
+            yield return new WaitForSeconds(0.25f);
+            multiplierText.text = "×" + s.Multiplier.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+            yield return new WaitForSeconds(0.4f);
+
+            // ③ 素点と倍率が左右に入る
+            string multLabel = "×" + s.Multiplier.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+            myBetText.text = s.MyBet.ToString();
+            theirBetText.text = s.TheirBet.ToString();
+            yield return new WaitForSeconds(0.18f);
+            myMultText.text = multLabel;
+            theirMultText.text = multLabel;
+            yield return new WaitForSeconds(0.18f);
+
+            // 単騎で倍になるのは負けた側だけ。**今まで画面のどこにも出ていなかった行。**
+            if (s.IsTankiWait && tankiMine != null && tankiTheirs != null)
+            {
+                // **ダッシュ `—`(U+2014) もフォントに無い。** ASCII のハイフンで代用する
+                tankiMine.text = s.LocalWon ? "-" : "×2";
+                tankiTheirs.text = s.LocalWon ? "×2" : "-";
+                yield return new WaitForSeconds(0.25f);
+            }
+
+            // ④ 血が動く。**パネルを出したまま動かす**ので、数字とゲージが同時に見える
+            if (KillingMahjong.Managers.AudioManager.Instance != null)
+            {
+                KillingMahjong.Managers.AudioManager.Instance.PlayRankVoice(s.RankName);
+            }
+
+            const float hpTime = 1.2f;
+            for (float t = 0; t < hpTime; t += Time.deltaTime)
+            {
+                float eased = 1f - Mathf.Pow(1f - Mathf.Clamp01(t / hpTime), 3f);
+
+                int myNow = Mathf.RoundToInt(Mathf.Lerp(s.MyHpBefore, s.MyHpAfter, eased));
+                int themNow = Mathf.RoundToInt(Mathf.Lerp(s.TheirHpBefore, s.TheirHpAfter, eased));
+
+                myDeltaText.text = FormatDelta(Mathf.RoundToInt(Mathf.Lerp(0, s.MyDelta, eased)));
+                theirDeltaText.text = FormatDelta(Mathf.RoundToInt(Mathf.Lerp(0, s.TheirDelta, eased)));
+                myHpText.text = $"{s.MyHpBefore}→{myNow}";
+                theirHpText.text = $"{s.TheirHpBefore}→{themNow}";
+
+                if (playerInfo != null) playerInfo.SetHP(Mathf.RoundToInt(Mathf.Lerp(prevLocalHp, newLocalHp, eased)));
+                if (enemyInfo != null) enemyInfo.SetHP(Mathf.RoundToInt(Mathf.Lerp(prevEnemyHp, newEnemyHp, eased)));
+
+                yield return null;
+            }
+
+            myDeltaText.text = FormatDelta(s.MyDelta);
+            theirDeltaText.text = FormatDelta(s.TheirDelta);
+            myHpText.text = $"{s.MyHpBefore}→{s.MyHpAfter}";
+            theirHpText.text = $"{s.TheirHpBefore}→{s.TheirHpAfter}";
+            if (playerInfo != null) playerInfo.SetHP(newLocalHp);
+            if (enemyInfo != null) enemyInfo.SetHP(newEnemyHp);
+
+            // 読み切るための間。**ここが唯一の「止まって見る」時間**
+            yield return new WaitForSeconds(1.6f);
+
+            Destroy(container);
+            yield return new WaitForSeconds(0.2f);
+        }
+
+        private static string FormatDelta(int v)
+        {
+            return v > 0 ? "+" + v : v.ToString(); // 負号は int の表記がそのまま使える
+        }
+
+        private CanvasGroup BuildSettlementPanel(RectTransform parent, RonSettlementInfo s,
+            List<TextMeshProUGUI> hanTexts,
+            out TextMeshProUGUI totalHanText, out TextMeshProUGUI multiplierText,
+            out TextMeshProUGUI myBetText, out TextMeshProUGUI theirBetText,
+            out TextMeshProUGUI myMultText, out TextMeshProUGUI theirMultText,
+            out TextMeshProUGUI tankiMine, out TextMeshProUGUI tankiTheirs,
+            out TextMeshProUGUI myDeltaText, out TextMeshProUGUI theirDeltaText,
+            out TextMeshProUGUI myHpText, out TextMeshProUGUI theirHpText)
+        {
+            // 外枠（線の色）→ 内側（地の色）の2枚重ね。1ドット＝2UI単位なので枠は4
+            GameObject root = new GameObject("SettlementPanel");
+            root.transform.SetParent(parent, false);
+            Image rootImg = root.AddComponent<Image>();
+            rootImg.color = PanelLine;
+
+            RectTransform rootRt = root.GetComponent<RectTransform>();
+            rootRt.anchorMin = rootRt.anchorMax = new Vector2(0.5f, 0.5f);
+            // **下端を固定して上へ伸ばす。** 役が増えても下（手牌）を押さない。
+            // 基準 800x600 で手牌の上端は中心から -146 なので、その少し上に置く。
+            // 上へ使えるのは中心から +300 まで。役5行でちょうど収まる寸法にしてある
+            // （実機で -105 に置いたら見出しの帯が画面外に出た）。
+            rootRt.pivot = new Vector2(0.5f, 0f);
+            rootRt.anchoredPosition = new Vector2(0f, -140f);
+            rootRt.sizeDelta = new Vector2(PanelWidth, 0f);
+
+            var rootFit = root.AddComponent<ContentSizeFitter>();
+            rootFit.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            var rootLayout = root.AddComponent<VerticalLayoutGroup>();
+            rootLayout.padding = new RectOffset(4, 4, 4, 4);
+            rootLayout.spacing = 0;
+            rootLayout.childControlWidth = true;
+            rootLayout.childControlHeight = true;
+            rootLayout.childForceExpandWidth = true;
+            rootLayout.childForceExpandHeight = false;
+
+            CanvasGroup group = root.AddComponent<CanvasGroup>();
+            group.alpha = 0f;
+
+            // ---- 見出しの帯：左に「和了」、右にランク ----
+            GameObject head = MakeBox(root.transform, PanelLine, 8, 4);
+            MakeText(head.transform, "和了", 20f, PanelInk, TextAlignmentOptions.Left, true);
+            MakeText(head.transform, s.RankName, 30f, AccentGold, TextAlignmentOptions.Right, false, 200f);
+
+            // ---- 中身（地の色） ----
+            GameObject body = new GameObject("Body");
+            body.transform.SetParent(root.transform, false);
+            body.AddComponent<Image>().color = PanelBg;
+            var bodyLayout = body.AddComponent<VerticalLayoutGroup>();
+            bodyLayout.padding = new RectOffset(12, 12, 6, 6);
+            bodyLayout.spacing = 1;
+            bodyLayout.childControlWidth = true;
+            bodyLayout.childControlHeight = true;
+            bodyLayout.childForceExpandWidth = true;
+            bodyLayout.childForceExpandHeight = false;
+
+            // ---- 役の行 ----
+            foreach (var row in s.Rows)
+            {
+                GameObject r = MakeBox(body.transform, Color.clear, 0, 1);
+                MakeText(r.transform, row.Name, 22f, PanelInk, TextAlignmentOptions.Left, true);
+                // 強化ぶんは黄色で独立させる。`断幺九+1` と地の文に埋めない
+                MakeText(r.transform, row.Boost > 0 ? "+" + row.Boost : "", 18f, AccentGold, TextAlignmentOptions.Right, false, 70f);
+                hanTexts.Add(MakeText(r.transform, "", 22f, PanelInk, TextAlignmentOptions.Right, false, 90f));
+            }
+
+            // ---- 合計 → 倍率 ----
+            MakeRule(body.transform);
+            GameObject sum = MakeBox(body.transform, Color.clear, 0, 2);
+            MakeText(sum.transform, "合計", 22f, PanelFaint, TextAlignmentOptions.Left, true);
+            totalHanText = MakeText(sum.transform, "", 24f, AccentGold, TextAlignmentOptions.Right, false, 90f);
+            multiplierText = MakeText(sum.transform, "", 24f, AccentGold, TextAlignmentOptions.Right, false, 70f);
+
+            // ---- 自分と相手の内訳 ----
+            MakeRule(body.transform);
+
+            GameObject colHead = MakeBox(body.transform, Color.clear, 0, 1);
+            MakeText(colHead.transform, "", 18f, PanelFaint, TextAlignmentOptions.Left, true);
+            MakeText(colHead.transform, "自分", 18f, AccentMine, TextAlignmentOptions.Right, false, ValueColumn);
+            MakeText(colHead.transform, "相手", 18f, AccentThem, TextAlignmentOptions.Right, false, ValueColumn);
+
+            // 持ち越しがあると素点が膨らむ。**その理由が今までどこにも出ていなかった**
+            string betLabel = s.CarryRounds > 1 ? $"素点（持ち越し{s.CarryRounds}局ぶん）" : "素点";
+            GameObject betRow = MakeBox(body.transform, Color.clear, 0, 1);
+            MakeText(betRow.transform, betLabel, 18f, PanelFaint, TextAlignmentOptions.Left, true);
+            myBetText = MakeText(betRow.transform, "", 21f, PanelInk, TextAlignmentOptions.Right, false, ValueColumn);
+            theirBetText = MakeText(betRow.transform, "", 21f, PanelInk, TextAlignmentOptions.Right, false, ValueColumn);
+
+            GameObject multRow = MakeBox(body.transform, Color.clear, 0, 1);
+            MakeText(multRow.transform, "倍率", 18f, PanelFaint, TextAlignmentOptions.Left, true);
+            myMultText = MakeText(multRow.transform, "", 21f, PanelInk, TextAlignmentOptions.Right, false, ValueColumn);
+            theirMultText = MakeText(multRow.transform, "", 21f, PanelInk, TextAlignmentOptions.Right, false, ValueColumn);
+
+            tankiMine = null;
+            tankiTheirs = null;
+            if (s.IsTankiWait)
+            {
+                GameObject tankiRow = MakeBox(body.transform, Color.clear, 0, 1);
+                MakeText(tankiRow.transform, "単騎待ち", 18f, PanelFaint, TextAlignmentOptions.Left, true);
+                tankiMine = MakeText(tankiRow.transform, "", 21f, AccentGold, TextAlignmentOptions.Right, false, ValueColumn);
+                tankiTheirs = MakeText(tankiRow.transform, "", 21f, AccentGold, TextAlignmentOptions.Right, false, ValueColumn);
+            }
+
+            // 強襲は「獲得が 0 に潰れ、その分が相手への追加ダメージへ回る」。式ではなく文で見せる
+            if (s.AssaultApplied)
+            {
+                GameObject assaultRow = MakeBox(body.transform, Color.clear, 0, 1);
+                MakeText(assaultRow.transform, "強襲", 18f, PanelFaint, TextAlignmentOptions.Left, true);
+                MakeText(assaultRow.transform, s.LocalWon ? "獲得なし" : "", 20f, AccentGold, TextAlignmentOptions.Right, false, ValueColumn);
+                MakeText(assaultRow.transform, s.LocalWon ? "+" + s.AssaultBonusDamage : "獲得なし", 20f, AccentGold, TextAlignmentOptions.Right, false, ValueColumn);
+            }
+
+            MakeRule(body.transform);
+
+            GameObject deltaRow = MakeBox(body.transform, Color.clear, 0, 2);
+            MakeText(deltaRow.transform, "血", 22f, PanelInk, TextAlignmentOptions.Left, true);
+            myDeltaText = MakeText(deltaRow.transform, "", 30f, AccentMine, TextAlignmentOptions.Right, false, ValueColumn);
+            theirDeltaText = MakeText(deltaRow.transform, "", 30f, AccentThem, TextAlignmentOptions.Right, false, ValueColumn);
+
+            GameObject hpRow = MakeBox(body.transform, Color.clear, 0, 1);
+            MakeText(hpRow.transform, "", 18f, PanelFaint, TextAlignmentOptions.Left, true);
+            myHpText = MakeText(hpRow.transform, "", 18f, PanelFaint, TextAlignmentOptions.Right, false, ValueColumn);
+            theirHpText = MakeText(hpRow.transform, "", 18f, PanelFaint, TextAlignmentOptions.Right, false, ValueColumn);
+
+            return group;
+        }
+
+        /// <summary>横1列の入れ物。中身は左から順に並ぶ。</summary>
+        private GameObject MakeBox(Transform parent, Color bg, int padX, int padY)
+        {
+            GameObject go = new GameObject("Row");
+            go.transform.SetParent(parent, false);
+
+            if (bg.a > 0f) go.AddComponent<Image>().color = bg;
+
+            var layout = go.AddComponent<HorizontalLayoutGroup>();
+            layout.padding = new RectOffset(padX, padX, padY, padY);
+            layout.spacing = 6;
+            layout.childControlWidth = true;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = false;
+            layout.childAlignment = TextAnchor.MiddleLeft;
+
+            return go;
+        }
+
+        /// <summary>区切りの細い線。1ドット＝2UI単位なので高さ2。</summary>
+        private void MakeRule(Transform parent)
+        {
+            GameObject go = new GameObject("Rule");
+            go.transform.SetParent(parent, false);
+            go.AddComponent<Image>().color = PanelLine;
+            var le = go.AddComponent<LayoutElement>();
+            le.minHeight = 2f;
+            le.preferredHeight = 2f;
+        }
+
+        /// <param name="flexible">true なら残りの幅を全部取る（左の見出し用）</param>
+        /// <param name="width">flexible が false のときの固定幅</param>
+        private TextMeshProUGUI MakeText(Transform parent, string content, float size, Color color,
+            TextAlignmentOptions align, bool flexible, float width = 0f)
+        {
+            GameObject go = new GameObject("Text");
+            go.transform.SetParent(parent, false);
+
+            var tmp = go.AddComponent<TextMeshProUGUI>();
+            if (customFont != null) tmp.font = customFont;
+            tmp.text = content;
+            tmp.fontSize = size;
+            tmp.color = color;
+            tmp.alignment = align;
+            tmp.textWrappingMode = TextWrappingModes.NoWrap;
+            tmp.overflowMode = TextOverflowModes.Overflow;
+
+            var le = go.AddComponent<LayoutElement>();
+            le.preferredHeight = size * 1.15f;
+            if (flexible)
+            {
+                le.flexibleWidth = 1f;
+                le.minWidth = 0f;
+            }
+            else
+            {
+                le.flexibleWidth = 0f;
+                le.preferredWidth = width;
+                le.minWidth = width;
+            }
+
+            return tmp;
         }
 
         private void InitializeTileVisual(GameObject tileObj, int tileId)

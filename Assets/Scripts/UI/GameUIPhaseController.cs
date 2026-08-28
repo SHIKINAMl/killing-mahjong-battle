@@ -884,11 +884,7 @@ namespace KillingMahjong.UI
                 
                 actualFormula = $"{liq.han}飜";
                 
-                if (liq.multiplier >= 4.0f) actualRank = "役満";
-                else if (liq.multiplier >= 3.0f) actualRank = "三倍満";
-                else if (liq.multiplier >= 2.0f) actualRank = "倍満";
-                else if (liq.multiplier >= 1.5f) actualRank = "跳満";
-                else actualRank = "満貫";
+                actualRank = ResolveRankName(liq.multiplier);
 
                 // 自分の和了なので、自己ベスト打点として通算戦績に記録する
                 KillingMahjong.Core.PlayerStatsManager.RecordScore(liq.winner_gain);
@@ -941,11 +937,7 @@ namespace KillingMahjong.UI
                     
                     actualFormula = $"{liq.han}飜";
                     
-                    if (liq.multiplier >= 4.0f) actualRank = "役満";
-                    else if (liq.multiplier >= 3.0f) actualRank = "三倍満";
-                    else if (liq.multiplier >= 2.0f) actualRank = "倍満";
-                    else if (liq.multiplier >= 1.5f) actualRank = "跳満";
-                    else actualRank = "満貫";
+                    actualRank = ResolveRankName(liq.multiplier);
                 }
                 
                 int ronTile = BoardStateManager.Instance.LastDiscardedTileId >= 0
@@ -1166,6 +1158,136 @@ namespace KillingMahjong.UI
         ///
         /// 内訳が無いときは null を返す。演出側は式を伏せて額だけ見せる。
         /// </summary>
+        /// <summary>
+        /// 清算パネルの中身を、サーバーの精算結果から組み立てる。
+        ///
+        /// **計算はしない。サーバーが出した数字を並べ替えるだけ。**
+        /// 唯一の例外が「役ごとの翻数」で、これはサーバーが内訳を送っていないので
+        /// クライアントの表（`GameRules.GetBaseHan`）から引く。
+        /// **引いた行の合計がサーバーの `han` と一致したときだけ表示する**（§ShowPerRowHan）。
+        /// 足して合わない数字を並べるのは、出さないより悪い。
+        ///
+        /// サーバー側の対応する計算は `mahjong_engine/engine/game_engine.py:757-790`。
+        ///   勝者 … `自分の賭け金 × 持ち越し局数 × 倍率`
+        ///   敗者 … `相手の賭け金 × 持ち越し局数 × 倍率 ×（単騎なら2）＋ 強襲の上乗せ`
+        /// **母数が別なので、両者の額は一致しない。** それを2列で見せるのがこのパネルの主目的。
+        /// </summary>
+        private static RonSettlementInfo BuildSettlementInfo(LiquidationData liq, bool isLocalWin,
+            List<Common.YakuNameUtil.Entry> yakuSummary, string rankName,
+            int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp)
+        {
+            if (liq == null) return null;
+
+            var info = new RonSettlementInfo
+            {
+                RankName = rankName,
+                TotalHan = liq.han,
+                Multiplier = liq.multiplier,
+                CarryRounds = liq.carry_over_draw_count + 1,
+                IsTankiWait = liq.is_tanki_wait,
+                AssaultApplied = liq.assault_applied,
+                AssaultBonusDamage = liq.assault_bonus_damage,
+                LocalWon = isLocalWin,
+
+                // **「自分」「相手」はローカル基準。** 勝った側基準ではない
+                MyBet = isLocalWin ? liq.winner_bet : liq.loser_bet,
+                TheirBet = isLocalWin ? liq.loser_bet : liq.winner_bet,
+                MyDelta = isLocalWin ? liq.winner_gain : -liq.loser_loss,
+                TheirDelta = isLocalWin ? -liq.loser_loss : liq.winner_gain,
+
+                MyHpBefore = prevLocalHp,
+                MyHpAfter = newLocalHp,
+                TheirHpBefore = prevEnemyHp,
+                TheirHpAfter = newEnemyHp,
+            };
+
+            // 行ごとの翻数。サーバーは重複も1要素ずつ足しているので、こちらも
+            // 「(素の翻 + 強化) × 枚数」で数える（`game_engine.py:757-758` と同じ数え方）
+            int rowSum = 0;
+            bool allKnown = true;
+
+            // 画面は 800x600 で、パネルは手牌と役帯の上に収まらないといけない。
+            // 行が増えすぎると上へはみ出すので、あふれた分は1行にまとめる。
+            // **役名そのものは直前の宣言で1つずつ読ませてあるので、ここで落ちても情報は失われない。**
+            const int MaxRows = 5;
+            int overflowHan = 0;
+            int overflowCount = 0;
+
+            foreach (var e in yakuSummary)
+            {
+                int baseHan = KillingMahjong.GameRules.GetBaseHan(e.BaseName);
+                if (baseHan < 0) allKnown = false;
+
+                int rowHan = (Mathf.Max(baseHan, 0) + e.Boost) * e.Count;
+                rowSum += rowHan;
+
+                // 最後の枠は「他N役」に使うので、あふれると分かった時点で畳む
+                bool isLast = info.Rows.Count == MaxRows - 1;
+                if (info.Rows.Count >= MaxRows || (isLast && yakuSummary.Count > MaxRows))
+                {
+                    overflowHan += rowHan;
+                    overflowCount += e.Count;
+                    continue;
+                }
+
+                info.Rows.Add(new RonSettlementInfo.YakuRow
+                {
+                    Name = Common.YakuNameUtil.ToDisplayText(new Common.YakuNameUtil.Entry
+                    {
+                        BaseName = e.BaseName,
+                        Boost = 0,      // 強化は別の列に出すので、名前には混ぜない
+                        Count = e.Count
+                    }),
+                    Boost = e.Boost,
+                    Han = rowHan,
+                });
+            }
+
+            if (overflowCount > 0)
+            {
+                info.Rows.Add(new RonSettlementInfo.YakuRow
+                {
+                    Name = $"他{overflowCount}役",
+                    Boost = 0,
+                    Han = overflowHan,
+                });
+            }
+
+            info.ShowPerRowHan = allKnown && rowSum == liq.han;
+            if (!info.ShowPerRowHan)
+            {
+                Debug.LogWarning($"[Ron] 役ごとの翻数を伏せた（合計 {rowSum} / サーバー {liq.han}, 全役既知={allKnown}）");
+            }
+
+            return info;
+        }
+
+        /// <summary>
+        /// 精算倍率から役ランクの呼称を出す。
+        ///
+        /// **サーバーの `_get_liquidation_multiplier` / `_get_multiplier_label` と対で読むこと**
+        /// （`mahjong_engine/engine/game_engine.py:646-675`）。あちらは翻数から倍率と呼称の
+        /// 両方を出しているが、**呼称は精算のペイロードに入っていない**ので、こちらで倍率から戻す。
+        ///
+        /// **26飜以上（倍率 8.0）の枝が無かった。** 2026-08-27 の調査で見つかった不具合で、
+        /// `>= 4.0` に吸われて「役満」と出る一方、式には「× 8」と出て**画面の中で食い違っていた**。
+        /// `純正九蓮宝燈` で実際に到達する。ボイス `rank_double_yakuman.wav` も収録済みだったが、
+        /// この文字列が生成されないため**一度も鳴っていなかった**。
+        ///
+        /// **この判定は表示のためだけのもの。** 勝敗も点数もサーバーが決めている。
+        /// 以前は `ExecuteRonAction` と `HandleAgari` に同じ if 連鎖が丸ごと2つあり、
+        /// 片方だけ直す事故が起きる形だったので1本にまとめてある。
+        /// </summary>
+        private static string ResolveRankName(float multiplier)
+        {
+            if (multiplier >= 8.0f) return "ダブル役満";
+            if (multiplier >= 4.0f) return "役満";
+            if (multiplier >= 3.0f) return "三倍満";
+            if (multiplier >= 2.0f) return "倍満";
+            if (multiplier >= 1.5f) return "跳満";
+            return "満貫";
+        }
+
         private static string BuildScoreFormula(LiquidationData liq)
         {
             if (liq == null) return null;
@@ -1197,15 +1319,25 @@ namespace KillingMahjong.UI
             // フェイズ切替の ScreenFlash（このファイルの上方）はそのまま残す。
             // Effects.ScreenFlash.Play();
 
+            // サーバーの役名は「役名＋強化回数」の連結で、ドラは1枚につき1要素で届く。
+            // 表示にもリアクション判定にも、まとめた内訳の方を使う（YakuNameUtil のコメント参照）。
+            var yakuSummary = KillingMahjong.Common.YakuNameUtil.Summarize(yaku);
+
             if (ReactionController.Instance != null)
             {
                 ReactionController.Instance.ClearReactions();
-                
-                bool isYakuman = rank == "役満";
-                bool isDoraBaku = false;
-                foreach (var y in yaku) if (y.Contains("ドラ") && y.Contains("3") || y.Contains("4") || y.Contains("5")) isDoraBaku = true;
+
+                bool isYakuman = rank == "役満" || rank == "ダブル役満";
+
+                // **以前は `y.Contains("ドラ") && y.Contains("3") || y.Contains("4") || ...` だった。**
+                // `&&` が `||` より強いので「ドラを含み、かつ3を含む」または「4を含む」または「5を含む」
+                // という判定になっており、しかもドラは `ドラ3` という形では届かないので、
+                // **ドラ爆では一度も成立せず、役を4回か5回強化しただけの局で成立していた**
+                // （2026-08-27 の調査）。枚数を数える形に直した。
+                bool isDoraBaku = KillingMahjong.Common.YakuNameUtil.CountDora(yakuSummary) >= 3;
+
                 bool isCheap = formula == "1飜" || formula == "2飜";
-                
+
                 ReactionController.Instance.HandleAgari(isLocalWin, isYakuman, isDoraBaku, isCheap);
                 ReactionController.Instance.SetPlayerLostLastRound(!isLocalWin);
             }
@@ -1235,10 +1367,14 @@ namespace KillingMahjong.UI
                 int prevLocalHp = board.HpBeforeLiquidationLocal;
                 int prevEnemyHp = board.HpBeforeLiquidationEnemy;
 
-                uiManager.RonAnimationUI.PlayRonSequence(winningHand, ronTile, yaku, formula, rank, score, isLocalWin,
+                uiManager.RonAnimationUI.PlayRonSequence(winningHand, ronTile,
+                    KillingMahjong.Common.YakuNameUtil.ToDisplayList(yakuSummary),
+                    formula, rank, score, isLocalWin,
                     uiManager.PlayerInfoUI, uiManager.EnemyInfoUI, prevLocalHp, newLocalHp, prevEnemyHp, newEnemyHp,
                     () => OnRonAnimationComplete(isLocalWin),
-                    BuildScoreFormula(liq));
+                    BuildScoreFormula(liq),
+                    BuildSettlementInfo(liq, isLocalWin, yakuSummary, rank,
+                        prevLocalHp, newLocalHp, prevEnemyHp, newEnemyHp));
             }
             yield break;
         }
@@ -1266,8 +1402,16 @@ namespace KillingMahjong.UI
             // 賭け金がゲージへ吸い込まれ、そのあとゲージが伸びる。
             // 勝敗の判定はサーバーの担当で、ここは表示のために積むだけ。
             // サーバーが「獲得で勝利」へ移行するまでは、この表示だけが先行する。
+            // **`winner_gain > 0` を条件にしてはいけない。** 強襲を撃った局は獲得が 0 に潰れる
+            // （得るはずだった額が相手への追加ダメージへ回る）ので、その局だけ吸い込みが走らず、
+            // **場に出ている賭け金の表示が 0 に戻らないまま次の局へ積み増されていた**
+            // （2026-08-27 の調査）。すぐ上の `BetPotUI.Clear()` は無条件に走るため、
+            // 同じ決着で2つの賭け金表示が食い違う形になっていた。
+            //
+            // `AbsorbStakesIntoGauge` は gain が 0 でも正しく動く。賭け金を吸って表示を空にし、
+            // ゲージには 0 を足す（＝伸びない）。判定はサーバーの担当で、ここは表示だけ。
             var liq = BoardStateManager.Instance.LastLiquidationData;
-            if (liq != null && liq.winner_gain > 0 && !uiManager.IsTutorialMode)
+            if (liq != null && uiManager.ScoreGauge != null && !uiManager.IsTutorialMode)
             {
                 uiManager.ScoreGauge.AbsorbStakesIntoGauge(isLocalWin, liq.winner_gain);
             }

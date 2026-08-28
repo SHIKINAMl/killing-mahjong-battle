@@ -610,15 +610,30 @@ namespace KillingMahjong.Managers
 
         /// <summary>
         /// 役名ボイスを再生する（例：「タンヤオ」「ピンフ」等）
+        ///
+        /// **渡されるのが素の役名とは限らない。** サーバーは強化回数を連結した
+        /// `断么九+1` の形で送ってくるし、表示側はさらに `ドラ×3` のようにまとめる。
+        /// 辞書は素の役名しかキーに持っていないので、そのまま引くと**外れて無音になる**。
+        /// 2026-08-27 の調査では 27役×強化0〜3回＝99通りのうち **72通り（72.7%）が無音**で、
+        /// しかもサーバーが全対局の開始時に強化を1件配るため、**狙って育てた役ほど黙っていた**。
+        ///
+        /// 素の名前で引けたときはそれを使い、外れたときだけ崩して引き直す。
+        /// **素の役名を渡す既存の呼び出しは、今までと同じ経路を通る。**
         /// </summary>
         public void PlayYakuVoice(string yakuName)
         {
             if (yakuVoiceClips == null) InitializeYakuVoices();
+            if (string.IsNullOrEmpty(yakuName)) return;
 
-            if (!string.IsNullOrEmpty(yakuName) && yakuVoiceClips.TryGetValue(yakuName, out AudioClip clip))
+            AudioClip clip;
+            if (!yakuVoiceClips.TryGetValue(yakuName, out clip))
             {
-                PlayVoice(clip);
+                string key = KillingMahjong.Common.YakuNameUtil.ToVoiceKey(yakuName);
+                if (key == yakuName) return; // 崩しても同じなら、本当に持っていない役
+                if (!yakuVoiceClips.TryGetValue(key, out clip)) return;
             }
+
+            PlayVoice(clip);
         }
 
         /// <summary>
