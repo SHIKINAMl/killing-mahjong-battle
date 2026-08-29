@@ -74,6 +74,14 @@ namespace KillingMahjong.Managers
         private int _playerStake;      // 自分が賭けている額
         private int _enemyStake;       // 相手が賭けている額
         private int Pot => _playerStake + _enemyStake;
+
+        /// <summary>
+        /// いま場に積まれているのが何局ぶんか。**清算パネルの「素点（持ち越しN局ぶん）」に使う。**
+        /// 流局のたびに `PlaceBet` がもう1局ぶん積むので、その回数を数えるのが正確。
+        /// **賭け金の割り算で求めてはいけない**（局ごとに額が変わりうるし、
+        /// 血が足りなくて満額払えなかった局があると割り切れない）。
+        /// </summary>
+        private int _stakeRounds;
         private int _lastBetAmount;    // 直前に賭けた額（流局の次の局はこれと同額が自動で賭けられる）
         private int _lastConfirmedBet; // 賭け金UIで実際に確定した額
         private bool _prevRoundWasDraw;
@@ -175,6 +183,7 @@ namespace KillingMahjong.Managers
 
             _playerStake = 0;
             _enemyStake = 0;
+            _stakeRounds = 0;
             _lastBetAmount = 0;
             _prevRoundWasDraw = false;
             if (gameUIManager != null) gameUIManager.ScoreGauge.ResetScores();
@@ -455,6 +464,7 @@ namespace KillingMahjong.Managers
             _enemyHp -= enemyPaid;
             _playerStake += playerPaid;
             _enemyStake += enemyPaid;
+            _stakeRounds++;
 
             ApplyHpToUI();
             ApplyPotToUI();
@@ -468,6 +478,7 @@ namespace KillingMahjong.Managers
         {
             _playerStake = 0;
             _enemyStake = 0;
+            _stakeRounds = 0;
             ApplyPotToUI(includeGauge: false);
         }
 
@@ -931,8 +942,16 @@ namespace KillingMahjong.Managers
             int prevPlayerHp = _playerHp;
 
             int han = GetWinnerHan(data, isPlayerWin: true);
-            int gain = GameRules.CalculateWinnerGain(_playerStake, han);
-            int loss = GameRules.CalculateLoserLoss(_enemyStake, han, data.isTankiWin);
+
+            // **賭け金は ClearStakes() の前に控える。** 清算パネルの素点も計算式も
+            // ここの額から作るので、0 になったフィールドを後から読むと式が消える
+            // （実際に消えていた。2026-08-29 に発覚。§BuildScoreFormula は stake<=0 で null を返す）
+            int myBet = _playerStake;
+            int theirBet = _enemyStake;
+            int carryRounds = Mathf.Max(1, _stakeRounds);
+
+            int gain = GameRules.CalculateWinnerGain(myBet, han);
+            int loss = GameRules.CalculateLoserLoss(theirBet, han, data.isTankiWin);
             ClearStakes();
 
             _playerHp = prevPlayerHp + gain;
@@ -950,7 +969,12 @@ namespace KillingMahjong.Managers
                 prevLocalHp: prevPlayerHp, newLocalHp: _playerHp,
                 prevEnemyHp: prevEnemyHp, newEnemyHp: _enemyHp,
                 displayScore: settlement,
-                scoreFormula: BuildScoreFormula(_playerStake, han)));
+                scoreFormula: BuildScoreFormula(myBet, han),
+                settlement: BuildSettlementInfo(
+                    data, isLocalWin: true, han: han, myBet: myBet, theirBet: theirBet,
+                    carryRounds: carryRounds, myDelta: gain, theirDelta: -loss,
+                    prevLocalHp: prevPlayerHp, newLocalHp: _playerHp,
+                    prevEnemyHp: prevEnemyHp, newEnemyHp: _enemyHp)));
 
             ApplyHpToUI();
 
@@ -968,8 +992,14 @@ namespace KillingMahjong.Managers
             int prevEnemyHp = _enemyHp;
 
             int han = GetWinnerHan(data, isPlayerWin: false);
-            int gain = GameRules.CalculateWinnerGain(_enemyStake, han);
-            int loss = GameRules.CalculateLoserLoss(_playerStake, han, data.isTankiWin);
+
+            // **賭け金は ClearStakes() の前に控える。** 理由は RunPlayerRon 側と同じ
+            int myBet = _playerStake;
+            int theirBet = _enemyStake;
+            int carryRounds = Mathf.Max(1, _stakeRounds);
+
+            int gain = GameRules.CalculateWinnerGain(theirBet, han);
+            int loss = GameRules.CalculateLoserLoss(myBet, han, data.isTankiWin);
             ClearStakes();
 
             _playerHp = Mathf.Max(0, prevPlayerHp - loss);
@@ -993,7 +1023,12 @@ namespace KillingMahjong.Managers
                 prevEnemyHp: prevEnemyHp, newEnemyHp: _enemyHp,
                 displayScore: settlement,
                 // ここで出しているのは自分の損失なので、損失側の式にする
-                scoreFormula: BuildScoreFormula(_playerStake, han, data.isTankiWin)));
+                scoreFormula: BuildScoreFormula(myBet, han, data.isTankiWin),
+                settlement: BuildSettlementInfo(
+                    data, isLocalWin: false, han: han, myBet: myBet, theirBet: theirBet,
+                    carryRounds: carryRounds, myDelta: -loss, theirDelta: gain,
+                    prevLocalHp: prevPlayerHp, newLocalHp: _playerHp,
+                    prevEnemyHp: prevEnemyHp, newEnemyHp: _enemyHp)));
 
             ApplyHpToUI();
 
@@ -1015,6 +1050,55 @@ namespace KillingMahjong.Managers
         /// 勝者の獲得と敗者の損失は別計算なので、どちらを出しているかで式が変わる。
         /// 混ぜると答えが合わなくなる。
         /// </summary>
+        /// <summary>
+        /// 清算パネルの中身を台本から組む。**本編の <c>GameUIPhaseController.BuildSettlementInfo</c> と対で読むこと。**
+        ///
+        /// あちらはサーバーの `liquidation` をそのまま写すだけだが、
+        /// **チュートリアルはサーバーに繋がないので、正は台本（<see cref="TutorialRoundData"/>）と
+        /// <see cref="GameRules"/> になる。** ここで別の式を書くと、同じ局の HP の増減
+        /// （`CalculateWinnerGain` / `CalculateLoserLoss` で出したもの）と表の数字が食い違うので、
+        /// **増減は呼び出し側で出した値をそのまま受け取る。ここでは計算し直さない。**
+        ///
+        /// 役の行は本編と同じ <c>GameUIPhaseController.FillYakuRows</c> に任せる。
+        /// 台本の役名と翻数が噛み合っていなければ、あちらが行ごとの翻数を伏せて合計だけ出す。
+        ///
+        /// **強襲はチュートリアルに出てこない**ので常に無し。
+        /// </summary>
+        private static UI.RonSettlementInfo BuildSettlementInfo(
+            TutorialRoundData data, bool isLocalWin, int han, int myBet, int theirBet, int carryRounds,
+            int myDelta, int theirDelta, int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp)
+        {
+            if (data == null) return null;
+
+            var info = new UI.RonSettlementInfo
+            {
+                RankName = data.rankText,
+                TotalHan = han,
+                Multiplier = GameRules.GetMultiplier(han),
+                CarryRounds = Mathf.Max(1, carryRounds),
+                IsTankiWait = data.isTankiWin,
+                AssaultApplied = false,
+                AssaultBonusDamage = 0,
+                LocalWon = isLocalWin,
+
+                // **「自分」「相手」はローカル基準。** 勝った側基準ではない（本編と同じ約束）
+                MyBet = myBet,
+                TheirBet = theirBet,
+                MyDelta = myDelta,
+                TheirDelta = theirDelta,
+
+                MyHpBefore = prevLocalHp,
+                MyHpAfter = newLocalHp,
+                TheirHpBefore = prevEnemyHp,
+                TheirHpAfter = newEnemyHp,
+            };
+
+            UI.GameUIPhaseController.FillYakuRows(
+                info, Common.YakuNameUtil.Summarize(data.yakuList), han);
+
+            return info;
+        }
+
         private static string BuildScoreFormula(int stake, int han, bool tankiDouble = false)
         {
             if (stake <= 0) return null;
@@ -1031,7 +1115,7 @@ namespace KillingMahjong.Managers
         private IEnumerator PlayRonAnimation(
             List<int> handTiles, int ronTileId, TutorialRoundData data, bool isLocalPlayerWin,
             int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp, int displayScore,
-            string scoreFormula = null)
+            string scoreFormula = null, UI.RonSettlementInfo settlement = null)
         {
             var ronUI = gameUIManager != null ? gameUIManager.RonAnimationUI : null;
             if (ronUI == null)
@@ -1054,7 +1138,8 @@ namespace KillingMahjong.Managers
                 prevLocalHp, newLocalHp,
                 prevEnemyHp, newEnemyHp,
                 () => done = true,
-                scoreFormula);
+                scoreFormula,
+                settlement);
 
             yield return new WaitUntil(() => done);
         }

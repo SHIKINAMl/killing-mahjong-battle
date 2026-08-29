@@ -1201,6 +1201,25 @@ namespace KillingMahjong.UI
                 TheirHpAfter = newEnemyHp,
             };
 
+            FillYakuRows(info, yakuSummary, liq.han);
+
+            return info;
+        }
+
+        /// <summary>
+        /// 役の行を積んで、行ごとの翻数を出してよいかを決める。
+        ///
+        /// **本編（サーバーの liquidation）とチュートリアル（台本）の両方から呼ぶ。**
+        /// 2026-08-29 にチュートリアルへ内訳を出すとき、丸ごと写すと
+        /// 「片方だけ直す事故」がまた起きるのでここへ寄せた。
+        ///
+        /// <paramref name="totalHan"/> は**正とみなす翻数**（本編ならサーバーの `han`、
+        /// チュートリアルなら台本の翻数）。行の合計がこれと一致したときだけ内訳の翻数を出す。
+        /// </summary>
+        public static void FillYakuRows(RonSettlementInfo info, List<Common.YakuNameUtil.Entry> yakuSummary, int totalHan)
+        {
+            if (info == null || yakuSummary == null) return;
+
             // 行ごとの翻数。サーバーは重複も1要素ずつ足しているので、こちらも
             // 「(素の翻 + 強化) × 枚数」で数える（`game_engine.py:757-758` と同じ数え方）
             int rowSum = 0;
@@ -1253,13 +1272,11 @@ namespace KillingMahjong.UI
                 });
             }
 
-            info.ShowPerRowHan = allKnown && rowSum == liq.han;
+            info.ShowPerRowHan = allKnown && rowSum == totalHan;
             if (!info.ShowPerRowHan)
             {
-                Debug.LogWarning($"[Ron] 役ごとの翻数を伏せた（合計 {rowSum} / サーバー {liq.han}, 全役既知={allKnown}）");
+                Debug.LogWarning($"[Ron] 役ごとの翻数を伏せた（合計 {rowSum} / 正 {totalHan}, 全役既知={allKnown}）");
             }
-
-            return info;
         }
 
         /// <summary>

@@ -227,7 +227,7 @@ MonoBehaviour:
     enemyRonMeldBaseIds: 010000000100000001000000020000000200000002000000030000000300000003000000040000000400000004000000
     enemyRonOnPlayerDiscardTurn: 5
     yakuList:
-    - "\u56DB\u6697\u523B\u5358\u9A0E"
+    - "\u56DB\u6697\u523B"
     formulaText: "\u5F79\u6E80"
     rankText: "\u5F79\u6E80"
     enemyWinningHan: 13
@@ -433,7 +433,7 @@ MonoBehaviour:
     yakuList:
     - "\u7D14\u6B63\u4E5D\u84EE\u5B9D\u71C8"
     formulaText: "26\u98DC"
-    rankText: "\u5F79\u6E80"
+    rankText: "\u30C0\u30D6\u30EB\u5F79\u6E80"
     enemyWinningHan: 13
     isTankiWin: 0
     drawDamageToPlayer: 0

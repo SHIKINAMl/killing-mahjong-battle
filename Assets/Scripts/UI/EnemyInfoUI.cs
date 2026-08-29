@@ -401,9 +401,36 @@ namespace KillingMahjong.UI
             }
 
             // 与えたダメージが敵側に一切表示されず、手応えが片側だけだったため追加。
-            if (!isFirstSetup && diff != 0)
+            if (!isFirstSetup && diff != 0 && !SuppressHpPopup)
             {
                 HpPopup.Report(diff, currentHp, maxHp);
+            }
+        }
+
+        /// <summary>
+        /// ロンの血の移動中だけ true にして、浮き数字とSEを止める。理由は
+        /// <see cref="PlayerInfoUI.SuppressHpPopup"/> と同じ（同じ数字が同じ場所に二重に出る）。
+        /// </summary>
+        public bool SuppressHpPopup { get; set; }
+
+        /// <summary>
+        /// 打撃SEのピッチ判定に使う分母。理由は <see cref="PlayerInfoUI.MaxHp"/> と同じ。
+        /// </summary>
+        public int MaxHp => maxHp;
+
+        /// <summary>
+        /// HPが見えている場所（血袋）。**血の移動の着弾点と、増減ラベルの置き場所に使う。**
+        /// 取り方は <see cref="HpPopup"/> と同じ。null は返さない。
+        /// </summary>
+        public RectTransform HpAnchor
+        {
+            get
+            {
+                if (damagePopupAnchor != null) return damagePopupAnchor;
+                var zoom = zoomTarget as RectTransform;
+                if (zoom != null) return zoom;
+                if (enemyPanel != null) return enemyPanel.transform as RectTransform;
+                return transform as RectTransform;
             }
         }
 

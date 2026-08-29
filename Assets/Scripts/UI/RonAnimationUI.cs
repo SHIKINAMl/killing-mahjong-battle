@@ -545,48 +545,383 @@ namespace KillingMahjong.UI
                 yield return new WaitForSeconds(0.25f);
             }
 
-            // ④ 血が動く。**パネルを出したまま動かす**ので、数字とゲージが同時に見える
+            // ④ 表を読み切る間。**パネルはこのあと消える**ので、ここが表を見られる最後の時間。
+            //
+            // **`myDeltaText` / `theirDeltaText` / `myHpText` / `theirHpText` には何も入れない。**
+            // 血の増減はこの下の演出が答えとして出すもので、先にパネルへ書くと山が消える。
+            // 行そのものも `BuildSettlementPanel` で非アクティブにしてある（out は署名維持のために残している）。
             if (KillingMahjong.Managers.AudioManager.Instance != null)
             {
                 KillingMahjong.Managers.AudioManager.Instance.PlayRankVoice(s.RankName);
             }
 
-            const float hpTime = 1.2f;
-            for (float t = 0; t < hpTime; t += Time.deltaTime)
-            {
-                float eased = 1f - Mathf.Pow(1f - Mathf.Clamp01(t / hpTime), 3f);
+            yield return new WaitForSeconds(0.8f);
 
-                int myNow = Mathf.RoundToInt(Mathf.Lerp(s.MyHpBefore, s.MyHpAfter, eased));
-                int themNow = Mathf.RoundToInt(Mathf.Lerp(s.TheirHpBefore, s.TheirHpAfter, eased));
-
-                myDeltaText.text = FormatDelta(Mathf.RoundToInt(Mathf.Lerp(0, s.MyDelta, eased)));
-                theirDeltaText.text = FormatDelta(Mathf.RoundToInt(Mathf.Lerp(0, s.TheirDelta, eased)));
-                myHpText.text = $"{s.MyHpBefore}→{myNow}";
-                theirHpText.text = $"{s.TheirHpBefore}→{themNow}";
-
-                if (playerInfo != null) playerInfo.SetHP(Mathf.RoundToInt(Mathf.Lerp(prevLocalHp, newLocalHp, eased)));
-                if (enemyInfo != null) enemyInfo.SetHP(Mathf.RoundToInt(Mathf.Lerp(prevEnemyHp, newEnemyHp, eased)));
-
-                yield return null;
-            }
-
-            myDeltaText.text = FormatDelta(s.MyDelta);
-            theirDeltaText.text = FormatDelta(s.TheirDelta);
-            myHpText.text = $"{s.MyHpBefore}→{s.MyHpAfter}";
-            theirHpText.text = $"{s.TheirHpBefore}→{s.TheirHpAfter}";
-            if (playerInfo != null) playerInfo.SetHP(newLocalHp);
-            if (enemyInfo != null) enemyInfo.SetHP(newEnemyHp);
-
-            // 読み切るための間。**ここが唯一の「止まって見る」時間**
-            yield return new WaitForSeconds(1.6f);
-
-            Destroy(container);
-            yield return new WaitForSeconds(0.2f);
+            // ⑤ 血が動く。**パネルを消しながら**素点の数字を持ち出す
+            yield return BloodTransferRoutine(container, s, myBetText, theirBetText,
+                playerInfo, enemyInfo, prevLocalHp, newLocalHp, prevEnemyHp, newEnemyHp);
         }
 
         private static string FormatDelta(int v)
         {
             return v > 0 ? "+" + v : v.ToString(); // 負号は int の表記がそのまま使える
+        }
+
+        // ============================================================
+        //  血が動く瞬間
+        //
+        //  2026-08-29 の指示（**それぞれ非対称な表示方法で**）:
+        //   ① 素点の数字が画面中央へ、大きくなりながら移動する
+        //   ② 「満貫」表示くらいの大きさになったら、数値が変化する
+        //   ③ 変化した数値がHPへ向かって収縮しながら移動し、HPの数値が動く
+        //   ④ 同時に、自分と相手のHPの隣にこの局の増減を出す
+        //
+        //  **飛ぶのは片側だけ。これが「非対称」の中身であり、同時に嘘を防いでいる。**
+        //  勝者の獲得と敗者の損失は母数が違う（単騎なら負けた側だけ2倍、強襲なら勝者は0）ので、
+        //  両側から数字を飛ばすと「血が相手から自分へ移った」ように見えてしまう。
+        //  旧経路の SpawnAbsorbParticles（中央 → 勝者）がまさにその絵で、新経路には持ってきていない。
+        //
+        //  尺: 離陸0.35 → 変化0.25 → 静止0.25 → 着弾0.30 → HP0.80 → 静止0.50 ＝ 約2.45秒。
+        //  **パネルを読ませる 0.8秒（SettlementRoutine 側）を別に取ってある。**
+        //  最後の静止は 2026-08-29 の実機確認のあと 1.00 → 0.50 に詰めた（見ていて一番余っていた場所）。
+        //  **中央の静止 0.25 は逆に短いくらいなので、削るならここではない。**
+        // ============================================================
+
+        /// <summary>
+        /// 中央で止まるときの文字の大きさ。**ゲーム内の「満貫」表示と同じ寸法にする**という指示。
+        /// 拡大は fontSize ではなく localScale でやる（毎フレーム fontSize を動かすと再レイアウトが走る）ので、
+        /// 文字は最初からこの大きさで作って縮めた状態から始める。
+        /// </summary>
+        private const float BloodPeakFontSize = UITypography.Huge;
+
+        /// <summary>着弾したときの大きさ。HPの数字と同じくらいに収める。</summary>
+        private const float BloodLandFontSize = 28f;
+
+        private IEnumerator BloodTransferRoutine(GameObject panelContainer, RonSettlementInfo s,
+            TextMeshProUGUI myBetText, TextMeshProUGUI theirBetText,
+            PlayerInfoUI playerInfo, EnemyInfoUI enemyInfo,
+            int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp)
+        {
+            // どちらの数字を飛ばすか。通常は自分。
+            // **強襲で自分の獲得が 0 に潰れた局だけ相手側を飛ばす。**
+            // 0 を満貫サイズまで拡大しても何も伝わらないし、強襲が何をしたのかは
+            // いま画面のどこにも動きで出ていない（2026-08-29 に判断を仰いで決めた）。
+            bool flyMine = s.MyDelta != 0 || s.TheirDelta == 0;
+
+            TextMeshProUGUI source = flyMine ? myBetText : theirBetText;
+            int fromValue = flyMine ? s.MyBet : s.TheirBet;
+            int toValue = flyMine ? s.MyDelta : s.TheirDelta;
+            Color tint = flyMine ? AccentMine : AccentThem;
+
+            RectTransform target = null;
+            if (flyMine) { if (playerInfo != null) target = playerInfo.HpAnchor; }
+            else { if (enemyInfo != null) target = enemyInfo.HpAnchor; }
+
+            // 飛ばす元か先が取れないときは演出を諦める。
+            // **ただしHPは必ず最終値に合わせる。** ここで抜けるとサーバーの結果と画面がずれる
+            if (source == null || target == null)
+            {
+                Debug.LogWarning("[RonAnimationUI] 血の移動を省略した（起点か着弾点が無い）。HPは最終値に合わせる");
+                if (panelContainer != null) Destroy(panelContainer);
+                if (playerInfo != null) playerInfo.SetHP(newLocalHp);
+                if (enemyInfo != null) enemyInfo.SetHP(newEnemyHp);
+                yield return new WaitForSeconds(0.2f);
+                yield break;
+            }
+
+            // 浮き数字を止める。**着弾点に増減ラベルを自分で出すので、重なると額が同じぶんかえって読めない。**
+            // SEもここで止まるので、下で鳴らし直す（ずらして鳴らすのが目的でもある）
+            if (playerInfo != null) playerInfo.SuppressHpPopup = true;
+            if (enemyInfo != null) enemyInfo.SuppressHpPopup = true;
+
+            // パネルが消えても残る入れ物。**ディマーは置かない**（盤面を見せたまま血を動かす）
+            GameObject stage = new GameObject("BloodTransferStage");
+            stage.transform.SetParent(transform, false);
+            stage.transform.SetAsLastSibling();
+            RectTransform stageRt = stage.AddComponent<RectTransform>();
+            stageRt.anchorMin = Vector2.zero;
+            stageRt.anchorMax = Vector2.one;
+            stageRt.sizeDelta = Vector2.zero;
+            Canvas stageCanvas = stage.AddComponent<Canvas>();
+            stageCanvas.overrideSorting = true;
+            stageCanvas.sortingOrder = UISortingOrders.RonAnimation;
+
+            Vector3 startPos = source.rectTransform.position;
+            Vector3 centerPos = new Vector3(Screen.width / 2f, Screen.height / 2f, 0f);
+            Vector3 endPos = AnchorCenter(target);
+
+            float startScale = Mathf.Max(0.05f, source.fontSize / BloodPeakFontSize);
+            float landScale = BloodLandFontSize / BloodPeakFontSize;
+
+            // 飛ぶ数字。**素点の複製**なので、元の行は最後まで消えない（パネルごと消えるだけ）
+            GameObject flyObj = new GameObject("BloodValue");
+            flyObj.transform.SetParent(stageRt, false);
+            TextMeshProUGUI fly = flyObj.AddComponent<TextMeshProUGUI>();
+            fly.text = fromValue.ToString();
+            fly.color = tint;
+            fly.fontSize = BloodPeakFontSize;
+            fly.alignment = TextAlignmentOptions.Center;
+            fly.fontStyle = FontStyles.Bold;
+            fly.textWrappingMode = TextWrappingModes.NoWrap;
+            // 盤面（赤い壁・緑の卓）の上を通るので、縁取りが無いと途中で読めなくなる
+            fly.outlineWidth = 0.2f;
+            fly.outlineColor = new Color32(0, 0, 0, 255);
+            RectTransform flyRt = flyObj.GetComponent<RectTransform>();
+            flyRt.sizeDelta = new Vector2(1000f, 260f);
+            flyRt.position = startPos;
+            flyRt.localScale = Vector3.one * startScale;
+
+            // 何が掛かってこの数字になったのか。**大きい数字の下に小さく出す**（8/29 に許可を取った）。
+            // 数字の子にしてあるので、拡大・収縮も一緒に付いてくる
+            GameObject noteObj = new GameObject("BloodNote");
+            noteObj.transform.SetParent(flyRt, false);
+            TextMeshProUGUI note = noteObj.AddComponent<TextMeshProUGUI>();
+            note.text = BuildMultiplierNote(s, toValue);
+            note.color = AccentGold;
+            note.fontSize = 34f;
+            note.alignment = TextAlignmentOptions.Center;
+            note.fontStyle = FontStyles.Bold;
+            note.textWrappingMode = TextWrappingModes.NoWrap;
+            note.outlineWidth = 0.2f;
+            note.outlineColor = new Color32(0, 0, 0, 255);
+            note.alpha = 0f; // 数値が変わる瞬間まで出さない
+            RectTransform noteRt = noteObj.GetComponent<RectTransform>();
+            noteRt.anchorMin = new Vector2(0.5f, 0f);
+            noteRt.anchorMax = new Vector2(0.5f, 0f);
+            noteRt.pivot = new Vector2(0.5f, 1f);
+            noteRt.sizeDelta = new Vector2(700f, 50f);
+            noteRt.anchoredPosition = new Vector2(0f, 4f);
+
+            // 清算パネルを丸ごと消しにかかる。**パネルだけ消して手牌や暗幕が残ると、
+            // 一拍おいてから全部が同時に消えることになって目立つ**ので、コンテナごと1枚で落とす
+            CanvasGroup containerGroup = null;
+            if (panelContainer != null)
+            {
+                containerGroup = panelContainer.GetComponent<CanvasGroup>();
+                if (containerGroup == null) containerGroup = panelContainer.AddComponent<CanvasGroup>();
+            }
+
+            // ① 離陸 → 画面中央。パネルは同じ時間で消える
+            const float riseTime = 0.35f;
+            for (float t = 0; t < riseTime; t += Time.deltaTime)
+            {
+                float p = Mathf.Clamp01(t / riseTime);
+                float eased = 1f - Mathf.Pow(1f - p, 3f);
+                flyRt.position = Vector3.Lerp(startPos, centerPos, eased);
+                flyRt.localScale = Vector3.one * Mathf.Lerp(startScale, 1f, eased);
+                if (containerGroup != null) containerGroup.alpha = 1f - p;
+                yield return null;
+            }
+            flyRt.position = centerPos;
+            flyRt.localScale = Vector3.one;
+            if (panelContainer != null) Destroy(panelContainer);
+
+            // ② 数値が変わる。**潰れきった瞬間に入れ替える**ので、途中の混ざった数字が読めてしまわない
+            string landed = FormatDelta(toValue);
+            bool swapped = false;
+            const float popTime = 0.25f;
+            for (float t = 0; t < popTime; t += Time.deltaTime)
+            {
+                float p = Mathf.Clamp01(t / popTime);
+                if (p < 0.5f)
+                {
+                    float q = p / 0.5f;
+                    flyRt.localScale = new Vector3(Mathf.Lerp(1f, 1.25f, q), Mathf.Lerp(1f, 0.2f, q), 1f);
+                }
+                else
+                {
+                    if (!swapped)
+                    {
+                        swapped = true;
+                        fly.text = landed;
+                        note.alpha = 1f;
+                        if (KillingMahjong.Managers.AudioManager.Instance != null)
+                        {
+                            // コインを置くような二段の決定音。**額が確定した音として借りている**
+                            KillingMahjong.Managers.AudioManager.Instance.PlayBetConfirmSE();
+                        }
+                    }
+                    float q = (p - 0.5f) / 0.5f;
+                    float e = 1f - Mathf.Pow(1f - q, 3f);
+                    flyRt.localScale = new Vector3(Mathf.Lerp(1.25f, 1f, e), Mathf.Lerp(0.2f, 1f, e), 1f);
+                }
+                yield return null;
+            }
+            fly.text = landed;
+            note.alpha = 1f;
+            flyRt.localScale = Vector3.one;
+
+            // 満貫サイズのまま静止。**ここが読ませる時間**
+            yield return new WaitForSeconds(0.25f);
+
+            // ③ 収縮しながらHPへ落ちる
+            //
+            // **落ちながら白へ寄せる（2026-08-29 の実機確認で決めた）。**
+            // 着弾点は HpAnchor の真ん中、つまり自分ならスマホの画面、相手なら血袋の中。
+            // **飛ぶ数字の色は自分が #57C7E8、相手が #F2705A で、どちらも着地先とほぼ同じ色**なので、
+            // 素の色のまま落とすと最後の数桁が背景に溶けて、いちばん見せたい着弾が読めなくなる。
+            // 黒縁を太くするのは**ドット絵の細い字には効かない**ので採らなかった。
+            const float diveTime = 0.30f;
+            for (float t = 0; t < diveTime; t += Time.deltaTime)
+            {
+                float p = Mathf.Clamp01(t / diveTime);
+                float eased = p * p; // 落ちるほど速く
+                flyRt.position = Vector3.Lerp(centerPos, endPos, eased);
+                flyRt.localScale = Vector3.one * Mathf.Lerp(1f, landScale, eased);
+                // **着弾より少し手前で白まで振り切る。** 背景に重なるのは終盤なので、
+                // 最後の一瞬で切り替えると間に合わない
+                fly.color = Color.Lerp(tint, Color.white, Mathf.Clamp01(p * 1.4f));
+                note.alpha = 1f - p; // 注記は途中で用済み
+                yield return null;
+            }
+            Destroy(flyObj);
+
+            // ④ 着弾。**両方のHPの隣に増減が出て、両方のメーターが同時に動き出す**
+            if (playerInfo != null) SpawnHpDeltaLabel(stageRt, playerInfo.HpAnchor, s.MyDelta, AccentMine, placeLeft: true);
+            if (enemyInfo != null) SpawnHpDeltaLabel(stageRt, enemyInfo.HpAnchor, s.TheirDelta, AccentThem, placeLeft: false);
+
+            PlayBloodSE(isLocalSide: true, delta: s.MyDelta, newHp: newLocalHp,
+                        maxHp: playerInfo != null ? playerInfo.MaxHp : 0);
+
+            const float hpTime = 0.8f;
+            bool enemySePlayed = false;
+            for (float t = 0; t < hpTime; t += Time.deltaTime)
+            {
+                float eased = 1f - Mathf.Pow(1f - Mathf.Clamp01(t / hpTime), 3f);
+                if (playerInfo != null) playerInfo.SetHP(Mathf.RoundToInt(Mathf.Lerp(prevLocalHp, newLocalHp, eased)));
+                if (enemyInfo != null) enemyInfo.SetHP(Mathf.RoundToInt(Mathf.Lerp(prevEnemyHp, newEnemyHp, eased)));
+
+                // **PlayDamageSE と PlayHitSE はHPの残量でピッチが変わる作りなのに、
+                // 今まで同時に鳴って潰し合っていた。** 少しずらすだけで聞き分けられる
+                if (!enemySePlayed && t >= 0.12f)
+                {
+                    enemySePlayed = true;
+                    PlayBloodSE(isLocalSide: false, delta: s.TheirDelta, newHp: newEnemyHp,
+                                maxHp: enemyInfo != null ? enemyInfo.MaxHp : 0);
+                }
+                yield return null;
+            }
+            if (!enemySePlayed)
+            {
+                PlayBloodSE(isLocalSide: false, delta: s.TheirDelta, newHp: newEnemyHp,
+                            maxHp: enemyInfo != null ? enemyInfo.MaxHp : 0);
+            }
+
+            if (playerInfo != null) playerInfo.SetHP(newLocalHp);
+            if (enemyInfo != null) enemyInfo.SetHP(newEnemyHp);
+
+            // 読み切るための間。**実機で見て一番余っていたので 1.00 → 0.50 に詰めた（8/29）**
+            yield return new WaitForSeconds(0.5f);
+
+            if (playerInfo != null) playerInfo.SuppressHpPopup = false;
+            if (enemyInfo != null) enemyInfo.SuppressHpPopup = false;
+            Destroy(stage);
+            yield return new WaitForSeconds(0.2f);
+        }
+
+        /// <summary>
+        /// 素点がこの額になった理由。**倍率・単騎の2倍・強襲の上乗せを、掛かった順に並べる。**
+        ///
+        /// 単騎の2倍と強襲の上乗せが乗るのは<strong>負けた側だけ</strong>なので、
+        /// 飛んでいる側が負けている（額が負）ときにだけ足す。
+        /// **全角の `＋`(U+FF0B) はフォントに無い。** ASCII の `+` を使うこと（§4 の欠字表）。
+        /// </summary>
+        private static string BuildMultiplierNote(RonSettlementInfo s, int flownDelta)
+        {
+            string note = "×" + s.Multiplier.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+            bool flownIsLoser = flownDelta < 0;
+            if (s.IsTankiWait && flownIsLoser) note += " ×2";
+            if (s.AssaultApplied && flownIsLoser) note += " +強襲";
+            return note;
+        }
+
+        /// <summary>
+        /// HPの隣に出すこの局の増減。**「隣」は画面の内側**（自分＝右のスマホなのでその左、相手＝左の血袋なのでその右）。
+        /// 上に出すと、いま止めた <c>HpPopupPresenter</c> の浮き数字と同じ場所になってしまう。
+        /// </summary>
+        private TextMeshProUGUI SpawnHpDeltaLabel(RectTransform parent, RectTransform anchor, int delta, Color tint, bool placeLeft)
+        {
+            if (anchor == null) return null;
+
+            GameObject go = new GameObject("HpDelta");
+            go.transform.SetParent(parent, false);
+            TextMeshProUGUI text = go.AddComponent<TextMeshProUGUI>();
+            text.text = FormatDelta(delta);
+            text.color = tint;
+            text.fontSize = 30f;
+            text.fontStyle = FontStyles.Bold;
+            text.textWrappingMode = TextWrappingModes.NoWrap;
+            text.alignment = placeLeft ? TextAlignmentOptions.Right : TextAlignmentOptions.Left;
+            text.outlineWidth = 0.2f;
+            text.outlineColor = new Color32(0, 0, 0, 255);
+
+            RectTransform rt = go.GetComponent<RectTransform>();
+            rt.sizeDelta = new Vector2(280f, 44f);
+            // **ピボットを文字が寄る側の端に置く。** 既定の中心(0.5)のままだと `rt.position` が箱の中心になり、
+            // 右寄せの文字は箱の半分ぶん外側へずれてスマホや血袋に重なる。
+            // **しかも sizeDelta はキャンバス単位・position は画面ピクセルなので、
+            // 解像度によってずれ方が変わる。机上では気付けない類のずれ。**
+            rt.pivot = new Vector2(placeLeft ? 1f : 0f, 0.5f);
+
+            Vector3[] corners = new Vector3[4];
+            anchor.GetWorldCorners(corners);
+            Vector3 center = (corners[0] + corners[2]) * 0.5f;
+            float halfWidth = (corners[2].x - corners[0].x) * 0.5f;
+            // HPの絵に食い込まないぶんだけ内側へ逃がす（画面ピクセル）。
+            // **24 では足りなかった（2026-08-29 の実機確認）。** ここで基準にしている HpAnchor は
+            // スマホの中の `HPPanel`（x 669..759）で、**スマホの外枠はそこから 24px ほど外へ出ている。**
+            // 逃がした量と枠までの距離がちょうど同じで、実質の隙間が 0 になっていた。
+            const float gap = 48f;
+            center.x += placeLeft ? -(halfWidth + gap) : (halfWidth + gap);
+            rt.position = center;
+
+            StartCoroutine(HpDeltaLabelRoutine(rt, text));
+            return text;
+        }
+
+        /// <summary>増減ラベルの出方。ふわっと出して、少しだけ浮かせる。</summary>
+        private IEnumerator HpDeltaLabelRoutine(RectTransform rt, TextMeshProUGUI text)
+        {
+            Vector3 basePos = rt.position;
+            const float appear = 0.18f;
+            for (float t = 0; t < appear; t += Time.deltaTime)
+            {
+                if (rt == null) yield break;
+                float p = Mathf.Clamp01(t / appear);
+                text.alpha = p;
+                rt.localScale = Vector3.one * Mathf.Lerp(1.4f, 1f, 1f - Mathf.Pow(1f - p, 3f));
+                rt.position = basePos + new Vector3(0f, Mathf.Lerp(-10f, 0f, p), 0f);
+                yield return null;
+            }
+            if (rt == null) yield break;
+            text.alpha = 1f;
+            rt.localScale = Vector3.one;
+            rt.position = basePos;
+        }
+
+        /// <summary>
+        /// 血が動く音。**元は <c>HpPopupPresenter.PlaySound</c> が鳴らしていたもの**で、
+        /// 浮き数字ごと止めたぶんをここで鳴らし直している。自分側は被弾音、相手側は打撃音。
+        /// </summary>
+        private static void PlayBloodSE(bool isLocalSide, int delta, int newHp, int maxHp)
+        {
+            if (delta == 0) return;
+            var audio = KillingMahjong.Managers.AudioManager.Instance;
+            if (audio == null) return;
+
+            if (delta > 0) { audio.PlayHealSE(); return; }
+
+            float ratio = maxHp > 0 ? (float)newHp / maxHp : 1f;
+            if (isLocalSide) audio.PlayDamageSE(ratio);
+            else audio.PlayHitSE(ratio);
+        }
+
+        /// <summary>RectTransform の中心をワールド座標で返す。**サイズが 0 の空オブジェクトでも中心が取れる。**</summary>
+        private static Vector3 AnchorCenter(RectTransform rt)
+        {
+            Vector3[] corners = new Vector3[4];
+            rt.GetWorldCorners(corners);
+            return (corners[0] + corners[2]) * 0.5f;
         }
 
         private CanvasGroup BuildSettlementPanel(RectTransform parent, RonSettlementInfo s,
@@ -712,6 +1047,14 @@ namespace KillingMahjong.UI
             MakeText(hpRow.transform, "", 18f, PanelFaint, TextAlignmentOptions.Left, true);
             myHpText = MakeText(hpRow.transform, "", 18f, PanelFaint, TextAlignmentOptions.Right, false, ValueColumn);
             theirHpText = MakeText(hpRow.transform, "", 18f, PanelFaint, TextAlignmentOptions.Right, false, ValueColumn);
+
+            // **血とHPの2行は伏せておく。**（2026-08-29）
+            // 血の増減はこのあとの「飛ぶ数字」が答えとして出すもので、パネルに先に書くと山が消える。
+            // 行そのものを消さずに非アクティブにしているのは、
+            // **out で返す4本の参照を維持したまま**（＝リフレクション経由の検証手順を壊さずに）
+            // 見せ方だけ戻せるようにするため。戻すなら SetActive(true) の1行でよい。
+            deltaRow.SetActive(false);
+            hpRow.SetActive(false);
 
             return group;
         }

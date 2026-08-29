@@ -291,7 +291,7 @@ namespace KillingMahjong.UI
                 hpFillImage.fillAmount = (float)hp / MeterMax;
             }
 
-            if (!isFirstSetup && diff != 0)
+            if (!isFirstSetup && diff != 0 && !SuppressHpPopup)
             {
                 HpPopup.Report(diff, currentHp, maxHp);
             }
@@ -348,6 +348,35 @@ namespace KillingMahjong.UI
             }
         }
 
+        /// <summary>
+        /// ロンの血の移動中だけ true にして、浮き数字とSEを止める。
+        ///
+        /// **止めないと同じ数字が同じ場所に二重に出る。** 血の移動は着弾点に増減ラベルを自分で出すので、
+        /// そこへ HpPopupPresenter の浮き数字が重なると、額が同じぶんかえって読めなくなる。
+        /// **対局中の他の場面（打牌でHPが動くなど）では止めない。**
+        /// </summary>
+        public bool SuppressHpPopup { get; set; }
+
+        /// <summary>
+        /// ダメージSEのピッチ判定に使う分母。**メーターの分母（<c>MeterMax</c>）ではない。**
+        /// 「絶対量としてどれだけ残っているか」で音が変わる作りなので、最高HPまで広げてはいけない。
+        /// </summary>
+        public int MaxHp => maxHp;
+
+        /// <summary>
+        /// HPが見えている場所（スマホ）。**血の移動の着弾点と、増減ラベルの置き場所に使う。**
+        /// 取り方は <see cref="HpPopup"/> と同じ。null は返さない（最後は自分の RectTransform）。
+        /// </summary>
+        public RectTransform HpAnchor
+        {
+            get
+            {
+                if (damagePopupAnchor != null) return damagePopupAnchor;
+                var zoom = zoomTarget as RectTransform;
+                if (zoom != null) return zoom;
+                return transform as RectTransform;
+            }
+        }
 
         public void ReduceHp(int amount)
         {
