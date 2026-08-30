@@ -177,9 +177,8 @@ namespace KillingMahjong.UI
             }
             message += "\n\nこの手牌で決定しますか？";
 
-            // WaitUIを移動させる処理を廃止 (ConfirmationDialogUI内部で表示する)
-            // if (uiManager.WaitUI != null) uiManager.WaitUI.MoveToCenter();
-
+            // WaitUI を中央へ移す処理は廃止（ConfirmationDialogUI が中に待ち牌を出す）。
+            // **2026-08-29 に WaitUI.MoveToCenter / MoveToOriginalPosition ごと削除した。**
             if (uiManager.ConfirmationDialogUI != null)
             {
                 uiManager.ConfirmationDialogUI.ShowDialogWithWaits(
@@ -190,7 +189,6 @@ namespace KillingMahjong.UI
                         if (ReactionController.Instance != null) ReactionController.Instance.StopHandSelectionTimer(true);
                         _autoConfirmNextHandSelection = true;
                         if (uiManager.HandUI != null) uiManager.HandUI.SetSubmittedState(true);
-                        // if (uiManager.WaitUI != null) uiManager.WaitUI.MoveToOriginalPosition();
 
                         if (uiManager.PhaseTransitionUI != null)
                         {
@@ -232,18 +230,12 @@ namespace KillingMahjong.UI
                         _autoConfirmNextHandSelection = false;
                         if (uiManager.HandUI != null) uiManager.HandUI.SetSubmittedState(false);
                         BoardStateManager.Instance.ClearWaitTiles();
-                        // if (uiManager.WaitUI != null) 
-                        // {
-                        //     uiManager.WaitUI.MoveToOriginalPosition();
-                        //     uiManager.WaitUI.Hide();
-                        // }
                         if (uiManager.PhaseController != null) uiManager.PhaseController.SetMatchUIVisibility(true);
                     }
                 );
             }
             else
             {
-                // if (uiManager.WaitUI != null) uiManager.WaitUI.MoveToOriginalPosition();
                 if (ReactionController.Instance != null) ReactionController.Instance.StopHandSelectionTimer(true);
                 _autoConfirmNextHandSelection = true;
                 if (uiManager.HandUI != null) uiManager.HandUI.SetSubmittedState(true);

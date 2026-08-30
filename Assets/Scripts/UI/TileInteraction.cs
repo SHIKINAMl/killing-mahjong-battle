@@ -151,12 +151,6 @@ namespace KillingMahjong.UI
             // ユーザー要望によりドラッグでの移動は無効化
         }
 
-        private void ReturnToOriginal()
-        {
-            transform.position = _originalPosition;
-            transform.SetParent(_originalParent);
-        }
-
         public void OnPointerEnter(PointerEventData eventData)
         {
             if (_gameUIManager != null && _gameUIManager.IsTransitioning) return;

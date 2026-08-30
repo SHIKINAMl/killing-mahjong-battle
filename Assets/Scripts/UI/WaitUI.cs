@@ -28,13 +28,6 @@ namespace KillingMahjong.UI
         private Coroutine paginationCoroutine = null;
         private const int MaxTilesPerPage = 3;
 
-        private Vector2 originalPosition;
-        private Vector2 originalPivot;
-        private Vector2 originalAnchorMin;
-        private Vector2 originalAnchorMax;
-        private Vector3 originalWorldPosition;
-        private bool isOriginalSaved = false;
-
         private void Awake()
         {
             if (waitContainer != null)
@@ -59,100 +52,6 @@ namespace KillingMahjong.UI
                     DestroyImmediate(hlg);
                 }
             }
-        }
-
-        private Transform originalParent;
-        private Vector3 originalLocalScale;
-
-        private void SaveOriginalRect()
-        {
-            if (isOriginalSaved || waitContainer == null) return;
-            originalParent = waitContainer.parent;
-            originalLocalScale = waitContainer.localScale;
-            originalPosition = waitContainer.anchoredPosition;
-            originalPivot = waitContainer.pivot;
-            originalAnchorMin = waitContainer.anchorMin;
-            originalAnchorMax = waitContainer.anchorMax;
-            originalWorldPosition = waitContainer.position;
-            isOriginalSaved = true;
-        }
-
-        public void MoveToCenter()
-        {
-            gameObject.SetActive(true);
-            SaveOriginalRect();
-            if (waitContainer != null)
-            {
-                CanvasGroup cg = waitContainer.GetComponent<CanvasGroup>();
-                if (cg == null) cg = waitContainer.gameObject.AddComponent<CanvasGroup>();
-                cg.alpha = 0f;
-
-                StartCoroutine(MoveToCenterCoroutine(cg));
-            }
-        }
-
-        private System.Collections.IEnumerator MoveToCenterCoroutine(CanvasGroup cg)
-        {
-            yield return null; // レイアウト更新を1フレーム待つ（WebGL互換）
-
-            if (waitContainer != null)
-            {
-                // 親のスケールや位置の影響を断ち切るため、ルートのCanvasの直下に一時的に移動
-                Canvas rootCanvas = GetComponentInParent<Canvas>();
-                if (rootCanvas != null)
-                {
-                    waitContainer.SetParent(rootCanvas.rootCanvas.transform, true);
-                }
-
-                Canvas canvas = waitContainer.GetComponent<Canvas>();
-                if (canvas != null)
-                {
-                    canvas.overrideSorting = true;
-                    canvas.sortingOrder = UISortingOrders.WaitDisplayFront;
-                }
-
-                UnityEngine.UI.LayoutElement layoutElement = waitContainer.GetComponent<UnityEngine.UI.LayoutElement>();
-                if (layoutElement == null) layoutElement = waitContainer.gameObject.AddComponent<UnityEngine.UI.LayoutElement>();
-                layoutElement.ignoreLayout = true;
-
-                waitContainer.localScale = Vector3.one; // 親の縮小スケールをリセット
-                waitContainer.anchorMin = new Vector2(0.5f, 0.5f);
-                waitContainer.anchorMax = new Vector2(0.5f, 0.5f);
-                waitContainer.pivot = new Vector2(0.5f, 0.5f);
-                // 画面中央から少し上の位置に強制配置
-                waitContainer.anchoredPosition = new Vector2(0, 120f);
-            }
-
-            if (cg != null) cg.alpha = 1f;
-        }
-
-        public void MoveToOriginalPosition()
-        {
-            if (!isOriginalSaved || waitContainer == null) return;
-            
-            if (originalParent != null)
-            {
-                waitContainer.SetParent(originalParent, true);
-            }
-
-            Canvas canvas = waitContainer.GetComponent<Canvas>();
-            if (canvas != null)
-            {
-                canvas.overrideSorting = false;
-            }
-
-            UnityEngine.UI.LayoutElement layoutElement = waitContainer.GetComponent<UnityEngine.UI.LayoutElement>();
-            if (layoutElement != null)
-            {
-                layoutElement.ignoreLayout = false;
-            }
-
-            waitContainer.localScale = originalLocalScale;
-            waitContainer.anchorMin = originalAnchorMin;
-            waitContainer.anchorMax = originalAnchorMax;
-            waitContainer.pivot = originalPivot;
-            waitContainer.anchoredPosition = originalPosition;
-            waitContainer.position = originalWorldPosition; 
         }
 
         public void DisplayWaits(List<int> waitTileIds)
@@ -284,11 +183,11 @@ namespace KillingMahjong.UI
                 // 枠の中に置いている間は、常に枠の中央へ。
                 // ピボットが中央なので、これで中身も枠の中央に揃う。
                 // （ダイアログ中央表示のために親を移し替えているときは触らない）
-                bool movedToDialog = isOriginalSaved && containerRt.parent != originalParent;
-                if (!movedToDialog)
-                {
-                    containerRt.anchoredPosition = new Vector2(0f, containerRt.anchoredPosition.y);
-                }
+                // 枠の中に置いている間は、常に枠の中央へ。
+                // ピボットが中央なので、これで中身も枠の中央に揃う。
+                // **ダイアログ中央への移し替え（MoveToCenter）は 2026-08-29 に消した**ので、
+                // 「親が移っているときは触らない」という分岐も要らなくなった。
+                containerRt.anchoredPosition = new Vector2(0f, containerRt.anchoredPosition.y);
             }
         }
 

@@ -63,14 +63,5 @@ namespace KillingMahjong.Core
             if (TotalMatches <= 0) return "通算成績: 初戦";
             return $"通算成績: {Wins}勝{Losses}敗（勝率{WinRatePercent}%）";
         }
-
-        public static void ResetAll()
-        {
-            PlayerPrefs.DeleteKey(KeyWins);
-            PlayerPrefs.DeleteKey(KeyLosses);
-            PlayerPrefs.DeleteKey(KeySpecialWins);
-            PlayerPrefs.DeleteKey(KeyBestScore);
-            PlayerPrefs.Save();
-        }
     }
 }

@@ -113,49 +113,5 @@ namespace KillingMahjong.Managers
                 board.MoveTileToWall(id);
             }
         }
-
-        /// <summary>
-        /// 手牌インデックスの各要素を、同じ牌種でよりドラ価値の高い牌のインデックスへ置き換える。
-        /// ※現在は呼び出し元が存在しない（BoardStateManager 時代からの未使用ロジック）。
-        /// 将来のドラ最適化用に保持しているが、不要であれば削除してよい。
-        /// </summary>
-        public int[] OptimizeHandIndicesForDora(int[] originalIndexes)
-        {
-            List<int> upgraded = new List<int>(originalIndexes);
-            List<int> wall = board.OriginalWallTiles;
-
-            for (int i = 0; i < upgraded.Count; i++)
-            {
-                int currentIndex = upgraded[i];
-                if (currentIndex < 0 || currentIndex >= wall.Count) continue;
-
-                int currentTile = wall[currentIndex];
-                int baseId = TileId.BaseId(currentTile);
-                int currentDoraFlag = TileId.DoraFlags(currentTile);
-
-                int bestIndex = currentIndex;
-                int bestDoraFlag = currentDoraFlag;
-
-                for (int w = 0; w < wall.Count; w++)
-                {
-                    if (upgraded.Contains(w)) continue;
-
-                    int wTile = wall[w];
-                    if (TileId.BaseId(wTile) == baseId)
-                    {
-                        int wDoraFlag = TileId.DoraFlags(wTile);
-                        if (wDoraFlag > bestDoraFlag)
-                        {
-                            bestDoraFlag = wDoraFlag;
-                            bestIndex = w;
-                        }
-                    }
-                }
-
-                upgraded[i] = bestIndex;
-            }
-
-            return upgraded.ToArray();
-        }
     }
 }

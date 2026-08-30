@@ -115,14 +115,6 @@ namespace KillingMahjong.UI
             return w * tileScale;
         }
 
-        /// <summary>牌1枚の見た目の高さ。</summary>
-        private float TileVisualHeight()
-        {
-            var prefabRect = tilePrefab != null ? tilePrefab.GetComponent<RectTransform>() : null;
-            float h = prefabRect != null && prefabRect.sizeDelta.y > 0f ? prefabRect.sizeDelta.y : 40f;
-            return h * tileScale;
-        }
-
         // 既存のタイル(Wallなどから)をRiverに入れるための新しいメソッド
         public void AddExistingTile(RectTransform rt, int tileId)
         {

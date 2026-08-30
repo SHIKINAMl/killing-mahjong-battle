@@ -485,22 +485,6 @@ namespace KillingMahjong.UI
             onConfirmAction?.Invoke(currentBet);
         }
 
-        private IEnumerator SlidePanel(Vector2 start, Vector2 end, Action onComplete = null)
-        {
-            float elapsedTime = 0f;
-            hpBarPanel.anchoredPosition = start;
-
-            while (elapsedTime < slideDuration)
-            {
-                hpBarPanel.anchoredPosition = Vector2.Lerp(start, end, elapsedTime / slideDuration);
-                elapsedTime += Time.deltaTime;
-                yield return null;
-            }
-
-            hpBarPanel.anchoredPosition = end;
-            onComplete?.Invoke();
-        }
-
         private IEnumerator AutoDialogueRoutine()
         {
             // Initial delay or immediate text
