@@ -86,18 +86,6 @@ namespace KillingMahjong.Common
             _states.Remove(go);
         }
 
-        /// <summary>
-        /// 前面化した全ての対象を元に戻す。
-        /// </summary>
-        public void RestoreAll()
-        {
-            foreach (var kv in _states)
-            {
-                if (kv.Key != null) RestoreState(kv.Key, kv.Value);
-            }
-            _states.Clear();
-        }
-
         private static void RestoreState(GameObject go, CanvasState state)
         {
             if (state.WasAdded)
