@@ -59,6 +59,8 @@ namespace KillingMahjong.UI
         [SerializeField] private Color crownColor = new Color32(255, 190, 40, 255);
 
         private RectTransform _selfFill, _enemyFill;
+        /// <summary>帯そのもの。外から部品をぶら下げるために持っておく（`AttachCenterWidget`）。</summary>
+        private RectTransform _bar;
         private TextMeshProUGUI _selfText, _enemyText;
         private TextMeshProUGUI _selfStake, _enemyStake;
         private RectTransform _selfStakeField, _enemyStakeField;
@@ -128,6 +130,30 @@ namespace KillingMahjong.UI
             // 賭け金は帯のすぐ下。決着でここからゲージへ吸い込まれる
             BuildStake(bar, true,  selfColor,  out _selfStakeField,  out _selfStake);
             BuildStake(bar, false, enemyColor, out _enemyStakeField, out _enemyStake);
+
+            _bar = bar;
+        }
+
+        /// <summary>
+        /// 帯の中央下に部品をぶら下げる。**タイマーをここへ移すために用意した**（2026-09-01）。
+        ///
+        /// タイマーは元々スマホの懐中時計に出していたが、
+        /// HPの絵を描き直したときに時計ごと無くなったので行き場を失った。
+        /// 帯の子にするので、ゲージが動けば一緒に動く。
+        /// 高さは賭け金の枠と同じ帯に合わせてある（左右の賭け金の間に収まる）。
+        /// </summary>
+        public void AttachCenterWidget(RectTransform widget)
+        {
+            if (widget == null) return;
+            EnsureBuilt();
+            if (_bar == null) return;
+
+            widget.SetParent(_bar, false);
+            widget.anchorMin = widget.anchorMax = new Vector2(0.5f, 0f);
+            widget.pivot = new Vector2(0.5f, 1f);
+            widget.sizeDelta = new Vector2(stakeFieldWidth, stakeFieldHeight);
+            widget.anchoredPosition = new Vector2(0f, -stakeGap);
+            widget.localScale = Vector3.one;
         }
 
         /// <summary>

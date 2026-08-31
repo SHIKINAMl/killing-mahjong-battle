@@ -134,7 +134,8 @@ namespace KillingMahjong.UI
             var rect = contentContainer as RectTransform;
             if (rect == null) return;
 
-            float listHeight = PanelInnerHeight - DescBoxHeight - ListTopMargin;
+            // 説明欄を巻物の外（右）へ出したので、一覧は内枠を上から下まで使える。
+            float listHeight = PanelInnerHeight - ListTopMargin;
 
             rect.anchorMin = new Vector2(0.5f, 0.5f);
             rect.anchorMax = new Vector2(0.5f, 0.5f);

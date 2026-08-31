@@ -134,12 +134,30 @@ namespace KillingMahjong.UI
             HpDamageGlitch.Ensure();
         }
 
+        /// <summary>タイマーを上のゲージへ移し終えたか。移せるまで毎回試す。</summary>
+        private bool _timerMovedToGauge;
+
         public void StartTurnTimer(float duration)
         {
-            if (timerUI != null)
+            if (timerUI == null) return;
+
+            // **タイマーは上のゲージの中央下に出す**（2026-09-01）。
+            // 元はスマホの懐中時計に出していたが、HPの絵を描き直したときに時計ごと消えた。
+            //
+            // ゲージは `GameUIManager` が実行時に作るのでシーンには居ない。
+            // ここへ来た時点でまだ無いこともあるため、**見つかった最初の機会に移す**
+            // （見つからなければ次の手番でまた試す）。
+            if (!_timerMovedToGauge)
             {
-                timerUI.StartTimer(duration);
+                var gauge = FindFirstObjectByType<ScoreGaugeUI>(FindObjectsInactive.Include);
+                if (gauge != null)
+                {
+                    gauge.AttachCenterWidget(timerUI.transform as RectTransform);
+                    _timerMovedToGauge = true;
+                }
             }
+
+            timerUI.StartTimer(duration);
         }
 
         public void StopTurnTimer()

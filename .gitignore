@@ -103,3 +103,30 @@ test.py
 
 # GitHub Pages WebGL Build Output
 /docs/
+
+# ローカル管理の AI 向け指示・記録（本体: C:\Unity\km-docs\）
+/AGENTS.md
+/.agents/
+/BACKLOG_*.md
+/claude_code_instruction.md
+/DEEP_EFFECTS_REVIEW_*.md
+/EFFECTS_REVIEW_*.md
+/GAME_REVIEW_*.md
+/HANDOFF_*.md
+/INTRO_*.md
+/MULTIPLAY_BUG_*.md
+/OPPONENT_BOT_SPEC_*.md
+/REACTION_EDITOR_SPEC_*.pdf
+/REFACTOR_PLAN_*.md
+/REQUESTS_*.md
+/RON_REVIEW_*.md
+/SERVER_REQUESTS_*.md
+/TUTORIAL_*.md
+/review_lanes/
+/review_lanes_claude/
+/ron_review_lanes/
+/review_shots/
+/intro_shots/
+/intro_page/
+/bot*.txt
+/bot_supervisor.pid

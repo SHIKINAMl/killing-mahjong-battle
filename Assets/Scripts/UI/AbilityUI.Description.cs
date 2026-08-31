@@ -42,13 +42,19 @@ namespace KillingMahjong.UI
             fillTr.localScale = Vector3.one;
             fillTr.SetAsFirstSibling();
 
+            // **巻物の外（右側）に出す**（2026-08-31）。
+            // 内枠の下に置いていたときは、閉じるボタンと場所を取り合っていた。
+            // 左上を基準にして、巻物の右端から DescPanelGap だけ離し、内枠の上端に頭を揃える。
+            // 巻物の幅はシーンの値なので、定数に焼かず実物から取る。
+            float windowHalfWidth = abilityWindow.rect.width * 0.5f;
+
             boxTr.anchorMin = new Vector2(0.5f, 0.5f);
             boxTr.anchorMax = new Vector2(0.5f, 0.5f);
-            boxTr.pivot = new Vector2(0.5f, 0f);
-            boxTr.sizeDelta = new Vector2(RowWidth, DescBoxHeight);
+            boxTr.pivot = new Vector2(0f, 1f);
+            boxTr.sizeDelta = new Vector2(DescPanelWidth, DescPanelHeight);
             boxTr.anchoredPosition = new Vector2(
-                PanelInnerCenter.x,
-                PanelInnerCenter.y - PanelInnerHeight * 0.5f + ListTopMargin);
+                windowHalfWidth + DescPanelGap,
+                PanelInnerCenter.y + PanelInnerHeight * 0.5f);
             boxTr.localScale = Vector3.one;
 
             var textTr = boxTr.Find(DescTextName) as RectTransform;
@@ -96,12 +102,120 @@ namespace KillingMahjong.UI
             if (tooltipText != null && !string.IsNullOrEmpty(tooltipText.text)) tooltipText.text = "";
             if (tooltipPanel != null && tooltipPanel.activeSelf) tooltipPanel.SetActive(false);
         }
+        /// <summary>閉じるボタンの絵。`Assets/Resources/能力UIcloseButton.png`。</summary>
+        private const string CloseButtonSpriteName = "能力UIcloseButton";
+
+        /// <summary>
+        /// 閉じるボタンを**一覧の下の空いた帯**へ置く（2026-08-31）。
+        ///
+        /// **シーンでは `役ListPanel` の子になっていて、巻物とは別の座標系にいた**ため、
+        /// 右上に取り残されていた。巻物の子へ移して、内枠の下端から測って置き直す。
+        /// 巻物の子にしておけば、開閉で巻物が動いても一緒に動く。
+        /// </summary>
+        private void LayoutCloseButton()
+        {
+            if (closeButton == null || abilityWindow == null) return;
+
+            var rt = closeButton.transform as RectTransform;
+            if (rt == null) return;
+
+            if (rt.parent != abilityWindow) rt.SetParent(abilityWindow, false);
+            rt.SetAsLastSibling(); // 巻物の絵より手前に出す
+
+            float innerBottom = PanelInnerCenter.y - PanelInnerHeight * 0.5f;
+
+            rt.anchorMin = new Vector2(0.5f, 0.5f);
+            rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta = new Vector2(CloseButtonSize, CloseButtonSize);
+            rt.anchoredPosition = new Vector2(
+                PanelInnerCenter.x,
+                innerBottom + CloseButtonBottomMargin + CloseButtonSize * 0.5f);
+            rt.localScale = Vector3.one;
+
+            // 大きさが変わったので、絵の拡大率を計算し直す
+            StyleCloseButton();
+        }
+
+        /// <summary>
+        /// 説明欄の出し入れ。**何も選んでいないときは箱ごと消す**（2026-08-31）。
+        /// 案内文を出しっぱなしにすると、対局開始時から巻物の外に箱が浮いて見える。
+        /// </summary>
+        private void SetDescriptionVisible(bool visible)
+        {
+            if (_descText == null) return;
+            var box = _descText.transform.parent;
+            if (box == null) return;
+            if (box.gameObject.activeSelf != visible) box.gameObject.SetActive(visible);
+        }
+
+        /// <summary>
+        /// 閉じるボタンの見た目を作る。
+        ///
+        /// **Inspector で絵を差しても効かない。** この関数が毎回 `sprite` を触るので、
+        /// 絵はここで入れないと、下の「色の四角」に上書きされてしまう。
+        /// </summary>
         private void StyleCloseButton()
         {
             if (closeButton == null) return;
             var img = closeButton.GetComponent<Image>();
             if (img == null) return;
 
+            // 絵があるならそれを出す。枠と塗りを重ねる下の処理は要らない。
+            var sprite = Resources.Load<Sprite>(CloseButtonSpriteName);
+            if (sprite != null)
+            {
+                // **素材は 101x157 だが、絵は (44,126)-(60,142) の 17x17 しかない。**
+                // 残り約9割は透明な余白。そのまま貼るとボタンの中で豆粒になり、
+                // しかも下寄りなので画面上でほぼ見えない（実際そうなっていた）。
+                //
+                // **素材は加工しない約束なので、コード側で吸収する。**
+                // 絵だけを子に置いて拡大し、絵の中心がボタンの中心へ来るようずらす。
+                // 素材を描き直したら、この4つの数値を測り直すこと。
+                const float SpriteW = 101f, SpriteH = 157f;
+                const float IconCenterX = 52f;   // (44+60)/2
+                const float IconCenterYFromBottom = 22f; // 下から数えた中心。UVは下が原点
+                const float IconSize = 17f;
+
+                // ボタン本体は当たり判定だけ持たせて、絵は子に描かせる。
+                // 本体を拡大すると、透明な余白まで押せる範囲になってしまう。
+                img.sprite = null;
+                img.color = new Color(1f, 1f, 1f, 0f);
+                img.raycastTarget = true;
+
+                var oldFill = img.rectTransform.Find(CloseFillName);
+                if (oldFill != null) oldFill.gameObject.SetActive(false);
+
+                var iconTr = img.rectTransform.Find(CloseIconName) as RectTransform;
+                if (iconTr == null)
+                {
+                    var iconGo = new GameObject(CloseIconName, typeof(RectTransform), typeof(Image));
+                    iconTr = (RectTransform)iconGo.transform;
+                    iconTr.SetParent(img.rectTransform, false);
+                }
+                var iconImg = iconTr.GetComponent<Image>();
+                iconImg.sprite = sprite;
+                iconImg.color = Color.white;
+                iconImg.type = Image.Type.Simple;
+                iconImg.raycastTarget = false;
+
+                // 絵の 17x17 がボタンの短辺いっぱいになる倍率
+                var btnRect = img.rectTransform.rect;
+                float k = Mathf.Min(btnRect.width, btnRect.height) / IconSize;
+
+                iconTr.anchorMin = new Vector2(0.5f, 0.5f);
+                iconTr.anchorMax = new Vector2(0.5f, 0.5f);
+                iconTr.pivot = new Vector2(0.5f, 0.5f);
+                iconTr.sizeDelta = new Vector2(SpriteW * k, SpriteH * k);
+                // 素材の中心から見た絵の中心のずれを、逆向きに打ち消す
+                iconTr.anchoredPosition = new Vector2(
+                    -(IconCenterX - SpriteW * 0.5f) * k,
+                    -(IconCenterYFromBottom - SpriteH * 0.5f) * k);
+                iconTr.localScale = Vector3.one;
+                return;
+            }
+
+            // 絵が見つからないときは、これまでどおり色の四角で描く
             img.sprite = null;
             img.color = CloseBorderColor;
 

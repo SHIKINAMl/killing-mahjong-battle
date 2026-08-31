@@ -110,7 +110,9 @@ namespace KillingMahjong.UI
 
             EnsureAbilities();
 
-            StyleCloseButton();
+            // 位置を決めてから絵を作る（大きさが決まらないと拡大率が出せない）。
+            // LayoutCloseButton の中で StyleCloseButton を呼んでいる。
+            LayoutCloseButton();
 
             // Populate List
             PopulateList();
@@ -147,8 +149,22 @@ namespace KillingMahjong.UI
         /// <summary>内枠の上端から一覧までの余白。2ドット。</summary>
         private const float ListTopMargin = 4f;
 
-        /// <summary>説明欄の高さ。4行の一覧を引いた残り。</summary>
-        private const float DescBoxHeight = 50f;
+        /// <summary>
+        /// 説明欄は**巻物の外（右側）**に出す（2026-08-31 に依頼者の指定で変更）。
+        /// 内枠の下に置いていたときは、閉じるボタンと場所を取り合っていた。
+        /// </summary>
+        private const float DescPanelWidth = 150f;
+        private const float DescPanelHeight = 70f;
+
+        /// <summary>巻物の右端から説明欄までの間。</summary>
+        private const float DescPanelGap = 8f;
+
+        /// <summary>
+        /// 閉じるボタンの大きさと、内枠の下端からの余白。
+        /// **一覧の下に空く帯（約60）に収める。**
+        /// </summary>
+        private const float CloseButtonSize = 34f;
+        private const float CloseButtonBottomMargin = 6f;
 
         public void CloseWindow(bool cancelSkill = true)
         {
@@ -281,6 +297,8 @@ namespace KillingMahjong.UI
             var text = EnsureDescriptionBox();
             if (text == null) return;
             text.text = string.IsNullOrEmpty(description) ? DescPlaceholder : description;
+            // 説明が無いときは箱ごと消す。案内文だけの箱が浮いて見えるのを避ける。
+            SetDescriptionVisible(!string.IsNullOrEmpty(description));
 
             // AbilityUI 全体を最前面化する。中身の表示順が壊れないようルート(this)のみ設定する
             Canvas rootCanvas = this.GetComponent<Canvas>();
@@ -293,6 +311,9 @@ namespace KillingMahjong.UI
             rootCanvas.sortingOrder = _transitionSuppressed ? UISortingOrders.AbilityDuringTransition : UISortingOrders.InfoPanelHighlight;
         }
         private const string CloseFillName = "CloseButtonFill";
+
+        /// <summary>閉じるボタンの絵を描く子。素材の余白を吸収するため本体とは分けている。</summary>
+        private const string CloseIconName = "CloseButtonIcon";
         // ---- フェーズ演出中の退避 ----
         //
         // 「決定！」などの帯（PhaseTransitionCanvas）は sortingOrder 19 なのに、
@@ -335,9 +356,10 @@ namespace KillingMahjong.UI
             var text = EnsureDescriptionBox();
             if (text != null)
             {
-                text.text = currentSelection != null && !string.IsNullOrEmpty(currentSelection.Description)
-                    ? currentSelection.Description
-                    : DescPlaceholder;
+                bool hasSelection = currentSelection != null && !string.IsNullOrEmpty(currentSelection.Description);
+                text.text = hasSelection ? currentSelection.Description : DescPlaceholder;
+                // 選択が無いなら箱ごと消す。対局開始直後はここを通る。
+                SetDescriptionVisible(hasSelection);
             }
 
             Canvas rootCanvas = this.GetComponent<Canvas>();
