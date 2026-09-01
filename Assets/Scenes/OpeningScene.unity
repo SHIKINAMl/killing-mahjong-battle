@@ -2264,7 +2264,7 @@ RectTransform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 194407459}
-  m_LocalRotation: {x: 0, y: -0.30070576, z: 0, w: 0.953717}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -2276,7 +2276,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 46.3, y: -5.8}
-  m_SizeDelta: {x: 161.4, y: 581.6}
+  m_SizeDelta: {x: 134.5, y: 498.5}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &194407461
 MonoBehaviour:
@@ -5151,7 +5151,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 102.4, y: 409.6}
+  m_SizeDelta: {x: 134.5, y: 498.5}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &347983973
 MonoBehaviour:
@@ -7315,11 +7315,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5b4e2b0f70f16184bbb7e8104ae4148d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.RonAnimationUI
-  bloodSplatterSprite: {fileID: 21300000, guid: ad1bb6e518a432f45944c8b8506f56c7, type: 3}
-  usePixelBlood: 1
-  pixelBloodDotCount: 70
-  pixelBloodGridSize: 6
-  keepSpriteSplatter: 0
   customFont: {fileID: 11400000, guid: c5bb941af3893c24fae6a3c218e0715b, type: 2}
   playerRonBubbleContainer: {fileID: 1541971913}
   tilePrefab: {fileID: 3470249716998659876, guid: 665b2ddf3e8ccac4aa366c094061ee09, type: 3}
@@ -9372,8 +9367,8 @@ Canvas:
   m_Enabled: 1
   serializedVersion: 3
   m_RenderMode: 1
-  m_Camera: {fileID: 0}
-  m_PlaneDistance: 100
+  m_Camera: {fileID: 1131278704}
+  m_PlaneDistance: 10
   m_PixelPerfect: 0
   m_ReceivesEvents: 1
   m_OverrideSorting: 0
@@ -9383,7 +9378,7 @@ Canvas:
   m_AdditionalShaderChannelsFlag: 25
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 0
-  m_SortingOrder: 1
+  m_SortingOrder: -2
   m_TargetDisplay: 0
 --- !u!114 &603402878
 MonoBehaviour:
@@ -13525,10 +13520,6 @@ MonoBehaviour:
   contentContainer: {fileID: 1508650623}
   closeButton: {fileID: 1660999213}
   activateButton: {fileID: 1660999213}
-  itemOffsetX: 0
-  itemOffsetY: 6
-  itemHeight: 40
-  itemSpacing: 5
   tooltipPanel: {fileID: 1857448721}
   tooltipText: {fileID: 1038039092}
   openFrames:
@@ -19357,7 +19348,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 161.4, y: 581.6}
+  m_SizeDelta: {x: 134.5, y: 498.5}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1449207470
 MonoBehaviour:

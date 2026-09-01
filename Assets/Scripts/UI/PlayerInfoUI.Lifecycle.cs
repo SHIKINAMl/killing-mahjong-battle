@@ -141,18 +141,21 @@ namespace KillingMahjong.UI
         {
             if (timerUI == null) return;
 
-            // **タイマーは上のゲージの中央下に出す**（2026-09-01）。
-            // 元はスマホの懐中時計に出していたが、HPの絵を描き直したときに時計ごと消えた。
+            // **タイマーの数字は上のゲージ（王冠の真下）に出す**（2026-09-01）。
+            // 元はスマホの懐中時計の文字盤に出していたが、HPの絵を描き直したときに
+            // 時計が無くなり、数字だけがHPの下に浮いて残っていた。
+            //
+            // **オブジェクトごと動かすのではなく、書き込み先だけを差し替える。**
+            // 動かす方式は親（HPPanel）の拡大演出に巻き込まれて安定しなかった。
             //
             // ゲージは `GameUIManager` が実行時に作るのでシーンには居ない。
-            // ここへ来た時点でまだ無いこともあるため、**見つかった最初の機会に移す**
-            // （見つからなければ次の手番でまた試す）。
+            // ここへ来た時点でまだ無いこともあるため、**見つかった最初の機会に繋ぐ**。
             if (!_timerMovedToGauge)
             {
                 var gauge = FindFirstObjectByType<ScoreGaugeUI>(FindObjectsInactive.Include);
-                if (gauge != null)
+                if (gauge != null && gauge.TimerText != null)
                 {
-                    gauge.AttachCenterWidget(timerUI.transform as RectTransform);
+                    timerUI.BindText(gauge.TimerText);
                     _timerMovedToGauge = true;
                 }
             }

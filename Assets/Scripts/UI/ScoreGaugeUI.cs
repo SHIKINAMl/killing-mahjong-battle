@@ -58,9 +58,17 @@ namespace KillingMahjong.UI
         [SerializeField] private Color backColor = new Color(0.06f, 0.06f, 0.08f, 0.85f);
         [SerializeField] private Color crownColor = new Color32(255, 190, 40, 255);
 
+        [Tooltip("残り時間の枠の幅(px)。賭け金の枠より狭くして王冠の下に収める")]
+        [SerializeField] private float timerFieldWidth = 56f;
+
+        [Tooltip("残り時間の縁と数字の色")]
+        [SerializeField] private Color timerColor = new Color32(0xE8, 0x3A, 0x3A, 0xFF);
+
         private RectTransform _selfFill, _enemyFill;
-        /// <summary>帯そのもの。外から部品をぶら下げるために持っておく（`AttachCenterWidget`）。</summary>
+        /// <summary>帯そのもの。</summary>
         private RectTransform _bar;
+        private RectTransform _timerField;
+        private TextMeshProUGUI _timerText;
         private TextMeshProUGUI _selfText, _enemyText;
         private TextMeshProUGUI _selfStake, _enemyStake;
         private RectTransform _selfStakeField, _enemyStakeField;
@@ -131,29 +139,75 @@ namespace KillingMahjong.UI
             BuildStake(bar, true,  selfColor,  out _selfStakeField,  out _selfStake);
             BuildStake(bar, false, enemyColor, out _enemyStakeField, out _enemyStake);
 
+            // 残り時間は王冠の真下。賭け金2つの間に入る
+            BuildTimer(bar);
+
             _bar = bar;
         }
 
         /// <summary>
-        /// 帯の中央下に部品をぶら下げる。**タイマーをここへ移すために用意した**（2026-09-01）。
+        /// 残り時間を出す枠。**王冠の真下、左右の賭け金の間**に置く（2026-09-01）。
         ///
-        /// タイマーは元々スマホの懐中時計に出していたが、
-        /// HPの絵を描き直したときに時計ごと無くなったので行き場を失った。
-        /// 帯の子にするので、ゲージが動けば一緒に動く。
-        /// 高さは賭け金の枠と同じ帯に合わせてある（左右の賭け金の間に収まる）。
+        /// タイマーは元々スマホの懐中時計の文字盤に出していたが、
+        /// HPの絵を描き直したときに時計ごと無くなり、数字だけがHPの下に浮いていた。
+        /// 賭け金の枠と同じ帯・同じ作りにして、見た目を揃える。
         /// </summary>
-        public void AttachCenterWidget(RectTransform widget)
+        private void BuildTimer(RectTransform bar)
         {
-            if (widget == null) return;
-            EnsureBuilt();
-            if (_bar == null) return;
+            var go = new GameObject("TimerField", typeof(RectTransform));
+            var field = go.GetComponent<RectTransform>();
+            field.SetParent(bar, false);
+            field.anchorMin = field.anchorMax = new Vector2(0.5f, 0f);
+            field.pivot = new Vector2(0.5f, 1f);
+            field.sizeDelta = new Vector2(timerFieldWidth, stakeFieldHeight);
+            field.anchoredPosition = new Vector2(0f, -stakeGap);
 
-            widget.SetParent(_bar, false);
-            widget.anchorMin = widget.anchorMax = new Vector2(0.5f, 0f);
-            widget.pivot = new Vector2(0.5f, 1f);
-            widget.sizeDelta = new Vector2(stakeFieldWidth, stakeFieldHeight);
-            widget.anchoredPosition = new Vector2(0f, -stakeGap);
-            widget.localScale = Vector3.one;
+            // 賭け金の枠と同じ作り。外を縁の色、内を暗く塗る
+            var border = go.AddComponent<Image>();
+            border.color = timerColor;
+            border.raycastTarget = false;
+
+            var innerGo = new GameObject("Inner", typeof(RectTransform));
+            var inner = innerGo.GetComponent<RectTransform>();
+            inner.SetParent(field, false);
+            inner.anchorMin = Vector2.zero;
+            inner.anchorMax = Vector2.one;
+            inner.offsetMin = new Vector2(2f, 2f);
+            inner.offsetMax = new Vector2(-2f, -2f);
+            var innerImg = innerGo.AddComponent<Image>();
+            innerImg.color = backColor;
+            innerImg.raycastTarget = false;
+
+            var textGo = new GameObject("Value", typeof(RectTransform));
+            var trt = textGo.GetComponent<RectTransform>();
+            trt.SetParent(field, false);
+            trt.anchorMin = trt.anchorMax = new Vector2(0.5f, 0.5f);
+            trt.pivot = new Vector2(0.5f, 0.5f);
+            trt.sizeDelta = new Vector2(timerFieldWidth - 8f, stakeFieldHeight);
+            trt.anchoredPosition = Vector2.zero;
+
+            _timerText = textGo.AddComponent<TextMeshProUGUI>();
+            _timerText.text = "";           // 動いていない間は空
+            _timerText.color = timerColor;
+            _timerText.alignment = TextAlignmentOptions.Center;
+            _timerText.raycastTarget = false;
+            _timerText.enableAutoSizing = true;
+            _timerText.fontSizeMin = 11f;
+            _timerText.fontSizeMax = 18f;
+            _timerText.fontMaterial.EnableKeyword("OUTLINE_ON");
+            _timerText.outlineColor = Color.black;
+            _timerText.outlineWidth = 0.2f;
+
+            _timerField = field;
+        }
+
+        /// <summary>
+        /// タイマーの数字を書き込む先。`TimerUI` がここへ出す。
+        /// ゲージがまだ組まれていなければ組んでから返す。
+        /// </summary>
+        public TextMeshProUGUI TimerText
+        {
+            get { EnsureBuilt(); return _timerText; }
         }
 
         /// <summary>

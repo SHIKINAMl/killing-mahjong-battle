@@ -48,6 +48,27 @@ namespace KillingMahjong.UI
             // 動いていない間は文字を空にして、絵だけ見せる。
         }
 
+        /// <summary>
+        /// 数字の出し先を差し替える（2026-09-01）。
+        ///
+        /// 元はスマホの懐中時計の文字盤に出していたが、HPの絵を描き直したときに
+        /// 時計が無くなり、**数字だけがHPの下に浮いて残っていた**。
+        /// 上のゲージに作った枠（`ScoreGaugeUI.TimerText`）へ向け直す。
+        ///
+        /// **元の出し先は空にしてから移る。** 残しておくと古い数字がその場に焼き付く。
+        /// </summary>
+        public void BindText(TextMeshProUGUI target)
+        {
+            if (target == null || target == timeText) return;
+
+            Initialize();
+            if (timeText != null) timeText.text = "";
+
+            timeText = target;
+            originalTextColor = target.color;
+            target.text = isRunning ? Mathf.CeilToInt(currentTime).ToString() : "";
+        }
+
         public void SetSize(float size)
         {
             RectTransform rt = GetComponent<RectTransform>();
