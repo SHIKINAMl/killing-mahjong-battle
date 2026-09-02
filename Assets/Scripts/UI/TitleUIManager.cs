@@ -1,5 +1,7 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using TMPro;
+using UnityEngine.UI;
 
 namespace KillingMahjong.UI
 {
@@ -13,17 +15,17 @@ namespace KillingMahjong.UI
 
         private void Start()
         {
-            // CanvasScalerの強制上書きは、OptionUIでの解像度設定とコンフリクトするため削除
+            ApplyMatchHubPresentation();
         }
 
         private TitleMultiMenuUI multiMenu;
 
         /// <summary>
-        /// 「マルチ」が押された時の処理。
+        /// 「対局する」が押された時の処理。
         ///
         /// **シーンの `onClick` はこのメソッド名で配線済みなので、名前は変えないこと。**
         /// 作り直すと配線が外れて「押しても何も起きない」状態になる。
-        /// 中身だけを差し替えて、対戦相手の探し方（野良／部屋を作る／あいことば）を
+        /// 中身だけを差し替えて、対戦相手の探し方（野良／フレンド）を
         /// 先に選ばせるようにしている。
         /// </summary>
         public void OnClickStartButton()
@@ -35,9 +37,64 @@ namespace KillingMahjong.UI
 
             multiMenu.Open(mode =>
             {
-                Debug.Log($"マルチ開始（{mode}）。{nextSceneName} に遷移します。");
+                Debug.Log($"対局開始（{mode}）。{nextSceneName} に遷移します。");
                 StartMultiplayScene();
             });
+        }
+
+        /// <summary>
+        /// タイトルを「ソロ／マルチ」の区分ではなく、対局の入口として見せる。
+        /// 既存 Button の onClick 配線はシーンに保存されているため、Button を作り直さず
+        /// 実行時に表示だけを置き換える。
+        /// </summary>
+        private static void ApplyMatchHubPresentation()
+        {
+            var labels = FindObjectsByType<TextMeshProUGUI>(FindObjectsInactive.Include,
+                FindObjectsSortMode.None);
+            TMP_FontAsset font = null;
+
+            foreach (var label in labels)
+            {
+                if (label == null) continue;
+                if (font == null && label.font != null) font = label.font;
+
+                string text = label.text.Trim();
+                if (text == "ソロ")
+                {
+                    var button = label.GetComponentInParent<Button>();
+                    if (button != null) button.gameObject.SetActive(false);
+                }
+                else if (text == "マルチ")
+                {
+                    label.text = "対局する";
+                }
+            }
+
+            if (font == null) return;
+
+            var canvas = FindFirstObjectByType<Canvas>();
+            if (canvas == null) return;
+
+            var existing = canvas.transform.Find("TruthNameHook");
+            var hook = existing != null ? existing.gameObject :
+                new GameObject("TruthNameHook", typeof(RectTransform), typeof(TextMeshProUGUI));
+            hook.transform.SetParent(canvas.transform, false);
+
+            var rect = hook.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = new Vector2(172f, 92f);
+            rect.sizeDelta = new Vector2(390f, 42f);
+
+            var textMesh = hook.GetComponent<TextMeshProUGUI>();
+            textMesh.font = font;
+            textMesh.text = "彼女の真名を、探しだせ。";
+            textMesh.fontSize = 22f;
+            textMesh.fontStyle = FontStyles.Bold;
+            textMesh.color = new Color32(240, 232, 236, 230);
+            textMesh.alignment = TextAlignmentOptions.Center;
+            textMesh.raycastTarget = false;
         }
 
         /// <summary>

@@ -7,7 +7,7 @@ using KillingMahjong.Network;
 namespace KillingMahjong.UI
 {
     /// <summary>
-    /// タイトルの「マルチ」を押したときに出す、対戦相手の探し方を選ぶ小さなメニュー。
+    /// タイトルの「対局する」を押したときに出す、対戦相手の探し方を選ぶ小さなメニュー。
     ///
     /// **シーンには置かず、実行時に組み立てる。**
     /// タイトルのボタンは `onClick` が `TitleUIManager` へシリアライズ済みで、
@@ -37,7 +37,9 @@ namespace KillingMahjong.UI
 
         private GameObject _root;
         private GameObject _modePanel;
+        private GameObject _friendPanel;
         private GameObject _passwordPanel;
+        private GameObject _truthNameHook;
         private TMP_InputField _passwordInput;
         private TMP_Text _passwordError;
         private TMP_Text _passwordStatus;
@@ -59,6 +61,7 @@ namespace KillingMahjong.UI
             if (_root == null) Build();
             if (_root == null) return;
 
+            SetTruthNameHookVisible(false);
             _root.SetActive(true);
             ShowModePanel();
         }
@@ -66,6 +69,7 @@ namespace KillingMahjong.UI
         public void Close()
         {
             if (_root != null) _root.SetActive(false);
+            SetTruthNameHookVisible(true);
         }
 
         // ------------------------------------------------------------------
@@ -76,6 +80,20 @@ namespace KillingMahjong.UI
             if (_isCheckingRoom) return;
 
             if (_modePanel != null) _modePanel.SetActive(true);
+            if (_friendPanel != null) _friendPanel.SetActive(false);
+            if (_passwordPanel != null) _passwordPanel.SetActive(false);
+        }
+
+        /// <summary>
+        /// フレンドと遊ぶための入口。ここを専用パネルにしておくと、将来の部屋設定を
+        /// サーバーの契約が決まった時点で安全に追加できる。
+        /// </summary>
+        private void ShowFriendPanel()
+        {
+            if (_isCheckingRoom) return;
+
+            if (_modePanel != null) _modePanel.SetActive(false);
+            if (_friendPanel != null) _friendPanel.SetActive(true);
             if (_passwordPanel != null) _passwordPanel.SetActive(false);
         }
 
@@ -84,6 +102,7 @@ namespace KillingMahjong.UI
             if (_isCheckingRoom) return;
 
             if (_modePanel != null) _modePanel.SetActive(false);
+            if (_friendPanel != null) _friendPanel.SetActive(false);
             if (_passwordPanel != null) _passwordPanel.SetActive(true);
 
             SetPasswordError("");
@@ -262,6 +281,16 @@ namespace KillingMahjong.UI
             if (_passwordStatus != null) _passwordStatus.text = text;
         }
 
+        private void SetTruthNameHookVisible(bool visible)
+        {
+            if (_truthNameHook == null)
+            {
+                _truthNameHook = GameObject.Find("TruthNameHook");
+            }
+
+            if (_truthNameHook != null) _truthNameHook.SetActive(visible);
+        }
+
         private void Decide(MatchJoinMode mode)
         {
             Close();
@@ -302,6 +331,7 @@ namespace KillingMahjong.UI
             scrimImg.raycastTarget = true;
 
             BuildModePanel();
+            BuildFriendPanel();
             BuildPasswordPanel();
         }
 
@@ -311,12 +341,26 @@ namespace KillingMahjong.UI
             _modePanel.transform.SetParent(_root.transform, false);
             Center(_modePanel.GetComponent<RectTransform>(), new Vector2(ItemWidth, ItemHeight * 5f));
 
-            CreateHeading(_modePanel.transform, "たたかう相手を さがす", ItemHeight * 2f);
+            CreateHeading(_modePanel.transform, "対局する", ItemHeight * 2f);
 
             CreateMenuItem(_modePanel.transform, "野良マッチ", ItemHeight * 0.9f, OnPublicSelected);
-            CreateMenuItem(_modePanel.transform, "部屋を作る", -ItemHeight * 0.1f, OnPrivateCreateSelected);
-            CreateMenuItem(_modePanel.transform, "あいことばで入る", -ItemHeight * 1.1f, ShowPasswordPanel);
-            CreateMenuItem(_modePanel.transform, "もどる", -ItemHeight * 2.3f, Close);
+            CreateMenuItem(_modePanel.transform, "フレンドマッチ", -ItemHeight * 0.2f, ShowFriendPanel);
+            CreateMenuItem(_modePanel.transform, "もどる", -ItemHeight * 1.5f, Close);
+        }
+
+        private void BuildFriendPanel()
+        {
+            _friendPanel = new GameObject("FriendPanel", typeof(RectTransform));
+            _friendPanel.transform.SetParent(_root.transform, false);
+            Center(_friendPanel.GetComponent<RectTransform>(), new Vector2(ItemWidth, ItemHeight * 5f));
+
+            CreateHeading(_friendPanel.transform, "フレンドマッチ", ItemHeight * 2f);
+            CreateMenuItem(_friendPanel.transform, "部屋を作る", ItemHeight * 0.9f, OnPrivateCreateSelected);
+            CreateMenuItem(_friendPanel.transform, "あいことばで入る", -ItemHeight * 0.2f, ShowPasswordPanel);
+            CreateCaption(_friendPanel.transform, "部屋設定は今後追加予定", -ItemHeight * 1.15f);
+            CreateMenuItem(_friendPanel.transform, "もどる", -ItemHeight * 2.1f, ShowModePanel);
+
+            _friendPanel.SetActive(false);
         }
 
         private void BuildPasswordPanel()
@@ -380,7 +424,7 @@ namespace KillingMahjong.UI
             _passwordStatus.raycastTarget = false;
 
             CreateMenuItem(_passwordPanel.transform, "決定", -ItemHeight * 0.8f, OnPasswordSubmit);
-            CreateMenuItem(_passwordPanel.transform, "もどる", -ItemHeight * 1.9f, ShowModePanel);
+            CreateMenuItem(_passwordPanel.transform, "もどる", -ItemHeight * 1.9f, ShowFriendPanel);
 
             _passwordPanel.SetActive(false);
         }
@@ -400,6 +444,23 @@ namespace KillingMahjong.UI
             tmp.text = text;
             tmp.fontSize = LabelFontSize * 0.85f;
             tmp.color = MenuText;
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.raycastTarget = false;
+        }
+
+        private void CreateCaption(Transform parent, string text, float y)
+        {
+            var obj = new GameObject("Caption", typeof(RectTransform), typeof(TextMeshProUGUI));
+            obj.transform.SetParent(parent, false);
+            var rt = obj.GetComponent<RectTransform>();
+            Center(rt, new Vector2(ItemWidth, ItemHeight));
+            rt.anchoredPosition = new Vector2(0f, y);
+
+            var tmp = obj.GetComponent<TextMeshProUGUI>();
+            ApplyFont(tmp);
+            tmp.text = text;
+            tmp.fontSize = LabelFontSize * 0.65f;
+            tmp.color = new Color(MenuText.r, MenuText.g, MenuText.b, 0.7f);
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.raycastTarget = false;
         }
