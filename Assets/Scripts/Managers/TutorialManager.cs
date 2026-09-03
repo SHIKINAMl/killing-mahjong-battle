@@ -176,9 +176,28 @@ namespace KillingMahjong.Managers
 
         // ==================== 開始 / 中断 ====================
 
+        private const string RequestedStartRoundKey = "Tutorial_RequestedStartRound";
+
+        /// <summary>
+        /// タイトルの待機画面から選んだ開始局を、OpeningScene の導入演出をまたいで渡す。
+        /// StartTutorial() が一度だけ消費するため、通常の起動や次回以降のチュートリアルには残らない。
+        /// </summary>
+        public static void RequestStartFrom(int roundIndex)
+        {
+            PlayerPrefs.SetInt(RequestedStartRoundKey, Mathf.Max(0, roundIndex));
+            PlayerPrefs.Save();
+        }
+
         public void StartTutorial()
         {
-            StartTutorialFrom(0);
+            int requestedRound = PlayerPrefs.GetInt(RequestedStartRoundKey, -1);
+            if (requestedRound >= 0)
+            {
+                PlayerPrefs.DeleteKey(RequestedStartRoundKey);
+                PlayerPrefs.Save();
+            }
+
+            StartTutorialFrom(requestedRound >= 0 ? requestedRound : 0);
         }
 
         public void StartTutorialFrom(int roundIndex)

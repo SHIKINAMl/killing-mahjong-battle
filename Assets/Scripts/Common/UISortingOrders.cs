@@ -152,6 +152,12 @@ namespace KillingMahjong.Common
 
         // ---- 80 - 89 ダイアログ・最前面パネル ----
 
+        /// <summary>
+        /// RoomScreenUI: タイトルからゲーム開始後に表示する部屋の待機画面。
+        /// 対戦相手の探し方を選ぶモーダル(81)より一段奥に置く。
+        /// </summary>
+        public const int TitleRoomScreen = 80;
+
         /// <summary>ConfirmationDialogUI: 確認ダイアログ (手牌等より手前)</summary>
         public const int ConfirmationDialog = 80;
 
