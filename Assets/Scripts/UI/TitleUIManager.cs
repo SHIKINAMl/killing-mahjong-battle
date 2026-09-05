@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.SceneManagement;
 using TMPro;
 using UnityEngine.UI;
@@ -171,31 +171,9 @@ namespace KillingMahjong.UI
                 }
             }
 
-            if (font == null) return;
-
-            var canvas = FindFirstObjectByType<Canvas>();
-            if (canvas == null) return;
-
-            var existing = canvas.transform.Find("TruthNameHook");
-            var hook = existing != null ? existing.gameObject :
-                new GameObject("TruthNameHook", typeof(RectTransform), typeof(TextMeshProUGUI));
-            hook.transform.SetParent(canvas.transform, false);
-
-            var rect = hook.GetComponent<RectTransform>();
-            rect.anchorMin = new Vector2(0.5f, 0.5f);
-            rect.anchorMax = new Vector2(0.5f, 0.5f);
-            rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = new Vector2(172f, 92f);
-            rect.sizeDelta = new Vector2(390f, 42f);
-
-            var textMesh = hook.GetComponent<TextMeshProUGUI>();
-            textMesh.font = font;
-            textMesh.text = "彼女の真名を、探しだせ。";
-            textMesh.fontSize = 22f;
-            textMesh.fontStyle = FontStyles.Bold;
-            textMesh.color = new Color32(240, 232, 236, 230);
-            textMesh.alignment = TextAlignmentOptions.Center;
-            textMesh.raycastTarget = false;
+            // キャッチコピー「彼女の真名を、探しだせ。」はユーザーの指示で外した（2026-09-05）。
+            // シーンには保存されておらず、ここで実行時に作っていただけなので、作らなければ出ない。
+            // 戻すときはこの位置に TruthNameHook を作り直すこと（旧: 中央から +172, +92 / 390x42 / 22pt）。
         }
 
         private static void SetTitlePresentationVisible(bool visible)
@@ -203,7 +181,6 @@ namespace KillingMahjong.UI
             string[] titleOnlyObjects =
             {
                 "TitleLogo",
-                "TruthNameHook",
                 "女の子",
                 "女の子_Silhouette (白フチ)",
                 "タイトル絵",
