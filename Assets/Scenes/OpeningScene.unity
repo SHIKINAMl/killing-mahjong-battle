@@ -9407,7 +9407,8 @@ MonoBehaviour:
   characterData: {fileID: 11400000, guid: b54cb2f20fc68214096f52c562338108, type: 2}
   bounceDuration: 0.3
   bounceHeight: 0.5
-  availableEnemies: []
+  availableEnemies:
+  - {fileID: 11400000, guid: 25ec830b4bda4c0e863f7133c9219e8b, type: 2}
   enemyPanel: {fileID: 385541335}
   damagePopupPrefab: {fileID: 0}
   damagePopupAnchor: {fileID: 0}

@@ -55,6 +55,17 @@ namespace KillingMahjong.Managers
             StartCoroutine(SequenceRoutine());
         }
 
+        private void Start()
+        {
+            // EnemyInfoUI の Awake 後に、OpeningScene にだけ登録したチュートリアル用
+            // CharacterData へ切り替える。共有アセットは変更しない。
+            GameUIManager uiManager = UnityEngine.Object.FindFirstObjectByType<GameUIManager>();
+            if (uiManager != null && uiManager.EnemyInfoUI != null)
+            {
+                uiManager.EnemyInfoUI.CycleEnemy();
+            }
+        }
+
         private IEnumerator SequenceRoutine()
         {
             // 開始時（契約書中）はBGMを止めて静かにする
