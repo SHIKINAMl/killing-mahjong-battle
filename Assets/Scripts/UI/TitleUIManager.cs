@@ -23,6 +23,7 @@ namespace KillingMahjong.UI
         private void Start()
         {
             ApplyTitlePresentation();
+            HideTitleLogo();
             PresentationApplied = true;
 
             // チュートリアルの完走／スキップ後だけは、入口へ戻すのではなく
@@ -178,19 +179,16 @@ namespace KillingMahjong.UI
 
         private static void SetTitlePresentationVisible(bool visible)
         {
+            // ロゴ（TitleLogo）とキラキラ（Sparkle0〜4）はここに入れない。
+            // 入れると、部屋から「タイトルへ」で戻ったときに復活する。
+            // 消すのは HideTitleLogo() の役目。
             string[] titleOnlyObjects =
             {
-                "TitleLogo",
                 "女の子",
                 "女の子_Silhouette (白フチ)",
                 "タイトル絵",
                 "TitleScrim",
-                "ボタン達",
-                "Sparkle0",
-                "Sparkle1",
-                "Sparkle2",
-                "Sparkle3",
-                "Sparkle4"
+                "ボタン達"
             };
 
             foreach (string objectName in titleOnlyObjects)
@@ -199,6 +197,32 @@ namespace KillingMahjong.UI
                 // 部屋から戻るときも確実に復帰できるよう、シーン内の非アクティブ要素を含めて探す。
                 var target = FindSceneObjectIncludingInactive(objectName);
                 if (target != null) target.SetActive(visible);
+            }
+        }
+
+        /// <summary>
+        /// タイトルのロゴ「じゃんぱいあ」と、その周りのキラキラを消す。ユーザーの指示（2026-09-05）。
+        ///
+        /// シーンを書き換えず実行時に隠している。シーンを直接触ると、
+        /// Play の出入りで差分が出たり、外部から書き換えたときに MCP ごと止まることがある
+        /// （AGENTS.md §15）。戻すときはこのメソッドの呼び出しを外すだけでよい。
+        /// </summary>
+        private static void HideTitleLogo()
+        {
+            string[] logoObjects =
+            {
+                "TitleLogo",
+                "Sparkle0",
+                "Sparkle1",
+                "Sparkle2",
+                "Sparkle3",
+                "Sparkle4"
+            };
+
+            foreach (string objectName in logoObjects)
+            {
+                var target = FindSceneObjectIncludingInactive(objectName);
+                if (target != null) target.SetActive(false);
             }
         }
 
