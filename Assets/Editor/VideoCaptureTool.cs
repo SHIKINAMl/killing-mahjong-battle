@@ -21,8 +21,21 @@ namespace KillingMahjong.EditorTools
         private static MovieRecorderSettings s_MovieRecorderSettings;
         private static string s_OutputPath = string.Empty;
 
+        /// <summary>このゲーム本来の画面比（4:3）。</summary>
+        private const int GameWidth = 800;
+
+        /// <summary>このゲーム本来の画面比（4:3）。</summary>
+        private const int GameHeight = 600;
+
         /// <summary>
         /// Starts an MP4 recording of the Game View. A duration of zero records until StopRecording is called.
+        ///
+        /// **既定は 800x600。このゲーム本来の画面比（4:3）に合わせてある。**
+        /// 16:9（1920x1080 など）で撮ると画面比が変わり、UI の配置が崩れる。
+        /// 実際、2026-09-06 に 1920x1080 で撮った映像では、自分の体力表示が
+        /// 画面の右端で見切れていた。**比を変えないこと。**
+        ///
+        /// 大きく撮りたいときは 4:3 の倍数を使う（1600x1200 / 2400x1800 など）。
         /// </summary>
         /// <param name="outputMp4Path">Absolute destination path, including the .mp4 extension.</param>
         /// <param name="width">Output width in pixels. Must be positive and even.</param>
@@ -32,8 +45,8 @@ namespace KillingMahjong.EditorTools
         /// <returns>A STARTED or ERROR message that includes the output path or failure reason.</returns>
         public static string StartRecording(
             string outputMp4Path,
-            int width = 1920,
-            int height = 1080,
+            int width = GameWidth,
+            int height = GameHeight,
             int frameRate = 60,
             float durationSeconds = 0f)
         {
@@ -203,6 +216,16 @@ namespace KillingMahjong.EditorTools
             if ((width & 1) != 0 || (height & 1) != 0)
             {
                 throw new ArgumentException("MP4 output width and height must both be even numbers.");
+            }
+
+            // 4:3 から外れたら知らせる。止めはしないが、たいていは指定の間違い。
+            // 16:9 で撮ると UI の配置が崩れる（2026-09-06 に体力表示が見切れた）。
+            if (width * GameHeight != height * GameWidth)
+            {
+                Debug.LogWarning(
+                    $"[VideoCaptureTool] 画面比が {width}x{height} になっています。" +
+                    $"このゲーム本来の比は {GameWidth}x{GameHeight}（4:3）です。" +
+                    "比を変えると UI の配置が崩れます。大きく撮るなら 1600x1200 など 4:3 の倍数を使ってください。");
             }
 
             if (frameRate <= 0)
