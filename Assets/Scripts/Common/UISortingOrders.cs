@@ -237,6 +237,13 @@ namespace KillingMahjong.Common
         /// カーソル(99)より奥なのは意図的で、光っている間もカーソルは見えていてよい。</summary>
         public const int ScreenFlash = 98;
 
+        /// <summary>TutorialIntro: チュートリアル開始前の問いかけと案内板。
+        ///
+        /// 対局が始まる前に全画面を覆う。答えるまで先へ進ませないので、
+        /// 盤面やダイアログ(97)より手前に置く。カーソル(99)より奥なのは
+        /// 押している間もカーソルが見えていてよいため。</summary>
+        public const int TutorialIntro = 98;
+
         /// <summary>CustomCusor: 自前マウスカーソル。常に全UIより手前</summary>
         public const int MouseCursor = 99;
 

@@ -197,7 +197,17 @@ namespace KillingMahjong.Managers
                 PlayerPrefs.Save();
             }
 
-            StartTutorialFrom(requestedRound >= 0 ? requestedRound : 0);
+            // 局を指定して呼ばれたときは、そのまま始める。
+            // コレクションやデバッグから途中の局へ飛ぶ入口なので、問いかけは邪魔になる。
+            if (requestedRound >= 0)
+            {
+                StartTutorialFrom(requestedRound);
+                return;
+            }
+
+            // 最初から始めるときだけ「麻雀をやったことがありますか？」を聞く。
+            // いいえなら案内板を1枚見せてから始まる。中身は TutorialManager.Intro.cs。
+            AskExperienceThenStart(0);
         }
 
         public void StartTutorialFrom(int roundIndex)
