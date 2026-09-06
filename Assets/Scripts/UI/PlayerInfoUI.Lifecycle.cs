@@ -83,6 +83,10 @@ namespace KillingMahjong.UI
             }
 
             InitializeOriginalTransform();
+
+            // 体力表示の重なり直し（血を袋の奥へ／黒い横線3本を出さない）。
+            // 中身は PlayerInfoUI.MeterLayering.cs。戻すときはこの1行を外す。
+            FixHpMeterLayering();
         }
 
         private void ApplyCharacterData(CharacterData data)
