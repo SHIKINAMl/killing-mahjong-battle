@@ -80,6 +80,11 @@ namespace KillingMahjong.UI
             SetupControllers();
             SetupUI();
 
+            // ボルテージのゲージを画面左に出す。**河からではなくここで作る。**
+            // 河は手牌を選んでいる間は消えているので、河側の OnEnable に任せると
+            // 対局が始まるまで作られない（実際そうなった）。
+            VoltageUI.EnsureCreated();
+
             // チュートリアルモードでなければWebSocketに自動接続する
             if (!IsTutorialMode)
             {

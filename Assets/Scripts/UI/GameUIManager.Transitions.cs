@@ -192,13 +192,15 @@ namespace KillingMahjong.UI
             // 打牌フェイズで、かつ演出中（先行・後攻演出など）ではない時だけ表示する
             bool shouldShow = (currentPhaseStatus == RoundStatus.Discard) && !IsTransitioning;
 
+            // 「YOUR TURN / ENEMY TURN」の文字は出さない（ユーザーの指示 2026-09-08）。
+            // その場所にはボルテージのゲージを置いた（VoltageUI）。
+            // 戻すときは false を shouldShow に戻す。
             if (turnIndicatorUI != null)
             {
-                turnIndicatorUI.SetVisible(shouldShow);
+                turnIndicatorUI.SetVisible(false);
             }
 
             // **手番を体力表示の光り物で示すのは、両側ともやめた。**
-            // 手番の合図は「YOUR TURN / ENEMY TURN」の文字だけに任せる。
             //
             // - 相手側: 2026-08-14 の指示で停止。EnemyInfoUI.SetTurnGlow の中身が空になっている
             //   （立ち絵を染める TurnCharacterGlow も、点滴の影絵 TurnGlow も生成されない）

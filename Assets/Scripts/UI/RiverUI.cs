@@ -35,6 +35,10 @@ namespace KillingMahjong.UI
 
         private List<Transform> discardedTiles = new List<Transform>();
 
+        // ボルテージのゲージはここでは作らない。**GameUIManager.Start が作る。**
+        // 河から作ると河のキャンバスの下にぶら下がり、手牌を選んでいる間は
+        // 河ごと消えてゲージまで見えなくなる（実際そうなった）。
+
         // ---- 2つの河を同じ中心線に乗せる（2026-08-24）----
         //
         // 同じ11枚でも、敵 x332..511（幅179）／自分 x339..543（幅204）と揃っていなかった。
@@ -119,7 +123,11 @@ namespace KillingMahjong.UI
         public void AddExistingTile(RectTransform rt, int tileId)
         {
             if (rt == null || riverContainer == null) return;
-            
+
+            // **並べる前に数える。** 並べてから呼ぶと、今捨てた牌を
+            // 「すでに出ている」と数えてしまう。AddTile 側も同じ。
+            KillingMahjong.Managers.VoltageSystem.NotifyDiscard(isEnemyRiver, tileId);
+
             rt.SetParent(riverContainer, true);
             rt.SetAsLastSibling();
 
@@ -149,6 +157,8 @@ namespace KillingMahjong.UI
         public void AddTile(int tileId)
         {
             if (tilePrefab == null || riverContainer == null) return;
+
+            KillingMahjong.Managers.VoltageSystem.NotifyDiscard(isEnemyRiver, tileId);
 
             GameObject obj = Instantiate(tilePrefab, riverContainer);
             RectTransform rt = obj.GetComponent<RectTransform>();
@@ -286,6 +296,10 @@ namespace KillingMahjong.UI
 
         public void Clear()
         {
+            // 局が切り替わって河が空になるので、ボルテージも履歴ごと捨てる。
+            // 自分・相手の河は続けて Clear されるが、二度呼んでも害はない。
+            KillingMahjong.Managers.VoltageSystem.ResetAll();
+
             var uiManager = FindFirstObjectByType<GameUIManager>();
             foreach (var t in discardedTiles)
             {

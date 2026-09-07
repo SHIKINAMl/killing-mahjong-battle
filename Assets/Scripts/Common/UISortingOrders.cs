@@ -101,6 +101,12 @@ namespace KillingMahjong.Common
         // ---- 20 - 29 情報パネル強調 ----
 
         /// <summary>AbilityUI ルート / PlayerInfoUI 強調表示時の共通レイヤー</summary>
+        /// <summary>VoltageUI: ボルテージのゲージ。画面左に常に出ている。
+        ///
+        /// 盤面（牌山16 / 情報パネル15）より手前。演出や各種パネル（20以上）よりは奥で、
+        /// 決着の演出やダイアログが出ている間は隠れてよい。</summary>
+        public const int VoltageGauge = 18;
+
         public const int InfoPanelHighlight = 20;
 
         /// <summary>BettingUI: ベットパネル（敵のダイアログより手前に出す）。
