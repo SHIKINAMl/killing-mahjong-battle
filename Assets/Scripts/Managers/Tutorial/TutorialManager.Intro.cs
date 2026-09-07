@@ -23,8 +23,16 @@ namespace KillingMahjong.Managers
     /// </summary>
     public partial class TutorialManager
     {
-        /// <summary>未経験者向け案内板。Resources 直下からの相対パス（拡張子なし）。</summary>
-        private const string GuideBoardPath = "Tutorial/麻雀の基本_アガリの形";
+        /// <summary>
+        /// 未経験者向け案内板。Resources 直下からの相対パス（拡張子なし）。
+        ///
+        /// **ユーザーが用意した画像を使う。差し替えないこと（2026-09-07 の指示）。**
+        /// 一度 AI が描いた `麻雀の基本_アガリの形.jpg` に置き換わったが、
+        /// あれは「3枚組×4＋2枚組×1＝14枚」という一般的な麻雀の説明で、
+        /// **このゲームの「山牌から13枚選んで満貫以上を作る」という決まりと食い違う。**
+        /// 未経験者に、この対局では使わない知識を教えることになるので戻した。
+        /// </summary>
+        private const string GuideBoardPath = "Tutorial/案内板_満貫";
 
         // ユーザーが選んだ B 案の問いかけと選択肢。
         private const string ExperienceQuestion = "あなた、麻雀は打てるの？";
@@ -33,11 +41,15 @@ namespace KillingMahjong.Managers
         private const string GuideStartLabel = "わかった";
 
         // 未経験を選んだ時だけ、説明画像の前に見せる短い会話。
+        //
+        // **最後の一行は案内板の中身に合わせること。** 案内板は「13枚から満貫手を狙う」
+        // という、この対局の決まりを説明したもの。ここで別の話（アガリの形など）を
+        // 予告すると、出てくる板と食い違う。
         private static readonly List<TutorialLine> BeginnerIntroLines = new List<TutorialLine>
         {
             new TutorialLine("……素人が紛れ込んできたわけね。"),
             new TutorialLine("いい度胸だこと。自分の命のルールも知らないで契約したの？"),
-            new TutorialLine("仕方ないわ。基本のアガリの形くらいは頭に叩き込んでおきなさい。"),
+            new TutorialLine("仕方ないわ。『満貫』の意味くらいは頭に叩き込んでおきなさい。"),
         };
 
         private GameObject _introRoot;
