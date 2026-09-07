@@ -205,8 +205,8 @@ namespace KillingMahjong.Managers
                 return;
             }
 
-            // 最初から始めるときだけ「麻雀をやったことがありますか？」を聞く。
-            // いいえなら案内板を1枚見せてから始まる。中身は TutorialManager.Intro.cs。
+            // 最初から始めるときだけ経験を聞く。
+            // 初めてなら短い会話と案内板を見せてから始まる。中身は TutorialManager.Intro.cs。
             AskExperienceThenStart(0);
         }
 

@@ -1,4 +1,6 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -9,8 +11,8 @@ namespace KillingMahjong.Managers
     /// <summary>
     /// チュートリアルを始める前の問いかけ。ユーザーの指示（2026-09-07）。
     ///
-    /// 「麻雀をやったことがありますか？」を先に聞き、
-    /// **はい → そのまま開始 / いいえ → 案内板を見せてから開始** とする。
+    /// 「あなた、麻雀は打てるの？」を先に聞き、
+    /// **経験あり → そのまま開始 / 初めて → 短い説明会話と案内板の後に開始** とする。
     ///
     /// **シーンには置かず実行時に組み立てる。** 対局シーンが2つ（UIテストシーン /
     /// OpeningScene）あるので、シーンに置くと片方だけ直る事故が起きる（AGENTS.md §2）。
@@ -21,13 +23,22 @@ namespace KillingMahjong.Managers
     /// </summary>
     public partial class TutorialManager
     {
-        /// <summary>案内板の画像。Resources 直下からの相対パス（拡張子なし）。</summary>
-        private const string GuideBoardPath = "Tutorial/案内板_満貫";
+        /// <summary>未経験者向け案内板。Resources 直下からの相対パス（拡張子なし）。</summary>
+        private const string GuideBoardPath = "Tutorial/麻雀の基本_アガリの形";
 
-        private const string ExperienceQuestion = "麻雀をやったことがありますか？";
-        private const string YesLabel = "はい";
-        private const string NoLabel = "いいえ";
-        private const string GuideStartLabel = "はじめる";
+        // ユーザーが選んだ B 案の問いかけと選択肢。
+        private const string ExperienceQuestion = "あなた、麻雀は打てるの？";
+        private const string YesLabel = "経験あり";
+        private const string NoLabel = "初めて";
+        private const string GuideStartLabel = "わかった";
+
+        // 未経験を選んだ時だけ、説明画像の前に見せる短い会話。
+        private static readonly List<TutorialLine> BeginnerIntroLines = new List<TutorialLine>
+        {
+            new TutorialLine("……素人が紛れ込んできたわけね。"),
+            new TutorialLine("いい度胸だこと。自分の命のルールも知らないで契約したの？"),
+            new TutorialLine("仕方ないわ。基本のアガリの形くらいは頭に叩き込んでおきなさい。"),
+        };
 
         private GameObject _introRoot;
 
@@ -53,10 +64,25 @@ namespace KillingMahjong.Managers
                     CloseIntro();
                     StartTutorialFrom(roundIndex);
                 },
-                onNo: () => ShowGuideBoard(roundIndex, font));
+                onNo: () => StartCoroutine(PlayBeginnerIntroThenShowGuide(roundIndex, font)));
         }
 
-        /// <summary>案内板を1枚見せて、「はじめる」でチュートリアルへ。</summary>
+        /// <summary>
+        /// 未経験者への短い会話を送り、説明画像を表示する。
+        /// 会話は既存の DialogueUI を使い、画像だけを実行時生成の Canvas に置く。
+        /// </summary>
+        private IEnumerator PlayBeginnerIntroThenShowGuide(int roundIndex, TMP_FontAsset font)
+        {
+            CloseIntro();
+
+            yield return PlayLines(BeginnerIntroLines);
+
+            // 画像の下に直前の吹き出しが残らないようにしてからカードを前面に出す。
+            if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
+            ShowGuideBoard(roundIndex, font);
+        }
+
+        /// <summary>未経験者向け案内板を1枚見せて、「わかった」で本編へ合流する。</summary>
         private void ShowGuideBoard(int roundIndex, TMP_FontAsset font)
         {
             CloseIntro();
@@ -84,21 +110,21 @@ namespace KillingMahjong.Managers
             imageRect.anchorMax = new Vector2(0.5f, 0.5f);
             imageRect.anchoredPosition = new Vector2(0f, 30f);
             // 元画像の縦横比のまま、画面に収まる大きさへ。
-            float scale = Mathf.Min(700f / board.rect.width, 420f / board.rect.height);
+            float scale = Mathf.Min(700f / board.rect.width, 450f / board.rect.height);
             imageRect.sizeDelta = new Vector2(board.rect.width * scale, board.rect.height * scale);
 
             var boardImage = image.GetComponent<Image>();
             boardImage.sprite = board;
             boardImage.raycastTarget = false;
 
-            CreateButton(parent, font, GuideStartLabel, new Vector2(0f, -230f), () =>
+            CreateButton(parent, font, GuideStartLabel, new Vector2(0f, -250f), () =>
             {
                 CloseIntro();
                 StartTutorialFrom(roundIndex);
             });
         }
 
-        /// <summary>問いかけの文と、はい／いいえの2つ。</summary>
+        /// <summary>問いかけの文と、経験あり／初めての2つ。</summary>
         private void BuildQuestionPanel(Transform parent, TMP_FontAsset font, Action onYes, Action onNo)
         {
             var label = new GameObject("Question", typeof(RectTransform), typeof(TextMeshProUGUI));
@@ -117,8 +143,8 @@ namespace KillingMahjong.Managers
             text.alignment = TextAlignmentOptions.Center;
             text.raycastTarget = false;
 
-            CreateButton(parent, font, YesLabel, new Vector2(-110f, -40f), onYes);
-            CreateButton(parent, font, NoLabel, new Vector2(110f, -40f), onNo);
+            CreateButton(parent, font, YesLabel, new Vector2(-115f, -40f), onYes);
+            CreateButton(parent, font, NoLabel, new Vector2(115f, -40f), onNo);
         }
 
         /// <summary>全画面を覆う Canvas を作る。すでにあれば作り直さない。</summary>
@@ -157,7 +183,7 @@ namespace KillingMahjong.Managers
             rect.anchorMin = new Vector2(0.5f, 0.5f);
             rect.anchorMax = new Vector2(0.5f, 0.5f);
             rect.anchoredPosition = position;
-            rect.sizeDelta = new Vector2(180f, 56f);
+            rect.sizeDelta = new Vector2(200f, 56f);
 
             go.GetComponent<Image>().color = new Color32(120, 24, 32, 255);
 
