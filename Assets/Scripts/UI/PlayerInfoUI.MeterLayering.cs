@@ -13,8 +13,10 @@ namespace KillingMahjong.UI
         private const string BagFrontName = "袋（手前）";
 
         // HP 袋の上部にある黒い数値欄の実寸。2 シーンで同じ値を使う。
+        // 数字専用にして左右へ 2px の余白を取り、枠線へ触れないようにする。
         private static readonly Vector2 HpTextAnchoredPosition = new Vector2(52f, 42f);
-        private static readonly Vector2 HpTextSize = new Vector2(76f, 18f);
+        private static readonly Vector2 HpTextSize = new Vector2(72f, 18f);
+        private static readonly Vector4 HpTextMargin = new Vector4(2f, 0f, 2f, 0f);
 
         /// <summary>
         /// 自分の体力表示の重なりを直す。ユーザーの指示（2026-09-06）。
@@ -55,13 +57,13 @@ namespace KillingMahjong.UI
             rect.anchoredPosition = HpTextAnchoredPosition;
             rect.sizeDelta = HpTextSize;
 
-            hpText.margin = Vector4.zero;
+            hpText.margin = HpTextMargin;
             hpText.enableWordWrapping = false;
             hpText.alignment = TextAlignmentOptions.Center;
-            hpText.fontSize = 12f;
+            hpText.fontSize = 11f;
             hpText.enableAutoSizing = true;
             hpText.fontSizeMin = 9f;
-            hpText.fontSizeMax = 12f;
+            hpText.fontSizeMax = 11f;
         }
 
         /// <summary>黒い横線3本の覆いを見えなくする。</summary>
