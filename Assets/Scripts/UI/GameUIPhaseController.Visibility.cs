@@ -145,8 +145,8 @@ namespace KillingMahjong.UI
             if (uiManager.RiverUI != null) uiManager.RiverUI.gameObject.SetActive(showBoardElements);
             if (uiManager.EnemyRiverUI != null) uiManager.EnemyRiverUI.gameObject.SetActive(showBoardElements);
 
-            // 待ち候補の推理は打牌中だけ意味があるので、そのときだけ出す
-            if (!uiManager.IsTutorialMode)
+            // 待ち候補UIは実行時生成を止めている。再有効化時も打牌中だけ表示する。
+            if (uiManager.IsWaitDeductionUIEnabled)
             {
                 uiManager.WaitDeduction.SetVisible(status == RoundStatus.Discard);
             }

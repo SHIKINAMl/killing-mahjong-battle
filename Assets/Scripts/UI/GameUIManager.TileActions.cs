@@ -254,11 +254,17 @@ namespace KillingMahjong.UI
         /// 「この牌が通った」の推理表示。無ければ実行時に作る。
         /// 判定はサーバー任せで、こちらは見えている打牌から候補を数えるだけ。
         /// </summary>
+        // ボルテージUIと表示領域が重なるため、待ち候補UIは実行時に生成しない。
+        // 判定ロジックとUIクラスは残し、再表示が必要になったときはここだけを切り替える。
+        private const bool WaitDeductionUIEnabled = false;
+        public bool IsWaitDeductionUIEnabled => WaitDeductionUIEnabled;
+
         private WaitDeductionUI _waitDeduction;
         public WaitDeductionUI WaitDeduction
         {
             get
             {
+                if (!WaitDeductionUIEnabled) return null;
                 if (_waitDeduction == null) _waitDeduction = GetComponentInChildren<WaitDeductionUI>(true);
                 if (_waitDeduction == null)
                 {
@@ -296,7 +302,7 @@ namespace KillingMahjong.UI
 
             // 通った牌・相手が切った牌のどちらも「相手の待ちではない」情報になる。
             // ロン成立時は局が終わって次局でリセットされるので、ここで弾く必要はない。
-            if (!IsTutorialMode) WaitDeduction.RegisterDiscard(discardedTileId, isLocalPlayer);
+            if (IsWaitDeductionUIEnabled) WaitDeduction.RegisterDiscard(discardedTileId, isLocalPlayer);
 
             if (KillingMahjong.Managers.AudioManager.Instance != null)
                 KillingMahjong.Managers.AudioManager.Instance.PlayDiscardSE(KillingMahjong.Managers.AudioManager.Instance.discardSE);

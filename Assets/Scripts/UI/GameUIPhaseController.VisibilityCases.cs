@@ -46,8 +46,8 @@ namespace KillingMahjong.UI
         {
             _hasShownHandSelectionPrompt = false; // 次の局のためにフラグをリセット
             _hasExecutedRonAnimation = false; // ロン演出の二重再生防止フラグをリセット
-            // 待ち候補の推理は局ごとにやり直す
-            if (!uiManager.IsTutorialMode) uiManager.WaitDeduction.ResetForNewRound();
+            // 待ち候補UIは実行時生成を止めている。再有効化時だけ局ごとに初期化する。
+            if (uiManager.IsWaitDeductionUIEnabled) uiManager.WaitDeduction.ResetForNewRound();
             if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.ShowReadyBox(false);
             if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.ShowReadyBox(false);
             ResetPhaseReadyMarks(); // 手牌選択・ベットの印は局ごとに引き直す
