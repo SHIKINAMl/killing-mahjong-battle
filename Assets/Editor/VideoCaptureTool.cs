@@ -203,9 +203,32 @@ namespace KillingMahjong.EditorTools
                 throw new ArgumentException("Output path must include a file name before .mp4.", nameof(outputMp4Path));
             }
 
+            // **同じ名前があっても撮り直せるようにする（2026-09-09）。**
+            //
+            // 以前はここで例外にして上書きを拒んでいたが、撮り直しのたびに落ちていた。
+            // 指示は毎回きまった名前を指定してくるので、1度失敗すると同じ名前では
+            // 二度と撮れなくなる。**撮り直しを止めるほうが害が大きい。**
+            //
+            // 消すのではなく、前の分は名前を変えて残す。上書きで消えて困るのは
+            // 「撮れていたのに撮り直して失敗した」場合なので、戻せる形にしておく。
             if (File.Exists(fullOutputPath))
             {
-                throw new IOException($"Output file already exists and will not be overwritten: {fullOutputPath}");
+                string backup = Path.Combine(
+                    Path.GetDirectoryName(fullOutputPath),
+                    Path.GetFileNameWithoutExtension(fullOutputPath)
+                        + "_prev_" + DateTime.Now.ToString("HHmmss")
+                        + Path.GetExtension(fullOutputPath));
+                try
+                {
+                    File.Move(fullOutputPath, backup);
+                    Debug.Log("[VideoCaptureTool] 同じ名前があったので、前の分を残しました: " + backup);
+                }
+                catch (IOException moveError)
+                {
+                    // 名前を変えられない（他で開かれている等）ときだけ、はっきり止める。
+                    throw new IOException(
+                        "既にある出力ファイルを避けられませんでした: " + fullOutputPath, moveError);
+                }
             }
 
             if (width <= 0 || height <= 0)
