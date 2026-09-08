@@ -10,7 +10,9 @@ namespace KillingMahjong.UI
     public class BettingUI : MonoBehaviour
     {
         [Header("UI References")]
-        [SerializeField] private RectTransform hpBarPanel; // Panel to slide in from right
+        // `BettingPanel` はスマホ型の枠と掛け金UIをまとめて持つ子。シーンごとに
+        // 別のアニメーションを置かず、このパネルを実行時に上下させる。
+        [SerializeField] private RectTransform hpBarPanel;
         [SerializeField] private TextMeshProUGUI currentMoneyText;
         [SerializeField] private TextMeshProUGUI currentBetText;
         [SerializeField] private TextMeshProUGUI expectedRewardText;
@@ -43,11 +45,17 @@ namespace KillingMahjong.UI
         private int currentBet = 0;
         private int maxBet = 0;
 
-        private Vector2 visiblePos; // On-screen
+        private Vector2 visiblePos;
+        private Coroutine slideCoroutine;
+        private CanvasGroup panelCanvasGroup;
+        private bool isSliding;
         
         private Action<int> onConfirmAction;
 
         private GameObject bettingDimmer;
+
+        /// <summary>スマホ型パネルが出入りしている間は、操作や誘導を待つための状態。</summary>
+        public bool IsSlideAnimating => isSliding;
 
         // ---- 予想報酬の行（調整値。シーンではなくここを触る）----
         //
@@ -193,7 +201,7 @@ namespace KillingMahjong.UI
 
         private void Awake()
         {
-            // Setup positions (スライドイン廃止のため、現在位置をvisiblePosとして保持するだけにする)
+            // シーンに置かれた通常位置を保存し、表示時はここへ戻す。
             if (hpBarPanel != null)
             {
                 visiblePos = hpBarPanel.anchoredPosition;
@@ -215,6 +223,112 @@ namespace KillingMahjong.UI
             DisableRaycastForButtonTexts(decreaseBetButton);
             DisableRaycastForButtonTexts(confirmButton);
             DisableRaycastForButtonTexts(fullBetButton);
+        }
+
+        /// <summary>
+        /// パネル全体が画面下端の外へ出る位置。
+        ///
+        /// 固定の画面ピクセル値ではなく親Canvasとパネル自身の高さから距離を出すため、
+        /// UIテストシーンとOpeningSceneのどちらでも同じ実行時経路を使える。
+        /// </summary>
+        private Vector2 GetOffscreenBottomPosition()
+        {
+            if (hpBarPanel == null) return visiblePos;
+
+            var parent = hpBarPanel.parent as RectTransform;
+            float parentHeight = parent != null ? parent.rect.height : 0f;
+            float travelDistance = parentHeight + hpBarPanel.rect.height + 8f;
+            return visiblePos + Vector2.down * travelDistance;
+        }
+
+        private void SetPanelInputEnabled(bool enabled)
+        {
+            if (hpBarPanel == null) return;
+
+            if (panelCanvasGroup == null)
+            {
+                panelCanvasGroup = hpBarPanel.GetComponent<CanvasGroup>();
+                if (panelCanvasGroup == null) panelCanvasGroup = hpBarPanel.gameObject.AddComponent<CanvasGroup>();
+            }
+
+            panelCanvasGroup.interactable = enabled;
+            panelCanvasGroup.blocksRaycasts = enabled;
+        }
+
+        private void StopPanelSlide()
+        {
+            if (slideCoroutine != null) StopCoroutine(slideCoroutine);
+            slideCoroutine = null;
+            isSliding = false;
+        }
+
+        private void StartPanelSlideIn()
+        {
+            StopPanelSlide();
+
+            if (hpBarPanel == null)
+            {
+                SetPanelInputEnabled(true);
+                return;
+            }
+
+            var offscreenPos = GetOffscreenBottomPosition();
+            hpBarPanel.anchoredPosition = offscreenPos;
+            SetPanelInputEnabled(false);
+            isSliding = true;
+            slideCoroutine = StartCoroutine(SlidePanelRoutine(offscreenPos, visiblePos, false));
+        }
+
+        private void StartPanelSlideOut()
+        {
+            StopPanelSlide();
+
+            if (hpBarPanel == null)
+            {
+                HideDimmer();
+                gameObject.SetActive(false);
+                return;
+            }
+
+            SetPanelInputEnabled(false);
+            isSliding = true;
+            slideCoroutine = StartCoroutine(SlidePanelRoutine(
+                hpBarPanel.anchoredPosition, GetOffscreenBottomPosition(), true));
+        }
+
+        private IEnumerator SlidePanelRoutine(Vector2 startPos, Vector2 targetPos, bool hideAfterSlide)
+        {
+            float duration = Mathf.Max(0f, slideDuration);
+            float elapsed = 0f;
+
+            while (elapsed < duration)
+            {
+                float progress = duration <= 0f ? 1f : elapsed / duration;
+                float eased = progress * progress * (3f - 2f * progress);
+                hpBarPanel.anchoredPosition = Vector2.Lerp(startPos, targetPos, eased);
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+
+            hpBarPanel.anchoredPosition = targetPos;
+            slideCoroutine = null;
+            isSliding = false;
+
+            if (hideAfterSlide)
+            {
+                HideDimmer();
+                gameObject.SetActive(false);
+            }
+            else
+            {
+                SetPanelInputEnabled(true);
+            }
+        }
+
+        /// <summary>進行側がパネルのスライド完了を待つための共通入口。</summary>
+        public IEnumerator WaitForSlideAnimation()
+        {
+            while (isSliding) yield return null;
         }
 
         private void DisableRaycastForButtonTexts(Button btn)
@@ -261,13 +375,7 @@ namespace KillingMahjong.UI
             gameObject.SetActive(true);
             ShowDimmer();
             UpdateUI();
-            
-            // Slide In Animationを廃止して即時表示
-            if (hpBarPanel != null)
-            {
-                StopAllCoroutines();
-                hpBarPanel.anchoredPosition = visiblePos;
-            }
+            StartPanelSlideIn();
             
             // Start Auto Dialogue
             if (dialogueUI != null && enemyDialogueLines.Length > 0)
@@ -314,22 +422,15 @@ namespace KillingMahjong.UI
 
             if (immediate || !gameObject.activeInHierarchy)
             {
+                StopPanelSlide();
+                SetPanelInputEnabled(false);
+                if (hpBarPanel != null) hpBarPanel.anchoredPosition = GetOffscreenBottomPosition();
                 gameObject.SetActive(false);
                 HideDimmer();
                 return;
             }
 
-            if (hpBarPanel != null)
-            {
-                StopAllCoroutines();
-                gameObject.SetActive(false);
-                HideDimmer();
-            }
-            else
-            {
-                gameObject.SetActive(false);
-                HideDimmer();
-            }
+            StartPanelSlideOut();
         }
 
         /// <summary>賭け金の「上限に対する現在値の割合」。SEのピッチに使う。</summary>
@@ -478,6 +579,7 @@ namespace KillingMahjong.UI
             if (decreaseBetButton != null) decreaseBetButton.interactable = false;
             if (fullBetButton != null) fullBetButton.interactable = false;
             if (confirmButton != null) confirmButton.interactable = false;
+            SetPanelInputEnabled(false);
 
             var audio = Managers.AudioManager.Instance;
             if (audio != null) audio.PlayBetConfirmSE();

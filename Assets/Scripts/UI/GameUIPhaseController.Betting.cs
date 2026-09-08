@@ -32,15 +32,10 @@ namespace KillingMahjong.UI
             if (uiManager.PlayerInfoUI != null)
             {
                 uiManager.PlayerInfoUI.StopTurnTimer();
-                if (uiManager.PlayerInfoUI.gameObject.activeInHierarchy)
-                {
-                    uiManager.PlayerInfoUI.StartCoroutine(
-                        uiManager.PlayerInfoUI.ResetZoomRoutine(BetZoomOutDuration));
-                }
             }
 
-            // スマホが縮んでから「準備完了」を出す。相手が賭けるまではここで待つことになる
-            StartCoroutine(ShowReadyBadgesAfterZoomOut());
+            // パネルが下へ戻ってから「準備完了」を出す。相手が賭けるまではここで待つことになる
+            StartCoroutine(ShowReadyBadgesAfterBettingPanelSlideOut());
 
             if (ReactionController.Instance != null)
             {
@@ -98,14 +93,7 @@ namespace KillingMahjong.UI
              {
                  uiManager.SetIsTransitioning(true);
                  
-                 // スマホは消さないようにする（ユーザー要望）
-                 // if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetPanelVisible(false);
-                 if (uiManager.PlayerInfoUI != null) 
-                 {
-                     uiManager.PlayerInfoUI.ResetZoomImmediate();
-                     // uiManager.PlayerInfoUI.gameObject.SetActive(false);
-                 }
-                 if (uiManager.AbilityUI != null) uiManager.AbilityUI.gameObject.SetActive(false);
+                  if (uiManager.AbilityUI != null) uiManager.AbilityUI.gameObject.SetActive(false);
                  if (uiManager.DialogueUI != null) uiManager.DialogueUI.gameObject.SetActive(false);
 
                  uiManager.PhaseTransitionUI.PlayTransition(roundString, uiManager.PlayerInfoUI, info,

@@ -131,23 +131,23 @@ namespace KillingMahjong.UI
             if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.ShowReadyBox(false);
         }
 
-        /// <summary>ベット中のスマホ拡大に隠れる間だけ、両者の札を伏せる。</summary>
+        /// <summary>ベット用スマホパネルに隠れる間だけ、両者の札を伏せる。</summary>
         private void SetReadyBadgesSuppressed(bool suppressed)
         {
             if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.SetReadyBoxSuppressed(suppressed);
             if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetReadyBoxSuppressed(suppressed);
         }
 
-        /// <summary>
-        /// 賭け金を確定するとスマホが縮む。縮み終わってから札を出し直す。
-        /// 拡大中は札がスマホの裏（x197..602・全高・描画順が上）に入って見えないため。
-        /// </summary>
-        private IEnumerator ShowReadyBadgesAfterZoomOut()
+        /// <summary>賭け金パネルが画面下へ戻ってから札を出し直す。</summary>
+        private IEnumerator ShowReadyBadgesAfterBettingPanelSlideOut()
         {
-            // 縮み切るのと同じ長さだけ待つと同フレームで競合し、札が「縮んでいる途中の
-            // スマホ」に合わせて置かれる（実測で x552..656。正しくは 668..772）。
-            // ReadyBadge は表示した瞬間にしか位置を測らないので、必ず後から動く
-            yield return new WaitForSeconds(BetZoomOutDuration + 0.05f);
+            if (uiManager.BettingUI != null)
+            {
+                yield return uiManager.BettingUI.WaitForSlideAnimation();
+            }
+
+            // ReadyBadge は表示した瞬間にしか位置を測らないので、パネルの完了フレームを避ける。
+            yield return new WaitForSeconds(0.05f);
 
             // 待っている間に相手も賭け終えてフェイズが進んでいたら、出さずに終わる
             if (uiManager.CurrentPhaseStatus != RoundStatus.Betting) yield break;

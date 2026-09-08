@@ -14,7 +14,7 @@ namespace KillingMahjong.UI
     // どのフェイズを読んでいるのか見失うので分けた（2026-08-30）。
     public partial class GameUIPhaseController
     {
-        /// <summary>賭け金フェイズ。スマホを拡大して賭け金UIを出す。</summary>
+        /// <summary>賭け金フェイズ。スマホ型の賭け金パネルを画面下から出す。</summary>
         private void ApplyBettingVisibility()
         {
             SetMatchUIVisibility(true);
@@ -23,19 +23,14 @@ namespace KillingMahjong.UI
             if (uiManager.WaitUI != null) uiManager.WaitUI.gameObject.SetActive(false);
             if (uiManager.AbilityUI != null) uiManager.AbilityUI.gameObject.SetActive(false);
 
-            // チュートリアルでは TutorialManager が「セリフ → 拡大 → 賭け金UI」の順で進める。
-            // ここで拡大やベット開始をしてしまうと、セリフを送る前にスマホが拡大してしまう。
+            // チュートリアルでは TutorialManager が「セリフ → 賭け金UI」の順で進める。
+            // ここでベット開始をしてしまうと、セリフを送る前にパネルがせり上がってしまう。
             if (!uiManager.IsTutorialMode)
             {
-                if (uiManager.PlayerInfoUI != null)
-                {
-                    uiManager.PlayerInfoUI.StartCoroutine(
-                        uiManager.PlayerInfoUI.ZoomInRoutine(0.4f, PlayerInfoUI.BettingZoomScale));
-                }
                 StartBettingPhase(Managers.BoardStateManager.Instance.LocalPlayerHp);
 
-                // スマホが拡大している間は札がその裏に入る。
-                // 賭け金を確定してスマホが縮んでから出す（OnBetConfirmed）
+                // 賭け金パネルが前面に出ている間は札を伏せる。
+                // 確定後、パネルが下へ戻ってから出す（OnBetConfirmed）。
                 SetReadyBadgesSuppressed(true);
                 ApplyPhaseReadyMarks(RoundStatus.Betting);
             }

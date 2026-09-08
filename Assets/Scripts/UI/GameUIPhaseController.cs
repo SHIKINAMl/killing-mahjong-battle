@@ -35,9 +35,6 @@ namespace KillingMahjong.UI
         // 手牌選択・ベットの「準備完了」印。phase_completed_notice で立ち、局の頭（Dealing）で落ちる。
         // 印を状態として持っておくのは、通知が HandlePhaseVisibility の保留より先に届くことがあるため。
         // 受け取った瞬間に SetReadyCheck するだけだと、あとから走る ShowReadyBox(true) に消される。
-        /// <summary>賭け金確定でスマホが縮むまでの秒数。OnBetConfirmed の ResetZoomRoutine と揃えること</summary>
-        private const float BetZoomOutDuration = 0.3f;
-
         private bool _handSelectionReadyLocal = false;
         private bool _handSelectionReadyEnemy = false;
         private bool _betReadyLocal = false;

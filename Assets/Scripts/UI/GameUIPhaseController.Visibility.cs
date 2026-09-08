@@ -114,18 +114,6 @@ namespace KillingMahjong.UI
                 if (!isSettlementPhase) Effects.ScreenFlash.Play();
             }
 
-            if (status != RoundStatus.Betting && uiManager.PlayerInfoUI != null)
-            {
-                if (uiManager.PlayerInfoUI.gameObject.activeInHierarchy)
-                {
-                    uiManager.PlayerInfoUI.StartCoroutine(uiManager.PlayerInfoUI.ResetZoomRoutine(0.3f));
-                }
-                else
-                {
-                    uiManager.PlayerInfoUI.ResetZoomImmediate();
-                }
-            }
-
             if (status != RoundStatus.Betting && uiManager.BettingUI != null)
             {
                 uiManager.BettingUI.HideBettingPhase(true);

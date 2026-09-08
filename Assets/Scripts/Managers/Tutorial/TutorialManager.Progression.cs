@@ -346,16 +346,8 @@ namespace KillingMahjong.Managers
                 yield break;
             }
 
-            // --- ② セリフのあとにスマホを拡大する ---
-            var info = gameUIManager.PlayerInfoUI;
-            if (info != null)
-            {
-                info.gameObject.SetActive(true);
-                yield return info.StartCoroutine(
-                    info.ZoomInRoutine(0.4f, UI.PlayerInfoUI.BettingZoomScale));
-            }
-
-            // --- ③ 賭け金は固定額。増減ボタンは押せないので決定するしかない ---
+            // --- ② セリフのあとにスマホ型の賭け金パネルを下から出す ---
+            // 賭け金は固定額。増減ボタンは押せないので決定するしかない。
             // 実際に賭ける額は UI が確定した値を使う。data.betAmount をそのまま使うと、
             // 表示されている額と場に積まれる額が食い違う余地が残る。
             bool confirmed = false;
@@ -366,17 +358,13 @@ namespace KillingMahjong.Managers
                 confirmed = true;
             });
 
+            yield return betting.WaitForSlideAnimation();
             GuideTo(betting.ConfirmButtonRect);
             yield return new WaitUntil(() => confirmed);
             ClearGuide();
 
             betting.HideBettingPhase();
-
-            // --- ④ 拡大を戻す ---
-            if (info != null)
-            {
-                yield return info.StartCoroutine(info.ResetZoomRoutine(0.3f));
-            }
+            yield return betting.WaitForSlideAnimation();
 
             yield return new WaitForSeconds(phaseSettleTime);
         }
