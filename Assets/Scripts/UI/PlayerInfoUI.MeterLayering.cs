@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 namespace KillingMahjong.UI
 {
@@ -10,6 +11,10 @@ namespace KillingMahjong.UI
 
         /// <summary>袋を血より手前に描くために作る複製の名前。</summary>
         private const string BagFrontName = "袋（手前）";
+
+        // HP 袋の上部にある黒い数値欄の実寸。2 シーンで同じ値を使う。
+        private static readonly Vector2 HpTextAnchoredPosition = new Vector2(52f, 42f);
+        private static readonly Vector2 HpTextSize = new Vector2(76f, 18f);
 
         /// <summary>
         /// 自分の体力表示の重なりを直す。ユーザーの指示（2026-09-06）。
@@ -27,6 +32,8 @@ namespace KillingMahjong.UI
         /// </summary>
         private void FixHpMeterLayering()
         {
+            FixHpTextLayout();
+
             if (hpFillImage == null) return;
 
             Transform meter = hpFillImage.transform.parent;
@@ -34,6 +41,27 @@ namespace KillingMahjong.UI
 
             HideCoverBars(meter);
             MoveBagBehindBlood(meter);
+        }
+
+        /// <summary>体力の数値を、袋上部の黒い表示欄の内側へ固定する。</summary>
+        private void FixHpTextLayout()
+        {
+            if (hpText == null) return;
+
+            var rect = hpText.rectTransform;
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = HpTextAnchoredPosition;
+            rect.sizeDelta = HpTextSize;
+
+            hpText.margin = Vector4.zero;
+            hpText.enableWordWrapping = false;
+            hpText.alignment = TextAlignmentOptions.Center;
+            hpText.fontSize = 12f;
+            hpText.enableAutoSizing = true;
+            hpText.fontSizeMin = 9f;
+            hpText.fontSizeMax = 12f;
         }
 
         /// <summary>黒い横線3本の覆いを見えなくする。</summary>
