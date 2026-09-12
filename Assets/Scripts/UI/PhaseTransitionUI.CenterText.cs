@@ -11,8 +11,9 @@ namespace KillingMahjong.UI
         {
             if (horizontalLineRt != null)
             {
+                PlayTransitionStinger("br_band_open");
                 horizontalLineRt.gameObject.SetActive(true);
-                horizontalLineRt.localScale = new Vector3(0, 2f, 1f); 
+                horizontalLineRt.localScale = new Vector3(0, 2f, 1f);
             }
 
             float t = 0;
@@ -36,7 +37,10 @@ namespace KillingMahjong.UI
             yield return new WaitForSeconds(duration);
             
             if (centerText != null) centerText.gameObject.SetActive(false);
-            
+
+            // 閉じる音は打点が終端にあるので、閉じ始めと同時に鳴らして帯が閉じ切る瞬間に合わせる
+            PlayTransitionStinger("br_band_close");
+
             t = 0;
             while (t < lineInDuration)
             {

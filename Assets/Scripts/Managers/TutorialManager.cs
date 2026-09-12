@@ -215,6 +215,10 @@ namespace KillingMahjong.Managers
             _scenario = scenario != null ? scenario : TutorialScenario.BuildDefault();
             _scenario.Validate();
 
+            // 台詞に ID を振る（2026-09-11）。音を台詞単位で当てるために要る。
+            // セリフ差し替え表とまったく同じ走査を通すので、採番がズレることはない。
+            Tutorial.TutorialLineTable.AssignIds(_scenario);
+
             _playerHp = _scenario.playerStartHp;
             _enemyHp = _scenario.enemyStartHp;
             _aborted = false;

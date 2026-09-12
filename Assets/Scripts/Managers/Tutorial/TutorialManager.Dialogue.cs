@@ -26,6 +26,11 @@ namespace KillingMahjong.Managers
             {
                 if (line == null || string.IsNullOrEmpty(line.text)) continue;
 
+                // 音は台詞に合わせて動く（2026-09-11）。**文字を出す直前に当てる。**
+                // 表に無い台詞では何も起きず、直前の音がそのまま続く。
+                // 設計は km-docs/tutorial/04_演出と音_統合.md。
+                Tutorial.TutorialAudioDirector.OnLine(line);
+
                 bool clicked = false;
                 if (dialogueUI != null)
                 {

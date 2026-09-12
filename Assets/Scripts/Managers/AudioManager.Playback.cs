@@ -44,6 +44,11 @@ namespace KillingMahjong.Managers
         public void StopBGM()
         {
             if (bgmSource != null) bgmSource.Stop();
+
+            // 止めたあと同じフェイズで呼び直されても鳴らし直せるようにしておく。
+            // これが無いと、タイトルへ戻ってもう一度対局を始めたときに
+            // 「もうその曲を鳴らしている」と判定されて無音のままになる。
+            ResetPhaseBgmState();
         }
 
         // --- SE Control ---

@@ -26,6 +26,7 @@ namespace KillingMahjong.UI
         private TMP_FontAsset font;
         private Action onMatchSelected;
         private Action onTutorialSelected;
+        private Action onCollectionSelected;
         private Action onOptionSelected;
         private Action onExitSelected;
         private Action onTitleSelected;
@@ -33,10 +34,11 @@ namespace KillingMahjong.UI
         public bool IsOpen => root != null && root.activeSelf;
 
         public void Open(Action matchSelected, Action tutorialSelected, Action optionSelected, Action exitSelected,
-            Action titleSelected)
+            Action titleSelected, Action collectionSelected = null)
         {
             onMatchSelected = matchSelected;
             onTutorialSelected = tutorialSelected;
+            onCollectionSelected = collectionSelected;
             onOptionSelected = optionSelected;
             onExitSelected = exitSelected;
             onTitleSelected = titleSelected;
@@ -261,16 +263,31 @@ namespace KillingMahjong.UI
             ruleImage.color = new Color(240f / 255f, 232f / 255f, 236f / 255f, 0.38f);
             ruleImage.raycastTarget = false;
 
-            CreateMenuItem(bar.transform, "RoomMenu_Match", "対局へ", new Vector2(-296f, -8f), new Vector2(148f, 44f), 19f,
-                () => onMatchSelected?.Invoke());
-            CreateMenuItem(bar.transform, "RoomMenu_Tutorial", "チュートリアル", new Vector2(-148f, -8f), new Vector2(148f, 44f), 15f,
-                () => onTutorialSelected?.Invoke());
-            CreateMenuItem(bar.transform, "RoomMenu_Option", "設定", new Vector2(0f, -8f), new Vector2(148f, 44f), 19f,
-                () => onOptionSelected?.Invoke());
-            CreateMenuItem(bar.transform, "RoomMenu_Exit", "やめる", new Vector2(148f, -8f), new Vector2(148f, 44f), 19f,
-                () => onExitSelected?.Invoke());
-            CreateMenuItem(bar.transform, "RoomMenu_Title", "タイトルへ", new Vector2(296f, -8f), new Vector2(148f, 44f), 18f,
-                () => onTitleSelected?.Invoke());
+            // **バーは 740 幅で、5項目 x 148 でちょうど埋まっていた（-370〜+370）。**
+            // コレクションを足して6項目になったので、バーを広げるのではなく1項目を詰める。
+            // 参照解像度が 800x600 なので、6 x 148 = 888 にするとバーが画面からはみ出す。
+            const float slot = 740f / 6f;   // 123.33
+            //
+            // **Act は Action ではなく Func<Action> で持つ。**
+            // バーは初回の Build でしか組まれないので、ここで Action の値を焼き込むと
+            // 2回目以降の Open で渡された新しいコールバックが無視される。
+            // クリック時にフィールドを読み直せば、元の `() => onXxx?.Invoke()` と同じ遅延束縛になる。
+            var items = new[]
+            {
+                new { Name = "RoomMenu_Match",      Label = "対局へ",        Size = 18f, Act = (Func<Action>)(() => onMatchSelected) },
+                new { Name = "RoomMenu_Tutorial",   Label = "チュートリアル", Size = 14f, Act = (Func<Action>)(() => onTutorialSelected) },
+                new { Name = "RoomMenu_Collection", Label = "コレクション",   Size = 15f, Act = (Func<Action>)(() => onCollectionSelected) },
+                new { Name = "RoomMenu_Option",     Label = "設定",          Size = 18f, Act = (Func<Action>)(() => onOptionSelected) },
+                new { Name = "RoomMenu_Exit",       Label = "やめる",        Size = 18f, Act = (Func<Action>)(() => onExitSelected) },
+                new { Name = "RoomMenu_Title",      Label = "タイトルへ",     Size = 16f, Act = (Func<Action>)(() => onTitleSelected) },
+            };
+            for (int i = 0; i < items.Length; i++)
+            {
+                var it = items[i];
+                float x = -370f + slot * (i + 0.5f);
+                CreateMenuItem(bar.transform, it.Name, it.Label, new Vector2(x, -8f), new Vector2(122f, 44f), it.Size,
+                    () => it.Act()?.Invoke());
+            }
         }
 
         private void BuildTutorialModal()

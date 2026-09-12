@@ -71,6 +71,18 @@ namespace KillingMahjong.Managers.Tutorial
         }
 
         /// <summary>
+        /// 台本の全セリフに ID を振る（2026-09-11）。
+        ///
+        /// **セリフ差し替えとまったく同じ `Walk` を通す。** 別に採番すると、
+        /// 行を1つ足しただけで音の割り当てと差し替え表がズレる。
+        /// 台本を読み込んだ直後に一度だけ呼ぶこと。
+        /// </summary>
+        public static void AssignIds(TutorialScenario scenario)
+        {
+            Walk(scenario, (id, line) => line.id = id);
+        }
+
+        /// <summary>
         /// 台本の全セリフを ID 付きで数え上げる。取り込みツールの書き出しに使う。
         /// </summary>
         public static List<Row> Dump(TutorialScenario scenario)

@@ -183,6 +183,14 @@ namespace KillingMahjong.Common
         /// </summary>
         public const int TitleMenuOverlay = 81;
 
+        /// <summary>
+        /// CollectionUI: タイトルの部屋から開くコレクション画面（音楽・CG・役）。
+        ///
+        /// 部屋の待機画面(80)と対戦メニュー(81)の**手前**に置く。全画面を覆うモーダルで、
+        /// 閉じるまで奥の部屋を触らせないため。カーソル(99)より奥なのは意図どおり。
+        /// </summary>
+        public const int CollectionScreen = 82;
+
         /// <summary>WaitUI: 待ち牌表示を最前面に出す際のレイヤー</summary>
         public const int WaitDisplayFront = 84;
 

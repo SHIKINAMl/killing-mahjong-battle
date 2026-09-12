@@ -117,8 +117,15 @@ namespace KillingMahjong.Managers
 
         private void Start()
         {
-            // ゲーム開始時にBGMが設定されていれば再生する
-            if (defaultBgm != null && !IsBgmPlaying)
+            if (IsBgmPlaying) return;
+
+            // 起動時は自作のタイトルBGM（2026-09-11）。
+            // Resources/Bgm/bgm_title が無ければ従来の defaultBgm に落ちる。
+            if (UsePhaseBgm)
+            {
+                PlayTitleBgm();
+            }
+            else if (defaultBgm != null)
             {
                 PlayBGM(defaultBgm);
             }
@@ -128,10 +135,14 @@ namespace KillingMahjong.Managers
 
         public void ApplyVolumes()
         {
-            if (bgmSource != null) bgmSource.volume = bgmVolume * masterVolume;
+            // 曲の差し替え中は音量を一瞬 0 まで落としている最中なので触らない。
+            // ここで上書きすると、その 50ms のあいだに設定を変えられたとき
+            // 落としたはずの音量が戻ってプツッと鳴る。差し替えが終われば向こうが戻す。
+            if (bgmSource != null && !IsSwappingPhaseBgm) bgmSource.volume = bgmVolume * masterVolume;
             if (seSource != null) seSource.volume = seVolume * masterVolume;
             if (voiceSource != null) voiceSource.volume = voiceVolume * masterVolume;
             if (discardSeSource != null) discardSeSource.volume = seVolume * masterVolume;
+            ApplyDrumVolume();
         }
 
         // --- BGM Filter Control ---

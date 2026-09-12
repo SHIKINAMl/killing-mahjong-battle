@@ -121,6 +121,10 @@ namespace KillingMahjong.Managers
             if (KillingMahjong.Managers.AudioManager.Instance != null)
             {
                 KillingMahjong.Managers.AudioManager.Instance.PlayPaperSlideSE();
+                // 契約書が迫り上がる厚みを足す（2026-09-11）。
+                // **この場面は無音のままにしておく。** 冒頭で StopBGM しているのは意図で、
+                // 音楽を置くと目覚めの生々しさが死ぬ。足すのは環境音だけにする。
+                KillingMahjong.Managers.AudioManager.Instance.PlayStinger("se_paper");
             }
             largePaperUI.SetActive(true);
             RectTransform rt = largePaperUI.GetComponent<RectTransform>();

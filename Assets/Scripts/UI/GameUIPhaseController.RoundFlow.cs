@@ -76,7 +76,10 @@ namespace KillingMahjong.UI
 
                 if (AudioManager.Instance != null)
                 {
-                    AudioManager.Instance.PlayBGM(AudioManager.Instance.battleBgm);
+                    // 自作のフェイズBGMを使う（2026-09-11）。以降の差し替えは
+                    // GameUIManager.ApplyBgmFilterForCurrentPhase から SetPhaseBgm が呼ぶ。
+                    // AudioManager.UsePhaseBgm を切れば battleBgm を鳴らす旧動作に戻る。
+                    AudioManager.Instance.StartPhaseBgm(RoundStatus.None);
                 }
             }
             catch (System.Exception ex)

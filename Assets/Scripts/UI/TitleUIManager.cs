@@ -55,7 +55,31 @@ namespace KillingMahjong.UI
             }
 
             SetTitlePresentationVisible(false);
-            roomScreen.Open(OpenMatchMenu, OpenRoomTutorial, OpenRoomOptions, ExitGameFromRoom, ReturnToTitle);
+            roomScreen.Open(OpenMatchMenu, OpenRoomTutorial, OpenRoomOptions, ExitGameFromRoom, ReturnToTitle,
+                OpenCollection);
+        }
+
+        private CollectionUI collection;
+
+        /// <summary>
+        /// コレクション画面を開く（2026-09-11）。
+        ///
+        /// **開いている間は部屋の絵を畳む。** 畳まないと、全画面モーダルの下で
+        /// 部屋のメニューが押せてしまう（設定パネルを開くときと同じ扱い）。
+        /// </summary>
+        private void OpenCollection()
+        {
+            if (collection == null)
+            {
+                collection = gameObject.GetComponent<CollectionUI>();
+                if (collection == null) collection = gameObject.AddComponent<CollectionUI>();
+            }
+
+            if (roomScreen != null) roomScreen.SetContentVisible(false);
+            collection.Open(() =>
+            {
+                if (roomScreen != null && roomScreen.IsOpen) roomScreen.SetContentVisible(true);
+            });
         }
 
         private GameObject truthNameHook;
@@ -66,8 +90,12 @@ namespace KillingMahjong.UI
 
             // OptionUI は既存 Canvas に置かれている。部屋の専用 Canvas より奥にあるため、
             // 設定中だけ部屋の絵を畳み、閉じたら元の待機画面を戻す。
+            //
+            // **コレクションも同じ扱いにする（2026-09-11）。** ここは毎フレーム走るので、
+            // 判定に入れておかないと開いた次のフレームで部屋の絵が戻ってきてしまう。
             bool isOptionOpen = optionUIPanel != null && optionUIPanel.activeInHierarchy;
-            roomScreen.SetContentVisible(!isOptionOpen);
+            bool isCollectionOpen = collection != null && collection.IsOpen;
+            roomScreen.SetContentVisible(!isOptionOpen && !isCollectionOpen);
 
             // TitleMultiMenuUI.Close() はタイトル用のコピーを再表示するため、部屋に戻った
             // 次フレームで必ず隠す。これにより「もどる」から待機画面へ自然に帰れる。

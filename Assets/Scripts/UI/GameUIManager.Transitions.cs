@@ -61,6 +61,14 @@ namespace KillingMahjong.UI
             if (IsTutorialMode || audio == null) return;
 
             audio.SetBgmFilter(currentPhaseStatus != RoundStatus.Discard);
+
+            // 曲そのものもここで合わせる（2026-09-11）。
+            // こもりと同じく「今のフェイズを読み直す」経路に乗せておけば、
+            // 保留から遅れて流れてきても行き先が食い違わない。
+            audio.SetPhaseBgm(currentPhaseStatus);
+
+            // ドラム層（旧方式）。`UsePhaseBgm` が true のあいだは中で何もしない。
+            audio.SetPhaseDrum(currentPhaseStatus);
         }
 
         public void SetIsTransitioning(bool value)

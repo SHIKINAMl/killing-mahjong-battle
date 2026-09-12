@@ -15,6 +15,7 @@ namespace KillingMahjong.UI
             Debug.Log("[DrawTransition] Step 1 - Line In");
             if (horizontalLineRt != null)
             {
+                PlayTransitionStinger("br_band_open");
                 horizontalLineRt.gameObject.SetActive(true);
                 horizontalLineRt.localScale = new Vector3(0, 2f, 1f);
             }
@@ -33,6 +34,8 @@ namespace KillingMahjong.UI
 
             if (centerText != null)
             {
+                // 流局は「決着」ではないので打撃音を当てない。垂れ下がるだけの音にする
+                PlayTransitionStinger("st_draw");
                 centerText.text = "流局";
                 centerText.gameObject.SetActive(true);
             }
@@ -40,6 +43,7 @@ namespace KillingMahjong.UI
 
             // === 2. 市松模様フェードイン (暗転) ===
             Debug.Log("[DrawTransition] Step 2 - Checker Fade In");
+            PlayTransitionStinger("br_fall");
             if (fullScreenCheckerImage != null) fullScreenCheckerImage.gameObject.SetActive(true);
             if (checkerMaterial != null)
             {

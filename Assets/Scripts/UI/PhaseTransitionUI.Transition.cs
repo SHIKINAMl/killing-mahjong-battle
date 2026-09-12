@@ -21,6 +21,7 @@ namespace KillingMahjong.UI
             {
                 Debug.Log("PhaseTransition: Step 1 - Line In");
                 // === 1. 一本線が入る + 「対局開始」 ===
+                PlayTransitionStinger("br_band_open");
                 horizontalLineRt.gameObject.SetActive(true);
                 horizontalLineRt.localScale = new Vector3(0, 2f, 1f); // Increased line width
 
@@ -43,7 +44,9 @@ namespace KillingMahjong.UI
 
                 Debug.Log("PhaseTransition: Step 2 - Line Expand and Checker Fade In");
                 // === 2. 線を中心に、市松模様が上下に広がり画面を埋める ===
-                
+
+                PlayTransitionStinger("br_fall");
+
                 // Enable fullscreen checker
                 if (fullScreenCheckerImage != null) fullScreenCheckerImage.gameObject.SetActive(true);
                 if (checkerMaterial != null)
@@ -121,6 +124,7 @@ namespace KillingMahjong.UI
 
             if (!isDarkened)
             {
+                PlayTransitionStinger("br_riser");
                 float tFade = 0;
                 while (tFade < checkerFadeDuration)
                 {
@@ -135,6 +139,7 @@ namespace KillingMahjong.UI
             Debug.Log("PhaseTransition: Step 6 - Turn Indicator");
 
             // === 6. 線が入り「先行/後攻」 ===
+            PlayTransitionStinger("br_band_open");
             horizontalLineRt.gameObject.SetActive(true);
             horizontalLineRt.localScale = new Vector3(0, 2f, 1f); 
             float tTurnLine = 0;
@@ -158,6 +163,7 @@ namespace KillingMahjong.UI
             Debug.Log("PhaseTransition: Step 7 - Finish");
             // === 7. 線アウト + 完了 ===
             if (centerText != null) centerText.gameObject.SetActive(false);
+            PlayTransitionStinger("br_band_close");
             float tOut = 0;
             while (tOut < lineInDuration)
             {

@@ -32,6 +32,15 @@ namespace KillingMahjong.Managers
         public TutorialSpeaker speaker = TutorialSpeaker.Enemy;
         [TextArea(1, 3)] public string text;
 
+        /// <summary>
+        /// 台本中の位置を表す識別子（`r0.introLines[3]` など）。**実行時に振る。保存しない。**
+        ///
+        /// 音を台詞単位で当てるために要る（2026-09-11）。
+        /// 手で振るとズレるので、`TutorialLineTable.AssignIds` が
+        /// セリフ差し替え表とまったく同じ走査で機械的に入れる。
+        /// </summary>
+        [NonSerialized] public string id;
+
         public TutorialLine() { }
 
         public TutorialLine(string text, TutorialSpeaker speaker = TutorialSpeaker.Enemy)
