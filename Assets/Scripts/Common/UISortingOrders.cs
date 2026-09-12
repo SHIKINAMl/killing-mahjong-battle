@@ -240,6 +240,21 @@ namespace KillingMahjong.Common
         /// <summary>AgariSelectionUI: 和了選択</summary>
         public const int AgariSelection = 97;
 
+        /// <summary>
+        /// ScreenTint: 場面の空気として画面全体にかけ続ける色（2026-09-12）。
+        ///
+        /// **一瞬光る `ScreenFlash`(98) の1つ奥。** 空気は合図の下に敷くもので、上に被せない。
+        ///
+        /// **`AgariSelection`(97) と同値なのは意図的。** 90番台に空きが無く、
+        /// かつ**この2つは同時に存在しない**。ScreenTint を使っているのはチュートリアルだけで、
+        /// チュートリアルは台本どおりに進むので和了選択を出さない。
+        /// 98番の3者（まぶた・フラッシュ・チュートリアル導入）と同じ理由の同値。
+        ///
+        /// **対局中にも色を使い始めるなら、ここを見直すこと。** そのときは和了選択と
+        /// 重なるので、どちらが手前かを決める必要がある。
+        /// </summary>
+        public const int ScreenTintLayer = 97;
+
         /// <summary>BlinkEffectUI: オープニングのまぶた。開ききるまで画面全体を覆う</summary>
         public const int OpeningEyelid = 98;
 

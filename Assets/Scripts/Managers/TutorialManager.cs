@@ -261,6 +261,10 @@ namespace KillingMahjong.Managers
                 dialogueUI.HideAdvanceOnAnyClick();
             }
 
+            // 画面にかけた色を必ず抜く（2026-09-12）。
+            // ScreenTint は DontDestroyOnLoad なので、抜かないと**次のシーンまで引きずる。**
+            Tutorial.TutorialAudioDirector.ResetVisuals();
+
             string sceneName = _scenario != null ? _scenario.titleSceneName : "タイトルシーン";
             SceneManager.LoadScene(sceneName);
         }

@@ -33,6 +33,11 @@ namespace KillingMahjong.Managers
             yield return StartCoroutine(RunEnemyDeath());
 
             yield return StartCoroutine(PlayLines(_scenario.endingLines));
+
+            // 幕切れで灰をかけているので、必ず抜いてから移る（2026-09-12）。
+            // ScreenTint は DontDestroyOnLoad で生き残るため、抜かないとタイトルが灰色のままになる。
+            Tutorial.TutorialAudioDirector.ResetVisuals();
+
             SceneManager.LoadScene(_scenario.titleSceneName);
         }
 
