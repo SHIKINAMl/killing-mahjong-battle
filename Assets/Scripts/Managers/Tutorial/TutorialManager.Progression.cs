@@ -125,7 +125,15 @@ namespace KillingMahjong.Managers
             if (reveal >= 0 && reveal < introLines.Count - 1)
             {
                 yield return StartCoroutine(PlayLines(introLines.GetRange(0, reveal + 1)));
-                SetBoardVisible(true);
+
+                // **第1局だけ、牌を配る演出を挟む**（2026-09-12、フロー図どおり）。
+                // 2局目以降は同じ卓が続いているので、配り直す絵は出さない。
+                bool isFirstRound = _scenario != null && _scenario.rounds != null
+                                    && _scenario.rounds.Count > 0
+                                    && ReferenceEquals(data, _scenario.rounds[0]);
+                if (isFirstRound) yield return StartCoroutine(DealTilesRoutine());
+                else SetBoardVisible(true);
+
                 yield return StartCoroutine(PlayLines(
                     introLines.GetRange(reveal + 1, introLines.Count - reveal - 1)));
             }

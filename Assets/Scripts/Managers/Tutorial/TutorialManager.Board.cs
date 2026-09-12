@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.SceneManagement;
 using System.Collections;
 using System.Collections.Generic;
@@ -197,6 +197,101 @@ namespace KillingMahjong.Managers
             if (gameUIManager.BetPotUI != null)
                 gameUIManager.BetPotUI.SetVisible(visible);
         }
+
+        /// <summary>
+        /// 牌を配る演出（2026-09-12、フロー図の「牌を配る演出」）。
+        ///
+        /// 山牌を一度に出さず、**左上から順に1枚ずつ置いていく。**
+        /// 以前はここも `SetBoardVisible(true)` 一発で、34枚が同時に現れていた。
+        ///
+        /// **並び順は子オブジェクトの順番ではなく、画面上の位置で決める。**
+        /// 牌は使い回し（<see cref="KillingMahjong.UI.TilePoolManager"/>）なので、
+        /// 子の順番は前局の出入りで入れ替わっていて当てにならない。
+        ///
+        /// **音は鳴らさない。** いま音は止めてあり（AGENTS.md 第6項）、
+        /// 戻すときに1枚ずつ音を当てる場所はここ。
+        /// </summary>
+        private IEnumerator DealTilesRoutine()
+        {
+            SetBoardVisible(true);
+
+            if (gameUIManager == null || gameUIManager.WallUI == null) yield break;
+
+            var tiles = new List<Transform>();
+            foreach (var t in gameUIManager.WallUI.GetComponentsInChildren<TileInteraction>(true))
+            {
+                if (t != null) tiles.Add(t.transform);
+            }
+            if (tiles.Count == 0) yield break;
+
+            // 上の段から、左から右へ。y は下に行くほど小さいので降順で見る
+            tiles.Sort((a, b) =>
+            {
+                Vector3 pa = a.position, pb = b.position;
+                if (Mathf.Abs(pa.y - pb.y) > DealRowTolerance) return pb.y.CompareTo(pa.y);
+                return pa.x.CompareTo(pb.x);
+            });
+
+            for (int i = 0; i < tiles.Count; i++)
+            {
+                if (tiles[i] != null) tiles[i].localScale = Vector3.zero;
+            }
+
+            // 1枚ずつ起こしていく。**待ち時間は実時間で数える。**
+            // 演出中に Time.timeScale をいじられても長さが変わらないようにする。
+            float started = Time.unscaledTime;
+            int placed = 0;
+            while (placed < tiles.Count)
+            {
+                float elapsed = Time.unscaledTime - started;
+                int want = Mathf.Min(tiles.Count, Mathf.FloorToInt(elapsed / DealInterval) + 1);
+
+                for (; placed < want; placed++)
+                {
+                    if (tiles[placed] != null) StartCoroutine(PopTileRoutine(tiles[placed]));
+                }
+                yield return null;
+            }
+
+            // 最後の1枚が起き上がりきるまで待つ
+            yield return new WaitForSecondsRealtime(DealPopSeconds);
+
+            // 途中で局が切り替わった等で取りこぼしても、最後は必ず等倍に戻す
+            for (int i = 0; i < tiles.Count; i++)
+            {
+                if (tiles[i] != null) tiles[i].localScale = Vector3.one;
+            }
+        }
+
+        /// <summary>牌1枚を起こす。**少し行き過ぎてから戻る**ので、置いた感じが出る。</summary>
+        private IEnumerator PopTileRoutine(Transform tile)
+        {
+            float t = 0f;
+            while (t < DealPopSeconds)
+            {
+                t += Time.unscaledDeltaTime;
+                if (tile == null) yield break;
+
+                float u = Mathf.Clamp01(t / DealPopSeconds);
+                // 1.0 を少し越えてから戻る
+                float scale = 1f + DealOvershoot * Mathf.Sin(u * Mathf.PI);
+                tile.localScale = Vector3.one * (scale * u + (1f - u) * 0f);
+                yield return null;
+            }
+            if (tile != null) tile.localScale = Vector3.one;
+        }
+
+        /// <summary>次の1枚を置くまでの間隔[秒]。34枚で 0.85 秒ほどになる。</summary>
+        private const float DealInterval = 0.025f;
+
+        /// <summary>1枚が起き上がるのにかける時間[秒]。</summary>
+        private const float DealPopSeconds = 0.14f;
+
+        /// <summary>行き過ぎる量。大きくすると牌が跳ねて見える。</summary>
+        private const float DealOvershoot = 0.18f;
+
+        /// <summary>同じ段とみなす y のずれ[px]。牌の高さより小さくすること。</summary>
+        private const float DealRowTolerance = 12f;
 
         private void SetBoardVisible(bool visible)
         {
