@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using System.Collections.Generic;
 using KillingMahjong.EngineData;
 using KillingMahjong.Managers;
@@ -11,6 +11,28 @@ namespace KillingMahjong.UI
     public partial class GameUIManager
     {
         // --- Entry points from external classes / old API ---
+
+        /// <summary>
+        /// 盤の状態を持つ入れ物が生きているか。
+        ///
+        /// **`BoardStateManager` はどのシーンにも置かれていない。**
+        /// `GameUIManager.Start` の `SetupManagers` が `AddComponent` で作り、
+        /// `OnDestroy`（Play終了・シーン再読込）で `Instance` が null に戻る。
+        /// **つまりシーンの切れ目に、誰も居ない一瞬がある。**
+        ///
+        /// そこへ外から呼ばれると `Instance` を触った時点で落ちる。
+        /// 実際に `BoxSelectionUI.Update` が空振りのクリックで
+        /// <see cref="ClearSelection"/> を呼び、`NullReferenceException` が出ていた
+        /// （2026-09-12 に確認）。あちらは `gameUIManager != null` は見ているが、
+        /// **その先のシングルトンまでは見ていない。**
+        ///
+        /// **弾くのは公開の入口だけにしてある。** 中の処理1行ずつに null を撒くと、
+        /// 本当に順番がおかしいときに黙って素通りして気づけなくなる。
+        /// </summary>
+        private static bool HasBoardState
+        {
+            get { return BoardStateManager.Instance != null; }
+        }
 
         public void ApplyGameStateFromJSON(string jsonString, string localPlayerId)
         {
@@ -27,6 +49,7 @@ namespace KillingMahjong.UI
 
         public void MoveTileToHand(int tileId)
         {
+            if (!HasBoardState) return;
             if (currentPhaseStatus != RoundStatus.HandSelection) return;
             if (handUI != null && handUI.IsSubmitted)
             {
@@ -62,6 +85,7 @@ namespace KillingMahjong.UI
 
         public void MoveTileToWall(int tileId)
         {
+            if (!HasBoardState) return;
             if (currentPhaseStatus != RoundStatus.HandSelection) return;
             if (handUI != null && handUI.IsSubmitted) return;
 
@@ -92,6 +116,7 @@ namespace KillingMahjong.UI
 
         public void SelectManganHand()
         {
+            if (!HasBoardState) return;
             if (currentPhaseStatus != RoundStatus.HandSelection) return;
             if (handUI != null && handUI.IsSubmitted) return;
 
@@ -119,6 +144,7 @@ namespace KillingMahjong.UI
 
         public void SelectRandomHand()
         {
+            if (!HasBoardState) return;
             if (currentPhaseStatus != RoundStatus.HandSelection) return;
             if (handUI != null && handUI.IsSubmitted) return;
 
@@ -140,6 +166,7 @@ namespace KillingMahjong.UI
 
         public void SelectTile(int tileId, bool isInHand, bool multiSelect)
         {
+            if (!HasBoardState) return;
             if (currentPhaseStatus == RoundStatus.Discard && !BoardStateManager.Instance.IsLocalTurn) return;
 
             BoardStateManager.Instance.SelectTile(tileId, multiSelect);
@@ -148,6 +175,7 @@ namespace KillingMahjong.UI
 
         public void SelectTiles(List<int> ids)
         {
+            if (!HasBoardState) return;
             if (currentPhaseStatus == RoundStatus.Discard && !BoardStateManager.Instance.IsLocalTurn) return;
             BoardStateManager.Instance.SelectTiles(ids);
             DeselectAbility();
@@ -155,16 +183,19 @@ namespace KillingMahjong.UI
 
         public void ClearSelection()
         {
+            if (!HasBoardState) return;
             BoardStateManager.Instance.ClearSelection();
         }
 
         public bool IsTileSelected(int tileId)
         {
+            if (!HasBoardState) return false;
             return BoardStateManager.Instance.IsTileSelected(tileId);
         }
 
         public void DiscardSelectedTile()
         {
+            if (!HasBoardState) return;
             if (currentPhaseStatus != RoundStatus.Discard) return;
             if (!BoardStateManager.Instance.IsLocalTurn) return;
             if (BoardStateManager.Instance.SelectedTileIds.Count == 0) return;
@@ -298,6 +329,7 @@ namespace KillingMahjong.UI
 
         public void HandleDiscardEvent(int discardedTileId, bool isLocalPlayer)
         {
+            if (!HasBoardState) return;
             BoardStateManager.Instance.LastDiscardedTileId = discardedTileId;
 
             // 通った牌・相手が切った牌のどちらも「相手の待ちではない」情報になる。
@@ -400,7 +432,9 @@ namespace KillingMahjong.UI
             // 「変化なし＝再生成不要」と誤判定され、盤面が空のままになる。
             if (VisualController != null) VisualController.InvalidateRebuildCache();
 
-            Managers.BoardStateManager.Instance.ClearAllBoardData();
+            // **ここは入口では弾かない。** 上のUI掃除は盤の状態が無くてもやる必要がある
+            // （牌のGameObjectをプールへ返す処理で、放っておくと前局の牌が画面に残る）。
+            if (HasBoardState) Managers.BoardStateManager.Instance.ClearAllBoardData();
         }
     }
 }
