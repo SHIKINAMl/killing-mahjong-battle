@@ -129,6 +129,7 @@ namespace KillingMahjong.Managers
         /// <param name="minInterval">この秒数より短い間隔の2発目は捨てる。0で制限なし</param>
         public void PlayStinger(string name, PitchJitter jitter, float minInterval = 0f)
         {
+            if (!CanPlay) return;
             if (string.IsNullOrEmpty(name) || seSource == null) return;
             if (!PassesRateLimit(name, minInterval)) return;
 
@@ -152,6 +153,7 @@ namespace KillingMahjong.Managers
         /// </summary>
         public void PlayStingerVariant(string key, string[] names, PitchJitter jitter, float minInterval = 0f)
         {
+            if (!CanPlay) return;
             if (names == null || names.Length == 0) return;
             if (!PassesRateLimit(key, minInterval)) return;
 
@@ -176,6 +178,7 @@ namespace KillingMahjong.Managers
         /// </summary>
         public void PlaySE(AudioClip clip, PitchJitter jitter, float minInterval = 0f)
         {
+            if (!CanPlay) return;
             if (clip == null || seSource == null) return;
             if (!PassesRateLimit(clip.name, minInterval)) return;
 

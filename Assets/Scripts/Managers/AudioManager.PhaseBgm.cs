@@ -143,6 +143,7 @@ namespace KillingMahjong.Managers
         /// </summary>
         public void SetPhaseBgm(RoundStatus status)
         {
+            if (!CanPlay) return;
             if (!UsePhaseBgm) return;
 
             currentBgmPhase = status;
@@ -300,6 +301,7 @@ namespace KillingMahjong.Managers
         /// </summary>
         public void StartPhaseBgm(RoundStatus status = RoundStatus.None)
         {
+            if (!CanPlay) return;
             if (!UsePhaseBgm)
             {
                 PlayBGM(battleBgm);
@@ -314,6 +316,7 @@ namespace KillingMahjong.Managers
         /// <summary>タイトル・メニュー用。対局のBGMとは別系統。</summary>
         public void PlayTitleBgm()
         {
+            if (!CanPlay) return;
             if (!UsePhaseBgm)
             {
                 PlayBGM(defaultBgm);
@@ -350,6 +353,7 @@ namespace KillingMahjong.Managers
 
         public void PlayStinger(string name)
         {
+            if (!CanPlay) return;
             if (string.IsNullOrEmpty(name) || seSource == null) return;
 
             AudioClip clip;
@@ -368,6 +372,7 @@ namespace KillingMahjong.Managers
         /// <summary>結果画面のBGMを勝敗で分ける。`SetPhaseBgm(Result)` より後に呼ぶこと。</summary>
         public void SetResultBgm(bool isLocalWin)
         {
+            if (!CanPlay) return;
             if (!UsePhaseBgm) return;
 
             var clip = GetPhaseBgmClip(isLocalWin ? "bgm_win" : "bgm_lose");
@@ -397,6 +402,7 @@ namespace KillingMahjong.Managers
         /// </summary>
         public void PlayTutorialBgm(string name)
         {
+            if (!CanPlay) return;
             if (bgmSource == null || string.IsNullOrEmpty(name)) return;
 
             var clip = GetPhaseBgmClip(name);

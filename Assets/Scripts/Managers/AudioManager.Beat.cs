@@ -180,6 +180,10 @@ namespace KillingMahjong.Managers
 
         private void Update()
         {
+            // 音を止めているあいだは、配下の AudioSource を毎フレーム黙らせる。
+            // 一発物は再生のたびに AudioSource を作るので、ここで掃除しないと取りこぼす。
+            EnforceMute();
+
             TickBeatClock();
         }
     }

@@ -111,6 +111,7 @@ namespace KillingMahjong.Managers
         /// </summary>
         public void StartLayeredBgm(int intensity)
         {
+            if (!CanPlay) return;
             if (!UseBgmLayers || !EnsureLayerSources()) return;
 
             // 層に切り替えるので、1本もので鳴っていたものは止める

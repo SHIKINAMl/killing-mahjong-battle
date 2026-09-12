@@ -10,6 +10,7 @@ namespace KillingMahjong.Managers
         /// </summary>
         public void PlaySynthSound(SynthWaveType type, float startFreq, float endFreq, float duration, float volume = 1.0f)
         {
+            if (!CanPlay) return;
             if (synth != null)
             {
                 synth.Play(type, startFreq, endFreq, duration, volume);
@@ -21,6 +22,7 @@ namespace KillingMahjong.Managers
         /// </summary>
         public void PlaySynthSoundDual(SynthWaveType type1, SynthWaveType type2, float startFreq, float endFreq, float duration, float volume = 1.0f)
         {
+            if (!CanPlay) return;
             if (synth != null)
             {
                 synth.PlayDual(type1, type2, true, startFreq, endFreq, duration, volume);
@@ -31,6 +33,7 @@ namespace KillingMahjong.Managers
         // 将来的にBGMのBPM（テンポ）同期やビート検知処理をここに追加できます
         public void PlayBGM(AudioClip clip = null, bool restartIfSame = false)
         {
+            if (!CanPlay) return;
             if (bgmSource == null) return;
             if (clip == null) clip = defaultBgm;
             if (clip == null) return;
@@ -54,6 +57,7 @@ namespace KillingMahjong.Managers
         // --- SE Control ---
         public void PlaySE(AudioClip clip)
         {
+            if (!CanPlay) return;
             if (clip != null && seSource != null)
             {
                 seSource.PlayOneShot(clip, seVolume * masterVolume);
@@ -63,6 +67,7 @@ namespace KillingMahjong.Managers
         // --- Discard SE Control ---
         public void PlayDiscardSE(AudioClip clip = null)
         {
+            if (!CanPlay) return;
             if (clip == null) clip = discardSE;
             if (clip == null || discardSeSource == null) return;
 

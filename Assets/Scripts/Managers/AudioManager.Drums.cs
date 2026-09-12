@@ -84,6 +84,7 @@ namespace KillingMahjong.Managers
         /// </summary>
         public void SetPhaseDrum(RoundStatus status)
         {
+            if (!CanPlay) return;
             // **フェイズBGMを使っているあいだは何もしない（2026-09-11）。**
             // `Resources/Bgm/` の曲には最初からドラムが入っているので、
             // ここで層をもう1枚重ねると打楽器が二重になる。

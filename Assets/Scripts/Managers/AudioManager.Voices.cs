@@ -8,6 +8,7 @@ namespace KillingMahjong.Managers
         // --- Voice Control ---
         public void PlayVoice(AudioClip clip)
         {
+            if (!CanPlay) return;
             if (clip != null && voiceSource != null)
             {
                 voiceSource.PlayOneShot(clip, voiceVolume * masterVolume);
