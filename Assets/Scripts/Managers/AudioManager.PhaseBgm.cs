@@ -90,6 +90,13 @@ namespace KillingMahjong.Managers
             { "bgm_ron",          new Tempo(88f,  4) },
             { "bgm_result",       new Tempo(96f,  3) },   // ワルツ
             { "bgm_win",          new Tempo(132f, 4) },
+
+            // 層のステム。**ここに無いと拍が引けず、音ハメが効かない。**
+            // 4本とも同じ編曲を分けたものなので当然おなじテンポ。
+            { "field_base",       new Tempo(118f, 4) },
+            { "field_melody",     new Tempo(118f, 4) },
+            { "field_drums",      new Tempo(118f, 4) },
+            { "field_sparkle",    new Tempo(118f, 4) },
         };
 
         /// <summary>拍の情報が無い曲のときの既定。すぐ切り替える方に倒す。</summary>

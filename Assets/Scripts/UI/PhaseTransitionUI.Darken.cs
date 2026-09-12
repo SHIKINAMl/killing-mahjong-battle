@@ -27,10 +27,15 @@ namespace KillingMahjong.UI
                            (name.StartsWith("se_ability") || name == "se_collapse" ||
                             name == "se_choice" || name == "se_choice_dark");
 
-            audio.PlayStinger(name,
-                pitched ? KillingMahjong.Managers.AudioManager.PitchJitter.None
-                        : KillingMahjong.Managers.AudioManager.PitchJitter.VerySmall,
-                0.05f);
+            var jitter = pitched ? KillingMahjong.Managers.AudioManager.PitchJitter.None
+                                 : KillingMahjong.Managers.AudioManager.PitchJitter.VerySmall;
+
+            // **演出の音は拍に寄せる（2026-09-12）。** ただし近いときだけで、
+            // 遠ければ待たずに鳴らす。待たせると演出そのものが遅れて見える。
+            // 台詞に合わせて鳴る音（se_drop など）は曲と無関係なので寄せない。
+            bool ceremonial = name != null && name.StartsWith("br_");
+            if (ceremonial) audio.PlayStingerSnapped(name, jitter, 2, 0.05f);
+            else audio.PlayStinger(name, jitter, 0.05f);
         }
 
         private IEnumerator RoundStartDarkenRoutine(string text, Action onDarkened)
