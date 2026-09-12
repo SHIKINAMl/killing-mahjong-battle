@@ -27,10 +27,14 @@ namespace KillingMahjong.Managers
         /// 未経験者向け案内板。Resources 直下からの相対パス（拡張子なし）。
         ///
         /// **ユーザーが用意した画像を使う。差し替えないこと（2026-09-07 の指示）。**
-        /// 一度 AI が描いた `麻雀の基本_アガリの形.jpg` に置き換わったが、
+        /// 一度 `麻雀の基本_アガリの形.jpg` に**置き換わって**いたが、
         /// あれは「3枚組×4＋2枚組×1＝14枚」という一般的な麻雀の説明で、
         /// **このゲームの「山牌から13枚選んで満貫以上を作る」という決まりと食い違う。**
-        /// 未経験者に、この対局では使わない知識を教えることになるので戻した。
+        /// 未経験者に、この対局では使わない知識を**代わりに**教えることになるので戻した。
+        ///
+        /// **2026-09-12 から、あちらも出る。** ただし置き換えではなく、
+        /// 麻雀を知らない人にだけ**先に**見せて、そのあと必ずこの板へ来る
+        /// （<see cref="MahjongRulePath"/>）。この順なら食い違いは起きない。
         /// </summary>
         private const string GuideBoardPath = "Tutorial/案内板_満貫";
 
@@ -124,7 +128,7 @@ namespace KillingMahjong.Managers
             {
                 // 麻雀そのものを知らない人。まず麻雀の形から
                 yield return PlayLines(NoviceBeforeMahjongUi);
-                yield return ShowRulePanelRoutine(font, MahjongRuleTitle, MahjongRuleBody, null);
+                yield return ShowRulePanelRoutine(font, MahjongRuleTitle, MahjongRuleBody, MahjongRulePath);
                 yield return PlayLines(NoviceAfterMahjongUi);
             }
             else
@@ -138,7 +142,23 @@ namespace KillingMahjong.Managers
             yield return PlayLines(AfterRuleUiLines);
         }
 
-        /// <summary>麻雀ルール説明UIの中身。**絵は使わず文字で出す**（第7項）。</summary>
+        /// <summary>
+        /// 麻雀ルール説明UIの絵。**ユーザーが用意したもの（2026-09-12 の指示で採用）。**
+        ///
+        /// **この絵は一度外された経緯がある。** 2026-09-07 に
+        /// <see cref="GuideBoardPath"/>（案内板_満貫）の**代わりに**出ていて、
+        /// 「山牌から13枚選んで満貫以上」というこの対局の決まりと食い違うため戻された。
+        ///
+        /// **いまは代わりではなく、前に置いている。** フロー図では
+        /// 「麻雀を知らない人にだけ麻雀の形を見せ、そのあと全員に17歩の決まりを見せる」
+        /// という順になっていて、食い違いは起きない。**外さないこと。**
+        /// </summary>
+        private const string MahjongRulePath = "Tutorial/麻雀の基本_アガリの形";
+
+        /// <summary>
+        /// 絵が読めなかったときの控え。**ふだんは使われない。**
+        /// 絵が消えただけで説明が丸ごと落ちるのを避けるために残してある。
+        /// </summary>
         private const string MahjongRuleTitle = "麻雀の基本";
 
         private static readonly string[] MahjongRuleBody =
@@ -291,16 +311,24 @@ namespace KillingMahjong.Managers
             scaler.matchWidthOrHeight = 0.5f;
             StretchFull((RectTransform)_introRoot.transform);
 
-            // 後ろの盤面を暗く落とす。ここを押しても何も起きないようにする覆いも兼ねる。
-            // **落とさないときは覆いごと作らない。** 透明な覆いを残すと、
-            // 背後のセリフ送り（画面のどこでも押せる）をこれが食ってしまう。
-            if (dim)
-            {
-                var scrim = new GameObject("Scrim", typeof(RectTransform), typeof(Image));
-                scrim.transform.SetParent(_introRoot.transform, false);
-                StretchFull((RectTransform)scrim.transform);
-                scrim.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.82f);
-            }
+            // 覆いは**必ず敷く。** `dim` は「暗くするか」であって「覆うか」ではない。
+            //
+            // **透明でも押さえは効く。** Unity の UI は既定で透明度を見ずに拾うので、
+            // alpha 0 の Image でも背後へクリックを通さない。
+            //
+            // **敷かないと牌が触れてしまう（2026-09-12 に実際に起きた）。**
+            // 問いかけの時点で盤面はもう出ている（牌を配る演出が先にある）。
+            // 暗転をやめたときに覆いごと外したせいで、
+            // 「麻雀を知ってたっけ？」の裏で牌が選べるようになっていた。
+            //
+            // ここで覆ってもセリフ送りは死なない。**問いかけの間は
+            // `ShowAdvanceOnAnyClick` を出していない**ので、食うものが無い。
+            var scrim = new GameObject("Scrim", typeof(RectTransform), typeof(Image));
+            scrim.transform.SetParent(_introRoot.transform, false);
+            StretchFull((RectTransform)scrim.transform);
+            scrim.GetComponent<Image>().color = dim
+                ? new Color(0f, 0f, 0f, 0.82f)
+                : new Color(0f, 0f, 0f, 0f);
 
             return _introRoot.transform;
         }
