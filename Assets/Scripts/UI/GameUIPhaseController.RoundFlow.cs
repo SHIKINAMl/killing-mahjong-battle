@@ -76,6 +76,10 @@ namespace KillingMahjong.UI
 
                 if (AudioManager.Instance != null)
                 {
+                    // 前の対局の濃さを持ち越さない（2026-09-12）。
+                    // 先に戻してから鳴らす。逆にすると一瞬だけ前局の厚みで始まる。
+                    AudioManager.Instance.ResetBgmIntensity();
+
                     // 自作のフェイズBGMを使う（2026-09-11）。以降の差し替えは
                     // GameUIManager.ApplyBgmFilterForCurrentPhase から SetPhaseBgm が呼ぶ。
                     // AudioManager.UsePhaseBgm を切れば battleBgm を鳴らす旧動作に戻る。

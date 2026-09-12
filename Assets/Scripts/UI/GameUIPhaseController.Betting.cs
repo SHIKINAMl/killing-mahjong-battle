@@ -69,6 +69,14 @@ namespace KillingMahjong.UI
                 ReactionController.Instance.SetEnemyHp(info.EnemyHpAfter);
             }
 
+            // BGMの濃さも同じ値から決める（2026-09-12）。
+            // **ここは両方の体力が同時に確定する唯一の場所。** 片方ずつ更新される
+            // 経路で呼ぶと、一瞬だけ嘘の段になる。
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.UpdateBgmIntensityFromHp(info.LocalHpAfter, info.EnemyHpAfter);
+            }
+
             TriggerBettingAnimationPhase(roundTitle, info);
             _isCarryOverNextRound = false;
         }
