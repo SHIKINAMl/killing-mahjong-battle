@@ -8,7 +8,15 @@ namespace KillingMahjong.Managers
     /// ボルテージ。ユーザーの指示（2026-09-08）。
     ///
     /// **自分と相手のどちらの河にも無い牌**を捨てると1段上がる。
-    /// すでに出ている牌を捨てると途切れ、**次に新しい牌を出したとき1段下から再開する。**
+    /// すでに出ている牌を捨てると**その場で1段下がる**（2026-09-12 に変更）。
+    ///
+    /// **以前は「途切れた印だけ付けて、次に新しい牌を出したとき1段下から再開」だった。**
+    /// 2つ問題があったので変えた:
+    ///   1. **見えない。** 既出牌を捨てた瞬間は何も起きず、次に新しい牌を捨てたときに
+    ///      初めて下がる。プレイヤーには何が起きたのか分からない
+    ///   2. **重い。** 元の段へ戻るだけで新しい牌が2枚必要だった（1段下がる＋1段上げ直す）。
+    ///      新しい牌は局が進むほど出にくくなるので、実質の罰が後半で勝手に跳ね上がっていた
+    /// いまは捨てた瞬間に落ちて、次の新しい牌で普通に +1 する。罰は1段ぶん。
     ///
     /// **段数は自分と相手で別々に持つ。** ただし「新しい牌か」の判定は
     /// **両方の河**を見る（相手が捨てた牌を自分が捨てても新しくない）。
@@ -34,9 +42,9 @@ namespace KillingMahjong.Managers
         private static int _localLevel;
         private static int _enemyLevel;
 
-        // 途切れている最中か。途切れた直後は段数を落とさず、
-        // **次に新しい牌が出た時点で1段下から再開する。**
-        // 落としてから再開すると差し引き元に戻ってしまい、途切れた意味がなくなる。
+        // 直前の1枚が既出牌だったか。**段数の計算には使わない**（罰はその場で済ませている）。
+        // 表示側が「いま途切れた」と分かるように出しているだけで、
+        // 次に牌が捨てられた時点で上書きされる。
         private static bool _localBroken;
         private static bool _enemyBroken;
 
@@ -75,24 +83,18 @@ namespace KillingMahjong.Managers
             SeenBaseIds.Add(baseId);
 
             int level = isEnemy ? _enemyLevel : _localLevel;
-            bool broken = isEnemy ? _enemyBroken : _localBroken;
+            bool broken;
 
             if (isNew)
             {
-                if (broken)
-                {
-                    // 1段下から再開する。上げ直しではなく、落ちた位置から。
-                    level = UnityEngine.Mathf.Max(0, level - 1);
-                    broken = false;
-                }
-                else
-                {
-                    level = UnityEngine.Mathf.Min(MaxLevel, level + 1);
-                }
+                level = UnityEngine.Mathf.Min(MaxLevel, level + 1);
+                broken = false;
             }
             else
             {
-                // すでに出ている牌。段数はまだ落とさず、途切れた印だけ付ける。
+                // **その場で落とす。** 捨てた瞬間にゲージが動くので、
+                // プレイヤーは何が起きたのかを見て分かる。
+                level = UnityEngine.Mathf.Max(0, level - 1);
                 broken = true;
             }
 
