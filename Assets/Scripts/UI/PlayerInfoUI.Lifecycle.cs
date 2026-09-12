@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using TMPro;
 using KillingMahjong.Common;
 
@@ -141,9 +141,31 @@ namespace KillingMahjong.UI
         /// <summary>タイマーを上のゲージへ移し終えたか。移せるまで毎回試す。</summary>
         private bool _timerMovedToGauge;
 
+        /// <summary>
+        /// チュートリアル中か。**見つけた `GameUIManager` は覚えておく。**
+        /// </summary>
+        private GameUIManager _uiManagerForTutorial;
+
+        private bool IsTutorialNow()
+        {
+            if (_uiManagerForTutorial == null)
+                _uiManagerForTutorial = FindFirstObjectByType<GameUIManager>(FindObjectsInactive.Include);
+            return _uiManagerForTutorial != null && _uiManagerForTutorial.IsTutorialMode;
+        }
+
         public void StartTurnTimer(float duration)
         {
             if (timerUI == null) return;
+
+            // **チュートリアル中はタイマーを出さない**（2026-09-12 の指示）。
+            // 台本を読ませる場なので、秒数に追われると読む前に押してしまう。
+            // 始める入口は4箇所あるので、**呼ばれる側で1回だけ弾く。**
+            // `StopTimer` は数字を空にするだけなので、絵の位置はそのまま。
+            if (IsTutorialNow())
+            {
+                timerUI.StopTimer();
+                return;
+            }
 
             // **タイマーの数字は上のゲージ（王冠の真下）に出す**（2026-09-01）。
             // 元はスマホの懐中時計の文字盤に出していたが、HPの絵を描き直したときに

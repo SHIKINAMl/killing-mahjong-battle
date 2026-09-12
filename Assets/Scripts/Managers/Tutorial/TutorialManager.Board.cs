@@ -317,6 +317,11 @@ namespace KillingMahjong.Managers
             // 獲得ゲージも盤面と一緒に出し入れする
             gameUIManager.ScoreGauge.SetVisible(visible);
 
+            // **チュートリアルではタイマーを使わないので、枠ごと出さない**（2026-09-12 の指示）。
+            // 数字は `PlayerInfoUI.StartTurnTimer` 側でも弾いてあるが、
+            // それだけだと王冠の下に空の枠が残る。
+            gameUIManager.ScoreGauge.SetTimerVisible(false);
+
             // ドラ表示牌（3Dグランドライト含む）はチュートリアルの説明に入らないので常に隠す
             if (gameUIManager.DoraDisplayUI != null)
                 gameUIManager.DoraDisplayUI.Hide();

@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.InputSystem;
 using System.Collections.Generic;
 using System.Linq;
@@ -106,10 +106,31 @@ namespace KillingMahjong.UI
             }
         }
 
+        /// <summary>
+        /// チュートリアル中か。**見つけた `GameUIManager` は覚えておく。**
+        /// クリックのたびに探し直すと、毎フレームの入力処理に探索が乗る。
+        ///
+        /// **真偽は毎回読み直す。** `IsTutorialMode` は
+        /// `OpeningSequenceManager.Awake` で立つので、こちらの `Start` より後のことがある。
+        /// </summary>
+        private GameUIManager _uiManager;
+
+        private bool IsTutorialNow()
+        {
+            if (_uiManager == null)
+                _uiManager = FindFirstObjectByType<GameUIManager>(FindObjectsInactive.Include);
+            return _uiManager != null && _uiManager.IsTutorialMode;
+        }
+
         private void Update()
         {
             var mouse = Mouse.current;
             if (mouse == null || !mouse.leftButton.wasPressedThisFrame) return;
+
+            // **チュートリアル中は体に触っても反応しない**（2026-09-12 の指示）。
+            // あそこは台本どおりに進める場なので、部位をつついて別の反応が挟まると話が途切れる。
+            if (IsTutorialNow()) return;
+
             if (Camera.main == null) return;
 
             Vector2 screenPos = mouse.position.ReadValue();

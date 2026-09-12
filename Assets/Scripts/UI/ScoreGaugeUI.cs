@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -199,6 +199,18 @@ namespace KillingMahjong.UI
             _timerText.outlineWidth = 0.2f;
 
             _timerField = field;
+        }
+
+        /// <summary>
+        /// タイマーの枠ごと出し入れする。**チュートリアルでは出さない**（2026-09-12 の指示）。
+        ///
+        /// 数字を空にするだけでは**枠が空のまま残る**（王冠の下に赤い箱が居座る）。
+        /// あそこは台本を読ませる場で秒数に追われる必要が無いので、枠ごと消す。
+        /// </summary>
+        public void SetTimerVisible(bool visible)
+        {
+            EnsureBuilt();
+            if (_timerField != null) _timerField.gameObject.SetActive(visible);
         }
 
         /// <summary>
