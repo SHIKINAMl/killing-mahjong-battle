@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
@@ -14,7 +14,11 @@ namespace KillingMahjong.UI
 
         // HP 袋の上部にある黒い数値欄の実寸。2 シーンで同じ値を使う。
         // 数字専用にして左右へ 2px の余白を取り、枠線へ触れないようにする。
-        private static readonly Vector2 HpTextAnchoredPosition = new Vector2(52f, 42f);
+        //
+        // **y は 42 → 37 に下げた（2026-09-12 の指示）。**
+        // シーン側には (31, 69) が入っているが、ここで上書きするので画面には出ない。
+        // **動かすときはシーンではなくこの値を変えること**（シーンが2つあるため。AGENTS.md §2）。
+        private static readonly Vector2 HpTextAnchoredPosition = new Vector2(52f, 37f);
         private static readonly Vector2 HpTextSize = new Vector2(72f, 18f);
         private static readonly Vector4 HpTextMargin = new Vector4(2f, 0f, 2f, 0f);
 
