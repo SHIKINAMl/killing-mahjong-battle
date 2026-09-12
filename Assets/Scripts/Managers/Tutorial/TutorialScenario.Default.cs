@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 using KillingMahjong.Common;
@@ -215,6 +215,12 @@ namespace KillingMahjong.Managers
             {
                 if (r.allowManualHandSelection) r.revealBoardAfterLineIndex = -1;
             }
+
+            // 第1局だけは例外（2026-09-12、フロー図どおり）。
+            // 導入の会話の途中、「それじゃはじめるよ」を送った時点で牌が配られる。
+            // **盤面が出たあとも、まだセリフと分岐が続く。**
+            // その間はセリフ送りの受け皿が画面全体を覆っているので、牌には触れない。
+            if (s.rounds.Count > 0) s.rounds[0].revealBoardAfterLineIndex = 13;
 
             // 第4局と第5局は手牌も役も違うので、共通設定のあとで上書きする
             if (s.rounds.Count > 3)

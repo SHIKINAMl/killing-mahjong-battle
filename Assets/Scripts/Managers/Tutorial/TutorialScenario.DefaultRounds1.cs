@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 using KillingMahjong.Common;
@@ -37,20 +37,21 @@ namespace KillingMahjong.Managers
 
                 introLines = new List<TutorialLine>
                 {
-                    new TutorialLine("契約は済んだわね。"),
-                    new TutorialLine("その契約書、まだ乾いていないでしょう。"),
-                    new TutorialLine("……インク？ 違うわ。あなたの色よ。"),
-                    new TutorialLine("名前を書いた指、まだ痛む？"),
-                    new TutorialLine("ねえ、その血。あなたは \"払った\" つもり？"),
-                    new TutorialLine("買い物なら、対価。詫びなら、誠意。契約なら、証。"),
-                    new TutorialLine("どれも、自分で差し出したものよね。"),
-                    new TutorialLine("それとも \"抜かれた\" と思っているのかしら。"),
-                    new TutorialLine("献血なら、腕を出しただけ。虫になら、気づかぬうちに。"),
-                    new TutorialLine("悪魔になら……断れなかったから。"),
-                    new TutorialLine("ふふ。どちらでも、減った量は同じよ。"),
-                    new TutorialLine("違うのは、誰が決めたかだけ。"),
-                    new TutorialLine("さあ、始めましょう。"),
-                    new TutorialLine("山牌から13枚選びなさい。それがあなたの命の値段になるわ。"),
+                    new TutorialLine("「おっ後輩ちゃんじゃーん」"),
+                    new TutorialLine("「先輩を助けに来たんだな？えらいぞー」"),
+                    new TutorialLine("「ふんふん……鬼気迫ったメールにいてもたってもいられなくなった」"),
+                    new TutorialLine("「……ってアタシのこと好きすぎかよー！！」"),
+                    new TutorialLine("「……まっ後輩ちゃんが今からやるのはそんな生やさしいもんじゃないんだけどね」"),
+                    new TutorialLine("「ラチられた時にチラッと見たかと思うけど、ここは賭場…ギャンブルをするとこなんだ」"),
+                    new TutorialLine("「しかもただのギャンブルじゃない……それは命がけのギャンブル！！」"),
+                    new TutorialLine("「なになに……入口で契約書を書かされた時から覚悟はしてた」"),
+                    new TutorialLine("「……って契約書！？アタシはそんなの書かなかったけど」"),
+                    new TutorialLine("「ビビらそうと思ってホラ吹いたけどそっちのほうが怖いな」"),
+                    new TutorialLine("「まっ長くなっちゃったから早速ルール説明するわ」"),
+                    new TutorialLine("「大丈夫！殺し合いとかしないからさ！何回かギャンブルできればアタシたちは脱出できるってワケ」"),
+                    new TutorialLine("「一人でここにカチコんだから相手いなかったんだよね…」"),
+                    new TutorialLine("「それじゃはじめるよ」"),   // ここで牌が配られる（盤面を出す）
+                    new TutorialLine("「ここでは特殊な麻雀をプレイしてギャンブルをしていくよ」"),
                 },
                 onHandFilledLines = new List<TutorialLine>
                 {

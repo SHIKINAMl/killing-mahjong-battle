@@ -34,28 +34,43 @@ namespace KillingMahjong.Managers
         /// </summary>
         private const string GuideBoardPath = "Tutorial/案内板_満貫";
 
-        // ユーザーが選んだ B 案の問いかけと選択肢。
-        private const string ExperienceQuestion = "あなた、麻雀は打てるの？";
-        private const string YesLabel = "経験あり";
-        private const string NoLabel = "初めて";
-        private const string GuideStartLabel = "わかった";
+        // 問いかけと選択肢。**文言はフロー図から（2026-09-12）。**
+        private const string ExperienceQuestion = "「って後輩ちゃんは麻雀とか知ってたっけ？」";
+        private const string YesLabel = "はい";
+        private const string NoLabel = "いいえ";
+        private const string GuideStartLabel = "閉じる";
 
-        // 未経験を選んだ時だけ、説明画像の前に見せる短い会話。
-        //
-        // **最後の一行は案内板の中身に合わせること。** 案内板は「13枚から満貫手を狙う」
-        // という、この対局の決まりを説明したもの。ここで別の話（アガリの形など）を
-        // 予告すると、出てくる板と食い違う。
-        private static readonly List<TutorialLine> BeginnerIntroLines = new List<TutorialLine>
+        // 「いいえ」を選んだときの流れ。**麻雀そのものを知らない人向け。**
+        // 麻雀ルール説明UI を挟んでから、17歩ルール説明UI へ合流する。
+        private static readonly List<TutorialLine> NoviceBeforeMahjongUi = new List<TutorialLine>
         {
-            new TutorialLine("……素人が紛れ込んできたわけね。"),
-            new TutorialLine("いい度胸だこと。自分の命のルールも知らないで契約したの？"),
-            new TutorialLine("仕方ないわ。『満貫』の意味くらいは頭に叩き込んでおきなさい。"),
+            new TutorialLine("「そっかじゃあ説明するわ」"),
+        };
+
+        private static readonly List<TutorialLine> NoviceAfterMahjongUi = new List<TutorialLine>
+        {
+            new TutorialLine("「まっ難しいと思うけど一旦説明続けるね」"),
+            new TutorialLine("「ここのギャンブルは麻雀をベースにした特殊なギャンブルなんだよ」"),
+            new TutorialLine("「とりまこれを見てー」"),
+        };
+
+        // 「はい」を選んだときの流れ。**麻雀は分かっている前提で、この賭場の決まりだけ。**
+        private static readonly List<TutorialLine> ExperiencedLines = new List<TutorialLine>
+        {
+            new TutorialLine("「そかそか昔一緒にやったことあったもんね」"),
+            new TutorialLine("「じゃあここのギャンブルのルールだけ説明するわ」"),
+        };
+
+        // 17歩ルール説明UI を閉じたあと。**ここで2つの経路が合流して実践へ向かう。**
+        private static readonly List<TutorialLine> AfterRuleUiLines = new List<TutorialLine>
+        {
+            new TutorialLine("「わかった？\nま、難しいと思うから、アタシと実践してみよっかー」"),
         };
 
         private GameObject _introRoot;
 
         /// <summary>
-        /// 導入セリフのあとに経験を聞くか。**`StartTutorial()` でだけ立つ。**
+        /// 導入のセリフが終わったあとに問いかけるか。**`StartTutorial()` でだけ立つ。**
         /// 局を指定して始める入口（自動走行が使う）では立たないので、あちらは止まらない。
         /// </summary>
         private bool _askExperienceAfterIntro;
@@ -68,10 +83,15 @@ namespace KillingMahjong.Managers
         public System.Action CharacterRevealRequested;
 
         /// <summary>
-        /// 導入セリフのあとに経験を聞く（2026-09-12 に位置を移した）。
+        /// 導入セリフのあとに「麻雀を知っているか」を聞き、答えに応じて説明を見せる
+        /// （2026-09-12、フロー図どおり）。
         ///
         /// **セリフとして聞く。暗転はしない（ユーザーの指示）。**
         /// あそこは会話の途中なので、暗く落とすと流れが切れて見える。
+        ///
+        /// 経路は2つ。**どちらも 17歩ルール説明UI で合流する。**
+        /// - いいえ … 麻雀ルール説明UI を挟んでから合流
+        /// - はい　 … この賭場の決まりだけ聞いて合流
         ///
         /// 聞かない設定のとき（局を指定して始めたとき）は、何もせずに抜ける。
         /// </summary>
@@ -94,54 +114,88 @@ namespace KillingMahjong.Managers
                 dialogueUI.ShowText(ExperienceQuestion);
             }
 
-            int answer = -1;                      // 0=経験あり / 1=初めて
+            int answer = -1;                      // 0=はい / 1=いいえ
             BuildQuestionPanel(parent, font, onYes: () => answer = 0, onNo: () => answer = 1);
             yield return new WaitUntil(() => answer >= 0);
 
             CloseIntro();
 
-            if (answer == 0) yield break;         // 経験ありはそのまま先へ
+            if (answer == 1)
+            {
+                // 麻雀そのものを知らない人。まず麻雀の形から
+                yield return PlayLines(NoviceBeforeMahjongUi);
+                yield return ShowRulePanelRoutine(font, MahjongRuleTitle, MahjongRuleBody, null);
+                yield return PlayLines(NoviceAfterMahjongUi);
+            }
+            else
+            {
+                yield return PlayLines(ExperiencedLines);
+            }
 
-            yield return PlayLines(BeginnerIntroLines);
+            // ここで合流。**この賭場の決まりは、どちらの経路でも必ず見せる。**
+            yield return ShowRulePanelRoutine(font, null, null, GuideBoardPath);
 
-            // 画像の下に直前の吹き出しが残らないようにしてからカードを前面に出す。
-            if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
-            yield return ShowGuideBoardRoutine(font);
+            yield return PlayLines(AfterRuleUiLines);
         }
 
+        /// <summary>麻雀ルール説明UIの中身。**絵は使わず文字で出す**（第7項）。</summary>
+        private const string MahjongRuleTitle = "麻雀の基本";
+
+        private static readonly string[] MahjongRuleBody =
+        {
+            "牌は 萬子・筒子・索子 の3種類と、字牌。",
+            "",
+            "同じ牌を3枚そろえる、または同じ種類で数字を",
+            "3つ続ける。これを「面子（メンツ）」という。",
+            "",
+            "同じ牌2枚を「雀頭（ジャントウ）」という。",
+            "",
+            "面子を4つと、雀頭を1つ。これがアガリの形。",
+        };
+
         /// <summary>
-        /// 未経験者向け案内板を1枚見せて、「わかった」を待つ。
-        /// **こちらは暗転したまま。** 1枚の絵を読ませる場なので、盤面が透けていると読みにくい。
-        /// 画像が無いなど組み立てに失敗したときは、**黙って止まらず**すぐ先へ進める。
+        /// ルール説明の板を1枚見せて、「閉じる」を待つ。
+        /// **こちらは暗転したまま。** 読ませる場なので、盤面が透けていると読みにくい。
+        ///
+        /// <paramref name="spritePath"/> があれば画像を、無ければ文字の板を出す。
+        /// **画像はユーザーが用意したものだけを使う。AIで描かない**（AGENTS.md 第7項）。
+        /// 画像が見つからないなど組み立てに失敗したときは、**黙って止まらず**すぐ先へ進める。
         /// </summary>
-        private IEnumerator ShowGuideBoardRoutine(TMP_FontAsset font)
+        private IEnumerator ShowRulePanelRoutine(TMP_FontAsset font, string title,
+                                                 string[] body, string spritePath)
         {
             CloseIntro();
 
-            Sprite board = Resources.Load<Sprite>(GuideBoardPath);
-            if (board == null)
+            Sprite board = string.IsNullOrEmpty(spritePath) ? null : Resources.Load<Sprite>(spritePath);
+            if (board == null && (body == null || body.Length == 0))
             {
-                // 画像が見つからないだけで進めなくなるのは行き過ぎ。記録して先へ進める。
-                Debug.LogWarning("[TutorialIntro] 案内板の画像が見つかりません: " + GuideBoardPath);
+                Debug.LogWarning("[TutorialIntro] 説明の中身がありません: " + spritePath);
                 yield break;
             }
 
             Transform parent = BuildIntroCanvas();
             if (parent == null) yield break;
 
-            var image = new GameObject("GuideBoard", typeof(RectTransform), typeof(Image));
-            image.transform.SetParent(parent, false);
-            var imageRect = (RectTransform)image.transform;
-            imageRect.anchorMin = new Vector2(0.5f, 0.5f);
-            imageRect.anchorMax = new Vector2(0.5f, 0.5f);
-            imageRect.anchoredPosition = new Vector2(0f, 30f);
-            // 元画像の縦横比のまま、画面に収まる大きさへ。
-            float scale = Mathf.Min(700f / board.rect.width, 450f / board.rect.height);
-            imageRect.sizeDelta = new Vector2(board.rect.width * scale, board.rect.height * scale);
+            if (board != null)
+            {
+                var image = new GameObject("RuleBoard", typeof(RectTransform), typeof(Image));
+                image.transform.SetParent(parent, false);
+                var imageRect = (RectTransform)image.transform;
+                imageRect.anchorMin = new Vector2(0.5f, 0.5f);
+                imageRect.anchorMax = new Vector2(0.5f, 0.5f);
+                imageRect.anchoredPosition = new Vector2(0f, 30f);
+                // 元画像の縦横比のまま、画面に収まる大きさへ。
+                float scale = Mathf.Min(700f / board.rect.width, 450f / board.rect.height);
+                imageRect.sizeDelta = new Vector2(board.rect.width * scale, board.rect.height * scale);
 
-            var boardImage = image.GetComponent<Image>();
-            boardImage.sprite = board;
-            boardImage.raycastTarget = false;
+                var boardImage = image.GetComponent<Image>();
+                boardImage.sprite = board;
+                boardImage.raycastTarget = false;
+            }
+            else
+            {
+                BuildTextCard(parent, font, title, body);
+            }
 
             bool done = false;
             CreateButton(parent, font, GuideStartLabel, new Vector2(0f, -250f), () => done = true);
@@ -150,7 +204,57 @@ namespace KillingMahjong.Managers
             CloseIntro();
         }
 
-        /// <summary>問いかけの文と、経験あり／初めての2つ。</summary>
+        /// <summary>文字だけの説明板。**絵を使わずに済ませるための受け皿。**</summary>
+        private void BuildTextCard(Transform parent, TMP_FontAsset font, string title, string[] body)
+        {
+            var card = new GameObject("RuleCard", typeof(RectTransform), typeof(Image));
+            card.transform.SetParent(parent, false);
+            var cardRect = (RectTransform)card.transform;
+            cardRect.anchorMin = new Vector2(0.5f, 0.5f);
+            cardRect.anchorMax = new Vector2(0.5f, 0.5f);
+            cardRect.anchoredPosition = new Vector2(0f, 30f);
+            cardRect.sizeDelta = new Vector2(620f, 380f);
+            card.GetComponent<Image>().color = new Color32(28, 16, 20, 245);
+
+            if (!string.IsNullOrEmpty(title))
+            {
+                var head = new GameObject("Title", typeof(RectTransform), typeof(TextMeshProUGUI));
+                head.transform.SetParent(card.transform, false);
+                var headRect = (RectTransform)head.transform;
+                headRect.anchorMin = new Vector2(0.5f, 1f);
+                headRect.anchorMax = new Vector2(0.5f, 1f);
+                headRect.pivot = new Vector2(0.5f, 1f);
+                headRect.anchoredPosition = new Vector2(0f, -22f);
+                headRect.sizeDelta = new Vector2(560f, 46f);
+
+                var headText = head.GetComponent<TextMeshProUGUI>();
+                if (font != null) headText.font = font;
+                headText.text = title;
+                headText.fontSize = 26f;
+                headText.color = new Color32(244, 214, 120, 255);
+                headText.alignment = TextAlignmentOptions.Center;
+                headText.raycastTarget = false;
+            }
+
+            var lines = new GameObject("Body", typeof(RectTransform), typeof(TextMeshProUGUI));
+            lines.transform.SetParent(card.transform, false);
+            var linesRect = (RectTransform)lines.transform;
+            linesRect.anchorMin = new Vector2(0.5f, 1f);
+            linesRect.anchorMax = new Vector2(0.5f, 1f);
+            linesRect.pivot = new Vector2(0.5f, 1f);
+            linesRect.anchoredPosition = new Vector2(0f, -76f);
+            linesRect.sizeDelta = new Vector2(560f, 280f);
+
+            var bodyText = lines.GetComponent<TextMeshProUGUI>();
+            if (font != null) bodyText.font = font;
+            bodyText.text = string.Join("\n", body);
+            bodyText.fontSize = 19f;
+            bodyText.lineSpacing = 12f;
+            bodyText.color = new Color32(240, 232, 236, 255);
+            bodyText.alignment = TextAlignmentOptions.TopLeft;
+            bodyText.raycastTarget = false;
+        }
+
         /// <summary>
         /// 「経験あり」「初めて」の2つ。**問いかけの文はここには出さない。**
         /// 文は吹き出し（DialogueUI）が受け持つ（2026-09-12）。
