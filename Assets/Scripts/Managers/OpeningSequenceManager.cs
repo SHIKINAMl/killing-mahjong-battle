@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
 using KillingMahjong.UI;
@@ -194,12 +194,33 @@ namespace KillingMahjong.Managers
             StartCoroutine(ShowEnemyRoutine());
         }
 
+        /// <summary>
+        /// 契約書を閉じたあと。**ここでは立ち絵を出さない（2026-09-12）。**
+        ///
+        /// フロー図の順序は「契約書を閉じる → セリフ1行 → 女の子立ち絵表示」。
+        /// 誰もいない画面に最初の一言だけが出て、そのあとに相手が現れる。
+        /// フェードインは <see cref="TutorialManager.CharacterRevealRequested"/> 経由で
+        /// TutorialManager が1行目を送り終えた時点で呼び戻してくる。
+        /// </summary>
         private IEnumerator ShowEnemyRoutine()
         {
-            // 女の子出現
+            // 吹き出しだけ先に出しておく。立ち絵はまだ出さない
+            if (dialogueUI != null) dialogueUI.gameObject.SetActive(true);
+            yield return null;
+
+            if (tutorialManager != null)
+            {
+                tutorialManager.CharacterRevealRequested = () => StartCoroutine(FadeInEnemyRoutine());
+            }
+
+            StartConversation();
+        }
+
+        /// <summary>女の子をうっすら浮かび上がらせる。**1行目のセリフの後に呼ばれる。**</summary>
+        private IEnumerator FadeInEnemyRoutine()
+        {
             enemyCharacterObj.SetActive(true);
 
-            // うっすらとフェードインする演出
             Image enemyImg = enemyCharacterObj.GetComponent<Image>();
             if (enemyImg != null)
             {
@@ -219,12 +240,6 @@ namespace KillingMahjong.Managers
                 c.a = 1f;
                 enemyImg.color = c;
             }
-
-            yield return new WaitForSeconds(0.5f);
-
-            // 吹き出し（DialogueUI）を表示して会話を開始
-            if (dialogueUI != null) dialogueUI.gameObject.SetActive(true);
-            StartConversation();
         }
 
         private void StartConversation()

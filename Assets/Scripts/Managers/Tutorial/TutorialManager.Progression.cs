@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.SceneManagement;
 using System.Collections;
 using System.Collections.Generic;
@@ -102,19 +102,44 @@ namespace KillingMahjong.Managers
             SetBoardVisible(false);
             yield return null;
 
+            // **立ち絵は1行目のセリフの後に出す（2026-09-12、フロー図どおり）。**
+            // 契約書を閉じた直後は誰もいない画面で、最初の一言だけが聞こえる。
+            // 立ち絵を持っているのはシーン側なので、こちらは合図を出すだけ。
+            // 合図を受け取る人がいない（局を指定して始めた等）ときは、何も起きずに素通りする。
+            var introLines = data.introLines;
             int reveal = data.revealBoardAfterLineIndex;
-            if (reveal >= 0 && reveal < data.introLines.Count - 1)
+
+            if (CharacterRevealRequested != null && introLines != null && introLines.Count > 0)
             {
-                yield return StartCoroutine(PlayLines(data.introLines.GetRange(0, reveal + 1)));
+                yield return StartCoroutine(PlayLines(introLines.GetRange(0, 1)));
+
+                var reveal1 = CharacterRevealRequested;
+                CharacterRevealRequested = null;     // 出すのは一度きり
+                reveal1();
+
+                // 1行ぶん先に送ったので、残りと「盤面を出す行」の番号をずらす
+                introLines = introLines.GetRange(1, introLines.Count - 1);
+                if (reveal >= 0) reveal -= 1;
+            }
+
+            if (reveal >= 0 && reveal < introLines.Count - 1)
+            {
+                yield return StartCoroutine(PlayLines(introLines.GetRange(0, reveal + 1)));
                 SetBoardVisible(true);
                 yield return StartCoroutine(PlayLines(
-                    data.introLines.GetRange(reveal + 1, data.introLines.Count - reveal - 1)));
+                    introLines.GetRange(reveal + 1, introLines.Count - reveal - 1)));
             }
             else
             {
-                yield return StartCoroutine(PlayLines(data.introLines));
+                yield return StartCoroutine(PlayLines(introLines));
                 SetBoardVisible(true);
             }
+
+            // **経験を聞くのはここ（2026-09-12 に位置を移した）。**
+            // 以前は立ち絵が出た直後、セリフより前に聞いていた。
+            // フロー図では導入の会話がひととおり終わってから分岐する。
+            // 頭から始めたときだけ聞く。中身は TutorialManager.Intro.cs。
+            yield return StartCoroutine(AskExperienceIfNeeded());
 
             // --- 能力の実演と説明（手順⑱〜⑳） ---
             // 能力は手牌フェイズでしか使えない仕様なので、実演もこのフェイズのうちに行う。

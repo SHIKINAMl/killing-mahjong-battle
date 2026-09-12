@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using TMPro;
@@ -55,47 +55,66 @@ namespace KillingMahjong.Managers
         private GameObject _introRoot;
 
         /// <summary>
-        /// 問いかけを出し、答えが出てから <paramref name="onDecided"/> を呼ぶ。
-        /// 画像が無いなど組み立てに失敗したときは、**黙って止まらず**すぐ先へ進める。
+        /// 導入セリフのあとに経験を聞くか。**`StartTutorial()` でだけ立つ。**
+        /// 局を指定して始める入口（自動走行が使う）では立たないので、あちらは止まらない。
         /// </summary>
-        private void AskExperienceThenStart(int roundIndex)
+        private bool _askExperienceAfterIntro;
+
+        /// <summary>
+        /// 立ち絵を出してほしいときに呼ぶ。**1行目のセリフの後に1度だけ。**
+        /// 立ち絵を持っているのは `OpeningSequenceManager`（シーン側）なので、
+        /// こちらは「出して」と言うだけにしてある。
+        /// </summary>
+        public System.Action CharacterRevealRequested;
+
+        /// <summary>
+        /// 導入セリフのあとに経験を聞く（2026-09-12 に位置を移した）。
+        ///
+        /// **セリフとして聞く。暗転はしない（ユーザーの指示）。**
+        /// あそこは会話の途中なので、暗く落とすと流れが切れて見える。
+        ///
+        /// 聞かない設定のとき（局を指定して始めたとき）は、何もせずに抜ける。
+        /// </summary>
+        private IEnumerator AskExperienceIfNeeded()
         {
+            if (!_askExperienceAfterIntro) yield break;
+            _askExperienceAfterIntro = false;
+
             CloseIntro();
 
             TMP_FontAsset font = BorrowJapaneseFont();
-            Transform parent = BuildIntroCanvas();
-            if (parent == null)
+            Transform parent = BuildIntroCanvas(dim: false);
+            if (parent == null) yield break;
+
+            // 問いかけは吹き出しに出す。**「どこでも押して送る」は出さない。**
+            // 出すと、答えないまま読み飛ばせてしまう。
+            if (dialogueUI != null)
             {
-                StartTutorialFrom(roundIndex);
-                return;
+                dialogueUI.gameObject.SetActive(true);
+                dialogueUI.ShowText(ExperienceQuestion);
             }
 
-            BuildQuestionPanel(parent, font,
-                onYes: () =>
-                {
-                    CloseIntro();
-                    StartTutorialFrom(roundIndex);
-                },
-                onNo: () => StartCoroutine(PlayBeginnerIntroThenShowGuide(roundIndex, font)));
-        }
+            int answer = -1;                      // 0=経験あり / 1=初めて
+            BuildQuestionPanel(parent, font, onYes: () => answer = 0, onNo: () => answer = 1);
+            yield return new WaitUntil(() => answer >= 0);
 
-        /// <summary>
-        /// 未経験者への短い会話を送り、説明画像を表示する。
-        /// 会話は既存の DialogueUI を使い、画像だけを実行時生成の Canvas に置く。
-        /// </summary>
-        private IEnumerator PlayBeginnerIntroThenShowGuide(int roundIndex, TMP_FontAsset font)
-        {
             CloseIntro();
+
+            if (answer == 0) yield break;         // 経験ありはそのまま先へ
 
             yield return PlayLines(BeginnerIntroLines);
 
             // 画像の下に直前の吹き出しが残らないようにしてからカードを前面に出す。
             if (dialogueUI != null) dialogueUI.gameObject.SetActive(false);
-            ShowGuideBoard(roundIndex, font);
+            yield return ShowGuideBoardRoutine(font);
         }
 
-        /// <summary>未経験者向け案内板を1枚見せて、「わかった」で本編へ合流する。</summary>
-        private void ShowGuideBoard(int roundIndex, TMP_FontAsset font)
+        /// <summary>
+        /// 未経験者向け案内板を1枚見せて、「わかった」を待つ。
+        /// **こちらは暗転したまま。** 1枚の絵を読ませる場なので、盤面が透けていると読みにくい。
+        /// 画像が無いなど組み立てに失敗したときは、**黙って止まらず**すぐ先へ進める。
+        /// </summary>
+        private IEnumerator ShowGuideBoardRoutine(TMP_FontAsset font)
         {
             CloseIntro();
 
@@ -104,16 +123,11 @@ namespace KillingMahjong.Managers
             {
                 // 画像が見つからないだけで進めなくなるのは行き過ぎ。記録して先へ進める。
                 Debug.LogWarning("[TutorialIntro] 案内板の画像が見つかりません: " + GuideBoardPath);
-                StartTutorialFrom(roundIndex);
-                return;
+                yield break;
             }
 
             Transform parent = BuildIntroCanvas();
-            if (parent == null)
-            {
-                StartTutorialFrom(roundIndex);
-                return;
-            }
+            if (parent == null) yield break;
 
             var image = new GameObject("GuideBoard", typeof(RectTransform), typeof(Image));
             image.transform.SetParent(parent, false);
@@ -129,38 +143,35 @@ namespace KillingMahjong.Managers
             boardImage.sprite = board;
             boardImage.raycastTarget = false;
 
-            CreateButton(parent, font, GuideStartLabel, new Vector2(0f, -250f), () =>
-            {
-                CloseIntro();
-                StartTutorialFrom(roundIndex);
-            });
+            bool done = false;
+            CreateButton(parent, font, GuideStartLabel, new Vector2(0f, -250f), () => done = true);
+            yield return new WaitUntil(() => done);
+
+            CloseIntro();
         }
 
         /// <summary>問いかけの文と、経験あり／初めての2つ。</summary>
+        /// <summary>
+        /// 「経験あり」「初めて」の2つ。**問いかけの文はここには出さない。**
+        /// 文は吹き出し（DialogueUI）が受け持つ（2026-09-12）。
+        /// </summary>
         private void BuildQuestionPanel(Transform parent, TMP_FontAsset font, Action onYes, Action onNo)
         {
-            var label = new GameObject("Question", typeof(RectTransform), typeof(TextMeshProUGUI));
-            label.transform.SetParent(parent, false);
-            var labelRect = (RectTransform)label.transform;
-            labelRect.anchorMin = new Vector2(0.5f, 0.5f);
-            labelRect.anchorMax = new Vector2(0.5f, 0.5f);
-            labelRect.anchoredPosition = new Vector2(0f, 80f);
-            labelRect.sizeDelta = new Vector2(600f, 80f);
-
-            var text = label.GetComponent<TextMeshProUGUI>();
-            if (font != null) text.font = font;
-            text.text = ExperienceQuestion;
-            text.fontSize = 28f;
-            text.color = new Color32(240, 232, 236, 255);
-            text.alignment = TextAlignmentOptions.Center;
-            text.raycastTarget = false;
-
-            CreateButton(parent, font, YesLabel, new Vector2(-115f, -40f), onYes);
-            CreateButton(parent, font, NoLabel, new Vector2(115f, -40f), onNo);
+            // **卓の空いている帯に置く（2026-09-12）。** 暗転をやめたので置き場所が効く。
+            // y=-40 だと相手の体に重なり、y=-150 だと手牌に被る。
+            // 相手の下端と手牌の上端のあいだ（800x600 基準で y=-105 あたり）が唯一空いている。
+            // **手牌を出したあとに聞く場面なので、ここは必ず空けておくこと。**
+            CreateButton(parent, font, YesLabel, new Vector2(-130f, -105f), onYes);
+            CreateButton(parent, font, NoLabel, new Vector2(130f, -105f), onNo);
         }
 
         /// <summary>全画面を覆う Canvas を作る。すでにあれば作り直さない。</summary>
-        private Transform BuildIntroCanvas()
+        /// <param name="dim">
+        /// 後ろを暗く落とすか。**問いかけでは落とさない（2026-09-12 の指示）。**
+        /// あそこはセリフで聞くので、暗転すると会話が途切れて見える。
+        /// 案内板は1枚の絵を読ませる場なので、こちらは落としたまま。
+        /// </param>
+        private Transform BuildIntroCanvas(bool dim = true)
         {
             _introRoot = new GameObject("TutorialIntro", typeof(RectTransform), typeof(Canvas),
                 typeof(CanvasScaler), typeof(GraphicRaycaster));
@@ -177,10 +188,15 @@ namespace KillingMahjong.Managers
             StretchFull((RectTransform)_introRoot.transform);
 
             // 後ろの盤面を暗く落とす。ここを押しても何も起きないようにする覆いも兼ねる。
-            var scrim = new GameObject("Scrim", typeof(RectTransform), typeof(Image));
-            scrim.transform.SetParent(_introRoot.transform, false);
-            StretchFull((RectTransform)scrim.transform);
-            scrim.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.82f);
+            // **落とさないときは覆いごと作らない。** 透明な覆いを残すと、
+            // 背後のセリフ送り（画面のどこでも押せる）をこれが食ってしまう。
+            if (dim)
+            {
+                var scrim = new GameObject("Scrim", typeof(RectTransform), typeof(Image));
+                scrim.transform.SetParent(_introRoot.transform, false);
+                StretchFull((RectTransform)scrim.transform);
+                scrim.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.82f);
+            }
 
             return _introRoot.transform;
         }

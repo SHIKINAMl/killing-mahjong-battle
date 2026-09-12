@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.SceneManagement;
 using System.Collections;
 using System.Collections.Generic;
@@ -206,8 +206,15 @@ namespace KillingMahjong.Managers
             }
 
             // 最初から始めるときだけ経験を聞く。
-            // 初めてなら短い会話と案内板を見せてから始まる。中身は TutorialManager.Intro.cs。
-            AskExperienceThenStart(0);
+            // **聞く場所は最初の局の導入セリフが終わったあと（2026-09-12）。**
+            // フロー図では立ち絵とセリフが先に来て、分岐はそのずっと後ろにある。
+            // 実際に聞くのは RunRound の中。中身は TutorialManager.Intro.cs。
+            //
+            // **`StartTutorialFrom` では立てない。** あちらは局を指定して直接始める入口で、
+            // 自動でチュートリアルを通す仕掛け（AGENTS.md §14）が毎フレーム叩いている。
+            // あちらで問いかけを挟むと自動走行が止まる。
+            _askExperienceAfterIntro = true;
+            StartTutorialFrom(0);
         }
 
         public void StartTutorialFrom(int roundIndex)
