@@ -139,6 +139,7 @@ namespace KillingMahjong.Managers
             // ここで上書きすると、その 50ms のあいだに設定を変えられたとき
             // 落としたはずの音量が戻ってプツッと鳴る。差し替えが終われば向こうが戻す。
             if (bgmSource != null && !IsSwappingPhaseBgm) bgmSource.volume = bgmVolume * masterVolume;
+            ApplyLayerVolumes();
             if (seSource != null) seSource.volume = seVolume * masterVolume;
             if (voiceSource != null) voiceSource.volume = voiceVolume * masterVolume;
             if (discardSeSource != null) discardSeSource.volume = seVolume * masterVolume;

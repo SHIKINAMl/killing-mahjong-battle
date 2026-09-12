@@ -152,6 +152,11 @@ namespace KillingMahjong.Managers
             if (clamped == bgmIntensity) return;
 
             bgmIntensity = clamped;
+
+            // 層で鳴らしているときは**曲を差し替えない。** 層の音量だけを動かす。
+            // 差し替えは、どれだけ丁寧に繋いでも「曲が変わった」と気づかれる。
+            if (AreLayersRunning) { ApplyLayerMix(clamped, instant: false); return; }
+
             if (UsePhaseBgm) ApplyPhaseBgm();
         }
 
@@ -165,6 +170,21 @@ namespace KillingMahjong.Managers
         private void ApplyPhaseBgm()
         {
             string want = ResolveBgmName(currentBgmPhase);
+
+            // **場のBGMは層で鳴らす。** 濃さが変わっても曲は変わらないので、
+            // ここでは「場に入ったか / 場から出たか」だけを見る。
+            if (UseBgmLayers)
+            {
+                bool isField = want != null && want.StartsWith("bgm_field_");
+                if (isField)
+                {
+                    if (!AreLayersRunning) StartLayeredBgm(bgmIntensity);
+                    else ApplyLayerMix(bgmIntensity, instant: false);
+                    return;
+                }
+                if (AreLayersRunning) StopLayeredBgm();   // 場を離れたら層を畳む
+            }
+
             if (want == currentPhaseBgmName) return;
 
             var clip = GetPhaseBgmClip(want);
@@ -396,6 +416,7 @@ namespace KillingMahjong.Managers
         {
             if (bgmSwapCoroutine != null) { StopCoroutine(bgmSwapCoroutine); bgmSwapCoroutine = null; }
             if (bgmSource != null) bgmSource.Stop();
+            StopLayeredBgm();             // 層で鳴っていたらそれも断つ
             currentPhaseBgmName = null;   // 同じ曲を鳴らし直せるようにしておく
         }
 
