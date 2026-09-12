@@ -17,7 +17,20 @@ namespace KillingMahjong.UI
         private void PlayTransitionStinger(string name)
         {
             var audio = KillingMahjong.Managers.AudioManager.Instance;
-            if (audio != null) audio.PlayStinger(name);
+            if (audio == null) return;
+
+            // **黒帯と暗転は局ごとに何度も鳴る。** 毎回まったく同じ波形だと、
+            // 3局目あたりで「また同じ音」と感じられてしまうので、わずかにばらす。
+            // 音程そのものに意味がある音（能力の3段、決めさせられていたの音型）は
+            // ばらしてはいけないので、そちらは None にする。
+            bool pitched = name != null &&
+                           (name.StartsWith("se_ability") || name == "se_collapse" ||
+                            name == "se_choice" || name == "se_choice_dark");
+
+            audio.PlayStinger(name,
+                pitched ? KillingMahjong.Managers.AudioManager.PitchJitter.None
+                        : KillingMahjong.Managers.AudioManager.PitchJitter.VerySmall,
+                0.05f);
         }
 
         private IEnumerator RoundStartDarkenRoutine(string text, Action onDarkened)

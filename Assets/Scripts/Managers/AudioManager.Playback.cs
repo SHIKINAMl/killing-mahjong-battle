@@ -89,30 +89,39 @@ namespace KillingMahjong.Managers
         }
 
         // --- ASMR Specific SE Control ---
-        public void PlayHoverSE()
-        {
-            if (hoverSE != null) PlaySE(hoverSE);
-        }
+
+        // 以下、何度も鳴る音は**ピッチをばらして連打も絞る**（2026-09-12）。
+        // 同じ波形を毎回そのまま出すと、数十回鳴るうちに作り物だと分かってしまう。
+        // 手法は AudioManager.Variation.cs を参照（Inscryption の AudioParams を参考にした）。
 
         public void PlayPickTileSE()
         {
-            if (pickTileSE != null) PlaySE(pickTileSE);
-            else if (selectTileSE != null) PlaySE(selectTileSE); // フォールバック
+            // 牌に触れる音。素材感を保ちたいので振り幅は最小にする。
+            // 連打を絞らないと、牌を高速で触られたとき機関銃のように鳴る。
+            if (pickTileSE != null) PlaySE(pickTileSE, PitchJitter.VerySmall, 0.04f);
+            else if (selectTileSE != null) PlaySE(selectTileSE, PitchJitter.VerySmall, 0.04f); // フォールバック
         }
 
         public void PlayDrawTileSE()
         {
-            if (drawTileSE != null) PlaySE(drawTileSE);
+            if (drawTileSE != null) PlaySE(drawTileSE, PitchJitter.VerySmall, 0.04f);
         }
 
         public void PlayUIPopupSE()
         {
-            if (uiPopupSE != null) PlaySE(uiPopupSE);
+            if (uiPopupSE != null) PlaySE(uiPopupSE, PitchJitter.VerySmall, 0.08f);
         }
 
         public void PlayPaperSlideSE()
         {
-            if (paperSlideSE != null) PlaySE(paperSlideSE);
+            if (paperSlideSE != null) PlaySE(paperSlideSE, PitchJitter.VerySmall, 0.10f);
+        }
+
+        public void PlayHoverSE()
+        {
+            // カーソルを乗せるだけで鳴るので、**一番強く絞る**。
+            // 牌の上をなぞられると毎フレーム近く飛んでくる。
+            if (hoverSE != null) PlaySE(hoverSE, PitchJitter.Small, 0.06f);
         }
 
     }
