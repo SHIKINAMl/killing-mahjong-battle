@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -156,29 +156,66 @@ namespace KillingMahjong.Managers
         ///   Ambient   … **演出中・キューに何かある間は捨てる**。全体クールダウンもかかる
         /// </summary>
         /// <returns>実際に積んだら true。捨てたら false</returns>
+        /// <summary>
+        /// チュートリアル中か。**見つけた `GameUIManager` は覚えておく。**
+        /// 反応のたびに探し直すと、打牌のたびに探索が乗る。
+        ///
+        /// **真偽は毎回読み直す。** `IsTutorialMode` は
+        /// `OpeningSequenceManager.Awake` で立つので、こちらの初期化より後のことがある。
+        /// </summary>
+        private KillingMahjong.UI.GameUIManager _uiManagerForTutorial;
+
+        /// <summary>
+        /// チュートリアル中は反応を出さない（2026-09-12 の指示）。
+        ///
+        /// **チュートリアルは台本のセリフだけをしゃべる場。**
+        /// 反応は台本の外から割り込んでくるので、話の筋と噛み合わない。
+        /// 実際に、手牌を選んでいる最中にタイマーの催促が挟まっていた。
+        ///
+        /// **止めるのは反応だけ。** 局や体力の記録（`SetCurrentRound` など）は
+        /// そのまま通す。止めると対局が終わったあとの状態がおかしくなる。
+        /// </summary>
+        private bool SuppressedInTutorial
+        {
+            get
+            {
+                if (_uiManagerForTutorial == null)
+                {
+                    _uiManagerForTutorial = UnityEngine.Object.FindFirstObjectByType<KillingMahjong.UI.GameUIManager>(
+                        UnityEngine.FindObjectsInactive.Include);
+                }
+                return _uiManagerForTutorial != null && _uiManagerForTutorial.IsTutorialMode;
+            }
+        }
+
         public bool Trigger(ReactionTrigger trigger, ReactionPriority priority, string formatArg = "")
         {
+            if (SuppressedInTutorial) return false;
             return TriggerCore(trigger, priority, formatArg);
         }
 
 
         public void EnqueueDiscardReaction(int tileId, bool isLocalPlayer, string tileName)
         {
+            if (SuppressedInTutorial) return;
             EnqueueDiscardReactionCore(tileId, isLocalPlayer, tileName);
         }
 
         public void EnqueueFormattedCSVDialogue(string condition, string formatArg, bool clearPrevious = true, Action onComplete = null)
         {
+            if (SuppressedInTutorial) return;
             EnqueueFormattedCSVDialogueCore(condition, formatArg, clearPrevious, onComplete);
         }
 
         public void EnqueueCustomDialogue(string text, string poseName = "", string expressionName = "", bool clearPrevious = true)
         {
+            if (SuppressedInTutorial) return;
             EnqueueCustomDialogueCore(text, poseName, expressionName, clearPrevious);
         }
 
         public void EnqueueCSVDialogue(string condition, bool clearPrevious = true)
         {
+            if (SuppressedInTutorial) return;
             EnqueueCSVDialogueCore(condition, clearPrevious);
         }
 
@@ -270,6 +307,7 @@ namespace KillingMahjong.Managers
         /// <returns>実際に積んだら true</returns>
         public bool Publish(ReactionEvent ev, ReactionContext ctx)
         {
+            if (SuppressedInTutorial) return false;
             return PublishCore(ev, ctx);
         }
 
@@ -280,11 +318,13 @@ namespace KillingMahjong.Managers
         /// </summary>
         public void NotifyBetAmountChanged()
         {
+            if (SuppressedInTutorial) return;
             NotifyBetAmountChangedCore();
         }
 
         public void CheckAndPlayBetReaction(int betAmount, int maxHp, bool isLocalPlayer)
         {
+            if (SuppressedInTutorial) return;
             CheckAndPlayBetReactionCore(betAmount, maxHp, isLocalPlayer);
         }
 
@@ -299,41 +339,49 @@ namespace KillingMahjong.Managers
         /// </summary>
         public void HandleSkillCast(string skillType, bool isLocalPlayer, int costPaid, int hpAfter)
         {
+            if (SuppressedInTutorial) return;
             HandleSkillCastCore(skillType, isLocalPlayer, costPaid, hpAfter);
         }
 
         public void CheckAndPlayDrawReaction()
         {
+            if (SuppressedInTutorial) return;
             CheckAndPlayDrawReactionCore();
         }
 
         public void PlayDealingReaction()
         {
+            if (SuppressedInTutorial) return;
             PlayDealingReactionCore();
         }
 
         public void HandleRoundStart(int round)
         {
+            if (SuppressedInTutorial) return;
             HandleRoundStartCore(round);
         }
 
         public void StartHandSelectionTimer()
         {
+            if (SuppressedInTutorial) return;
             StartHandSelectionTimerCore();
         }
         
         public void StopHandSelectionTimer(bool isLocalPlayer)
         {
+            if (SuppressedInTutorial) return;
             StopHandSelectionTimerCore(isLocalPlayer);
         }
 
         public void StartBetPhaseTimer()
         {
+            if (SuppressedInTutorial) return;
             StartBetPhaseTimerCore();
         }
 
         public void HandleEnemyHandSelection(bool isYakuman, bool isMangan, bool isCheap)
         {
+            if (SuppressedInTutorial) return;
             HandleEnemyHandSelectionCore(isYakuman, isMangan, isCheap);
         }
 
@@ -349,16 +397,19 @@ namespace KillingMahjong.Managers
         /// </summary>
         public void HandleAgari(bool isLocalPlayerWin, bool isYakuman, bool isDoraBaku, bool isCheap)
         {
+            if (SuppressedInTutorial) return;
             HandleAgariCore(isLocalPlayerWin, isYakuman, isDoraBaku, isCheap);
         }
 
         public void HandleGameEnd(bool isLocalPlayerWin)
         {
+            if (SuppressedInTutorial) return;
             HandleGameEndCore(isLocalPlayerWin);
         }
 
         public void CheckDiscardConditions(int tileId, bool isLocalPlayer)
         {
+            if (SuppressedInTutorial) return;
             CheckDiscardConditionsCore(tileId, isLocalPlayer);
         }
     }
