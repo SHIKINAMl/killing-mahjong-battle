@@ -20,24 +20,42 @@ namespace KillingMahjong.UI
     /// </summary>
     public class VoltageFlame : MonoBehaviour
     {
-        /// <summary>段ごとの激しさ。添字が段数（0段＝炎なし）。</summary>
+        /// <summary>段ごとの激しさと色。添字が段数（0段＝炎なし）。</summary>
         private struct Tuning
         {
             public float Height;     // 背の高さの倍率
             public float Speed;      // 揺れの速さ
             public float Sway;       // 横揺れの幅[px]
             public float CoreAlpha;  // 芯の濃さ（0で芯なし）
+            public Color Root;       // 根元の色
+            public Color Tip;        // 先端の色
 
-            public Tuning(float h, float s, float w, float c) { Height = h; Speed = s; Sway = w; CoreAlpha = c; }
+            public Tuning(float h, float s, float w, float c, Color root, Color tip)
+            {
+                Height = h; Speed = s; Sway = w; CoreAlpha = c; Root = root; Tip = tip;
+            }
         }
 
+        /// <summary>
+        /// 段ごとの値。**調整はここだけ触ればよい。**
+        ///
+        /// **色は熱の段階として並べてある**（2026-09-13 の指示）。
+        /// 低い段は赤寄りで弱々しく、上がるにつれて橙 → 黄 → 白に近づく。
+        /// 炎は温度が上がるほど赤→橙→黄→白と見えるので、その順に合わせている。
+        /// 段の差が「本数」「激しさ」だけでなく**色でも分かる**ようにするため。
+        /// </summary>
         private static readonly Tuning[] ByLevel =
         {
-            new Tuning(0.00f,  0f, 0.0f, 0.00f),   // 0段: 出さない
-            new Tuning(1.00f,  4f, 0.8f, 0.00f),   // 1段: ちろちろ
-            new Tuning(1.25f,  6f, 1.3f, 0.00f),   // 2段
-            new Tuning(1.55f,  8f, 1.9f, 0.35f),   // 3段: 芯が見え始める
-            new Tuning(1.90f, 11f, 2.6f, 0.70f),   // 4段: 一番激しい
+            // 0段: 出さない
+            new Tuning(0.00f,  0f, 0.0f, 0.00f, Color.clear, Color.clear),
+            // 1段: くすんだ赤。ちろちろ
+            new Tuning(1.00f,  4f, 0.8f, 0.00f, new Color32(190,  55,  20, 225), new Color32(240, 120,  35, 230)),
+            // 2段: 橙
+            new Tuning(1.25f,  6f, 1.3f, 0.00f, new Color32(230,  95,  25, 230), new Color32(255, 165,  55, 235)),
+            // 3段: 明るい橙から黄。芯が見え始める
+            new Tuning(1.55f,  8f, 1.9f, 0.35f, new Color32(255, 140,  35, 235), new Color32(255, 210,  95, 240)),
+            // 4段: 黄から白。一番激しい
+            new Tuning(1.90f, 11f, 2.6f, 0.70f, new Color32(255, 185,  70, 240), new Color32(255, 248, 205, 245)),
         };
 
         /// <summary>舌の数。増やすほど重くなるので、この大きさなら3枚で足りる。</summary>
@@ -49,9 +67,8 @@ namespace KillingMahjong.UI
         /// <summary>舌1枚ぶんの積み上げ量[px]。`Height` 倍されて使われる。</summary>
         private const float StackStep = 5.5f;
 
-        private static readonly Color FlameLow = new Color32(255, 120, 30, 230);
-        private static readonly Color FlameHigh = new Color32(255, 190, 60, 235);
-        private static readonly Color CoreColor = new Color32(255, 245, 180, 255);
+        /// <summary>芯の色。**段によらず白寄り**にしてある（一番熱い場所なので）。</summary>
+        private static readonly Color CoreColor = new Color32(255, 250, 225, 255);
 
         private Image[] _tongues;
         private Image _core;
@@ -211,8 +228,9 @@ namespace KillingMahjong.UI
                 rect.sizeDelta = new Vector2(width, width * 1.6f);         // 縦に伸ばして炎の形に近づける
                 rect.anchoredPosition = new Vector2(sway, y);
 
-                // 先端ほど明るい。揺れに合わせて少し明滅させる
-                Color c = Color.Lerp(FlameLow, FlameHigh, up);
+                // 先端ほど明るい。色は段ごとの組み合わせから取る。
+                // 揺れに合わせて少し明滅させる
+                Color c = Color.Lerp(t.Root, t.Tip, up);
                 c.a *= 0.85f + 0.15f * Mathf.Sin(p * 2.3f);
                 _tongues[i].color = c;
             }
