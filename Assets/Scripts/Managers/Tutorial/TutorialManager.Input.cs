@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.SceneManagement;
 using System.Collections;
 using System.Collections.Generic;
@@ -71,6 +71,14 @@ namespace KillingMahjong.Managers
                 }
                 return false;
             }
+
+            // **ここでガイドを消す（2026-09-12 の指示）。**
+            // この後は確認ダイアログが出て手牌決定の演出に入る。
+            // 矢印はもう役目を終えているのに、決定を押した先でも右下を指したままだった。
+            //
+            // **弾いた場合（上の return false）では消さない。** あちらはまだ押してほしい状態で、
+            // わざわざ押す先を指し直している。
+            ClearGuide();
 
             // 実際の待機解除は ConfirmationDialogUI での決定後（ConfirmHandSelectionComplete）
             return true;
