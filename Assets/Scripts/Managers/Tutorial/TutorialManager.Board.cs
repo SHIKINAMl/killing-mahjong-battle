@@ -174,8 +174,21 @@ namespace KillingMahjong.Managers
         ///
         /// ドラは `SetBoardVisible` が常に隠しているのでここでは触らない。
         /// </summary>
+        /// <summary>
+        /// いま牌以外を伏せているか。**フェイズ側から見るために公開している。**
+        ///
+        /// 伏せるのは一度きりでは足りない。`GameUIPhaseController` はフェイズが変わるたびに
+        /// 表示を組み直すので、**賭け金フェイズに入った瞬間に役一覧が戻ってしまう**
+        /// （`ApplyBettingVisibility` が `SetMatchUIVisibility(true)` を通るため。2026-09-12 に確認）。
+        /// そちらから毎回この旗を見て、伏せ直してもらう。
+        /// </summary>
+        public bool FirstRoundChromeHidden { get { return _firstRoundChromeHidden; } }
+
+        private bool _firstRoundChromeHidden;
+
         private void SetFirstRoundChromeVisible(bool visible)
         {
+            _firstRoundChromeHidden = !visible;
             if (gameUIManager == null) return;
 
             if (gameUIManager.PlayerInfoUI != null)

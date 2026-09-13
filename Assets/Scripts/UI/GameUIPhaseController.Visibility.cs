@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 using KillingMahjong.EngineData;
@@ -173,6 +173,36 @@ namespace KillingMahjong.UI
                 case RoundStatus.Result:       ApplyAgariVisibility();         break;
                 case RoundStatus.Draw:         ApplyDrawVisibility();          break;
             }
+
+            ReHideTutorialChrome();
+        }
+
+        /// <summary>
+        /// チュートリアル第1局で牌以外を伏せている間は、**フェイズが変わっても伏せ直す**
+        /// （2026-09-12 の指示）。
+        ///
+        /// 上の `Apply*Visibility` は素直に「そのフェイズで出すべきもの」を出すので、
+        /// 賭け金フェイズに入った瞬間に役一覧が戻ってしまう。
+        /// **伏せる指示のほうが後から来る**形にして、取りこぼしを無くしている。
+        ///
+        /// **賭け金パネルそのものは伏せない。** あれは `BettingUI` で別物なので、
+        /// 体力表示を伏せたままでも画面下から出てくる（実機で確認済み）。
+        /// </summary>
+        private void ReHideTutorialChrome()
+        {
+            if (!uiManager.IsTutorialMode) return;
+            if (uiManager.TutorialManager == null) return;
+            if (!uiManager.TutorialManager.FirstRoundChromeHidden) return;
+
+            if (uiManager.YakuListUI != null)
+            {
+                uiManager.YakuListUI.CloseYakuList();
+                uiManager.YakuListUI.gameObject.SetActive(false);
+            }
+            if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.SetVitalsVisible(false);
+            if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetVitalsVisible(false);
+            if (uiManager.ScoreGauge != null) uiManager.ScoreGauge.SetVisible(false);
+            if (uiManager.BetPotUI != null) uiManager.BetPotUI.SetVisible(false);
         }
 
         private void UpdateDoraDisplay()

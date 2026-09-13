@@ -232,10 +232,6 @@ namespace KillingMahjong.Managers
             yield return new WaitUntil(() => !_isWaitingForHandSelectionComplete);
             ClearGuide();
 
-            // **賭け金フェイズの前に必ず戻す。** 賭け金はスマホ（体力表示）を拡大して
-            // 見せる演出なので、伏せたままだと何も出ない
-            if (hideChrome) SetFirstRoundChromeVisible(true);
-
             // --- 賭け金フェイズ ---
             if (_prevRoundWasDraw)
             {
@@ -257,6 +253,15 @@ namespace KillingMahjong.Managers
                 _lastBetAmount = bet;
                 PlaceBet(bet);
             }
+
+            // **牌以外を戻すのはここ（2026-09-12 の指示）。**
+            // 第1局は「牌を選ぶ → 賭け金を決める」まで牌だけを見せ、
+            // 賭け金が決まってから残りのUIを出す。
+            //
+            // **以前は賭け金フェイズの直前で戻していた。** 賭け金がスマホ（体力表示）を
+            // 拡大して見せる演出だったころの名残で、伏せたままだと何も出なかったため。
+            // いまは賭け金パネルが画面下から出てくる作りなので、伏せたままでも出る。
+            if (hideChrome) SetFirstRoundChromeVisible(true);
 
             // --- 打牌フェイズ ---
             // GameUIPhaseController は IsTutorialMode のとき HP パネルを出さないので、
