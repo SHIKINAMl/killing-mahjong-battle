@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
 using System;
@@ -85,19 +85,14 @@ namespace KillingMahjong.UI
 
             yield return new WaitForSeconds(initialWait);
 
-            // 1回目のまばたき（少し開いてすぐ閉じる）
-            yield return StartCoroutine(MoveLidScale(1f, 0.7f, 0.2f));
-            yield return StartCoroutine(MoveLidScale(0.7f, 1f, 0.15f));
-
-            yield return new WaitForSeconds(0.3f);
-
-            // 2回目のまばたき（もう少し開いて閉じる）
-            yield return StartCoroutine(MoveLidScale(1f, 0.4f, 0.2f));
-            yield return StartCoroutine(MoveLidScale(0.4f, 1f, 0.15f));
-
-            yield return new WaitForSeconds(0.3f);
-
-            // 3回目（完全に開く）
+            // **一度で開ききる（2026-09-13 の指示）。**
+            //
+            // 元は「少し開いて閉じる」を2回はさんでから開いていた。
+            // まぶたが開くたびに**赤い部屋が一瞬映っては消える**ので、
+            // 画面が赤く点滅しているように見える、と指摘を受けた。
+            // 実測でも まぶたの縮尺が 1.00→0.74→1.00→0.47→1.00→0.19→0.00 と往復していた。
+            //
+            // 目を覚ます感じは、開く速さ（finalOpenDuration）で出す。
             yield return StartCoroutine(MoveLidScale(1f, 0f, finalOpenDuration));
 
             // 開ききったら無効化する（Raycastブロックなどを避けるため）
