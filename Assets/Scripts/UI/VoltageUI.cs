@@ -1,4 +1,4 @@
-using TMPro;
+﻿using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using KillingMahjong.Common;
@@ -49,6 +49,7 @@ namespace KillingMahjong.UI
 
         private bool _isEnemy;
         private Image[] _pips;
+        private VoltageFlame[] _flames;
         private TextMeshProUGUI _multiplierText;
 
         /// <summary>
@@ -125,6 +126,7 @@ namespace KillingMahjong.UI
         {
             _isEnemy = isEnemy;
             _pips = new Image[PipCount];
+            _flames = new VoltageFlame[PipCount];
 
             for (int i = 0; i < PipCount; i++)
             {
@@ -140,6 +142,10 @@ namespace KillingMahjong.UI
                 var image = pip.GetComponent<Image>();
                 image.raycastTarget = false;   // 牌のクリック判定を吸わない
                 _pips[i] = image;
+
+                // 点いた四角の上で炎を揺らす（2026-09-13 の指示）。
+                // 絵は使わず丸を積んで作っている。中身は VoltageFlame.cs。
+                _flames[i] = VoltageFlame.Attach(pipRect);
             }
 
             // 倍率は四角の上に、四角の並びの中央に乗せる（ユーザーの指示 2026-09-08）。
@@ -149,7 +155,9 @@ namespace KillingMahjong.UI
             labelRect.anchorMin = new Vector2(0f, 0.5f);
             labelRect.anchorMax = new Vector2(0f, 0.5f);
             labelRect.pivot = new Vector2(0.5f, 0f);
-            labelRect.anchoredPosition = new Vector2(PipRowWidth * 0.5f, PipSize * 0.5f + 3f);
+            // **炎のぶん上へ逃がす（2026-09-13）。** 四角の真上は炎が使うので、
+            // 元の +3 では数字と炎が重なって読めなくなった。
+            labelRect.anchoredPosition = new Vector2(PipRowWidth * 0.5f, PipSize * 0.5f + 20f);
             labelRect.sizeDelta = new Vector2(80f, 22f);
 
             _multiplierText = label.GetComponent<TextMeshProUGUI>();
@@ -184,6 +192,10 @@ namespace KillingMahjong.UI
                 if (_pips[i] == null) continue;
                 bool lit = i < level;
                 _pips[i].color = lit ? (broken ? PipBroken : PipOn) : PipOff;
+
+                // **炎は点いた四角にだけ。** 段が上がるほど、どの炎も激しくなる。
+                // 「本数が増える」と「1本ずつ強くなる」の両方で段の差を出している。
+                if (_flames[i] != null) _flames[i].SetLevel(lit ? level : 0, broken);
             }
 
             // 等倍のときは数字を出さない。常に「×1.0」が並んでいると、
