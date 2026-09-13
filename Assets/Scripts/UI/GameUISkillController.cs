@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using System.Collections.Generic;
 using KillingMahjong.EngineData;
 using KillingMahjong.Managers;
@@ -205,6 +205,13 @@ namespace KillingMahjong.UI
             // 能力麻雀の核であるスキル発動が完全に無音だったため、種類別の音を鳴らす
             var audioMgr = Managers.AudioManager.Instance;
             if (audioMgr != null) audioMgr.PlaySkillSE(data.skillType);
+
+            // **発動の手応えは揺れで出す（2026-09-13）。**
+            // 上のフラッシュを止めたとき、合図が音だけになっていた。
+            // 音は切ってあることがある（`AudioManager.AudioEnabled`）ので、
+            // 無音でも「何かが起きた」と分かる合図が要る。
+            // ロンより弱くする。能力は局に何度も飛ぶので、同じ強さだと疲れる。
+            Effects.ScreenQuake.Play(12f, 0.22f);
 
             string localPlayerId = KillingMahjong.Network.NetworkMessageHandler.Instance.LocalPlayerId;
             bool isLocalPlayer = (data.player_id == localPlayerId);

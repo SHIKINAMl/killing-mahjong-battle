@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System.Collections;
@@ -9,6 +9,37 @@ namespace KillingMahjong.UI
 {
     public partial class RonAnimationUI
     {
+        /// <summary>
+        /// 手の大きさごとの揺れ幅[px]。**表は `AudioManager.Voices` のランク名に合わせてある。**
+        /// 知らない名前が来たら、いちばん小さい揺れにする（鳴らさないと事故に見える）。
+        /// </summary>
+        private static float QuakePowerForRank(string rankName)
+        {
+            switch (rankName)
+            {
+                case "ダブル役満": return 42f;
+                case "役満":       return 36f;
+                case "三倍満":     return 26f;
+                case "倍満":       return 20f;
+                case "跳満":       return 14f;
+                default:           return 10f;   // 満貫とそれ以下
+            }
+        }
+
+        /// <summary>揺れている長さ[秒]。大きい手ほど長く尾を引かせる。</summary>
+        private static float QuakeSecondsForRank(string rankName)
+        {
+            switch (rankName)
+            {
+                case "ダブル役満": return 0.70f;
+                case "役満":       return 0.60f;
+                case "三倍満":     return 0.44f;
+                case "倍満":       return 0.38f;
+                case "跳満":       return 0.32f;
+                default:           return 0.28f;
+            }
+        }
+
         private IEnumerator SequenceRoutine(List<int> handTiles, int ronTile, List<string> yakuList, string formula, string rankName, int score, bool isLocalPlayerWin,
             PlayerInfoUI playerInfo, EnemyInfoUI enemyInfo, int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp, System.Action onComplete,
             string scoreFormula, RonSettlementInfo settlement = null)
@@ -47,6 +78,13 @@ namespace KillingMahjong.UI
                 {
                     KillingMahjong.Managers.AudioManager.Instance.PlayRonVoice();
                 }
+
+                // **手の大きさぶんだけ画面を揺らす（2026-09-13）。**
+                // 満貫と役満が同じ見え方だと、何が起きたのかが伝わらない。
+                // 白フラッシュは 2026-08-20 に外してある（直後のカットインの
+                // 黒幕に埋もれて効かなかった）。揺れは黒幕越しでも伝わるので、
+                // こちらで衝撃を出す。
+                Effects.ScreenQuake.Play(QuakePowerForRank(rankName), QuakeSecondsForRank(rankName));
 
                 CutinAnimationUI cutinUI = gameObject.AddComponent<CutinAnimationUI>();
                 cutinUI.PlayCutin(winnerSprite, faceSprite, customFont, cutinText, () => {
