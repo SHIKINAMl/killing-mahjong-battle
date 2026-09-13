@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 namespace KillingMahjong.Managers.Tutorial
@@ -55,6 +55,13 @@ namespace KillingMahjong.Managers.Tutorial
             public static Cue SilenceWith(string se) { return new Cue(null, true, se); }
             public static Cue Both(string bgm, string se) { return new Cue(bgm, false, se); }
 
+            /// <summary>
+            /// 音は変えず、色だけ当てる。
+            /// **曲を止めていない場面で色を戻すのに要る。**
+            /// `Cue.Music(...)` で戻そうとすると曲が頭から鳴り直してしまう。
+            /// </summary>
+            public static Cue Screen(Tint tint) { return new Cue(null, false, null).With(tint); }
+
             /// <summary>色を足す。`Cue.Music("x").With(Tint.Warm)` のように繋げて使う。</summary>
             public Cue With(Tint tint) { var c = this; c.Tint = tint; return c; }
 
@@ -65,11 +72,20 @@ namespace KillingMahjong.Managers.Tutorial
         private static readonly Dictionary<string, Cue> Cues = new Dictionary<string, Cue>
         {
             // ---------- 第1局: 契約と、満貫の残酷な算数 ----------
+            //
+            // **2026-09-13 に貼り直した。** 導入の台詞が5行から15行へ書き換わり、
+            // 合図だけが古い行番号に残っていた。
+            // 直す前は [3] の「……ってアタシのこと好きすぎかよー！！」で
+            // 悲鳴のSEと赤い明滅が鳴っていた。
             { "r0.introLines[0]",      Cue.Music("tut_lesson") },
-            { "r0.introLines[2]",      Cue.Sound("se_drop").With(Tint.Blood) },        // 「あなたの色よ」
-            // 絶叫。**ここだけ曲の外側**。前後の音楽を変えず、終わったら何事もなく戻す
-            { "r0.introLines[3]",      Cue.SilenceWith("se_crack").Flick(Tint.Blood, 0.9f) },
-            { "r0.introLines[4]",      Cue.Music("tut_lesson").With(Tint.Clear) },
+            // 空気の切れ目1。軽口から「命がけ」の告知へ
+            { "r0.introLines[6]",      Cue.Sound("se_crack").Flick(Tint.Blood, 0.9f) },
+            // **契約書と血の合図は、契約書の話が出るここへ移した。**
+            { "r0.introLines[8]",      Cue.Sound("se_drop").With(Tint.Blood) },        // 「アタシはそんなの書かなかったけど」
+            // 冗談で済まない気配。色だけ冷たくする
+            { "r0.introLines[9]",      Cue.Screen(Tint.Cold) },      // 「そっちのほうが怖いな」
+            // ルール説明へ戻るので色を抜く。**曲は止めていないので鳴らし直さない**
+            { "r0.introLines[10]",     Cue.Screen(Tint.Clear) },
             { "r0.beforeBetLines[1]",  Cue.Sound("se_tube_slow") },
             { "r0.beforeBetLines[2]",  Cue.Sound("se_tube_fast") },
             { "r0.beforeBetLines[6]",  Cue.Sound("se_choice") },      // 「自分で決めていいのよ」
