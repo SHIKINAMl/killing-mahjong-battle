@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
 using KillingMahjong.Common;
 
@@ -16,6 +16,20 @@ namespace KillingMahjong.UI
     {
         [Header("Settings")]
         [SerializeField] private Color maskColor = new Color(0, 0, 0, 0.7f);
+
+        /// <summary>
+        /// 実際に使う覆いの濃さ。**シーンの値を無視して Awake で上書きする。**
+        ///
+        /// **濃すぎると集中が切れる**（2026-09-13 の指摘）。
+        /// 元は 0.7 で、誘導が入るたびに画面がほぼ真っ暗になっていた。
+        /// 155秒の通しで測ったところ **20秒が暗転**、うち冒頭のまぶたを除いても4回あった。
+        /// 穴（対象の周りだけ明るい）は残るので、薄くしても誘導としては効く。
+        ///
+        /// **なぜシーンではなくコードで決めるか。** 対局シーンが2つ（UIテストシーン /
+        /// OpeningScene）あり、シーン側を直すと片方だけ直る（AGENTS.md §2）。
+        /// 濃さを変えるときはこの値を触ること。
+        /// </summary>
+        private static readonly Color ForcedMaskColor = new Color(0f, 0f, 0f, 0.30f);
 
         [Tooltip("切り抜く枠の余白。小さすぎると対象に張り付いて窮屈に見える。")]
         [SerializeField] private float padding = 18f;
@@ -49,6 +63,9 @@ namespace KillingMahjong.UI
 
         private void Awake()
         {
+            // シーンに入っている濃さは使わない。理由は ForcedMaskColor を参照
+            maskColor = ForcedMaskColor;
+
             _canvas = GetComponent<Canvas>();
             _canvas.overrideSorting = true;
             _canvas.sortingOrder = UISortingOrders.TutorialMask;
