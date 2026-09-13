@@ -1,4 +1,4 @@
-using KillingMahjong.Common;
+﻿using KillingMahjong.Common;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -13,10 +13,16 @@ namespace KillingMahjong.UI
     {
         private const string CanvasName = "VoltageTileFlightCanvas";
         private const string GaugeName = "VoltageUI_Self";
-        private const int ParticleCount = 9;
-        private const float FlightDuration = 0.42f;
-        private const float LaunchInterval = 0.025f;
-        private const float FinishHold = 0.10f;
+        // **実測して決めた数字（2026-09-13）。**
+        // 最初は 3〜6px の四角だったが、800x600 の画面では点が見えず、
+        // 録画でも1フレームも光として写らなかった。円のスプライトに変え、
+        // 大きさを4倍ほどにしてようやく「光が飛ぶ」ように見える。
+        private const int ParticleCount = 14;
+        private const float FlightDuration = 0.55f;
+        private const float LaunchInterval = 0.03f;
+        private const float FinishHold = 0.18f;
+        private const float ParticleMinSize = 13f;
+        private const float ParticleMaxSize = 24f;
 
         private sealed class Particle
         {
@@ -61,7 +67,31 @@ namespace KillingMahjong.UI
             effectRect.offsetMin = Vector2.zero;
             effectRect.offsetMax = Vector2.zero;
 
-            root.GetComponent<VoltageTileFlightEffect>().Build(start, end);
+            // **牌の位置は、このフレームではまだ決まっていない。**
+            // 河は並べ直しを次のフレームに回すので、呼ばれた瞬間に測ると
+            // 牌のいる場所ではなく、並べる前の場所から光が出てしまう。
+            // 1フレーム待ってから測り直す。
+            root.GetComponent<VoltageTileFlightEffect>()
+                .StartCoroutine(BuildNextFrame(root, canvasRect, sourceTile, targetGauge, start, end));
+        }
+
+        /// <summary>
+        /// 1フレーム待ってから、牌とゲージの位置を測り直して光を組む。
+        /// 牌が消えていたら、呼ばれた時に測った位置をそのまま使う。
+        /// </summary>
+        private static System.Collections.IEnumerator BuildNextFrame(
+            GameObject root, RectTransform canvasRect, RectTransform sourceTile,
+            RectTransform targetGauge, Vector2 fallbackStart, Vector2 fallbackEnd)
+        {
+            yield return null;
+
+            if (root == null) yield break;
+
+            Vector2 start = sourceTile != null ? ToCanvasPosition(canvasRect, sourceTile) : fallbackStart;
+            Vector2 end = targetGauge != null ? ToCanvasPosition(canvasRect, targetGauge) : fallbackEnd;
+
+            var effect = root.GetComponent<VoltageTileFlightEffect>();
+            if (effect != null) effect.Build(start, end);
         }
 
         private static RectTransform EnsureCanvas()
@@ -112,12 +142,15 @@ namespace KillingMahjong.UI
 
                 var image = particleObject.GetComponent<Image>();
                 image.raycastTarget = false;
+                // 炎と同じ円を借りる。縁が硬い四角だと、小さいうちは
+                // ただの点にしか見えない。
+                image.sprite = VoltageFlame.SharedBlob;
                 image.color = new Color(1f, 0.78f, 0.20f, 0f);
 
                 float side = Random.Range(-1f, 1f);
                 float along = Random.Range(0.42f, 0.64f);
-                float arc = Random.Range(24f, 50f) * (side >= 0f ? 1f : -1f);
-                float size = Random.Range(3.5f, 6.5f);
+                float arc = Random.Range(40f, 80f) * (side >= 0f ? 1f : -1f);
+                float size = Random.Range(ParticleMinSize, ParticleMaxSize);
 
                 _particles[i] = new Particle
                 {
@@ -132,7 +165,7 @@ namespace KillingMahjong.UI
                 };
             }
 
-            _arrivalSpark = CreateSpark("ArrivalSpark", end, 7f);
+            _arrivalSpark = CreateSpark("ArrivalSpark", end, 16f);
             _totalDuration = FlightDuration + (ParticleCount - 1) * LaunchInterval + FinishHold;
         }
 
@@ -147,12 +180,16 @@ namespace KillingMahjong.UI
 
             var image = sparkObject.GetComponent<Image>();
             image.raycastTarget = false;
+            image.sprite = VoltageFlame.SharedBlob;
             image.color = new Color(1f, 0.88f, 0.35f, 0f);
             return image;
         }
 
         private void Update()
         {
+            // 組み上がる前（1フレーム待っている間）は、時計を進めない
+            if (_particles == null) return;
+
             _elapsed += Time.unscaledDeltaTime;
             UpdateParticles();
             UpdateArrivalSpark();
@@ -189,7 +226,10 @@ namespace KillingMahjong.UI
 
                 float fadeIn = Mathf.Clamp01(t / 0.16f);
                 float fadeOut = 1f - Mathf.Clamp01((t - 0.62f) / 0.38f);
-                particle.Image.color = new Color(1f, Mathf.Lerp(0.62f, 0.96f, t), 0.20f, fadeIn * fadeOut);
+                // **赤い壁の前を飛ぶ。** オレンジのままだと背景に沈むので、
+                // 進むほど白へ寄せて、光っているように見せる。
+                float white = Mathf.Lerp(0.55f, 1f, t);
+                particle.Image.color = new Color(1f, Mathf.Lerp(0.80f, 1f, t), Mathf.Lerp(0.25f, white, t), fadeIn * fadeOut);
             }
         }
 
@@ -199,8 +239,8 @@ namespace KillingMahjong.UI
 
             float arrivalTime = FlightDuration + (ParticleCount - 1) * LaunchInterval;
             float normalizedTime = Mathf.Clamp01((_elapsed - arrivalTime + 0.12f) / 0.22f);
-            float alpha = normalizedTime <= 0f ? 0f : (1f - normalizedTime) * 0.8f;
-            float size = Mathf.Lerp(7f, 25f, normalizedTime);
+            float alpha = normalizedTime <= 0f ? 0f : (1f - normalizedTime) * 0.95f;
+            float size = Mathf.Lerp(16f, 72f, normalizedTime);
 
             var rect = _arrivalSpark.rectTransform;
             rect.sizeDelta = new Vector2(size, size);

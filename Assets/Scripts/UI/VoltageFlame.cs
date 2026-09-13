@@ -126,6 +126,13 @@ namespace KillingMahjong.UI
         /// </summary>
         private static Sprite _blob;
 
+        /// <summary>
+        /// 同じ円を、ボルテージへ飛ぶ光（<see cref="VoltageTileFlightEffect"/>）でも貸す。
+        /// **四角のまま出すと点にしか見えない。** 外へ薄くなる円だと、
+        /// 小さくても光って見える。
+        /// </summary>
+        public static Sprite SharedBlob => GetBlob();
+
         private static Sprite GetBlob()
         {
             if (_blob != null) return _blob;
