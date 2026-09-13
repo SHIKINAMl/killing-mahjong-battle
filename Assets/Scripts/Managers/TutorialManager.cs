@@ -247,6 +247,16 @@ namespace KillingMahjong.Managers
                     gameUIManager.EnemyInfoUI.ResetHpMeter(_scenario.enemyStartHp);
             }
 
+            // **牌以外のUIは、始まる前から伏せておく（2026-09-14 のユーザー指示）。**
+            // 「13枚選ぶところの、その前のシーンから体力UIや上のゲージ、
+            // 役一覧が出ている」と指摘を受けた。
+            //
+            // 伏せる指示は RunRound の手牌構築フェイズに置いてあったが、
+            // **そこは導入のセリフが全部終わったあと**で、間に合っていなかった。
+            // ここで伏せると、契約書の場面から賭け金が決まるまでずっと出ない。
+            // 出し直すのは賭け金フェイズの後（TutorialManager.Progression）。
+            if (roundIndex <= 0) SetFirstRoundChromeVisible(false);
+
             if (_scenarioRoutine != null) StopCoroutine(_scenarioRoutine);
             _scenarioRoutine = StartCoroutine(ScenarioRoutine(Mathf.Max(0, roundIndex)));
         }

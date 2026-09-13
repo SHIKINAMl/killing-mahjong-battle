@@ -242,6 +242,13 @@ namespace KillingMahjong.UI
             {
                 if (!visible) uiManager.WaitUI.gameObject.SetActive(false);
             }
+
+            // **ここでも伏せ直す（2026-09-14）。**
+            // この関数は10箇所以上から呼ばれていて、そのうちのいくつかは
+            // チュートリアルの導入中にも通る。呼ぶ側を1つずつ直すより、
+            // **出したあとに必ず伏せ直す**ほうが取りこぼしが無い。
+            // 伏せているあいだ以外は何もしない（FirstRoundChromeHidden を見る）。
+            ReHideTutorialChrome();
         }
     }
 }

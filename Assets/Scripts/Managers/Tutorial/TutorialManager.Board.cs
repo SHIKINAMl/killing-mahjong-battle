@@ -323,12 +323,19 @@ namespace KillingMahjong.Managers
                 gameUIManager.TurnIndicatorUI.gameObject.SetActive(visible && isDiscardPhase);
             }
 
+            // **第1局で牌以外を伏せている間は、出し直さない（2026-09-14）。**
+            // ここは盤面を出すときに場の血と獲得ゲージも一緒に出していたが、
+            // 牌を配る演出はまさに「牌だけを見せる」場面なので、
+            // ここで出すと伏せた意味が無くなる。実際、導入の途中で
+            // 上のゲージだけが出てしまっていた。
+            bool keepHidden = _firstRoundChromeHidden;
+
             // 場の血は額を保持したまま表示だけ消す（持ち越し分が消えて見えないように）
             if (gameUIManager.BetPotUI != null)
-                gameUIManager.BetPotUI.SetVisible(visible);
+                gameUIManager.BetPotUI.SetVisible(visible && !keepHidden);
 
             // 獲得ゲージも盤面と一緒に出し入れする
-            gameUIManager.ScoreGauge.SetVisible(visible);
+            gameUIManager.ScoreGauge.SetVisible(visible && !keepHidden);
 
             // **チュートリアルではタイマーを使わないので、枠ごと出さない**（2026-09-12 の指示）。
             // 数字は `PlayerInfoUI.StartTurnTimer` 側でも弾いてあるが、

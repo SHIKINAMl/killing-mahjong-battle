@@ -62,7 +62,7 @@ namespace KillingMahjong.Managers.Tutorial
             /// </summary>
             public static Cue Screen(Tint tint) { return new Cue(null, false, null).With(tint); }
 
-            /// <summary>色を足す。`Cue.Music("x").With(Tint.Warm)` のように繋げて使う。</summary>
+            /// <summary>色を足す。`Cue.Music("x")` のように繋げて使う。</summary>
             public Cue With(Tint tint) { var c = this; c.Tint = tint; return c; }
 
             /// <summary>明滅を足す。色は `tint` の色を使う。</summary>
@@ -79,13 +79,11 @@ namespace KillingMahjong.Managers.Tutorial
             // 悲鳴のSEと赤い明滅が鳴っていた。
             { "r0.introLines[0]",      Cue.Music("tut_lesson") },
             // 空気の切れ目1。軽口から「命がけ」の告知へ
-            { "r0.introLines[6]",      Cue.Sound("se_crack").Flick(Tint.Blood, 0.9f) },
+            { "r0.introLines[6]",      Cue.Sound("se_crack") },
             // **契約書と血の合図は、契約書の話が出るここへ移した。**
-            { "r0.introLines[8]",      Cue.Sound("se_drop").With(Tint.Blood) },        // 「アタシはそんなの書かなかったけど」
+            { "r0.introLines[8]",      Cue.Sound("se_drop") },        // 「アタシはそんなの書かなかったけど」
             // 冗談で済まない気配。色だけ冷たくする
-            { "r0.introLines[9]",      Cue.Screen(Tint.Cold) },      // 「そっちのほうが怖いな」
             // ルール説明へ戻るので色を抜く。**曲は止めていないので鳴らし直さない**
-            { "r0.introLines[10]",     Cue.Screen(Tint.Clear) },
             { "r0.beforeBetLines[1]",  Cue.Sound("se_tube_slow") },
             { "r0.beforeBetLines[2]",  Cue.Sound("se_tube_fast") },
             { "r0.beforeBetLines[6]",  Cue.Sound("se_choice") },      // 「自分で決めていいのよ」
@@ -101,15 +99,15 @@ namespace KillingMahjong.Managers.Tutorial
             // ---------- 第3局: 嘘 ----------
             { "r2.inheritedBetLines[1]", Cue.Sound("se_stack") },
             // **ここから5行だけ温かい。** 長調にはしない。温かさは音色と残響で作ってある
-            { "r2.onBattleStartLines[0]", Cue.Music("tut_lie").With(Tint.Warm) },
+            { "r2.onBattleStartLines[0]", Cue.Music("tut_lie") },
             // 空気の切れ目3。**フェードでも小節待ちでもなく、1フレームで断つ**
-            { "r2.outroLines[0]",      Cue.Silence().With(Tint.Cold) },               // 「ロン。」
-            { "r2.outroLines[2]",      Cue.Music("tut_cruel").With(Tint.Clear) },
+            { "r2.outroLines[0]",      Cue.Silence() },               // 「ロン。」
+            { "r2.outroLines[2]",      Cue.Music("tut_cruel") },
             { "r2.outroLines[3]",      Cue.Sound("se_choice_dark") }, // 「決めさせられていたの」
-            { "r2.outroLines[8]",      Cue.Sound("se_drop").With(Tint.Blood) },        // 「契約書に垂れちゃった」
+            { "r2.outroLines[8]",      Cue.Sound("se_drop") },        // 「契約書に垂れちゃった」
 
             // ---------- 第4局: 能力、そして反転 ----------
-            { "r3.introLines[0]",      Cue.Music("tut_lesson").With(Tint.Clear) },
+            { "r3.introLines[0]",      Cue.Music("tut_lesson") },
             { "r3.abilityIntroLines[2]", Cue.Music("tut_ability") },
             { "r3.abilityShowcases[0].beforeLines[0]", Cue.Sound("se_ability_1") },
             { "r3.abilityShowcases[1].beforeLines[0]", Cue.Sound("se_ability_2") },
@@ -122,14 +120,14 @@ namespace KillingMahjong.Managers.Tutorial
             // ---------- 第5局: 決着、そして問い ----------
             { "r4.introLines[0]",      Cue.Music("tut_final") },
             // 空気の切れ目5。駆け引きが消え、命のやり取りへ
-            { "r4.onBattleStartLines[5]", Cue.Sound("se_two_pulses").With(Tint.Warm) },// 「私も、あなたと同じだけ抜かれている」
+            { "r4.onBattleStartLines[5]", Cue.Sound("se_two_pulses") },// 「私も、あなたと同じだけ抜かれている」
             { "r4.outroLines[0]",      Cue.Silence() },               // 「……九蓮宝燈。」
             // 導入の絶叫と**同じ音源**。あちらは仮面の裂け目、こちらは崩壊
-            { "r4.outroLines[2]",      Cue.Sound("se_crack_long").Flick(Tint.Blood, 1.6f) },
-            { "r4.outroLines[3]",      Cue.Music("tut_farewell").With(Tint.Ash) },
+            { "r4.outroLines[2]",      Cue.Sound("se_crack_long") },
+            { "r4.outroLines[3]",      Cue.Music("tut_farewell") },
 
             // ---------- 幕 ----------
-            { "ending[0]",             Cue.Silence().With(Tint.Ash) },
+            { "ending[0]",             Cue.Silence() },
         };
 
         /// <summary>台詞が表示される直前に呼ぶ。表に無い ID なら何もしない。</summary>
@@ -156,6 +154,14 @@ namespace KillingMahjong.Managers.Tutorial
         /// </summary>
         private static void ApplyTint(Cue cue)
         {
+            // **チュートリアルでは色を当てない（2026-09-14 のユーザー指示）。**
+            // 「赤点滅や黄色や青色に色味が変わるところはいらない」と言われて止めた。
+            // 表から `.With(Tint.X)` と `.Flick(...)` は外してあるので、
+            // ここへ来ることはもう無いが、**戻すときに探しやすいよう仕組みは残す。**
+            // 色を使いたくなったら、この return を外して表に書き足すこと。
+            return;
+
+#pragma warning disable 162
             if (cue.Tint == Tint.Keep) return;
 
             if (cue.Tint == Tint.Clear)
@@ -186,6 +192,7 @@ namespace KillingMahjong.Managers.Tutorial
                 return;
             }
             KillingMahjong.UI.Effects.ScreenTint.Set(c, alpha, fade);
+#pragma warning restore 162
         }
 
         /// <summary>チュートリアルを抜けるときに呼ぶ。**掛けっぱなしを残さない。**</summary>
