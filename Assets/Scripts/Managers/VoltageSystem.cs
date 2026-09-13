@@ -55,6 +55,15 @@ namespace KillingMahjong.Managers
 
         public static bool IsBroken(bool isEnemy) => isEnemy ? _enemyBroken : _localBroken;
 
+        /// <summary>
+        /// Returns whether this tile type has not yet appeared in either river this round.
+        /// This is a read-only query; <see cref="NotifyDiscard"/> remains responsible for state changes.
+        /// </summary>
+        public static bool IsNewTileType(int encodedTileId)
+        {
+            return !SeenBaseIds.Contains(TileId.BaseId(encodedTileId));
+        }
+
         public static float GetMultiplier(bool isEnemy)
         {
             int level = UnityEngine.Mathf.Clamp(GetLevel(isEnemy), 0, MaxLevel);

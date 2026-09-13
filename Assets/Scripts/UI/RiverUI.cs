@@ -124,6 +124,8 @@ namespace KillingMahjong.UI
         {
             if (rt == null || riverContainer == null) return;
 
+            bool showTutorialVoltageFlight = ShouldShowTutorialVoltageFlight(tileId);
+
             // **並べる前に数える。** 並べてから呼ぶと、今捨てた牌を
             // 「すでに出ている」と数えてしまう。AddTile 側も同じ。
             KillingMahjong.Managers.VoltageSystem.NotifyDiscard(isEnemyRiver, tileId);
@@ -152,11 +154,18 @@ namespace KillingMahjong.UI
             discardedTiles.Add(rt);
             UpdateTurnText();
             UpdateSiblingOrder();
+
+            if (showTutorialVoltageFlight)
+            {
+                VoltageTileFlightEffect.TryPlay(rt);
+            }
         }
 
         public void AddTile(int tileId)
         {
             if (tilePrefab == null || riverContainer == null) return;
+
+            bool showTutorialVoltageFlight = ShouldShowTutorialVoltageFlight(tileId);
 
             KillingMahjong.Managers.VoltageSystem.NotifyDiscard(isEnemyRiver, tileId);
 
@@ -185,6 +194,24 @@ namespace KillingMahjong.UI
             discardedTiles.Add(obj.transform);
             UpdateTurnText();
             UpdateSiblingOrder();
+
+            if (showTutorialVoltageFlight)
+            {
+                VoltageTileFlightEffect.TryPlay(rt);
+            }
+        }
+
+        /// <summary>
+        /// Prototype-only condition: the local player's tutorial river receives a tile type
+        /// that has not appeared in either river this round. Normal games and enemy discards
+        /// remain completely unchanged.
+        /// </summary>
+        private bool ShouldShowTutorialVoltageFlight(int tileId)
+        {
+            if (isEnemyRiver || !KillingMahjong.Managers.VoltageSystem.IsNewTileType(tileId)) return false;
+
+            var uiManager = FindFirstObjectByType<GameUIManager>();
+            return uiManager != null && uiManager.IsTutorialMode;
         }
 
         private void ApplyRiverLayout(RectTransform rt)
