@@ -61,6 +61,7 @@ namespace KillingMahjong.UI
 
         private bool _isEnemy;
         private Image[] _pips;
+        private Image[] _pipFills;
         private VoltageFlame[] _flames;
         private TextMeshProUGUI _multiplierText;
 
@@ -138,6 +139,7 @@ namespace KillingMahjong.UI
         {
             _isEnemy = isEnemy;
             _pips = new Image[PipCount];
+            _pipFills = new Image[PipCount];
             _flames = new VoltageFlame[PipCount];
 
             for (int i = 0; i < PipCount; i++)
@@ -154,6 +156,22 @@ namespace KillingMahjong.UI
                 var image = pip.GetComponent<Image>();
                 image.raycastTarget = false;   // 牌のクリック判定を吸わない
                 _pips[i] = image;
+
+                // **次の段までの途中を、区画の中に左から塗る（2026-09-13）。**
+                // 仕様書どおりだと、次の段まで2枚・3枚・4枚・5枚と要る。
+                // 区画が点くまで何も動かないと、ゲージが壊れて見える。
+                var fill = new GameObject("Fill", typeof(RectTransform), typeof(Image));
+                var fillRect = (RectTransform)fill.transform;
+                fillRect.SetParent(pipRect, false);
+                fillRect.anchorMin = new Vector2(0f, 0f);
+                fillRect.anchorMax = new Vector2(0f, 1f);
+                fillRect.pivot = new Vector2(0f, 0.5f);
+                fillRect.anchoredPosition = Vector2.zero;
+                fillRect.sizeDelta = new Vector2(0f, 0f);
+
+                var fillImage = fill.GetComponent<Image>();
+                fillImage.raycastTarget = false;
+                _pipFills[i] = fillImage;
 
                 // 点いた四角の上で炎を揺らす（2026-09-13 の指示）。
                 // 絵は使わず丸を積んで作っている。中身は VoltageFlame.cs。
@@ -199,6 +217,12 @@ namespace KillingMahjong.UI
             int level = VoltageSystem.GetLevel(_isEnemy);
             bool broken = VoltageSystem.IsBroken(_isEnemy);
 
+            // 次の段まであとどれくらいか。0〜1。最大段まで行っていたら 0。
+            int points = VoltageSystem.GetPoints(_isEnemy);
+            int from = VoltageSystem.GetPointsAtCurrentLevel(_isEnemy);
+            int to = VoltageSystem.GetPointsForNextLevel(_isEnemy);
+            float progress = to > from ? Mathf.Clamp01((points - from) / (float)(to - from)) : 0f;
+
             for (int i = 0; i < _pips.Length; i++)
             {
                 if (_pips[i] == null) continue;
@@ -214,6 +238,16 @@ namespace KillingMahjong.UI
                 // **炎は点いた四角にだけ。** 段が上がるほど、どの炎も激しくなる。
                 // 「本数が増える」と「1本ずつ強くなる」の両方で段の差を出している。
                 if (_flames[i] != null) _flames[i].SetLevel(lit ? level : 0, broken);
+
+                // 途中の塗りは、**次に点く区画1つだけ**に出す
+                if (_pipFills[i] == null) continue;
+                bool isNextPip = !broken && i == level && level < VoltageSystem.MaxLevel;
+                var fillRect = _pipFills[i].rectTransform;
+                fillRect.sizeDelta = new Vector2(isNextPip ? PipSize * progress : 0f, 0f);
+
+                var nextColor = VoltageFlame.PipColorFor(level + 1);
+                nextColor.a = 0.45f;   // まだ点いていないと分かる濃さ
+                _pipFills[i].color = nextColor;
             }
 
             // **0段でも出す（2026-09-13、参考画像どおり）。**
