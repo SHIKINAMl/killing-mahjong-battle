@@ -20,12 +20,23 @@ namespace KillingMahjong.UI
     {
         // ---- 調整値（シーンではなくここを触る）----
 
+        /// <summary>
+        /// 区画の数。**左から順に埋まる**（2026-09-13 のプランナー指定）。
+        /// </summary>
         private const int PipCount = 4;
-        private const float PipSize = 13f;
-        private const float PipGap = 4f;
 
-        /// <summary>四角を並べた全体の幅。倍率をその中央に乗せるのに使う。</summary>
+        // 帯の寸法。**プランナーの参考画像を実測して決めた。**
+        // 参考画像は 402x304 で、帯は 幅40・高さ4・区画10px・隙間4px だった。
+        // このゲームは 800x600 なので、およそ2倍にしてある。
+        private const float PipSize = 20f;     // 区画1つの横幅
+        private const float PipHeight = 8f;    // 帯の高さ
+        private const float PipGap = 8f;       // 区画の隙間
+
+        /// <summary>帯全体の幅。倍率をその上に乗せるのに使う。</summary>
         private const float PipRowWidth = PipCount * PipSize + (PipCount - 1) * PipGap;
+
+        /// <summary>倍率の文字の大きさ。参考画像では帯の5倍ほどの高さがあった。</summary>
+        private const float MultiplierFontSize = 30f;
 
         /// <summary>
         /// 置き場所。画面中央からのずれ。**「YOUR TURN / ENEMY TURN」が出ていた場所**に置く
@@ -138,7 +149,7 @@ namespace KillingMahjong.UI
                 pipRect.anchorMax = new Vector2(0f, 0.5f);
                 pipRect.pivot = new Vector2(0f, 0.5f);
                 pipRect.anchoredPosition = new Vector2(i * (PipSize + PipGap), 0f);
-                pipRect.sizeDelta = new Vector2(PipSize, PipSize);
+                pipRect.sizeDelta = new Vector2(PipSize, PipHeight);
 
                 var image = pip.GetComponent<Image>();
                 image.raycastTarget = false;   // 牌のクリック判定を吸わない
@@ -156,14 +167,14 @@ namespace KillingMahjong.UI
             labelRect.anchorMin = new Vector2(0f, 0.5f);
             labelRect.anchorMax = new Vector2(0f, 0.5f);
             labelRect.pivot = new Vector2(0.5f, 0f);
-            // **炎のぶん上へ逃がす（2026-09-13）。** 四角の真上は炎が使うので、
-            // 元の +3 では数字と炎が重なって読めなくなった。
-            labelRect.anchoredPosition = new Vector2(PipRowWidth * 0.5f, PipSize * 0.5f + 20f);
-            labelRect.sizeDelta = new Vector2(80f, 22f);
+            // **帯の真上に大きく出す（参考画像どおり）。**
+            // 炎は帯の上で揺れるので、そのぶんの高さを空けてから文字を置く。
+            labelRect.anchoredPosition = new Vector2(PipRowWidth * 0.5f, PipHeight * 0.5f + 26f);
+            labelRect.sizeDelta = new Vector2(PipRowWidth + 40f, MultiplierFontSize + 6f);
 
             _multiplierText = label.GetComponent<TextMeshProUGUI>();
             _multiplierText.font = BorrowJapaneseFont();
-            _multiplierText.fontSize = 16f;
+            _multiplierText.fontSize = MultiplierFontSize;
             _multiplierText.alignment = TextAlignmentOptions.Center;
             _multiplierText.raycastTarget = false;
 
@@ -205,11 +216,10 @@ namespace KillingMahjong.UI
                 if (_flames[i] != null) _flames[i].SetLevel(lit ? level : 0, broken);
             }
 
-            // 等倍のときは数字を出さない。常に「×1.0」が並んでいると、
-            // 段が乗ったときの変化に気づきにくい。
-            _multiplierText.text = level > 0
-                ? "×" + VoltageSystem.GetMultiplier(_isEnemy).ToString("0.0")
-                : string.Empty;
+            // **0段でも出す（2026-09-13、参考画像どおり）。**
+            // 以前は等倍のとき空にしていたが、参考画像は倍率を常に見せる作りで、
+            // 帯と文字が揃っているほうが「ここが何の表示か」が分かる。
+            _multiplierText.text = "×" + VoltageSystem.GetMultiplier(_isEnemy).ToString("0.0");
             _multiplierText.color = broken ? TextBroken : TextOn;
         }
 
