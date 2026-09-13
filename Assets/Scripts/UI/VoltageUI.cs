@@ -41,7 +41,8 @@ namespace KillingMahjong.UI
         private const float EnemyPosY = 20f;
         private const float SelfPosY = -30f;
 
-        private static readonly Color PipOn = new Color32(255, 150, 40, 255);
+        // 点いた四角の色は段ごとに変わるので、ここには持たない。
+        // 配っているのは VoltageFlame.PipColorFor（2026-09-13）。
         private static readonly Color PipOff = new Color32(70, 40, 40, 200);
         private static readonly Color PipBroken = new Color32(90, 90, 95, 200);
         private static readonly Color TextOn = new Color32(255, 190, 90, 255);
@@ -191,7 +192,13 @@ namespace KillingMahjong.UI
             {
                 if (_pips[i] == null) continue;
                 bool lit = i < level;
-                _pips[i].color = lit ? (broken ? PipBroken : PipOn) : PipOff;
+
+                // **点いた四角は段の色で塗る（2026-09-13）。**
+                // 炎より四角のほうが大きいので、そちらが段の色になっているほうが早く読める。
+                // 色は炎と同じ表から配ってもらう（2箇所に書かないため）。
+                _pips[i].color = lit
+                    ? (broken ? PipBroken : VoltageFlame.PipColorFor(level))
+                    : PipOff;
 
                 // **炎は点いた四角にだけ。** 段が上がるほど、どの炎も激しくなる。
                 // 「本数が増える」と「1本ずつ強くなる」の両方で段の差を出している。

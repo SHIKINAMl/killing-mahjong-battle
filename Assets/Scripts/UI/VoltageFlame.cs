@@ -27,36 +27,50 @@ namespace KillingMahjong.UI
             public float Speed;      // 揺れの速さ
             public float Sway;       // 横揺れの幅[px]
             public float CoreAlpha;  // 芯の濃さ（0で芯なし）
-            public Color Root;       // 根元の色
-            public Color Tip;        // 先端の色
+            public Color Root;       // 炎の根元の色
+            public Color Tip;        // 炎の先端の色
+            public Color Pip;        // 四角そのものの色
 
-            public Tuning(float h, float s, float w, float c, Color root, Color tip)
+            public Tuning(float h, float s, float w, float c, Color root, Color tip, Color pip)
             {
-                Height = h; Speed = s; Sway = w; CoreAlpha = c; Root = root; Tip = tip;
+                Height = h; Speed = s; Sway = w; CoreAlpha = c; Root = root; Tip = tip; Pip = pip;
             }
         }
 
         /// <summary>
         /// 段ごとの値。**調整はここだけ触ればよい。**
         ///
-        /// **色は熱の段階として並べてある**（2026-09-13 の指示）。
-        /// 低い段は赤寄りで弱々しく、上がるにつれて橙 → 黄 → 白に近づく。
-        /// 炎は温度が上がるほど赤→橙→黄→白と見えるので、その順に合わせている。
-        /// 段の差が「本数」「激しさ」だけでなく**色でも分かる**ようにするため。
+        /// **段ごとに別の色にしてある**（2026-09-13 の指示）。
+        /// 以前は赤→白の熱の階調にしていたが、四角も炎も小さいので差が読み取れなかった。
+        /// いまは 赤 → 橙 → 黄 → 青白 と**色相ごと変えて**、ひと目で段が分かるようにしている。
+        /// 4段が青白いのは、炎は一番熱いところが青くなるため。
+        ///
+        /// **四角の色も同じ表から取る。** 炎より四角のほうが大きいので、
+        /// そちらが段の色になっているほうが早く読める。
         /// </summary>
         private static readonly Tuning[] ByLevel =
         {
             // 0段: 出さない
-            new Tuning(0.00f,  0f, 0.0f, 0.00f, Color.clear, Color.clear),
-            // 1段: くすんだ赤。ちろちろ
-            new Tuning(1.00f,  4f, 0.8f, 0.00f, new Color32(190,  55,  20, 225), new Color32(240, 120,  35, 230)),
+            new Tuning(0.00f,  0f, 0.0f, 0.00f, Color.clear, Color.clear, new Color32(255, 150,  40, 255)),
+            // 1段: 赤
+            new Tuning(1.00f,  4f, 0.8f, 0.00f, new Color32(205,  45,  30, 235), new Color32(255, 115,  80, 240), new Color32(230,  70,  50, 255)),
             // 2段: 橙
-            new Tuning(1.25f,  6f, 1.3f, 0.00f, new Color32(230,  95,  25, 230), new Color32(255, 165,  55, 235)),
-            // 3段: 明るい橙から黄。芯が見え始める
-            new Tuning(1.55f,  8f, 1.9f, 0.35f, new Color32(255, 140,  35, 235), new Color32(255, 210,  95, 240)),
-            // 4段: 黄から白。一番激しい
-            new Tuning(1.90f, 11f, 2.6f, 0.70f, new Color32(255, 185,  70, 240), new Color32(255, 248, 205, 245)),
+            new Tuning(1.30f,  6f, 1.3f, 0.00f, new Color32(240, 105,  25, 235), new Color32(255, 190,  85, 240), new Color32(255, 150,  40, 255)),
+            // 3段: 黄
+            new Tuning(1.60f,  8f, 1.9f, 0.40f, new Color32(250, 200,  40, 240), new Color32(255, 250, 170, 245), new Color32(255, 225,  70, 255)),
+            // 4段: 青白（一番熱い）
+            new Tuning(1.95f, 12f, 2.6f, 0.75f, new Color32( 70, 150, 255, 240), new Color32(225, 245, 255, 250), new Color32(120, 195, 255, 255)),
         };
+
+        /// <summary>
+        /// その段の四角の色。<see cref="VoltageUI"/> が点いた四角に塗るのに使う。
+        /// **色を2箇所に書かないため、ここから配る。**
+        /// </summary>
+        public static Color PipColorFor(int level)
+        {
+            int i = Mathf.Clamp(level, 0, ByLevel.Length - 1);
+            return ByLevel[i].Pip;
+        }
 
         /// <summary>舌の数。増やすほど重くなるので、この大きさなら3枚で足りる。</summary>
         private const int TongueCount = 3;
