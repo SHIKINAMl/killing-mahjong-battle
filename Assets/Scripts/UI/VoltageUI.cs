@@ -1,4 +1,4 @@
-﻿using TMPro;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using KillingMahjong.Common;
@@ -49,8 +49,8 @@ namespace KillingMahjong.UI
         /// ドラより下の、壁と卓のあいだの暗い帯が空いている。
         /// </summary>
         private const float PosX = -280f;
-        private const float EnemyPosY = 20f;
-        private const float SelfPosY = -30f;
+        private const float EnemyPosY = -30f;
+        private const float SelfPosY = -120f;
 
         // 点いた四角の色は段ごとに変わるので、ここには持たない。
         // 配っているのは VoltageFlame.PipColorFor（2026-09-13）。
@@ -187,7 +187,7 @@ namespace KillingMahjong.UI
             labelRect.pivot = new Vector2(0.5f, 0f);
             // **帯の真上に大きく出す（参考画像どおり）。**
             // 炎は帯の上で揺れるので、そのぶんの高さを空けてから文字を置く。
-            labelRect.anchoredPosition = new Vector2(PipRowWidth * 0.5f, PipHeight * 0.5f + 26f);
+            labelRect.anchoredPosition = new Vector2(PipRowWidth * 0.5f, PipHeight * 0.5f + 36f);
             labelRect.sizeDelta = new Vector2(PipRowWidth + 40f, MultiplierFontSize + 6f);
 
             _multiplierText = label.GetComponent<TextMeshProUGUI>();
