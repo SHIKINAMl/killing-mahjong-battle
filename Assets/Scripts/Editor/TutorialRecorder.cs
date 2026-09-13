@@ -47,6 +47,11 @@ namespace KillingMahjong.EditorTools
                 OutputHeight = height,
             };
 
+            // **音も録る（2026-09-13）。** 揺れを曲の拍に合わせたので、
+            // 絵だけ録っても合っているかどうかが分からない。
+            // ゲームの音を止めているあいだは無音のまま録れるだけで、害は無い。
+            movie.AudioInputSettings.PreserveAudio = true;
+
             settings.AddRecorderSettings(movie);
 
             _controller = new RecorderController(settings);

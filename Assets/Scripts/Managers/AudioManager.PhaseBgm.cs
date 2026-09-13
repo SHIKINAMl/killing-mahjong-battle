@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using KillingMahjong.EngineData;
@@ -90,6 +90,12 @@ namespace KillingMahjong.Managers
             { "bgm_ron",          new Tempo(88f,  4) },
             { "bgm_result",       new Tempo(96f,  3) },   // ワルツ
             { "bgm_win",          new Tempo(132f, 4) },
+
+            // **チュートリアルの曲。** ここに載っていないと拍の時計が動かず、
+            // 揺れ（`FloatingAnimator`）も音に合わせられない。
+            // `tut_lesson` は `km-docs/tools/compose.py` で作っていて、
+            // **135.00 ちょうど・1拍目がサンプル0**。実測ではなく設計値。
+            { "tut_lesson",       new Tempo(135f, 4) },
 
             // 層のステム。**ここに無いと拍が引けず、音ハメが効かない。**
             // 4本とも同じ編曲を分けたものなので当然おなじテンポ。
