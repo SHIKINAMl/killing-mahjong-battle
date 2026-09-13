@@ -12,7 +12,8 @@ namespace KillingMahjong.UI
     public sealed class VoltageTileFlightEffect : MonoBehaviour
     {
         private const string CanvasName = "VoltageTileFlightCanvas";
-        private const string GaugeName = "VoltageUI_Self";
+        private const string SelfGaugeName = "VoltageUI_Self";
+        private const string EnemyGaugeName = "VoltageUI_Enemy";
         // **実測して決めた数字（2026-09-13）。**
         // 最初は 3〜6px の四角だったが、800x600 の画面では点が見えず、
         // 録画でも1フレームも光として写らなかった。円のスプライトに変え、
@@ -40,21 +41,30 @@ namespace KillingMahjong.UI
         private Image _arrivalSpark;
         private float _elapsed;
         private float _totalDuration;
+        private float _arrivalTime;
+
+        // 光が着いたときに1度だけ呼ぶ。段を上げるのはここ。
+        private System.Action _onArrive;
+        private bool _arrived;
 
         /// <summary>
-        /// Starts the effect from the supplied discard tile. If the voltage UI is not present,
-        /// it deliberately does nothing rather than creating UI outside the normal game flow.
+        /// 捨てた牌から、その人のボルテージゲージへ光を飛ばす。
+        /// ゲージが無い場面（表示を切っているチュートリアルの冒頭など）では
+        /// **何も作らずに false を返す。** 呼んだ側は、そのときは段を自分で上げること。
         /// </summary>
-        public static void TryPlay(RectTransform sourceTile)
+        /// <param name="sourceTile">河に置かれた牌。</param>
+        /// <param name="isEnemy">相手の打牌なら true。飛ぶ先のゲージが変わる。</param>
+        /// <param name="onArrive">光が着いた瞬間に1度だけ呼ばれる。</param>
+        public static bool TryPlay(RectTransform sourceTile, bool isEnemy, System.Action onArrive)
         {
-            if (sourceTile == null) return;
+            if (sourceTile == null) return false;
 
-            var gaugeObject = GameObject.Find(GaugeName);
+            var gaugeObject = GameObject.Find(isEnemy ? EnemyGaugeName : SelfGaugeName);
             var targetGauge = gaugeObject != null ? gaugeObject.GetComponent<RectTransform>() : null;
-            if (targetGauge == null) return;
+            if (targetGauge == null) return false;
 
             var canvasRect = EnsureCanvas();
-            if (canvasRect == null) return;
+            if (canvasRect == null) return false;
 
             Vector2 start = ToCanvasPosition(canvasRect, sourceTile);
             Vector2 end = ToCanvasPosition(canvasRect, targetGauge);
@@ -71,8 +81,10 @@ namespace KillingMahjong.UI
             // 河は並べ直しを次のフレームに回すので、呼ばれた瞬間に測ると
             // 牌のいる場所ではなく、並べる前の場所から光が出てしまう。
             // 1フレーム待ってから測り直す。
-            root.GetComponent<VoltageTileFlightEffect>()
-                .StartCoroutine(BuildNextFrame(root, canvasRect, sourceTile, targetGauge, start, end));
+            var effect = root.GetComponent<VoltageTileFlightEffect>();
+            effect._onArrive = onArrive;
+            effect.StartCoroutine(BuildNextFrame(root, canvasRect, sourceTile, targetGauge, start, end));
+            return true;
         }
 
         /// <summary>
@@ -166,7 +178,8 @@ namespace KillingMahjong.UI
             }
 
             _arrivalSpark = CreateSpark("ArrivalSpark", end, 16f);
-            _totalDuration = FlightDuration + (ParticleCount - 1) * LaunchInterval + FinishHold;
+            _arrivalTime = FlightDuration + (ParticleCount - 1) * LaunchInterval;
+            _totalDuration = _arrivalTime + FinishHold;
         }
 
         private Image CreateSpark(string name, Vector2 position, float size)
@@ -194,10 +207,32 @@ namespace KillingMahjong.UI
             UpdateParticles();
             UpdateArrivalSpark();
 
+            // **段が上がるのはここ。** 光が着いたのを見てからゲージが動く。
+            if (!_arrived && _elapsed >= _arrivalTime)
+            {
+                _arrived = true;
+                var callback = _onArrive;
+                _onArrive = null;
+                if (callback != null) callback();
+            }
+
             if (_elapsed >= _totalDuration)
             {
                 Destroy(gameObject);
             }
+        }
+
+        /// <summary>
+        /// 局の切り替えなどで途中に消されても、**段は必ず上げる。**
+        /// ここを落とすと、捨てたのにゲージが動かない牌が出る。
+        /// </summary>
+        private void OnDestroy()
+        {
+            if (_arrived) return;
+            _arrived = true;
+            var callback = _onArrive;
+            _onArrive = null;
+            if (callback != null) callback();
         }
 
         private void UpdateParticles()
@@ -237,8 +272,7 @@ namespace KillingMahjong.UI
         {
             if (_arrivalSpark == null) return;
 
-            float arrivalTime = FlightDuration + (ParticleCount - 1) * LaunchInterval;
-            float normalizedTime = Mathf.Clamp01((_elapsed - arrivalTime + 0.12f) / 0.22f);
+            float normalizedTime = Mathf.Clamp01((_elapsed - _arrivalTime + 0.12f) / 0.22f);
             float alpha = normalizedTime <= 0f ? 0f : (1f - normalizedTime) * 0.95f;
             float size = Mathf.Lerp(16f, 72f, normalizedTime);
 

@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using System.Collections.Generic;
 
 namespace KillingMahjong.UI
@@ -124,11 +124,9 @@ namespace KillingMahjong.UI
         {
             if (rt == null || riverContainer == null) return;
 
-            bool showTutorialVoltageFlight = ShouldShowTutorialVoltageFlight(tileId);
-
             // **並べる前に数える。** 並べてから呼ぶと、今捨てた牌を
             // 「すでに出ている」と数えてしまう。AddTile 側も同じ。
-            KillingMahjong.Managers.VoltageSystem.NotifyDiscard(isEnemyRiver, tileId);
+            bool willFly = BeginVoltage(tileId);
 
             rt.SetParent(riverContainer, true);
             rt.SetAsLastSibling();
@@ -155,19 +153,14 @@ namespace KillingMahjong.UI
             UpdateTurnText();
             UpdateSiblingOrder();
 
-            if (showTutorialVoltageFlight)
-            {
-                VoltageTileFlightEffect.TryPlay(rt);
-            }
+            if (willFly) FinishVoltage(rt);
         }
 
         public void AddTile(int tileId)
         {
             if (tilePrefab == null || riverContainer == null) return;
 
-            bool showTutorialVoltageFlight = ShouldShowTutorialVoltageFlight(tileId);
-
-            KillingMahjong.Managers.VoltageSystem.NotifyDiscard(isEnemyRiver, tileId);
+            bool willFly = BeginVoltage(tileId);
 
             GameObject obj = Instantiate(tilePrefab, riverContainer);
             RectTransform rt = obj.GetComponent<RectTransform>();
@@ -195,23 +188,43 @@ namespace KillingMahjong.UI
             UpdateTurnText();
             UpdateSiblingOrder();
 
-            if (showTutorialVoltageFlight)
-            {
-                VoltageTileFlightEffect.TryPlay(rt);
-            }
+            if (willFly) FinishVoltage(rt);
         }
 
         /// <summary>
-        /// Prototype-only condition: the local player's tutorial river receives a tile type
-        /// that has not appeared in either river this round. Normal games and enemy discards
-        /// remain completely unchanged.
+        /// 牌を1枚置く前に呼ぶ。まだ出ていない牌なら、**記録だけ先に済ませて
+        /// 段を上げるのは後回しにする**（光が着いてから上げるため）。
+        /// すでに出ている牌なら、その場で段を落とす。
+        ///
+        /// **自分・相手の両方で動く**（2026-09-13 のユーザー指示）。
+        /// 以前はチュートリアルの自分の打牌だけの試作だった。
         /// </summary>
-        private bool ShouldShowTutorialVoltageFlight(int tileId)
+        /// <returns>光を飛ばす牌なら true。</returns>
+        private bool BeginVoltage(int tileId)
         {
-            if (isEnemyRiver || !KillingMahjong.Managers.VoltageSystem.IsNewTileType(tileId)) return false;
+            if (!KillingMahjong.Managers.VoltageSystem.IsNewTileType(tileId))
+            {
+                KillingMahjong.Managers.VoltageSystem.NotifyDiscard(isEnemyRiver, tileId);
+                return false;
+            }
 
-            var uiManager = FindFirstObjectByType<GameUIManager>();
-            return uiManager != null && uiManager.IsTutorialMode;
+            KillingMahjong.Managers.VoltageSystem.MarkSeen(tileId);
+            return true;
+        }
+
+        /// <summary>
+        /// 置いた牌からゲージへ光を飛ばし、**着いた瞬間に段を上げる。**
+        /// ゲージが出ていない場面では光を飛ばせないので、その場で上げる。
+        /// </summary>
+        private void FinishVoltage(RectTransform rt)
+        {
+            bool enemy = isEnemyRiver;
+            if (!VoltageTileFlightEffect.TryPlay(
+                    rt, enemy,
+                    () => KillingMahjong.Managers.VoltageSystem.ApplyDiscardResult(enemy, true)))
+            {
+                KillingMahjong.Managers.VoltageSystem.ApplyDiscardResult(enemy, true);
+            }
         }
 
         private void ApplyRiverLayout(RectTransform rt)

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using KillingMahjong.Common;
 
@@ -56,41 +56,37 @@ namespace KillingMahjong.Managers
         public static bool IsBroken(bool isEnemy) => isEnemy ? _enemyBroken : _localBroken;
 
         /// <summary>
-        /// Returns whether this tile type has not yet appeared in either river this round.
-        /// This is a read-only query; <see cref="NotifyDiscard"/> remains responsible for state changes.
+        /// この種類の牌が、まだどちらの河にも無いか。**数えるだけで、何も変えない。**
+        /// 段数を動かすのは <see cref="NotifyDiscard"/> と <see cref="ApplyDiscardResult"/>。
         /// </summary>
         public static bool IsNewTileType(int encodedTileId)
         {
             return !SeenBaseIds.Contains(TileId.BaseId(encodedTileId));
         }
 
-        public static float GetMultiplier(bool isEnemy)
-        {
-            int level = UnityEngine.Mathf.Clamp(GetLevel(isEnemy), 0, MaxLevel);
-            return Multipliers[level];
-        }
-
-        /// <summary>局の切り替わりで呼ぶ。河が空になったら段数も履歴も捨てる。</summary>
-        public static void ResetAll()
-        {
-            SeenBaseIds.Clear();
-            _localLevel = 0;
-            _enemyLevel = 0;
-            _localBroken = false;
-            _enemyBroken = false;
-            Changed?.Invoke();
-        }
-
         /// <summary>
-        /// 牌が1枚捨てられたときに呼ぶ。**河に並べる前に呼ぶこと。**
-        /// 並べてから呼ぶと、自分が今捨てた牌を「すでに出ている」と数えてしまう。
+        /// 「この牌は出た」とだけ記録する。**段数は動かさない。**
+        ///
+        /// ボルテージへ光が飛ぶ演出（<see cref="KillingMahjong.UI.VoltageTileFlightEffect"/>）は、
+        /// **光が届いてから段を上げる**（2026-09-13 のユーザー指示）。
+        /// 上げるのを待つあいだに同じ牌がもう1枚捨てられても二重に数えないよう、
+        /// 記録だけは捨てた瞬間に済ませておく。
         /// </summary>
-        public static void NotifyDiscard(bool isEnemy, int encodedTileId)
+        /// <returns>まだ出ていない牌だった場合に true。</returns>
+        public static bool MarkSeen(int encodedTileId)
         {
             int baseId = TileId.BaseId(encodedTileId);
             bool isNew = !SeenBaseIds.Contains(baseId);
             SeenBaseIds.Add(baseId);
+            return isNew;
+        }
 
+        /// <summary>
+        /// <see cref="MarkSeen"/> の結果を、実際に段数へ反映する。
+        /// 光が着いた時に呼ぶ想定。
+        /// </summary>
+        public static void ApplyDiscardResult(bool isEnemy, bool isNew)
+        {
             int level = isEnemy ? _enemyLevel : _localLevel;
             bool broken;
 
@@ -119,6 +115,32 @@ namespace KillingMahjong.Managers
             }
 
             Changed?.Invoke();
+        }
+
+        public static float GetMultiplier(bool isEnemy)
+        {
+            int level = UnityEngine.Mathf.Clamp(GetLevel(isEnemy), 0, MaxLevel);
+            return Multipliers[level];
+        }
+
+        /// <summary>局の切り替わりで呼ぶ。河が空になったら段数も履歴も捨てる。</summary>
+        public static void ResetAll()
+        {
+            SeenBaseIds.Clear();
+            _localLevel = 0;
+            _enemyLevel = 0;
+            _localBroken = false;
+            _enemyBroken = false;
+            Changed?.Invoke();
+        }
+
+        /// <summary>
+        /// 牌が1枚捨てられたときに呼ぶ。**河に並べる前に呼ぶこと。**
+        /// 並べてから呼ぶと、自分が今捨てた牌を「すでに出ている」と数えてしまう。
+        /// </summary>
+        public static void NotifyDiscard(bool isEnemy, int encodedTileId)
+        {
+            ApplyDiscardResult(isEnemy, MarkSeen(encodedTileId));
         }
     }
 }
