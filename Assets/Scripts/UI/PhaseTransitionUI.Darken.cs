@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using UnityEngine;
 
@@ -38,9 +38,29 @@ namespace KillingMahjong.UI
             else audio.PlayStinger(name, jitter, 0.05f);
         }
 
+        /// <summary>
+        /// 局の頭の暗転の濃さ。**真っ暗にしない**（2026-09-13 の指摘）。
+        ///
+        /// 元は市松模様が 1.0 まで濃くなり、画面の明るさが 255 段階で **3.7** まで落ちていた。
+        /// しかも配牌が終わるまで（サーバー待ちのぶん数秒）そのまま。
+        /// **局が始まるたびにこれが入るので、集中が切れる**と指摘を受けた。
+        ///
+        /// 卓が薄く見える程度に留める。局名の文字は前面に出るので読める。
+        /// 濃さを変えるときはここを触ること。
+        /// </summary>
+        private const float RoundDarkenAlpha = 0.55f;
+
         private IEnumerator RoundStartDarkenRoutine(string text, Action onDarkened)
         {
             ResetVisuals();
+
+            // 濃さを抑える。ResetVisuals のあとに当てないと戻される
+            if (fullScreenCheckerImage != null)
+            {
+                var c = fullScreenCheckerImage.color;
+                c.a = RoundDarkenAlpha;
+                fullScreenCheckerImage.color = c;
+            }
 
             // 市松模様フェードイン (暗転)。落ちていくスイープを重ねる
             PlayTransitionStinger("br_fall");
