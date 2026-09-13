@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -29,8 +29,11 @@ namespace KillingMahjong.UI.Effects
         /// <summary>1秒あたりの揺れ回数。低いとガタガタ、高いとブルブルになる。</summary>
         private const float Frequency = 38f;
 
-        private readonly List<RectTransform> _targets = new List<RectTransform>();
-        private readonly List<Vector2> _origins = new List<Vector2>();
+        // **RectTransform ではなく Transform で持つ。**
+        // 画面の本体である `Canvas` はただの入れ物で、RectTransform ですらない。
+        // `localPosition` なら、どちらの種類でも同じように動かせる。
+        private readonly List<Transform> _targets = new List<Transform>();
+        private readonly List<Vector3> _origins = new List<Vector3>();
         private Coroutine _routine;
         private float _runningPower;
 
@@ -91,19 +94,35 @@ namespace KillingMahjong.UI.Effects
             _targets.Clear();
             _origins.Clear();
 
+            // **`Canvas.isRootCanvas` で拾う（2026-09-13 に2度直した）。**
+            //
+            // ここで2回間違えた。記録しておく。
+            //   1回目: 「Canvas コンポーネントを持つ root の子」を揺らした。
+            //          このゲームの画面の本体は `Canvas` という名前の
+            //          **Canvas を持たないただの入れ物**なので、丸ごと漏れた。
+            //   2回目: その入れ物自体を動かした。**これも効かない。**
+            //          入れ物の下の `初期Canvas` などは、親に Canvas が無いため
+            //          **それぞれが root canvas 扱い**になり、Unity が毎フレーム
+            //          位置を上書きする。親をずらしても無視される。
+            //
+            // 正解は「root canvas の直下の子」。階層のどこに居ても
+            // `isRootCanvas` で判別できる。
             var canvases = FindObjectsByType<Canvas>(FindObjectsSortMode.None);
             foreach (var canvas in canvases)
             {
                 if (canvas == null || !canvas.isActiveAndEnabled) continue;
-                if (canvas.transform.parent != null) continue;          // root だけ
-                if (canvas.gameObject == gameObject) continue;          // 自分は揺らさない
+                if (!canvas.isRootCanvas) continue;                 // 入れ子は親が動く
+                if (canvas.gameObject == gameObject) continue;      // 自分は揺らさない
+
+                string n = canvas.gameObject.name;
+                if (n == "ScreenTint" || n == "ScreenFlash") continue;
 
                 for (int i = 0; i < canvas.transform.childCount; i++)
                 {
-                    var child = canvas.transform.GetChild(i) as RectTransform;
+                    var child = canvas.transform.GetChild(i);
                     if (child == null) continue;
                     _targets.Add(child);
-                    _origins.Add(child.anchoredPosition);
+                    _origins.Add(child.localPosition);
                 }
             }
         }
@@ -112,7 +131,7 @@ namespace KillingMahjong.UI.Effects
         {
             for (int i = 0; i < _targets.Count; i++)
             {
-                if (_targets[i] != null) _targets[i].anchoredPosition = _origins[i];
+                if (_targets[i] != null) _targets[i].localPosition = _origins[i];
             }
             _targets.Clear();
             _origins.Clear();
@@ -147,7 +166,7 @@ namespace KillingMahjong.UI.Effects
                 for (int i = 0; i < _targets.Count; i++)
                 {
                     if (_targets[i] == null) continue;
-                    _targets[i].anchoredPosition = _origins[i] + new Vector2(x, y);
+                    _targets[i].localPosition = _origins[i] + new Vector3(x, y, 0f);
                 }
                 yield return null;
             }
