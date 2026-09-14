@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using TMPro;
 
 namespace KillingMahjong.UI
@@ -20,7 +20,20 @@ namespace KillingMahjong.UI
             {
                 Debug.LogError("[MatchmakingUI] statusText is null!");
             }
+
+            // **待っているあいだ牌をじゃらじゃらさせる（2026-09-15 のユーザー指示）。**
+            // 文字だけで止まっている画面だったので、卓の上で牌をかき混ぜている
+            // 見た目を足す。作るのは1回だけで、2回目以降は使い回す。
+            var rect = transform as RectTransform;
+            if (rect != null) Effects.TileClatterEffect.Attach(rect, ClatterOffsetY);
         }
+
+        /// <summary>
+        /// 牌を並べる高さ。**画面の下端から測る。**
+        /// 待ち文字は 200x50 の枠に 80pt を流し込んでいて枠からはみ出すので、
+        /// 文字を基準にすると必ず重なる（2026-09-15 に実際そうなった）。
+        /// </summary>
+        private const float ClatterOffsetY = 110f;
 
         public void Hide()
         {
