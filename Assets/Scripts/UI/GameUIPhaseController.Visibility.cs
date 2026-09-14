@@ -174,15 +174,18 @@ namespace KillingMahjong.UI
                 case RoundStatus.Draw:         ApplyDrawVisibility();          break;
             }
 
-            // **ボルテージゲージは打牌フェイズだけ（2026-09-14 のユーザー指示）。**
+            // **ボルテージゲージの出し入れ（2026-09-15 のユーザー指示）。**
+            //   チュートリアル: **一度も出さない。**
+            //   対局:           打牌フェイズのときだけ出す。
+            //
             // 牌を選んでいる間や賭け金を決めている間はゲージが動かないので、
             // 出していても意味が無く、画面が混むだけだった。
             //
-            // `TurnDecision` も入れてある。**あれは打牌のあいだに毎ターン挟まる**ので、
-            // 外すと1手ごとにゲージが点いたり消えたりする。
+            // `TurnDecision` も出す側に入れてある。**あれは打牌のあいだに毎ターン
+            // 挟まる**ので、外すと1手ごとにゲージが点いたり消えたりする。
             bool duringDiscard = status == RoundStatus.Discard
                               || status == RoundStatus.TurnDecision;
-            VoltageUI.SetCanvasVisible(duringDiscard);
+            VoltageUI.SetCanvasVisible(duringDiscard && !uiManager.IsTutorialMode);
 
             ReHideTutorialChrome();
         }

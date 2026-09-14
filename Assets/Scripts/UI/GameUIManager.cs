@@ -89,8 +89,12 @@ namespace KillingMahjong.UI
             // 出すのは打牌フェイズに入ってから（GameUIPhaseController.Visibility）。
             // ここで伏せないと、フェイズが最初に切り替わるまでのあいだ
             // 出っぱなしになる。
-            VoltageUI.SetCanvasVisible(CurrentPhaseStatus == RoundStatus.Discard
-                                       || CurrentPhaseStatus == RoundStatus.TurnDecision);
+            //
+            // **チュートリアルでは一度も出さない**（2026-09-15 の指示）。
+            bool showVoltageNow = !IsTutorialMode
+                                  && (CurrentPhaseStatus == RoundStatus.Discard
+                                      || CurrentPhaseStatus == RoundStatus.TurnDecision);
+            VoltageUI.SetCanvasVisible(showVoltageNow);
 
             // チュートリアルモードでなければWebSocketに自動接続する
             if (!IsTutorialMode)
