@@ -26,6 +26,23 @@ namespace KillingMahjong.UI
             }
         }
 
+        /// <summary>
+        /// 手の大きさを 0〜1 にならしたもの。カットインの強さに渡す。
+        /// **揺れの表と同じ順番**にしてあるので、片方だけ直すと食い違う。
+        /// </summary>
+        private static float IntensityForRank(string rankName)
+        {
+            switch (rankName)
+            {
+                case "ダブル役満": return 1.00f;
+                case "役満":       return 0.85f;
+                case "三倍満":     return 0.55f;
+                case "倍満":       return 0.38f;
+                case "跳満":       return 0.20f;
+                default:           return 0.00f;
+            }
+        }
+
         /// <summary>揺れている長さ[秒]。大きい手ほど長く尾を引かせる。</summary>
         private static float QuakeSecondsForRank(string rankName)
         {
@@ -79,21 +96,24 @@ namespace KillingMahjong.UI
                     KillingMahjong.Managers.AudioManager.Instance.PlayRonVoice();
                 }
 
-                // **手の大きさぶんだけ画面を揺らす（2026-09-13）。**
-                // 満貫と役満が同じ見え方だと、何が起きたのかが伝わらない。
-                // 白フラッシュは 2026-08-20 に外してある（直後のカットインの
-                // 黒幕に埋もれて効かなかった）。揺れは黒幕越しでも伝わるので、
-                // こちらで衝撃を出す。
-                Effects.ScreenQuake.Play(QuakePowerForRank(rankName), QuakeSecondsForRank(rankName));
+                // **揺れはカットインの中で鳴らす（2026-09-15 に移した）。**
+                // ここで鳴らすと、帯が出てくる途中で揺れ終わってしまう。
+                // 絵が揃った瞬間に当てたいので、カットイン側へ強さだけ渡す。
 
                 CutinAnimationUI cutinUI = gameObject.AddComponent<CutinAnimationUI>();
                 cutinUI.PlayCutin(winnerSprite, faceSprite, customFont, cutinText, () => {
                     cutinFinished = true;
                     Destroy(cutinUI);
-                });
+                }, IntensityForRank(rankName));
 
                 // カットインが終わるまで待機
                 while (!cutinFinished) yield return null;
+            }
+            else
+            {
+                // **立ち絵が無いときはカットインが出ない。** そのときは
+                // 揺れる相手が居なくなるので、ここで直接鳴らす。
+                Effects.ScreenQuake.Play(QuakePowerForRank(rankName), QuakeSecondsForRank(rankName));
             }
 
             // 1. 大枠コンテナの生成（すべてを包括する最前面キャンバス）

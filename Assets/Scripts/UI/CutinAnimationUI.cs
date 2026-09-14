@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System.Collections;
@@ -8,12 +8,23 @@ namespace KillingMahjong.UI
 {
     public class CutinAnimationUI : MonoBehaviour
     {
-        public void PlayCutin(Sprite characterSprite, Sprite faceSprite, TMP_FontAsset font, string cutinText, System.Action onComplete)
+        /// <summary>
+        /// カットインを出す。
+        /// </summary>
+        /// <param name="intensity">
+        /// 手の大きさ。0 で満貫級、1 で役満級（2026-09-15 に追加）。
+        /// **大きいほど、文字が強く叩きつけられ、寄りが深く、間が長くなる。**
+        /// 同じ絵で大小を表すために、この3つを一緒に動かしている。
+        /// </param>
+        public void PlayCutin(Sprite characterSprite, Sprite faceSprite, TMP_FontAsset font,
+                              string cutinText, System.Action onComplete, float intensity = 0f)
         {
-            StartCoroutine(CutinRoutine(characterSprite, faceSprite, font, cutinText, onComplete));
+            StartCoroutine(CutinRoutine(characterSprite, faceSprite, font, cutinText, onComplete,
+                                        Mathf.Clamp01(intensity)));
         }
 
-        private IEnumerator CutinRoutine(Sprite characterSprite, Sprite faceSprite, TMP_FontAsset font, string cutinText, System.Action onComplete)
+        private IEnumerator CutinRoutine(Sprite characterSprite, Sprite faceSprite, TMP_FontAsset font,
+                                         string cutinText, System.Action onComplete, float intensity)
         {
             // 1. ルートコンテナの作成
             GameObject root = new GameObject("CutinRoot");
@@ -145,9 +156,39 @@ namespace KillingMahjong.UI
             }
             revealImg.fillAmount = 1f;
 
-            // ② タメ（文字も動かさない）
-            float shakeTime = 0.8f;
-            yield return new WaitForSeconds(shakeTime);
+            // ①.5 **帯が出きった瞬間に叩きつける（2026-09-15）。**
+            // 揺れはこれまでカットインが始まる前に鳴っていて、
+            // 帯が出てくる途中で揺れ終わっていた。絵が揃った瞬間に当てるほうが効く。
+            Effects.ScreenQuake.Play(Mathf.Lerp(12f, 36f, intensity),
+                                     Mathf.Lerp(0.28f, 0.60f, intensity));
+
+            // 文字を叩きつける。大きい手ほど大きいところから落ちてくる
+            float slamFrom = Mathf.Lerp(1.8f, 2.6f, intensity);
+            float slamTime = 0.12f;
+            t = 0f;
+            while (t < slamTime)
+            {
+                float k = t / slamTime;
+                float eased = 1f - Mathf.Pow(1f - k, 3f);
+                textRt.localScale = Vector3.one * Mathf.Lerp(slamFrom, 1f, eased);
+                t += Time.deltaTime;
+                yield return null;
+            }
+            textRt.localScale = Vector3.one;
+
+            // ② タメ。**ここでキャラへゆっくり寄る。**
+            // 止め絵のまま待たせると間延びするので、わずかに動かし続ける
+            float shakeTime = Mathf.Lerp(0.8f, 1.15f, intensity) - slamTime;
+            float pushTo = Mathf.Lerp(1.06f, 1.16f, intensity);
+            Vector3 charScale = charRt.localScale;
+            t = 0f;
+            while (t < shakeTime)
+            {
+                float k = Mathf.Clamp01(t / shakeTime);
+                charRt.localScale = charScale * Mathf.Lerp(1f, pushTo, k);
+                t += Time.deltaTime;
+                yield return null;
+            }
 
             // ③ 全体がフェードアウトして消える
             t = 0;
