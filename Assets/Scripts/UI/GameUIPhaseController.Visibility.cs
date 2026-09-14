@@ -174,6 +174,16 @@ namespace KillingMahjong.UI
                 case RoundStatus.Draw:         ApplyDrawVisibility();          break;
             }
 
+            // **ボルテージゲージは打牌フェイズだけ（2026-09-14 のユーザー指示）。**
+            // 牌を選んでいる間や賭け金を決めている間はゲージが動かないので、
+            // 出していても意味が無く、画面が混むだけだった。
+            //
+            // `TurnDecision` も入れてある。**あれは打牌のあいだに毎ターン挟まる**ので、
+            // 外すと1手ごとにゲージが点いたり消えたりする。
+            bool duringDiscard = status == RoundStatus.Discard
+                              || status == RoundStatus.TurnDecision;
+            VoltageUI.SetCanvasVisible(duringDiscard);
+
             ReHideTutorialChrome();
         }
 
@@ -203,6 +213,9 @@ namespace KillingMahjong.UI
             if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetVitalsVisible(false);
             if (uiManager.ScoreGauge != null) uiManager.ScoreGauge.SetVisible(false);
             if (uiManager.BetPotUI != null) uiManager.BetPotUI.SetVisible(false);
+
+            // ボルテージゲージも、第1局で伏せているあいだは出さない
+            VoltageUI.SetCanvasVisible(false);
         }
 
         private void UpdateDoraDisplay()

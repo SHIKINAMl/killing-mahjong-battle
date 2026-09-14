@@ -1,4 +1,4 @@
-using TMPro;
+﻿using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using KillingMahjong.Common;
@@ -81,13 +81,24 @@ namespace KillingMahjong.UI
         /// 親が場面ごとに消えるのに巻き込まれる（河のキャンバスに付けたら、
         /// 手牌を選んでいる間ゲージまで消えた）。RoomScreenUI などと同じやり方。
         /// </summary>
+        /// <summary>
+        /// 作ったキャンバスを覚えておく。
+        ///
+        /// **`GameObject.Find` で探し直してはいけない（2026-09-14 に踏んだ）。**
+        /// あれは**非アクティブな物を見つけられない**ので、一度伏せると
+        /// 二度と見つからず、出し直せないうえに次の `EnsureCreated` で
+        /// 2枚目が作られてしまう。
+        /// </summary>
+        private static GameObject _canvasObject;
+
         public static void EnsureCreated()
         {
-            var existing = GameObject.Find(CanvasName);
+            var existing = _canvasObject != null ? _canvasObject : GameObject.Find(CanvasName);
             RectTransform parent;
 
             if (existing != null)
             {
+                _canvasObject = existing;
                 parent = existing.transform as RectTransform;
             }
             else
@@ -104,6 +115,7 @@ namespace KillingMahjong.UI
                 scaler.referenceResolution = new Vector2(800f, 600f);
                 scaler.matchWidthOrHeight = 0.5f;
 
+                _canvasObject = canvasObject;
                 parent = (RectTransform)canvasObject.transform;
             }
 
@@ -112,6 +124,22 @@ namespace KillingMahjong.UI
         }
 
         private const string CanvasName = "VoltageCanvas";
+
+        /// <summary>
+        /// ゲージ全体の出し入れ（2026-09-14 のユーザー指示）。
+        ///
+        /// **打牌フェイズのときだけ出す。** 牌を選んでいる間や賭け金を決めている間は、
+        /// ボルテージは動かないので出していても意味が無く、画面が混むだけだった。
+        ///
+        /// **まだ作られていないときは何もしない。** ここで作ってしまうと、
+        /// 出さないはずの場面で作られて1フレーム映り込む。
+        /// </summary>
+        public static void SetCanvasVisible(bool visible)
+        {
+            if (_canvasObject == null) return;
+            if (_canvasObject.activeSelf == visible) return;
+            _canvasObject.SetActive(visible);
+        }
 
         private static VoltageUI Attach(RectTransform parent, bool isEnemy)
         {

@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -84,6 +84,13 @@ namespace KillingMahjong.UI
             // 河は手牌を選んでいる間は消えているので、河側の OnEnable に任せると
             // 対局が始まるまで作られない（実際そうなった）。
             VoltageUI.EnsureCreated();
+
+            // **作った直後は伏せる（2026-09-14 のユーザー指示）。**
+            // 出すのは打牌フェイズに入ってから（GameUIPhaseController.Visibility）。
+            // ここで伏せないと、フェイズが最初に切り替わるまでのあいだ
+            // 出っぱなしになる。
+            VoltageUI.SetCanvasVisible(CurrentPhaseStatus == RoundStatus.Discard
+                                       || CurrentPhaseStatus == RoundStatus.TurnDecision);
 
             // チュートリアルモードでなければWebSocketに自動接続する
             if (!IsTutorialMode)
