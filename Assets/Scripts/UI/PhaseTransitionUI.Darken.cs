@@ -115,6 +115,11 @@ namespace KillingMahjong.UI
 
         private IEnumerator RoundStartFadeOutRoutine(Action onComplete)
         {
+            // 配牌が完了したら、局名と一緒に手混ぜ用の牌の山も消す。
+            // TileClatterEffect は破棄せず、次のマッチング待ちで再利用できる。
+            var transitionRect = transform as RectTransform;
+            if (transitionRect != null) Effects.TileClatterEffect.Hide(transitionRect);
+
             // テキストを隠す
             if (centerText != null) centerText.gameObject.SetActive(false);
             if (horizontalLineRt != null) horizontalLineRt.gameObject.SetActive(false);

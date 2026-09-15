@@ -192,6 +192,10 @@ namespace KillingMahjong.UI
             }
         }
 
+        // 第1局の配牌待ちで、局名を隠さずに牌の山を置く高さ。
+        // 4:3 の画面下端から測るため、待ち画面と同じ卓の手前側に収まる。
+        private const float FirstRoundClatterOffsetY = 112f;
+
         private IEnumerator DealingRoutine()
         {
             _isStartingNextRound = false;
@@ -203,6 +207,17 @@ namespace KillingMahjong.UI
                     yield return null;
                 }
                 uiManager.PhaseTransitionUI.ChangeDarkenText($"第{_currentRoundIndex}局進行中...");
+
+                // 第1局の配牌待ちだけは、手で混ぜる裏牌の山を重ねる。
+                // 2局目以降とチュートリアルには出さない（初局の導入を賑やかにする演出）。
+                if (!uiManager.IsTutorialMode && _currentRoundIndex == 1)
+                {
+                    var transitionRect = uiManager.PhaseTransitionUI.transform as RectTransform;
+                    if (transitionRect != null)
+                    {
+                        Effects.TileClatterEffect.Attach(transitionRect, FirstRoundClatterOffsetY);
+                    }
+                }
             }
             
             uiManager.ClearAllTiles();
