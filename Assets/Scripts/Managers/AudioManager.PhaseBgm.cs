@@ -85,7 +85,9 @@ namespace KillingMahjong.Managers
             { "bgm_field_4",      new Tempo(118f, 4) },
             { "bgm_betting",      new Tempo(128f, 4) },
             { "bgm_tension",      new Tempo(144f, 4) },
-            { "bgm_discard",      new Tempo(132f, 4) },
+            // **compose.py で作り直した（2026-09-16）。** 実測ではなく設計値で
+            // 135.00 ちょうど・1拍目がサンプル0。以前は実測の 132 だった。
+            { "bgm_discard",      new Tempo(135f, 4) },
             { "bgm_discard_hot",  new Tempo(160f, 4) },
             { "bgm_ron",          new Tempo(88f,  4) },
             { "bgm_result",       new Tempo(96f,  3) },   // ワルツ
