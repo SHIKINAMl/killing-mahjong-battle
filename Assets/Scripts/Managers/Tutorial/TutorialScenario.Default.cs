@@ -59,28 +59,48 @@ namespace KillingMahjong.Managers
             // --- 共通の配牌 ---
             // 手牌13枚: 一萬×3 二三四萬 五六七萬 八萬×2 九萬×2
             //   → 111m 234m 567m 88m 99m の清一色シャンポン待ち（8m / 9m）
+            // **満貫ちょうどになる手にしてある（2026-09-17 のユーザー指示）。**
+            //
+            // 以前は萬子だけの手（清一色）で、門前だと必ず6飜＝跳満になっていた。
+            // ところが第1局の決着のセリフは「満貫は1倍」「満貫で勝っても1滴も
+            // 増えていない」という話なので、**実際に上がる手と噛み合っていなかった。**
+            //
+            //   111m 123m 456m 789m 東東
+            //     混一色（門前3飜） + 一気通貫（門前2飜） = 5飜 = 満貫
+            //
+            // **東は雀頭にとどめる。** 刻子にすると場風・自風しだいで役牌が付き、
+            // 6飜になって跳満へ戻ってしまう。雀頭なら風に関係なく5飜で固定できる。
+            //
+            // **刻子は 111m にする。** 222m だと第3局の敵の暗刻（222m 333m 444m 555m）
+            // と合わせて5枚目が出てしまう。1m は 123m で1枚使うので合計4枚ちょうど。
             var hand = new List<int>
             {
                 TutorialTiles.Man(1), TutorialTiles.Man(1), TutorialTiles.Man(1),
-                TutorialTiles.Man(2), TutorialTiles.Man(3), TutorialTiles.Man(4),
-                TutorialTiles.Man(5), TutorialTiles.Man(6), TutorialTiles.Man(7),
-                TutorialTiles.Man(8), TutorialTiles.Man(8),
-                TutorialTiles.Man(9), TutorialTiles.Man(9),
+                TutorialTiles.Man(1), TutorialTiles.Man(2), TutorialTiles.Man(3),
+                TutorialTiles.Man(4), TutorialTiles.Man(5), TutorialTiles.Man(6),
+                TutorialTiles.Man(7), TutorialTiles.Man(9),
+                TutorialTiles.Ton, TutorialTiles.Ton,
             };
-            // 待ちは 8m / 9m のシャンポンに加えて 7m の三面待ち。
-            //   7m: 11m雀頭 + 123m 456m 789m 789m
-            //   8m: 111m 234m 567m 888m 99m
-            //   9m: 111m 234m 567m 999m 88m
-            // いずれの和了形も萬子のみなので清一色が成立する。
-            var waits = new List<int> { TutorialTiles.Man(7), TutorialTiles.Man(8), TutorialTiles.Man(9) };
+            // 待ちは 8m の嵌張ひとつ。
+            //   8m: 111m + 123m 456m 789m + 東東
+            //
+            // **単騎待ちにはしない。** 第3局で「単騎は相手の失う額が2倍」と教えるので、
+            // 第1局を単騎にすると満貫1倍の話が崩れる。
+            // **両面にもしない。** 78m の形だと 6m でも上がれてしまい、
+            // そのときは一気通貫が崩れて混一色だけの3飜になる。
+            var waits = new List<int> { TutorialTiles.Man(8) };
 
-            // 残り21枚: 一筒〜九筒 / 一索〜九索 / 東×2 / 西
+            // 残り21枚: 一筒〜九筒 / 一索〜九索 / 東×2 / 八萬
+            //
+            // **八萬をここに入れておくこと（2026-09-17）。** 山は「手牌＋この21枚」で
+            // できているので、ここに無い牌は**誰も打てない**。第1局の当たり牌は 8m なので、
+            // 手牌に無いぶんをここで用意する。西と入れ替えてあり、枚数は21枚のまま。
             var rest = new List<int>();
             for (int n = 1; n <= 9; n++) rest.Add(TutorialTiles.Pin(n));
             for (int n = 1; n <= 9; n++) rest.Add(TutorialTiles.Sou(n));
             rest.Add(TutorialTiles.Ton);
             rest.Add(TutorialTiles.Ton);
-            rest.Add(TutorialTiles.Sha);
+            rest.Add(TutorialTiles.Man(8));
 
             List<int> Wall()
             {
@@ -155,7 +175,7 @@ namespace KillingMahjong.Managers
 
             int dora = TutorialTiles.Pin(5);
 
-            // 敵の捨て牌に使う無難な牌（プレイヤーの待ち 8m/9m を含まない）
+            // 敵の捨て牌に使う無難な牌（プレイヤーの待ち 8m を含まない）
             int d1 = TutorialTiles.Ton;
             int d2 = TutorialTiles.Pin(1);
             int d3 = TutorialTiles.Sou(1);
@@ -163,7 +183,7 @@ namespace KillingMahjong.Managers
             int d5 = TutorialTiles.Sou(9);
 
             // 第2局（流局の説明）用: 17手ぶんの敵の捨て牌。
-            // プレイヤーの待ち 7m/8m/9m を含まないよう筒子・索子だけで組む。
+            // プレイヤーの待ち 8m を含まないよう筒子・索子だけで組む。
             var drawDiscards = new List<int>();
             for (int n = 1; n <= 9; n++) drawDiscards.Add(TutorialTiles.Pin(n));
             for (int n = 1; n <= 8; n++) drawDiscards.Add(TutorialTiles.Sou(n));

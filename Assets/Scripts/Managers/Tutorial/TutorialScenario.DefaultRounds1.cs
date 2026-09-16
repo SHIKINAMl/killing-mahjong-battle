@@ -24,14 +24,19 @@ namespace KillingMahjong.Managers
                 rejectFirstConfirm = true,         // ② 必ず弾く
                 requireAutoManganToConfirm = true, // ④ オートへ誘導
 
-                betAmount = 2000, // 各自2000払い、跳満1.5倍で自分+3000 / 相手-3000
-                enemyDiscardBaseIds = new List<int> { d1, d2, d3, d4, TutorialTiles.Man(9) },
+                betAmount = 2000, // 各自2000払い、満貫1.0倍で自分+2000 / 相手-2000
+                enemyDiscardBaseIds = new List<int> { d1, d2, d3, d4, TutorialTiles.Man(8) },
                 outcome = TutorialOutcome.PlayerRon,
-                playerWinningTileBaseId = TutorialTiles.Man(9),
-                yakuList = new List<string> { "清一色" },
-                formulaText = "6飜",
-                rankText = "跳満",
-                // 清一色6飜=跳満なので倍率1.5。自分 +2000×1.5=3000 / 相手 -3000
+                playerWinningTileBaseId = TutorialTiles.Man(8),
+                yakuList = new List<string> { "混一色", "一気通貫" },
+                formulaText = "5飜",
+                rankText = "満貫",
+                // **満貫ちょうどにしてある（2026-09-17 のユーザー指示）。**
+                // 倍率1.0なので 自分 +2000×1.0=2000 / 相手 -2000。
+                // 2000払って2000戻るだけ＝増減なし。
+                // 決着のセリフ「満貫で勝っても、あなたは1滴も増えていないの」が
+                // **そのまま事実になる。** 以前は清一色6飜＝跳満で +3000 入っていて、
+                // セリフと食い違っていた。
 
                 betPromptText = "{0}円。それがあなたの言い値ね。",
 
