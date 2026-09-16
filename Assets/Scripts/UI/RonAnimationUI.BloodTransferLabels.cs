@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System.Collections;
@@ -29,6 +29,13 @@ namespace KillingMahjong.UI
         /// HPの隣に出すこの局の増減。**「隣」は画面の内側**（自分＝右のスマホなのでその左、相手＝左の血袋なのでその右）。
         /// 上に出すと、いま止めた <c>HpPopupPresenter</c> の浮き数字と同じ場所になってしまう。
         /// </summary>
+        /// <summary>基準が潰れているとみなす大きさ[px]。</summary>
+        private const float MinAnchorSize = 20f;
+
+        /// <summary>潰れていたときに置く場所（画面の割合）。点滴の右隣。</summary>
+        private const float FallbackCenterX = 0.42f;
+        private const float FallbackCenterY = 0.58f;
+
         private TextMeshProUGUI SpawnHpDeltaLabel(RectTransform parent, RectTransform anchor, int delta, Color tint, bool placeLeft)
         {
             if (anchor == null) return null;
@@ -47,6 +54,9 @@ namespace KillingMahjong.UI
 
             RectTransform rt = go.GetComponent<RectTransform>();
             rt.sizeDelta = new Vector2(280f, 44f);
+
+            // 基準が潰れているとみなす大きさ[px]。これ以下は「画面に映っていない」
+            // 扱いにする。まともなHP表示なら軽く超える。
             // **ピボットを文字が寄る側の端に置く。** 既定の中心(0.5)のままだと `rt.position` が箱の中心になり、
             // 右寄せの文字は箱の半分ぶん外側へずれてスマホや血袋に重なる。
             // **しかも sizeDelta はキャンバス単位・position は画面ピクセルなので、
@@ -57,6 +67,30 @@ namespace KillingMahjong.UI
             anchor.GetWorldCorners(corners);
             Vector3 center = (corners[0] + corners[2]) * 0.5f;
             float halfWidth = (corners[2].x - corners[0].x) * 0.5f;
+
+            // **基準が潰れていたら、画面の位置で置き直す（2026-09-17）。**
+            //
+            // 相手側の基準（`EnemyInfoUI.HpAnchor` → `EnemyPanel`）は、画面上では
+            // **3x3px・座標(-5,3)** しかない。`EnemyInfoUI` の localScale が 0.02 で、
+            // パネル側に打ち消しが無いため。しかも**見えている点滴はUIではなく
+            // スプライト**で、`EnemyInfoUI` の階層の外にあるので、
+            // RectTransform を返すこの仕組みからは届かない。
+            //
+            // そのままだと増減ラベルが画面左下の隅へ飛び、下端で切れる
+            // （「ロン後の点数の出る位置がおかしい」の正体。2026-09-17 に実測）。
+            //
+            // **根本はシーンの作りのほう。** ここは、壊れた基準を見つけたら
+            // 画面上の妥当な場所へ逃がすだけに留める。
+            float anchorWidth = corners[2].x - corners[0].x;
+            float anchorHeight = corners[2].y - corners[0].y;
+            if (anchorWidth < MinAnchorSize || anchorHeight < MinAnchorSize)
+            {
+                // 点滴は画面のやや左・中ほどにある（800x600 で x225〜270 / y270〜430 を実測）。
+                // その右隣へ置く。画面の割合で持つので、解像度が変わっても付いてくる。
+                center = new Vector3(Screen.width * FallbackCenterX,
+                                     Screen.height * FallbackCenterY, 0f);
+                halfWidth = 0f;
+            }
             // HPの絵に食い込まないぶんだけ内側へ逃がす（画面ピクセル）。
             // **24 では足りなかった（2026-08-29 の実機確認）。** ここで基準にしている HpAnchor は
             // スマホの中の `HPPanel`（x 669..759）で、**スマホの外枠はそこから 24px ほど外へ出ている。**
