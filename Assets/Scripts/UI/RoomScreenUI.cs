@@ -139,56 +139,92 @@ namespace KillingMahjong.UI
             // これより後に作るもの（メニュー・確認パネル）は曇らない。
             Effects.RoomAtmosphere.Attach(content.transform);
 
+            // **光・影・奥行き・つぶやき（2026-09-17）。**
+            // 空気の層より後に作る。つぶやきの吹き出しは、
+            // 周辺減光や粒子で曇らせたくないため。
+            Effects.RoomAmbience.Attach(content.transform, girlRectForAmbience,
+                                        windowGlow, lampGlow,
+                                        farLayer, midLayer, nearLayer, font);
+
             BuildMenuBar();
             BuildTutorialModal();
         }
 
+        /// <summary>奥行きを出すための層。遠・中・近。歩きに合わせて別々の速さで流す。</summary>
+        private RectTransform farLayer;
+        private RectTransform midLayer;
+        private RectTransform nearLayer;
+
+        /// <summary>明滅させる光。`RoomAmbience` が握る。</summary>
+        private Image windowGlow;
+        private Image lampGlow;
+
+        /// <summary>歩く女の子。影と視差とつぶやきが、この位置を見る。</summary>
+        private RectTransform girlRectForAmbience;
+
+        /// <summary>視差用の層を1枚作る。中身は全画面に広げておく。</summary>
+        private RectTransform CreateParallaxLayer(string name)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(content.transform, false);
+            var rt = go.GetComponent<RectTransform>();
+            Stretch(rt);
+            return rt;
+        }
+
         private void BuildRoomBackground()
         {
+            // **3つの層に分けて置く（2026-09-17）。**
+            // 平らな1枚だと、歩いても部屋が動かず書き割りに見える。
+            // 遠いものほどゆっくり流すために、ここで分けておく。
+            farLayer = CreateParallaxLayer("RoomLayerFar");
+            midLayer = CreateParallaxLayer("RoomLayerMid");
+            nearLayer = CreateParallaxLayer("RoomLayerNear");
+
             // 素材待ちでタイトル絵が透けないよう、まずはコードだけで室内を組む。
             // 壁・床・窓明かり・本棚・机を重ね、あとで背景画へ差し替えても他のUIに影響しない構造にする。
-            CreateStretchImage(content.transform, "RoomBackdrop", RoomDark);
-            CreateCenteredImage(content.transform, "RoomWall", new Vector2(0f, 100f), new Vector2(800f, 400f), RoomWall);
-            CreateCenteredImage(content.transform, "RoomFloor", new Vector2(0f, -200f), new Vector2(800f, 200f), RoomFloor);
-            CreateCenteredImage(content.transform, "RoomCeilingTrim", new Vector2(0f, 286f), new Vector2(800f, 18f),
+            CreateStretchImage(farLayer, "RoomBackdrop", RoomDark);
+            CreateCenteredImage(farLayer, "RoomWall", new Vector2(0f, 100f), new Vector2(800f, 400f), RoomWall);
+            CreateCenteredImage(nearLayer, "RoomFloor", new Vector2(0f, -200f), new Vector2(800f, 200f), RoomFloor);
+            CreateCenteredImage(farLayer, "RoomCeilingTrim", new Vector2(0f, 286f), new Vector2(800f, 18f),
                 new Color32(75, 45, 55, 255));
 
-            CreateCenteredImage(content.transform, "RoomRug", new Vector2(-58f, -144f), new Vector2(435f, 118f),
+            CreateCenteredImage(nearLayer, "RoomRug", new Vector2(-58f, -144f), new Vector2(435f, 118f),
                 new Color32(92, 47, 58, 255));
-            CreateCenteredImage(content.transform, "RoomRugInner", new Vector2(-58f, -144f), new Vector2(392f, 88f),
+            CreateCenteredImage(nearLayer, "RoomRugInner", new Vector2(-58f, -144f), new Vector2(392f, 88f),
                 new Color32(65, 35, 46, 255));
 
-            CreateCenteredImage(content.transform, "RoomWindowFrame", new Vector2(190f, 92f), new Vector2(248f, 228f),
+            CreateCenteredImage(farLayer, "RoomWindowFrame", new Vector2(190f, 92f), new Vector2(248f, 228f),
                 new Color32(30, 21, 31, 255));
-            CreateCenteredImage(content.transform, "RoomWindowNight", new Vector2(190f, 92f), new Vector2(224f, 204f),
+            CreateCenteredImage(farLayer, "RoomWindowNight", new Vector2(190f, 92f), new Vector2(224f, 204f),
                 new Color32(38, 55, 79, 255));
-            CreateCenteredImage(content.transform, "RoomWindowCrossVertical", new Vector2(190f, 92f), new Vector2(7f, 204f),
+            CreateCenteredImage(farLayer, "RoomWindowCrossVertical", new Vector2(190f, 92f), new Vector2(7f, 204f),
                 new Color32(31, 23, 34, 255));
-            CreateCenteredImage(content.transform, "RoomWindowCrossHorizontal", new Vector2(190f, 92f), new Vector2(224f, 7f),
+            CreateCenteredImage(farLayer, "RoomWindowCrossHorizontal", new Vector2(190f, 92f), new Vector2(224f, 7f),
                 new Color32(31, 23, 34, 255));
-            CreateCenteredImage(content.transform, "RoomWindowGlow", new Vector2(116f, -46f), new Vector2(314f, 106f),
+            windowGlow = CreateCenteredImage(midLayer, "RoomWindowGlow", new Vector2(116f, -46f), new Vector2(314f, 106f),
                 new Color(89f / 255f, 120f / 255f, 150f / 255f, 0.13f));
 
-            CreateCenteredImage(content.transform, "RoomBookshelf", new Vector2(-304f, 8f), new Vector2(158f, 292f), WoodDark);
-            CreateCenteredImage(content.transform, "RoomBookshelfInner", new Vector2(-304f, 8f), new Vector2(134f, 268f),
+            CreateCenteredImage(midLayer, "RoomBookshelf", new Vector2(-304f, 8f), new Vector2(158f, 292f), WoodDark);
+            CreateCenteredImage(midLayer, "RoomBookshelfInner", new Vector2(-304f, 8f), new Vector2(134f, 268f),
                 new Color32(30, 20, 27, 255));
             for (int i = 0; i < 4; i++)
             {
                 float y = 104f - i * 64f;
-                CreateCenteredImage(content.transform, "RoomShelf" + i, new Vector2(-304f, y), new Vector2(136f, 6f), WoodLight);
-                CreateCenteredImage(content.transform, "RoomBookRed" + i, new Vector2(-342f + i * 7f, y + 22f),
+                CreateCenteredImage(midLayer, "RoomShelf" + i, new Vector2(-304f, y), new Vector2(136f, 6f), WoodLight);
+                CreateCenteredImage(midLayer, "RoomBookRed" + i, new Vector2(-342f + i * 7f, y + 22f),
                     new Vector2(12f, 38f), new Color32(139, 53, 58, 255));
-                CreateCenteredImage(content.transform, "RoomBookCream" + i, new Vector2(-326f + i * 8f, y + 20f),
+                CreateCenteredImage(midLayer, "RoomBookCream" + i, new Vector2(-326f + i * 8f, y + 20f),
                     new Vector2(11f, 34f), new Color32(194, 158, 119, 255));
-                CreateCenteredImage(content.transform, "RoomBookBlue" + i, new Vector2(-307f + i * 5f, y + 18f),
+                CreateCenteredImage(midLayer, "RoomBookBlue" + i, new Vector2(-307f + i * 5f, y + 18f),
                     new Vector2(10f, 31f), new Color32(58, 84, 111, 255));
             }
 
-            CreateCenteredImage(content.transform, "RoomDesk", new Vector2(257f, -121f), new Vector2(168f, 106f), WoodDark);
-            CreateCenteredImage(content.transform, "RoomDeskTop", new Vector2(257f, -72f), new Vector2(190f, 13f), WoodLight);
-            CreateCenteredImage(content.transform, "RoomLampGlow", new Vector2(260f, 15f), new Vector2(94f, 108f),
+            CreateCenteredImage(midLayer, "RoomDesk", new Vector2(257f, -121f), new Vector2(168f, 106f), WoodDark);
+            CreateCenteredImage(midLayer, "RoomDeskTop", new Vector2(257f, -72f), new Vector2(190f, 13f), WoodLight);
+            lampGlow = CreateCenteredImage(midLayer, "RoomLampGlow", new Vector2(260f, 15f), new Vector2(94f, 108f),
                 new Color(232f / 255f, 174f / 255f, 110f / 255f, 0.16f));
-            CreateCenteredImage(content.transform, "RoomCurtain", new Vector2(349f, 90f), new Vector2(103f, 424f),
+            CreateCenteredImage(midLayer, "RoomCurtain", new Vector2(349f, 90f), new Vector2(103f, 424f),
                 new Color32(70, 24, 39, 255));
             CreateStretchImage(content.transform, "RoomAmbientShade", new Color(0f, 0f, 0f, 0.12f));
         }
@@ -218,6 +254,8 @@ namespace KillingMahjong.UI
             ConfigureGirlRect(girlRect);
             CreateGirlLayer(girl.transform, "RoomGirlBody", body, Color.white);
             Image face = CreateGirlLayer(girl.transform, "RoomGirlFace", openFace, Color.white);
+
+            girlRectForAmbience = girlRect;
 
             var walker = girl.AddComponent<RoomGirlWalker>();
             walker.Initialize(outlineRect, outlineFace, face, openFace, closedFace,

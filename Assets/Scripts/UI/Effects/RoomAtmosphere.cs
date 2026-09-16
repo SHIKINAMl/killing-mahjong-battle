@@ -24,8 +24,13 @@ namespace KillingMahjong.UI.Effects
         /// <summary>四隅の暗さ。0.45 で「少し落ちた」程度。</summary>
         private const float VignetteAlpha = 0.45f;
 
-        /// <summary>ざらつきの濃さ。**0.05 を超えるとドット絵が汚れる。**</summary>
-        private const float GrainAlpha = 0.030f;
+        /// <summary>
+        /// ざらつきの濃さ。**0.05 を超えるとドット絵が汚れる。**
+        ///
+        /// 0.030 で撮って測ったら、平らな壁が毎フレーム平均7.4も揺れていた。
+        /// 静止画では質感でも、動くとザワつきとして目につくので半分にした。
+        /// </summary>
+        private const float GrainAlpha = 0.015f;
 
         /// <summary>粒子の焼き置き枚数。順に見せてざらつきを動かす。</summary>
         private const int GrainFrames = 8;
