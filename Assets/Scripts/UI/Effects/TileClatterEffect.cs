@@ -23,14 +23,20 @@ namespace KillingMahjong.UI.Effects
         /// 手で混ぜるための裏牌の枚数。列ではなく小さな山にして、
         /// カーソルで払ったときに「じゃらじゃら」と崩れる量にする。
         /// </summary>
-        private const int TileCount = 18;
+        private const int TileCount = 28;
 
-        private const float TileWidth = 30f;
-        private const float TileHeight = 40f;
-        private const float PileWidth = 250f;
-        private const float PileHeight = 130f;
-        private const float PileHalfWidth = 96f;
-        private const float PileHalfHeight = 46f;
+        // **牌の絵は 320x320 の正方形**（`Assets/Resources/麻雀牌/`）。
+        // 縦長の枠に入れると余白が出るので、枠も正方形にして
+        // `preserveAspect` に任せる。
+        private const float TileWidth = 42f;
+        private const float TileHeight = 42f;
+
+        // **卓の上へ広げる（2026-09-17 のユーザー指示）。**
+        // 以前は 192x92 の小さな山だったので、卓の真ん中に固まって見えた。
+        private const float PileWidth = 620f;
+        private const float PileHeight = 200f;
+        private const float PileHalfWidth = 250f;
+        private const float PileHalfHeight = 72f;
 
         /// <summary>常に揺れている量。**小さく。** 大きいと壊れて見える。</summary>
         private const float IdleSwayDegrees = 2.5f;
@@ -57,7 +63,10 @@ namespace KillingMahjong.UI.Effects
         private const float SpinSpring = 14f;
         private const float PairRadius = 29f;
         private const float PairSeparation = 780f;
-        private const float MaxStray = 70f;
+        // **押して広げられる距離（2026-09-17 に 70 -> 190 へ）。**
+        // 「もっと卓上に広げたい」という指示。狭いと、手で払っても
+        // すぐ引き戻されて散らばらなかった。
+        private const float MaxStray = 190f;
         private const float MaxSpin = 24f;
 
         private class Tile
@@ -143,7 +152,9 @@ namespace KillingMahjong.UI.Effects
 
         private void Build()
         {
-            Sprite back = FindBackSprite();
+            // **1枚ずつ違う絵にする。** 同じ牌が並ぶと、卓に広げた感じが出ない
+            Sprite[] faces = LoadTileSprites();
+            var bag = new List<Sprite>(faces);
             for (int i = 0; i < TileCount; i++)
             {
                 var go = new GameObject("Tile" + i, typeof(RectTransform), typeof(Image));
@@ -159,16 +170,19 @@ namespace KillingMahjong.UI.Effects
 
                 var img = go.GetComponent<Image>();
                 img.raycastTarget = false;
-                if (back != null)
+
+                // 袋から1枚ずつ引く。空になったら詰め直す（枚数が絵の数を超えるため）
+                if (bag.Count == 0) bag.AddRange(faces);
+                if (bag.Count > 0)
                 {
-                    img.sprite = back;
+                    int pick = Random.Range(0, bag.Count);
+                    img.sprite = bag[pick];
+                    bag.RemoveAt(pick);
                     img.preserveAspect = true;
                 }
                 else
                 {
-                    // **牌の絵が取れない場面がある。** 対局シーン以外には
-                    // `TileResourceManager` が居らず、裏牌が借りられない。
-                    // そのときは、それらしい色の札に縁を付けて牌に見せる。
+                    // 絵が1枚も読めなかったときの保険
                     img.color = new Color32(238, 232, 214, 255);
                     KillingMahjong.Visuals.UIEdgeOutline.AddBehind(rt, 3f);
                 }
@@ -229,12 +243,38 @@ namespace KillingMahjong.UI.Effects
         /// 裏向きの牌の絵を借りる。**取れなければ null**（呼ぶ側で色を塗る）。
         /// `GetTileSprite(-1)` が裏牌を返す約束になっている。
         /// </summary>
-        private static Sprite FindBackSprite()
+        /// <summary>
+        /// 牌の絵を読み込む（2026-09-17 のユーザー指示「もともとある牌の画像を使う」）。
+        ///
+        /// **シーンの `TileResourceManager` に頼らない。** あれは対局シーンにしか
+        /// 居ないので、待ち画面では借りられず、白い札で代用していた。
+        /// 絵は `Assets/Resources/麻雀牌/` にあるので、そこから直に読む。
+        ///
+        /// **牌でないものを弾く。** 同じフォルダに『能力発動ボタン』が入っている。
+        /// 『自身打』は河へ捨てた見た目の別絵なので、手元の牌としては使わない。
+        /// </summary>
+        private static Sprite[] LoadTileSprites()
         {
-            var manager = FindFirstObjectByType<TileResourceManager>();
-            if (manager == null) return null;
-            return manager.GetTileSprite(-1);
+            if (_tileSprites != null) return _tileSprites;
+
+            var all = Resources.LoadAll<Sprite>(TileFolder);
+            var list = new List<Sprite>();
+            foreach (var sprite in all)
+            {
+                if (sprite == null) continue;
+                string n = sprite.name;
+                if (n.Contains("ボタン")) continue;
+                if (n.Contains("自身打")) continue;
+                if (n.Contains("裏牌")) continue;      // 表を向けて並べたいので外す
+                list.Add(sprite);
+            }
+
+            _tileSprites = list.ToArray();
+            return _tileSprites;
         }
+
+        private const string TileFolder = "麻雀牌";
+        private static Sprite[] _tileSprites;
 
         private void Update()
         {
