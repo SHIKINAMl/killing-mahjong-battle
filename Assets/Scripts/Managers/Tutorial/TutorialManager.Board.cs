@@ -148,7 +148,17 @@ namespace KillingMahjong.Managers
             }
             if (gameUIManager.EnemyInfoUI != null)
             {
-                gameUIManager.EnemyInfoUI.SetPanelVisible(_boardVisible);
+                // **第1局で伏せている間は、点滴（相手の体力）を出し直さない**
+                // （2026-09-17 のユーザー指摘）。
+                //
+                // ここは `SetVitalsVisible(false)` が消したのとまったく同じ
+                // GameObject を起こしてしまう。そのため、導入のセリフの途中で
+                // 盤面が出た瞬間に相手の体力だけが現れ、牌を選ぶ場面に入ると
+                // （伏せ直しが走って）また消える、という挙動になっていた。
+                //
+                // 自分側は `PlayerInfoUI.gameObject` を起こしているだけで、
+                // 体力を消しているのは中の別の物なので、この症状が出ない。
+                gameUIManager.EnemyInfoUI.SetPanelVisible(_boardVisible && !_firstRoundChromeHidden);
                 gameUIManager.EnemyInfoUI.SetMaxHP(_scenario.enemyStartHp);
                 gameUIManager.EnemyInfoUI.SetHP(_enemyHp);
                 gameUIManager.EnemyInfoUI.ShowReadyBox(false);
