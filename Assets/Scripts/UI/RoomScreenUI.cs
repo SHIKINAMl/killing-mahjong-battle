@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -133,6 +133,12 @@ namespace KillingMahjong.UI
 
             BuildRoomBackground();
             BuildGirl();
+
+            // **ここで空気をかぶせる（2026-09-17 のユーザー指示）。**
+            // 部屋と女の子の上、メニューの下。順番が重なり順になるので、
+            // これより後に作るもの（メニュー・確認パネル）は曇らない。
+            Effects.RoomAtmosphere.Attach(content.transform);
+
             BuildMenuBar();
             BuildTutorialModal();
         }
