@@ -137,7 +137,10 @@ namespace KillingMahjong.UI
             // **ここで空気をかぶせる（2026-09-17 のユーザー指示）。**
             // 部屋と女の子の上、メニューの下。順番が重なり順になるので、
             // これより後に作るもの（メニュー・確認パネル）は曇らない。
-            Effects.RoomAtmosphere.Attach(content.transform);
+            Effects.SceneAtmosphere.Attach(content.transform,
+                                           Effects.SceneAtmosphere.RoomVignette,
+                                           Effects.SceneAtmosphere.RoomGrain,
+                                           Effects.SceneAtmosphere.RoomGrainMean);
 
             // **光・影・奥行き・つぶやき（2026-09-17）。**
             // 空気の層より後に作る。つぶやきの吹き出しは、

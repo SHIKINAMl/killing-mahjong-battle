@@ -1,10 +1,11 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.UI;
 
 namespace KillingMahjong.UI.Effects
 {
     /// <summary>
-    /// 部屋の待機画面に、地下の空気をかぶせる（2026-09-17 のユーザー指示）。
+    /// 画面に「空気」をかぶせる（2026-09-17 のユーザー指示）。
+    /// 部屋の待機画面から始めて、対局とチュートリアルにも同じものを使う。
     ///
     /// 重ねるのは2枚:
     ///   1. 周辺減光 … 四隅を落として、真ん中へ目を集める
@@ -14,23 +15,25 @@ namespace KillingMahjong.UI.Effects
     /// （`VoltageFlame` の丸と同じ考え方）。
     ///
     /// **薄くかけること。** このゲームはドット絵なので、濃くすると絵が潰れる。
-    /// 濃さを変えるときは下の2つの定数だけ触ればよい。
+    /// 濃さは <see cref="Attach(Transform, float, float, float)"/> の引数で決める。
     ///
     /// **クリックを吸わない。** 全画面に重ねるので、`raycastTarget` を切らないと
-    /// 裏のメニューが永久に押せなくなる。
+    /// 裏のUIが永久に押せなくなる。
+    ///
+    /// **情報の上に乗せない。** 対局画面では Canvas の `sortingOrder` で
+    /// 卓や牌より上・数字やセリフより下に置く（<see cref="BattleAtmosphere"/>）。
     /// </summary>
-    public sealed class RoomAtmosphere : MonoBehaviour
+    public sealed class SceneAtmosphere : MonoBehaviour
     {
-        /// <summary>四隅の暗さ。0.45 で「少し落ちた」程度。</summary>
-        private const float VignetteAlpha = 0.45f;
+        /// <summary>部屋の待機画面の濃さ。</summary>
+        public const float RoomVignette = 0.45f;
+        /// <summary>部屋の待機画面のざらつき。</summary>
+        public const float RoomGrain = 0.07f;
+        /// <summary>部屋の地の明るさ（255階調中 40 前後）。</summary>
+        public const float RoomGrainMean = 0.16f;
 
-        /// <summary>
-        /// ざらつきの濃さ。**0.05 を超えるとドット絵が汚れる。**
-        ///
-        /// 0.030 で撮って測ったら、平らな壁が毎フレーム平均7.4も揺れていた。
-        /// 静止画では質感でも、動くとザワつきとして目につくので半分にした。
-        /// </summary>
-        private const float GrainAlpha = 0.015f;
+        /// <summary>粒のばらつき幅。粒の明るさの上下へこの割合で振る。</summary>
+        private const float GrainSpread = 0.16f;
 
         /// <summary>粒子の焼き置き枚数。順に見せてざらつきを動かす。</summary>
         private const int GrainFrames = 8;
@@ -44,33 +47,41 @@ namespace KillingMahjong.UI.Effects
 
         /// <summary>
         /// 画面へ空気の層を足す。**呼ぶ場所で重なり順が決まる。**
-        /// 部屋の中身を作ったあと、メニューを作る前に呼ぶこと。
+        /// 中身を作ったあと、手前に置きたい物を作る前に呼ぶこと。
         /// </summary>
-        public static RoomAtmosphere Attach(Transform parent)
+        /// <param name="vignetteAlpha">四隅の暗さ。</param>
+        /// <param name="grainAlpha">ざらつきの濃さ。0.05 前後まで。</param>
+        /// <param name="grainMean">
+        /// 粒の明るさの中心。**その画面の地の明るさに合わせること。**
+        /// 白い粒(0.5)を暗い画面へかけると、ざらつきではなく**ただの白み**になる。
+        /// 実測では四隅が +7.5階調 持ち上がり、周辺減光(-7.0)を打ち消していた。
+        /// </param>
+        public static SceneAtmosphere Attach(Transform parent, float vignetteAlpha,
+                                             float grainAlpha, float grainMean)
         {
             if (parent == null) return null;
 
-            var go = new GameObject("RoomAtmosphere", typeof(RectTransform));
+            var go = new GameObject("SceneAtmosphere", typeof(RectTransform));
             var rt = (RectTransform)go.transform;
             rt.SetParent(parent, false);
             Stretch(rt);
 
-            var atmosphere = go.AddComponent<RoomAtmosphere>();
-            atmosphere.Build(rt);
+            var atmosphere = go.AddComponent<SceneAtmosphere>();
+            atmosphere.Build(rt, vignetteAlpha, grainAlpha, grainMean);
             return atmosphere;
         }
 
-        private void Build(RectTransform rt)
+        private void Build(RectTransform rt, float vignetteAlpha, float grainAlpha, float grainMean)
         {
-            AddLayer(rt, "Vignette", BakeVignette(), new Color(0f, 0f, 0f, VignetteAlpha),
+            AddLayer(rt, "Vignette", BakeVignette(), new Color(0f, 0f, 0f, vignetteAlpha),
                      Image.Type.Simple);
 
             // **粒子は引き伸ばさず、敷き詰める（2026-09-17 に直した）。**
             // 64px の絵を画面いっぱいへ広げたら、1粒が 12x9px の塊になって
             // ドット絵が泥のように汚れた。等倍で並べれば、粒が1画素になる。
-            _grainSprites = BakeGrain();
+            _grainSprites = BakeGrain(grainMean);
             _grain = AddLayer(rt, "Grain", _grainSprites[0],
-                              new Color(1f, 1f, 1f, GrainAlpha), Image.Type.Tiled);
+                              new Color(1f, 1f, 1f, grainAlpha), Image.Type.Tiled);
 
             // **走査線は入れない（2026-09-17 に試してやめた）。**
             // `Image.Type.Tiled` で敷こうとしたが、横1pxでも64pxでも描画されず
@@ -134,11 +145,16 @@ namespace KillingMahjong.UI.Effects
             }
             tex.SetPixels(px);
             tex.Apply();
-            return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f);
+            // **`SpriteMeshType.FullRect` を明示する（2026-09-17）。**
+            // 既定の `Tight` は透明な画素を刈った多角形を作るので、
+            // 中心が透明なこの絵は形が崩れる（頂点が19個もできていた）。
+            // 足元の影は同じ罠で一枚も描かれなかった。焼いた絵は FullRect。
+            return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f,
+                                 0, SpriteMeshType.FullRect);
         }
 
         /// <summary>ざらつきを何枚か焼く。毎フレーム作ると重いので、順に見せて回す。</summary>
-        private static Sprite[] BakeGrain()
+        private static Sprite[] BakeGrain(float grainMean)
         {
             const int size = 64;
             var sprites = new Sprite[GrainFrames];
@@ -153,17 +169,28 @@ namespace KillingMahjong.UI.Effects
                 var px = new Color[size * size];
                 for (int i = 0; i < px.Length; i++)
                 {
-                    // 白と黒を混ぜる。**中間を多めに**しないとチカチカする
+                    // 地の明るさを中心に振る。0〜1 いっぱいに振ると、
+                    // 薄くかけても画面全体が白く浮く
                     float v = (float)rng.NextDouble();
-                    v = 0.5f + (v - 0.5f) * 0.9f;
+                    v = grainMean + (v - 0.5f) * 2f * GrainSpread;
+                    v = Mathf.Clamp01(v);
                     px[i] = new Color(v, v, v, 1f);
                 }
                 tex.SetPixels(px);
                 tex.Apply();
-                // **1画素を1単位で作る。** ここを 100 にすると、
-                // 敷き詰めたとき 100分の1 に縮んで模様が消える
+                // **PPU は `Canvas.referencePixelsPerUnit` と同じ 100 にする。**
+                //
+                // `Image.Type.Tiled` の敷き詰め幅は
+                //   絵の幅 ÷ (スプライトのPPU ÷ CanvasのreferencePixelsPerUnit)
+                // で決まる。既定の referencePixelsPerUnit は 100 なので、
+                // **PPU=1 にすると 64px の絵が 6400px に引き伸ばされ、
+                // 1粒が 100x100px の塊になっていた**（2026-09-17 に実測。
+                // 空気層の有無で撮り比べたら、四隅がむしろ +6.5階調 明るくなり、
+                // 壁一面に四角い斑が出ていた）。
+                // 100 なら 64px がそのまま 64px で並び、1粒=1画素になる。
                 sprites[f] = Sprite.Create(tex, new Rect(0, 0, size, size),
-                                           new Vector2(0.5f, 0.5f), 1f);
+                                           new Vector2(0.5f, 0.5f), 100f,
+                                           0, SpriteMeshType.FullRect);
             }
             return sprites;
         }

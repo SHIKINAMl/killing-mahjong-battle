@@ -85,6 +85,10 @@ namespace KillingMahjong.UI
             // 対局が始まるまで作られない（実際そうなった）。
             VoltageUI.EnsureCreated();
 
+            // 画面に空気の層をかぶせる（2026-09-17 の指示）。
+            // **数字やセリフより下に入る**ので、読みやすさは変わらない。
+            Effects.BattleAtmosphere.EnsureCreated();
+
             // **作った直後は伏せる（2026-09-14 のユーザー指示）。**
             // 出すのは打牌フェイズに入ってから（GameUIPhaseController.Visibility）。
             // ここで伏せないと、フェイズが最初に切り替わるまでのあいだ
