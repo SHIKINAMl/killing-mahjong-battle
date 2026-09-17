@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace KillingMahjong.UI.Effects
 {
@@ -32,19 +32,27 @@ namespace KillingMahjong.UI.Effects
         private const int SortingOrder = 4;
 
         /// <summary>
-        /// 四隅の暗さ。**部屋(0.45)より弱くする。**
-        /// 対局画面は四隅にも手牌や河が来るので、同じ濃さだと端の牌が沈む。
+        /// 四隅の暗さ。
+        ///
+        /// 最初 0.26 にしていたが、**弱すぎて言われないと気づかなかった**
+        /// （四隅で -7.4階調 = -7%。中心は 107.2→107.0 とほぼ無変化）。
+        /// 0.26 / 0.45 / 0.65 を並べて見比べ、2026-09-18 に 0.45 へ上げた。
+        /// 0.65 まで行くと四隅の河や手牌の端が沈んで、牌が見づらくなる。
         /// </summary>
-        private const float Vignette = 0.26f;
+        private const float Vignette = 0.45f;
 
-        /// <summary>ざらつきの濃さ。牌の柄と喧嘩しないよう部屋より控えめ。</summary>
-        private const float Grain = 0.045f;
+        /// <summary>ざらつきの濃さ。牌の柄と喧嘩しないよう部屋(0.07)より控えめ。</summary>
+        private const float Grain = 0.06f;
 
         /// <summary>
         /// 粒の明るさの中心。**対局画面の地の明るさに合わせる。**
-        /// ここを白(0.5)にすると画面全体が白っぽく浮く。
+        ///
+        /// 画面ぜんぶの平均を実際に測ったら 255階調中 92 だったので 92/255 = 0.36。
+        /// 当てずっぽうで 0.20 を入れていたころは、粒が画面全体を
+        /// 1.2階調ぶん暗くしていた（濃くするほどこのズレも大きくなる）。
+        /// ここを白(0.5)にすると、逆に画面全体が白っぽく浮く。
         /// </summary>
-        private const float GrainMean = 0.20f;
+        private const float GrainMean = 0.36f;
 
         private static SceneAtmosphere _instance;
 
