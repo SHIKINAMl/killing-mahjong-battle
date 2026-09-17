@@ -1,0 +1,45 @@
+# 改行の扱い（2026-09-17 に追加）
+#
+# **リポジトリも作業ツリーも LF に統一する。**
+#
+# これを置く前は各自の `core.autocrlf` 任せで、この環境では
+# 「リポジトリは LF、作業ツリーは CRLF」という食い違いが起きていた。
+# するとファイルサイズが索引の記録と合わないので、Unity がファイルに触るたび
+# git は中身を読み直さないと同じかどうか判断できない。
+# さらに `--no-optional-locks` を付けて git を呼ぶツール（エディタや
+# 自動化エージェント）は索引を書き戻さないため、**中身が1バイトも
+# 変わっていないファイルが、ずっと「変更あり」と表示され続けていた。**
+#
+# `eol=lf` を書いておけば、誰がどの設定で clone しても LF で揃う。
+
+* text=auto eol=lf
+
+# **拡張子で `text` を強制しないこと。**
+# 例えば `Assets/Scripts/Common/YakuNameUtil.cs` は文字列リテラルに生の NUL を
+# 含んでいて、git はこれをバイナリと判定する。`Assets/link.xml` などは UTF-16。
+# `text=auto` なら中身を見て自動で避けてくれるが、`*.cs text` と書くと
+# そこを無視して触りにいく。
+
+# 中身を絶対に触らせないもの（自動判定に任せず明示する）
+*.png          binary
+*.jpg          binary
+*.jpeg         binary
+*.gif          binary
+*.psd          binary
+*.tga          binary
+*.exr          binary
+*.wav          binary
+*.mp3          binary
+*.ogg          binary
+*.mp4          binary
+*.fbx          binary
+*.blend        binary
+*.ttf          binary
+*.otf          binary
+*.dll          binary
+*.so           binary
+*.a            binary
+*.dylib        binary
+*.pdf          binary
+*.moc3         binary
+*.unitypackage binary
