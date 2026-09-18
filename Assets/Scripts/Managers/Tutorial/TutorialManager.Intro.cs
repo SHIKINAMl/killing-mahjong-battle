@@ -72,6 +72,46 @@ namespace KillingMahjong.Managers
             new TutorialLine("「わかった？\nま、難しいと思うから、アタシと実践してみよっかー」"),
         };
 
+        // ここから下はフロー図の続き（2026-09-19 に追加）。
+        // 「わかった？…」のあと、手牌を選ばせる直前までの案内。
+
+        /// <summary>山牌を見せてから、何をさせるかを言う。**どちらの経路でも共通。**</summary>
+        private static readonly List<TutorialLine> ShowWallLines = new List<TutorialLine>
+        {
+            new TutorialLine("「じゃーん！\nこれが君の山牌ね」"),
+            new TutorialLine("「君はこの中から13枚選んでテンパイな手牌を作ってもらうよ」"),
+        };
+
+        /// <summary>
+        /// **2つめの分岐。** 最初の「麻雀を知っていますか」で『いいえ』だった人にだけ、
+        /// テンパイの意味を足す。知っている人には冗長なので出さない。
+        /// </summary>
+        private static readonly List<TutorialLine> TenpaiExplainLines = new List<TutorialLine>
+        {
+            new TutorialLine("「えっテンパイって何かって？」"),
+            new TutorialLine("「テンパイってのはあと1牌でアガりって状態のこと」"),
+            new TutorialLine("「ま普通にアガる手を作って１牌抜くのがラクだよ」"),
+        };
+
+        /// <summary>合流後。満貫を作らせる話へ。</summary>
+        private static readonly List<TutorialLine> ManganRequestLines = new List<TutorialLine>
+        {
+            new TutorialLine("「で今回作ってもらうのはただのテンパイじゃないよ」"),
+            new TutorialLine("「君には満貫な手を作ってもらうねー」"),
+        };
+
+        /// <summary>最後のひと押し。この直後に手牌選択へ入る。</summary>
+        private static readonly List<TutorialLine> StartBuildingLines = new List<TutorialLine>
+        {
+            new TutorialLine("「とりあえず適当に作ってみようかー？」"),
+        };
+
+        /// <summary>
+        /// 最初の問いかけの答え。**2つめの分岐で使うので覚えておく。**
+        /// 0=はい（麻雀を知っている） / 1=いいえ / -1=まだ聞いていない。
+        /// </summary>
+        private int _mahjongExperienceAnswer = -1;
+
         private GameObject _introRoot;
 
         /// <summary>
@@ -122,6 +162,7 @@ namespace KillingMahjong.Managers
             int answer = -1;                      // 0=はい / 1=いいえ
             BuildQuestionPanel(parent, font, onYes: () => answer = 0, onNo: () => answer = 1);
             yield return new WaitUntil(() => answer >= 0);
+            _mahjongExperienceAnswer = answer;    // 2つめの分岐で使う
 
             CloseIntro();
 
@@ -141,6 +182,25 @@ namespace KillingMahjong.Managers
             yield return ShowRulePanelRoutine(font, null, null, GuideBoardPath);
 
             yield return PlayLines(AfterRuleUiLines);
+
+            // ここからフロー図の続き（2026-09-19）。山牌を見せて、満貫を作らせるまで。
+            yield return PlayLines(ShowWallLines);
+
+            // **知らないと答えた人にだけテンパイの説明。** 知っている人はそのまま合流する
+            if (_mahjongExperienceAnswer == 1)
+            {
+                yield return PlayLines(TenpaiExplainLines);
+            }
+
+            yield return PlayLines(ManganRequestLines);
+
+            // **満貫説明UI はまだ出さない。**
+            // 図は「麻雀ルール説明UI」「17歩ルール説明UI」「満貫説明UI」の3枚を要求しているが、
+            // 手元の絵は `麻雀のあそびかた` と `案内板_満貫` の2枚だけで、
+            // しかも合流点（図が17歩ルールと書いている位置）に `案内板_満貫` を出している。
+            // どの絵をどこへ出すかが決まってから足すこと。**AIで絵を描かないこと。**
+
+            yield return PlayLines(StartBuildingLines);
         }
 
         /// <summary>
