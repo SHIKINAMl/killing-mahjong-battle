@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System.Collections;
@@ -18,6 +18,43 @@ namespace KillingMahjong.UI
         //  （2026-08-27 の計測で、因果を目で追える時間は 0 秒）。
         //  枠が動かなければ、覆う問題そのものが起きない。
         // ============================================================
+
+        // ------------------------------------------------------------
+        //  表が出ていく速さ（2026-09-18 に MnoA さんの指示で遅くした）
+        //
+        //  「役計算の表の演出が早すぎる」。**数字が出た瞬間に次が出るので、
+        //  読み終わる前に次へ行ってしまう**のが原因だった。
+        //  全体でおよそ 1.7 倍に伸ばしてある。
+        //
+        //  **速さを変えるときはここだけ触ればよい。** 以前はコードの中に
+        //  0.12f や 0.8f が直接書いてあり、どれがどの間なのか分からなかった。
+        //
+        //  とくに効くのは次の2つ:
+        //    - RowInterval … 役が1行ずつ入る間隔。ここが詰まると表が一瞬で埋まる
+        //    - ReadHold    … 最後の静止。**パネルはこの直後に消える**ので、
+        //                    表を読める最後の時間がここ
+        // ------------------------------------------------------------
+
+        /// <summary>枠がフェードインする時間。0.30 → 0.45</summary>
+        private const float PanelFadeIn = 0.45f;
+
+        /// <summary>役の行が1行ずつ入る間隔。0.12 → 0.22</summary>
+        private const float RowInterval = 0.22f;
+
+        /// <summary>合計翻数を出したあとの間。0.25 → 0.45</summary>
+        private const float AfterTotalHan = 0.45f;
+
+        /// <summary>倍率を出したあとの間。0.40 → 0.65</summary>
+        private const float AfterMultiplier = 0.65f;
+
+        /// <summary>素点・倍率ラベルを出したあとの間。0.18 → 0.30</summary>
+        private const float AfterSideValue = 0.30f;
+
+        /// <summary>単騎待ちの行を出したあとの間。0.25 → 0.45</summary>
+        private const float AfterTanki = 0.45f;
+
+        /// <summary>表を読み切らせる最後の静止。0.80 → 1.50</summary>
+        private const float ReadHold = 1.5f;
 
         private IEnumerator SettlementRoutine(RectTransform containerRt, GameObject container, RonSettlementInfo s,
             PlayerInfoUI playerInfo, EnemyInfoUI enemyInfo, int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp)
@@ -45,7 +82,7 @@ namespace KillingMahjong.UI
                 out myDeltaText, out theirDeltaText, out myHpText, out theirHpText);
 
             // 枠がフェードインする。ここではまだ数字は入っていない
-            const float fadeIn = 0.3f;
+            const float fadeIn = PanelFadeIn;
             for (float t = 0; t < fadeIn; t += Time.deltaTime)
             {
                 float p = t / fadeIn;
@@ -63,23 +100,23 @@ namespace KillingMahjong.UI
                 // ゲームの他の表示テキスト（AbilityUI・チュートリアル）は `翻`(U+7FFB) を使っているので揃える。
                 // コード中のコメントや Tooltip には `飜` が残っているが、あれは画面に出ない。
                 hanTexts[i].text = s.ShowPerRowHan ? $"{s.Rows[i].Han}翻" : "";
-                yield return new WaitForSeconds(0.12f);
+                yield return new WaitForSeconds(RowInterval);
             }
 
             // ② 合計と倍率
             totalHanText.text = $"{s.TotalHan}翻";
-            yield return new WaitForSeconds(0.25f);
+            yield return new WaitForSeconds(AfterTotalHan);
             multiplierText.text = "×" + s.Multiplier.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
-            yield return new WaitForSeconds(0.4f);
+            yield return new WaitForSeconds(AfterMultiplier);
 
             // ③ 素点と倍率が左右に入る
             string multLabel = "×" + s.Multiplier.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
             myBetText.text = s.MyBet.ToString();
             theirBetText.text = s.TheirBet.ToString();
-            yield return new WaitForSeconds(0.18f);
+            yield return new WaitForSeconds(AfterSideValue);
             myMultText.text = multLabel;
             theirMultText.text = multLabel;
-            yield return new WaitForSeconds(0.18f);
+            yield return new WaitForSeconds(AfterSideValue);
 
             // 単騎で倍になるのは負けた側だけ。**今まで画面のどこにも出ていなかった行。**
             if (s.IsTankiWait && tankiMine != null && tankiTheirs != null)
@@ -87,7 +124,7 @@ namespace KillingMahjong.UI
                 // **ダッシュ `—`(U+2014) もフォントに無い。** ASCII のハイフンで代用する
                 tankiMine.text = s.LocalWon ? "-" : "×2";
                 tankiTheirs.text = s.LocalWon ? "×2" : "-";
-                yield return new WaitForSeconds(0.25f);
+                yield return new WaitForSeconds(AfterTanki);
             }
 
             // ④ 表を読み切る間。**パネルはこのあと消える**ので、ここが表を見られる最後の時間。
@@ -100,7 +137,7 @@ namespace KillingMahjong.UI
                 KillingMahjong.Managers.AudioManager.Instance.PlayRankVoice(s.RankName);
             }
 
-            yield return new WaitForSeconds(0.8f);
+            yield return new WaitForSeconds(ReadHold);
 
             // ⑤ 血が動く。**パネルを消しながら**素点の数字を持ち出す
             yield return BloodTransferRoutine(container, s, myBetText, theirBetText,
