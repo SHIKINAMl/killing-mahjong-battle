@@ -376,7 +376,8 @@ namespace KillingMahjong.UI
             preview.Play();
 
             if (nowPlayingText != null) nowPlayingText.text = t.Label;
-            if (playLabel != null) playLabel.text = "‖";
+            // **一時停止は `∥`(U+2225)。** `‖`(U+2016) は PixelMplus に無く □ になっていた（2026-09-19）
+            if (playLabel != null) playLabel.text = "∥";
         }
 
         private float PreviewVolume()
@@ -394,7 +395,7 @@ namespace KillingMahjong.UI
                 return;
             }
             if (preview.isPlaying) { preview.Pause(); if (playLabel != null) playLabel.text = "▶"; }
-            else { preview.UnPause(); if (preview.isPlaying == false) preview.Play(); if (playLabel != null) playLabel.text = "‖"; }
+            else { preview.UnPause(); if (preview.isPlaying == false) preview.Play(); if (playLabel != null) playLabel.text = "∥"; }
         }
 
         private void StopPreview()
