@@ -23,6 +23,8 @@ namespace KillingMahjong.UI
         private GameObject root;
         private GameObject content;
         private GameObject tutorialModal;
+        private GameObject menuBar;
+        private GameObject backdropDim;
         private TMP_FontAsset font;
         private Action onMatchSelected;
         private Action onTutorialSelected;
@@ -60,6 +62,35 @@ namespace KillingMahjong.UI
         public void SetContentVisible(bool visible)
         {
             if (content != null && content.activeSelf != visible) content.SetActive(visible);
+        }
+
+        /// <summary>
+        /// 設定パネルの**背景として**部屋を見せる（2026-09-19 のユーザー指示）。
+        ///
+        /// 以前は設定中に部屋を丸ごと隠していて、パネルの後ろに何もない空間（カメラの空）が映っていた。
+        /// 部屋は残して暗くし、下のメニューだけ隠す（残すとボタンの隙間から文字が覗く）。
+        /// 暗幕が当たり判定を持つので、設定中に部屋のボタンは押せない。
+        /// **設定パネルを部屋より手前に出すのは呼ぶ側の仕事**（`TitleUIManager.OpenRoomOptions`）。
+        /// </summary>
+        public void SetBackdropMode(bool on)
+        {
+            if (menuBar != null && menuBar.activeSelf == on) menuBar.SetActive(!on);
+            if (backdropDim != null && backdropDim.activeSelf != on)
+            {
+                backdropDim.SetActive(on);
+                if (on) backdropDim.transform.SetAsLastSibling();
+            }
+        }
+
+        private void BuildBackdropDim()
+        {
+            backdropDim = new GameObject("RoomBackdropDim", typeof(RectTransform), typeof(Image));
+            backdropDim.transform.SetParent(root.transform, false);
+            Stretch(backdropDim.GetComponent<RectTransform>());
+            var image = backdropDim.GetComponent<Image>();
+            image.color = new Color(0f, 0f, 0f, 0.55f);
+            image.raycastTarget = true;
+            backdropDim.SetActive(false);
         }
 
         /// <summary>進捗がある時だけ、最初から／続きからを選ばせる小さな確認パネルを開く。</summary>
@@ -151,6 +182,7 @@ namespace KillingMahjong.UI
 
             BuildMenuBar();
             BuildTutorialModal();
+            BuildBackdropDim();
         }
 
         /// <summary>奥行きを出すための層。遠・中・近。歩きに合わせて別々の速さで流す。</summary>
@@ -291,6 +323,7 @@ namespace KillingMahjong.UI
         {
             var bar = new GameObject("RoomMenuBar", typeof(RectTransform));
             bar.transform.SetParent(content.transform, false);
+            menuBar = bar;
             var barRect = bar.GetComponent<RectTransform>();
             barRect.anchorMin = new Vector2(0.5f, 0f);
             barRect.anchorMax = new Vector2(0.5f, 0f);

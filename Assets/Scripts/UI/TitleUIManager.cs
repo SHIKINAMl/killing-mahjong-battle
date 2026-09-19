@@ -96,14 +96,16 @@ namespace KillingMahjong.UI
         {
             if (roomScreen == null || !roomScreen.IsOpen) return;
 
-            // OptionUI は既存 Canvas に置かれている。部屋の専用 Canvas より奥にあるため、
-            // 設定中だけ部屋の絵を畳み、閉じたら元の待機画面を戻す。
+            // **設定中は部屋を暗くして背景に残す（2026-09-19 のユーザー指示）。**
+            // 以前は部屋を畳んでいて、パネルの後ろに何もない空間が映っていた。
+            // パネルを部屋より手前に出すのは OpenRoomOptions。
             //
-            // **コレクションも同じ扱いにする（2026-09-11）。** ここは毎フレーム走るので、
+            // **コレクションは今までどおり部屋を畳む（2026-09-11）。** ここは毎フレーム走るので、
             // 判定に入れておかないと開いた次のフレームで部屋の絵が戻ってきてしまう。
             bool isOptionOpen = optionUIPanel != null && optionUIPanel.activeInHierarchy;
             bool isCollectionOpen = collection != null && collection.IsOpen;
-            roomScreen.SetContentVisible(!isOptionOpen && !isCollectionOpen);
+            roomScreen.SetContentVisible(!isCollectionOpen);
+            roomScreen.SetBackdropMode(isOptionOpen && !isCollectionOpen);
 
             // TitleMultiMenuUI.Close() はタイトル用のコピーを再表示するため、部屋に戻った
             // 次フレームで必ず隠す。これにより「もどる」から待機画面へ自然に帰れる。
@@ -134,8 +136,20 @@ namespace KillingMahjong.UI
 
         private void OpenRoomOptions()
         {
-            if (roomScreen != null) roomScreen.SetContentVisible(false);
+            // 設定パネルは既存の Canvas（並び順 0）にあり、部屋（TitleRoomScreen）より奥になる。
+            // 部屋を背景に残すので、パネルだけ部屋より手前へ出す。
+            // **開いてから設定すること。** overrideSorting は入れ子の Canvas にしか効かず、
+            // 非表示のうちに立てても無視される（先に立てたら部屋の裏に隠れたままだった）
             OnClickOptionButton();
+            if (optionUIPanel != null)
+            {
+                var canvas = optionUIPanel.GetComponent<Canvas>();
+                if (canvas == null) canvas = optionUIPanel.AddComponent<Canvas>();
+                canvas.overrideSorting = true;
+                canvas.sortingOrder = KillingMahjong.Common.UISortingOrders.TitleRoomScreen + 5;
+                if (optionUIPanel.GetComponent<UnityEngine.UI.GraphicRaycaster>() == null)
+                    optionUIPanel.AddComponent<UnityEngine.UI.GraphicRaycaster>();
+            }
         }
 
         private void OpenRoomTutorial()
