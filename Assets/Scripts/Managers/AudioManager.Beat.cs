@@ -76,15 +76,64 @@ namespace KillingMahjong.Managers
         /// </summary>
         public bool TryGetBeatPosition(out double beats)
         {
+            // 揺れ物が何十個も毎フレーム聞きに来るので、1フレームに1回だけ計算する
+            // （clip.name は呼ぶたびに文字列を作る）
+            if (_beatCacheFrame == Time.frameCount)
+            {
+                beats = _beatCacheValue;
+                return _beatCacheOk;
+            }
+            _beatCacheFrame = Time.frameCount;
+            _beatCacheOk = false;
+            _beatCacheValue = 0;
             beats = 0;
+
             double spb; int bpb;
             if (!TryGetTempo(out spb, out bpb)) return false;
 
             var src = BeatClockSource;
             if (src == null) return false;
 
-            beats = src.time / spb;
+            beats = SmoothedTime(src) / spb;
+            _beatCacheValue = beats;
+            _beatCacheOk = true;
             return true;
+        }
+
+        private int _beatCacheFrame = -1;
+        private double _beatCacheValue;
+        private bool _beatCacheOk;
+
+        private AudioSource _smoothSource;
+        private double _smoothTime;
+        private int _smoothFrame = -1;
+
+        /// <summary>
+        /// 曲の再生位置を、**フレームごとに滑らかに進めたもの**（2026-09-19）。
+        ///
+        /// `AudioSource.time` は音声の処理単位（約20ms）ごとにしか進まない。
+        /// 60fps で測ると**4フレームに1回は同じ値のまま止まり**、残りは一気に飛ぶ。
+        /// これで拍に合わせた揺れ（敵のセリフの吹き出しなど）がカクついて、
+        /// 「セリフの動きを変えてから重い」と言われた。
+        /// フレームの経過時間で先読みし、本物の値へ少しずつ寄せる。
+        /// ループや頭出しで大きく離れたときだけ、本物の値へ飛ばす。
+        /// </summary>
+        private double SmoothedTime(AudioSource src)
+        {
+            double raw = src.time;
+            if (src != _smoothSource || _smoothFrame < 0 || Time.frameCount - _smoothFrame > 5)
+            {
+                _smoothTime = raw;
+            }
+            else
+            {
+                double predicted = _smoothTime + Time.unscaledDeltaTime * src.pitch;
+                double error = raw - predicted;
+                _smoothTime = (error > 0.1 || error < -0.1) ? raw : predicted + error * 0.1;
+            }
+            _smoothSource = src;
+            _smoothFrame = Time.frameCount;
+            return _smoothTime;
         }
 
         /// <summary>
