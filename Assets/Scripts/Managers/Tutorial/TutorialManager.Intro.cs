@@ -112,6 +112,28 @@ namespace KillingMahjong.Managers
         /// </summary>
         private int _mahjongExperienceAnswer = -1;
 
+        /// <summary>
+        /// 「17歩ルール説明UI」の**仮の板**（2026-09-19）。
+        ///
+        /// フロー図は説明UIを3枚（麻雀ルール／17歩ルール／満貫）要求しているが、絵は2枚しかない。
+        /// `案内板_満貫` は中身が「13枚の牌から満貫手を組もう」なので**満貫説明UI**に当たり、
+        /// 17歩ルール（この賭場の決まり）に当たる絵が無い。
+        /// ルールの文面は企画の領分なので**こちらで書かない**。絵が届いたら差し替えること。
+        /// **AIで絵を描かないこと。**
+        /// </summary>
+        private const string Rule17Title = "17歩ルール説明";
+        private static readonly string[] Rule17Placeholder =
+        {
+            "（ここに17歩ルール説明UIが入ります）",
+            "画像が届いたら差し替えます",
+        };
+
+        /// <summary>
+        /// 山牌を「じゃーん！これが君の山牌ね」の行まで出さずにおくか（2026-09-19 のユーザー指示）。
+        /// 最初から始めたチュートリアルの第1局だけ立つ。立っていれば、その行で1枚ずつ起こす。
+        /// </summary>
+        private bool _wallRevealDeferred;
+
         private GameObject _introRoot;
 
         /// <summary>
@@ -179,11 +201,20 @@ namespace KillingMahjong.Managers
             }
 
             // ここで合流。**この賭場の決まりは、どちらの経路でも必ず見せる。**
-            yield return ShowRulePanelRoutine(font, null, null, GuideBoardPath);
+            // フロー図の「17歩ルール説明UI」。絵がまだ無いので仮の文字板（Rule17Placeholder）。
+            // 以前はここに `案内板_満貫` を出していたが、あれは満貫の説明なので下へ移した（2026-09-19）
+            yield return ShowRulePanelRoutine(font, Rule17Title, Rule17Placeholder, null);
 
             yield return PlayLines(AfterRuleUiLines);
 
             // ここからフロー図の続き（2026-09-19）。山牌を見せて、満貫を作らせるまで。
+            // **「じゃーん！これが君の山牌ね」と同時に山牌を1枚ずつ起こす**（ユーザー指示）。
+            // 待たずに走らせて、セリフの表示と重ねる
+            if (_wallRevealDeferred)
+            {
+                _wallRevealDeferred = false;
+                StartCoroutine(DealTilesRoutine());
+            }
             yield return PlayLines(ShowWallLines);
 
             // **知らないと答えた人にだけテンパイの説明。** 知っている人はそのまま合流する
@@ -194,11 +225,10 @@ namespace KillingMahjong.Managers
 
             yield return PlayLines(ManganRequestLines);
 
-            // **満貫説明UI はまだ出さない。**
-            // 図は「麻雀ルール説明UI」「17歩ルール説明UI」「満貫説明UI」の3枚を要求しているが、
-            // 手元の絵は `麻雀のあそびかた` と `案内板_満貫` の2枚だけで、
-            // しかも合流点（図が17歩ルールと書いている位置）に `案内板_満貫` を出している。
-            // どの絵をどこへ出すかが決まってから足すこと。**AIで絵を描かないこと。**
+            // フロー図の「満貫説明UI」→「閉じるボタンをクリック」。
+            // `案内板_満貫` は「13枚の牌から満貫手を組もう」「困ったら左下のオートボタン」という中身で、
+            // 手を組ませる直前のここが正しい位置（以前は合流点に出していた）
+            yield return ShowRulePanelRoutine(font, null, null, GuideBoardPath);
 
             yield return PlayLines(StartBuildingLines);
         }

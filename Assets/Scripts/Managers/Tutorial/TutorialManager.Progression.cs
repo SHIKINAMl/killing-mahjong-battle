@@ -131,7 +131,13 @@ namespace KillingMahjong.Managers
                 bool isFirstRound = _scenario != null && _scenario.rounds != null
                                     && _scenario.rounds.Count > 0
                                     && ReferenceEquals(data, _scenario.rounds[0]);
-                if (isFirstRound) yield return StartCoroutine(DealTilesRoutine());
+                if (isFirstRound && _askExperienceAfterIntro)
+                {
+                    // **最初から始めたときは、山牌を「じゃーん！これが君の山牌ね」まで出さない**
+                    // （2026-09-19 のユーザー指示）。起こすのは AskExperienceIfNeeded の中
+                    _wallRevealDeferred = true;
+                }
+                else if (isFirstRound) yield return StartCoroutine(DealTilesRoutine());
                 else SetBoardVisible(true);
 
                 yield return StartCoroutine(PlayLines(
@@ -148,6 +154,13 @@ namespace KillingMahjong.Managers
             // フロー図では導入の会話がひととおり終わってから分岐する。
             // 頭から始めたときだけ聞く。中身は TutorialManager.Intro.cs。
             yield return StartCoroutine(AskExperienceIfNeeded());
+
+            // 念のため: 山牌を遅らせたのに「じゃーん」の行を通らなかったら、ここで出す
+            if (_wallRevealDeferred)
+            {
+                _wallRevealDeferred = false;
+                yield return StartCoroutine(DealTilesRoutine());
+            }
 
             // --- 能力の実演と説明（手順⑱〜⑳） ---
             // 能力は手牌フェイズでしか使えない仕様なので、実演もこのフェイズのうちに行う。
