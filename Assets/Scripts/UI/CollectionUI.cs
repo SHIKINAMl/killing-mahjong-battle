@@ -85,6 +85,29 @@ namespace KillingMahjong.UI
             new Track("Bgm", "bgm_ex_surreal",   "奇妙な回廊"),
         };
 
+        /// <summary>
+        /// 「効果音」タブ右列: チュートリアルでセリフに合わせて鳴る効果音（2026-09-19 に追加）。
+        /// 意味は km-docs/tutorial/04_演出と音_統合.md。並びは意味の対が隣り合うようにしてある
+        /// （一滴↔一滴、ひび↔崩れる亀裂、選択↔選ばされた、能力の予兆↔崩壊）。
+        /// </summary>
+        private static readonly Track[] TutorialSes =
+        {
+            new Track("Stingers", "se_paper",       "契約書"),
+            new Track("Stingers", "se_drop",        "一滴"),
+            new Track("Stingers", "se_tube_slow",   "管を流れる　遅"),
+            new Track("Stingers", "se_tube_fast",   "管を流れる　速"),
+            new Track("Stingers", "se_choice",      "選択"),
+            new Track("Stingers", "se_choice_dark", "選ばされた"),
+            new Track("Stingers", "se_stack",       "積み上がる"),
+            new Track("Stingers", "se_two_pulses",  "二つの鼓動"),
+            new Track("Stingers", "se_crack",       "ひび"),
+            new Track("Stingers", "se_crack_long",  "崩れる亀裂"),
+            new Track("Stingers", "se_ability_1",   "能力の予兆　1"),
+            new Track("Stingers", "se_ability_2",   "能力の予兆　2"),
+            new Track("Stingers", "se_ability_3",   "能力の予兆　3"),
+            new Track("Stingers", "se_collapse",    "崩壊"),
+        };
+
         private static readonly Track[] Stingers =
         {
             new Track("Stingers", "br_band_open",  "黒帯　開く"),
@@ -105,6 +128,7 @@ namespace KillingMahjong.UI
         private GameObject root;
         private GameObject musicPage;
         private GameObject originalsPage;   // 「追加曲」タブ
+        private GameObject sePage;          // 「効果音」タブ
         private GameObject cgPage;
         private GameObject yakuPage;
         private TMP_FontAsset font;
@@ -196,6 +220,13 @@ namespace KillingMahjong.UI
             Stretch(originalsPage.GetComponent<RectTransform>());
             BuildColumn(originalsPage.transform, -178f, "オリジナル曲", Originals);
 
+            // 「効果音」タブ。左は演出の効果音、右はチュートリアルの効果音。
+            // **行はスクロールしない**ので、1列14行まで（それ以上は再生バーの裏へ潜る）
+            sePage = NewEmpty(panel.transform, "SePage");
+            Stretch(sePage.GetComponent<RectTransform>());
+            BuildColumn(sePage.transform, -178f, "演出", Stingers);
+            BuildColumn(sePage.transform, 178f, "チュートリアル", TutorialSes);
+
             cgPage = NewEmpty(panel.transform, "CgPage");
             Stretch(cgPage.GetComponent<RectTransform>());
             Label(cgPage.transform, "Soon", "準備中", new Vector2(0f, 20f), new Vector2(400f, 40f),
@@ -214,7 +245,7 @@ namespace KillingMahjong.UI
 
         private void BuildTabs(Transform parent)
         {
-            string[] names = { "音楽", "追加曲", "CG", "役" };
+            string[] names = { "音楽", "追加曲", "効果音", "CG", "役" };
             for (int i = 0; i < names.Length; i++)
             {
                 int index = i;
@@ -234,8 +265,9 @@ namespace KillingMahjong.UI
         {
             if (musicPage != null) musicPage.SetActive(index == 0);
             if (originalsPage != null) originalsPage.SetActive(index == 1);
-            if (cgPage != null) cgPage.SetActive(index == 2);
-            if (yakuPage != null) yakuPage.SetActive(index == 3);
+            if (sePage != null) sePage.SetActive(index == 2);
+            if (cgPage != null) cgPage.SetActive(index == 3);
+            if (yakuPage != null) yakuPage.SetActive(index == 4);
             for (int i = 0; i < tabMarks.Count; i++)
                 if (tabMarks[i] != null) tabMarks[i].enabled = (i == index);
         }
@@ -245,8 +277,22 @@ namespace KillingMahjong.UI
             flat.Clear();
             rowBgs.Clear();
 
-            BuildColumn(parent, -178f, "BGM", Bgms);
-            BuildColumn(parent, 178f, "スティンガー", Stingers);
+            // 効果音は「効果音」タブへ移した（2026-09-19 の指示）。
+            // **空いた右の列へBGMの後ろを回す。** 行はスクロールしないので、1列16行だと
+            // 最後の「負け」が再生バーの裏に隠れて押せなかった（以前からの不具合）。
+            // 対局の流れの切れ目（ロンで決着するところ）で分ける
+            BuildColumn(parent, -178f, "BGM　対局", Slice(Bgms, 0, BgmSplitAt));
+            BuildColumn(parent, 178f, "BGM　決着", Slice(Bgms, BgmSplitAt, Bgms.Length - BgmSplitAt));
+        }
+
+        /// <summary>BGM を2列に分ける位置。ここから後ろ（ロン・決着〜負け）が右の列。</summary>
+        private const int BgmSplitAt = 11;
+
+        private static Track[] Slice(Track[] src, int start, int count)
+        {
+            var dst = new Track[count];
+            System.Array.Copy(src, start, dst, 0, count);
+            return dst;
         }
 
         private void BuildColumn(Transform parent, float centerX, string heading, Track[] tracks)
