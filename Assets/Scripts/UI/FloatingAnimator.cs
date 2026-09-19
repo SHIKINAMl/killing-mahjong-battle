@@ -37,6 +37,15 @@ namespace KillingMahjong.UI
         [Tooltip("曲の拍に合わせて揺らす。曲が鳴っていないときは今までどおり時間で揺れる")]
         [SerializeField] private bool followMusic = true;
 
+        /// <summary>
+        /// 曲の拍に合わせて揺らすか。**体力ゲージは実行時に false にしている**（2026-09-19）。
+        ///
+        /// 拍への同期は曲が鳴っているときしか働かない。09-12〜09-19 は音を止めていたので、
+        /// その間の体力ゲージはずっと「パネルごとにばらばらの時間で揺れる」元の動きだった。
+        /// 音を戻したら拍に揃って揺れるようになり、「以前の揺れ方に戻してほしい」と言われた。
+        /// </summary>
+        public bool FollowMusic { get { return followMusic; } set { followMusic = value; } }
+
         [Tooltip("縦に1往復する拍数。4で1小節ぶん")]
         [SerializeField] private float beatsPerCycleY = 4f;
 

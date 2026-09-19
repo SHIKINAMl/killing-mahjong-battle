@@ -89,6 +89,18 @@ namespace KillingMahjong.UI
             // **数字やセリフより下に入る**ので、読みやすさは変わらない。
             Effects.BattleAtmosphere.EnsureCreated();
 
+            // **体力ゲージは曲の拍に合わせない**（2026-09-19 のユーザー指示「以前の揺れ方に戻して」）。
+            // 音を止めていた間の、パネルごとにばらばらな揺れ方に戻す。吹き出しは拍に合わせたまま。
+            // シーンは2つあるので、名前ではなく「体力UIの下にあるか」で見つける
+            foreach (var floater in FindObjectsByType<FloatingAnimator>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                if (floater.GetComponentInParent<PlayerInfoUI>(true) != null
+                    || floater.GetComponentInParent<EnemyInfoUI>(true) != null)
+                {
+                    floater.FollowMusic = false;
+                }
+            }
+
             // **作った直後は伏せる（2026-09-14 のユーザー指示）。**
             // 出すのは打牌フェイズに入ってから（GameUIPhaseController.Visibility）。
             // ここで伏せないと、フェイズが最初に切り替わるまでのあいだ
