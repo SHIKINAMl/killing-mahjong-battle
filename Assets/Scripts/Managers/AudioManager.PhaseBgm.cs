@@ -324,6 +324,24 @@ namespace KillingMahjong.Managers
         /// <summary>タイトル・メニュー用。対局のBGMとは別系統。</summary>
         public void PlayTitleBgm()
         {
+            PlayMenuBgm("bgm_title");
+        }
+
+        /// <summary>
+        /// 部屋の待機画面の曲（2026-09-19 のユーザー指示「このシーンではチルい曲を」）。
+        /// 追加曲の lo-fi。**ループ用の曲ではないので、終わりの約2秒でフェードしてから頭に戻る。**
+        /// 継ぎ目を消したくなったら、ループ版を作って差し替えること。
+        /// </summary>
+        public const string RoomBgmName = "bgm_ex_lofi";
+
+        public void PlayRoomBgm()
+        {
+            PlayMenuBgm(RoomBgmName);
+        }
+
+        /// <summary>タイトル・部屋など、対局の外で流す曲。すでに同じ曲が流れていれば頭に戻さない。</summary>
+        private void PlayMenuBgm(string name)
+        {
             if (!CanPlay) return;
             if (!UsePhaseBgm)
             {
@@ -331,10 +349,11 @@ namespace KillingMahjong.Managers
                 return;
             }
 
-            var clip = GetPhaseBgmClip("bgm_title");
+            var clip = GetPhaseBgmClip(name);
             if (clip == null) { PlayBGM(defaultBgm); return; }
+            if (bgmSource.isPlaying && bgmSource.clip == clip) return;
 
-            currentPhaseBgmName = "bgm_title";
+            currentPhaseBgmName = name;
             currentBgmPhase = RoundStatus.None;
             if (bgmSwapCoroutine != null) { StopCoroutine(bgmSwapCoroutine); bgmSwapCoroutine = null; }
 

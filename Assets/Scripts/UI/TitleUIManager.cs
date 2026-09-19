@@ -57,6 +57,10 @@ namespace KillingMahjong.UI
             SetTitlePresentationVisible(false);
             roomScreen.Open(OpenMatchMenu, OpenRoomTutorial, OpenRoomOptions, ExitGameFromRoom, ReturnToTitle,
                 OpenCollection);
+
+            // 部屋ではチルい曲（2026-09-19 のユーザー指示）。タイトルへ戻るときに戻す
+            var audio = KillingMahjong.Managers.AudioManager.Instance;
+            if (audio != null) audio.PlayRoomBgm();
         }
 
         private CollectionUI collection;
@@ -79,6 +83,10 @@ namespace KillingMahjong.UI
             collection.Open(() =>
             {
                 if (roomScreen != null && roomScreen.IsOpen) roomScreen.SetContentVisible(true);
+
+                // コレクションは閉じるときにタイトル曲を流すので、部屋にいるなら部屋の曲へ戻す
+                var audio = KillingMahjong.Managers.AudioManager.Instance;
+                if (audio != null && roomScreen != null && roomScreen.IsOpen) audio.PlayRoomBgm();
             });
         }
 
@@ -154,6 +162,9 @@ namespace KillingMahjong.UI
             if (multiMenu != null) multiMenu.Close();
             if (roomScreen != null) roomScreen.Close();
             SetTitlePresentationVisible(true);
+
+            var audio = KillingMahjong.Managers.AudioManager.Instance;
+            if (audio != null) audio.PlayTitleBgm();
         }
 
         private void ExitGameFromRoom()
