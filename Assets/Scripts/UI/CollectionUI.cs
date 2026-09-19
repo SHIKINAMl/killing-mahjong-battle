@@ -57,6 +57,27 @@ namespace KillingMahjong.UI
             new Track("Bgm", "bgm_lose",         "負け"),
         };
 
+        /// <summary>
+        /// 「追加曲」タブの曲。**場面に割り当てていない**（2026-09-19 に追加）。
+        ///
+        /// ユーザーが別に作ったオリジナル曲（C:\Users\akira\Music\D_N_A_original_bgm\）を、
+        /// 44100Hz/モノラル/16bit・RMS −18.91dBFS（既存曲の中央値）に揃えて取り込んだもの。
+        /// 対局中には流れない。場面に当てるときは AudioManager の Tempos 表も足すこと。
+        ///
+        /// **「音楽」タブの列に足さないこと。** 行は y = 132 - i*21 で並べるだけで
+        /// スクロールが無く、16曲で既に再生バーの上端に届いている。
+        /// 足すと下の行が再生バーの裏へ潜って押せなくなる。
+        /// </summary>
+        private static readonly Track[] Originals =
+        {
+            new Track("Bgm", "bgm_ex_midnight",  "真夜中のアーケード"),
+            new Track("Bgm", "bgm_ex_glitch",    "グリッチ"),
+            new Track("Bgm", "bgm_ex_lofi",      "夕暮れのローファイ"),
+            new Track("Bgm", "bgm_ex_summer",    "夏の空"),
+            new Track("Bgm", "bgm_ex_fantasy",   "はるかな地平線"),
+            new Track("Bgm", "bgm_ex_sporty",    "カウントダウン"),
+        };
+
         private static readonly Track[] Stingers =
         {
             new Track("Stingers", "br_band_open",  "黒帯　開く"),
@@ -76,6 +97,7 @@ namespace KillingMahjong.UI
 
         private GameObject root;
         private GameObject musicPage;
+        private GameObject originalsPage;   // 「追加曲」タブ
         private GameObject cgPage;
         private GameObject yakuPage;
         private TMP_FontAsset font;
@@ -161,6 +183,12 @@ namespace KillingMahjong.UI
             Stretch(musicPage.GetComponent<RectTransform>());
             BuildMusicPage(musicPage.transform);
 
+            // **音楽ページのあとに作る。** BuildMusicPage が flat を空にするので、
+            // 先に作ると追加曲の行が消える。再生バーはパネル直下にあり、どのタブでも共有される
+            originalsPage = NewEmpty(panel.transform, "OriginalsPage");
+            Stretch(originalsPage.GetComponent<RectTransform>());
+            BuildColumn(originalsPage.transform, -178f, "オリジナル曲", Originals);
+
             cgPage = NewEmpty(panel.transform, "CgPage");
             Stretch(cgPage.GetComponent<RectTransform>());
             Label(cgPage.transform, "Soon", "準備中", new Vector2(0f, 20f), new Vector2(400f, 40f),
@@ -179,7 +207,7 @@ namespace KillingMahjong.UI
 
         private void BuildTabs(Transform parent)
         {
-            string[] names = { "音楽", "CG", "役" };
+            string[] names = { "音楽", "追加曲", "CG", "役" };
             for (int i = 0; i < names.Length; i++)
             {
                 int index = i;
@@ -198,8 +226,9 @@ namespace KillingMahjong.UI
         private void ShowTab(int index)
         {
             if (musicPage != null) musicPage.SetActive(index == 0);
-            if (cgPage != null) cgPage.SetActive(index == 1);
-            if (yakuPage != null) yakuPage.SetActive(index == 2);
+            if (originalsPage != null) originalsPage.SetActive(index == 1);
+            if (cgPage != null) cgPage.SetActive(index == 2);
+            if (yakuPage != null) yakuPage.SetActive(index == 3);
             for (int i = 0; i < tabMarks.Count; i++)
                 if (tabMarks[i] != null) tabMarks[i].enabled = (i == index);
         }

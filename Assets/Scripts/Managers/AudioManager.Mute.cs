@@ -31,7 +31,7 @@ namespace KillingMahjong.Managers
         /// </summary>
         [Header("音の栓")]
         [Tooltip("切ると、このマネージャが出す音がすべて止まる。音の作業を後回しにしているあいだ false")]
-        public bool AudioEnabled = false;
+        public bool AudioEnabled = true;   // 2026-09-19 にユーザーの指示で再開（09-12 から止めていた）
 
         /// <summary>入口で使う。鳴らしてよいか。</summary>
         private bool CanPlay { get { return AudioEnabled; } }
