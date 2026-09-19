@@ -62,6 +62,9 @@ namespace KillingMahjong.UI
         ///
         /// ユーザーが別に作ったオリジナル曲（C:\Users\akira\Music\D_N_A_original_bgm\）を、
         /// 44100Hz/モノラル/16bit・RMS −18.91dBFS（既存曲の中央値）に揃えて取り込んだもの。
+        /// 2026-09-19 にリマスター版（*_gm_remaster_v3_final / *_v2_final の **MP3**）へ差し替え、4曲追加。
+        /// **同名の WAV は仕上げ前で −42dB と小さいので使わない。** 仕上げ済みは MP3。
+        /// リマスター版は**無音で終わる**（末尾0.6〜1.2秒）ので、ループすると少し間が空く。
         /// 対局中には流れない。場面に当てるときは AudioManager の Tempos 表も足すこと。
         ///
         /// **「音楽」タブの列に足さないこと。** 行は y = 132 - i*21 で並べるだけで
@@ -76,6 +79,10 @@ namespace KillingMahjong.UI
             new Track("Bgm", "bgm_ex_summer",    "夏の空"),
             new Track("Bgm", "bgm_ex_fantasy",   "はるかな地平線"),
             new Track("Bgm", "bgm_ex_sporty",    "カウントダウン"),
+            new Track("Bgm", "bgm_ex_mystery",   "時計じかけの謎"),
+            new Track("Bgm", "bgm_ex_steampunk", "蒸気の夜想曲"),
+            new Track("Bgm", "bgm_ex_incident",  "ひび割れた事件"),
+            new Track("Bgm", "bgm_ex_surreal",   "奇妙な回廊"),
         };
 
         private static readonly Track[] Stingers =
