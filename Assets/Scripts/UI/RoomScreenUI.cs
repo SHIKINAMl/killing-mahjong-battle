@@ -322,7 +322,7 @@ namespace KillingMahjong.UI
             var items = new[]
             {
                 new { Name = "RoomMenu_Match",      Label = "対局へ",        Size = 18f, Act = (Func<Action>)(() => onMatchSelected) },
-                new { Name = "RoomMenu_Tutorial",   Label = "チュートリアル", Size = 14f, Act = (Func<Action>)(() => onTutorialSelected) },
+                new { Name = "RoomMenu_Tutorial",   Label = "チュートリアル", Size = 13f, Act = (Func<Action>)(() => onTutorialSelected) },
                 new { Name = "RoomMenu_Collection", Label = "コレクション",   Size = 15f, Act = (Func<Action>)(() => onCollectionSelected) },
                 new { Name = "RoomMenu_Option",     Label = "設定",          Size = 18f, Act = (Func<Action>)(() => onOptionSelected) },
                 new { Name = "RoomMenu_Exit",       Label = "やめる",        Size = 18f, Act = (Func<Action>)(() => onExitSelected) },
@@ -404,8 +404,11 @@ namespace KillingMahjong.UI
             tmp.fontSize = fontSize;
             tmp.fontStyle = FontStyles.Bold;
             tmp.color = MenuText;
-            tmp.alignment = TextAlignmentOptions.Left | TextAlignmentOptions.Midline;
-            tmp.margin = new Vector4(20f, 0f, 0f, 0f);
+            // **`Left | Midline` と書かないこと。** Midline は横の中央揃えも含むので、OR すると
+            // 左と中央が混ざった値になり、文字が右へずれて隣の項目の菱形に重なっていた（2026-09-19）。
+            // 「チュートリアル」は 13pt でちょうど枠に収まる（14pt だと隣の菱形にかかる）
+            tmp.alignment = TextAlignmentOptions.MidlineLeft;
+            tmp.margin = new Vector4(24f, 0f, 0f, 0f);
             tmp.textWrappingMode = TextWrappingModes.NoWrap;
             tmp.raycastTarget = false;
 
