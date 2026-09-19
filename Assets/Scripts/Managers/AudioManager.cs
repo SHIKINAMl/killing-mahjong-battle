@@ -100,6 +100,9 @@ namespace KillingMahjong.Managers
                 if (!string.IsNullOrEmpty(n) && scene.name == n)
                 {
                     StopBGM();
+                    // 止めたままだとタイトルが無音になる。部屋へ直行する場合は
+                    // TitleUIManager が部屋の曲へ切り替える
+                    PlayTitleBgm();
                     return;
                 }
             }

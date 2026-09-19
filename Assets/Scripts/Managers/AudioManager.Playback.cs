@@ -48,6 +48,12 @@ namespace KillingMahjong.Managers
         {
             if (bgmSource != null) bgmSource.Stop();
 
+            // **層とドラムも止める（2026-09-19）。** 場のBGMは bgmSource ではなく層（4本）で鳴り、
+            // ドラムも別の音源でループしている。bgmSource だけ止めていたので、
+            // 対局からタイトルへ戻っても対局の曲が鳴り続けていた
+            StopLayeredBgm();
+            if (drumSource != null && drumSource.isPlaying) drumSource.Stop();
+
             // 止めたあと同じフェイズで呼び直されても鳴らし直せるようにしておく。
             // これが無いと、タイトルへ戻ってもう一度対局を始めたときに
             // 「もうその曲を鳴らしている」と判定されて無音のままになる。
