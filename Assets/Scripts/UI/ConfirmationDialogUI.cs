@@ -210,7 +210,9 @@ namespace KillingMahjong.UI
                 GameObject obj = Instantiate(tilePrefab, waitTilesContainer);
                 activeWaitTiles.Add(obj);
                 
-                float scale = waitTileIds.Length > 6 ? 0.6f : 1.0f;
+                // **枚数で縮めない**（2026-09-19）。以前は7枚以上で0.6倍にしていて、9枚待ちで牌が読めなかった。
+                // 枠は760px幅あり、最大の13枚待ちでも等倍で約480pxに収まる
+                const float scale = 1.0f;
                 // 手動レイアウトなのでスケールをそのまま適用し、アンカーを中央にする
                 RectTransform rt = obj.GetComponent<RectTransform>();
                 if (rt != null)
