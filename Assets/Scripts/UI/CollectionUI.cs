@@ -83,6 +83,7 @@ namespace KillingMahjong.UI
             new Track("Bgm", "bgm_ex_steampunk", "蒸気の夜想曲"),
             new Track("Bgm", "bgm_ex_incident",  "ひび割れた事件"),
             new Track("Bgm", "bgm_ex_surreal",   "奇妙な回廊"),
+            new Track("Bgm", "bgm_ex_think",     "長考"),
         };
 
         /// <summary>
