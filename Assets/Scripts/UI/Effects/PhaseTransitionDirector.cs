@@ -65,6 +65,7 @@ namespace KillingMahjong.UI.Effects
 
             SceneManager.sceneLoaded += HandleSceneLoaded;
             SubscribeToPhaseManager();
+            SubscribeToBoard();
         }
 
         private void OnDisable()
@@ -72,13 +73,65 @@ namespace KillingMahjong.UI.Effects
             SceneManager.sceneLoaded -= HandleSceneLoaded;
             StopSubscribeRoutine();
             UnsubscribeFromPhaseManager();
+            UnsubscribeFromBoard();
         }
 
         private void OnDestroy()
         {
             // 破棄経路では OnDisable が先に来るが、購読解除漏れをここでも防ぐ。
             UnsubscribeFromPhaseManager();
+            UnsubscribeFromBoard();
             if (instance == this) instance = null;
+        }
+
+        // --- 相手の番のあいだ、自分の手牌を静める（2026-09-20 のユーザー指示）---
+        //
+        // 手番は BoardStateManager が持っていて、変わるたびに OnTurnChanged が飛ぶ。
+        // **打牌フェイズのときだけ**効かせる。手牌選択や賭けの最中に落とすと、
+        // 操作できるのに操作できないように見える。
+
+        private BoardStateManager subscribedBoard;
+
+        private void SubscribeToBoard()
+        {
+            var board = BoardStateManager.Instance;
+            if (board == subscribedBoard) return;
+
+            UnsubscribeFromBoard();
+            if (board == null) return;
+
+            subscribedBoard = board;
+            subscribedBoard.OnTurnChanged += HandleTurnChanged;
+        }
+
+        private void UnsubscribeFromBoard()
+        {
+            if (subscribedBoard != null) subscribedBoard.OnTurnChanged -= HandleTurnChanged;
+            subscribedBoard = null;
+        }
+
+        private void HandleTurnChanged(bool isLocalTurn)
+        {
+            ApplyOpponentTurnQuiet();
+        }
+
+        /// <summary>
+        /// いまの手番とフェイズから、手牌を静めるかどうかを当て直す。
+        /// フェイズが変わったときにも呼ぶ（打牌を抜けたら必ず元へ戻す）。
+        /// </summary>
+        private void ApplyOpponentTurnQuiet()
+        {
+            var uiManager = FindFirstObjectByType<GameUIManager>();
+            if (uiManager == null || uiManager.WallUI == null) return;
+
+            var board = BoardStateManager.Instance;
+            bool quiet = board != null
+                && !board.IsLocalTurn
+                && uiManager.CurrentPhaseStatus == RoundStatus.Discard;
+
+            // **落とすのは山牌の段だけ。** 打牌で触るのはここで、自分の手牌は
+            // 「手牌を見る」で覗く方式のため画面に出ていない（2026-09-20 に実機で確認）
+            uiManager.WallUI.SetQuietForOpponentTurn(quiet);
         }
 
         private void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
@@ -107,6 +160,7 @@ namespace KillingMahjong.UI.Effects
             yield return null;
 
             SubscribeToPhaseManager();
+            SubscribeToBoard();
             subscribeRoutine = null;
         }
 
@@ -148,6 +202,8 @@ namespace KillingMahjong.UI.Effects
         private void HandleRoundPhaseChanged(RoundStatus previous, RoundStatus next)
         {
             Debug.Log($"[PhaseTransitionDirector] {previous} -> {next}");
+            SubscribeToBoard();
+            ApplyOpponentTurnQuiet();
             StartCoroutine(PlayTransitionRoutine(previous, next));
         }
 

@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections;
 using System.Collections.Generic;
 using KillingMahjong.Common;
 
@@ -56,6 +57,56 @@ namespace KillingMahjong.UI
         /// <summary>
         /// wallSlotsからtileIdが一致するRectTransformを取り出し、スロットから削除して返す
         /// </summary>
+        // --- 相手の番のあいだ、山牌の段だけを静める（2026-09-20 のユーザー指示）---
+        //
+        // 打牌フェイズで触るのは**この段**（「山牌から1枚切る」）。自分の手牌は
+        // 「手牌を見る」で覗く方式なので画面に出ていない。
+        // **画面全体に暗幕は敷かない。** 牌が読みにくくなるより、触れる場所だけを落とす。
+
+        /// <summary>
+        /// 相手の番のときの濃さ。**0.72 では実機で3%しか変わらず、気づけなかった**ので 0.55 にした。
+        /// 牌の絵柄はまだ読める（2026-09-20 に実測して決めた値）。
+        /// </summary>
+        private const float OpponentTurnQuietAlpha = 0.55f;
+
+        /// <summary>濃さを移す時間。切り替わりが目で追える速さ。</summary>
+        private const float QuietFadeSeconds = 0.25f;
+
+        private CanvasGroup quietGroup;
+        private Coroutine quietRoutine;
+
+        /// <summary>山牌の段を静めるか。相手の番に true、自分の番に false。</summary>
+        public void SetQuietForOpponentTurn(bool quiet)
+        {
+            if (wallContainer == null) return;
+
+            if (quietGroup == null)
+            {
+                quietGroup = wallContainer.GetComponent<CanvasGroup>();
+                if (quietGroup == null) quietGroup = wallContainer.gameObject.AddComponent<CanvasGroup>();
+            }
+
+            float to = quiet ? OpponentTurnQuietAlpha : 1f;
+            if (Mathf.Approximately(quietGroup.alpha, to)) return;
+
+            if (quietRoutine != null) StopCoroutine(quietRoutine);
+            if (!gameObject.activeInHierarchy) { quietGroup.alpha = to; return; }
+            quietRoutine = StartCoroutine(QuietFadeRoutine(to));
+        }
+
+        private IEnumerator QuietFadeRoutine(float to)
+        {
+            float from = quietGroup.alpha;
+            for (float t = 0f; t < QuietFadeSeconds; t += Time.unscaledDeltaTime)
+            {
+                if (quietGroup == null) yield break;
+                quietGroup.alpha = Mathf.Lerp(from, to, t / QuietFadeSeconds);
+                yield return null;
+            }
+            if (quietGroup != null) quietGroup.alpha = to;
+            quietRoutine = null;
+        }
+
         public RectTransform GrabTileById(int tileId)
         {
             for (int i = 0; i < wallSlots.Count; i++)

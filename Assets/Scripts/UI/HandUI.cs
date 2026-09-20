@@ -145,6 +145,56 @@ namespace KillingMahjong.UI
             }
         }
 
+        // --- 相手の番のあいだ、自分の手牌だけを静める（2026-09-20 のユーザー指示）---
+        //
+        // **暗幕は敷かない。** 画面全体を落とすと牌まで読みづらくなる。
+        // 自分の手牌の帯だけを少し落として「いまは打てない」を伝える。
+        // 牌の文字が読める濃さに留めること（0.72 で実機確認）。
+
+        /// <summary>相手の番のときの濃さ。これ以上落とすと牌が読みにくくなる。</summary>
+        private const float OpponentTurnQuietAlpha = 0.72f;
+
+        /// <summary>濃さを移す時間。切り替わりが分かる程度に、目で追える速さ。</summary>
+        private const float QuietFadeSeconds = 0.25f;
+
+        private CanvasGroup quietGroup;
+        private Coroutine quietRoutine;
+
+        /// <summary>
+        /// 自分の手牌を静めるか。相手の番に true、自分の番に false。
+        /// **操作の可否そのものは変えない**（打てるかどうかは既存の判定が持っている）。
+        /// </summary>
+        public void SetQuietForOpponentTurn(bool quiet)
+        {
+            var target = discardPhaseContainer as RectTransform;
+            if (target == null) return;
+
+            if (quietGroup == null)
+            {
+                quietGroup = target.GetComponent<CanvasGroup>();
+                if (quietGroup == null) quietGroup = target.gameObject.AddComponent<CanvasGroup>();
+            }
+
+            float to = quiet ? OpponentTurnQuietAlpha : 1f;
+            if (Mathf.Approximately(quietGroup.alpha, to)) return;
+
+            if (quietRoutine != null) StopCoroutine(quietRoutine);
+            quietRoutine = StartCoroutine(QuietFadeRoutine(to));
+        }
+
+        private IEnumerator QuietFadeRoutine(float to)
+        {
+            float from = quietGroup.alpha;
+            for (float t = 0f; t < QuietFadeSeconds; t += Time.unscaledDeltaTime)
+            {
+                if (quietGroup == null) yield break;
+                quietGroup.alpha = Mathf.Lerp(from, to, t / QuietFadeSeconds);
+                yield return null;
+            }
+            if (quietGroup != null) quietGroup.alpha = to;
+            quietRoutine = null;
+        }
+
         /// <summary>
         /// 賭け確定後、打牌用の自分の手牌だけを下から元の位置へ戻す。
         ///
