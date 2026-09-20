@@ -7,9 +7,19 @@ namespace KillingMahjong.UI
     public partial class PhaseTransitionUI
     {
 
+        /// <summary>
+        /// 開戦の着弾を出す時点。市松模様のフェードアウトのうち、どれだけ進んだところで出すか。
+        /// 0.55 は「盤面が見えてきたが、まだ晴れ切ってはいない」あたり（fade は 1.0 秒）。
+        /// </summary>
+        private const float BattleStartImpactAtFadeRatio = 0.55f;
+
         private IEnumerator SequenceRoutine(string roundName, KillingMahjong.EngineData.BettingCompletedInfo bet, Action onMidpoint, Action onComplete)
         {
             ResetVisuals();
+
+            // 賭け確定の既存シーケンスは維持し、暗転解除の瞬間だけ指揮者へ追加する。
+            // isDarkened 中は盤面が戻らないため、この追加演出も予約しない。
+            if (!isDarkened) Effects.PhaseTransitionDirector.PrepareBattleStartRelease();
 
             // トランジション（対局開始演出）が開始された瞬間に敵のHPなどのUIを非表示にする
             // if (targetPlayerInfoUI != null)
@@ -124,14 +134,27 @@ namespace KillingMahjong.UI
 
             if (!isDarkened)
             {
+                // 既存の市松模様を明ける直前に、タメと開戦の着弾を足す。
+                // onMidpoint と onComplete の進行処理には触れない。
+                yield return Effects.PhaseTransitionDirector.PlayBattleStartRelease();
+
                 PlayTransitionStinger("br_riser");
                 float tFade = 0;
+                // **揺れは市松模様が半分以上晴れてから。**
+                // 晴れる前に揺らすと画面が真っ暗で、揺れがまったく見えない（2026-09-20 のユーザー指摘）
+                bool impactDone = false;
                 while (tFade < checkerFadeDuration)
                 {
                     if (checkerMaterial != null) checkerMaterial.SetFloat("_Progress", 1f - (tFade / checkerFadeDuration));
+                    if (!impactDone && tFade >= checkerFadeDuration * BattleStartImpactAtFadeRatio)
+                    {
+                        impactDone = true;
+                        Effects.PhaseTransitionDirector.PlayBattleStartImpact();
+                    }
                     tFade += Time.deltaTime;
                     yield return null;
                 }
+                if (!impactDone) Effects.PhaseTransitionDirector.PlayBattleStartImpact();
                 if (checkerMaterial != null) checkerMaterial.SetFloat("_Progress", 0f);
                 if (fullScreenCheckerImage != null) fullScreenCheckerImage.gameObject.SetActive(false);
             }

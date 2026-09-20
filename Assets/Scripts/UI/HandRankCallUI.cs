@@ -140,10 +140,25 @@ namespace KillingMahjong.UI
 
             _label.text = rankName;
             yield return FadeTo(1f, FadeInSeconds);
-            yield return new WaitForSeconds(HoldSeconds);
+            // **実時間で待つ。** 決着演出などで timeScale を触られても、出したまま残らない
+            yield return new WaitForSecondsRealtime(HoldSeconds);
             yield return FadeTo(0f, FadeOutSeconds);
 
             _routine = null;
+        }
+
+        /// <summary>
+        /// **出しっぱなしを防ぐ保険（2026-09-20）。**
+        ///
+        /// コルーチンが外から止められる（対局が終わって別の演出がオブジェクトを触る等）と、
+        /// 最後に当てた alpha のまま画面に残る。実際に決着画面へ役名が残ったことがある。
+        /// 動いている手続きが無いのに見えていたら、ここで静かに消す。
+        /// </summary>
+        private void Update()
+        {
+            if (_routine != null || _group == null || _group.alpha <= 0f) return;
+
+            _group.alpha = Mathf.MoveTowards(_group.alpha, 0f, Time.unscaledDeltaTime / FadeOutSeconds);
         }
 
         private IEnumerator FadeTo(float target, float seconds)
@@ -151,7 +166,7 @@ namespace KillingMahjong.UI
             float from = _group.alpha;
             if (seconds <= 0f) { _group.alpha = target; yield break; }
 
-            for (float t = 0f; t < seconds; t += Time.deltaTime)
+            for (float t = 0f; t < seconds; t += Time.unscaledDeltaTime)
             {
                 _group.alpha = Mathf.Lerp(from, target, t / seconds);
                 yield return null;

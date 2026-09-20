@@ -109,6 +109,10 @@ namespace KillingMahjong.UI
             if (!CanShowInstantRankCall())
             {
                 _hasRankResult = false;
+                // **手牌選択を抜けたら片付ける。** 13枚を割っただけなら消さない（自分の2秒で消える）が、
+                // フェイズが変わったら役名は用済み。残すと決着画面まで出続ける（2026-09-20）
+                if (uiManager != null && uiManager.CurrentPhaseStatus != RoundStatus.HandSelection
+                    && _rankCallUI != null) _rankCallUI.HideImmediate();
                 return;
             }
 

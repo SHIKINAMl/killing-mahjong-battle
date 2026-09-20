@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using System.Collections;
 using System.Collections.Generic;
 using KillingMahjong.Common;
 using KillingMahjong.EngineData;
@@ -14,6 +15,15 @@ namespace KillingMahjong.UI
         // --- Dragging the Hand Panel ---
         private RectTransform panelRect;
         private Vector2 dragOffset;
+        private Coroutine battleStartRiseRoutine;
+        private RectTransform battleStartRiseTarget;
+        private Vector2 battleStartRiseRestPosition;
+
+        // 800x600 の画面で手牌が画面外へ沈まず、それでも着弾と分かる最小限の移動量。
+        private const float BattleStartRiseDistance = 36f;
+
+        // 暗転解除と同時に始め、既存の市松模様フェードアウト中に収める長さ。
+        private const float BattleStartRiseDuration = 0.24f;
 
         [Header("Cursor")]
         [SerializeField] private Transform cursor; // Changed from RectTransform to Transform
@@ -132,6 +142,66 @@ namespace KillingMahjong.UI
                 autoDiscardButton.gameObject.SetActive(false);
 
                 CreatePeekButton();
+            }
+        }
+
+        /// <summary>
+        /// 賭け確定後、打牌用の自分の手牌だけを下から元の位置へ戻す。
+        ///
+        /// シーンごとの座標を持たず、現在の anchoredPosition を終点にする。
+        /// そのため UIテストシーンと OpeningScene で既存配置が違っても、配置そのものは変えない。
+        /// </summary>
+        public void PlayBattleStartRise()
+        {
+            var target = discardPhaseContainer as RectTransform;
+            if (target == null || !target.gameObject.activeInHierarchy) return;
+
+            StopBattleStartRise();
+
+            battleStartRiseTarget = target;
+            battleStartRiseRestPosition = target.anchoredPosition;
+            battleStartRiseRoutine = StartCoroutine(PlayBattleStartRiseRoutine(target, battleStartRiseRestPosition));
+        }
+
+        private void StopBattleStartRise()
+        {
+            if (battleStartRiseRoutine == null) return;
+
+            StopCoroutine(battleStartRiseRoutine);
+            if (battleStartRiseTarget != null)
+            {
+                battleStartRiseTarget.anchoredPosition = battleStartRiseRestPosition;
+            }
+
+            battleStartRiseRoutine = null;
+            battleStartRiseTarget = null;
+        }
+
+        private IEnumerator PlayBattleStartRiseRoutine(RectTransform target, Vector2 restPosition)
+        {
+            Vector2 startPosition = restPosition + Vector2.down * BattleStartRiseDistance;
+            float elapsed = 0f;
+
+            if (target != null) target.anchoredPosition = startPosition;
+
+            while (elapsed < BattleStartRiseDuration)
+            {
+                elapsed += Time.deltaTime;
+                float progress = Mathf.Clamp01(elapsed / BattleStartRiseDuration);
+                // 終点で減速させ、着弾の揺れのあとに手牌だけが跳ねないようにする。
+                progress = 1f - (1f - progress) * (1f - progress);
+                if (target != null)
+                {
+                    target.anchoredPosition = Vector2.LerpUnclamped(startPosition, restPosition, progress);
+                }
+                yield return null;
+            }
+
+            if (target != null) target.anchoredPosition = restPosition;
+            if (battleStartRiseTarget == target)
+            {
+                battleStartRiseRoutine = null;
+                battleStartRiseTarget = null;
             }
         }
 
