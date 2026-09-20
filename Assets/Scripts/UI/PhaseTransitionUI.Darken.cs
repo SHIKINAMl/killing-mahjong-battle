@@ -116,6 +116,26 @@ namespace KillingMahjong.UI
                 // 画面揺れ（着弾の衝撃）
                 StartCoroutine(ScreenShakeRoutine(0.2f, 20f));
             }
+
+            // **局名が出たら、裏牌の山を置く（2026-09-20 のユーザー指示）。**
+            // ここから配牌が届くまではサーバー待ちで、長いと画面が文字だけで止まる。
+            // 第1局だけでなく**どの局でも**混ぜられるようにする。
+            // 片付けは配牌後の RoundStartFadeOutRoutine が Hide でやっている。
+            if (!IsTutorialScene())
+            {
+                var selfRect = transform as RectTransform;
+                if (selfRect != null) Effects.TileClatterEffect.Attach(selfRect, RoundWaitClatterOffsetY);
+            }
+        }
+
+        /// <summary>局名を出したあとに置く裏牌の高さ。**画面の下端から測る**（待ち画面と同じ）。</summary>
+        private const float RoundWaitClatterOffsetY = 112f;
+
+        /// <summary>チュートリアルには出さない。台本が進む画面なので、触らせる時間が無い。</summary>
+        private bool IsTutorialScene()
+        {
+            var ui = FindFirstObjectByType<GameUIManager>();
+            return ui != null && ui.IsTutorialMode;
         }
 
         private IEnumerator RoundStartFadeOutRoutine(Action onComplete)

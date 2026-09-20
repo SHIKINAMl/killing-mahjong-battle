@@ -208,9 +208,10 @@ namespace KillingMahjong.UI
                 }
                 uiManager.PhaseTransitionUI.ChangeDarkenText($"第{_currentRoundIndex}局進行中...");
 
-                // 第1局の配牌待ちだけは、手で混ぜる裏牌の山を重ねる。
-                // 2局目以降とチュートリアルには出さない（初局の導入を賑やかにする演出）。
-                if (!uiManager.IsTutorialMode && _currentRoundIndex == 1)
+                // 配牌待ちのあいだ、手で混ぜる裏牌の山を重ねる。
+                // **2026-09-20 に全局へ広げた**（以前は第1局だけ。2局目以降も
+                // サーバー待ちで文字だけの画面になるため）。チュートリアルには出さない。
+                if (!uiManager.IsTutorialMode)
                 {
                     var transitionRect = uiManager.PhaseTransitionUI.transform as RectTransform;
                     if (transitionRect != null)
