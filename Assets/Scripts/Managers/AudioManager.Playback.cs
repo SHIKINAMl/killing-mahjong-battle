@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections;
 using System.Collections.Generic;
 
 namespace KillingMahjong.Managers
@@ -42,6 +43,37 @@ namespace KillingMahjong.Managers
 
             bgmSource.clip = clip;
             bgmSource.Play();
+        }
+
+        /// <summary>
+        /// 曲を <paramref name="seconds"/> 秒かけて小さくしてから止める（2026-09-20）。
+        ///
+        /// **場面の切れ目で「終わった」と聞かせたいときだけ使う。**
+        /// 不意打ちで断ちたいときは <see cref="CutBgmImmediately"/>。
+        /// </summary>
+        public void FadeOutBgm(float seconds)
+        {
+            if (bgmSource == null || !bgmSource.isPlaying || seconds <= 0f)
+            {
+                StopBGM();
+                return;
+            }
+            StartCoroutine(FadeOutBgmRoutine(seconds));
+        }
+
+        private IEnumerator FadeOutBgmRoutine(float seconds)
+        {
+            float from = bgmSource.volume;
+            for (float t = 0f; t < seconds; t += Time.deltaTime)
+            {
+                if (bgmSource == null) yield break;
+                bgmSource.volume = Mathf.Lerp(from, 0f, t / seconds);
+                yield return null;
+            }
+
+            StopBGM();
+            // 次に鳴らすときのために音量を戻しておく
+            if (bgmSource != null) bgmSource.volume = bgmVolume * masterVolume;
         }
 
         public void StopBGM()
