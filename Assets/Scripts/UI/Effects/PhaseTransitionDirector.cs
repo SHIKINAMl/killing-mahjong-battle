@@ -84,7 +84,7 @@ namespace KillingMahjong.UI.Effects
             if (instance == this) instance = null;
         }
 
-        // --- 相手の番のあいだ、自分の手牌を静める（2026-09-20 のユーザー指示）---
+        // --- 相手の番のあいだ、盤面の見せ方を静かに切り替える（2026-09-20 のユーザー指示）---
         //
         // 手番は BoardStateManager が持っていて、変わるたびに OnTurnChanged が飛ぶ。
         // **打牌フェイズのときだけ**効かせる。手牌選択や賭けの最中に落とすと、
@@ -116,22 +116,33 @@ namespace KillingMahjong.UI.Effects
         }
 
         /// <summary>
-        /// いまの手番とフェイズから、手牌を静めるかどうかを当て直す。
+        /// いまの手番とフェイズから、相手の番用の見せ方を当て直す。
         /// フェイズが変わったときにも呼ぶ（打牌を抜けたら必ず元へ戻す）。
         /// </summary>
         private void ApplyOpponentTurnQuiet()
         {
             var uiManager = FindFirstObjectByType<GameUIManager>();
-            if (uiManager == null || uiManager.WallUI == null) return;
+            if (uiManager == null) return;
 
             var board = BoardStateManager.Instance;
             bool quiet = board != null
+                && !uiManager.IsTutorialMode
                 && !board.IsLocalTurn
                 && uiManager.CurrentPhaseStatus == RoundStatus.Discard;
 
             // **落とすのは山牌の段だけ。** 打牌で触るのはここで、自分の手牌は
             // 「手牌を見る」で覗く方式のため画面に出ていない（2026-09-20 に実機で確認）
-            uiManager.WallUI.SetQuietForOpponentTurn(quiet);
+            if (uiManager.WallUI != null)
+            {
+                uiManager.WallUI.SetQuietForOpponentTurn(quiet);
+            }
+
+            // 相手パネルは位置を変えず、同じ手番判定だけでわずかに大きくする。
+            // 別イベントを購読すると山牌の段と食い違うため、この既存の当て直しに集約する。
+            if (uiManager.EnemyInfoUI != null)
+            {
+                uiManager.EnemyInfoUI.SetOpponentTurnEmphasis(quiet);
+            }
         }
 
         private void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
