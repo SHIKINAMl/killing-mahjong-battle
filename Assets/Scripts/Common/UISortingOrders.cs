@@ -156,6 +156,12 @@ namespace KillingMahjong.Common
         /// <summary>GameUISkillController: マリガン中のプロンプトテキスト (独立Canvas)</summary>
         public const int MulliganPromptText = 78;
 
+        /// <summary>
+        /// HandRankCallUI: 手牌が13枚そろった瞬間に出る役名（満貫／跳満／倍満／役満）。
+        /// 牌より手前・ダイアログより奥。2秒で自分から消える一瞬の表示。
+        /// </summary>
+        public const int HandRankCall = 79;
+
         // ---- 80 - 89 ダイアログ・最前面パネル ----
 
         /// <summary>

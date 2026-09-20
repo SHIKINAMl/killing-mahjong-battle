@@ -357,12 +357,12 @@ namespace KillingMahjong.UI
             }
             UpdatePhaseGuide(phaseStatus);
 
-            // 13枚そろった瞬間の聴牌プレビューもここで更新する。
+            // 13枚そろった瞬間の即席満貫以上判定もここで起こす（2026-09-20 の仕様書）。
             // 手牌の増減ごとに UpdateLayout が通るため、決定ボタンを押す前の状態だけを
             // GameUIHandSelectionController へ通知できる。
             if (gameUIManager != null && gameUIManager.HandSelectionController != null)
             {
-                gameUIManager.HandSelectionController.UpdateTenpaiPreviewForCurrentHand();
+                gameUIManager.HandSelectionController.UpdateInstantRankCallForCurrentHand();
             }
 
             if (autoDiscardButton != null)

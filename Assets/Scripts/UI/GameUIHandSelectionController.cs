@@ -16,15 +16,15 @@ namespace KillingMahjong.UI
         private List<int> _pendingHandIndexes;
         private List<int> _pendingHandTiles;
 
-        // 聴牌プレビューは確定処理とは別の、13枚選択中だけの問い合わせ。
+        // 即席の役名表示は確定処理とは別の、13枚選択中だけの問い合わせ。
         // 応答に request id はないため、送信時の山牌indexと現在の13枚を照合して
         // 選び直し後の古い応答を画面に出さない。
-        private List<int> _previewRequestIndexes;
-        private List<int> _previewResultIndexes;
-        private bool _previewRequestInFlight;
-        private bool _hasPreviewResult;
-        private bool _ignoreNextPreviewResponse;
-        private TenpaiPreviewUI _tenpaiPreviewUI;
+        private List<int> _rankRequestIndexes;
+        private List<int> _rankResultIndexes;
+        private bool _rankRequestInFlight;
+        private bool _hasRankResult;
+        private bool _ignoreNextRankResponse;
+        private HandRankCallUI _rankCallUI;
 
         /// <summary>
         /// もう取り下げられないか。**相手を待っている間は取り下げてよい**（`select_cancel` は
@@ -42,11 +42,11 @@ namespace KillingMahjong.UI
 
         private void OnDestroy()
         {
-            // TenpaiPreviewUI は既存Canvasの座標を継承しない独立Canvas。
+            // HandRankCallUI は既存Canvasの座標を継承しない独立Canvas。
             // コントローラだけが途中で破棄される場合にも残さない。
-            if (_tenpaiPreviewUI != null)
+            if (_rankCallUI != null)
             {
-                Destroy(_tenpaiPreviewUI.gameObject);
+                Destroy(_rankCallUI.gameObject);
             }
         }
 
@@ -55,7 +55,7 @@ namespace KillingMahjong.UI
             if (uiManager.CurrentPhaseStatus != RoundStatus.HandSelection) return;
             if (uiManager.DialogueUI != null && uiManager.DialogueUI.IsLogOpen) return;
 
-            StopTenpaiPreviewForSubmission();
+            StopInstantRankCallForSubmission();
             if (uiManager.HandUI != null) uiManager.HandUI.SetSubmittedState(true);
 
             if (!TryCaptureCurrentHandSelection(out _pendingHandIndexes, out _pendingHandTiles)) return;
@@ -96,49 +96,47 @@ namespace KillingMahjong.UI
 
         /// <summary>
         /// 手牌の増減後に HandUI.UpdateLayout から呼ばれる。
-        /// 本編ではサーバーへ問い合わせ、受信した値だけを TenpaiPreviewUI に渡す。
-        /// チュートリアルにはサーバーが存在しないため、誤って通信エラーを出さないよう
-        /// プレビューは表示しない（確定時の既存チュートリアル処理は変更しない）。
+        /// 本編ではサーバーへ問い合わせ、返ってきた待ちの中で**いちばん上の格**を役名として出す
+        /// （2026-09-20 の仕様書「即席満貫以上判定システム」のフロー図）。
+        /// チュートリアルにはサーバーが存在しないため、誤って通信エラーを出さないよう出さない
+        /// （確定時の既存チュートリアル処理は変更しない）。
         /// </summary>
-        public void UpdateTenpaiPreviewForCurrentHand()
+        public void UpdateInstantRankCallForCurrentHand()
         {
-            if (!CanShowTenpaiPreview())
+            // **出ている役名は途中で消さない。**（2026-09-20）
+            // 牌を1枚戻して13枚を割ったときに消していたが、仕様書のフロー図で
+            // 表示が消えるのは「2秒後のフェードアウト」と「次の役名が出るとき」だけ。
+            if (!CanShowInstantRankCall())
             {
-                _hasPreviewResult = false;
-                if (_tenpaiPreviewUI != null) _tenpaiPreviewUI.Hide();
+                _hasRankResult = false;
                 return;
             }
 
             if (!TryCaptureCurrentHandSelection(out List<int> currentIndexes, out _))
             {
-                _hasPreviewResult = false;
-                if (_tenpaiPreviewUI != null) _tenpaiPreviewUI.Hide();
+                _hasRankResult = false;
                 return;
             }
 
-            if (_previewRequestInFlight)
+            if (_rankRequestInFlight)
             {
-                if (!SameHandIndexes(currentIndexes, _previewRequestIndexes))
-                {
-                    _hasPreviewResult = false;
-                    if (_tenpaiPreviewUI != null) _tenpaiPreviewUI.Hide();
-                }
+                if (!SameHandIndexes(currentIndexes, _rankRequestIndexes)) _hasRankResult = false;
                 return;
             }
 
-            if (_hasPreviewResult && SameHandIndexes(currentIndexes, _previewResultIndexes)) return;
+            if (_hasRankResult && SameHandIndexes(currentIndexes, _rankResultIndexes)) return;
 
-            _previewRequestIndexes = new List<int>(currentIndexes);
-            _previewRequestInFlight = true;
-            _hasPreviewResult = false;
-            GetTenpaiPreviewUI().ShowPending();
+            _rankRequestIndexes = new List<int>(currentIndexes);
+            _rankRequestInFlight = true;
+            _hasRankResult = false;
+            // 待っている間は何も出さない。フロー図に「確認中」の表示は無い
             uiManager.SendActionToServer("is_tenpai", new KillingMahjong.Network.ActionPayload
             {
-                wall_indexes = _previewRequestIndexes
+                wall_indexes = _rankRequestIndexes
             });
         }
 
-        private bool CanShowTenpaiPreview()
+        private bool CanShowInstantRankCall()
         {
             return uiManager != null
                 && !uiManager.IsTutorialMode
@@ -203,83 +201,114 @@ namespace KillingMahjong.UI
             return true;
         }
 
-        private TenpaiPreviewUI GetTenpaiPreviewUI()
+        private HandRankCallUI GetRankCallUI()
         {
-            if (_tenpaiPreviewUI == null)
+            if (_rankCallUI == null)
             {
-                _tenpaiPreviewUI = TenpaiPreviewUI.Create();
+                _rankCallUI = HandRankCallUI.Create();
             }
-            return _tenpaiPreviewUI;
+            return _rankCallUI;
         }
 
-        private void StopTenpaiPreviewForSubmission()
+        /// <summary>
+        /// 待ちの一覧から、**届きうる中でいちばん上の格**を役名として出す（2026-09-20 の仕様書）。
+        ///
+        /// 満貫に届かないなら何も出さない（フロー図の「if それが満貫以上であるか → NO → なにもしない」）。
+        /// 倍率は 満貫1 / 跳満1.5 / 倍満2 / 三倍満3 / 役満4（<see cref="Managers.GameRules.GetMultiplier"/>）。
+        /// **フロー図は三倍満を分けていない**ので、3倍は「倍満以上」に含めて倍満と出す。
+        /// </summary>
+        private void ShowRankCall(EngineData.WaitData[] waits)
         {
-            if (_previewRequestInFlight)
+            if (waits == null || waits.Length == 0) return;
+
+            float best = 0f;
+            bool manganOrMore = false;
+            for (int i = 0; i < waits.Length; i++)
+            {
+                if (waits[i] == null) continue;
+                if (waits[i].mangan_or_more) manganOrMore = true;
+                if (waits[i].multiplier > best) best = waits[i].multiplier;
+            }
+
+            if (!manganOrMore) return;
+
+            string rank;
+            if (best >= 4f) rank = "役満";
+            else if (best >= 2f) rank = "倍満";
+            else if (best >= 1.5f) rank = "跳満";
+            else rank = "満貫";
+
+            GetRankCallUI().ShowRank(rank);
+        }
+
+        private void StopInstantRankCallForSubmission()
+        {
+            if (_rankRequestInFlight)
             {
                 // 直後に確定用の is_tenpai をもう一度送る。先に返るプレビュー応答だけを
                 // 捨て、確定用の応答は従来どおり確認ダイアログへ渡す。
-                _ignoreNextPreviewResponse = true;
-                _previewRequestInFlight = false;
+                _ignoreNextRankResponse = true;
+                _rankRequestInFlight = false;
             }
-            _hasPreviewResult = false;
-            if (_tenpaiPreviewUI != null) _tenpaiPreviewUI.Hide();
+            _hasRankResult = false;
+            if (_rankCallUI != null) _rankCallUI.HideImmediate();
         }
 
-        private bool TryHandleTenpaiPreview(IsTenpaiData data)
+        private bool TryHandleInstantRankCall(IsTenpaiData data)
         {
-            if (_ignoreNextPreviewResponse)
+            if (_ignoreNextRankResponse)
             {
-                _ignoreNextPreviewResponse = false;
+                _ignoreNextRankResponse = false;
                 return true;
             }
-            if (!_previewRequestInFlight) return false;
+            if (!_rankRequestInFlight) return false;
 
-            _previewRequestInFlight = false;
-            if (!CanShowTenpaiPreview()
+            _rankRequestInFlight = false;
+            if (!CanShowInstantRankCall()
                 || !TryCaptureCurrentHandSelection(out List<int> currentIndexes, out _))
             {
-                if (_tenpaiPreviewUI != null) _tenpaiPreviewUI.Hide();
+                // 返事が来た時にはもう13枚ではない。出ているものはそのまま消えさせる
                 return true;
             }
 
-            if (!SameHandIndexes(currentIndexes, _previewRequestIndexes))
+            if (!SameHandIndexes(currentIndexes, _rankRequestIndexes))
             {
-                UpdateTenpaiPreviewForCurrentHand();
+                UpdateInstantRankCallForCurrentHand();
                 return true;
             }
 
-            _previewResultIndexes = new List<int>(currentIndexes);
-            _hasPreviewResult = true;
-            GetTenpaiPreviewUI().ShowTenpai(data != null ? data.waits : null);
+            _rankResultIndexes = new List<int>(currentIndexes);
+            _hasRankResult = true;
+            ShowRankCall(data != null ? data.waits : null);
             return true;
         }
 
-        private bool TryHandleNotTenpaiPreview(string reason)
+        private bool TryHandleInstantNotTenpai(string reason)
         {
-            if (_ignoreNextPreviewResponse)
+            if (_ignoreNextRankResponse)
             {
-                _ignoreNextPreviewResponse = false;
+                _ignoreNextRankResponse = false;
                 return true;
             }
-            if (!_previewRequestInFlight) return false;
+            if (!_rankRequestInFlight) return false;
 
-            _previewRequestInFlight = false;
-            if (!CanShowTenpaiPreview()
+            _rankRequestInFlight = false;
+            if (!CanShowInstantRankCall()
                 || !TryCaptureCurrentHandSelection(out List<int> currentIndexes, out _))
             {
-                if (_tenpaiPreviewUI != null) _tenpaiPreviewUI.Hide();
+                // 返事が来た時にはもう13枚ではない。出ているものはそのまま消えさせる
                 return true;
             }
 
-            if (!SameHandIndexes(currentIndexes, _previewRequestIndexes))
+            if (!SameHandIndexes(currentIndexes, _rankRequestIndexes))
             {
-                UpdateTenpaiPreviewForCurrentHand();
+                UpdateInstantRankCallForCurrentHand();
                 return true;
             }
 
-            _previewResultIndexes = new List<int>(currentIndexes);
-            _hasPreviewResult = true;
-            GetTenpaiPreviewUI().ShowNotTenpai(reason);
+            _rankResultIndexes = new List<int>(currentIndexes);
+            _hasRankResult = true;
+            // 聴牌していないなら、フロー図どおり「なにもしない」
             return true;
         }
 
@@ -310,7 +339,7 @@ namespace KillingMahjong.UI
 
         public void HandleIsTenpaiReceived(IsTenpaiData data)
         {
-            if (TryHandleTenpaiPreview(data)) return;
+            if (TryHandleInstantRankCall(data)) return;
             if (uiManager.CurrentPhaseStatus != RoundStatus.HandSelection) return;
 
             // **応答を待っている間に「選び直す」を押されていたら、もう出さない。**
@@ -444,7 +473,7 @@ namespace KillingMahjong.UI
 
         public void HandleNotTenpaiReceived(string reason)
         {
-            if (TryHandleNotTenpaiPreview(reason)) return;
+            if (TryHandleInstantNotTenpai(reason)) return;
             if (uiManager.CurrentPhaseStatus != RoundStatus.HandSelection) return;
 
             string message = $"ノーテン（聴牌していません）\n\nこのまま決定しますか？";
