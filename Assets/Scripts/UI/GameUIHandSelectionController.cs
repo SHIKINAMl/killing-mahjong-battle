@@ -16,6 +16,16 @@ namespace KillingMahjong.UI
         private List<int> _pendingHandIndexes;
         private List<int> _pendingHandTiles;
 
+        // 聴牌プレビューは確定処理とは別の、13枚選択中だけの問い合わせ。
+        // 応答に request id はないため、送信時の山牌indexと現在の13枚を照合して
+        // 選び直し後の古い応答を画面に出さない。
+        private List<int> _previewRequestIndexes;
+        private List<int> _previewResultIndexes;
+        private bool _previewRequestInFlight;
+        private bool _hasPreviewResult;
+        private bool _ignoreNextPreviewResponse;
+        private TenpaiPreviewUI _tenpaiPreviewUI;
+
         /// <summary>
         /// もう取り下げられないか。**相手を待っている間は取り下げてよい**（`select_cancel` は
         /// そのためにある）。手遅れになるのは相手も確定して掛け金フェイズへ移る直前だけ。
@@ -30,39 +40,25 @@ namespace KillingMahjong.UI
             this.uiManager = manager;
         }
 
+        private void OnDestroy()
+        {
+            // TenpaiPreviewUI は既存Canvasの座標を継承しない独立Canvas。
+            // コントローラだけが途中で破棄される場合にも残さない。
+            if (_tenpaiPreviewUI != null)
+            {
+                Destroy(_tenpaiPreviewUI.gameObject);
+            }
+        }
+
         public void CompleteHandSelection()
         {
             if (uiManager.CurrentPhaseStatus != RoundStatus.HandSelection) return;
             if (uiManager.DialogueUI != null && uiManager.DialogueUI.IsLogOpen) return;
-            
+
+            StopTenpaiPreviewForSubmission();
             if (uiManager.HandUI != null) uiManager.HandUI.SetSubmittedState(true);
 
-            if (BoardStateManager.Instance.TargetHandIndexes != null && BoardStateManager.Instance.TargetHandIndexes.Count == 13)
-            {
-                _pendingHandIndexes = new List<int>(BoardStateManager.Instance.TargetHandIndexes);
-            }
-            else
-            {
-                _pendingHandIndexes = new List<int>();
-                HashSet<int> usedIndexes = new HashSet<int>();
-                foreach(int tileId in BoardStateManager.Instance.CurrentHandTiles) {
-                     var wallTiles = BoardStateManager.Instance.OriginalWallTiles;
-                     int idx = -1;
-                     for (int i = 0; i < wallTiles.Count; i++)
-                     {
-                         if (wallTiles[i] == tileId && !usedIndexes.Contains(i))
-                         {
-                             idx = i;
-                             break;
-                         }
-                     }
-                     if (idx >= 0) {
-                         _pendingHandIndexes.Add(idx);
-                         usedIndexes.Add(idx);
-                     }
-                }
-            }
-            _pendingHandTiles = new List<int>(BoardStateManager.Instance.CurrentHandTiles);
+            if (!TryCaptureCurrentHandSelection(out _pendingHandIndexes, out _pendingHandTiles)) return;
 
             if (uiManager.IsTutorialMode)
             {
@@ -98,6 +94,195 @@ namespace KillingMahjong.UI
             }
         }
 
+        /// <summary>
+        /// 手牌の増減後に HandUI.UpdateLayout から呼ばれる。
+        /// 本編ではサーバーへ問い合わせ、受信した値だけを TenpaiPreviewUI に渡す。
+        /// チュートリアルにはサーバーが存在しないため、誤って通信エラーを出さないよう
+        /// プレビューは表示しない（確定時の既存チュートリアル処理は変更しない）。
+        /// </summary>
+        public void UpdateTenpaiPreviewForCurrentHand()
+        {
+            if (!CanShowTenpaiPreview())
+            {
+                _hasPreviewResult = false;
+                if (_tenpaiPreviewUI != null) _tenpaiPreviewUI.Hide();
+                return;
+            }
+
+            if (!TryCaptureCurrentHandSelection(out List<int> currentIndexes, out _))
+            {
+                _hasPreviewResult = false;
+                if (_tenpaiPreviewUI != null) _tenpaiPreviewUI.Hide();
+                return;
+            }
+
+            if (_previewRequestInFlight)
+            {
+                if (!SameHandIndexes(currentIndexes, _previewRequestIndexes))
+                {
+                    _hasPreviewResult = false;
+                    if (_tenpaiPreviewUI != null) _tenpaiPreviewUI.Hide();
+                }
+                return;
+            }
+
+            if (_hasPreviewResult && SameHandIndexes(currentIndexes, _previewResultIndexes)) return;
+
+            _previewRequestIndexes = new List<int>(currentIndexes);
+            _previewRequestInFlight = true;
+            _hasPreviewResult = false;
+            GetTenpaiPreviewUI().ShowPending();
+            uiManager.SendActionToServer("is_tenpai", new KillingMahjong.Network.ActionPayload
+            {
+                wall_indexes = _previewRequestIndexes
+            });
+        }
+
+        private bool CanShowTenpaiPreview()
+        {
+            return uiManager != null
+                && !uiManager.IsTutorialMode
+                && uiManager.CurrentPhaseStatus == RoundStatus.HandSelection
+                && (uiManager.HandUI == null || !uiManager.HandUI.IsSubmitted)
+                && BoardStateManager.Instance != null
+                && BoardStateManager.Instance.CurrentHandTiles != null
+                && BoardStateManager.Instance.CurrentHandTiles.Count == 13;
+        }
+
+        private bool TryCaptureCurrentHandSelection(out List<int> handIndexes, out List<int> handTiles)
+        {
+            handIndexes = new List<int>();
+            handTiles = new List<int>();
+
+            if (BoardStateManager.Instance == null || BoardStateManager.Instance.CurrentHandTiles == null)
+            {
+                return false;
+            }
+
+            handTiles = new List<int>(BoardStateManager.Instance.CurrentHandTiles);
+            if (handTiles.Count != 13) return false;
+
+            if (BoardStateManager.Instance.TargetHandIndexes != null
+                && BoardStateManager.Instance.TargetHandIndexes.Count == 13)
+            {
+                handIndexes = new List<int>(BoardStateManager.Instance.TargetHandIndexes);
+                return true;
+            }
+
+            var wallTiles = BoardStateManager.Instance.OriginalWallTiles;
+            if (wallTiles == null) return false;
+
+            HashSet<int> usedIndexes = new HashSet<int>();
+            foreach (int tileId in handTiles)
+            {
+                int index = -1;
+                for (int i = 0; i < wallTiles.Count; i++)
+                {
+                    if (wallTiles[i] == tileId && !usedIndexes.Contains(i))
+                    {
+                        index = i;
+                        break;
+                    }
+                }
+
+                if (index < 0) return false;
+                handIndexes.Add(index);
+                usedIndexes.Add(index);
+            }
+
+            return handIndexes.Count == 13;
+        }
+
+        private static bool SameHandIndexes(List<int> first, List<int> second)
+        {
+            if (first == null || second == null || first.Count != second.Count) return false;
+            for (int i = 0; i < first.Count; i++)
+            {
+                if (first[i] != second[i]) return false;
+            }
+            return true;
+        }
+
+        private TenpaiPreviewUI GetTenpaiPreviewUI()
+        {
+            if (_tenpaiPreviewUI == null)
+            {
+                _tenpaiPreviewUI = TenpaiPreviewUI.Create();
+            }
+            return _tenpaiPreviewUI;
+        }
+
+        private void StopTenpaiPreviewForSubmission()
+        {
+            if (_previewRequestInFlight)
+            {
+                // 直後に確定用の is_tenpai をもう一度送る。先に返るプレビュー応答だけを
+                // 捨て、確定用の応答は従来どおり確認ダイアログへ渡す。
+                _ignoreNextPreviewResponse = true;
+                _previewRequestInFlight = false;
+            }
+            _hasPreviewResult = false;
+            if (_tenpaiPreviewUI != null) _tenpaiPreviewUI.Hide();
+        }
+
+        private bool TryHandleTenpaiPreview(IsTenpaiData data)
+        {
+            if (_ignoreNextPreviewResponse)
+            {
+                _ignoreNextPreviewResponse = false;
+                return true;
+            }
+            if (!_previewRequestInFlight) return false;
+
+            _previewRequestInFlight = false;
+            if (!CanShowTenpaiPreview()
+                || !TryCaptureCurrentHandSelection(out List<int> currentIndexes, out _))
+            {
+                if (_tenpaiPreviewUI != null) _tenpaiPreviewUI.Hide();
+                return true;
+            }
+
+            if (!SameHandIndexes(currentIndexes, _previewRequestIndexes))
+            {
+                UpdateTenpaiPreviewForCurrentHand();
+                return true;
+            }
+
+            _previewResultIndexes = new List<int>(currentIndexes);
+            _hasPreviewResult = true;
+            GetTenpaiPreviewUI().ShowTenpai(data != null ? data.waits : null);
+            return true;
+        }
+
+        private bool TryHandleNotTenpaiPreview(string reason)
+        {
+            if (_ignoreNextPreviewResponse)
+            {
+                _ignoreNextPreviewResponse = false;
+                return true;
+            }
+            if (!_previewRequestInFlight) return false;
+
+            _previewRequestInFlight = false;
+            if (!CanShowTenpaiPreview()
+                || !TryCaptureCurrentHandSelection(out List<int> currentIndexes, out _))
+            {
+                if (_tenpaiPreviewUI != null) _tenpaiPreviewUI.Hide();
+                return true;
+            }
+
+            if (!SameHandIndexes(currentIndexes, _previewRequestIndexes))
+            {
+                UpdateTenpaiPreviewForCurrentHand();
+                return true;
+            }
+
+            _previewResultIndexes = new List<int>(currentIndexes);
+            _hasPreviewResult = true;
+            GetTenpaiPreviewUI().ShowNotTenpai(reason);
+            return true;
+        }
+
 
         public void CancelHandSelection()
         {
@@ -125,6 +310,7 @@ namespace KillingMahjong.UI
 
         public void HandleIsTenpaiReceived(IsTenpaiData data)
         {
+            if (TryHandleTenpaiPreview(data)) return;
             if (uiManager.CurrentPhaseStatus != RoundStatus.HandSelection) return;
 
             // **応答を待っている間に「選び直す」を押されていたら、もう出さない。**
@@ -258,6 +444,7 @@ namespace KillingMahjong.UI
 
         public void HandleNotTenpaiReceived(string reason)
         {
+            if (TryHandleNotTenpaiPreview(reason)) return;
             if (uiManager.CurrentPhaseStatus != RoundStatus.HandSelection) return;
 
             string message = $"ノーテン（聴牌していません）\n\nこのまま決定しますか？";

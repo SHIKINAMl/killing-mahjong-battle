@@ -409,8 +409,11 @@ namespace KillingMahjong.EngineData
     {
         public int tile;
         public bool mangan_or_more;
-        public int han; // ★ 追加: 翻数
+        public int han;
         public string[] yaku;
+        public string[] base_yaku;
+        public float multiplier;
+        public string multiplier_label;
     }
 
     [Serializable]

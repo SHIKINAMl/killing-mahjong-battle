@@ -198,7 +198,7 @@ namespace KillingMahjong.Network
             yakuJson += "]";
 
             string json = $"{{\"type\":\"is_tenpai\",\"data\":{{\"waits\":[" +
-                          $"{{\"tile\":{LOCAL_WAIT_TILE},\"mangan_or_more\":true,\"yaku\":{yakuJson},\"base_yaku\":{yakuJson}}}" +
+                          $"{{\"tile\":{LOCAL_WAIT_TILE},\"mangan_or_more\":true,\"han\":7,\"yaku\":{yakuJson},\"base_yaku\":{yakuJson},\"multiplier\":3.0,\"multiplier_label\":\"跳満\"}}" +
                           $"]}}}}";
             SendRawJson(json);
             Debug.Log($"[Debug Client] is_tenpai 返答: 待ち=七萬(6), 清一色七対子, マンガン以上=true");

@@ -357,6 +357,14 @@ namespace KillingMahjong.UI
             }
             UpdatePhaseGuide(phaseStatus);
 
+            // 13枚そろった瞬間の聴牌プレビューもここで更新する。
+            // 手牌の増減ごとに UpdateLayout が通るため、決定ボタンを押す前の状態だけを
+            // GameUIHandSelectionController へ通知できる。
+            if (gameUIManager != null && gameUIManager.HandSelectionController != null)
+            {
+                gameUIManager.HandSelectionController.UpdateTenpaiPreviewForCurrentHand();
+            }
+
             if (autoDiscardButton != null)
             {
                 // 自動打牌ボタンは非表示にする（要望5）。
