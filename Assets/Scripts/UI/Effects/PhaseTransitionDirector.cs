@@ -119,30 +119,71 @@ namespace KillingMahjong.UI.Effects
         /// いまの手番とフェイズから、相手の番用の見せ方を当て直す。
         /// フェイズが変わったときにも呼ぶ（打牌を抜けたら必ず元へ戻す）。
         /// </summary>
+        /// <summary>
+        /// 落とし始めるまでの待ち（2026-09-20 のユーザー指摘）。
+        ///
+        /// **手番は局の終わりにも切り替わる。** その一瞬で落とすと、
+        /// 直後に始まる賭け金フェイズの暗転の**前に**山牌が透けて、ちらついて見える。
+        /// 少し待ってから落とせば、暗転が先に画面を覆うので気にならない。
+        /// 元へ戻すほう（自分の番）は待たない。待つと打てる瞬間が遅れて見える。
+        /// </summary>
+        private const float QuietOnsetDelaySeconds = 0.45f;
+
+        private bool quietApplied;
+        private float quietWantedSince = -1f;
+
+        /// <summary>
+        /// いまの手番・フェイズ・演出中かどうかから、山牌を落とすかを決める。
+        ///
+        /// **毎フレーム当て直す。** イベントだけに頼ると、先攻で始まったときのように
+        /// 「演出が明けた時点ではもう手番が変わらない」場面で落としたままになる
+        /// （実際に、先攻の初手で山牌が透けたままになった）。
+        /// </summary>
         private void ApplyOpponentTurnQuiet()
         {
             var uiManager = FindFirstObjectByType<GameUIManager>();
             if (uiManager == null) return;
 
             var board = BoardStateManager.Instance;
-            bool quiet = board != null
+            bool wantQuiet = board != null
                 && !uiManager.IsTutorialMode
                 && !board.IsLocalTurn
-                && uiManager.CurrentPhaseStatus == RoundStatus.Discard;
+                && uiManager.CurrentPhaseStatus == RoundStatus.Discard
+                && !uiManager.IsBusyWithTransition;   // 演出中は触らない。暗転が明けてから決める
+
+            if (wantQuiet)
+            {
+                if (quietWantedSince < 0f) quietWantedSince = Time.unscaledTime;
+                if (!quietApplied && Time.unscaledTime - quietWantedSince < QuietOnsetDelaySeconds) return;
+            }
+            else
+            {
+                quietWantedSince = -1f;
+            }
+
+            if (quietApplied == wantQuiet) return;
+            quietApplied = wantQuiet;
 
             // **落とすのは山牌の段だけ。** 打牌で触るのはここで、自分の手牌は
             // 「手牌を見る」で覗く方式のため画面に出ていない（2026-09-20 に実機で確認）
             if (uiManager.WallUI != null)
             {
-                uiManager.WallUI.SetQuietForOpponentTurn(quiet);
+                uiManager.WallUI.SetQuietForOpponentTurn(wantQuiet);
             }
 
             // 相手パネルは位置を変えず、同じ手番判定だけでわずかに大きくする。
             // 別イベントを購読すると山牌の段と食い違うため、この既存の当て直しに集約する。
             if (uiManager.EnemyInfoUI != null)
             {
-                uiManager.EnemyInfoUI.SetOpponentTurnEmphasis(quiet);
+                uiManager.EnemyInfoUI.SetOpponentTurnEmphasis(wantQuiet);
             }
+        }
+
+        private void Update()
+        {
+            // 手番のイベントだけでは取りこぼす場面があるので、ここで当て直す。
+            // 中身は状態が変わったときしか働かないので、毎フレーム呼んでも重くない
+            ApplyOpponentTurnQuiet();
         }
 
         private void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
