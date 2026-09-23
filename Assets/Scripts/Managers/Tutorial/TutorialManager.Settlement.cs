@@ -119,7 +119,7 @@ namespace KillingMahjong.Managers
 
             // 6〜7. 表全体を指してから、何を読む表なのかを説明する。
             GuideTo(ronUI != null ? ronUI.TutorialSettlementGuideTarget : null, false, new Vector2(0f, 18f),
-                UI.TutorialHighlightUI.Style.Frame);
+                UI.TutorialHighlightUI.Style.Band);
             yield return StartCoroutine(PlayLines(new List<TutorialLine>
             {
                 new TutorialLine("これが点数計算表ね"),
