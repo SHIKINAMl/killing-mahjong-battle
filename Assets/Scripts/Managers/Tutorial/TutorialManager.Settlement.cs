@@ -118,7 +118,8 @@ namespace KillingMahjong.Managers
             }
 
             // 6〜7. 表全体を指してから、何を読む表なのかを説明する。
-            GuideTo(ronUI != null ? ronUI.TutorialSettlementGuideTarget : null, false, new Vector2(0f, 18f));
+            GuideTo(ronUI != null ? ronUI.TutorialSettlementGuideTarget : null, false, new Vector2(0f, 18f),
+                UI.TutorialHighlightUI.Style.Frame);
             yield return StartCoroutine(PlayLines(new List<TutorialLine>
             {
                 new TutorialLine("これが点数計算表ね"),
@@ -127,7 +128,8 @@ namespace KillingMahjong.Managers
             ClearGuide();
 
             // 8〜11. 払い戻しの計算欄を指して、満貫での増え方を説明する。
-            GuideTo(ronUI != null ? ronUI.TutorialRefundFormulaGuideTarget : null, false, new Vector2(0f, 18f));
+            GuideTo(ronUI != null ? ronUI.TutorialRefundFormulaGuideTarget : null, false, new Vector2(0f, 18f),
+                UI.TutorialHighlightUI.Style.Band);
             yield return StartCoroutine(PlayLines(new List<TutorialLine>
             {
                 new TutorialLine("今回君は2000を賭けたから"),
@@ -198,7 +200,8 @@ namespace KillingMahjong.Managers
                 yield return null;
                 ronUI.MoveTutorialSettlementLeft();
             }
-            GuideTo(ronUI != null ? ronUI.TutorialDamageFormulaGuideTarget : null, false, new Vector2(0f, 18f));
+            GuideTo(ronUI != null ? ronUI.TutorialDamageFormulaGuideTarget : null, false, new Vector2(0f, 18f),
+                UI.TutorialHighlightUI.Style.Band);
 
             // 24〜26. 負けた場合の差し引きを説明する。
             yield return StartCoroutine(PlayLines(new List<TutorialLine>

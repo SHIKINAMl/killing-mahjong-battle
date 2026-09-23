@@ -141,6 +141,12 @@ namespace KillingMahjong.Common
         /// <summary>TutorialMaskUI: 誘導先だけを切り抜く集中マスク</summary>
         public const int TutorialMask = 60;
 
+        /// <summary>
+        /// TutorialHighlightUI: 説明している範囲を塗る／囲む強調（2026-09-24）。
+        /// 点数計算表（ResultPanel 55）の上に重ね、矢印(65)よりは奥。
+        /// </summary>
+        public const int TutorialHighlight = 63;
+
         /// <summary>TutorialArrowUI: 誘導矢印。穴の外にはみ出すので必ずマスクより手前に置く</summary>
         public const int TutorialArrow = 65;
 

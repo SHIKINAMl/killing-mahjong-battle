@@ -93,11 +93,26 @@ namespace KillingMahjong.Managers
         /// false にすると矢印だけで指し示す。マスクは穴の外側のクリックを全て食べるので、
         /// セリフ送りと併用したい場面（説明しながら指す）では必ず false にすること。
         /// </param>
-        private void GuideTo(RectTransform target, bool useMask = true, Vector2? arrowOffset = null)
+        /// <param name="highlight">
+        /// 指定すると、矢印の代わりに**範囲そのもの**を塗る／囲む（<see cref="UI.TutorialHighlightUI"/>）。
+        /// 点数計算表のように、点で指しても何を指しているのか伝わらない相手に使う。
+        /// </param>
+        private void GuideTo(RectTransform target, bool useMask = true, Vector2? arrowOffset = null,
+            UI.TutorialHighlightUI.Style? highlight = null)
         {
             if (target == null) return;
 
-            if (arrowUI != null) arrowUI.ShowAt(target, arrowOffset ?? new Vector2(0, 50f));
+            // **面で示すときは矢印を出さない。** 帯は表の文字の上に重なって読みづらくなるし、
+            // 枠のほうも、表の上端のすぐ外＝立ち絵のあごの前に 80x80 の矢印が立つ。
+            // どこを見ればいいかは枠と帯がすでに言っているので、二重に指さない。
+            if (arrowUI != null)
+            {
+                if (highlight.HasValue) arrowUI.Hide();
+                else arrowUI.ShowAt(target, arrowOffset ?? new Vector2(0, 50f));
+            }
+
+            if (highlight.HasValue) UI.TutorialHighlightUI.Show(target, highlight.Value);
+            else UI.TutorialHighlightUI.HideCurrent();
 
             if (useMask)
             {
@@ -113,6 +128,7 @@ namespace KillingMahjong.Managers
         {
             if (arrowUI != null) arrowUI.Hide();
             if (maskUI != null) maskUI.Hide();
+            UI.TutorialHighlightUI.HideCurrent();
         }
 
     }
