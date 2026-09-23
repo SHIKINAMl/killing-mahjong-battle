@@ -56,6 +56,224 @@ namespace KillingMahjong.UI
         /// <summary>表を読み切らせる最後の静止。0.80 → 1.50</summary>
         private const float ReadHold = 1.5f;
 
+        // チュートリアル第1局の説明用。通常のロン演出とは別の順番で同じ清算パネルを読ませるため、
+        // パネルそのものと既存の血移動に渡す値だけを一時的に保持する。
+        private GameObject _tutorialSettlementContainer;
+        private RectTransform _tutorialSettlementPanel;
+        private RectTransform _tutorialRefundFormulaTarget;
+        private RectTransform _tutorialDamageFormulaTarget;
+        private TextMeshProUGUI _tutorialMyBetText;
+        private TextMeshProUGUI _tutorialTheirBetText;
+        private TextMeshProUGUI _tutorialMyMultText;
+
+        /// <summary>第1局の「点数計算表」を指し示すための実体。</summary>
+        public RectTransform TutorialSettlementGuideTarget => _tutorialSettlementPanel;
+
+        /// <summary>払い戻しの説明で、素点と倍率の行をまとめて指し示すための実体。</summary>
+        public RectTransform TutorialRefundFormulaGuideTarget => _tutorialRefundFormulaTarget;
+
+        /// <summary>負けた場合の説明で、同じ計算欄を別の手順として指し示すための実体。</summary>
+        public RectTransform TutorialDamageFormulaGuideTarget => _tutorialDamageFormulaTarget;
+
+        /// <summary>
+        /// チュートリアル第1局専用に、既存の清算パネルを静止表示する。
+        /// ロン演出の <see cref="SettlementRoutine"/> は表を読ませた直後に血を動かすため、
+        /// 台本の説明を挟む第1局ではここで同じ枠を先に出す。
+        /// </summary>
+        public void ShowTutorialSettlement(RonSettlementInfo settlement)
+        {
+            HideTutorialSettlement();
+            if (settlement == null) return;
+
+            _tutorialSettlementContainer = new GameObject("TutorialSettlementCanvas", typeof(RectTransform));
+            _tutorialSettlementContainer.transform.SetParent(transform, false);
+            _tutorialSettlementContainer.transform.SetAsLastSibling();
+
+            var containerRt = _tutorialSettlementContainer.GetComponent<RectTransform>();
+            containerRt.anchorMin = Vector2.zero;
+            containerRt.anchorMax = Vector2.one;
+            containerRt.offsetMin = Vector2.zero;
+            containerRt.offsetMax = Vector2.zero;
+
+            var canvas = _tutorialSettlementContainer.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.overrideSorting = true;
+            // セリフ送りは表の上からでも効かなければならないので、GraphicRaycaster は付けない。
+            canvas.sortingOrder = UISortingOrders.ResultPanel;
+
+            var scaler = _tutorialSettlementContainer.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(800f, 600f);
+            scaler.matchWidthOrHeight = 0f;
+
+            var hanTexts = new List<TextMeshProUGUI>();
+            TextMeshProUGUI totalHanText, multiplierText;
+            TextMeshProUGUI myBetText, theirBetText, myMultText, theirMultText;
+            TextMeshProUGUI tankiMine, tankiTheirs;
+            TextMeshProUGUI myDeltaText, theirDeltaText, myHpText, theirHpText;
+
+            CanvasGroup panelGroup = BuildSettlementPanel(containerRt, settlement,
+                hanTexts, out totalHanText, out multiplierText,
+                out myBetText, out theirBetText, out myMultText, out theirMultText,
+                out tankiMine, out tankiTheirs,
+                out myDeltaText, out theirDeltaText, out myHpText, out theirHpText);
+
+            FillTutorialSettlementValues(settlement, hanTexts, totalHanText, multiplierText,
+                myBetText, theirBetText, myMultText, theirMultText, tankiMine, tankiTheirs);
+            panelGroup.alpha = 1f;
+
+            _tutorialSettlementPanel = panelGroup.transform as RectTransform;
+            _tutorialMyBetText = myBetText;
+            _tutorialTheirBetText = theirBetText;
+            _tutorialMyMultText = myMultText;
+
+            Canvas.ForceUpdateCanvases();
+            if (_tutorialSettlementPanel != null)
+                LayoutRebuilder.ForceRebuildLayoutImmediate(_tutorialSettlementPanel);
+            RebuildTutorialFormulaTargets();
+        }
+
+        /// <summary>表を女の子の顔と重ならない左側へ寄せる。</summary>
+        public void MoveTutorialSettlementLeft()
+        {
+            if (_tutorialSettlementPanel == null) return;
+            _tutorialSettlementPanel.anchoredPosition = new Vector2(-115f, _tutorialSettlementPanel.anchoredPosition.y);
+            // 誘導対象は表とは別の透明Rectなので、表を寄せた直後の位置で作り直す。
+            RebuildTutorialFormulaTargets();
+        }
+
+        /// <summary>表だけを閉じる。第1局の説明を抜けたあとに本編のUIを残さないために呼ぶ。</summary>
+        public void HideTutorialSettlement()
+        {
+            if (_tutorialSettlementContainer != null) Destroy(_tutorialSettlementContainer);
+            ClearTutorialSettlementReferences();
+        }
+
+        /// <summary>
+        /// 表を消しながら、通常の清算と同じ血移動・増減表示を出す。
+        /// これで第1局だけ「説明を読んでから獲得を見せる」順にでき、本編の清算順は変えない。
+        /// </summary>
+        public IEnumerator PlayTutorialSettlementTransfer(RonSettlementInfo settlement,
+            PlayerInfoUI playerInfo, EnemyInfoUI enemyInfo,
+            int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp)
+        {
+            if (_tutorialSettlementContainer == null || settlement == null ||
+                _tutorialMyBetText == null || _tutorialTheirBetText == null)
+            {
+                if (playerInfo != null) playerInfo.SetHP(newLocalHp);
+                if (enemyInfo != null) enemyInfo.SetHP(newEnemyHp);
+                yield break;
+            }
+
+            yield return BloodTransferRoutine(_tutorialSettlementContainer, settlement,
+                _tutorialMyBetText, _tutorialTheirBetText,
+                playerInfo, enemyInfo, prevLocalHp, newLocalHp, prevEnemyHp, newEnemyHp);
+            ClearTutorialSettlementReferences();
+        }
+
+        /// <summary>
+        /// 負けた場合の説明では実際のHPを変えず、既存の増減ラベルだけで相手の被ダメージ例を見せる。
+        /// この局はプレイヤー勝利済みなので、説明のために相手の状態を書き換えてはいけない。
+        /// </summary>
+        public void ShowTutorialDamagePreview(EnemyInfoUI enemyInfo, int damage)
+        {
+            if (enemyInfo == null || enemyInfo.HpAnchor == null || damage <= 0) return;
+
+            GameObject stage = new GameObject("TutorialDamagePreview");
+            stage.transform.SetParent(transform, false);
+            stage.transform.SetAsLastSibling();
+            RectTransform stageRt = stage.AddComponent<RectTransform>();
+            stageRt.anchorMin = Vector2.zero;
+            stageRt.anchorMax = Vector2.one;
+            stageRt.offsetMin = Vector2.zero;
+            stageRt.offsetMax = Vector2.zero;
+
+            Canvas canvas = stage.AddComponent<Canvas>();
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = UISortingOrders.RonAnimation;
+
+            SpawnHpDeltaLabel(stageRt, enemyInfo.HpAnchor, -damage, AccentThem, placeLeft: false);
+            StartCoroutine(DestroyTutorialDamagePreview(stage));
+        }
+
+        private static IEnumerator DestroyTutorialDamagePreview(GameObject stage)
+        {
+            yield return new WaitForSeconds(1f);
+            if (stage != null) Destroy(stage);
+        }
+
+        private void FillTutorialSettlementValues(RonSettlementInfo settlement, List<TextMeshProUGUI> hanTexts,
+            TextMeshProUGUI totalHanText, TextMeshProUGUI multiplierText,
+            TextMeshProUGUI myBetText, TextMeshProUGUI theirBetText,
+            TextMeshProUGUI myMultText, TextMeshProUGUI theirMultText,
+            TextMeshProUGUI tankiMine, TextMeshProUGUI tankiTheirs)
+        {
+            for (int i = 0; i < hanTexts.Count && i < settlement.Rows.Count; i++)
+                hanTexts[i].text = settlement.ShowPerRowHan ? $"{settlement.Rows[i].Han}翻" : "";
+
+            string multiplier = "×" + settlement.Multiplier.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+            if (totalHanText != null) totalHanText.text = $"{settlement.TotalHan}翻";
+            if (multiplierText != null) multiplierText.text = multiplier;
+            if (myBetText != null) myBetText.text = settlement.MyBet.ToString();
+            if (theirBetText != null) theirBetText.text = settlement.TheirBet.ToString();
+            if (myMultText != null) myMultText.text = multiplier;
+            if (theirMultText != null) theirMultText.text = multiplier;
+
+            if (settlement.IsTankiWait && tankiMine != null && tankiTheirs != null)
+            {
+                tankiMine.text = settlement.LocalWon ? "-" : "×2";
+                tankiTheirs.text = settlement.LocalWon ? "×2" : "-";
+            }
+        }
+
+        private RectTransform CreateTutorialFormulaTarget(string name, RectTransform firstRow, RectTransform lastRow)
+        {
+            if (_tutorialSettlementContainer == null || firstRow == null || lastRow == null) return null;
+
+            Vector3[] corners = new Vector3[4];
+            firstRow.GetWorldCorners(corners);
+            Vector3 min = corners[0];
+            Vector3 max = corners[2];
+            lastRow.GetWorldCorners(corners);
+            min = Vector3.Min(min, corners[0]);
+            max = Vector3.Max(max, corners[2]);
+
+            RectTransform containerRt = _tutorialSettlementContainer.GetComponent<RectTransform>();
+            Vector2 localMin = containerRt.InverseTransformPoint(min);
+            Vector2 localMax = containerRt.InverseTransformPoint(max);
+
+            GameObject target = new GameObject(name, typeof(RectTransform));
+            target.transform.SetParent(_tutorialSettlementContainer.transform, false);
+            RectTransform targetRt = target.GetComponent<RectTransform>();
+            targetRt.anchorMin = targetRt.anchorMax = new Vector2(0.5f, 0.5f);
+            targetRt.pivot = new Vector2(0.5f, 0.5f);
+            targetRt.sizeDelta = localMax - localMin;
+            targetRt.anchoredPosition = (localMin + localMax) * 0.5f;
+            return targetRt;
+        }
+
+        private void RebuildTutorialFormulaTargets()
+        {
+            if (_tutorialRefundFormulaTarget != null) Destroy(_tutorialRefundFormulaTarget.gameObject);
+            if (_tutorialDamageFormulaTarget != null) Destroy(_tutorialDamageFormulaTarget.gameObject);
+
+            RectTransform betRow = _tutorialMyBetText != null ? _tutorialMyBetText.rectTransform.parent as RectTransform : null;
+            RectTransform multRow = _tutorialMyMultText != null ? _tutorialMyMultText.rectTransform.parent as RectTransform : null;
+            _tutorialRefundFormulaTarget = CreateTutorialFormulaTarget("RefundFormulaGuideTarget", betRow, multRow);
+            _tutorialDamageFormulaTarget = CreateTutorialFormulaTarget("DamageFormulaGuideTarget", betRow, multRow);
+        }
+
+        private void ClearTutorialSettlementReferences()
+        {
+            _tutorialSettlementContainer = null;
+            _tutorialSettlementPanel = null;
+            _tutorialRefundFormulaTarget = null;
+            _tutorialDamageFormulaTarget = null;
+            _tutorialMyBetText = null;
+            _tutorialTheirBetText = null;
+            _tutorialMyMultText = null;
+        }
+
         private IEnumerator SettlementRoutine(RectTransform containerRt, GameObject container, RonSettlementInfo s,
             PlayerInfoUI playerInfo, EnemyInfoUI enemyInfo, int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp)
         {

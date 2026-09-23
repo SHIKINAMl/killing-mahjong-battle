@@ -59,7 +59,8 @@ namespace KillingMahjong.UI
 
         private IEnumerator SequenceRoutine(List<int> handTiles, int ronTile, List<string> yakuList, string formula, string rankName, int score, bool isLocalPlayerWin,
             PlayerInfoUI playerInfo, EnemyInfoUI enemyInfo, int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp, System.Action onComplete,
-            string scoreFormula, RonSettlementInfo settlement = null)
+            string scoreFormula, RonSettlementInfo settlement = null,
+            bool suppressSettlementPanel = false, bool deferHpUpdate = false)
         {
             // 0. カットイン演出（勝者の顔と「ロン！」を表示）
             bool cutinFinished = false;
@@ -250,11 +251,16 @@ namespace KillingMahjong.UI
             if (settlement == null)
             {
                 // **HPだけは必ず最終値に合わせる。** ここで抜けて放置すると
-                // サーバーの結果と画面がずれたまま次の局へ進む
-                Debug.LogWarning("[RonAnimationUI] 内訳の無いロン。パネルを出さずHPだけ最終値に合わせる");
+                // サーバーの結果と画面がずれたまま次の局へ進む。
+                // ただしチュートリアル第1局だけは、台本どおり表を読ませてから既存の血移動で反映する。
+                if (!suppressSettlementPanel)
+                    Debug.LogWarning("[RonAnimationUI] 内訳の無いロン。パネルを出さずHPだけ最終値に合わせる");
                 Destroy(container);
-                if (playerInfo != null) playerInfo.SetHP(newLocalHp);
-                if (enemyInfo != null) enemyInfo.SetHP(newEnemyHp);
+                if (!deferHpUpdate)
+                {
+                    if (playerInfo != null) playerInfo.SetHP(newLocalHp);
+                    if (enemyInfo != null) enemyInfo.SetHP(newEnemyHp);
+                }
                 yield return new WaitForSeconds(0.2f);
                 onComplete?.Invoke();
                 yield break;

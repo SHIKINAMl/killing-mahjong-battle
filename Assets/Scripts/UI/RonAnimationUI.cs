@@ -104,13 +104,21 @@ namespace KillingMahjong.UI
         /// </param>
         /// <param name="settlement">
         /// 清算パネルの内容。**渡すと「式 → ランク → 巨大な数字」の代わりに1枚のパネルを出す。**
-        /// null なら従来の見せ方に落ちる（チュートリアルなど内訳を持たない経路のため）。
+        /// null なら内訳を出さず、HPだけを最終値へ反映する。
+        /// </param>
+        /// <param name="suppressSettlementPanel">
+        /// チュートリアル第1局だけは、ロン演出と清算表の説明を別の手順で見せる。
+        /// 本編の演出は従来どおり <paramref name="settlement"/> を渡す。
+        /// </param>
+        /// <param name="deferHpUpdate">
+        /// 清算表を読ませた後に既存の血移動表示を出すため、チュートリアル第1局だけHP反映を後ろへ送る。
         /// </param>
         public void PlayRonSequence(List<int> handTiles, int ronTile, List<string> yakuList, string formula, string rankName, int score, bool isLocalPlayerWin,
             PlayerInfoUI playerInfo, EnemyInfoUI enemyInfo, int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp, System.Action onComplete,
-            string scoreFormula = null, RonSettlementInfo settlement = null)
+            string scoreFormula = null, RonSettlementInfo settlement = null,
+            bool suppressSettlementPanel = false, bool deferHpUpdate = false)
         {
-            StartCoroutine(SequenceRoutine(handTiles, ronTile, yakuList, formula, rankName, score, isLocalPlayerWin, playerInfo, enemyInfo, prevLocalHp, newLocalHp, prevEnemyHp, newEnemyHp, onComplete, scoreFormula, settlement));
+            StartCoroutine(SequenceRoutine(handTiles, ronTile, yakuList, formula, rankName, score, isLocalPlayerWin, playerInfo, enemyInfo, prevLocalHp, newLocalHp, prevEnemyHp, newEnemyHp, onComplete, scoreFormula, settlement, suppressSettlementPanel, deferHpUpdate));
         }
     }
 }

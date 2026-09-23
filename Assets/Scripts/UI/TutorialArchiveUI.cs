@@ -318,4 +318,167 @@ namespace KillingMahjong.UI
             rect.anchoredPosition = Vector2.zero;
         }
     }
+
+    /// <summary>
+    /// チュートリアル第1局でだけ開く、負けたときのダメージの説明。
+    /// シーンに置くと本編にも混ざるため、資料UIと同じく実行時に1枚だけ組み立てる。
+    /// </summary>
+    public class TutorialDamageExplanationUI : MonoBehaviour
+    {
+        private const float ReferenceWidth = 800f;
+        private const float ReferenceHeight = 600f;
+
+        private Action _onClosed;
+        private TMP_FontAsset _font;
+
+        public static TutorialDamageExplanationUI Create()
+        {
+            var root = new GameObject("TutorialDamageExplanationUI", typeof(RectTransform));
+            return root.AddComponent<TutorialDamageExplanationUI>();
+        }
+
+        private void Awake()
+        {
+            Build();
+            gameObject.SetActive(false);
+        }
+
+        /// <summary>閉じるボタンが押されるまで、指定された1ページだけを表示する。</summary>
+        public void Open(Action closedCallback)
+        {
+            _onClosed = closedCallback;
+            gameObject.SetActive(true);
+        }
+
+        private void Build()
+        {
+            _font = Resources.Load<TMP_FontAsset>("PixelMplus10_DynamicFixed");
+
+            var canvas = gameObject.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = UISortingOrders.TutorialArchive;
+
+            var scaler = gameObject.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(ReferenceWidth, ReferenceHeight);
+            scaler.matchWidthOrHeight = 0.5f;
+            gameObject.AddComponent<GraphicRaycaster>();
+
+            var dimmer = new GameObject("Dimmer", typeof(RectTransform), typeof(Image));
+            dimmer.transform.SetParent(transform, false);
+            Stretch((RectTransform)dimmer.transform);
+            dimmer.GetComponent<Image>().color = new Color(0.02f, 0.02f, 0.04f, 0.78f);
+
+            var panel = new GameObject("Panel", typeof(RectTransform), typeof(Image), typeof(Outline));
+            panel.transform.SetParent(transform, false);
+            var panelRect = (RectTransform)panel.transform;
+            Center(panelRect, new Vector2(650f, 380f));
+            panel.GetComponent<Image>().color = new Color(0.08f, 0.06f, 0.12f, 0.98f);
+            var panelOutline = panel.GetComponent<Outline>();
+            panelOutline.effectColor = new Color32(214, 40, 62, 220);
+            panelOutline.effectDistance = new Vector2(2f, -2f);
+
+            CreateText(panelRect, "Title", "負けたときのダメージ", new Vector2(0f, 132f),
+                new Vector2(560f, 34f), 26f, TextAlignmentOptions.Center);
+
+            var body = new GameObject("Body", typeof(RectTransform), typeof(Image), typeof(Outline));
+            body.transform.SetParent(panelRect, false);
+            var bodyRect = (RectTransform)body.transform;
+            Center(bodyRect, new Vector2(560f, 190f));
+            bodyRect.anchoredPosition = new Vector2(0f, 18f);
+            body.GetComponent<Image>().color = new Color(0.025f, 0.02f, 0.05f, 0.9f);
+            var bodyOutline = body.GetComponent<Outline>();
+            bodyOutline.effectColor = new Color(0.42f, 0.23f, 0.48f, 0.9f);
+            bodyOutline.effectDistance = new Vector2(1f, -1f);
+
+            var bodyText = CreateText(bodyRect, "BodyText",
+                "賭けた分だけ持ち点を失う。\n賭けた額も戻らないので、マイナスは2倍。\n\n相手が満貫以上の役を作っていると、\nダメージはさらに増える。",
+                Vector2.zero, new Vector2(510f, 150f), 20f, TextAlignmentOptions.TopLeft);
+            bodyText.enableWordWrapping = false;
+            bodyText.lineSpacing = 5f;
+            bodyText.overflowMode = TextOverflowModes.Ellipsis;
+
+            Button closeButton = CreateCloseButton(panelRect);
+            closeButton.onClick.AddListener(Close);
+        }
+
+        private Button CreateCloseButton(RectTransform parent)
+        {
+            var buttonObject = new GameObject("CloseButton", typeof(RectTransform), typeof(Image), typeof(Button));
+            buttonObject.transform.SetParent(parent, false);
+            var rect = (RectTransform)buttonObject.transform;
+            Center(rect, new Vector2(180f, 48f));
+            rect.anchoredPosition = new Vector2(0f, -132f);
+
+            buttonObject.GetComponent<Image>().color = new Color(0.8f, 0.2f, 0.2f, 1f);
+            var outline = buttonObject.AddComponent<Outline>();
+            outline.effectColor = new Color(0.2f, 0.03f, 0.05f, 1f);
+            outline.effectDistance = new Vector2(2f, -2f);
+
+            var labelObject = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
+            labelObject.transform.SetParent(buttonObject.transform, false);
+            Stretch((RectTransform)labelObject.transform);
+            var label = labelObject.GetComponent<TextMeshProUGUI>();
+            ApplyFont(label);
+            label.text = "閉じる";
+            label.fontSize = 18f;
+            label.alignment = TextAlignmentOptions.Center;
+            label.color = Color.white;
+            label.raycastTarget = false;
+
+            // 資料UIと同じホバーを付け、チュートリアル中だけ操作感が変わらないようにする。
+            buttonObject.AddComponent<UIButtonHoverEffect>();
+            return buttonObject.GetComponent<Button>();
+        }
+
+        private TextMeshProUGUI CreateText(RectTransform parent, string name, string textValue,
+            Vector2 position, Vector2 size, float fontSize, TextAlignmentOptions alignment)
+        {
+            var textObject = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
+            textObject.transform.SetParent(parent, false);
+            var rect = (RectTransform)textObject.transform;
+            Center(rect, size);
+            rect.anchoredPosition = position;
+
+            var text = textObject.GetComponent<TextMeshProUGUI>();
+            ApplyFont(text);
+            text.text = textValue;
+            text.fontSize = fontSize;
+            text.alignment = alignment;
+            text.color = Color.white;
+            text.raycastTarget = false;
+            return text;
+        }
+
+        private void ApplyFont(TMP_Text text)
+        {
+            if (_font != null) text.font = _font;
+        }
+
+        private void Close()
+        {
+            gameObject.SetActive(false);
+            Action callback = _onClosed;
+            _onClosed = null;
+            callback?.Invoke();
+        }
+
+        private static void Stretch(RectTransform rect)
+        {
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+        }
+
+        private static void Center(RectTransform rect, Vector2 size)
+        {
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.sizeDelta = size;
+            rect.anchoredPosition = Vector2.zero;
+        }
+    }
 }
