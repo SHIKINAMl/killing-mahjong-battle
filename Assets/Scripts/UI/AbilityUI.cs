@@ -8,6 +8,18 @@ namespace KillingMahjong.UI
     {
         [Header("UI References")]
         [SerializeField] private Button triggerButton; // The Red Button on the right
+
+        /// <summary>
+        /// 能力ベル（右の呼び出しボタン）を出す／隠す。
+        ///
+        /// フロー図の「初期非表示UI：能力ベル」。**チュートリアルでは能力の話に入るまで隠す。**
+        /// まだ説明していないものが画面に居ると、押してよいのか分からない。
+        /// 本編は誰も呼ばないので、今までどおり最初から出たままになる。
+        /// </summary>
+        public void SetBellVisible(bool visible)
+        {
+            if (triggerButton != null) triggerButton.gameObject.SetActive(visible);
+        }
         [SerializeField] private RectTransform abilityWindow; // The window on the left
         [SerializeField] private Vector2 hiddenPosition = new Vector2(-500, -500); // Off-screen or hidden
         [SerializeField] private Vector2 showPosition = new Vector2(100, 100); // On-screen

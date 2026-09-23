@@ -45,6 +45,25 @@ namespace KillingMahjong.UI
         private CanvasGroup _canvasGroup;
         private RectTransform _rectTransform;
 
+        // --- チュートリアルの誘導用（2026-09-24、フロー図シート3） ---
+        //
+        // 資料を読んでいる間 `OpenTutorialArchive` が自分を SetActive(false) するので、
+        // **activeSelf では「閉じた」と「資料を読んでいる」が見分けられない。**
+        // 開いたか閉じたかは自分で覚えておく。
+
+        private bool _isOpen;
+
+        /// <summary>オプション画面が開いているか。資料を読んでいる間も開いている扱い。</summary>
+        public bool IsOpen => _isOpen;
+
+        /// <summary>資料を読んでいる最中か。</summary>
+        public bool IsTutorialArchiveOpen =>
+            tutorialArchiveUI != null && tutorialArchiveUI.gameObject.activeInHierarchy;
+
+        /// <summary>「チュートリアル資料」ボタン。実行時に作るので外から取れるようにしておく。</summary>
+        public RectTransform TutorialArchiveButtonRect =>
+            tutorialArchiveButton != null ? tutorialArchiveButton.transform as RectTransform : null;
+
         private void Awake()
         {
             _canvasGroup = GetComponent<CanvasGroup>();
@@ -116,6 +135,7 @@ namespace KillingMahjong.UI
         public void Open()
         {
             Debug.Log("[OptionUI] Open() が呼ばれました。");
+            _isOpen = true;
             gameObject.SetActive(true);
             
             if (_canvasGroup == null) 
@@ -162,6 +182,7 @@ namespace KillingMahjong.UI
 
         public void Close()
         {
+            _isOpen = false;
             if (_canvasGroup == null) return;
 
             _canvasGroup.blocksRaycasts = false;

@@ -100,9 +100,24 @@ namespace KillingMahjong.Managers
             // 手牌は空の状態で開始する（プレイヤーが山牌から選ぶ）
             SetupBoard(data, null);
 
+            // 能力ベルはフロー図で「初期非表示UI」。能力の話に入る局まで伏せておき、
+            // 一度出したらそれ以降は出したままにする。
+            if (data.enemyUsesAbility) _abilityBellRevealed = true;
+            SetAbilityBellVisible(_abilityBellRevealed);
+
             // 開幕は女の子とセリフだけ。盤面はイントロの途中で出す。
             SetBoardVisible(false);
             yield return null;
+
+            // フロー図シート3の頭。対局フェイズ①が終わって手牌選択フェイズ②へ来たところで、
+            // ゲームの流れをまとめ、資料の開き方を実際に開かせて教える。
+            // **第2局の台本より前。** 第1局の締めくくりなので、盤面を出してから話す。
+            if (IsSecondTutorialRound(data))
+            {
+                SetBoardVisible(true);
+                yield return StartCoroutine(RunAfterFirstRoundWrapUp());
+                if (_aborted) yield break;
+            }
 
             // **立ち絵は1行目のセリフの後に出す（2026-09-12、フロー図どおり）。**
             // 契約書を閉じた直後は誰もいない画面で、最初の一言だけが聞こえる。
