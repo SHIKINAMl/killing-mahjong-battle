@@ -133,11 +133,45 @@ namespace KillingMahjong.UI
             RebuildTutorialFormulaTargets();
         }
 
-        /// <summary>表を女の子の顔と重ならない左側へ寄せる。</summary>
+        // ------------------------------------------------------------
+        //  説明中の表の置き場所（基準 800x600、画面中心が原点・上が +y）
+        //
+        //  **左へ寄せるだけでは顔は空かない（2026-09-24）。** 表の幅は 560 あり、
+        //  左端に付けても右端は 566 まで来る。立ち絵の顔は 330〜490 にあるので、
+        //  横にどうずらしても必ずあごの辺りが隠れる。実機でもそうなっていた。
+        //  逃がせるのは下だけなので、**あごより下に表の上端が来るまで下げる**。
+        //  河と手牌の上には乗るが、この説明の間は読ませたいのは表のほうなので構わない。
+        // ------------------------------------------------------------
+
+        /// <summary>立ち絵のあご（画面上から 268px）。表の上端はここより下に置く。</summary>
+        private const float TutorialPanelTopY = 32f;
+
+        /// <summary>表の下端の限界（画面上から 515px）。これ以上は下げず、入らなければ縮める。</summary>
+        private const float TutorialPanelBottomY = -215f;
+
+        /// <summary>画面左端から空ける余白。</summary>
+        private const float TutorialPanelLeftMargin = 6f;
+
+        /// <summary>表を女の子の顔と重ならない位置（左下）へ寄せる。</summary>
         public void MoveTutorialSettlementLeft()
         {
             if (_tutorialSettlementPanel == null) return;
-            _tutorialSettlementPanel.anchoredPosition = new Vector2(-115f, _tutorialSettlementPanel.anchoredPosition.y);
+
+            // 役の行数で高さが変わるので、寸法は確定させてから読む。
+            LayoutRebuilder.ForceRebuildLayoutImmediate(_tutorialSettlementPanel);
+            float w = _tutorialSettlementPanel.rect.width;
+            float h = _tutorialSettlementPanel.rect.height;
+
+            // あごと手牌のあいだに入り切らない高さのときだけ縮める。
+            float room = TutorialPanelTopY - TutorialPanelBottomY;
+            float scale = Mathf.Clamp(h > 1f ? room / h : 1f, 0.6f, 1f);
+            _tutorialSettlementPanel.localScale = new Vector3(scale, scale, 1f);
+
+            // pivot は (0.5, 0) なので anchoredPosition は表の下端を指す。
+            _tutorialSettlementPanel.anchoredPosition = new Vector2(
+                -400f + TutorialPanelLeftMargin + w * scale * 0.5f,
+                TutorialPanelTopY - h * scale);
+
             // 誘導対象は表とは別の透明Rectなので、表を寄せた直後の位置で作り直す。
             RebuildTutorialFormulaTargets();
         }
