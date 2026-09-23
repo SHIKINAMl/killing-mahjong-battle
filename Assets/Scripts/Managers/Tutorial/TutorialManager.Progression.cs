@@ -521,7 +521,13 @@ namespace KillingMahjong.Managers
                     }
                     else
                     {
-                        yield return StartCoroutine(PlayLines(BuildDiscardReaction(_lastPlayerDiscardBaseId, ref lastReactionIndex)));
+                        // フロー図の繰り返しループは
+                        //   プレイヤーの打牌 → ランダム2行 → 「それじゃあ　あたしはこれ」 → 相手の打牌
+                        // の順。**この1行が相手の打牌の合図**なので、ランダム2行だけで打たせない。
+                        // 1巡目は上の分岐が同じ並びを直接書いている。
+                        var reaction = BuildDiscardReaction(_lastPlayerDiscardBaseId, ref lastReactionIndex);
+                        reaction.Add(new TutorialLine("それじゃあ　あたしはこれ"));
+                        yield return StartCoroutine(PlayLines(reaction));
                     }
                 }
 
@@ -558,6 +564,18 @@ namespace KillingMahjong.Managers
                 {
                     yield return StartCoroutine(RunPlayerRon(data, discardId));
                     yield break;
+                }
+
+                // フロー図では、相手が打ってロンにならなかったとき
+                // 「プレイヤーの打牌選択フェイズ」へ戻る手前にこの1行が入る。
+                // **1巡目には言わない。** あちらは待ち牌の説明のあとの
+                // 「じゃ　再開しようかとりま打牌よろしくー」が同じ役目をしている。
+                if (isFirstTutorialRound && !isAutoTurn && turn >= 2)
+                {
+                    yield return StartCoroutine(PlayLines(new List<TutorialLine>
+                    {
+                        new TutorialLine("次は後輩ちゃんねー"),
+                    }));
                 }
 
                 if (!isAutoTurn) yield return new WaitForSeconds(0.4f);
