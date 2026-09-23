@@ -23,6 +23,14 @@ namespace KillingMahjong.UI
 
         public bool IsLogOpen => logPanel != null && logPanel.activeSelf;
 
+        private void Awake()
+        {
+            // シーンに置いてある仮の文字（"Nothing"）を消しておく。
+            // 吹き出しが最初に出た一瞬だけ、それが読めてしまっていた
+            // （2026-09-24 に録画で確認）。シーンを直さずコードで潰す。
+            if (dialogueText != null) dialogueText.text = string.Empty;
+        }
+
         private void Start()
         {
             if (toggleLogButton != null) toggleLogButton.onClick.AddListener(ToggleLog);
