@@ -197,6 +197,12 @@ namespace KillingMahjong.Common
         /// </summary>
         public const int CollectionScreen = 82;
 
+        /// <summary>
+        /// TutorialArchiveUI: オプションから開くチュートリアル資料。
+        /// オプション画面より前で操作を受け、タイトルのコレクション画面とは重ならない。
+        /// </summary>
+        public const int TutorialArchive = 83;
+
         /// <summary>WaitUI: 待ち牌表示を最前面に出す際のレイヤー</summary>
         public const int WaitDisplayFront = 84;
 

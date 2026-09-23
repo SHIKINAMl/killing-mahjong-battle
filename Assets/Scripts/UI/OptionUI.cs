@@ -32,6 +32,10 @@ namespace KillingMahjong.UI
         [SerializeField] private Button returnToTitleButton; // タイトル（または別シーン）に戻る
         [SerializeField] private Button quitButton; // ゲーム終了
 
+        // シーンを編集せず、既存の保存ボタンをひな形にして実行時に追加する。
+        private Button tutorialArchiveButton;
+        private TutorialArchiveUI tutorialArchiveUI;
+
         [Header("Scene Transition Settings")]
         [Tooltip("このシーンで『戻る』ボタンを表示するかどうか")]
         [SerializeField] private bool showReturnButton = true;
@@ -63,6 +67,10 @@ namespace KillingMahjong.UI
         {
             InitializeUI();
 
+            // ひな形の Button にはまだ Start 内のクリック処理が入っていない段階で複製する。
+            // こうして資料ボタンへ「保存して閉じる」の処理が混ざるのを防ぐ。
+            CreateTutorialArchiveButton();
+
             // --- スライダーのイベント登録 ---
             if (bgmSlider != null) bgmSlider.onValueChanged.AddListener(OnBgmChanged);
             if (seSlider != null) seSlider.onValueChanged.AddListener(OnSeChanged);
@@ -86,6 +94,15 @@ namespace KillingMahjong.UI
                 returnToTitleButton.onClick.AddListener(ReturnToScene);
             }
             if (quitButton != null) quitButton.onClick.AddListener(QuitGame);
+        }
+
+        private void OnDestroy()
+        {
+            // 資料は独立した Overlay Canvas なので、オプションだけが破棄された場合にも残さない。
+            if (tutorialArchiveUI != null)
+            {
+                Destroy(tutorialArchiveUI.gameObject);
+            }
         }
 
         private void OnEnable()
@@ -228,6 +245,66 @@ namespace KillingMahjong.UI
         private void OnResolutionChanged(int index)
         {
             if (Core.SettingsManager.Instance != null) Core.SettingsManager.Instance.SetResolutionIndex(index);
+        }
+
+        private void CreateTutorialArchiveButton()
+        {
+            if (tutorialArchiveButton != null) return;
+
+            // 保存ボタンは長い日本語ラベルを収められる横幅なので、見た目のひな形に使う。
+            Button template = saveAndCloseButton != null ? saveAndCloseButton : returnToTitleButton;
+            if (template == null)
+            {
+                Debug.LogWarning("[OptionUI] チュートリアル資料のひな形ボタンが見つかりません。");
+                return;
+            }
+
+            GameObject buttonObject = Instantiate(template.gameObject, template.transform.parent, false);
+            buttonObject.name = "TutorialArchiveButton";
+            tutorialArchiveButton = buttonObject.GetComponent<Button>();
+            tutorialArchiveButton.onClick.RemoveAllListeners();
+
+            TMP_Text label = buttonObject.GetComponentInChildren<TMP_Text>(true);
+            if (label != null) label.text = "チュートリアル資料";
+
+            if (buttonObject.GetComponent<UIButtonHoverEffect>() == null)
+            {
+                buttonObject.AddComponent<UIButtonHoverEffect>();
+            }
+
+            ArrangeSystemButtons();
+            tutorialArchiveButton.onClick.AddListener(OpenTutorialArchive);
+        }
+
+        private void ArrangeSystemButtons()
+        {
+            // 3個だった下部ボタンを **2段2列** へ並べ替える。
+            // 横3つに並べると、右端が上の「Window Resolution」の選択欄と重なった
+            // （2026-09-23 に実機で確認）。左右対称に置けば重ならず、押し間違いも減る。
+            SetButtonPosition(returnToTitleButton, new Vector2(-135f, -205f));
+            SetButtonPosition(quitButton, new Vector2(135f, -205f));
+            SetButtonPosition(tutorialArchiveButton, new Vector2(-135f, -265f));
+            SetButtonPosition(saveAndCloseButton, new Vector2(135f, -265f));
+        }
+
+        private static void SetButtonPosition(Button button, Vector2 position)
+        {
+            if (button == null) return;
+
+            RectTransform rect = button.transform as RectTransform;
+            if (rect != null) rect.anchoredPosition = position;
+        }
+
+        private void OpenTutorialArchive()
+        {
+            if (tutorialArchiveUI == null)
+            {
+                tutorialArchiveUI = TutorialArchiveUI.Create();
+            }
+
+            // 資料を読んでいる間は、背後の設定を誤って操作できないようオプション自体を伏せる。
+            gameObject.SetActive(false);
+            tutorialArchiveUI.Open(Open);
         }
 
         // --- ボタン処理 ---
