@@ -161,10 +161,10 @@ namespace KillingMahjong.Managers
             }));
 
             if (gauge != null) gauge.SetVisible(true);
-            // 14. 累計バーも枠で囲む。画面の上辺に貼りついた細い帯なので、
+            // 14. 累計バーも面で示す。画面の上辺に貼りついた細い帯なので、
             //     矢印を下から当てても「どこからどこまでがバーなのか」が伝わらない。
             GuideTo(gauge != null ? gauge.GuideTargetRect : null, false, new Vector2(0f, -36f),
-                UI.TutorialHighlightUI.Style.Frame);
+                UI.TutorialHighlightUI.Style.Band);
             yield return StartCoroutine(PlayLines(new List<TutorialLine>
             {
                 new TutorialLine("点数を獲得すると儲けた分だけここに蓄積されていくよ"),
