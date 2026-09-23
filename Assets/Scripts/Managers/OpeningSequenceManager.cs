@@ -29,7 +29,20 @@ namespace KillingMahjong.Managers
             enemyCharacterObj.SetActive(false); // 最初は女の子がいない
             if (largePaperUI != null) largePaperUI.SetActive(false); // 大きな紙も最初は隠す
 
-            if (dialogueUI != null) dialogueUI.gameObject.SetActive(false); // 吹き出しを最初は消す
+            if (dialogueUI != null)
+            {
+                dialogueUI.gameObject.SetActive(false); // 吹き出しを最初は消す
+
+                // チュートリアルの文字は読みやすさを優先して固定する。
+                // DialoguePanel 自体を揺らすと、子の TMP 文字まで毎フレーム 3px / 5px
+                // 動いて録画でも読みにくくなるため、他画面の浮遊演出は変えずにここだけ止める。
+                Transform dialoguePanel = dialogueUI.transform.Find("DialoguePanel");
+                if (dialoguePanel != null)
+                {
+                    var floatingAnimator = dialoguePanel.GetComponent<FloatingAnimator>();
+                    if (floatingAnimator != null) floatingAnimator.enabled = false;
+                }
+            }
 
             // 不要なロード表示やマッチメイキングUIを強制オフ
             GameUIManager uiManager = UnityEngine.Object.FindFirstObjectByType<GameUIManager>();

@@ -103,6 +103,7 @@ namespace KillingMahjong.Managers
         private bool _isWaitingForDiscard;
         private bool _isWaitingForHandSelectionComplete;
         private bool _hasRejectedFirstConfirm;
+        private bool _hasMovedTileThisRound;
         private int _lastPlayerDiscardBaseId = -1;
 
         private Coroutine _scenarioRoutine;
@@ -125,7 +126,7 @@ namespace KillingMahjong.Managers
             AutoOnly,
             AutoAndDecide,
 
-            /// <summary>自力で満貫手を組めた場合。オートは不要なので決定だけ出す。</summary>
+            /// <summary>自力で満貫手を組めた場合。オートの紹介後に決定だけ出す。</summary>
             DecideOnly
         }
 

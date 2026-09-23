@@ -29,6 +29,8 @@ namespace KillingMahjong.Managers
                 ShowInterruptMessage("今は『自動』ボタンを押してね。");
                 return false;
             }
+
+            if (toHand) _hasMovedTileThisRound = true;
             return true;
         }
 

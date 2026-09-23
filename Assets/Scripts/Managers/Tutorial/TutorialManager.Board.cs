@@ -93,8 +93,9 @@ namespace KillingMahjong.Managers
 
         private static readonly List<TutorialLine> DefaultSelfManganLines = new List<TutorialLine>
         {
-            new TutorialLine("あら、自分で満貫手を組めたのね。やるじゃない。"),
-            new TutorialLine("それなら『自動』は要らないわ。そのまま決定しなさい。"),
+            new TutorialLine("おっきっちりできたね"),
+            new TutorialLine("さすがは後輩ちゃん 飲み込み早いねー"),
+            new TutorialLine("じゃあまぁいらないと思うけど"),
         };
 
         private static List<TutorialLine> ResolveSelfManganLines(TutorialRoundData data)

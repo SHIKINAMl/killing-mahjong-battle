@@ -88,6 +88,7 @@ namespace KillingMahjong.Managers
             _hasRejectedFirstConfirm = false;
             _isWaitingForHandSelectionComplete = true;
             _lastPlayerDiscardBaseId = -1;
+            _hasMovedTileThisRound = false;
 
             // 前局の透視マークがプールの牌に残らないようにする
             ClearPerspectiveMarks();
@@ -200,6 +201,11 @@ namespace KillingMahjong.Managers
 
             if (data.allowManualHandSelection)
             {
+                // 第1局は、フロー図どおり4秒間まったく牌を取らなかったときだけ
+                // 「クリックすると手牌に登録できる」ことを補足する。
+                if (IsFirstTutorialRound(data))
+                    StartCoroutine(RunFirstRoundHandIdleHint(data));
+
                 yield return new WaitUntil(() =>
                     GetHandTileCount() >= HandSize || !_isWaitingForHandSelectionComplete);
 
@@ -226,9 +232,14 @@ namespace KillingMahjong.Managers
             }
             else if (selfMadeMangan)
             {
-                // 自力で満貫手を組めたなら『自動』を挟ませる理由がない。そのまま決定へ通す。
-                // HasClickedAutoMangan は「台本の満貫手が盤面にそろっている」ことを表すフラグとして
-                // 待ち牌の公開と決定の解禁に使われているので、ここでも立てておく。
+                // 自力で満貫手を組めた場合も、フロー図どおり『おまかせ』を4秒だけ紹介する。
+                // その後は手牌を保ったまま決定へ進める。HasClickedAutoMangan は待ち牌の公開と
+                // 決定の解禁に使われているので、紹介が終わった時点で立てる。
+                SetHandButtonStage(HandButtonStage.AutoOnly);
+                GuideTo(gameUIManager != null && gameUIManager.HandUI != null
+                    ? gameUIManager.HandUI.AutoManganButtonRect : null);
+                yield return new WaitForSeconds(4f);
+                ClearGuide();
                 HasClickedAutoMangan = true;
 
                 SetHandButtonStage(HandButtonStage.DecideOnly);
@@ -282,7 +293,10 @@ namespace KillingMahjong.Managers
             SetPhase(RoundStatus.Discard);
             ApplyHpToUI();
             yield return new WaitForSeconds(phaseSettleTime);
-            yield return StartCoroutine(PlayLines(data.onBattleStartLines));
+            // 第1局の対局導入は、フロー図どおり山牌／待ち牌の誘導を挟む専用シーケンスで進める。
+            // 2局目以降は従来どおり各局の台本をそのまま表示する。
+            if (!IsFirstTutorialRound(data))
+                yield return StartCoroutine(PlayLines(data.onBattleStartLines));
 
             yield return StartCoroutine(RunBattle(data));
 
@@ -427,11 +441,19 @@ namespace KillingMahjong.Managers
 
         // ==================== 対局 ====================
 
+        private bool IsFirstTutorialRound(TutorialRoundData data)
+        {
+            return _scenario != null && _scenario.rounds != null
+                   && _scenario.rounds.Count > 0 && _scenario.rounds[0] == data;
+        }
+
         private IEnumerator RunBattle(TutorialRoundData data)
         {
             var board = BoardStateManager.Instance;
             int turns = data.enemyDiscardBaseIds.Count;
             int autoTurns = Mathf.Clamp(data.autoDiscardTurns, 0, turns);
+            bool isFirstTutorialRound = IsFirstTutorialRound(data);
+            int lastReactionIndex = -1;
 
             for (int turn = 1; turn <= turns; turn++)
             {
@@ -452,13 +474,38 @@ namespace KillingMahjong.Managers
                 }
                 else
                 {
+                    if (isFirstTutorialRound && turn == 1)
+                        yield return StartCoroutine(RunFirstRoundOpening());
+
+                    if (isFirstTutorialRound && (turn == 1 || turn == 2))
+                        GuideTo(GetWallGuideTarget(), true, new Vector2(0f, 10f));
+
                     _isWaitingForDiscard = true;
                     _lastPlayerDiscardBaseId = -1;
 
                     yield return new WaitUntil(() => !_isWaitingForDiscard);
+
+                    if (isFirstTutorialRound && (turn == 1 || turn == 2))
+                        ClearGuide();
                 }
 
                 yield return new WaitForSeconds(isAutoTurn ? autoDiscardInterval : discardInterval);
+
+                if (isFirstTutorialRound && !isAutoTurn)
+                {
+                    if (turn == 1)
+                    {
+                        yield return StartCoroutine(PlayLines(new List<TutorialLine>
+                        {
+                            new TutorialLine($"おっ{GetTileName(_lastPlayerDiscardBaseId)}かぁ"),
+                            new TutorialLine("それじゃあ　あたしはこれ"),
+                        }));
+                    }
+                    else
+                    {
+                        yield return StartCoroutine(PlayLines(BuildDiscardReaction(_lastPlayerDiscardBaseId, ref lastReactionIndex)));
+                    }
+                }
 
                 // --- 敵のロン（プレイヤーの打牌に反応する。手順⑮） ---
                 if (data.outcome == TutorialOutcome.EnemyRon && turn >= data.enemyRonOnPlayerDiscardTurn)
@@ -479,6 +526,15 @@ namespace KillingMahjong.Managers
 
                 yield return new WaitForSeconds(isAutoTurn ? autoDiscardInterval : discardInterval);
 
+                if (isFirstTutorialRound && turn == 1)
+                {
+                    yield return StartCoroutine(PlayLines(new List<TutorialLine>
+                    {
+                        new TutorialLine($"フフフ　あたしは{GetTileName(discardBase)}を打ったよ"),
+                    }));
+                    yield return StartCoroutine(RunFirstRoundWaitExplanation());
+                }
+
                 // --- プレイヤーのロン（手順⑥ / ㉓） ---
                 if (data.outcome == TutorialOutcome.PlayerRon && discardBase == data.playerWinningTileBaseId)
                 {
@@ -493,6 +549,109 @@ namespace KillingMahjong.Managers
             {
                 yield return StartCoroutine(RunDraw(data));
             }
+        }
+
+        private IEnumerator RunFirstRoundOpening()
+        {
+            GuideTo(GetWallGuideTarget(), false, new Vector2(0f, 10f));
+            yield return StartCoroutine(PlayLines(new List<TutorialLine>
+            {
+                new TutorialLine("よっし　対局だね"),
+                new TutorialLine($"対局では交互に牌をこの{HighlightOpen}山牌{HighlightClose}から打ってくよ"),
+                new TutorialLine("試しに適当に打ってみな"),
+            }));
+            ClearGuide();
+        }
+
+        private IEnumerator RunFirstRoundWaitExplanation()
+        {
+            GuideTo(GetWaitGuideTarget(), false, new Vector2(0f, 10f));
+            yield return StartCoroutine(PlayLines(new List<TutorialLine>
+            {
+                new TutorialLine($"とまぁこんな感じでお互い{HighlightOpen}１ターンに１枚{HighlightClose}牌を打っていって"),
+                new TutorialLine($"{HighlightOpen}先に{HighlightClose}{HighlightOpen}相手に自分の待ち牌を出させた人の勝ち{HighlightClose}"),
+                new TutorialLine("というチキンレースなギャンブルなんだこれは"),
+                new TutorialLine($"{HighlightOpen}待ち牌はここに表示{HighlightClose}されるから"),
+                new TutorialLine("相手がその牌を出すのを祈りながら牌を打っていってね"),
+            }));
+            ClearGuide();
+
+            yield return StartCoroutine(PlayLines(new List<TutorialLine>
+            {
+                new TutorialLine("じゃ　再開しようか"),
+                new TutorialLine("とりま打牌よろしくー"),
+            }));
+        }
+
+        private RectTransform GetWallGuideTarget()
+        {
+            return gameUIManager != null && gameUIManager.WallUI != null
+                ? gameUIManager.WallUI.GuideTargetRect
+                : null;
+        }
+
+        private RectTransform GetWaitGuideTarget()
+        {
+            return gameUIManager != null && gameUIManager.WaitUI != null
+                ? gameUIManager.WaitUI.GuideTargetRect
+                : null;
+        }
+
+        private static string GetTileName(int tileId)
+        {
+            return tileId >= 0 ? new TileData(tileId).GetTileName() : "その牌";
+        }
+
+        private static List<TutorialLine> BuildDiscardReaction(int tileId, ref int previousIndex)
+        {
+            string tileName = GetTileName(tileId);
+            int reactionIndex = UnityEngine.Random.Range(0, 3);
+            if (previousIndex >= 0 && reactionIndex >= previousIndex) reactionIndex++;
+            previousIndex = reactionIndex;
+
+            switch (reactionIndex)
+            {
+                case 0:
+                    return new List<TutorialLine>
+                    {
+                        new TutorialLine($"おっ{tileName}かぁ"),
+                        new TutorialLine("あたし的にはセーフ！"),
+                    };
+                case 1:
+                    return new List<TutorialLine>
+                    {
+                        new TutorialLine($"うーん{tileName}ね"),
+                        new TutorialLine("くぅーおしいっ！"),
+                    };
+                case 2:
+                    return new List<TutorialLine>
+                    {
+                        new TutorialLine($"はぁ{tileName}…？"),
+                        new TutorialLine("ぜんぜんロンできんなぁ"),
+                    };
+                default:
+                    return new List<TutorialLine>
+                    {
+                        new TutorialLine($"へぇ{tileName}？"),
+                        new TutorialLine("あたしも同じの打と"),
+                    };
+            }
+        }
+
+        private IEnumerator RunFirstRoundHandIdleHint(TutorialRoundData data)
+        {
+            yield return new WaitForSeconds(4f);
+
+            if (!IsFirstTutorialRound(data) || _round != data || _hasMovedTileThisRound ||
+                !_isWaitingForHandSelectionComplete)
+            {
+                yield break;
+            }
+
+            yield return StartCoroutine(PlayLines(new List<TutorialLine>
+            {
+                new TutorialLine("そうそう　牌をクリックすると手牌に登録できるよ"),
+            }));
         }
 
         /// <summary>

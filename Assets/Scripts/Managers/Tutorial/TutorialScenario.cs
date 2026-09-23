@@ -211,7 +211,7 @@ namespace KillingMahjong.Managers
         [Tooltip("13枚そろったあと、『自動』ボタンを開放する直前のセリフ。空なら既定文が使われる。")]
         public List<TutorialLine> onHandFilledLines = new List<TutorialLine>();
 
-        [Tooltip("プレイヤーが自力で満貫手を組めたときのセリフ。この場合『自動』は出さず決定へ進ませる。空なら既定文。")]
+        [Tooltip("プレイヤーが自力で満貫手を組めたときのセリフ。『おまかせ』を短く紹介してから決定へ進ませる。空なら既定文。")]
         public List<TutorialLine> onSelfManganLines = new List<TutorialLine>();
 
         [Tooltip("手牌決定後・賭け金フェイズ前")]

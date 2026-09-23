@@ -18,6 +18,8 @@ namespace KillingMahjong.Managers
                 wallBaseIds = Wall(),
                 manganHandBaseIds = new List<int>(hand),
                 waitBaseIds = new List<int>(waits),
+                manganHandYaku = new List<string> { "混一色", "一気通貫" },
+                manganHandHan = 5,
                 doraBaseId = dora,
 
                 allowManualHandSelection = true,   // ① 適当に13枚選ばせる
@@ -38,7 +40,7 @@ namespace KillingMahjong.Managers
                 // **そのまま事実になる。** 以前は清一色6飜＝跳満で +3000 入っていて、
                 // セリフと食い違っていた。
 
-                betPromptText = "{0}円。それがあなたの言い値ね。",
+                betPromptText = "",
 
                 introLines = new List<TutorialLine>
                 {
@@ -60,32 +62,25 @@ namespace KillingMahjong.Managers
                 },
                 onHandFilledLines = new List<TutorialLine>
                 {
-                    new TutorialLine("13枚ね。……その手、満貫にも届いていないわ。"),
-                    new TutorialLine("安い手で座るのは許さない。死ぬ値打ちがないもの。"),
-                    new TutorialLine("今回は組んであげる。『自動』を押しなさい。"),
+                    new TutorialLine("あーそれは違うね"),
+                    new TutorialLine("まぁ難しいし、しゃあないか"),
+                    new TutorialLine("じゃあ、コレ使ってよ"),
+                    new TutorialLine("これは おまかせボタン"),
+                    new TutorialLine("自動で山牌の中から満貫以上の形を作ってくれるよ"),
                 },
                 onSelfManganLines = new List<TutorialLine>
                 {
-                    new TutorialLine("……あら。ちゃんと満貫に届いてる。"),
-                    new TutorialLine("麻雀を知っている手ね。少し楽しくなってきたわ。"),
-                    new TutorialLine("文句はないわ。『決定』を押しなさい。"),
+                    new TutorialLine("おっきっちりできたね"),
+                    new TutorialLine("さすがは後輩ちゃん 飲み込み早いねー"),
+                    new TutorialLine("じゃあまぁいらないと思うけど"),
                 },
                 beforeBetLines = new List<TutorialLine>
                 {
-                    new TutorialLine("次は賭け金よ。"),
-                    new TutorialLine("言っておくけど、決めた分の血はその場で抜かれるわ。"),
-                    new TutorialLine("勝ってから払うんじゃない。賭けた瞬間に、もう減っているの。"),
-                    new TutorialLine("体力ゲージ、決めた瞬間に減るのを見ていなさい。"),
-                    new TutorialLine("戻ってくるかどうかは、まだ何も決まっていないけれど。"),
-                    new TutorialLine("勝てば役の倍率をかけて返る。負ければ、払った上にもっと持っていかれる。"),
-                    new TutorialLine("いくら出す？ 自分で決めていいのよ。"),
+                    new TutorialLine("あっ！その前に賭け金の設定をしなきゃね"),
+                    new TutorialLine("あとで説明するから今回は2000賭けてくれるかな"),
                 },
-                onBattleStartLines = new List<TutorialLine>
-                {
-                    new TutorialLine("対局開始よ。"),
-                    new TutorialLine("あなたの番。好きな牌を捨ててごらんなさい。"),
-                    new TutorialLine("一枚捨てるたびに、どちらかが近づくの。"),
-                },
+                // 第1局の対局導入は TutorialManager.Progression の専用フローで表示する。
+                onBattleStartLines = new List<TutorialLine>(),
                 outroLines = new List<TutorialLine>
                 {
                     new TutorialLine("ロン。あなたの上がりね。"),

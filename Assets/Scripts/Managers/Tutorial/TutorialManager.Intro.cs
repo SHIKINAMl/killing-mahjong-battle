@@ -74,12 +74,15 @@ namespace KillingMahjong.Managers
 
         // ここから下はフロー図の続き（2026-09-19 に追加）。
         // 「わかった？…」のあと、手牌を選ばせる直前までの案内。
+        // 使用フォントは Regular のみなので、青太字の指定は黄色 + 1pt で表現する。
+        private const string HighlightOpen = "<color=#FFD700><size=16>";
+        private const string HighlightClose = "</size></color>";
 
         /// <summary>山牌を見せてから、何をさせるかを言う。**どちらの経路でも共通。**</summary>
         private static readonly List<TutorialLine> ShowWallLines = new List<TutorialLine>
         {
-            new TutorialLine("「じゃーん！\nこれが君の山牌ね」"),
-            new TutorialLine("「君はこの中から13枚選んでテンパイな手牌を作ってもらうよ」"),
+            new TutorialLine("「じゃーん！\nこれが君の" + HighlightOpen + "山牌" + HighlightClose + "ね」"),
+            new TutorialLine("「君はこの中から" + HighlightOpen + "13枚選んでテンパイな手牌" + HighlightClose + "を作ってもらうよ」"),
         };
 
         /// <summary>
@@ -89,7 +92,7 @@ namespace KillingMahjong.Managers
         private static readonly List<TutorialLine> TenpaiExplainLines = new List<TutorialLine>
         {
             new TutorialLine("「えっテンパイって何かって？」"),
-            new TutorialLine("「テンパイってのはあと1牌でアガりって状態のこと」"),
+            new TutorialLine("「テンパイってのは" + HighlightOpen + "あと1牌でアガりって状態" + HighlightClose + "のこと」"),
             new TutorialLine("「ま普通にアガる手を作って１牌抜くのがラクだよ」"),
         };
 
@@ -97,13 +100,13 @@ namespace KillingMahjong.Managers
         private static readonly List<TutorialLine> ManganRequestLines = new List<TutorialLine>
         {
             new TutorialLine("「で今回作ってもらうのはただのテンパイじゃないよ」"),
-            new TutorialLine("「君には満貫な手を作ってもらうねー」"),
+            new TutorialLine("「君には" + HighlightOpen + "満貫" + HighlightClose + "な手を作ってもらうねー」"),
         };
 
         /// <summary>最後のひと押し。この直後に手牌選択へ入る。</summary>
         private static readonly List<TutorialLine> StartBuildingLines = new List<TutorialLine>
         {
-            new TutorialLine("「とりあえず適当に作ってみようかー？」"),
+            new TutorialLine("「とりあえず適当に13牌触ってみてよ」"),
         };
 
         /// <summary>
