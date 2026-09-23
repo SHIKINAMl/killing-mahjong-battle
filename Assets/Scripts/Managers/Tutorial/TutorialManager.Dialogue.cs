@@ -93,11 +93,11 @@ namespace KillingMahjong.Managers
         /// false にすると矢印だけで指し示す。マスクは穴の外側のクリックを全て食べるので、
         /// セリフ送りと併用したい場面（説明しながら指す）では必ず false にすること。
         /// </param>
-        private void GuideTo(RectTransform target, bool useMask = true)
+        private void GuideTo(RectTransform target, bool useMask = true, Vector2? arrowOffset = null)
         {
             if (target == null) return;
 
-            if (arrowUI != null) arrowUI.ShowAt(target, new Vector2(0, 50f));
+            if (arrowUI != null) arrowUI.ShowAt(target, arrowOffset ?? new Vector2(0, 50f));
 
             if (useMask)
             {

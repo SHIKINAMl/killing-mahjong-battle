@@ -44,6 +44,9 @@ namespace KillingMahjong.UI
         private List<RectTransform> wallSlots = new List<RectTransform>();
         public List<RectTransform> GetWallSlots() => wallSlots;
 
+        /// <summary>チュートリアルで山牌エリアを指し示すための実表示領域。</summary>
+        public RectTransform GuideTargetRect => wallContainer as RectTransform;
+
         /// <summary>
         /// 山牌1枚ぶん。表示は種類順に並べ替えるので、
         /// 元の山での位置（WallIndex）を一緒に持ち回るために使う。

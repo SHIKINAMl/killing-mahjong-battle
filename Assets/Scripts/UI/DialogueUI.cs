@@ -95,13 +95,20 @@ namespace KillingMahjong.UI
 
         private System.Collections.IEnumerator TypeMessageRoutine(string fullText)
         {
-            dialogueText.text = "";
+            // 先に全文を TMP に解析させ、可視文字数だけを進める。
+            // これなら <color> / <size> のタグそのものを文字送りで見せずに済む。
+            dialogueText.text = fullText;
+            dialogueText.maxVisibleCharacters = 0;
+            yield return null; // ShowText() が DialoguePanel を有効化した次フレームに解析する
+            dialogueText.ForceMeshUpdate();
+
             float timePerChar = 0.03f; // 1文字あたりの表示時間
             float nextSoundTime = 0f;
+            int visibleCharacterCount = dialogueText.textInfo.characterCount;
 
-            for (int i = 0; i < fullText.Length; i++)
+            for (int i = 0; i < visibleCharacterCount; i++)
             {
-                dialogueText.text += fullText[i];
+                dialogueText.maxVisibleCharacters = i + 1;
 
                 // 音が連続しすぎないように、一定間隔（例: 0.06秒）で鳴らす
                 if (Time.time >= nextSoundTime)
@@ -116,6 +123,8 @@ namespace KillingMahjong.UI
 
                 yield return new WaitForSeconds(timePerChar);
             }
+
+            dialogueText.maxVisibleCharacters = int.MaxValue;
         }
 
         public void HideText()
