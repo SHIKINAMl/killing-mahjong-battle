@@ -100,13 +100,24 @@ namespace KillingMahjong.Managers
         private static readonly List<TutorialLine> ManganRequestLines = new List<TutorialLine>
         {
             new TutorialLine("「で今回作ってもらうのはただのテンパイじゃないよ」"),
-            new TutorialLine("「君には" + HighlightOpen + "満貫" + HighlightClose + "な手を作ってもらうねー」"),
+            new TutorialLine("「君には" + HighlightOpen + "満貫" + HighlightClose + "なテンパイを作ってもらうねー」"),
+        };
+
+        /// <summary>
+        /// 満貫説明UIを閉じたあとの念押し（2026-09-23 に足した。フロー図にあったが抜けていた）。
+        /// </summary>
+        private static readonly List<TutorialLine> ManganRuleLines = new List<TutorialLine>
+        {
+            new TutorialLine("「このゲームはまず" + HighlightOpen + "満貫以上の形" + HighlightClose + "を作るのがルールでね」"),
+            new TutorialLine("「満貫以上を作れないと" + HighlightOpen + "賭けにならない" + HighlightClose + "から注意して」"),
+            new TutorialLine("「んじゃあ満貫を作る練習ねー」"),
         };
 
         /// <summary>最後のひと押し。この直後に手牌選択へ入る。</summary>
         private static readonly List<TutorialLine> StartBuildingLines = new List<TutorialLine>
         {
             new TutorialLine("「とりあえず適当に13牌触ってみてよ」"),
+            new TutorialLine("「アタシが見てやるからさー」"),
         };
 
         /// <summary>
@@ -233,6 +244,7 @@ namespace KillingMahjong.Managers
             // 手を組ませる直前のここが正しい位置（以前は合流点に出していた）
             yield return ShowRulePanelRoutine(font, null, null, GuideBoardPath);
 
+            yield return PlayLines(ManganRuleLines);
             yield return PlayLines(StartBuildingLines);
         }
 

@@ -85,6 +85,7 @@ namespace KillingMahjong.Managers
         {
             // --- 局の初期化 ---
             HasClickedAutoMangan = false;
+            IsAutoButtonLocked = false;
             _hasRejectedFirstConfirm = false;
             _isWaitingForHandSelectionComplete = true;
             _lastPlayerDiscardBaseId = -1;
@@ -213,9 +214,20 @@ namespace KillingMahjong.Managers
                 {
                     selfMadeMangan = IsSelfMadeManganHand();
 
-                    yield return StartCoroutine(PlayLines(selfMadeMangan
-                        ? ResolveSelfManganLines(data)
-                        : ResolveHandFilledLines(data)));
+                    var lines = selfMadeMangan ? ResolveSelfManganLines(data) : ResolveHandFilledLines(data);
+
+                    if (data.freeHandBuilding)
+                    {
+                        yield return StartCoroutine(PlayLines(lines));
+                    }
+                    else
+                    {
+                        // **フロー図の順番（2026-09-23 のユーザー指示）。**
+                        //   「じゃあ、コレ使ってよ」まで → ボタンを出す → 4秒ハイライト
+                        //   → 「これはおまかせボタン」以降
+                        // ボタンが無い状態で「これはおまかせボタン」と言っても指す先が無い。
+                        yield return StartCoroutine(PlayLinesUntilAutoIntro(data, lines));
+                    }
                 }
             }
 
@@ -232,15 +244,18 @@ namespace KillingMahjong.Managers
             }
             else if (selfMadeMangan)
             {
-                // 自力で満貫手を組めた場合も、フロー図どおり『おまかせ』を4秒だけ紹介する。
-                // その後は手牌を保ったまま決定へ進める。HasClickedAutoMangan は待ち牌の公開と
-                // 決定の解禁に使われているので、紹介が終わった時点で立てる。
-                SetHandButtonStage(HandButtonStage.AutoOnly);
-                GuideTo(gameUIManager != null && gameUIManager.HandUI != null
-                    ? gameUIManager.HandUI.AutoManganButtonRect : null);
-                yield return new WaitForSeconds(4f);
-                ClearGuide();
+                // 『おまかせ』の紹介（ボタン表示＋4秒ハイライト＋紹介セリフ）は
+                // PlayLinesUntilAutoIntro で済んでいる。ここでは決定へ進めるだけ。
+                // HasClickedAutoMangan は待ち牌の公開と決定の解禁に使われているので、ここで立てる。
                 HasClickedAutoMangan = true;
+                IsAutoButtonLocked = false;   // ここから先は『自動』を出さないので旗も下ろす
+
+                // フロー図どおり、**ハイライトの前に**決定を促す一言を入れる（2026-09-23）。
+                // 『おまかせ』を押した経路では ApplyMockAutoMangan が同じ言葉を言う。
+                yield return StartCoroutine(PlayLines(new List<TutorialLine>
+                {
+                    new TutorialLine(DecidePromptLine),
+                }));
 
                 SetHandButtonStage(HandButtonStage.DecideOnly);
                 GuideTo(gameUIManager != null && gameUIManager.HandUI != null
@@ -303,7 +318,10 @@ namespace KillingMahjong.Managers
             // 流局なら賭け金は場に残したまま次局へ持ち越す
             _prevRoundWasDraw = data.outcome == TutorialOutcome.Draw;
 
-            yield return StartCoroutine(PlayLines(data.outroLines));
+            // 第1局はロン後の40手順を RunPlayerRon 側で完結させる。
+            // ここで旧 outroLines を続けると、フロー図に無い別の締めが追加されてしまう。
+            if (!IsFirstTutorialRound(data))
+                yield return StartCoroutine(PlayLines(data.outroLines));
         }
 
         /// <summary>
@@ -551,6 +569,93 @@ namespace KillingMahjong.Managers
             }
         }
 
+        /// <summary>
+        /// 『おまかせ』の紹介を、フロー図の順番で流す（2026-09-23）。
+        ///
+        /// 「これはおまかせボタン」と言い出す**手前**でボタンを出し、
+        /// そのまま4秒ハイライトしてから残りのセリフを続ける。
+        /// 目印の語が見つからない台本（差し替え時など）では、全部言ってからボタンを出す。
+        /// </summary>
+        private IEnumerator PlayLinesUntilAutoIntro(TutorialRoundData data, List<TutorialLine> lines)
+        {
+            int introIndex = IndexOfAutoIntro(lines);
+
+            if (lines == null || introIndex < 0)
+            {
+                // 自力で満貫を作れたときの台本には『おまかせ』の紹介が入っていない。
+                // フロー図ではどちらの道も紹介セリフへ合流するので、
+                // 手牌が足りないときの台本から**紹介の2行だけ**を借りて言う（2026-09-23）。
+                if (lines != null) yield return StartCoroutine(PlayLines(lines));
+
+                // **見せるだけ。押させない。** 自分で組んだ満貫手が置き換わらないようにする
+                IsAutoButtonLocked = true;
+                SetHandButtonStage(HandButtonStage.AutoOnly);
+                yield return StartCoroutine(HighlightAutoManganButton());
+                yield return StartCoroutine(PlayLines(BuildAutoIntroLines(data)));
+                yield break;
+            }
+
+            if (introIndex > 0) yield return StartCoroutine(PlayLines(lines.GetRange(0, introIndex)));
+
+            SetHandButtonStage(HandButtonStage.AutoOnly);
+            yield return StartCoroutine(HighlightAutoManganButton());
+
+            yield return StartCoroutine(PlayLines(lines.GetRange(introIndex, lines.Count - introIndex)));
+        }
+
+        /// <summary>この語を含むセリフの手前で『おまかせ』を出す。</summary>
+        private const string AutoButtonIntroKeyword = "おまかせボタン";
+
+        /// <summary>
+        /// 決定ボタンへ促す一言（フロー図 y=9360）。
+        /// **『おまかせ』を押した場合も、自力で満貫を作れた場合も、同じ言葉で促す。**
+        /// </summary>
+        internal const string DecidePromptLine = "手牌が決まったら決定ボタンを押してね";
+
+        /// <summary>『おまかせ』の紹介が始まる行。無ければ -1。</summary>
+        private static int IndexOfAutoIntro(List<TutorialLine> lines)
+        {
+            if (lines == null) return -1;
+            for (int i = 0; i < lines.Count; i++)
+            {
+                if (lines[i] != null && !string.IsNullOrEmpty(lines[i].text)
+                    && lines[i].text.Contains(AutoButtonIntroKeyword))
+                {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        /// <summary>
+        /// 『おまかせ』の紹介だけを取り出す。
+        /// **「これを押して」は入れない。** 自分で満貫を作れた人には押す必要が無いため。
+        /// </summary>
+        private List<TutorialLine> BuildAutoIntroLines(TutorialRoundData data)
+        {
+            var source = ResolveHandFilledLines(data);
+            int start = IndexOfAutoIntro(source);
+            var result = new List<TutorialLine>();
+            if (source == null || start < 0) return result;
+
+            for (int i = start; i < source.Count; i++)
+            {
+                if (source[i] == null || string.IsNullOrEmpty(source[i].text)) continue;
+                if (source[i].text.Contains("押して")) continue;
+                result.Add(source[i]);
+            }
+            return result;
+        }
+
+        /// <summary>フロー図の「４秒間オート満貫ボタンハイライト」。</summary>
+        private IEnumerator HighlightAutoManganButton()
+        {
+            GuideTo(gameUIManager != null && gameUIManager.HandUI != null
+                ? gameUIManager.HandUI.AutoManganButtonRect : null);
+            yield return new WaitForSeconds(4f);
+            ClearGuide();
+        }
+
         private IEnumerator RunFirstRoundOpening()
         {
             GuideTo(GetWallGuideTarget(), false, new Vector2(0f, 10f));
@@ -565,12 +670,19 @@ namespace KillingMahjong.Managers
 
         private IEnumerator RunFirstRoundWaitExplanation()
         {
-            GuideTo(GetWaitGuideTarget(), false, new Vector2(0f, 10f));
+            // **矢印はフロー図どおり「待ち牌はここに表示されるから」の手前で出す**（2026-09-23）。
+            // 図の並びは チキンレース → 待ち牌UIハイライト → 「待ち牌はここに表示されるから」。
+            // 以前はこの3行より前から出していたので、まだ話題になっていない枠を指していた。
             yield return StartCoroutine(PlayLines(new List<TutorialLine>
             {
                 new TutorialLine($"とまぁこんな感じでお互い{HighlightOpen}１ターンに１枚{HighlightClose}牌を打っていって"),
                 new TutorialLine($"{HighlightOpen}先に{HighlightClose}{HighlightOpen}相手に自分の待ち牌を出させた人の勝ち{HighlightClose}"),
                 new TutorialLine("というチキンレースなギャンブルなんだこれは"),
+            }));
+
+            GuideTo(GetWaitGuideTarget(), false, new Vector2(0f, 10f));
+            yield return StartCoroutine(PlayLines(new List<TutorialLine>
+            {
                 new TutorialLine($"{HighlightOpen}待ち牌はここに表示{HighlightClose}されるから"),
                 new TutorialLine("相手がその牌を出すのを祈りながら牌を打っていってね"),
             }));

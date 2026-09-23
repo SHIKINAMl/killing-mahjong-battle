@@ -137,6 +137,14 @@ namespace KillingMahjong.Managers
             _handButtonStage == HandButtonStage.AutoOnly ||
             _handButtonStage == HandButtonStage.AutoAndDecide;
 
+        /// <summary>
+        /// 『自動』ボタンを**見せるだけで押させない**か（2026-09-23 のユーザー指示）。
+        ///
+        /// 自力で満貫手を作れた人には、紹介のあいだ『おまかせ』を見せるが、
+        /// 押されると台本の手牌に置き換わってしまう。紹介の4秒とセリフの間は押させない。
+        /// </summary>
+        public bool IsAutoButtonLocked { get; set; }
+
         /// <summary>『決定』ボタンを出してよいか。HandUI.UpdateLayout から参照される。</summary>
         public bool IsDecideButtonVisible =>
             _handButtonStage == HandButtonStage.AutoAndDecide ||

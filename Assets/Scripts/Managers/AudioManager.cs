@@ -118,8 +118,18 @@ namespace KillingMahjong.Managers
             }
         }
 
+        /// <summary>
+        /// 起動時にタイトル曲を流さない（2026-09-23）。
+        ///
+        /// **チュートリアルの冒頭を無音にするために要る。** `OpeningSequenceManager` は
+        /// Awake で `StopBGM()` を呼ぶが、こちらの `Start` はそのあとに走るので、
+        /// 止めた直後にタイトル曲が鳴り出していた。Awake でこの旗を立ててもらう。
+        /// </summary>
+        public bool SuppressStartupBgm { get; set; }
+
         private void Start()
         {
+            if (SuppressStartupBgm) return;
             if (IsBgmPlaying) return;
 
             // 起動時は自作のタイトルBGM（2026-09-11）。

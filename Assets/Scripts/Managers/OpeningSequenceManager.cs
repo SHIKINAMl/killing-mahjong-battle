@@ -81,13 +81,15 @@ namespace KillingMahjong.Managers
 
         private IEnumerator SequenceRoutine()
         {
-            // **目を開けてから紙を取るまでは「時計じかけの謎」を流す**（2026-09-20 のユーザー指示）。
-            // 以前はここを無音にしていた（目覚めの生々しさを残すため）が、指示で曲を置くことにした。
-            // 紙をクリックした時点で OnPaperClicked がフェードアウトさせる。
+            // **目を開けてから紙を取るまでは無音にする（2026-09-23 のユーザー指示）。**
+            // 一度は「時計じかけの謎」を流したが、要らないと言われて戻した。
+            // 曲は契約書のあと、台本の1行目で TutorialAudioDirector が流し始める。
             if (KillingMahjong.Managers.AudioManager.Instance != null)
             {
+                // **旗を先に立てる。** AudioManager.Start はこのあとに走り、
+                // 何も鳴っていなければタイトル曲を流し始めてしまう（2026-09-23 に実機で確認）
+                KillingMahjong.Managers.AudioManager.Instance.SuppressStartupBgm = true;
                 KillingMahjong.Managers.AudioManager.Instance.StopBGM();
-                KillingMahjong.Managers.AudioManager.Instance.PlayTutorialBgm(OpeningBgmName);
             }
 
             // 少し待ってから目を覚ます演出
@@ -106,24 +108,9 @@ namespace KillingMahjong.Managers
             paperObject.SetActive(true);
         }
 
-        /// <summary>
-        /// 目覚めから紙を取るまでに流す曲（2026-09-20 のユーザー指示）。
-        /// 追加曲の「時計じかけの謎」。コレクションの「追加曲」タブで聴ける。
-        /// </summary>
-        private const string OpeningBgmName = "bgm_ex_mystery";
-
-        /// <summary>紙を取ったあと曲を消すのにかける秒数。場面の切れ目を作るため、ゆっくり。</summary>
-        private const float OpeningBgmFadeSeconds = 1.6f;
-
         private void OnPaperClicked()
         {
             paperObject.SetActive(false); // 卓上の小さな紙を隠す
-
-            // ここまでが「目を開けて紙を取るまで」。曲を消して、契約書の場面は静かに戻す
-            if (KillingMahjong.Managers.AudioManager.Instance != null)
-            {
-                KillingMahjong.Managers.AudioManager.Instance.FadeOutBgm(OpeningBgmFadeSeconds);
-            }
 
             if (largePaperUI != null && largePaperNextButton != null)
             {
@@ -153,8 +140,7 @@ namespace KillingMahjong.Managers
             {
                 KillingMahjong.Managers.AudioManager.Instance.PlayPaperSlideSE();
                 // 契約書が迫り上がる厚みを足す（2026-09-11）。
-                // **ここに来る時点で曲はフェードアウト中**（OnPaperClicked）。
-                // 契約書の場面そのものは、この効果音だけで静かに進める。
+                // **ここまでは無音。** 契約書の場面は、この効果音だけで静かに進める。
                 KillingMahjong.Managers.AudioManager.Instance.PlayStinger("se_paper");
             }
             largePaperUI.SetActive(true);

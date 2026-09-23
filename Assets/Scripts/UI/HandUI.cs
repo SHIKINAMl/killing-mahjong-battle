@@ -459,6 +459,13 @@ namespace KillingMahjong.UI
             if (autoManganButton != null)
             {
                 autoManganButton.gameObject.SetActive(showAuto);
+
+                // チュートリアルの紹介中は、出してはいるが押させない（2026-09-23）。
+                // 押されると台本の手牌に置き換わり、自分で組んだ満貫手が消えてしまう。
+                bool lockAuto = showAuto && gameUIManager != null && gameUIManager.IsTutorialMode
+                                && gameUIManager.TutorialManager != null
+                                && gameUIManager.TutorialManager.IsAutoButtonLocked;
+                autoManganButton.interactable = !lockAuto;
             }
             if (reselectButton != null)
             {

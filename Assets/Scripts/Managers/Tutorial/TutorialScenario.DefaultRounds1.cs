@@ -67,6 +67,8 @@ namespace KillingMahjong.Managers
                     new TutorialLine("じゃあ、コレ使ってよ"),
                     new TutorialLine("これは おまかせボタン"),
                     new TutorialLine("自動で山牌の中から満貫以上の形を作ってくれるよ"),
+                    // フロー図にあったが抜けていた1行（2026-09-23 に足した）
+                    new TutorialLine("君はまだできないみたいだからこれを押して"),
                 },
                 onSelfManganLines = new List<TutorialLine>
                 {
