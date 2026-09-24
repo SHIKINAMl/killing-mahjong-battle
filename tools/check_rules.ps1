@@ -114,6 +114,32 @@ foreach ($f in $files) {
     }
 }
 
+# --- 6. フォント図版のふくらみが紛れ込んでいないか（警告） ------------------
+#
+# TextMeshPro の Dynamic なフォント資産は、**エディタが開いているだけで
+# 中身が数千行ふくらんだり縮んだりする。** 焼かれた図版はビルド時に
+# `m_ClearDynamicDataOnBuild` で捨てられるので、コミットする意味が無い。
+#
+# 本命の1つ（`PixelMplus10_DynamicFixed.asset`）は
+# `git update-index --skip-worktree` を当てて git から見えなくしてあるので、
+# 普段ここには出てこない。**新しく clone したときや、その指定を外したときの網。**
+# 2回コミットに紛れ込ませた実績があるので置いてある。
+foreach ($f in $files) {
+    if ($f.Path -notlike '*.asset') { continue }
+    $stat = & git diff HEAD --numstat -- $f.Path
+    if (-not $stat) { continue }
+    $parts = ($stat | Select-Object -First 1) -split "`t"
+    if ($parts.Count -lt 2) { continue }
+    $addRem = 0
+    [int]$a = 0; [int]$r = 0
+    [void][int]::TryParse($parts[0], [ref]$a)
+    [void][int]::TryParse($parts[1], [ref]$r)
+    $addRem = $a + $r
+    if ($addRem -gt 500) {
+        Add-Warn 'フォント図版' $f.Path "$addRem 行の差分。TMP が焼いた図版なら**コミットしない**（git checkout -- で捨てる）。ビルド時にどうせ消える。"
+    }
+}
+
 # --- 結果 -------------------------------------------------------------------
 if ($warns.Count -gt 0) {
     Write-Host ""
