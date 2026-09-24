@@ -61,7 +61,10 @@ namespace KillingMahjong.UI.Effects
 
             if (playSound && AudioManager.Instance != null)
             {
-                AudioManager.Instance.PlaySynthSound(SynthWaveType.Sine, 2600f, 1800f, 0.06f, 0.5f);
+                // **音量は 0.5 では足りない（2026-09-25 に実測）。**
+                // 録画から測ると、0.5 のときの振幅は 0.035。同じ録画の打牌SEが 0.189 で、
+                // **牌を1枚置く音より5倍小さい。** 合図として置く音がそれでは聞こえない。
+                AudioManager.Instance.PlaySynthSound(SynthWaveType.Sine, 2600f, 1800f, 0.06f, 1.0f);
             }
 
             flash.StartCoroutine(flash.FadeRoutine());
