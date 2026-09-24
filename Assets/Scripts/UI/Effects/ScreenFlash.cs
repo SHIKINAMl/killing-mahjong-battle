@@ -2,6 +2,7 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 using KillingMahjong.Common;
+using KillingMahjong.Managers;
 
 namespace KillingMahjong.UI.Effects
 {
@@ -17,11 +18,14 @@ namespace KillingMahjong.UI.Effects
     /// </summary>
     public class ScreenFlash : MonoBehaviour
     {
-        /// <summary>既定の長さ。「一瞬」に見せたいので、伸ばすとしてもこの倍まで。</summary>
+        /// <summary>既定の長さ。ピーク保持と減衰を合わせても、従来より長くしない。</summary>
         public const float DefaultDuration = 0.12f;
 
         /// <summary>既定の濃さ。真っ白(1.0)まで上げると眩しすぎるので抑えてある。</summary>
         public const float DefaultPeakAlpha = 0.7f;
+
+        // 60fps なら約2フレーム。光が一度は画面に残り、「叩いた」合図として読める長さにする。
+        private const float PeakHoldDuration = 0.03f;
 
         private Image _image;
         private Color _color;
@@ -29,13 +33,13 @@ namespace KillingMahjong.UI.Effects
         private float _peakAlpha;
 
         /// <summary>白く一瞬光らせる。</summary>
-        public static void Play(float duration = DefaultDuration, float peakAlpha = DefaultPeakAlpha)
+        public static void Play(float duration = DefaultDuration, float peakAlpha = DefaultPeakAlpha, bool playSound = true)
         {
-            Play(Color.white, duration, peakAlpha);
+            Play(Color.white, duration, peakAlpha, playSound);
         }
 
         /// <summary>色を指定して一瞬光らせる。</summary>
-        public static void Play(Color color, float duration = DefaultDuration, float peakAlpha = DefaultPeakAlpha)
+        public static void Play(Color color, float duration = DefaultDuration, float peakAlpha = DefaultPeakAlpha, bool playSound = true)
         {
             // エディタの停止中や、シーン遷移中に呼ばれても何もしない
             if (!Application.isPlaying) return;
@@ -47,6 +51,12 @@ namespace KillingMahjong.UI.Effects
             flash._duration = duration;
             flash._peakAlpha = Mathf.Clamp01(peakAlpha);
             flash.Build();
+
+            if (playSound && AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlaySynthSound(SynthWaveType.Sine, 2600f, 1800f, 0.06f, 0.5f);
+            }
+
             flash.StartCoroutine(flash.FadeRoutine());
         }
 
@@ -72,16 +82,26 @@ namespace KillingMahjong.UI.Effects
 
         private IEnumerator FadeRoutine()
         {
-            // 立ち上がりは入れない。フェイズ演出の直前に差し込むものなので、
-            // 光り始めを待つと「合図」ではなく「前置き」になってしまう。
-            //
-            // Time.timeScale に左右されないよう unscaled で進める。演出中に
-            // スローがかかっても、フラッシュの長さは見た目どおりであってほしい。
-            float elapsed = 0f;
-            while (elapsed < _duration)
+            // 立ち上がりは入れず、ピークを最低1フレーム描いてから落とす。
+            // 秒だけで保持すると重い環境では一度も描かれずに終わるため、必ず yield する。
+            float holdDuration = Mathf.Min(PeakHoldDuration, _duration);
+            float holdElapsed = 0f;
+            do
             {
-                elapsed += Time.unscaledDeltaTime;
-                float alpha = Mathf.Lerp(_peakAlpha, 0f, elapsed / _duration);
+                yield return null;
+                holdElapsed += Time.unscaledDeltaTime;
+            }
+            while (holdElapsed < holdDuration);
+
+            // Time.timeScale に左右されないよう unscaled で進める。直線ではなく、
+            // 最初に大きく落としてから消える形にすることで、ぼんやりした明滅に見せない。
+            float fadeDuration = _duration - holdDuration;
+            float fadeElapsed = 0f;
+            while (fadeElapsed < fadeDuration)
+            {
+                fadeElapsed += Time.unscaledDeltaTime;
+                float t = Mathf.Clamp01(fadeElapsed / fadeDuration);
+                float alpha = _peakAlpha * Mathf.Pow(1f - t, 3f);
                 if (_image == null) break;
                 _image.color = new Color(_color.r, _color.g, _color.b, alpha);
                 yield return null;
