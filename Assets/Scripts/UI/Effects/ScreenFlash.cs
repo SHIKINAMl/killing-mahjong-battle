@@ -15,6 +15,13 @@ namespace KillingMahjong.UI.Effects
     ///
     /// GraphicRaycaster は**わざと付けていない**。付けると光っている一瞬だけ
     /// 全画面のクリックを吸ってしまい、その裏のボタンが反応しなくなる。
+    ///
+    /// **この光は Unity Recorder の録画には写らない（2026-09-25 に確認）。**
+    /// `TutorialRecorder` の GameView 入力が拾わないため、60fps で録っても
+    /// 1コマも入らない。他の Overlay キャンバス（セリフ・オプション・資料）は
+    /// 写るので、録画を見て「出ていない」と判断しないこと。
+    /// 確かめるときは `ScreenCapture.CaptureScreenshot` を使う。
+    /// 実測では画面の平均輝度が 73 から 178 へ上がる。
     /// </summary>
     public class ScreenFlash : MonoBehaviour
     {
