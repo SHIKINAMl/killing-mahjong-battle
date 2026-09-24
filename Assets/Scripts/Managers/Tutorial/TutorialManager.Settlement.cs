@@ -173,7 +173,7 @@ namespace KillingMahjong.Managers
             ClearGuide();
 
             // 17〜20. 勝利条件を示す。
-            KillingMahjong.UI.Effects.ScreenFlash.Play();
+            KillingMahjong.UI.Effects.ScreenFlash.PlaySceneBreak();
             yield return StartCoroutine(PlayLines(new List<TutorialLine>
             {
                 new TutorialLine("なんとゲームに勝利！晴れて脱出だ！"),
@@ -182,7 +182,7 @@ namespace KillingMahjong.Managers
             }));
 
             // 21〜22. 同じ対局でも負けたときの説明へ切り替える。
-            KillingMahjong.UI.Effects.ScreenFlash.Play();
+            KillingMahjong.UI.Effects.ScreenFlash.PlaySceneBreak();
             yield return StartCoroutine(PlayLines(new List<TutorialLine>
             {
                 new TutorialLine("次は対局に負けた…ロンされちゃった時のやり方ね"),
@@ -242,7 +242,7 @@ namespace KillingMahjong.Managers
             }));
 
             // 33〜39. 最後のフラッシュのあと、対局フェイズ①を締める。
-            KillingMahjong.UI.Effects.ScreenFlash.Play();
+            KillingMahjong.UI.Effects.ScreenFlash.PlaySceneBreak();
             yield return StartCoroutine(PlayLines(new List<TutorialLine>
             {
                 new TutorialLine("死を意味する……！"),
