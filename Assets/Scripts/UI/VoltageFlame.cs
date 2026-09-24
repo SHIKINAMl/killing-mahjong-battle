@@ -4,36 +4,59 @@ using UnityEngine.UI;
 namespace KillingMahjong.UI
 {
     /// <summary>
-    /// ボルテージの四角の上で揺れる炎（2026-09-13）。
+    /// ボルテージの四角の上で燃える炎（2026-09-13 に作り、2026-09-25 に作り直した）。
     ///
-    /// **絵は使わず、丸を積んで作っている。** 炎の素材がプロジェクトに無く、
-    /// AIで描くことは禁じられている（AGENTS.md 第7項）ため。
-    /// 中心から外へ薄くなる円をその場で焼き（<see cref="GetBlob"/>）、
-    /// それを3枚重ねて、位置と大きさと色を毎フレーム動かして炎に見せている。
+    /// **絵は使わない。** 炎の素材がプロジェクトに無く、AIで描くことは
+    /// 禁じられている（AGENTS.md 第7項）。四角いドットを撒いて炎にしている。
+    ///
+    /// ---
+    ///
+    /// **粒はカールノイズの流れ場で動かす（2026-09-25）。**
+    /// ユーザーが参考にくれた動画（ドット絵の炎を RANDOM と CURL NOISE で
+    /// 並べたもの）で、違いがはっきり出ていた。
+    ///
+    ///   - RANDOM … 粒が銘々に散る。**煙のように濁って、炎に見えない**
+    ///   - CURL NOISE … 粒が同じ流れに乗る。**縄のようにねじれて立ち上がる**
+    ///
+    /// カールノイズは、スカラー場 ψ の勾配を90度ひねったもの
+    /// （`v = (∂ψ/∂y, -∂ψ/∂x)`）。**湧き出しも吸い込みも生まれない**ので、
+    /// 粒が一点に集まったり抜けたりせず、流体らしいうねりになる。
+    /// ψ には Perlin ノイズを使い、場そのものを上へ流している。
+    ///
+    /// 前の作りは丸いぼかし画像を3枚重ねて sin で揺らすものだった。
+    /// 小さく光る点にしか見えず、炎として読めなかったので捨てた。
+    ///
+    /// ---
+    ///
+    /// **描画は自前のメッシュ1枚。** 粒ごとに `Image` を置くと、
+    /// 自分と相手で 4区画 × 2 = 8本ぶん、百個を超える `Image` が毎フレーム
+    /// レイアウトを揺らすことになる。`Graphic` を1つだけ持ち、
+    /// <see cref="OnPopulateMesh"/> で粒のぶんの四角形を積む。
     ///
     /// **段が上がるほど激しくする**（ユーザーの指示）。
-    /// 背が伸び、揺れが速く大きくなり、芯（明るい黄色）が出る。
-    /// 段ごとの値は <see cref="Tuning"/> にまとめてあるので、そこだけ触ればよい。
+    /// 背が伸び、粒が増え、速くなる。段ごとの値は <see cref="Tuning"/> に集めてある。
     ///
     /// **揺れは実時間で回す。** 演出中に `Time.timeScale` をいじられても
     /// 炎だけ止まったり倍速になったりしないようにする。
     /// </summary>
-    public class VoltageFlame : MonoBehaviour
+    public class VoltageFlame : MaskableGraphic
     {
         /// <summary>段ごとの激しさと色。添字が段数（0段＝炎なし）。</summary>
         private struct Tuning
         {
-            public float Height;     // 背の高さの倍率
-            public float Speed;      // 揺れの速さ
-            public float Sway;       // 横揺れの幅[px]
-            public float CoreAlpha;  // 芯の濃さ（0で芯なし）
-            public Color Root;       // 炎の根元の色
-            public Color Tip;        // 炎の先端の色
+            public float Height;     // 粒が消えるまでに上がる高さ[px]
+            public float Rise;       // 立ち上がる速さ[px/秒]
+            public float Swirl;      // 流れ場のうねりの強さ[px/秒]
+            public int Count;        // 同時に出ている粒の数
+            public float Dot;        // 粒の一辺[px]
+            public Color Root;       // 中ほどの色
+            public Color Tip;        // 消えぎわの色
             public Color Pip;        // 四角そのものの色
 
-            public Tuning(float h, float s, float w, float c, Color root, Color tip, Color pip)
+            public Tuning(float h, float rise, float swirl, int count, float dot, Color root, Color tip, Color pip)
             {
-                Height = h; Speed = s; Sway = w; CoreAlpha = c; Root = root; Tip = tip; Pip = pip;
+                Height = h; Rise = rise; Swirl = swirl; Count = count; Dot = dot;
+                Root = root; Tip = tip; Pip = pip;
             }
         }
 
@@ -51,15 +74,15 @@ namespace KillingMahjong.UI
         private static readonly Tuning[] ByLevel =
         {
             // 0段: 出さない
-            new Tuning(0.00f,  0f, 0.0f, 0.00f, Color.clear, Color.clear, new Color32(255, 150,  40, 255)),
+            new Tuning( 0f,  0f,  0f,  0, 0f, Color.clear, Color.clear, new Color32(255, 150,  40, 255)),
             // 1段: 赤
-            new Tuning(1.00f,  4f, 0.8f, 0.00f, new Color32(205,  45,  30, 235), new Color32(255, 115,  80, 240), new Color32(230,  70,  50, 255)),
+            new Tuning(20f, 26f, 12f, 16, 2f, new Color32(235,  80,  35, 255), new Color32(150,  25,  20, 255), new Color32(230,  70,  50, 255)),
             // 2段: 橙
-            new Tuning(1.30f,  6f, 1.3f, 0.00f, new Color32(240, 105,  25, 235), new Color32(255, 190,  85, 240), new Color32(255, 150,  40, 255)),
+            new Tuning(26f, 32f, 16f, 22, 2f, new Color32(255, 140,  35, 255), new Color32(180,  45,  25, 255), new Color32(255, 150,  40, 255)),
             // 3段: 黄
-            new Tuning(1.60f,  8f, 1.9f, 0.40f, new Color32(250, 200,  40, 240), new Color32(255, 250, 170, 245), new Color32(255, 225,  70, 255)),
+            new Tuning(32f, 40f, 20f, 28, 2f, new Color32(255, 205,  60, 255), new Color32(210,  85,  30, 255), new Color32(255, 225,  70, 255)),
             // 4段: 青白（一番熱い）
-            new Tuning(1.95f, 12f, 2.6f, 0.75f, new Color32( 70, 150, 255, 240), new Color32(225, 245, 255, 250), new Color32(120, 195, 255, 255)),
+            new Tuning(40f, 50f, 25f, 34, 2f, new Color32(120, 195, 255, 255), new Color32( 40,  80, 200, 255), new Color32(120, 195, 255, 255)),
         };
 
         /// <summary>
@@ -72,26 +95,36 @@ namespace KillingMahjong.UI
             return ByLevel[i].Pip;
         }
 
-        /// <summary>舌の数。増やすほど重くなるので、この大きさなら3枚で足りる。</summary>
-        private const int TongueCount = 3;
+        /// <summary>根元の色。**段によらず白寄り**にしてある（一番熱い場所なので）。</summary>
+        private static readonly Color CoreColor = new Color32(255, 248, 225, 255);
 
-        /// <summary>一番下の舌の直径[px]。四角（13px）より少し細くして、乗っている感を出す。</summary>
-        private const float BaseWidth = 12f;
+        /// <summary>粒が出てくる幅[px]。四角（20px）より細くして、乗っている感を出す。</summary>
+        private const float BaseWidth = 11f;
 
-        /// <summary>舌1枚ぶんの積み上げ量[px]。`Height` 倍されて使われる。</summary>
-        private const float StackStep = 5.5f;
+        /// <summary>
+        /// ノイズの細かさ。小さいほど大きなうねりになる。
+        /// 0.06 で、おおよそ 16px ごとに流れの向きが変わる。炎の幅が 11px なので
+        /// **1本の炎の中に、ひとうねりが収まる**大きさ。
+        /// </summary>
+        private const float NoiseScale = 0.06f;
 
-        /// <summary>芯の色。**段によらず白寄り**にしてある（一番熱い場所なので）。</summary>
-        private static readonly Color CoreColor = new Color32(255, 250, 225, 255);
+        /// <summary>流れ場そのものが上へ流れる速さ。止めると模様が貼り付いて見える。</summary>
+        private const float FieldScroll = 0.55f;
 
-        private Image[] _tongues;
-        private Image _core;
-        private RectTransform[] _tongueRects;
-        private RectTransform _coreRect;
+        /// <summary>差分で勾配を取るときの幅[px]。</summary>
+        private const float Epsilon = 1.5f;
 
+        private struct Particle
+        {
+            public Vector2 Pos;
+            public float Age;
+            public float Life;
+        }
+
+        private Particle[] _particles;
         private int _level;
         private bool _broken;
-        private float _phase;
+        private float _fieldOffset;
 
         /// <summary>四角の上に炎を1つ作る。すでに付いていればそれを返す。</summary>
         public static VoltageFlame Attach(RectTransform pip)
@@ -101,7 +134,11 @@ namespace KillingMahjong.UI
             var existing = pip.GetComponentInChildren<VoltageFlame>(true);
             if (existing != null) return existing;
 
-            var go = new GameObject("Flame", typeof(RectTransform), typeof(VoltageFlame));
+            // **CanvasRenderer を自分で付けること。** `Graphic` は RequireComponent で
+            // 付くことになっているが、`new GameObject(..., typeof(VoltageFlame))` で
+            // 作るとこの経路では付かず、**絵が一切出ない**（2026-09-25 に実機で確認。
+            // canvas も material も正しいのに CanvasRenderer だけ無かった）。
+            var go = new GameObject("Flame", typeof(RectTransform), typeof(CanvasRenderer), typeof(VoltageFlame));
             var rect = (RectTransform)go.transform;
             rect.SetParent(pip, false);
 
@@ -113,102 +150,67 @@ namespace KillingMahjong.UI
             rect.sizeDelta = new Vector2(BaseWidth, 1f);
 
             var flame = go.GetComponent<VoltageFlame>();
-            flame.Build();
+            flame.raycastTarget = false;                    // 牌のクリック判定を吸わない
+            flame.ApplyVisibility();
             return flame;
         }
 
-        /// <summary>
-        /// 炎の粒に使う円。**その場で焼いて、全員で使い回す。**
-        ///
-        /// `Resources.GetBuiltinResource<Sprite>("UI/Skin/Knob.psd")` は
-        /// このUnityでは null が返る（2026-09-13 に確認）ので当てにしない。
-        /// 中心から外へ薄くなる作りにしてあり、縁が硬い円より炎に見える。
-        /// </summary>
+        // ------------------------------------------------------------
+        //  丸いぼかし画像（他所へ貸しているので残す）
+        // ------------------------------------------------------------
+
         private static Sprite _blob;
 
         /// <summary>
-        /// 同じ円を、ボルテージへ飛ぶ光（<see cref="VoltageTileFlightEffect"/>）でも貸す。
+        /// ボルテージへ飛ぶ光（<see cref="VoltageTileFlightEffect"/>）へ貸している円。
         /// **四角のまま出すと点にしか見えない。** 外へ薄くなる円だと、
         /// 小さくても光って見える。
+        ///
+        /// 炎そのものは 2026-09-25 からこれを使っていない（四角いドットを撒いている）。
+        /// 借り手が居るあいだは置いておく。
         /// </summary>
-        public static Sprite SharedBlob => GetBlob();
-
-        private static Sprite GetBlob()
+        public static Sprite SharedBlob
         {
-            if (_blob != null) return _blob;
-
-            const int size = 32;
-            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
-            tex.wrapMode = TextureWrapMode.Clamp;
-            tex.filterMode = FilterMode.Bilinear;
-
-            float c = (size - 1) * 0.5f;
-            var px = new Color[size * size];
-            for (int y = 0; y < size; y++)
+            get
             {
-                for (int x = 0; x < size; x++)
+                if (_blob != null) return _blob;
+
+                const int size = 32;
+                var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+                tex.wrapMode = TextureWrapMode.Clamp;
+                tex.filterMode = FilterMode.Bilinear;
+
+                float c = (size - 1) * 0.5f;
+                var px = new Color[size * size];
+                for (int y = 0; y < size; y++)
                 {
-                    float dx = (x - c) / c;
-                    float dy = (y - c) / c;
-                    float d = Mathf.Sqrt(dx * dx + dy * dy);
-                    // 中心は不透明、外周でちょうど 0。二乗で落として芯を残す
-                    float a = Mathf.Clamp01(1f - d);
-                    px[y * size + x] = new Color(1f, 1f, 1f, a * a);
+                    for (int x = 0; x < size; x++)
+                    {
+                        float dx = (x - c) / c;
+                        float dy = (y - c) / c;
+                        float d = Mathf.Sqrt(dx * dx + dy * dy);
+                        float a = Mathf.Clamp01(1f - d);
+                        px[y * size + x] = new Color(1f, 1f, 1f, a * a);
+                    }
                 }
+                tex.SetPixels(px);
+                tex.Apply();
+
+                _blob = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f);
+                return _blob;
             }
-            tex.SetPixels(px);
-            tex.Apply();
-
-            _blob = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f);
-            return _blob;
-        }
-
-        private void Build()
-        {
-            Sprite circle = GetBlob();
-
-            _tongues = new Image[TongueCount];
-            _tongueRects = new RectTransform[TongueCount];
-
-            for (int i = 0; i < TongueCount; i++)
-            {
-                var go = new GameObject("Tongue" + i, typeof(RectTransform), typeof(Image));
-                var rect = (RectTransform)go.transform;
-                rect.SetParent(transform, false);
-                rect.anchorMin = new Vector2(0.5f, 0f);
-                rect.anchorMax = new Vector2(0.5f, 0f);
-                rect.pivot = new Vector2(0.5f, 0.5f);
-
-                var img = go.GetComponent<Image>();
-                img.sprite = circle;
-                img.raycastTarget = false;      // 牌のクリック判定を吸わない
-                _tongues[i] = img;
-                _tongueRects[i] = rect;
-            }
-
-            var coreGo = new GameObject("Core", typeof(RectTransform), typeof(Image));
-            _coreRect = (RectTransform)coreGo.transform;
-            _coreRect.SetParent(transform, false);
-            _coreRect.anchorMin = new Vector2(0.5f, 0f);
-            _coreRect.anchorMax = new Vector2(0.5f, 0f);
-            _coreRect.pivot = new Vector2(0.5f, 0.5f);
-
-            _core = coreGo.GetComponent<Image>();
-            _core.sprite = circle;
-            _core.raycastTarget = false;
-            _core.color = new Color(CoreColor.r, CoreColor.g, CoreColor.b, 0f);
-
-            // 起きた瞬間に全部が同じ形にならないよう、個体ごとに位相をずらす
-            _phase = Random.Range(0f, 10f);
-
-            ApplyVisibility();
         }
 
         /// <summary>段と破棄状態を伝える。<see cref="VoltageUI"/> が段を変えるたびに呼ぶ。</summary>
         public void SetLevel(int level, bool broken)
         {
-            _level = Mathf.Clamp(level, 0, ByLevel.Length - 1);
+            int next = Mathf.Clamp(level, 0, ByLevel.Length - 1);
+            bool changed = next != _level || broken != _broken;
+
+            _level = next;
             _broken = broken;
+
+            if (changed && _level > 0 && !_broken) Reseed();
             ApplyVisibility();
         }
 
@@ -220,59 +222,129 @@ namespace KillingMahjong.UI
             if (gameObject.activeSelf != show) gameObject.SetActive(show);
         }
 
+        private void Reseed()
+        {
+            Tuning t = ByLevel[_level];
+            if (_particles == null || _particles.Length != t.Count)
+            {
+                _particles = new Particle[t.Count];
+            }
+
+            for (int i = 0; i < _particles.Length; i++)
+            {
+                Spawn(ref _particles[i], t);
+                // **最初から一様に散らす。** 全部を足元から始めると、
+                // 段が上がった瞬間に炎が「生えてくる」動きになって目立つ。
+                _particles[i].Age = Random.Range(0f, _particles[i].Life);
+            }
+        }
+
+        private static void Spawn(ref Particle p, Tuning t)
+        {
+            // 中央ほど濃く撒く。端から同じだけ出すと、根元が四角く見える
+            float x = (Random.value + Random.value - 1f) * BaseWidth * 0.5f;
+            p.Pos = new Vector2(x, Random.Range(-1f, 1f));
+            p.Age = 0f;
+            p.Life = t.Height / Mathf.Max(1f, t.Rise) * Random.Range(0.75f, 1.25f);
+        }
+
+        /// <summary>
+        /// カールノイズの速度。スカラー場 ψ の勾配を90度ひねる。
+        /// **こうすると流れに湧き出しが無くなり、粒が固まらずに回り込む。**
+        /// </summary>
+        private Vector2 Curl(float x, float y)
+        {
+            float px = x * NoiseScale;
+            float py = y * NoiseScale - _fieldOffset;
+            float e = Epsilon * NoiseScale;
+
+            float ddx = Mathf.PerlinNoise(px + e, py) - Mathf.PerlinNoise(px - e, py);
+            float ddy = Mathf.PerlinNoise(px, py + e) - Mathf.PerlinNoise(px, py - e);
+
+            // (∂ψ/∂y, -∂ψ/∂x)
+            return new Vector2(ddy, -ddx) / (2f * e);
+        }
+
         private void Update()
         {
             if (_level <= 0 || _broken) return;
-            if (_tongueRects == null) return;
+
+            Tuning t = ByLevel[_level];
+            if (_particles == null || _particles.Length != t.Count) Reseed();
+
+            // **実時間で回す。** timeScale を落とす演出に巻き込まれないように
+            float dt = Mathf.Min(Time.unscaledDeltaTime, 0.05f);   // 重いフレームで飛ばない
+            _fieldOffset += dt * FieldScroll;
+
+            for (int i = 0; i < _particles.Length; i++)
+            {
+                _particles[i].Age += dt;
+                if (_particles[i].Age >= _particles[i].Life)
+                {
+                    Spawn(ref _particles[i], t);
+                    continue;
+                }
+
+                Vector2 v = Curl(_particles[i].Pos.x, _particles[i].Pos.y) * t.Swirl;
+
+                // 上ほど速く、外へ広がる。炎は上で開く
+                float up = _particles[i].Age / _particles[i].Life;
+                v.y += t.Rise * (0.6f + 0.8f * up);
+                v.x *= 0.7f + 1.1f * up;
+
+                _particles[i].Pos += v * dt;
+            }
+
+            SetVerticesDirty();
+        }
+
+        protected override void OnPopulateMesh(VertexHelper vh)
+        {
+            vh.Clear();
+            if (_level <= 0 || _broken || _particles == null) return;
 
             Tuning t = ByLevel[_level];
 
-            // **実時間で回す。** timeScale を落とす演出に巻き込まれないように
-            _phase += Time.unscaledDeltaTime * t.Speed;
-
-            for (int i = 0; i < _tongueRects.Length; i++)
+            for (int i = 0; i < _particles.Length; i++)
             {
-                var rect = _tongueRects[i];
-                if (rect == null) continue;
+                float up = Mathf.Clamp01(_particles[i].Age / Mathf.Max(0.0001f, _particles[i].Life));
 
-                // 上にある舌ほど細く、よく揺れる
-                float up = i / (float)(TongueCount - 1);          // 0=根元, 1=先端
-                float width = Mathf.Lerp(BaseWidth, BaseWidth * 0.45f, up);
+                // **根元は白熱、中ほどが段の色、消えぎわは暗く落とす。**
+                // 参考動画の炎も 白 → 黄 → 橙 → 赤 と、寿命で色が移っていた。
+                Color c = up < 0.35f
+                    ? Color.Lerp(CoreColor, t.Root, up / 0.35f)
+                    : Color.Lerp(t.Root, t.Tip, (up - 0.35f) / 0.65f);
 
-                // 舌ごとに位相をずらして、束が一体で動かないようにする
-                float p = _phase + i * 1.7f;
-                float sway = Mathf.Sin(p) * t.Sway * (0.3f + up);          // 先ほど大きく振れる
-                float breathe = 1f + Mathf.Sin(p * 1.9f) * (0.12f + 0.10f * up);
+                // 最後の2割で消す。ふっと無くなるより、薄れて終わるほうが炎に見える
+                if (up > 0.8f) c.a *= 1f - (up - 0.8f) / 0.2f;
+                if (c.a <= 0.01f) continue;
 
-                float y = (i * StackStep) * t.Height * breathe;
+                // **座標も大きさも整数に丸める。** ドット絵の中で半端な位置に置くと、
+                // にじんで他のUIと質感が合わなくなる。
+                // 下half は太く、上へ行くほど細く。参考動画も**胴が太くて先が散る**形だった
+                float size = up < 0.55f ? t.Dot + 1f : t.Dot;
+                float x = Mathf.Round(_particles[i].Pos.x);
+                float y = Mathf.Round(_particles[i].Pos.y);
 
-                rect.sizeDelta = new Vector2(width, width * 1.6f);         // 縦に伸ばして炎の形に近づける
-                rect.anchoredPosition = new Vector2(sway, y);
-
-                // 先端ほど明るい。色は段ごとの組み合わせから取る。
-                // 揺れに合わせて少し明滅させる
-                Color c = Color.Lerp(t.Root, t.Tip, up);
-                c.a *= 0.85f + 0.15f * Mathf.Sin(p * 2.3f);
-                _tongues[i].color = c;
+                AddQuad(vh, x, y, size, c);
             }
+        }
 
-            // 芯は3段目から。根元に置いて、内側が白く燃えている感じにする
-            if (_core != null)
-            {
-                if (t.CoreAlpha <= 0f)
-                {
-                    _core.color = new Color(CoreColor.r, CoreColor.g, CoreColor.b, 0f);
-                }
-                else
-                {
-                    float flicker = 0.75f + 0.25f * Mathf.Sin(_phase * 3.1f);
-                    float w = BaseWidth * 0.45f;
-                    _coreRect.sizeDelta = new Vector2(w, w * 1.6f);
-                    _coreRect.anchoredPosition = new Vector2(Mathf.Sin(_phase * 1.3f) * t.Sway * 0.4f,
-                                                            StackStep * 0.6f * t.Height);
-                    _core.color = new Color(CoreColor.r, CoreColor.g, CoreColor.b, t.CoreAlpha * flicker);
-                }
-            }
+        private static void AddQuad(VertexHelper vh, float x, float y, float size, Color c)
+        {
+            int start = vh.currentVertCount;
+            float h = size * 0.5f;
+
+            var v = UIVertex.simpleVert;
+            v.color = c;
+
+            v.position = new Vector3(x - h, y - h); vh.AddVert(v);
+            v.position = new Vector3(x - h, y + h); vh.AddVert(v);
+            v.position = new Vector3(x + h, y + h); vh.AddVert(v);
+            v.position = new Vector3(x + h, y - h); vh.AddVert(v);
+
+            vh.AddTriangle(start, start + 1, start + 2);
+            vh.AddTriangle(start + 2, start + 3, start);
         }
     }
 }
