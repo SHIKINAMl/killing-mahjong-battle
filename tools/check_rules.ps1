@@ -34,11 +34,16 @@ function Add-Error($rule, $file, $detail) { $errors.Add("[$rule] $file`n        
 function Add-Warn($rule, $file, $detail)  { $warns.Add("[$rule] $file`n        $detail") }
 
 # --- 対象の洗い出し ---------------------------------------------------------
-$diffArgs = if ($Staged) { @('diff', '--cached', '--name-status', '--diff-filter=ACMR') }
-            else         { @('diff', 'HEAD',     '--name-status', '--diff-filter=ACMR') }
+# **-c core.quotepath=false を必ず付ける。** 付けないと git は非ASCIIのパスを
+# "Assets/Resources/å¸..." のように引用符ごと返す。その文字列を
+# [System.IO.Path]::GetExtension に渡すと「パスに無効な文字」で落ち、
+# 日本語名のファイルを触った回だけ検査そのものが動かなくなる（2026-09-26 に遭遇）。
+$q = @('-c', 'core.quotepath=false')
+$diffArgs = if ($Staged) { $q + @('diff', '--cached', '--name-status', '--diff-filter=ACMR') }
+            else         { $q + @('diff', 'HEAD',     '--name-status', '--diff-filter=ACMR') }
 $changed = @(& git @diffArgs)
 # 追跡されていない新規ファイルも見る。新しく足した .py などを見落とさないため
-$changed += @(& git ls-files --others --exclude-standard | ForEach-Object { "A`t$_" })
+$changed += @(& git @q ls-files --others --exclude-standard | ForEach-Object { "A`t$_" })
 
 $files = @()
 foreach ($line in $changed) {
