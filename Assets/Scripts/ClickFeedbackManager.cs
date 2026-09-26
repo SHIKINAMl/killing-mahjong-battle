@@ -26,8 +26,12 @@ namespace KillingMahjong.UI
         private Canvas targetCanvas;
         private Sprite[] rippleFrames;
 
-        /// <summary>1コマの長さ。支給された spec.json の 70ms。</summary>
-        private const float FrameSeconds = 0.070f;
+        /// <summary>
+        /// 1コマの長さ。**支給された spec.json は 70ms（合計0.56秒）だったが、
+        /// 「もっと早くコマ送りしていい」との指示で 40ms（合計0.32秒）にした（2026-09-26）。**
+        /// クリックの手応えとしては、この方が指と絵が離れない。
+        /// </summary>
+        private const float FrameSeconds = 0.040f;
 
         /// <summary>コマ数。シートは横に8コマ並んでいる。</summary>
         private const int FrameCount = 8;
@@ -38,8 +42,12 @@ namespace KillingMahjong.UI
         /// <summary>
         /// 画面に出すときの拡大率。**整数でなければならない。**
         /// 半端な倍率にすると1ドットが画素に割り切れず、目が潰れて滲んで見える。
+        ///
+        /// **「もっと小さく」との指示で 2 → 1 にした（2026-09-26）。**
+        /// 800×600 の画面で 64px、横幅の8%。小さくするなら次は 64px の絵そのものを
+        /// 32px で描き直してもらうことになる。ここを 0.5 のような半端な値にはできない。
         /// </summary>
-        private const int PixelScale = 2;
+        private const int PixelScale = 1;
 
         private const string SheetPath = "Effects/attack_ripple_sheet_8x64";
 
