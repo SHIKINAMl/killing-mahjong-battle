@@ -73,6 +73,26 @@ namespace KillingMahjong.Managers
         public bool IsPairBgmRunning { get { return _pairRunning; } }
 
         /// <summary>
+        /// 対局中にどちらのBGMを鳴らすかを当てる。設定画面から呼ばれる。
+        ///
+        /// **その場で切り替える。** 次の対局まで変わらないと、選べた実感がない。
+        /// 2曲方式をやめたときは、いま鳴っている2本を畳んでから従来の経路へ渡す。
+        /// そうしないと2本が鳴り続けたまま、上に従来の曲が重なる。
+        /// </summary>
+        public void ApplyMatchBgmSet(int kind)
+        {
+            bool wantPair = kind == (int)Core.SettingsManager.MatchBgmSetKind.Pair;
+            if (wantPair == UsePairBgm) return;
+
+            UsePairBgm = wantPair;
+            if (!wantPair) StopPairBgm();
+            else { if (bgmSource != null && bgmSource.isPlaying) bgmSource.Stop(); currentPhaseBgmName = null; }
+
+            // いまのフェイズで鳴らし直す
+            if (CanPlay && UsePhaseBgm) ApplyPhaseBgm();
+        }
+
+        /// <summary>
         /// 直近のクロスフェードを始めた曲位置（秒）。小節頭に乗っているかを外から確かめるために出している。
         /// 曲の長さで割り切れる位置＝小節頭のはずで、ずれていたら拍の計算が合っていない。
         /// </summary>

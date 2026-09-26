@@ -36,6 +36,15 @@ namespace KillingMahjong.UI
         private Button tutorialArchiveButton;
         private TutorialArchiveUI tutorialArchiveUI;
 
+        // 対局BGMの選択欄。**解像度の選択欄をひな形にして実行時に作る。**
+        // シーンに置くと、対局シーンとOpeningSceneの2つを同じように直す必要があり、
+        // 片方だけ古いままになる（セリフの影で実際に起きた）。
+        private TMP_Dropdown matchBgmDropdown;
+        private TMP_Text matchBgmLabel;
+
+        /// <summary>解像度の欄からどれだけ上へずらすか。空いているのはここだけ（本文の説明を参照）。</summary>
+        private const float RowOffsetY = 195f;
+
         [Header("Scene Transition Settings")]
         [Tooltip("このシーンで『戻る』ボタンを表示するかどうか")]
         [SerializeField] private bool showReturnButton = true;
@@ -89,6 +98,7 @@ namespace KillingMahjong.UI
             // ひな形の Button にはまだ Start 内のクリック処理が入っていない段階で複製する。
             // こうして資料ボタンへ「保存して閉じる」の処理が混ざるのを防ぐ。
             CreateTutorialArchiveButton();
+            CreateMatchBgmDropdown();
 
             // --- スライダーのイベント登録 ---
             if (bgmSlider != null) bgmSlider.onValueChanged.AddListener(OnBgmChanged);
@@ -229,6 +239,10 @@ namespace KillingMahjong.UI
                 
                 if (resolutionDropdown != null) resolutionDropdown.value = 0;
                 if (fullscreenToggle != null) fullscreenToggle.isOn = settings.IsFullScreen;
+
+                // **通知を止めてから入れる。** そのまま代入すると onValueChanged が走り、
+                // 画面を開いただけで曲が鳴り直す
+                if (matchBgmDropdown != null) matchBgmDropdown.SetValueWithoutNotify(settings.MatchBgmSet);
             }
         }
 
@@ -266,6 +280,86 @@ namespace KillingMahjong.UI
         private void OnResolutionChanged(int index)
         {
             if (Core.SettingsManager.Instance != null) Core.SettingsManager.Instance.SetResolutionIndex(index);
+        }
+
+        /// <summary>
+        /// 対局中のBGMを選ぶ欄を作る。
+        ///
+        /// **解像度の選択欄を複製する。** 同じ見た目・同じ大きさになるので、
+        /// 自前で組むより早いし、あとでデザインが変わっても勝手に追従する。
+        /// </summary>
+        private void CreateMatchBgmDropdown()
+        {
+            if (matchBgmDropdown != null) return;
+            if (resolutionDropdown == null)
+            {
+                Debug.LogWarning("[OptionUI] BGM選択欄のひな形（解像度の選択欄）が見つかりません。");
+                return;
+            }
+
+            var go = Instantiate(resolutionDropdown.gameObject, resolutionDropdown.transform.parent, false);
+            go.name = "MatchBgmDropdown";
+            matchBgmDropdown = go.GetComponent<TMP_Dropdown>();
+            matchBgmDropdown.onValueChanged.RemoveAllListeners();
+
+            matchBgmDropdown.ClearOptions();
+            matchBgmDropdown.AddOptions(new System.Collections.Generic.List<string>(Core.SettingsManager.MatchBgmSetLabels));
+
+            // **音量の段と、ゲーム設定の段のあいだへ置く。**
+            // 実測で、設定画面の空きはここ（画面の上から 240〜290px）しかなかった。
+            // 解像度の欄のすぐ下（-60）に置いたら「タイトルへ」「やめる」に丸かぶりした。
+            // 解像度の欄が anchored y=-160 で画面 440〜480 に出るので、
+            // +195 ずらすと 245〜285 に収まる。
+            var src = resolutionDropdown.transform as RectTransform;
+            var rt = go.transform as RectTransform;
+            if (src != null && rt != null) rt.anchoredPosition = src.anchoredPosition + new Vector2(0f, RowOffsetY);
+
+            // 見出し。解像度の欄の見出しがあれば、それを複製して文言だけ差し替える
+            var srcLabel = FindSiblingLabel(resolutionDropdown.transform);
+            if (srcLabel != null)
+            {
+                var lgo = Instantiate(srcLabel.gameObject, srcLabel.transform.parent, false);
+                lgo.name = "MatchBgmLabel";
+                matchBgmLabel = lgo.GetComponent<TMP_Text>();
+                if (matchBgmLabel != null) matchBgmLabel.text = "対局BGM";
+                var lsrc = srcLabel.transform as RectTransform;
+                var lrt = lgo.transform as RectTransform;
+                if (lsrc != null && lrt != null) lrt.anchoredPosition = lsrc.anchoredPosition + new Vector2(0f, RowOffsetY);
+            }
+
+            matchBgmDropdown.onValueChanged.AddListener(OnMatchBgmChanged);
+        }
+
+        /// <summary>選択欄の見出しらしき TMP_Text を、同じ親の中から探す。</summary>
+        private static TMP_Text FindSiblingLabel(Transform dropdown)
+        {
+            var parent = dropdown.parent;
+            if (parent == null) return null;
+            var dRect = dropdown as RectTransform;
+            if (dRect == null) return null;
+
+            TMP_Text best = null;
+            float bestDist = float.MaxValue;
+            for (int i = 0; i < parent.childCount; i++)
+            {
+                var child = parent.GetChild(i);
+                if (child == dropdown) continue;
+                // 選択欄そのものの中身（Label / Item）は拾わない
+                if (child.GetComponentInParent<TMP_Dropdown>() != null) continue;
+                var txt = child.GetComponent<TMP_Text>();
+                if (txt == null) continue;
+                var r = child as RectTransform;
+                if (r == null) continue;
+                float d = Mathf.Abs(r.anchoredPosition.y - dRect.anchoredPosition.y);
+                if (d < bestDist) { bestDist = d; best = txt; }
+            }
+            // 高さが離れすぎているものは見出しではない
+            return bestDist <= 40f ? best : null;
+        }
+
+        private void OnMatchBgmChanged(int index)
+        {
+            if (Core.SettingsManager.Instance != null) Core.SettingsManager.Instance.SetMatchBgmSet(index);
         }
 
         private void CreateTutorialArchiveButton()

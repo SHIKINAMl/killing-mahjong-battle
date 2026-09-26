@@ -28,6 +28,28 @@ namespace KillingMahjong.Core
         [SerializeField] private bool isHighSpeedMode = false;
         public bool IsHighSpeedMode => isHighSpeedMode; // 打牌スピード（標準/高速）
 
+        // --- 対局中のBGM ---
+        //
+        // **どちらの曲を鳴らすかを選べるようにした（2026-09-26）。**
+        // 採用2曲を入れたとき、対局中のフェイズを全部そちらが受け持つようにしたため、
+        // 従来のフェイズ別BGM（bgm_prepare / bgm_betting / 場の4層 / bgm_ron）が
+        // 一切鳴らなくなっていた。リマスター版を入れても聞こえない、という状態だった。
+        [Header("Match BGM")]
+        [SerializeField] private int matchBgmSet = (int)MatchBgmSetKind.Pair;
+        public int MatchBgmSet => matchBgmSet;
+
+        /// <summary>対局中に鳴らすBGMの種類。</summary>
+        public enum MatchBgmSetKind
+        {
+            /// <summary>採用した2曲を、通常と盛り上がりでクロスフェードする</summary>
+            Pair = 0,
+            /// <summary>従来のフェイズ別BGM（場の4層・賭け・ロンなど）</summary>
+            PerPhase = 1,
+        }
+
+        /// <summary>選べる種類の表示名。並び順は MatchBgmSetKind と合わせること。</summary>
+        public static readonly string[] MatchBgmSetLabels = { "採用2曲（切替）", "フェイズ別（従来）" };
+
         // --- 表示・システム設定 ---
         [Header("System Settings")]
         [SerializeField] private bool isEffectEnabled = true;
@@ -97,6 +119,8 @@ namespace KillingMahjong.Core
             isHighSpeedMode = PlayerPrefs.GetInt("IsHighSpeedMode", isHighSpeedMode ? 1 : 0) == 1;
             isEffectEnabled = PlayerPrefs.GetInt("IsEffectEnabled", isEffectEnabled ? 1 : 0) == 1;
 
+            matchBgmSet = PlayerPrefs.GetInt("MatchBgmSet", matchBgmSet);
+
             resolutionIndex = PlayerPrefs.GetInt("ResolutionIndex", resolutionIndex);
             isFullScreen = PlayerPrefs.GetInt("IsFullScreen", isFullScreen ? 1 : 0) == 1;
 
@@ -114,6 +138,8 @@ namespace KillingMahjong.Core
             
             PlayerPrefs.SetInt("IsHighSpeedMode", isHighSpeedMode ? 1 : 0);
             PlayerPrefs.SetInt("IsEffectEnabled", isEffectEnabled ? 1 : 0);
+
+            PlayerPrefs.SetInt("MatchBgmSet", matchBgmSet);
 
             PlayerPrefs.SetInt("ResolutionIndex", resolutionIndex);
             PlayerPrefs.SetInt("IsFullScreen", isFullScreen ? 1 : 0);
@@ -135,6 +161,17 @@ namespace KillingMahjong.Core
             }
         }
         
+        /// <summary>
+        /// 対局中のBGMの種類を変える。**その場で切り替わる。**
+        /// 設定画面で選んだのに次の対局まで変わらないと、選べた実感がない。
+        /// </summary>
+        public void SetMatchBgmSet(int kind)
+        {
+            matchBgmSet = Mathf.Clamp(kind, 0, MatchBgmSetLabels.Length - 1);
+            var am = KillingMahjong.Managers.AudioManager.Instance;
+            if (am != null) am.ApplyMatchBgmSet(matchBgmSet);
+        }
+
         public void SetSeVolume(float volume) 
         { 
             seVolume = volume; 
@@ -179,6 +216,9 @@ namespace KillingMahjong.Core
                 KillingMahjong.Managers.AudioManager.Instance.seVolume = seVolume;
                 KillingMahjong.Managers.AudioManager.Instance.voiceVolume = voiceVolume;
                 KillingMahjong.Managers.AudioManager.Instance.ApplyVolumes();
+                // 保存した選択を当て直す。ここで当てないと、起動のたびに
+                // AudioManager の既定（採用2曲）へ戻ってしまう
+                KillingMahjong.Managers.AudioManager.Instance.ApplyMatchBgmSet(matchBgmSet);
             }
             // **`AudioListener.volume` を代用してはいけない。**
             // あれはゲーム全体のマスターで、BGMの値を入れるとSEもボイスも巻き添えになる。
