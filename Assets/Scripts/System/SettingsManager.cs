@@ -43,12 +43,27 @@ namespace KillingMahjong.Core
         {
             /// <summary>採用した2曲を、通常と盛り上がりでクロスフェードする</summary>
             Pair = 0,
-            /// <summary>従来のフェイズ別BGM（場の4層・賭け・ロンなど）</summary>
+            /// <summary>従来のフェイズ別BGM。打牌中の場のBGMは4層のステムで鳴る</summary>
             PerPhase = 1,
+            /// <summary>
+            /// 従来のフェイズ別BGMだが、**場のBGMを層で鳴らさない。**
+            /// こうしないと bgm_field_1〜4 は一度も鳴らない（層のステムが先に使われるため）。
+            /// </summary>
+            PerPhaseNoLayers = 2,
         }
 
-        /// <summary>選べる種類の表示名。並び順は MatchBgmSetKind と合わせること。</summary>
-        public static readonly string[] MatchBgmSetLabels = { "採用2曲（切替）", "フェイズ別（従来）" };
+        /// <summary>
+        /// 選べる種類の表示名。並び順は MatchBgmSetKind と合わせること。
+        ///
+        /// **全角7文字まで。** 選択欄の幅は解像度の欄と同じで、8文字を超えると
+        /// 折り返して下が切れる（実機で「フェイズ別（層なし）」が切れた）。
+        /// </summary>
+        public static readonly string[] MatchBgmSetLabels =
+        {
+            "新2曲（切替）",
+            "従来（層あり）",
+            "従来（層なし）",
+        };
 
         // --- 表示・システム設定 ---
         [Header("System Settings")]

@@ -82,11 +82,23 @@ namespace KillingMahjong.Managers
         public void ApplyMatchBgmSet(int kind)
         {
             bool wantPair = kind == (int)Core.SettingsManager.MatchBgmSetKind.Pair;
-            if (wantPair == UsePairBgm) return;
+            // **層なしを選んだときだけ層を切る。** 層を鳴らしたままだと
+            // bgm_field_1〜4 は一度も鳴らない（層のステムが先に使われるため）。
+            bool wantLayers = kind != (int)Core.SettingsManager.MatchBgmSetKind.PerPhaseNoLayers;
+
+            if (wantPair == UsePairBgm && wantLayers == UseBgmLayers) return;
 
             UsePairBgm = wantPair;
+            UseBgmLayers = wantLayers;
+
+            // いま鳴らしているもののうち、行き先で使わないものを先に畳む。
+            // 畳まずに鳴らし直すと、前の鳴らし方が残ったまま上に重なる。
             if (!wantPair) StopPairBgm();
-            else { if (bgmSource != null && bgmSource.isPlaying) bgmSource.Stop(); currentPhaseBgmName = null; }
+            if (!wantLayers && AreLayersRunning) StopLayeredBgm();
+            if (wantPair && bgmSource != null && bgmSource.isPlaying) bgmSource.Stop();
+
+            // 「もうその曲を鳴らしている」と誤判定されて無音のままになるのを防ぐ
+            currentPhaseBgmName = null;
 
             // いまのフェイズで鳴らし直す
             if (CanPlay && UsePhaseBgm) ApplyPhaseBgm();
