@@ -123,8 +123,17 @@ namespace KillingMahjong.UI
                 {
                     if (KillingMahjong.Managers.AudioManager.Instance != null)
                     {
-                        // タップ音のような三角波（Triangle）、330Hz、長さ30ms、ボリューム小さめ
-                        KillingMahjong.Managers.AudioManager.Instance.PlaySynthSound(KillingMahjong.Managers.SynthWaveType.Triangle, 330f, 330f, 0.03f, 0.3f);
+                        // タップ音のような三角波（Triangle）、330Hz、長さ30ms。
+                        //
+                        // **最後の値は 0.3 では BGM に完全に埋もれる（2026-09-26 に 5.0 へ）。**
+                        // 経路は 三角波 × 包絡 × 0.2（AudioSynth の中で掛かる）× ここの値 × seVolume。
+                        // 0.3 のときの実効値は -42.76 dBFS で、BGM（-21.74 dBFS）より **21dB 下**だった。
+                        // 中の 0.2 は全シンセSE共通なので触らず、ここだけで持ち上げている。
+                        // 5.0 で -18.33 dBFS、BGM比 +3.4 dB、ピーク -6.87 dBFS（歪まない）。
+                        //
+                        // **1 を超えてよい。** AudioSource.PlayOneShot の volumeScale は
+                        // 頭打ちにならない。実測で vol=3 がちょうど3.2倍、vol=10 が9.6倍になった。
+                        KillingMahjong.Managers.AudioManager.Instance.PlaySynthSound(KillingMahjong.Managers.SynthWaveType.Triangle, 330f, 330f, 0.03f, 5.0f);
                     }
                     nextSoundTime = Time.time + 0.06f;
                 }
