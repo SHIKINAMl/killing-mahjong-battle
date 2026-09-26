@@ -88,6 +88,15 @@ namespace KillingMahjong.Managers
 
             if (wantPair == UsePairBgm && wantLayers == UseBgmLayers) return;
 
+            // **いま鳴っていないなら、鳴らし始めてはいけない。**
+            // この処理は設定を変えたときだけでなく、起動時の当て直しからも呼ばれる。
+            // チュートリアルの冒頭は契約書を取るまで無音にしてあるのに、
+            // 保存された選択が既定と違うだけで、そこで場のBGMが鳴り出していた
+            // （2026-09-26 に実機で確認。PlayerPrefs に 1 が残っていて層が 4/4 で鳴った）。
+            // 旗だけ差し替えて、音は次に誰かがフェイズを指定したときに任せる。
+            bool wasPlaying = IsPairBgmRunning || AreLayersRunning
+                              || (bgmSource != null && bgmSource.isPlaying);
+
             UsePairBgm = wantPair;
             UseBgmLayers = wantLayers;
 
@@ -100,8 +109,10 @@ namespace KillingMahjong.Managers
             // 「もうその曲を鳴らしている」と誤判定されて無音のままになるのを防ぐ
             currentPhaseBgmName = null;
 
-            // いまのフェイズで鳴らし直す
-            if (CanPlay && UsePhaseBgm) ApplyPhaseBgm();
+            // いまのフェイズで鳴らし直す。**鳴っていたときだけ。**
+            // `SuppressStartupBgm` も見る。あれは「いまは何も鳴らすな」という旗で、
+            // チュートリアルの冒頭がそれで無音になっている。
+            if (wasPlaying && !SuppressStartupBgm && CanPlay && UsePhaseBgm) ApplyPhaseBgm();
         }
 
         /// <summary>
