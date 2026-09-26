@@ -84,6 +84,7 @@ namespace KillingMahjong.Managers
             // ドラムも別の音源でループしている。bgmSource だけ止めていたので、
             // 対局からタイトルへ戻っても対局の曲が鳴り続けていた
             StopLayeredBgm();
+            StopPairBgm();   // 採用した2曲も別の音源で鳴っているので、同じ理由でここで止める
             if (drumSource != null && drumSource.isPlaying) drumSource.Stop();
 
             // 止めたあと同じフェイズで呼び直されても鳴らし直せるようにしておく。
