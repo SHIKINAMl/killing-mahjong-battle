@@ -127,6 +127,9 @@ namespace KillingMahjong.UI
 
         private void OnDestroy()
         {
+            // **立てたまま消さない。** 残ると次の場面でセリフ送りが効かなくなる
+            IsScreenDarkened = false;
+
             if (NetworkMessageHandler.Instance != null)
             {
                 NetworkMessageHandler.Instance.OnDealingStarted -= HandleDealingStarted;
@@ -223,6 +226,19 @@ namespace KillingMahjong.UI
 
         public bool IsDarkenTransitioning { get; private set; }
 
+        /// <summary>
+        /// 局頭の黒幕が降りているあいだ true（2026-09-27）。
+        ///
+        /// **黒幕の裏でセリフ送りが走ると、見えないのに音だけ「ポポポポ」と鳴る。**
+        /// それを止めるために <see cref="DialogueUI"/> から見に来る。
+        /// 場面をまたいで見る必要があるので static にしてある。
+        ///
+        /// **必ず降ろすこと。** 立てたまま消えると、そこから先ずっと
+        /// セリフ送りが無くなる（同じ作りの `SuppressStartupBgm` で実際にやった）。
+        /// `OnDestroy` でも降ろしている。
+        /// </summary>
+        public static bool IsScreenDarkened { get; private set; }
+
         public void PlayRoundStartDarken(string text, Action onDarkened = null)
         {
             if (isDarkened)
@@ -231,6 +247,7 @@ namespace KillingMahjong.UI
                 return;
             }
             isDarkened = true;
+            IsScreenDarkened = true;
             IsDarkenTransitioning = true;
             StartCoroutine(RoundStartDarkenRoutine(text, onDarkened));
         }
@@ -244,6 +261,7 @@ namespace KillingMahjong.UI
                 return;
             }
             isDarkened = false;
+            IsScreenDarkened = false;
             StartCoroutine(RoundStartFadeOutRoutine(onComplete));
         }
 

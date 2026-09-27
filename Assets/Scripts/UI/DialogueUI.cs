@@ -152,6 +152,16 @@ namespace KillingMahjong.UI
             yield return null; // ShowText() が DialoguePanel を有効化した次フレームに解析する
             dialogueText.ForceMeshUpdate();
 
+            // **黒幕が降りているあいだは1文字ずつ送らない（2026-09-27 のユーザー指示）。**
+            // 「第1局進行中...」で画面が真っ暗な裏でセリフ送りが走っていて、
+            // 見えないのに送りの音だけが「ポポポポポ」と鳴っていた。
+            // ここで全文を出してしまえば、音も鳴らず、待っている側も普通に先へ進む。
+            if (PhaseTransitionUI.IsScreenDarkened)
+            {
+                dialogueText.maxVisibleCharacters = int.MaxValue;
+                yield break;
+            }
+
             // 1文字あたりの表示時間。**設定から引く（2026-09-27）。**
             // 以前は 0.03 の決め打ちだった。設定が無いときは従来どおり 0.03。
             var settings = KillingMahjong.Core.SettingsManager.Instance;
