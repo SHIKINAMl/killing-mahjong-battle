@@ -36,11 +36,23 @@ namespace KillingMahjong.UI
             public Track(string folder, string id, string label) { Folder = folder; Id = id; Label = label; }
         }
 
-        // 並びは実際の対局の流れ順。ファイル名ではなく場面で探せるようにする。
-        private static readonly Track[] Bgms =
+        /// <summary>
+        /// **いま実際にゲームで鳴っている曲**（2026-09-27 にユーザーの指示で分けた）。
+        /// 並びは場面の流れ順。ファイル名ではなく場面で探せるようにする。
+        ///
+        /// どこで鳴るかはコードから追える:
+        ///   tut_lesson            TutorialAudioDirector の台本（契約書のあと）
+        ///   bgm_phase_normal/turn AudioManager.PairBgm（対局BGM「新2曲」を選んだとき）
+        ///   その他                AudioManager.PhaseBgmNames（「従来」を選んだとき）
+        ///
+        /// **1列は16行まで。** 行は y = 132 - i*21 で並べるだけでスクロールが無く、
+        /// 17行目は再生バーの裏へ潜って押せなくなる。
+        /// </summary>
+        private static readonly Track[] BgmsInUse =
         {
-            new Track("Bgm", "bgm_title",        "タイトル"),
-            new Track("Bgm", "bgm_tutorial",     "チュートリアル"),
+            new Track("Bgm", "tut_lesson",       "チュートリアル"),
+            new Track("Bgm", "bgm_phase_normal", "対局　通常"),
+            new Track("Bgm", "bgm_phase_turn",   "対局　高揚"),
             new Track("Bgm", "bgm_prepare",      "配牌・手牌選択"),
             new Track("Bgm", "bgm_betting",      "賭け"),
             new Track("Bgm", "bgm_tension",      "先行・後攻"),
@@ -48,8 +60,6 @@ namespace KillingMahjong.UI
             new Track("Bgm", "bgm_field_2",      "場 II"),
             new Track("Bgm", "bgm_field_3",      "場 III"),
             new Track("Bgm", "bgm_field_4",      "場 IV　終盤"),
-            new Track("Bgm", "bgm_discard",      "打牌"),
-            new Track("Bgm", "bgm_discard_hot",  "打牌　激"),
             new Track("Bgm", "bgm_ron",          "ロン・決着"),
             new Track("Bgm", "bgm_draw",         "流局"),
             new Track("Bgm", "bgm_result",       "結果"),
@@ -58,7 +68,34 @@ namespace KillingMahjong.UI
         };
 
         /// <summary>
-        /// 「追加曲」タブの曲。**場面に割り当てていない**（2026-09-19 に追加）。
+        /// **作ったが、いまどこでも鳴っていない曲**（2026-09-27）。
+        /// 消さずに残してあるので、ここから試聴できる。
+        ///
+        ///   bgm_title      タイトルは追加曲の bgm_ex_midnight に差し替えた
+        ///   bgm_tutorial   チュートリアルは tut_lesson に差し替えた
+        ///   bgm_discard    打牌フェイズは場のBGMが受け持つようになり、出番が無くなった
+        ///   bgm_discard_hot  同上
+        ///   bgm_battle     どこからも参照されていない
+        ///
+        /// 使い始めるときは AudioManager の Tempos 表にも足すこと。拍が引けないと
+        /// 音ハメ（FloatingAnimator など）が効かない。
+        /// </summary>
+        private static readonly Track[] BgmsUnused =
+        {
+            new Track("Bgm", "bgm_title",        "タイトル（旧）"),
+            new Track("Bgm", "bgm_tutorial",     "チュートリアル（旧）"),
+            new Track("Bgm", "bgm_discard",      "打牌"),
+            new Track("Bgm", "bgm_discard_hot",  "打牌　激"),
+            new Track("Bgm", "bgm_battle",       "対局（旧）"),
+        };
+
+        /// <summary>
+        /// 「追加曲」タブの曲（2026-09-19 に追加）。
+        ///
+        /// **このうち2曲はもう場面に当たっている**（2026-09-27 に確認）。
+        ///   bgm_ex_midnight  タイトル（AudioManager.TitleBgmName）
+        ///   bgm_ex_lofi      部屋の待機画面（AudioManager.RoomBgmName）
+        /// 残りは、どこでも鳴っていない。
         ///
         /// ユーザーが別に作ったオリジナル曲（C:\Users\akira\Music\D_N_A_original_bgm\）を、
         /// 44100Hz/モノラル/16bit・RMS −18.91dBFS（既存曲の中央値）に揃えて取り込んだもの。
@@ -279,21 +316,14 @@ namespace KillingMahjong.UI
             rowBgs.Clear();
 
             // 効果音は「効果音」タブへ移した（2026-09-19 の指示）。
-            // **空いた右の列へBGMの後ろを回す。** 行はスクロールしないので、1列16行だと
-            // 最後の「負け」が再生バーの裏に隠れて押せなかった（以前からの不具合）。
-            // 対局の流れの切れ目（ロンで決着するところ）で分ける
-            BuildColumn(parent, -178f, "BGM　対局", Slice(Bgms, 0, BgmSplitAt));
-            BuildColumn(parent, 178f, "BGM　決着", Slice(Bgms, BgmSplitAt, Bgms.Length - BgmSplitAt));
-        }
-
-        /// <summary>BGM を2列に分ける位置。ここから後ろ（ロン・決着〜負け）が右の列。</summary>
-        private const int BgmSplitAt = 11;
-
-        private static Track[] Slice(Track[] src, int start, int count)
-        {
-            var dst = new Track[count];
-            System.Array.Copy(src, start, dst, 0, count);
-            return dst;
+            // **左が使用中、右が未使用**（2026-09-27 の指示）。
+            // 以前は対局の流れで前半・後半に割っていたが、鳴っていない曲が混ざっていて
+            // どれが生きているのか分からなかった。
+            //
+            // タイトルと部屋の待機画面は「追加曲」タブの曲（bgm_ex_midnight / bgm_ex_lofi）が
+            // 鳴っている。こちらの列には出てこないので注意。
+            BuildColumn(parent, -178f, "BGM　使用中", BgmsInUse);
+            BuildColumn(parent, 178f, "BGM　未使用", BgmsUnused);
         }
 
         private void BuildColumn(Transform parent, float centerX, string heading, Track[] tracks)
