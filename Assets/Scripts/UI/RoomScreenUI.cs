@@ -198,12 +198,26 @@ namespace KillingMahjong.UI
         private RectTransform girlRectForAmbience;
 
         /// <summary>視差用の層を1枚作る。中身は全画面に広げておく。</summary>
+        /// <summary>
+        /// 視差で流す層の、画面からはみ出させる幅（左右それぞれ）。
+        ///
+        /// **層は画面より広く作らないと、端が画面の中に入ってくる。**
+        /// 女の子は x -200〜+40 の 240px を歩き、層はその動きの逆へ
+        /// far 0.05 / mid 0.11 / near 0.19 倍ずれる。いちばん動く near で 45.6px。
+        /// 余裕を見て 80px。ここを削ると、女の子が端へ行ったとき
+        /// 壁や床の向こうの「何も無い背景」が覗く（2026-09-27 の指摘）。
+        /// </summary>
+        private const float ParallaxOverscan = 80f;
+
         private RectTransform CreateParallaxLayer(string name)
         {
             var go = new GameObject(name, typeof(RectTransform));
             go.transform.SetParent(content.transform, false);
             var rt = go.GetComponent<RectTransform>();
             Stretch(rt);
+            // 左右へ広げる。Stretch のままだと画面と同じ幅で、ずらすと端が出る
+            rt.offsetMin = new Vector2(-ParallaxOverscan, rt.offsetMin.y);
+            rt.offsetMax = new Vector2(ParallaxOverscan, rt.offsetMax.y);
             return rt;
         }
 
@@ -218,10 +232,14 @@ namespace KillingMahjong.UI
 
             // 素材待ちでタイトル絵が透けないよう、まずはコードだけで室内を組む。
             // 壁・床・窓明かり・本棚・机を重ね、あとで背景画へ差し替えても他のUIに影響しない構造にする。
+            // **横幅は画面(800)ではなく、はみ出しぶんを足した幅にする。**
+            // 800 のままだと、層をずらしたときに絵の端が画面の中へ入ってくる。
+            const float wideW = 800f + ParallaxOverscan * 2f;
+
             CreateStretchImage(farLayer, "RoomBackdrop", RoomDark);
-            CreateCenteredImage(farLayer, "RoomWall", new Vector2(0f, 100f), new Vector2(800f, 400f), RoomWall);
-            CreateCenteredImage(nearLayer, "RoomFloor", new Vector2(0f, -200f), new Vector2(800f, 200f), RoomFloor);
-            CreateCenteredImage(farLayer, "RoomCeilingTrim", new Vector2(0f, 286f), new Vector2(800f, 18f),
+            CreateCenteredImage(farLayer, "RoomWall", new Vector2(0f, 100f), new Vector2(wideW, 400f), RoomWall);
+            CreateCenteredImage(nearLayer, "RoomFloor", new Vector2(0f, -200f), new Vector2(wideW, 200f), RoomFloor);
+            CreateCenteredImage(farLayer, "RoomCeilingTrim", new Vector2(0f, 286f), new Vector2(wideW, 18f),
                 new Color32(75, 45, 55, 255));
 
             CreateCenteredImage(nearLayer, "RoomRug", new Vector2(-58f, -144f), new Vector2(435f, 118f),
