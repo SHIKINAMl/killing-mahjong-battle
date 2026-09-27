@@ -76,6 +76,11 @@ namespace KillingMahjong.UI
         ///   bgm_discard    打牌フェイズは場のBGMが受け持つようになり、出番が無くなった
         ///   bgm_discard_hot  同上
         ///   bgm_battle     どこからも参照されていない
+        ///   bgm_kake_1/2   ユーザーが作った「賭けの合図」（2026-09-27 に追加）。
+        ///                  元は Assets/Se/ にあるが、あちらは Resources の外なので
+        ///                  試聴できない。**コピーを置いている**（元はそのまま）。
+        ///                  2 の方はシーンの battleBgm 枠に入っているが、
+        ///                  あの経路は UsePhaseBgm が false のときしか通らないので鳴らない。
         ///
         /// 使い始めるときは AudioManager の Tempos 表にも足すこと。拍が引けないと
         /// 音ハメ（FloatingAnimator など）が効かない。
@@ -87,6 +92,8 @@ namespace KillingMahjong.UI
             new Track("Bgm", "bgm_discard",      "打牌"),
             new Track("Bgm", "bgm_discard_hot",  "打牌　激"),
             new Track("Bgm", "bgm_battle",       "対局（旧）"),
+            new Track("Bgm", "bgm_kake_1",       "賭けの合図 I"),
+            new Track("Bgm", "bgm_kake_2",       "賭けの合図 II"),
         };
 
         /// <summary>
