@@ -58,6 +58,41 @@ namespace KillingMahjong.UI
         private bool isWaitingForDeal = false;
         private float dealWaitTimer = 0f;
 
+        /// <summary>
+        /// 実行時に作ったマテリアルの複製。**後始末のために持っておく。**
+        /// </summary>
+        private Material checkerMaterialInstance;
+
+        private void Awake()
+        {
+            EnsureCheckerMaterialInstance();
+        }
+
+        /// <summary>
+        /// 市松模様のマテリアルを、実行時だけの複製に差し替える。
+        ///
+        /// **共有アセットを直接触ってはいけない。** `checkerMaterial` はシーンから
+        /// `Assets/Resources/市松模様.mat` を直に指していて、そこへ `SetFloat("_Progress", ...)`
+        /// を書くと**アセットそのものが書き換わる**。エディタでは再生するたびに
+        /// `_Progress: 0` が `1` になってファイルが汚れ、毎回 git に差分が出ていた
+        /// （2026-09-27 に原因を特定）。
+        ///
+        /// 複製に差し替えれば、演出は同じまま、アセットには何も書かれない。
+        /// **`Start` ではなく `Awake` でやる。** 演出は `Start` より前に走ることがある。
+        /// </summary>
+        private void EnsureCheckerMaterialInstance()
+        {
+            if (checkerMaterialInstance != null) return;
+            if (checkerMaterial == null) return;
+
+            checkerMaterialInstance = new Material(checkerMaterial);
+            checkerMaterialInstance.name = checkerMaterial.name + " (実行時の複製)";
+            checkerMaterial = checkerMaterialInstance;
+
+            // 画像側も複製を使うようにする。ここを忘れると、見た目は元のまま動かない
+            if (fullScreenCheckerImage != null) fullScreenCheckerImage.material = checkerMaterialInstance;
+        }
+
         private void Start()
         {
             // UIの被り対策: トランジション演出を最前面に表示するためCanvasを追加してSortingOrderを高く設定
@@ -96,6 +131,14 @@ namespace KillingMahjong.UI
             {
                 NetworkMessageHandler.Instance.OnDealingStarted -= HandleDealingStarted;
                 NetworkMessageHandler.Instance.OnDealingCompleted -= HandleDealingCompleted;
+            }
+
+            // 複製は自分で捨てる。放っておくと再生のたびに積もる
+            if (checkerMaterialInstance != null)
+            {
+                if (Application.isPlaying) Destroy(checkerMaterialInstance);
+                else DestroyImmediate(checkerMaterialInstance);
+                checkerMaterialInstance = null;
             }
         }
 
