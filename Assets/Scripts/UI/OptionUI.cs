@@ -45,16 +45,19 @@ namespace KillingMahjong.UI
         private TMP_Dropdown matchBgmDropdown;
         private TMP_Dropdown textSpeedDropdown;
         private TMP_Dropdown screenModeDropdown;
+        private TMP_Dropdown dialogueBubbleDropdown;
 
         /// <summary>
         /// 選択欄の行の位置（anchoredPosition の y）。
         ///
-        /// 音量3つが 195 / 140 / 80 に並んでいるので、その下へ 55 刻みで続ける。
-        /// 画面の上からの位置に直すと 265 / 320 / 375px。
+        /// 音量3つが 195 / 140 / 80 に並んでいる。その下に選択欄を4つ続けるので、
+        /// **刻みを 55 から 50 に詰めた（2026-09-27）。** 55 のままだと4行目が
+        /// ボタンの段（-160）に噛む。
         /// </summary>
-        private const float RowMatchBgm = 35f;
-        private const float RowTextSpeed = -20f;
-        private const float RowScreenMode = -75f;
+        private const float RowMatchBgm = 32f;
+        private const float RowTextSpeed = -18f;
+        private const float RowScreenMode = -68f;
+        private const float RowDialogueBubble = -118f;
 
         [Header("Scene Transition Settings")]
         [Tooltip("このシーンで『戻る』ボタンを表示するかどうか")]
@@ -255,6 +258,7 @@ namespace KillingMahjong.UI
                 SetDropdown(matchBgmDropdown, settings.MatchBgmSet);
                 SetDropdown(textSpeedDropdown, settings.TextSpeed);
                 SetDropdown(screenModeDropdown, settings.ScreenMode);
+                SetDropdown(dialogueBubbleDropdown, settings.DialogueBubble);
             }
         }
 
@@ -337,6 +341,11 @@ namespace KillingMahjong.UI
             screenModeDropdown = CreateDropdownRow("ScreenMode", "画面サイズ",
                 Core.SettingsManager.ScreenModeLabels, RowScreenMode,
                 current != null ? current.ScreenMode : 0, OnScreenModeChanged);
+            // **枠は既定で出さない（プランナーの判断）。**
+            // 感触を見比べたいという話なので、切り替えだけ残してある。
+            dialogueBubbleDropdown = CreateDropdownRow("DialogueBubble", "吹き出し",
+                Core.SettingsManager.DialogueBubbleLabels, RowDialogueBubble,
+                current != null ? current.DialogueBubble : 0, OnDialogueBubbleChanged);
 
             HideRetiredRows();
             ArrangeSystemButtons();
@@ -459,6 +468,11 @@ namespace KillingMahjong.UI
             if (Core.SettingsManager.Instance != null) Core.SettingsManager.Instance.SetScreenMode(index);
         }
 
+        private void OnDialogueBubbleChanged(int index)
+        {
+            if (Core.SettingsManager.Instance != null) Core.SettingsManager.Instance.SetDialogueBubble(index);
+        }
+
         private void CreateTutorialArchiveButton()
         {
             if (tutorialArchiveButton != null) return;
@@ -495,9 +509,9 @@ namespace KillingMahjong.UI
             // 保存がいちばん押す操作なので、単独で目立つ位置に置く。
             //
             // 以前は4つを2段2列に並べ、いちばん下が画面の端に張り付いていた。
-            SetButtonPosition(returnToTitleButton, new Vector2(-135f, -160f));
-            SetButtonPosition(tutorialArchiveButton, new Vector2(135f, -160f));
-            SetButtonPosition(saveAndCloseButton, new Vector2(0f, -225f));
+            SetButtonPosition(returnToTitleButton, new Vector2(-135f, -172f));
+            SetButtonPosition(tutorialArchiveButton, new Vector2(135f, -172f));
+            SetButtonPosition(saveAndCloseButton, new Vector2(0f, -232f));
         }
 
         private static void SetButtonPosition(Button button, Vector2 position)

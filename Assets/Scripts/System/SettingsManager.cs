@@ -89,6 +89,26 @@ namespace KillingMahjong.Core
             get { return TextSpeedSeconds[Mathf.Clamp(textSpeed, 0, TextSpeedSeconds.Length - 1)]; }
         }
 
+        // --- セリフの吹き出し ---
+        //
+        // **既定は「出さない」（2026-09-27、プランナーの判断）。**
+        // 吹き出しの枠は要らないが、有りと無しの感触を見比べたいので切り替えを残す。
+        // 消すのは枠（DialoguePanel の Image と Shadow）だけで、文字とLOGボタンは残る。
+        [Header("Dialogue Bubble")]
+        [SerializeField] private int dialogueBubble = (int)DialogueBubbleKind.Hidden;
+        public int DialogueBubble => dialogueBubble;
+
+        public enum DialogueBubbleKind { Hidden = 0, Shown = 1 }
+
+        /// <summary>選べる表示の名前。並び順は DialogueBubbleKind と合わせること。</summary>
+        public static readonly string[] DialogueBubbleLabels = { "出さない", "出す" };
+
+        /// <summary>吹き出しの枠を出すかどうか。</summary>
+        public bool ShowDialogueBubble
+        {
+            get { return dialogueBubble == (int)DialogueBubbleKind.Shown; }
+        }
+
         // --- 画面サイズ ---
         //
         // **ドット絵なので整数倍だけにする。** 1.5倍のような半端な倍率にすると
@@ -173,6 +193,7 @@ namespace KillingMahjong.Core
             matchBgmSet = PlayerPrefs.GetInt("MatchBgmSet", matchBgmSet);
             textSpeed = PlayerPrefs.GetInt("TextSpeed", textSpeed);
             screenMode = PlayerPrefs.GetInt("ScreenMode", screenMode);
+            dialogueBubble = PlayerPrefs.GetInt("DialogueBubble", dialogueBubble);
 
             resolutionIndex = PlayerPrefs.GetInt("ResolutionIndex", resolutionIndex);
             isFullScreen = PlayerPrefs.GetInt("IsFullScreen", isFullScreen ? 1 : 0) == 1;
@@ -195,6 +216,7 @@ namespace KillingMahjong.Core
             PlayerPrefs.SetInt("MatchBgmSet", matchBgmSet);
             PlayerPrefs.SetInt("TextSpeed", textSpeed);
             PlayerPrefs.SetInt("ScreenMode", screenMode);
+            PlayerPrefs.SetInt("DialogueBubble", dialogueBubble);
 
             PlayerPrefs.SetInt("ResolutionIndex", resolutionIndex);
             PlayerPrefs.SetInt("IsFullScreen", isFullScreen ? 1 : 0);
@@ -231,6 +253,16 @@ namespace KillingMahjong.Core
         public void SetTextSpeed(int kind)
         {
             textSpeed = Mathf.Clamp(kind, 0, TextSpeedLabels.Length - 1);
+        }
+
+        /// <summary>
+        /// セリフの吹き出しの枠を出すかどうかを変える。**その場で切り替わる。**
+        /// 感触を見比べるための設定なので、次のセリフまで待たされると比べにくい。
+        /// </summary>
+        public void SetDialogueBubble(int kind)
+        {
+            dialogueBubble = Mathf.Clamp(kind, 0, DialogueBubbleLabels.Length - 1);
+            KillingMahjong.UI.DialogueUI.ApplyBubbleSettingToAll();
         }
 
         /// <summary>画面サイズを変える。**その場で切り替わる。**</summary>
@@ -295,6 +327,7 @@ namespace KillingMahjong.Core
             // `AudioManager` がまだ居ないだけなら、`Start()` の当て直しで拾える。
 
             ApplyResolution();
+            KillingMahjong.UI.DialogueUI.ApplyBubbleSettingToAll();
         }
 
         /// <summary>

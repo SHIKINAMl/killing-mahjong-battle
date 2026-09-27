@@ -29,6 +29,8 @@ namespace KillingMahjong.UI
             // 吹き出しが最初に出た一瞬だけ、それが読めてしまっていた
             // （2026-09-24 に録画で確認）。シーンを直さずコードで潰す。
             if (dialogueText != null) dialogueText.text = string.Empty;
+
+            ApplyBubbleSetting();
         }
 
         private void Start()
@@ -36,6 +38,46 @@ namespace KillingMahjong.UI
             if (toggleLogButton != null) toggleLogButton.onClick.AddListener(ToggleLog);
             if (closeLogBackgroundButton != null) closeLogBackgroundButton.onClick.AddListener(CloseLog);
             logPanel.SetActive(false);
+
+            ApplyBubbleSetting();
+        }
+
+        // ==================== 吹き出しの枠 ====================
+        //
+        // **枠は既定で出さない（2026-09-27、プランナーの判断）。**
+        // ただし有りと無しの感触を見比べたいので、設定から切り替えられるようにしてある。
+        //
+        // 消すのは `DialoguePanel` 自身の `Image` と `Shadow` だけ。
+        // **SetActive では消さないこと。** あれを切ると子の文字とLOGボタンも道連れになり、
+        // セリフが1行も出なくなる。
+
+        /// <summary>
+        /// 画面にある DialogueUI すべてに設定を当て直す。
+        /// 設定画面で切り替えた瞬間に見た目が変わるように、`SettingsManager` から呼ぶ。
+        /// **非アクティブなものも拾う。** セリフが出ていない間に切り替えることの方が多い。
+        /// </summary>
+        public static void ApplyBubbleSettingToAll()
+        {
+            var all = Object.FindObjectsByType<DialogueUI>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None);
+            for (int i = 0; i < all.Length; i++) all[i].ApplyBubbleSetting();
+        }
+
+        private void ApplyBubbleSetting()
+        {
+            if (dialoguePanel == null) return;
+
+            // 設定がまだ居ない場面（起動直後など）は、既定の「出さない」で進める
+            var settings = KillingMahjong.Core.SettingsManager.Instance;
+            bool show = settings != null && settings.ShowDialogueBubble;
+
+            var img = dialoguePanel.GetComponent<Image>();
+            if (img != null) img.enabled = show;
+
+            // 枠に付いている影も一緒に。枠が消えているのに影だけ残ると、
+            // 文字のまわりに薄い四角が浮いて見える
+            var shadow = dialoguePanel.GetComponent<Shadow>();
+            if (shadow != null) shadow.enabled = show;
         }
 
         // セリフの影の設定。対局シーンが2つ（UIテストシーン / OpeningScene）あるので
