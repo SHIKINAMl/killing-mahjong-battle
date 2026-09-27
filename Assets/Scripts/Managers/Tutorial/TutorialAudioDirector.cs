@@ -77,57 +77,39 @@ namespace KillingMahjong.Managers.Tutorial
             // 合図だけが古い行番号に残っていた。
             // 直す前は [3] の「……ってアタシのこと好きすぎかよー！！」で
             // 悲鳴のSEと赤い明滅が鳴っていた。
+            // **曲は tut_lesson を1曲、最初から最後まで（2026-09-27 のユーザー指示）。**
+            // 以前は台詞ごとに8曲を渡り歩き、7箇所で無音に落としていた。
+            // 曲を切り替える合図と `Cue.Silence()` は全部やめて、
+            // **一発物（SE）の合図だけ残してある。** 鳴らす場所は変えていない。
+            //
+            // 戻すときは、このファイルの履歴（2026-09-27 より前）に元の表がある。
+            // 対になっている音（drop×2 / crack↔crack_long / choice↔choice_dark /
+            // ability↔collapse）は、そのとき一緒に戻すこと。
             { "r0.introLines[0]",      Cue.Music("tut_lesson") },
-            // 空気の切れ目1。軽口から「命がけ」の告知へ
             { "r0.introLines[6]",      Cue.Sound("se_crack") },
-            // **契約書と血の合図は、契約書の話が出るここへ移した。**
             { "r0.introLines[8]",      Cue.Sound("se_drop") },        // 「アタシはそんなの書かなかったけど」
-            // 冗談で済まない気配。色だけ冷たくする
-            // ルール説明へ戻るので色を抜く。**曲は止めていないので鳴らし直さない**
             { "r0.beforeBetLines[1]",  Cue.Sound("se_tube_slow") },
             { "r0.beforeBetLines[2]",  Cue.Sound("se_tube_fast") },
             { "r0.beforeBetLines[6]",  Cue.Sound("se_choice") },      // 「自分で決めていいのよ」
-            { "r0.outroLines[3]",      Cue.Silence() },               // 「満貫は、1倍なの」
-            { "r0.outroLines[4]",      Cue.Music("tut_lesson") },
 
             // ---------- 第2局: 流局 ----------
-            { "r1.introLines[0]",      Cue.Music("tut_slack") },
             { "r1.outroLines[3]",      Cue.Sound("se_stack") },
-            // 空気の切れ目2。弛緩から重圧の自覚へ
-            { "r1.outroLines[5]",      Cue.Music("tut_lesson") },
 
             // ---------- 第3局: 嘘 ----------
             { "r2.inheritedBetLines[1]", Cue.Sound("se_stack") },
-            // **ここから5行だけ温かい。** 長調にはしない。温かさは音色と残響で作ってある
-            { "r2.onBattleStartLines[0]", Cue.Music("tut_lie") },
-            // 空気の切れ目3。**フェードでも小節待ちでもなく、1フレームで断つ**
-            { "r2.outroLines[0]",      Cue.Silence() },               // 「ロン。」
-            { "r2.outroLines[2]",      Cue.Music("tut_cruel") },
             { "r2.outroLines[3]",      Cue.Sound("se_choice_dark") }, // 「決めさせられていたの」
             { "r2.outroLines[8]",      Cue.Sound("se_drop") },        // 「契約書に垂れちゃった」
 
             // ---------- 第4局: 能力、そして反転 ----------
-            { "r3.introLines[0]",      Cue.Music("tut_lesson") },
-            { "r3.abilityIntroLines[2]", Cue.Music("tut_ability") },
             { "r3.abilityShowcases[0].beforeLines[0]", Cue.Sound("se_ability_1") },
             { "r3.abilityShowcases[1].beforeLines[0]", Cue.Sound("se_ability_2") },
             { "r3.abilityShowcases[2].beforeLines[0]", Cue.Sound("se_ability_3") },
-            // 空気の切れ目4。積み上げたものが崩れる。加害者から当事者へ
-            { "r3.abilityExplainLines[2]", Cue.Both("tut_reversal", "se_collapse") },
-            { "r3.outroLines[4]",      Cue.Silence() },               // 「私のゲージ、あなたより短いのよ」
-            { "r3.outroLines[5]",      Cue.Music("tut_final") },      // 「次で最後にしましょう」
+            { "r3.abilityExplainLines[2]", Cue.Sound("se_collapse") },
 
             // ---------- 第5局: 決着、そして問い ----------
-            { "r4.introLines[0]",      Cue.Music("tut_final") },
-            // 空気の切れ目5。駆け引きが消え、命のやり取りへ
             { "r4.onBattleStartLines[5]", Cue.Sound("se_two_pulses") },// 「私も、あなたと同じだけ抜かれている」
-            { "r4.outroLines[0]",      Cue.Silence() },               // 「……九蓮宝燈。」
             // 導入の絶叫と**同じ音源**。あちらは仮面の裂け目、こちらは崩壊
             { "r4.outroLines[2]",      Cue.Sound("se_crack_long") },
-            { "r4.outroLines[3]",      Cue.Music("tut_farewell") },
-
-            // ---------- 幕 ----------
-            { "ending[0]",             Cue.Silence() },
         };
 
         /// <summary>台詞が表示される直前に呼ぶ。表に無い ID なら何もしない。</summary>

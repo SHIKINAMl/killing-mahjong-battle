@@ -74,6 +74,10 @@ namespace KillingMahjong.UI
         ///
         ///   bgm_title      タイトルは追加曲の bgm_ex_midnight に差し替えた
         ///   bgm_tutorial   チュートリアルは tut_lesson に差し替えた
+        ///   tut_* の7曲    チュートリアルは tut_lesson 1曲を最後まで流す形になった
+        ///                  （2026-09-27 のユーザー指示）。台詞ごとの曲の切り替えと
+        ///                  無音をやめたので、この7曲は鳴らなくなった。
+        ///                  合図の表は TutorialAudioDirector にあり、戻すならそちら。
         ///   bgm_discard    打牌フェイズは場のBGMが受け持つようになり、出番が無くなった
         ///   bgm_discard_hot  同上
         ///   bgm_battle     どこからも参照されていない
@@ -111,6 +115,13 @@ namespace KillingMahjong.UI
             new Track("Bgm", "bgm_ex_incident",  "ひび割れた事件"),
             new Track("Bgm", "bgm_ex_surreal",   "奇妙な回廊"),
             new Track("Bgm", "bgm_ex_think",     "長考"),
+            new Track("Bgm", "tut_slack",        "チュートリアル　弛緩"),
+            new Track("Bgm", "tut_lie",          "チュートリアル　嘘"),
+            new Track("Bgm", "tut_cruel",        "チュートリアル　残酷"),
+            new Track("Bgm", "tut_ability",      "チュートリアル　能力"),
+            new Track("Bgm", "tut_reversal",     "チュートリアル　反転"),
+            new Track("Bgm", "tut_final",        "チュートリアル　決着"),
+            new Track("Bgm", "tut_farewell",     "チュートリアル　別れ"),
         };
 
         /// <summary>
