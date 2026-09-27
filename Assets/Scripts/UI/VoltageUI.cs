@@ -39,18 +39,29 @@ namespace KillingMahjong.UI
         private const float MultiplierFontSize = 30f;
 
         /// <summary>
-        /// 置き場所。画面中央からのずれ。**「YOUR TURN / ENEMY TURN」が出ていた場所**に置く
-        /// （ユーザーの指示 2026-09-08。あの文字は出さないことにした）。
-        /// 元の文字は (-280, 125) にあった。上が相手、下が自分。
+        /// 置き場所。画面中央からのずれ。**敵と自分で左右に分ける。**
+        ///
+        /// 自分（左）… 元は「YOUR TURN / ENEMY TURN」が出ていた場所（2026-09-08 の指示。
+        /// あの文字は出さないことにした）。元の文字は (-280, 125) にあったが、その高さだと
+        /// ドラ表示（画面左の中ほど）と重なったので、ドラより下の、壁と卓のあいだの
+        /// 暗い帯へ下ろしてある。
+        ///
+        /// 敵（右）… **セリフの吹き出しの真下**（2026-09-27 の指示）。
+        /// プランナーの以前の取り決めは「自分は右・敵は左」だったが、
+        /// 吹き出しの下に敵を置く方を優先すると確認を取った。
+        ///
+        /// **ここは整数で持つこと。** 実機で合わせたときの値は (148.92, -67.86) だったが、
+        /// 画面が 800x600 で CanvasScaler の基準も 800x600 なので UI は等倍。
+        /// 小数を入れると四角の縁が半画素にかかって、ドット絵の中でそこだけ滲む。
+        ///
+        /// なお吹き出し（DialoguePanel）は FloatingAnimator で上下に浮いていて、
+        /// 下端が 314〜324 の間を往復する。倍率ラベルの上端は 308 で固定なので、
+        /// **すき間は 6〜16px の間で変わる。** 16px はいちばん離れた瞬間の値。
         /// </summary>
-        /// <summary>
-        /// **ドラ表示（画面左の中ほど）を避けた位置。**
-        /// 元の「YOUR TURN」の高さ(125)に置いたら、自分側のゲージがドラと重なった。
-        /// ドラより下の、壁と卓のあいだの暗い帯が空いている。
-        /// </summary>
-        private const float PosX = -280f;
-        private const float EnemyPosY = -30f;
+        private const float SelfPosX = -280f;
         private const float SelfPosY = -120f;
+        private const float EnemyPosX = 149f;
+        private const float EnemyPosY = -68f;
 
         // 点いた四角の色は段ごとに変わるので、ここには持たない。
         // 配っているのは VoltageFlame.PipColorFor（2026-09-13）。
@@ -155,7 +166,9 @@ namespace KillingMahjong.UI
             rect.anchorMin = new Vector2(0.5f, 0.5f);
             rect.anchorMax = new Vector2(0.5f, 0.5f);
             rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = new Vector2(PosX, isEnemy ? EnemyPosY : SelfPosY);
+            rect.anchoredPosition = isEnemy
+                ? new Vector2(EnemyPosX, EnemyPosY)
+                : new Vector2(SelfPosX, SelfPosY);
             rect.sizeDelta = new Vector2(PipRowWidth, 40f);
 
             var ui = root.GetComponent<VoltageUI>();
