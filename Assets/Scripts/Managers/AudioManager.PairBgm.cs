@@ -110,9 +110,17 @@ namespace KillingMahjong.Managers
             currentPhaseBgmName = null;
 
             // いまのフェイズで鳴らし直す。**鳴っていたときだけ。**
-            // `SuppressStartupBgm` も見る。あれは「いまは何も鳴らすな」という旗で、
-            // チュートリアルの冒頭がそれで無音になっている。
-            if (wasPlaying && !SuppressStartupBgm && CanPlay && UsePhaseBgm) ApplyPhaseBgm();
+            //
+            // **ここで `SuppressStartupBgm` を見てはいけない（2026-09-27）。**
+            // あの旗は `OpeningSequenceManager.Awake` で立つきり、どこでも降りない。
+            // AudioManager は DontDestroyOnLoad で生き残るので、チュートリアルから
+            // 始まるこのゲームでは**遊んでいる間ずっと立ったまま**になる。
+            // 見てしまうと、設定でBGMを変えた瞬間に上で音を畳んだきり鳴らし直さず、
+            // **そこから先ずっと無音になる**（ユーザー報告。実機で再現した）。
+            //
+            // そもそも `wasPlaying` が真なら音は鳴っている＝無音にしておく時間は
+            // もう終わっている。旗を見る意味がない。
+            if (wasPlaying && CanPlay && UsePhaseBgm) ApplyPhaseBgm();
         }
 
         /// <summary>
