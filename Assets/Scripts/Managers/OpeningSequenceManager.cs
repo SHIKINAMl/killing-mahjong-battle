@@ -212,17 +212,17 @@ namespace KillingMahjong.Managers
         }
 
         /// <summary>
-        /// 契約書を閉じたあと。**ここでは立ち絵を出さない（2026-09-12）。**
+        /// 契約書を閉じたあと。**ここでは立ち絵を出さない。**
         ///
-        /// フロー図の順序は「契約書を閉じる → セリフ1行 → 女の子立ち絵表示」。
-        /// 誰もいない画面に最初の一言だけが出て、そのあとに相手が現れる。
+        /// 順序は「契約書を閉じる → 女の子がフェードイン → セリフ（と同時に曲）」
+        /// （2026-09-27 の指示。2026-09-12 のフロー図とは逆になっている）。
         /// フェードインは <see cref="TutorialManager.CharacterRevealRequested"/> 経由で
-        /// TutorialManager が1行目を送り終えた時点で呼び戻してくる。
+        /// TutorialManager が台詞を出す前に呼び戻してくる。
         /// </summary>
         private IEnumerator ShowEnemyRoutine()
         {
-            // 吹き出しだけ先に出しておく。立ち絵はまだ出さない
-            if (dialogueUI != null) dialogueUI.gameObject.SetActive(true);
+            // **吹き出しはまだ出さない。** 立ち絵より先に枠だけ出ると、
+            // 誰もいない画面に喋る場所だけがある絵になる。
             yield return null;
 
             if (tutorialManager != null)
@@ -237,11 +237,14 @@ namespace KillingMahjong.Managers
         private const float EnemyFadeInSeconds = 1.5f;
 
         /// <summary>
-        /// 女の子をうっすら浮かび上がらせる。**1行目のセリフの後に呼ばれる。**
+        /// 女の子をうっすら浮かび上がらせる。**台詞より先に呼ばれる。**
         ///
         /// 立ち絵は UI の Image ではなく **SpriteRenderer**（体と、子の顔の2枚）。
         /// 以前は Image だけを探していたので必ず null になり、フェードを素通りして
         /// SetActive(true) の瞬間にぱっと出ていた。子まで含めて両方を拾う。
+        ///
+        /// 出し終わったら <see cref="TutorialManager.CharacterRevealFinished"/> を立てる。
+        /// **どの抜け方をしても必ず立てること。** 立て忘れると台詞が出なくなる。
         /// </summary>
         private IEnumerator FadeInEnemyRoutine()
         {
@@ -257,7 +260,11 @@ namespace KillingMahjong.Managers
             var imageAlpha = new float[images.Length];
             for (int i = 0; i < images.Length; i++) imageAlpha[i] = images[i].color.a;
 
-            if (sprites.Length == 0 && images.Length == 0) yield break;
+            if (sprites.Length == 0 && images.Length == 0)
+            {
+                NotifyRevealFinished();
+                yield break;
+            }
 
             ApplyEnemyAlpha(sprites, spriteAlpha, images, imageAlpha, 0f);
 
@@ -271,6 +278,13 @@ namespace KillingMahjong.Managers
                 yield return null;
             }
             ApplyEnemyAlpha(sprites, spriteAlpha, images, imageAlpha, 1f);
+
+            NotifyRevealFinished();
+        }
+
+        private void NotifyRevealFinished()
+        {
+            if (tutorialManager != null) tutorialManager.CharacterRevealFinished = true;
         }
 
         private static void ApplyEnemyAlpha(SpriteRenderer[] sprites, float[] spriteAlpha,

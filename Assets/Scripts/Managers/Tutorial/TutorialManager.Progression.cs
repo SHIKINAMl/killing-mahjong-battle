@@ -119,24 +119,30 @@ namespace KillingMahjong.Managers
                 if (_aborted) yield break;
             }
 
-            // **立ち絵は1行目のセリフの後に出す（2026-09-12、フロー図どおり）。**
-            // 契約書を閉じた直後は誰もいない画面で、最初の一言だけが聞こえる。
-            // 立ち絵を持っているのはシーン側なので、こちらは合図を出すだけ。
+            // **立ち絵が出きってから台詞を出す（2026-09-27 の指示）。**
+            // 2026-09-12 のフロー図は「契約書を閉じる → セリフ1行 → 立ち絵」だったが、
+            // 順番を入れ替えた。誰もいない画面に声だけが出るのではなく、
+            // 先に相手が滲み出てきて、そのあとで喋り出す。
+            // 曲も1行目の合図で鳴り始めるので、無音のまま立ち絵が浮かぶことになる。
+            //
+            // 立ち絵を持っているのはシーン側なので、こちらは合図を出して待つだけ。
             // 合図を受け取る人がいない（局を指定して始めた等）ときは、何も起きずに素通りする。
             var introLines = data.introLines;
             int reveal = data.revealBoardAfterLineIndex;
 
             if (CharacterRevealRequested != null && introLines != null && introLines.Count > 0)
             {
-                yield return StartCoroutine(PlayLines(introLines.GetRange(0, 1)));
-
                 var reveal1 = CharacterRevealRequested;
                 CharacterRevealRequested = null;     // 出すのは一度きり
+                CharacterRevealFinished = false;
                 reveal1();
 
-                // 1行ぶん先に送ったので、残りと「盤面を出す行」の番号をずらす
-                introLines = introLines.GetRange(1, introLines.Count - 1);
-                if (reveal >= 0) reveal -= 1;
+                // **出し終わりを待つ。** 相手がいないところに台詞が出ないように。
+                // シーン側が旗を立て損ねても止まらないよう、上限だけ決めておく。
+                float revealLimit = Time.time + 5f;
+                yield return new WaitUntil(
+                    () => CharacterRevealFinished || Time.time > revealLimit);
+                if (_aborted) yield break;
             }
 
             if (reveal >= 0 && reveal < introLines.Count - 1)

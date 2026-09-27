@@ -157,11 +157,17 @@ namespace KillingMahjong.Managers
         private bool _askExperienceAfterIntro;
 
         /// <summary>
-        /// 立ち絵を出してほしいときに呼ぶ。**1行目のセリフの後に1度だけ。**
+        /// 立ち絵を出してほしいときに呼ぶ。**契約書を閉じた直後に1度だけ。**
         /// 立ち絵を持っているのは `OpeningSequenceManager`（シーン側）なので、
         /// こちらは「出して」と言うだけにしてある。
         /// </summary>
         public System.Action CharacterRevealRequested;
+
+        /// <summary>
+        /// 立ち絵が出きったかどうか。**台詞はこれが立つまで待つ（2026-09-27 の指示）。**
+        /// 出すのはシーン側、待つのはこちらなので、旗で受け渡す。
+        /// </summary>
+        public bool CharacterRevealFinished;
 
         /// <summary>
         /// 導入セリフのあとに「麻雀を知っているか」を聞き、答えに応じて説明を見せる
