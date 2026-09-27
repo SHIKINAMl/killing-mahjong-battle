@@ -65,6 +65,42 @@ namespace KillingMahjong.Core
             "従来（層なし）",
         };
 
+        // --- 文字送りの速さ ---
+        //
+        // NEEDY GIRL OVERDOSE の設定を参考にした（2026-09-27）。あちらは設定項目が
+        // BGM / SE / 解像度 / 進行の速さ / 言語 の5つだけで、かなり絞ってある。
+        // じゃんぱいあも、読む所が無い設定（旧 High Speed Mode / Show Effects）を
+        // 画面から下ろして、代わりに実際に効くものを置く。
+        [Header("Text Speed")]
+        [SerializeField] private int textSpeed = (int)TextSpeedKind.Normal;
+        public int TextSpeed => textSpeed;
+
+        public enum TextSpeedKind { Slow = 0, Normal = 1, Fast = 2 }
+
+        /// <summary>選べる速さの表示名。並び順は TextSpeedKind と合わせること。</summary>
+        public static readonly string[] TextSpeedLabels = { "ゆっくり", "ふつう", "はやい" };
+
+        /// <summary>1文字あたりの秒数。**小さいほど速い。** 既定（ふつう）は従来と同じ 0.03。</summary>
+        private static readonly float[] TextSpeedSeconds = { 0.055f, 0.030f, 0.014f };
+
+        /// <summary>いまの設定での1文字あたりの秒数。</summary>
+        public float SecondsPerCharacter
+        {
+            get { return TextSpeedSeconds[Mathf.Clamp(textSpeed, 0, TextSpeedSeconds.Length - 1)]; }
+        }
+
+        // --- 画面サイズ ---
+        //
+        // **ドット絵なので整数倍だけにする。** 1.5倍のような半端な倍率にすると
+        // 1ドットが画素に割り切れず、目が潰れて滲む（クリックの波紋でも同じ問題が出た）。
+        [Header("Screen")]
+        [SerializeField] private int screenMode = (int)ScreenModeKind.X1;
+        public int ScreenMode => screenMode;
+
+        public enum ScreenModeKind { X1 = 0, X2 = 1, FullScreen = 2 }
+
+        public static readonly string[] ScreenModeLabels = { "800×600　等倍", "1600×1200　2倍", "全画面" };
+
         // --- 表示・システム設定 ---
         [Header("System Settings")]
         [SerializeField] private bool isEffectEnabled = true;
@@ -135,6 +171,8 @@ namespace KillingMahjong.Core
             isEffectEnabled = PlayerPrefs.GetInt("IsEffectEnabled", isEffectEnabled ? 1 : 0) == 1;
 
             matchBgmSet = PlayerPrefs.GetInt("MatchBgmSet", matchBgmSet);
+            textSpeed = PlayerPrefs.GetInt("TextSpeed", textSpeed);
+            screenMode = PlayerPrefs.GetInt("ScreenMode", screenMode);
 
             resolutionIndex = PlayerPrefs.GetInt("ResolutionIndex", resolutionIndex);
             isFullScreen = PlayerPrefs.GetInt("IsFullScreen", isFullScreen ? 1 : 0) == 1;
@@ -155,6 +193,8 @@ namespace KillingMahjong.Core
             PlayerPrefs.SetInt("IsEffectEnabled", isEffectEnabled ? 1 : 0);
 
             PlayerPrefs.SetInt("MatchBgmSet", matchBgmSet);
+            PlayerPrefs.SetInt("TextSpeed", textSpeed);
+            PlayerPrefs.SetInt("ScreenMode", screenMode);
 
             PlayerPrefs.SetInt("ResolutionIndex", resolutionIndex);
             PlayerPrefs.SetInt("IsFullScreen", isFullScreen ? 1 : 0);
@@ -185,6 +225,19 @@ namespace KillingMahjong.Core
             matchBgmSet = Mathf.Clamp(kind, 0, MatchBgmSetLabels.Length - 1);
             var am = KillingMahjong.Managers.AudioManager.Instance;
             if (am != null) am.ApplyMatchBgmSet(matchBgmSet);
+        }
+
+        /// <summary>文字送りの速さを変える。次に出るセリフから効く。</summary>
+        public void SetTextSpeed(int kind)
+        {
+            textSpeed = Mathf.Clamp(kind, 0, TextSpeedLabels.Length - 1);
+        }
+
+        /// <summary>画面サイズを変える。**その場で切り替わる。**</summary>
+        public void SetScreenMode(int kind)
+        {
+            screenMode = Mathf.Clamp(kind, 0, ScreenModeLabels.Length - 1);
+            ApplyResolution();
         }
 
         public void SetSeVolume(float volume) 
@@ -244,12 +297,30 @@ namespace KillingMahjong.Core
             ApplyResolution();
         }
 
+        /// <summary>
+        /// 画面サイズを当てる。
+        ///
+        /// **倍率は整数だけ。** ドット絵なので、1.5倍のような半端な倍率にすると
+        /// 1ドットが画素に割り切れず目が潰れる。全画面のときは倍率を指定できないので、
+        /// ディスプレイ側の拡大に任せる（そのぶん滲むが、全画面はユーザーが選んだ結果）。
+        /// </summary>
         private void ApplyResolution()
         {
-            int width = 800;
-            int height = 600;
+            const int baseWidth = 800;
+            const int baseHeight = 600;
 #if !UNITY_WEBGL
-            Screen.SetResolution(width, height, isFullScreen);
+            switch ((ScreenModeKind)screenMode)
+            {
+                case ScreenModeKind.X2:
+                    Screen.SetResolution(baseWidth * 2, baseHeight * 2, false);
+                    break;
+                case ScreenModeKind.FullScreen:
+                    Screen.SetResolution(Screen.currentResolution.width, Screen.currentResolution.height, true);
+                    break;
+                default:
+                    Screen.SetResolution(baseWidth, baseHeight, false);
+                    break;
+            }
 #endif
         }
     }

@@ -110,7 +110,10 @@ namespace KillingMahjong.UI
             yield return null; // ShowText() が DialoguePanel を有効化した次フレームに解析する
             dialogueText.ForceMeshUpdate();
 
-            float timePerChar = 0.03f; // 1文字あたりの表示時間
+            // 1文字あたりの表示時間。**設定から引く（2026-09-27）。**
+            // 以前は 0.03 の決め打ちだった。設定が無いときは従来どおり 0.03。
+            var settings = KillingMahjong.Core.SettingsManager.Instance;
+            float timePerChar = settings != null ? settings.SecondsPerCharacter : 0.03f;
             float nextSoundTime = 0f;
             int visibleCharacterCount = dialogueText.textInfo.characterCount;
 
