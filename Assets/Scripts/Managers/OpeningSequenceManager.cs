@@ -233,29 +233,60 @@ namespace KillingMahjong.Managers
             StartConversation();
         }
 
-        /// <summary>女の子をうっすら浮かび上がらせる。**1行目のセリフの後に呼ばれる。**</summary>
+        /// <summary>フェードインにかける時間（秒）。</summary>
+        private const float EnemyFadeInSeconds = 1.5f;
+
+        /// <summary>
+        /// 女の子をうっすら浮かび上がらせる。**1行目のセリフの後に呼ばれる。**
+        ///
+        /// 立ち絵は UI の Image ではなく **SpriteRenderer**（体と、子の顔の2枚）。
+        /// 以前は Image だけを探していたので必ず null になり、フェードを素通りして
+        /// SetActive(true) の瞬間にぱっと出ていた。子まで含めて両方を拾う。
+        /// </summary>
         private IEnumerator FadeInEnemyRoutine()
         {
             enemyCharacterObj.SetActive(true);
 
-            Image enemyImg = enemyCharacterObj.GetComponent<Image>();
-            if (enemyImg != null)
+            var sprites = enemyCharacterObj.GetComponentsInChildren<SpriteRenderer>(true);
+            var images = enemyCharacterObj.GetComponentsInChildren<Image>(true);
+
+            // **元の不透明度を覚えておく。** 半透明で置いてある部品を
+            // 勝手に不透明にしてしまわないため。
+            var spriteAlpha = new float[sprites.Length];
+            for (int i = 0; i < sprites.Length; i++) spriteAlpha[i] = sprites[i].color.a;
+            var imageAlpha = new float[images.Length];
+            for (int i = 0; i < images.Length; i++) imageAlpha[i] = images[i].color.a;
+
+            if (sprites.Length == 0 && images.Length == 0) yield break;
+
+            ApplyEnemyAlpha(sprites, spriteAlpha, images, imageAlpha, 0f);
+
+            float elapsed = 0f;
+            while (elapsed < EnemyFadeInSeconds)
             {
-                Color c = enemyImg.color;
-                c.a = 0f;
-                enemyImg.color = c;
-                
-                float duration = 1.5f; // フェードインにかける時間
-                float elapsed = 0f;
-                while (elapsed < duration)
-                {
-                    elapsed += Time.deltaTime;
-                    c.a = Mathf.Lerp(0f, 1f, elapsed / duration);
-                    enemyImg.color = c;
-                    yield return null;
-                }
-                c.a = 1f;
-                enemyImg.color = c;
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / EnemyFadeInSeconds);
+                // 立ち上がりを緩めて、滲み出てくるように見せる
+                ApplyEnemyAlpha(sprites, spriteAlpha, images, imageAlpha, t * t * (3f - 2f * t));
+                yield return null;
+            }
+            ApplyEnemyAlpha(sprites, spriteAlpha, images, imageAlpha, 1f);
+        }
+
+        private static void ApplyEnemyAlpha(SpriteRenderer[] sprites, float[] spriteAlpha,
+                                            Image[] images, float[] imageAlpha, float t)
+        {
+            for (int i = 0; i < sprites.Length; i++)
+            {
+                Color c = sprites[i].color;
+                c.a = spriteAlpha[i] * t;
+                sprites[i].color = c;
+            }
+            for (int i = 0; i < images.Length; i++)
+            {
+                Color c = images[i].color;
+                c.a = imageAlpha[i] * t;
+                images[i].color = c;
             }
         }
 
