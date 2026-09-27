@@ -1,7 +1,9 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using System.Collections;
+using System.Collections.Generic;
 using KillingMahjong.Common;
 
 namespace KillingMahjong.UI
@@ -137,7 +139,62 @@ namespace KillingMahjong.UI
                 clickPos = Touchscreen.current.primaryTouch.position.ReadValue();
             }
 
-            if (isClicked) SpawnRipple(clickPos);
+            if (isClicked)
+            {
+                SpawnRipple(clickPos);
+                if (IsEmptyClick(clickPos)) PlayEmptyClickSe();
+            }
+        }
+
+        /// <summary>空クリックの音。録画で示された「選択」の音に寄せてある。</summary>
+        private const string EmptyClickSe = "se_click_empty";
+
+        /// <summary>音が続けて鳴りすぎないようにする間隔。連打しても耳に刺さらない程度。</summary>
+        private const float EmptyClickMinInterval = 0.08f;
+        private float _nextEmptyClickTime;
+
+        /// <summary>レイキャストの結果を毎回作り直さない。クリックは頻繁に起きる。</summary>
+        private readonly List<RaycastResult> _hits = new List<RaycastResult>();
+
+        /// <summary>
+        /// 押したものが「何もしない場所」かどうか。
+        ///
+        /// **当たったかどうかでは判定できない。** 背景や卓の画像が画面いっぱいに敷かれていて、
+        /// どこを押しても必ず何かには当たる。押して意味のあるもの
+        /// （ボタン・トグル・牌など、クリックを受け取る実装があるもの）が
+        /// 一つも無いときだけ「空クリック」とみなす。
+        /// </summary>
+        private bool IsEmptyClick(Vector2 screenPos)
+        {
+            var es = EventSystem.current;
+            if (es == null) return true;
+
+            var ped = new PointerEventData(es) { position = screenPos };
+            _hits.Clear();
+            es.RaycastAll(ped, _hits);
+
+            for (int i = 0; i < _hits.Count; i++)
+            {
+                var go = _hits[i].gameObject;
+                if (go == null) continue;
+
+                // Selectable は Button / Toggle / Slider / InputField などの親
+                var selectable = go.GetComponentInParent<Selectable>();
+                if (selectable != null && selectable.interactable) return false;
+
+                // 牌のように、自前でクリックを受けているもの
+                if (ExecuteEvents.GetEventHandler<IPointerClickHandler>(go) != null) return false;
+            }
+            return true;
+        }
+
+        private void PlayEmptyClickSe()
+        {
+            if (Time.unscaledTime < _nextEmptyClickTime) return;
+            _nextEmptyClickTime = Time.unscaledTime + EmptyClickMinInterval;
+
+            var audio = KillingMahjong.Managers.AudioManager.Instance;
+            if (audio != null) audio.PlayStinger(EmptyClickSe);
         }
 
         /// <summary>クリックした場所に波紋を1回だけ出す。</summary>
