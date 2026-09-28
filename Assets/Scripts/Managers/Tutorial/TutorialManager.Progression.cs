@@ -324,9 +324,19 @@ namespace KillingMahjong.Managers
             if (hideChrome) SetFirstRoundChromeVisible(true);
 
             // --- 打牌フェイズ ---
+            // **黒帯で隠してから入る（2026-09-28 の指示）。**
+            // 本編は賭けが決まると `TriggerBettingAnimationPhase` から
+            // `PhaseTransitionUI.PlayTransition` を通り、一本線 →「対局開始」→
+            // 市松模様が画面を覆う、という段取りで打牌フェイズへ移る。
+            // チュートリアルは `SetPhase` を直接呼んでいたので**そこだけ素通りで、
+            // 賭け金の次の瞬間に打牌が始まっていた。** 本編と同じ見え方に揃える。
+            //
+            // フェイズの切り替えは、本編と同じく**覆い切った時点（onMidpoint）**で行う。
+            // 先に切り替えると、盤面が組み替わる様子が見えてしまう。
+            yield return StartCoroutine(RunDiscardEntryTransition());
+
             // GameUIPhaseController は IsTutorialMode のとき HP パネルを出さないので、
             // フェイズを切り替えたあとに毎回こちらで表示し直す（手順⑦の説明に必要）。
-            SetPhase(RoundStatus.Discard);
             ApplyHpToUI();
             yield return new WaitForSeconds(phaseSettleTime);
             // 第1局の対局導入は、フロー図どおり山牌／待ち牌の誘導を挟む専用シーケンスで進める。
