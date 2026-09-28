@@ -33,6 +33,21 @@ namespace KillingMahjong.UI
             ApplyBubbleSetting();
         }
 
+        /// <summary>
+        /// 仮の文字を消すのは `OnEnable` でもやる（2026-09-28）。
+        ///
+        /// **`Awake` は伏せたままの間は走らない。** 2026-09-27 に
+        /// `OpeningSequenceManager` が開幕で吹き出しを起こすのをやめたため、
+        /// チュートリアルの頭では伏せられたままになり、シーンに置いてある
+        /// "Nothing" が消えないまま残っていた（実機で確認）。
+        /// 最初に起こされた瞬間にも消しておけば、1フレームも読めない。
+        /// </summary>
+        private void OnEnable()
+        {
+            if (dialogueText != null && dialogueText.text == "Nothing")
+                dialogueText.text = string.Empty;
+        }
+
         private void Start()
         {
             if (toggleLogButton != null) toggleLogButton.onClick.AddListener(ToggleLog);
