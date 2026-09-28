@@ -83,6 +83,9 @@ namespace KillingMahjong.UI
         public bool IsTutorialArchiveOpen =>
             tutorialArchiveUI != null && tutorialArchiveUI.gameObject.activeInHierarchy;
 
+        /// <summary>開いている資料そのもの。**中で目線を運ぶ誘導が見に来る。**</summary>
+        public TutorialArchiveUI TutorialArchive => tutorialArchiveUI;
+
         /// <summary>「チュートリアル資料」ボタン。実行時に作るので外から取れるようにしておく。</summary>
         public RectTransform TutorialArchiveButtonRect =>
             tutorialArchiveButton != null ? tutorialArchiveButton.transform as RectTransform : null;

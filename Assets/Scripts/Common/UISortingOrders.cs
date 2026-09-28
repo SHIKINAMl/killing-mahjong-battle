@@ -209,6 +209,13 @@ namespace KillingMahjong.Common
         /// </summary>
         public const int TutorialArchive = 83;
 
+        /// <summary>
+        /// 資料の中で範囲を示す強調（2026-09-29）。**資料より手前に置く。**
+        /// 通常の `TutorialHighlight`(63) のままだと資料(83)の下に潜って見えない。
+        /// 実機で band を出しても画面に出ず、これで気づいた。
+        /// </summary>
+        public const int TutorialArchiveHighlight = 84;
+
         /// <summary>WaitUI: 待ち牌表示を最前面に出す際のレイヤー</summary>
         public const int WaitDisplayFront = 84;
 

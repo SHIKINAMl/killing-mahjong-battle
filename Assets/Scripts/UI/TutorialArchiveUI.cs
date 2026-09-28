@@ -78,6 +78,7 @@ namespace KillingMahjong.UI
         private TextMeshProUGUI pageNumber;
         private Button previousButton;
         private Button nextButton;
+        private Button closeButton;
         private int pageIndex;
         private Action onClosed;
 
@@ -92,6 +93,48 @@ namespace KillingMahjong.UI
             Build();
             ValidatePageBounds();
             gameObject.SetActive(false);
+        }
+
+        // --- チュートリアルの誘導から見るための口（2026-09-29） ---
+        //
+        // **資料の中でも目線を運ぶ**ため、見出し・本文・ボタンをそれぞれ
+        // 外から指せるようにしてある。光らせるのは誘導側（TutorialManager）の仕事。
+
+        /// <summary>いま開いているページ（0 始まり）。</summary>
+        public int PageIndex { get { return pageIndex; } }
+
+        /// <summary>ページの総数。</summary>
+        public int PageCount { get { return Pages.Length; } }
+
+        /// <summary>最後のページを開いているか。</summary>
+        public bool IsLastPage { get { return pageIndex >= Pages.Length - 1; } }
+
+        /// <summary>ページの見出し。</summary>
+        public RectTransform PageTitleRect
+        {
+            get { return pageTitle != null ? pageTitle.rectTransform : null; }
+        }
+
+        /// <summary>本文。**帯を敷く相手。**</summary>
+        public RectTransform PageBodyRect
+        {
+            get { return pageBody != null ? pageBody.rectTransform : null; }
+        }
+
+        /// <summary>「次へ」。**枠で囲む相手。** 押せないときは null を返す。</summary>
+        public RectTransform NextButtonRect
+        {
+            get
+            {
+                if (nextButton == null || !nextButton.interactable) return null;
+                return nextButton.transform as RectTransform;
+            }
+        }
+
+        /// <summary>「閉じる」。**枠で囲む相手。**</summary>
+        public RectTransform CloseButtonRect
+        {
+            get { return closeButton != null ? closeButton.transform as RectTransform : null; }
         }
 
         /// <summary>先頭ページから資料を開き、閉じたら呼び出し元へ戻す。</summary>
@@ -154,7 +197,7 @@ namespace KillingMahjong.UI
             pageBody = CreateBodyText(bodyPanelRect);
             previousButton = CreateButton(panelRect, "PreviousButton", "◀ 前へ", new Vector2(-210f, -195f), new Vector2(150f, 48f));
             nextButton = CreateButton(panelRect, "NextButton", "次へ ▶", new Vector2(0f, -195f), new Vector2(150f, 48f));
-            Button closeButton = CreateButton(panelRect, "CloseButton", "閉じる", new Vector2(210f, -195f), new Vector2(150f, 48f));
+            closeButton = CreateButton(panelRect, "CloseButton", "閉じる", new Vector2(210f, -195f), new Vector2(150f, 48f));
 
             previousButton.onClick.AddListener(ShowPreviousPage);
             nextButton.onClick.AddListener(ShowNextPage);

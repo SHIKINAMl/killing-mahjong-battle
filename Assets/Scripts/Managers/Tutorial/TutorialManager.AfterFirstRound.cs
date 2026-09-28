@@ -147,11 +147,84 @@ namespace KillingMahjong.Managers
             yield return new WaitUntil(() => option.IsTutorialArchiveOpen || !option.IsOpen);
             ClearGuide();
 
-            // チュートリアル資料表示 → プレイヤーオプション画面を閉じる
+            // チュートリアル資料表示。**中でも目線を運ぶ（2026-09-29 の指示）。**
+            // 開いただけだと、どこから読めばいいのか分からないまま閉じられる。
+            yield return StartCoroutine(RunArchiveReadingGuide(option));
+
+            // プレイヤーオプション画面を閉じる
             // 資料を閉じるとオプションへ戻るので、**オプションが閉じるまで**待つ。
             yield return new WaitUntil(() => !option.IsOpen);
 
             yield return StartCoroutine(PlayLines(ArchiveClosingLines));
+        }
+
+        /// <summary>
+        /// 資料の中を指す。**資料より手前の描画順で出す。**
+        /// 既定（63）のままだと資料（83）の下に潜って、実機で一切見えなかった。
+        /// </summary>
+        private void ShowArchiveHighlight(RectTransform target, UI.TutorialHighlightUI.Style style)
+        {
+            UI.TutorialHighlightUI.Show(target, style, Common.UISortingOrders.TutorialArchiveHighlight);
+        }
+
+        /// <summary>見出しを指している時間。読むものではないので短く。</summary>
+        private const float ArchiveTitleDwell = 0.7f;
+
+        /// <summary>本文に帯を敷いている時間。**ここだけは読ませる。**</summary>
+        private const float ArchiveBodyDwell = 1.6f;
+
+        /// <summary>
+        /// 資料の中で目線を運ぶ（2026-09-29 の指示）。
+        ///
+        /// ページごとに **見出し → 本文 → 次のボタン** の順で指す。
+        /// 帯と枠の使い分けは既存の決まりに従う。読ませたい本文は帯、
+        /// 押させるボタンは枠（帯を敷いたボタンは押せないものに見える）。
+        ///
+        /// **ボタンでだけ待つ。** 見出しと本文はクリックできないので、
+        /// そこで待つと進めなくなる。短く置いて次へ送る。
+        ///
+        /// 途中で閉じられたら、そこで誘導をやめる。**付き合わせ続けない。**
+        /// </summary>
+        private IEnumerator RunArchiveReadingGuide(UI.OptionUI option)
+        {
+            var archive = option != null ? option.TutorialArchive : null;
+            if (archive == null)
+            {
+                // 資料そのものが取れないときは、開いている間だけ待って抜ける
+                yield return new WaitUntil(() => !option.IsTutorialArchiveOpen || !option.IsOpen);
+                ClearGuide();
+                yield break;
+            }
+
+            // **何周もしないよう、ページ数ぶんで打ち切る。** 前へ戻られても回り続けない
+            for (int step = 0; step < archive.PageCount; step++)
+            {
+                if (!option.IsTutorialArchiveOpen) break;
+
+                ShowArchiveHighlight(archive.PageTitleRect, UI.TutorialHighlightUI.Style.Band);
+                yield return new WaitForSeconds(ArchiveTitleDwell);
+                if (!option.IsTutorialArchiveOpen) break;
+
+                ShowArchiveHighlight(archive.PageBodyRect, UI.TutorialHighlightUI.Style.Band);
+                yield return new WaitForSeconds(ArchiveBodyDwell);
+                if (!option.IsTutorialArchiveOpen) break;
+
+                if (archive.IsLastPage)
+                {
+                    // 最後のページ。閉じるところまで案内して終わり
+                    ShowArchiveHighlight(archive.CloseButtonRect, UI.TutorialHighlightUI.Style.Frame);
+                    break;
+                }
+
+                int shown = archive.PageIndex;
+                ShowArchiveHighlight(archive.NextButtonRect, UI.TutorialHighlightUI.Style.Frame);
+                yield return new WaitUntil(
+                    () => !option.IsTutorialArchiveOpen || archive.PageIndex != shown);
+            }
+
+            // 閉じられるまでは枠を出したままにしておく
+            yield return new WaitUntil(() => !option.IsTutorialArchiveOpen || !option.IsOpen);
+            ClearGuide();
         }
     }
 }

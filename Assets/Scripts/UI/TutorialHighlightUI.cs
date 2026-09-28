@@ -63,11 +63,17 @@ namespace KillingMahjong.UI
         private Canvas _canvas;
         private Style _style;
 
-        /// <summary>対象の範囲を示し始める。すでに出ていれば対象を差し替える。</summary>
-        public static void Show(RectTransform target, Style style)
+        /// <summary>
+        /// 対象の範囲を示し始める。すでに出ていれば対象を差し替える。
+        ///
+        /// `sortingOrder` は、**資料のように手前に重なる画面の中を指すとき**に渡す。
+        /// 既定（63）のままだと、その画面の下に潜って見えない。
+        /// </summary>
+        public static void Show(RectTransform target, Style style, int? sortingOrder = null)
         {
             if (target == null) { HideCurrent(); return; }
             if (_instance == null) _instance = Create();
+            _instance._canvas.sortingOrder = sortingOrder ?? UISortingOrders.TutorialHighlight;
             _instance.ShowInternal(target, style);
         }
 
