@@ -150,6 +150,12 @@ namespace KillingMahjong.Common
         /// <summary>TutorialArrowUI: 誘導矢印。穴の外にはみ出すので必ずマスクより手前に置く</summary>
         public const int TutorialArrow = 65;
 
+        /// <summary>
+        /// TutorialButtonIntroUI: ボタンを紹介するとき、中央に大きく出す**絵だけの複製**（2026-09-29）。
+        /// 矢印(65)より手前。紹介が終わると本来の位置へ飛んでいって消える。
+        /// </summary>
+        public const int TutorialButtonIntro = 66;
+
         // ---- 70 - 79 牌アニメーション・実況 ----
 
         /// <summary>TilePoolManager のコンテナ / GameUIVisualController の AnimationCanvas。

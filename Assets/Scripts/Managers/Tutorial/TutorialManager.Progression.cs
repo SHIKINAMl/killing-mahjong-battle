@@ -636,20 +636,53 @@ namespace KillingMahjong.Managers
                 // 手牌が足りないときの台本から**紹介の2行だけ**を借りて言う（2026-09-23）。
                 if (lines != null) yield return StartCoroutine(PlayLines(lines));
 
-                // **見せるだけ。押させない。** 自分で組んだ満貫手が置き換わらないようにする
+                // **見せるだけ。押させない。** 自分で組んだ満貫手が置き換わらないようにする。
+                // 紹介中は絵の複製しか出ないが、飛び終わって本物が出たあとも押させない
                 IsAutoButtonLocked = true;
-                SetHandButtonStage(HandButtonStage.AutoOnly);
-                yield return StartCoroutine(HighlightAutoManganButton());
-                yield return StartCoroutine(PlayLines(BuildAutoIntroLines(data)));
+                yield return StartCoroutine(PresentAutoManganButton(
+                    () => PlayLines(BuildAutoIntroLines(data))));
                 yield break;
             }
 
             if (introIndex > 0) yield return StartCoroutine(PlayLines(lines.GetRange(0, introIndex)));
 
-            SetHandButtonStage(HandButtonStage.AutoOnly);
-            yield return StartCoroutine(HighlightAutoManganButton());
+            yield return StartCoroutine(PresentAutoManganButton(
+                () => PlayLines(lines.GetRange(introIndex, lines.Count - introIndex))));
+        }
 
-            yield return StartCoroutine(PlayLines(lines.GetRange(introIndex, lines.Count - introIndex)));
+        /// <summary>
+        /// 『おまかせ』を紹介する（2026-09-29 のユーザー指示）。
+        ///
+        /// **絵の複製を中央にバッと出す → 紹介セリフ → 本来の位置へ飛ばす → 本物を出す。**
+        ///
+        /// 以前は本物をその場に出して4秒ハイライトしていた。押せる見た目のまま
+        /// 4秒光っているので「押せそうな雰囲気だし、その間押しそうになる」と言われた。
+        /// 複製は当たり判定を持たないので、紹介のあいだは押しようがない。
+        /// **4秒の無言の間も無くなる** — 紹介セリフを読んでいる間が、そのまま見せる時間になる。
+        /// </summary>
+        private IEnumerator PresentAutoManganButton(System.Func<IEnumerator> playIntroLines)
+        {
+            var target = gameUIManager != null && gameUIManager.HandUI != null
+                ? gameUIManager.HandUI.AutoManganButtonRect : null;
+
+            // ボタンが取れない場面（台本の差し替えなど）では、今までどおり出して話すだけ。
+            // **黙って何も出さないより、押せるボタンが出ているほうがまだ通じる。**
+            if (target == null)
+            {
+                SetHandButtonStage(HandButtonStage.AutoOnly);
+                if (playIntroLines != null) yield return StartCoroutine(playIntroLines());
+                yield break;
+            }
+
+            var intro = UI.TutorialButtonIntroUI.Show(target);
+            if (intro != null) yield return StartCoroutine(intro.PopIn());
+
+            if (playIntroLines != null) yield return StartCoroutine(playIntroLines());
+
+            if (intro != null) yield return StartCoroutine(intro.MoveToPlace(target));
+
+            // **飛び終わってから本物を出す。** ここで初めて押せるようになる
+            SetHandButtonStage(HandButtonStage.AutoOnly);
         }
 
         /// <summary>この語を含むセリフの手前で『おまかせ』を出す。</summary>
@@ -696,14 +729,9 @@ namespace KillingMahjong.Managers
             return result;
         }
 
-        /// <summary>フロー図の「４秒間オート満貫ボタンハイライト」。</summary>
-        private IEnumerator HighlightAutoManganButton()
-        {
-            GuideTo(gameUIManager != null && gameUIManager.HandUI != null
-                ? gameUIManager.HandUI.AutoManganButtonRect : null);
-            yield return new WaitForSeconds(4f);
-            ClearGuide();
-        }
+        // フロー図の「４秒間オート満貫ボタンハイライト」はここにあったが、
+        // 2026-09-29 に <see cref="PresentAutoManganButton"/> へ置き換えて消した。
+        // 本物を出して4秒光らせる作りだったので、押せそうに見えて実際に押されかけていた。
 
         private IEnumerator RunFirstRoundOpening()
         {
