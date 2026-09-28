@@ -191,7 +191,8 @@ namespace KillingMahjong.Common
         /// 原因が見えにくい。
         ///
         /// タイトルシーンには 80 番台の住人が他に居ないのでここを使う。
-        /// カーソル(99)より奥なのは意図どおりで、カーソルはメニューの上に出てよい。
+        /// カーソル（<see cref="MouseCursor"/>）より奥なのは意図どおりで、
+        /// カーソルはメニューの上に出てよい。
         /// </summary>
         public const int TitleMenuOverlay = 81;
 
@@ -294,12 +295,28 @@ namespace KillingMahjong.Common
         /// <summary>TutorialIntro: チュートリアル開始前の問いかけと案内板。
         ///
         /// 対局が始まる前に全画面を覆う。答えるまで先へ進ませないので、
-        /// 盤面やダイアログ(97)より手前に置く。カーソル(99)より奥なのは
-        /// 押している間もカーソルが見えていてよいため。</summary>
+        /// 盤面やダイアログ(97)より手前に置く。カーソル（<see cref="MouseCursor"/>）より
+        /// 奥なのは、押している間もカーソルが見えていてよいため。</summary>
         public const int TutorialIntro = 98;
 
-        /// <summary>CustomCusor: 自前マウスカーソル。常に全UIより手前</summary>
-        public const int MouseCursor = 99;
+        /// <summary>
+        /// CustomCusor: 自前マウスカーソル。常に全UIより手前。
+        ///
+        /// **99 では足りない（2026-09-29 に実機で判明）。**
+        /// Unity の `TMP_Dropdown` は、開いた一覧の Canvas を
+        /// `overrideSorting = true` / `sortingOrder = 30000` で作る（遮蔽板は 29999）。
+        /// これは Unity 側に焼かれている値で、こちらからは動かせない。
+        /// そのため 99 のままだと**設定のドロップダウンを開くとカーソルが下に潜り**、
+        /// 何を指しているか見えないまま選ばされることになる（ユーザー報告）。
+        ///
+        /// この Canvas は GraphicRaycaster を**意図的に切って**あるので
+        /// （カーソルの絵がクリックを食わないように）、手前へ出しても
+        /// 下の UI の当たり判定は奪わない。
+        ///
+        /// **他の番号と比べるときは 99 のつもりで読むこと。** ここだけ桁が違うのは
+        /// Unity の固定値を越えるためで、UIの重なりの設計が変わったわけではない。
+        /// </summary>
+        public const int MouseCursor = 30100;
 
         // ---- SpriteRenderer 用 (Canvas とは別系統) ----
         // ScreenSpace-Overlay の Canvas とは描画パスが違うため、上の値とは比較できない。
