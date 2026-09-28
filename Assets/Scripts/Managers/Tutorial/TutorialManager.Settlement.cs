@@ -12,6 +12,20 @@ namespace KillingMahjong.Managers
     {
         // TutorialManager: 決着（プレイヤー／敵のロン、清算パネル、ロン演出）
 
+        /// <summary>
+        /// ダンロン風の白飛ばしを出し、**光り終わるまで待つ**（2026-09-29 の指示）。
+        ///
+        /// 以前は `PlaySceneBreak()` を呼んだ直後に次のセリフを流していたので、
+        /// **画面が真っ白なうちに文字が出ていた。** 白で場面を切ってから喋り出す形に揃える。
+        ///
+        /// 待つ長さは <see cref="UI.Effects.ScreenFlash.SceneBreakDuration"/> から引く。
+        /// こちらに数字を書くと、演出を直したときに片方だけ古くなる。
+        /// </summary>
+        private IEnumerator PlaySceneBreakAndWait()
+        {
+            UI.Effects.ScreenFlash.PlaySceneBreak();
+            yield return new WaitForSeconds(UI.Effects.ScreenFlash.SceneBreakDuration);
+        }
 
         private IEnumerator RunPlayerRon(TutorialRoundData data, int ronTileId)
         {
@@ -173,7 +187,7 @@ namespace KillingMahjong.Managers
             ClearGuide();
 
             // 17〜20. 勝利条件を示す。
-            KillingMahjong.UI.Effects.ScreenFlash.PlaySceneBreak();
+            yield return StartCoroutine(PlaySceneBreakAndWait());
             yield return StartCoroutine(PlayLines(new List<TutorialLine>
             {
                 new TutorialLine("なんとゲームに勝利！晴れて脱出だ！"),
@@ -182,7 +196,7 @@ namespace KillingMahjong.Managers
             }));
 
             // 21〜22. 同じ対局でも負けたときの説明へ切り替える。
-            KillingMahjong.UI.Effects.ScreenFlash.PlaySceneBreak();
+            yield return StartCoroutine(PlaySceneBreakAndWait());
             yield return StartCoroutine(PlayLines(new List<TutorialLine>
             {
                 new TutorialLine("次は対局に負けた…ロンされちゃった時のやり方ね"),
@@ -242,7 +256,7 @@ namespace KillingMahjong.Managers
             }));
 
             // 33〜39. 最後のフラッシュのあと、対局フェイズ①を締める。
-            KillingMahjong.UI.Effects.ScreenFlash.PlaySceneBreak();
+            yield return StartCoroutine(PlaySceneBreakAndWait());
             yield return StartCoroutine(PlayLines(new List<TutorialLine>
             {
                 new TutorialLine("死を意味する……！"),

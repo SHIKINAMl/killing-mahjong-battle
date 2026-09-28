@@ -56,6 +56,13 @@ namespace KillingMahjong.UI.Effects
         /// <summary>白から戻るまで。参考動画では直線で 0.5 秒。</summary>
         private const float SceneBreakFade = 0.50f;
 
+        /// <summary>
+        /// 白飛ばしが始まってから消えるまでの長さ（秒）。
+        /// **待つ側が同じ数字を持たなくて済むように出している。**
+        /// ここを変えれば、光り終わりを待っている所も一緒に動く。
+        /// </summary>
+        public const float SceneBreakDuration = SceneBreakRise + SceneBreakFade;
+
         private Image _image;
         private Color _color;
         private float _duration;
