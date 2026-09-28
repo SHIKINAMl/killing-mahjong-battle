@@ -193,6 +193,69 @@ namespace KillingMahjong.UI
         /// チュートリアルの誘導用。指定した skillType の行の RectTransform を返す。
         /// ウィンドウを開く前は行が生成されていないため null を返す。
         /// </summary>
+        /// <summary>能力ベル（右の呼び出しボタン）の枠。チュートリアルの誘導で囲む。</summary>
+        public RectTransform BellRect
+        {
+            get { return triggerButton != null ? triggerButton.transform as RectTransform : null; }
+        }
+
+        /// <summary>能力の一覧（行が並ぶ入れ物）の枠。「どれでも押して」と囲むのに使う。</summary>
+        public RectTransform AbilityListRect
+        {
+            get { return contentContainer != null ? contentContainer as RectTransform : null; }
+        }
+
+        /// <summary>能力の窓がいま開いているか。</summary>
+        public bool IsWindowOpen { get { return isWindowVisible; } }
+
+        /// <summary>
+        /// 特定の能力の行を隠す／戻す。フロー図の「初期非表示能力：強襲」。
+        /// **まだ説明していないものを並べない**ため。行そのものを消すのではなく、
+        /// 見えなくするだけなので、戻せば元の並びに復帰する。
+        /// </summary>
+        public void SetAbilityHidden(string skillType, bool hidden)
+        {
+            if (realAbilities == null || instantiatedItems == null) return;
+            for (int i = 0; i < realAbilities.Count && i < instantiatedItems.Count; i++)
+            {
+                if (realAbilities[i].skillType != skillType) continue;
+                if (instantiatedItems[i] != null) instantiatedItems[i].gameObject.SetActive(!hidden);
+                return;
+            }
+        }
+
+        /// <summary>
+        /// 発動ボタンの枠。チュートリアルの「発動ボタンハイライト」で使う（2026-09-28）。
+        /// **閉じるボタンと同じものが入っている場面がある**ので、そのときは null を返す。
+        /// 枠で囲んで「押せ」と言った先が X では、押すと話が終わってしまう。
+        /// </summary>
+        public RectTransform ActivateButtonRect
+        {
+            get
+            {
+                if (activateButton == null || activateButton == closeButton) return null;
+                return activateButton.transform as RectTransform;
+            }
+        }
+
+        /// <summary>
+        /// いま選ばれている能力の種類（`SkillNames` の値）。選ばれていなければ null。
+        /// **行そのものは種類を持っていない**ので、並び順で引き当てている。
+        /// </summary>
+        public string SelectedSkillType
+        {
+            get
+            {
+                if (currentSelection == null || realAbilities == null || instantiatedItems == null) return null;
+                for (int i = 0; i < realAbilities.Count && i < instantiatedItems.Count; i++)
+                {
+                    if (instantiatedItems[i] == null) continue;
+                    if (instantiatedItems[i] == currentSelection) return realAbilities[i].skillType;
+                }
+                return null;
+            }
+        }
+
         public RectTransform GetAbilityItemRect(string skillType)
         {
             if (realAbilities == null) return null;

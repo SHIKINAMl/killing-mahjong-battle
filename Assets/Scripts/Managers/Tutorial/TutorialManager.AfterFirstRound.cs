@@ -9,8 +9,9 @@ namespace KillingMahjong.Managers
     {
         // 対局フェイズ①が終わったあとの締め（2026-09-24）。
         //
-        // 出どころはフロー図（Drive の draw.io）の3枚目「流局＆能力について」。
-        // **題は流局と能力だが、その中身はまだ描かれていない。** 描いてあるのは
+        // 出どころはフロー図（km-docs/tutorial/flow_20260927.drawio）の3枚目
+        // 「流局＆能力について」。**2026-09-28 に能力の中身まで描かれた。**
+        // ここが受け持つのは前半で、
         //
         //   対局フェイズ①終了 → 手牌選択フェイズ②へ → 初期非表示UI：能力ベル
         //   → 「とまぁこれがゲームの流れね」 → 「わかった？」 → 分岐
@@ -21,7 +22,7 @@ namespace KillingMahjong.Managers
         //   → チュートリアル資料表示 → プレイヤーオプション画面を閉じる
         //   → 「ここに今までのチュートリアルがまとめてあるから困ったら見て」
         //
-        // までで、ここではその範囲だけを作っている。
+        // まで。**この続き（能力の紹介）は `TutorialManager.AbilityIntro.cs`。**
 
         private static readonly List<TutorialLine> WrapUpLines = new List<TutorialLine>
         {
@@ -94,6 +95,10 @@ namespace KillingMahjong.Managers
                 answer == 1 ? WrapUpConfusedLines : WrapUpUnderstoodLines));
 
             yield return StartCoroutine(RunTutorialArchiveGuide());
+
+            // フロー図では「ここに今までの…」から「それじゃあ第二局目だね」へ
+            // そのまま矢印が伸びている。**続けて能力の紹介に入る。**
+            yield return StartCoroutine(RunAbilityIntroduction());
         }
 
         /// <summary>
