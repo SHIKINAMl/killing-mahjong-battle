@@ -23,6 +23,19 @@ namespace KillingMahjong.UI
 
         public bool IsLogOpen => logPanel != null && logPanel.activeSelf;
 
+        /// <summary>
+        /// いま1文字ずつ送っている最中か。**喋っているあいだだけ跳ねさせる**ために出している
+        /// （<see cref="TalkBobAnimator"/> が見ている）。
+        ///
+        /// **`static` にしてあるのは、跳ねる側が吹き出しを知らないから。**
+        /// 女の子はシーンに置いたスプライトで、吹き出しへの参照を持っていない。
+        /// 吹き出しは画面に1つしか出ないので、静的な旗で足りる。
+        ///
+        /// 黒幕が降りているあいだは送り自体を飛ばす（<see cref="TypeMessageRoutine"/>）ので、
+        /// ここも立たない。見えていないのに跳ねる、ということは起きない。
+        /// </summary>
+        public static bool IsTalking { get; private set; }
+
         private void Awake()
         {
             // シーンに置いてある仮の文字（"Nothing"）を消しておく。
@@ -140,6 +153,9 @@ namespace KillingMahjong.UI
 
         public void ShowText(string text)
         {
+            // **`StopAllCoroutines` で止めた分は `finally` が走らない。** 先に倒しておく。
+            // 送りの途中で次のセリフが来たとき、旗が立ちっぱなしになるのを防ぐ。
+            IsTalking = false;
             StopAllCoroutines(); // 既存の文字送り演出などがあれば即座にキャンセルする
 
             ApplyShadow();
@@ -177,6 +193,8 @@ namespace KillingMahjong.UI
                 yield break;
             }
 
+            IsTalking = true;
+
             // 1文字あたりの表示時間。**設定から引く（2026-09-27）。**
             // 以前は 0.03 の決め打ちだった。設定が無いときは従来どおり 0.03。
             var settings = KillingMahjong.Core.SettingsManager.Instance;
@@ -212,12 +230,21 @@ namespace KillingMahjong.UI
             }
 
             dialogueText.maxVisibleCharacters = int.MaxValue;
+            IsTalking = false;
         }
 
         public void HideText()
         {
+            IsTalking = false;
             if (dialoguePanel != null) dialoguePanel.SetActive(false);
             if (gameObject.activeSelf) gameObject.SetActive(false); // パネル自体も隠す
+        }
+
+        // 吹き出しごと伏せられたときも倒す。**シーンを移ると `static` が残る**ので、
+        // ここで落としておかないと、次のシーンで誰も喋っていないのに跳ね続ける。
+        private void OnDisable()
+        {
+            IsTalking = false;
         }
 
         private void AddToLog(string text)

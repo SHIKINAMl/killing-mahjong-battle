@@ -280,6 +280,13 @@ namespace KillingMahjong.Managers
             ApplyEnemyAlpha(sprites, spriteAlpha, images, imageAlpha, 1f);
 
             NotifyRevealFinished();
+
+            // 出し終わってから跳ねる部品を付ける。**シーンには足さない。**
+            // 対局シーンが `UIテストシーン` と `OpeningScene` の2つあるので、
+            // シーンに置くと片方にだけ入れる事故になる（ScreenFlash と同じ理由）。
+            // フェードが終わってからなら、立ち絵の大きさも確定している。
+            if (enemyCharacterObj.GetComponent<UI.TalkBobAnimator>() == null)
+                enemyCharacterObj.AddComponent<UI.TalkBobAnimator>();
         }
 
         private void NotifyRevealFinished()
