@@ -248,13 +248,18 @@ namespace KillingMahjong.Managers
             RectTransform bell = ability != null ? ability.BellRect : null;
             if (ability == null || bell == null) yield break;
 
-            // **強襲はここでは見せない。** フロー図の「初期非表示能力：強襲」。
-            // 使い方を教えていないものを並べると、押してよいのか分からない。
-            ability.SetAbilityHidden(SkillNames.Assault, true);
-
             GuideTo(bell, false, null, UI.TutorialHighlightUI.Style.Frame);
             yield return new WaitUntil(() => ability.IsWindowOpen);
             ClearGuide();
+
+            // **強襲はここでは見せない。** フロー図の「初期非表示能力：強襲」。
+            // 使い方を教えていないものを並べると、押してよいのか分からない。
+            //
+            // **窓が開いたあとに隠すこと。** 行は窓を最初に開いたときに作られるので、
+            // 開く前に呼んでも相手が居らず、何も起きない（2026-09-28 に実機で確認。
+            // 一覧に強襲が出たままだった）。作られる次のフレームまで待つ。
+            yield return null;
+            ability.SetAbilityHidden(SkillNames.Assault, true);
 
             // 能力ベルのアニメーションが再生終わるまで待つ
             yield return new WaitForSeconds(0.6f);

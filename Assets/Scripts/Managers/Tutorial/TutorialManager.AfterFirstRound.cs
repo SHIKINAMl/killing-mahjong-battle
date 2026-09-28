@@ -65,8 +65,16 @@ namespace KillingMahjong.Managers
         /// </summary>
         private void SetAbilityBellVisible(bool visible)
         {
-            if (gameUIManager != null && gameUIManager.AbilityUI != null)
-                gameUIManager.AbilityUI.SetBellVisible(visible);
+            if (gameUIManager == null || gameUIManager.AbilityUI == null) return;
+
+            // **入れ物ごと起こす。** `AbilityUI` の GameObject 自体を伏せている場所が
+            // 6箇所あり（賭け・マッチング・ロン・局送りなど）、子のベルだけ
+            // SetActive(true) にしても `activeInHierarchy` は false のまま。
+            // 2026-09-28 に実機で詰まった。ベルが出ないのに枠だけ出て、
+            // 押しようがないまま止まる。
+            if (visible) gameUIManager.AbilityUI.gameObject.SetActive(true);
+
+            gameUIManager.AbilityUI.SetBellVisible(visible);
         }
 
         private IEnumerator RunAfterFirstRoundWrapUp()
