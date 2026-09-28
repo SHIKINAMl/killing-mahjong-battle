@@ -35,6 +35,36 @@ namespace KillingMahjong.UI
         /// <summary>帯全体の幅。倍率をその上に乗せるのに使う。</summary>
         private const float PipRowWidth = PipCount * PipSize + (PipCount - 1) * PipGap;
 
+        // ---- 下段：次の段までを刻む行（2026-09-29 のユーザー指示）----
+        //
+        // **上段（段の数）はそのまま上へずらし、その下にもう一行足す。**
+        // 下段は「いまの段から次の段へ上がるのに要るポイント」を、その数だけ
+        // 区画に割ったもの。1ポイント溜まるごとに1区画が埋まり、**埋まり切ると
+        // 上段の区画が1つ点いて、下段は次の段ぶんの刻みに作り直される。**
+        //
+        // 以前は上段の区画の中を半透明で横に伸ばして進み具合を見せていたが、
+        // 不透明度45%・幅10pxほどの薄い影にしかならず、**溜まっているのに
+        // 溜まって見えなかった**（2026-09-29 に実機で測った。計算自体は合っていた）。
+
+        /// <summary>段ごとに要るポイント数。**仕様書の 0/2/5/9/14 の差分。**</summary>
+        private static readonly int[] PointsPerTier = { 2, 3, 4, 5 };
+
+        /// <summary>下段の区画の高さ。上段より薄くして、主役を上段に残す。</summary>
+        private const float ChargeHeight = 6f;
+
+        /// <summary>下段の区画どうしの隙間。</summary>
+        private const float ChargeGap = 3f;
+
+        /// <summary>上段と下段の間隔。</summary>
+        private const float RowGap = 5f;
+
+        /// <summary>下段の区画は**常に上段と同じ幅に収める**ので、数で割って決める。</summary>
+        private static float ChargePipWidth(int count)
+        {
+            if (count <= 0) return 0f;
+            return (PipRowWidth - (count - 1) * ChargeGap) / count;
+        }
+
         /// <summary>倍率の文字の大きさ。参考画像では帯の5倍ほどの高さがあった。</summary>
         private const float MultiplierFontSize = 30f;
 
@@ -70,7 +100,16 @@ namespace KillingMahjong.UI
         private static readonly Color TextOn = new Color32(255, 190, 90, 255);
         private static readonly Color TextBroken = new Color32(140, 140, 145, 255);
 
+        /// <summary>上段の高さ。下段を置くぶん上へ寄せる。</summary>
+        private const float UpperRowY = (ChargeHeight + RowGap) * 0.5f;
+
+        /// <summary>下段の高さ。</summary>
+        private const float LowerRowY = -(PipHeight + RowGap) * 0.5f;
+
         private bool _isEnemy;
+        private RectTransform _chargeRow;
+        private Image[] _chargePips;
+        private int _chargeTier = -1;
         private Image[] _pips;
         private Image[] _pipFills;
         private VoltageFlame[] _flames;
@@ -191,7 +230,8 @@ namespace KillingMahjong.UI
                 pipRect.anchorMin = new Vector2(0f, 0.5f);
                 pipRect.anchorMax = new Vector2(0f, 0.5f);
                 pipRect.pivot = new Vector2(0f, 0.5f);
-                pipRect.anchoredPosition = new Vector2(i * (PipSize + PipGap), 0f);
+                // **上段は上へずらす。** 下に刻みの行を置くため（2026-09-29）
+                pipRect.anchoredPosition = new Vector2(i * (PipSize + PipGap), UpperRowY);
                 pipRect.sizeDelta = new Vector2(PipSize, PipHeight);
 
                 var image = pip.GetComponent<Image>();
@@ -218,6 +258,16 @@ namespace KillingMahjong.UI
                 // 絵は使わず丸を積んで作っている。中身は VoltageFlame.cs。
                 _flames[i] = VoltageFlame.Attach(pipRect);
             }
+
+            // 下段の入れ物。中身は段が変わるたびに作り直す
+            var chargeRow = new GameObject("ChargeRow", typeof(RectTransform));
+            _chargeRow = (RectTransform)chargeRow.transform;
+            _chargeRow.SetParent(transform, false);
+            _chargeRow.anchorMin = new Vector2(0f, 0.5f);
+            _chargeRow.anchorMax = new Vector2(0f, 0.5f);
+            _chargeRow.pivot = new Vector2(0f, 0.5f);
+            _chargeRow.anchoredPosition = new Vector2(0f, LowerRowY);
+            _chargeRow.sizeDelta = new Vector2(PipRowWidth, ChargeHeight);
 
             // 倍率は四角の上に、四角の並びの中央に乗せる（ユーザーの指示 2026-09-08）。
             var label = new GameObject("Multiplier", typeof(RectTransform), typeof(TextMeshProUGUI));
@@ -262,7 +312,7 @@ namespace KillingMahjong.UI
             int points = VoltageSystem.GetPoints(_isEnemy);
             int from = VoltageSystem.GetPointsAtCurrentLevel(_isEnemy);
             int to = VoltageSystem.GetPointsForNextLevel(_isEnemy);
-            float progress = to > from ? Mathf.Clamp01((points - from) / (float)(to - from)) : 0f;
+            // progress は下段の区画の数で見せるので、ここでは使わない
 
             for (int i = 0; i < _pips.Length; i++)
             {
@@ -280,22 +330,69 @@ namespace KillingMahjong.UI
                 // 「本数が増える」と「1本ずつ強くなる」の両方で段の差を出している。
                 if (_flames[i] != null) _flames[i].SetLevel(lit ? level : 0, broken);
 
-                // 途中の塗りは、**次に点く区画1つだけ**に出す
-                if (_pipFills[i] == null) continue;
-                bool isNextPip = !broken && i == level && level < VoltageSystem.MaxLevel;
-                var fillRect = _pipFills[i].rectTransform;
-                fillRect.sizeDelta = new Vector2(isNextPip ? PipSize * progress : 0f, 0f);
-
-                var nextColor = VoltageFlame.PipColorFor(level + 1);
-                nextColor.a = 0.45f;   // まだ点いていないと分かる濃さ
-                _pipFills[i].color = nextColor;
+                // **上段の中は塗らない（2026-09-29）。** 途中経過は下段が受け持つ。
+                // ここで半透明を横に伸ばしていたが、薄すぎて見えていなかった。
+                if (_pipFills[i] != null)
+                    _pipFills[i].rectTransform.sizeDelta = new Vector2(0f, 0f);
             }
+
+            RefreshChargeRow(level, broken, points, from, to);
 
             // **0段でも出す（2026-09-13、参考画像どおり）。**
             // 以前は等倍のとき空にしていたが、参考画像は倍率を常に見せる作りで、
             // 帯と文字が揃っているほうが「ここが何の表示か」が分かる。
             _multiplierText.text = "×" + VoltageSystem.GetMultiplier(_isEnemy).ToString("0.0");
             _multiplierText.color = broken ? TextBroken : TextOn;
+        }
+
+        /// <summary>
+        /// 下段（次の段までの刻み）を描き直す。
+        ///
+        /// **段が変わったときだけ作り直す。** 要る区画の数が段ごとに違う
+        /// （2→3→4→5）ので、毎フレーム作ると無駄に生成し続けることになる。
+        /// 最大段まで行ったら下段は空にする。もう溜めるものが無い。
+        /// </summary>
+        private void RefreshChargeRow(int level, bool broken, int points, int from, int to)
+        {
+            if (_chargeRow == null) return;
+
+            int need = (!broken && level < PointsPerTier.Length) ? PointsPerTier[level] : 0;
+
+            if (_chargeTier != level || _chargePips == null || _chargePips.Length != need)
+            {
+                for (int i = _chargeRow.childCount - 1; i >= 0; i--)
+                    Destroy(_chargeRow.GetChild(i).gameObject);
+
+                _chargePips = new Image[need];
+                float w = ChargePipWidth(need);
+                for (int i = 0; i < need; i++)
+                {
+                    var go = new GameObject("Charge" + i, typeof(RectTransform), typeof(Image));
+                    var rt = (RectTransform)go.transform;
+                    rt.SetParent(_chargeRow, false);
+                    rt.anchorMin = new Vector2(0f, 0.5f);
+                    rt.anchorMax = new Vector2(0f, 0.5f);
+                    rt.pivot = new Vector2(0f, 0.5f);
+                    rt.anchoredPosition = new Vector2(i * (w + ChargeGap), 0f);
+                    rt.sizeDelta = new Vector2(w, ChargeHeight);
+
+                    var img = go.GetComponent<Image>();
+                    img.raycastTarget = false;   // 牌のクリック判定を吸わない
+                    _chargePips[i] = img;
+                }
+                _chargeTier = level;
+            }
+
+            if (_chargePips == null) return;
+
+            // いまの段で何個ぶん溜まったか
+            int filled = Mathf.Clamp(points - from, 0, _chargePips.Length);
+            var onColor = VoltageFlame.PipColorFor(level + 1);
+            for (int i = 0; i < _chargePips.Length; i++)
+            {
+                if (_chargePips[i] == null) continue;
+                _chargePips[i].color = i < filled ? onColor : PipOff;
+            }
         }
 
         /// <summary>
