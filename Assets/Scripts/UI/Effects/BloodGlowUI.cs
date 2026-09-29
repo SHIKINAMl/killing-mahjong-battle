@@ -38,25 +38,28 @@ namespace KillingMahjong.UI.Effects
         private const float PulsePerSecond = 0.5f;
 
         /// <summary>
-        /// 血の縁から外へ光をにじませる幅。**血の横幅に対する割合で持つ**（2026-09-30）。
+        /// 光をどれだけ外へ広げるか（血の横幅に対する割合）。
         ///
-        /// 画素の決め打ちにしてはいけない。自分の体力（Overlay）と相手の血袋
+        /// **画素の決め打ちにしてはいけない。** 自分の体力（Overlay）と相手の血袋
         /// （ScreenSpaceCamera・拡大率 0.02）では単位の大きさが50倍違い、
-        /// 同じ数を入れると片方だけ豆粒になる。実際それで失敗している。
+        /// 同じ数を入れると片方だけ豆粒になる。実際それで一度失敗している。
         /// </summary>
-        private const float HaloBleedRatio = 0.30f;
+        private const float GlowSpreadRatio = 0.34f;
 
         /// <summary>
-        /// にじみの濃さ。**本体よりかなり弱くする。**
-        /// 0.22〜0.45 では卓の上に四角い光の板が乗って見えた（実機で確認）。
+        /// 光を何枚に分けて重ねるか。
+        /// **枚数が少ないと、一番外の一枚の縁が輪郭として見える。**
         /// </summary>
-        private const float HaloPowerMin = 0.13f;
-        private const float HaloPowerMax = 0.26f;
+        private const int GlowLayerCount = 6;
+
+        /// <summary>いちばん内側の一枚の濃さ。外へ行くほど薄くなる。</summary>
+        private const float GlowPowerMin = 0.10f;
+        private const float GlowPowerMax = 0.19f;
 
         private Image _blood;
         private Image _neon;
-        private Image _halo;
-        private RectTransform _haloRect;
+        private Image[] _glowLayers;
+        private RectTransform[] _glowRects;
         private float _phase;
 
         /// <summary>
@@ -94,9 +97,9 @@ namespace KillingMahjong.UI.Effects
             _neon = GetComponent<Image>();
             _neon.raycastTarget = false;
             _neon.material = NeonMaterials.CreateAll(NeonColor);
-            BuildHalo();
+            BuildGlowLayers();
             _phase = Random.Range(0f, Mathf.PI * 2f);
-            ApplyPower((PowerMin + PowerMax) * 0.5f, (HaloPowerMin + HaloPowerMax) * 0.5f);
+            ApplyPower((PowerMin + PowerMax) * 0.5f, (GlowPowerMin + GlowPowerMax) * 0.5f);
             SyncShape();
         }
 
@@ -104,29 +107,44 @@ namespace KillingMahjong.UI.Effects
         /// 血の**外へ**こぼれる光を作る（2026-09-30 のユーザー指示
         /// 「そこから光を放っているような感じに」）。
         ///
-        /// **血より手前に置くが、真ん中は透明にしてある。** 加算合成なので、
-        /// 真ん中まで光らせると本体が二重に明るくなって白飛びする。
-        /// 縁でいちばん明るく、外へ向かって消えていく輪にすることで、
-        /// 「血から光が漏れている」ように見せる。
+        /// **血と同じ絵を、少しずつ大きく・薄くして何枚も加算で重ねる。**
+        /// ぼかした絵を一枚かぶせるのと近い結果になるが、レンダーテクスチャが要らない。
+        ///
+        /// **四角いぼかし板を一枚置くのは失敗だった（2026-09-30）。**
+        /// 血の形と関係ない箱なので、卓の上に光の四角が乗っているようにしか見えず、
+        /// ユーザーから「四角い枠が光るのではなく、中の赤い血が光を出している感じに」
+        /// と言われた。ここでは全部の層が血そのものの形なので、箱の縁は出ない。
+        ///
+        /// **本物の Bloom を使わない理由。** URP の後処理は ScreenSpaceOverlay の
+        /// Canvas には効かない（後処理より後に描かれるため）。自分の体力は Overlay に
+        /// 居るので原理的に光らない。Camera 方式へ移せば効くが、手牌(1)や吹き出し(16)
+        /// など他の Overlay すべての後ろへ回ってしまい、表示が崩れる。
         /// </summary>
-        private void BuildHalo()
+        private void BuildGlowLayers()
         {
-            var go = new GameObject("BloodHalo", typeof(RectTransform), typeof(Image));
-            go.transform.SetParent(transform.parent, false);
-            // 蛍光色の本体より奥に置く。血 → にじみ → 本体 の順で描く
-            go.transform.SetSiblingIndex(transform.GetSiblingIndex());
+            _glowLayers = new Image[GlowLayerCount];
+            _glowRects = new RectTransform[GlowLayerCount];
 
-            _haloRect = (RectTransform)go.transform;
-            _haloRect.anchorMin = new Vector2(0.5f, 0.5f);
-            _haloRect.anchorMax = new Vector2(0.5f, 0.5f);
-            _haloRect.pivot = new Vector2(0.5f, 0.5f);
-            _haloRect.localScale = Vector3.one;
+            for (int i = 0; i < GlowLayerCount; i++)
+            {
+                var go = new GameObject("BloodGlow" + i, typeof(RectTransform), typeof(Image));
+                go.transform.SetParent(transform.parent, false);
+                // 蛍光色の本体より奥。外側の層ほど先に描く
+                go.transform.SetSiblingIndex(transform.GetSiblingIndex());
 
-            _halo = go.GetComponent<Image>();
-            _halo.raycastTarget = false;
-            _halo.sprite = HaloSprite;
-            _halo.type = Image.Type.Sliced;
-            _halo.material = NeonMaterials.CreateAll(NeonColor);
+                var rect = (RectTransform)go.transform;
+                rect.anchorMin = new Vector2(0.5f, 0.5f);
+                rect.anchorMax = new Vector2(0.5f, 0.5f);
+                rect.pivot = new Vector2(0.5f, 0.5f);
+                rect.localScale = Vector3.one;
+
+                var img = go.GetComponent<Image>();
+                img.raycastTarget = false;
+                img.material = NeonMaterials.CreateAll(NeonColor);
+
+                _glowRects[i] = rect;
+                _glowLayers[i] = img;
+            }
         }
 
         private void LateUpdate()
@@ -138,115 +156,80 @@ namespace KillingMahjong.UI.Effects
             _phase += Time.deltaTime * PulsePerSecond * Mathf.PI * 2f;
             float t = (Mathf.Sin(_phase) + 1f) * 0.5f;
             ApplyPower(Mathf.Lerp(PowerMin, PowerMax, t),
-                       Mathf.Lerp(HaloPowerMin, HaloPowerMax, t));
+                       Mathf.Lerp(GlowPowerMin, GlowPowerMax, t));
         }
 
         /// <summary>光の強さは頂点カラーのアルファで渡す（シェーダがそれを掛けている）。</summary>
-        private void ApplyPower(float power, float haloPower)
+        private void ApplyPower(float power, float glowPower)
         {
             _neon.color = new Color(1f, 1f, 1f, power);
-            if (_halo != null) _halo.color = new Color(1f, 1f, 1f, haloPower);
+            if (_glowLayers == null) return;
+
+            for (int i = 0; i < _glowLayers.Length; i++)
+            {
+                if (_glowLayers[i] == null) continue;
+                // 外の層ほど薄く。二乗で落として、いちばん外を目立たなくする
+                float u = (i + 1) / (float)_glowLayers.Length;
+                float fade = (1f - u) * (1f - u);
+                _glowLayers[i].color = new Color(1f, 1f, 1f, glowPower * fade);
+            }
         }
 
         /// <summary>
-        /// にじみを「いま血が入っている範囲」の外側に合わせる。
+        /// 光の各層を、血と同じ形のまま少しずつ大きくして並べる。
         ///
-        /// **親（血）の中の座標で計算する。** にじみは血の子なので、
-        /// 画面の拡大率を気にしなくてよい。以前これを親の外で計算して、
-        /// 相手側（拡大率 0.02）の光が画面上 3x10 画素になった。
+        /// **親（血）の中の座標で計算する。** 光は血の子なので、画面の拡大率を
+        /// 気にしなくてよい。以前これを親の外で計算して、相手側（拡大率 0.02）の
+        /// 光が画面上 3x10 画素になった。
+        ///
+        /// **`fillAmount` も写す。** 写さないと、体力が減っても光だけ枠いっぱいに残る。
         /// </summary>
-        private void SyncHalo()
+        private void SyncGlowLayers()
         {
-            if (_halo == null || _haloRect == null) return;
+            if (_glowLayers == null) return;
 
             Rect r = _blood.rectTransform.rect;
-            float fill = _blood.type == Image.Type.Filled ? Mathf.Clamp01(_blood.fillAmount) : 1f;
+            bool filled = _blood.type == Image.Type.Filled;
+            float fill = filled ? Mathf.Clamp01(_blood.fillAmount) : 1f;
+            bool alive = _blood.enabled && fill > 0.001f;
 
-            float w = r.width;
-            float h = r.height;
-            float cx = 0f;
-            float cy = 0f;
+            float spread = r.width * GlowSpreadRatio;
 
-            if (_blood.type == Image.Type.Filled && _blood.fillMethod == Image.FillMethod.Vertical)
+            for (int i = 0; i < _glowLayers.Length; i++)
             {
-                h = r.height * fill;
-                // fillOrigin 0 = 下から溜まる
-                cy = _blood.fillOrigin == 0 ? -(r.height - h) * 0.5f : (r.height - h) * 0.5f;
-            }
-            else if (_blood.type == Image.Type.Filled && _blood.fillMethod == Image.FillMethod.Horizontal)
-            {
-                w = r.width * fill;
-                cx = _blood.fillOrigin == 0 ? -(r.width - w) * 0.5f : (r.width - w) * 0.5f;
-            }
+                var img = _glowLayers[i];
+                var rect = _glowRects[i];
+                if (img == null || rect == null) continue;
 
-            float bleed = r.width * HaloBleedRatio;
-            // 絵のふち(HaloBorder)を bleed 画素ぶんに縮めて描かせる。
-            // これを忘れると、ふちだけで中央が潰れて血の何倍もある板になる
-            _halo.pixelsPerUnitMultiplier = HaloBorder / Mathf.Max(0.01f, bleed);
+                img.enabled = alive;
+                if (!alive) continue;
 
-            _haloRect.sizeDelta = new Vector2(w + bleed * 2f, h + bleed * 2f);
-            _haloRect.anchoredPosition = new Vector2(cx, cy);
-            _halo.enabled = _blood.enabled && fill > 0.001f;
-        }
+                // 血と同じ絵・同じ減り方にする。これで層も血の形になる
+                img.sprite = _blood.sprite;
+                img.type = _blood.type;
+                img.preserveAspect = _blood.preserveAspect;
+                img.fillMethod = _blood.fillMethod;
+                img.fillOrigin = _blood.fillOrigin;
+                img.fillAmount = _blood.fillAmount;
+                img.fillClockwise = _blood.fillClockwise;
 
-        // ------------------------------------------------------------
-        //  外へこぼれる光の絵を実行時に作る
-        //
-        //  **真ん中は透明。** 縁でいちばん濃く、外へ向かって消える。
-        //  画像アセットは足さない（`PixelBloodEffect` が 1x1 の白を自前で
-        //  作っているのと同じ考え方）。
-        // ------------------------------------------------------------
+                // 外の層ほど大きく広げる
+                float step = spread * (i + 1) / _glowLayers.Length;
+                rect.sizeDelta = new Vector2(r.width + step * 2f, r.height + step * 2f);
 
-        private const int HaloTextureSize = 64;
-        private const int HaloBorder = 22;
-
-        private static Sprite _haloSprite;
-
-        private static Sprite HaloSprite
-        {
-            get
-            {
-                if (_haloSprite != null) return _haloSprite;
-
-                var tex = new Texture2D(HaloTextureSize, HaloTextureSize, TextureFormat.RGBA32, false);
-                tex.wrapMode = TextureWrapMode.Clamp;
-                tex.filterMode = FilterMode.Bilinear;
-
-                var pixels = new Color32[HaloTextureSize * HaloTextureSize];
-                for (int y = 0; y < HaloTextureSize; y++)
+                // **広げた分の半分だけ下げる。** 血は下から溜まるので、枠だけ
+                // 上下に広げると、溜まっている部分が上へずれてしまう
+                float cy = 0f;
+                if (filled && _blood.fillMethod == Image.FillMethod.Vertical)
                 {
-                    for (int x = 0; x < HaloTextureSize; x++)
-                    {
-                        // 内側の四角（＝血の縁）からどれだけ外に居るか
-                        float dx = Mathf.Max(0f, Mathf.Max(HaloBorder - x, x - (HaloTextureSize - 1 - HaloBorder)));
-                        float dy = Mathf.Max(0f, Mathf.Max(HaloBorder - y, y - (HaloTextureSize - 1 - HaloBorder)));
-                        float d = Mathf.Sqrt(dx * dx + dy * dy) / HaloBorder;
-                        // 内側（d=0）は透明、縁の少し外でいちばん濃く、さらに外で消える
-                        float a = Mathf.Clamp01(1f - d);
-                        // **3乗にして裾を長くする。** 2乗だと落ちが早く、
-                        // 光の輪郭が四角い板の縁として見えてしまう
-                        a = a * a * a;
-                        // 中央は完全に透明にして、本体を二重に光らせない
-                        if (dx <= 0f && dy <= 0f) a = 0f;
-                        pixels[y * HaloTextureSize + x] = new Color32(255, 255, 255, (byte)(a * 255f));
-                    }
+                    cy = _blood.fillOrigin == 0 ? -step * (1f - fill) : step * (1f - fill);
                 }
-                tex.SetPixels32(pixels);
-                tex.Apply();
-
-                _haloSprite = Sprite.Create(
-                    tex,
-                    new Rect(0f, 0f, HaloTextureSize, HaloTextureSize),
-                    new Vector2(0.5f, 0.5f),
-                    100f, 0, SpriteMeshType.FullRect,
-                    new Vector4(HaloBorder, HaloBorder, HaloBorder, HaloBorder));
-                _haloSprite.name = "BloodHaloSprite";
-                return _haloSprite;
+                rect.anchoredPosition = new Vector2(0f, cy);
             }
         }
 
         /// <summary>
-        /// 血と同じ形・同じ減り方にする。
+        /// 蛍光色の本体を、血と同じ形・同じ減り方にする。
         ///
         /// **`fillAmount` まで写すこと。** 子は親の `fillAmount` では切られないので、
         /// ここを写さないと体力が減っても光だけ枠いっぱいに残り、
@@ -263,7 +246,7 @@ namespace KillingMahjong.UI.Effects
             _neon.fillClockwise = _blood.fillClockwise;
             _neon.enabled = _blood.enabled && _blood.fillAmount > 0.001f;
 
-            SyncHalo();
+            SyncGlowLayers();
         }
     }
 }
