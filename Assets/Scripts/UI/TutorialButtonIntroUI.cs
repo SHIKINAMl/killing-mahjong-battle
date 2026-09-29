@@ -44,6 +44,23 @@ namespace KillingMahjong.UI
         private const float PopInSeconds = 0.26f;
         private const float MoveSeconds = 0.45f;
 
+        /// <summary>
+        /// 1フレームで進めてよい最大の時間（秒）。
+        ///
+        /// **これが無いと、引っかかった直後に瞬間移動する。**
+        /// 画面が一度止まると、再開した最初のフレームの `unscaledDeltaTime` に
+        /// 止まっていた分がまとめて乗る。0.45秒の移動が2フレームで終わってしまい、
+        /// 飛んでいる姿が1コマも出ない（2026-09-29 に録画で確認）。
+        /// 30分の1秒で頭打ちにすれば、重い場面でも必ず十数コマは描かれる。
+        /// そのぶん実時間は延びるが、短い演出なので気にならない。
+        /// </summary>
+        private const float MaxStepSeconds = 1f / 30f;
+
+        private static float Step()
+        {
+            return Mathf.Min(Time.unscaledDeltaTime, MaxStepSeconds);
+        }
+
         private RectTransform _copy;
         private CanvasGroup _group;
         private float _centerScale;
@@ -114,7 +131,7 @@ namespace KillingMahjong.UI
             float t = 0f;
             while (t < PopInSeconds)
             {
-                t += Time.unscaledDeltaTime;
+                t += Step();
                 float u = Mathf.Clamp01(t / PopInSeconds);
                 if (_copy == null) yield break;
                 // 0.55 倍から 1.12 倍まで行き過ぎて、等倍へ戻る
@@ -150,7 +167,7 @@ namespace KillingMahjong.UI
             float t = 0f;
             while (t < MoveSeconds)
             {
-                t += Time.unscaledDeltaTime;
+                t += Step();
                 float u = Mathf.Clamp01(t / MoveSeconds);
                 if (_copy == null) yield break;
                 float e = u * u * (3f - 2f * u);   // 緩やかに出て緩やかに止まる
