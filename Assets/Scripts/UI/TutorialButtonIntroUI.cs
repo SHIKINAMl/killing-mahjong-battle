@@ -26,11 +26,20 @@ namespace KillingMahjong.UI
         public const float DefaultCenterScale = 2.2f;
 
         /// <summary>
-        /// 中央から少し上へずらす量（画素）。
-        /// **セリフの吹き出しと重ねないため。** 吹き出しは画面の右中ほどに出るので、
-        /// ちょうど中央に置くと紹介文の左端に掛かる。
+        /// 中央から縦にずらす量（画素・上が正）。
+        ///
+        /// **女の子の顔に被せないための値**（2026-09-29 のユーザー指示）。
+        /// 800x600 の実機画面で測ると、立ち絵の顔は上から **y 105〜250**（横は 360〜460）。
+        /// 2.2倍の複製は高さ 88px なので、画面中央（y 300）に置くと上端が y 256 に来て、
+        /// 顎(250)とほぼ接する。**40px 下げると上端が y 296** になり、顎から 46px 空く。
+        ///
+        /// 下げすぎると卓の縁（y 390 から）に掛かるので、これ以上は下げられない。
+        /// 以前は逆に 60px 上げていたが、それだと口元をちょうど隠していた。
+        ///
+        /// 吹き出しとも重ならない。吹き出しの文字は x 455〜650 / y 200〜260 に出るので、
+        /// 複製（x 268〜532 / y 296〜384）とは縦で離れている。
         /// </summary>
-        public const float DefaultCenterOffsetY = 60f;
+        public const float DefaultCenterOffsetY = -40f;
 
         private const float PopInSeconds = 0.26f;
         private const float MoveSeconds = 0.45f;
