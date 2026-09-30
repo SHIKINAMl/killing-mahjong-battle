@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using KillingMahjong.EngineData;
+using KillingMahjong.UI;
 using UnityEngine;
 
 namespace KillingMahjong.Network.Handlers
@@ -14,11 +15,31 @@ namespace KillingMahjong.Network.Handlers
 
         public void Handle(string messageType, string jsonString, NetworkMessageHandler network)
         {
-            // 既存実装と同じく、盤面反映より先に完了イベントを通知する
-            network.RaiseDealingCompleted();
+            // サーバーの配牌が速くなると、phase_change(dealing) の暗転が終わる前に
+            // dealing_completed が届く。暗転の完了コールバックは前局の牌を消すため、
+            // ここで先に盤面へ入れると **新しい配牌まで後から消されてしまう**。
+            //
+            // 局頭のリセットが済むまで payload 全体を保留し、完了後に状態・描画・
+            // 暗転解除の順で適用する。サーバー側の到着順を前提にしない。
+            var uiManager = Object.FindFirstObjectByType<GameUIManager>();
+            if (uiManager != null && uiManager.IsBusyWithTransition)
+            {
+                uiManager.DeferUntilIdle(
+                    "dealingCompleted",
+                    // 同じ保留の前に別のフェイズ遷移が始まることがあるため、
+                    // 実行時にも改めて busy 状態を確認する。
+                    () => Handle(messageType, jsonString, network));
+                return;
+            }
+
+            ApplyDealingCompleted(jsonString, network);
+        }
+
+        private static void ApplyDealingCompleted(string jsonString, NetworkMessageHandler network)
+        {
 
             DealingCompletedMessage msg = JsonUtility.FromJson<DealingCompletedMessage>(jsonString);
-            if (msg.hands == null) return;
+            if (msg == null || msg.hands == null) return;
 
             var board = Managers.BoardStateManager.Instance;
             string localPlayerId = network.LocalPlayerId;
@@ -64,6 +85,11 @@ namespace KillingMahjong.Network.Handlers
                 }
             }
             board.FireRebuildEvent();
+
+            // PhaseTransitionUI はこのイベントで局頭の暗転を解除する。
+            // 盤面反映より先に発火すると、表示がないまま暗転だけが明けるため、
+            // FireRebuildEvent の後に通知する。
+            network.RaiseDealingCompleted();
         }
     }
 }

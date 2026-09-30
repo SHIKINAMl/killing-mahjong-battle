@@ -221,7 +221,9 @@ namespace KillingMahjong.UI
                 }
             }
             
-            uiManager.ClearAllTiles();
+            // 牌のリセットは、この Routine を起動する各遷移の暗転中に済ませている。
+            // ここで改めて消すと、サーバー高速化後に暗転明けで反映された新局の牌を
+            // 後から消してしまうため、待機UIだけを整える。
             SetMatchUIVisibility(false);
             if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetPanelVisible(true);
             if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.gameObject.SetActive(true);
