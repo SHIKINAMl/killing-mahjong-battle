@@ -153,6 +153,7 @@ namespace KillingMahjong.UI
             UpdateTurnText();
             UpdateSiblingOrder();
 
+            PlayPlacedHeartbeat();
             if (willFly) FinishVoltage(rt);
         }
 
@@ -188,7 +189,22 @@ namespace KillingMahjong.UI
             UpdateTurnText();
             UpdateSiblingOrder();
 
+            PlayPlacedHeartbeat();
             if (willFly) FinishVoltage(rt);
+        }
+
+        /// <summary>
+        /// 牌が河に置かれた直後の心音（弱・詰まった1拍）。
+        ///
+        /// **ここ1か所だけで鳴らす。** <see cref="AddTile"/> と
+        /// <see cref="AddExistingTile"/> は自分・相手・チュートリアルの
+        /// すべての打牌が通る場所なので、`GameUIManager.HandleDiscardEvent` や
+        /// `TutorialManager` 側にも足すと二重に鳴る。
+        /// </summary>
+        private void PlayPlacedHeartbeat()
+        {
+            var audio = KillingMahjong.Managers.AudioManager.Instance;
+            if (audio != null) audio.PlayDiscardHeartbeat();
         }
 
         /// <summary>
@@ -219,12 +235,39 @@ namespace KillingMahjong.UI
         private void FinishVoltage(RectTransform rt)
         {
             bool enemy = isEnemyRiver;
-            if (!VoltageTileFlightEffect.TryPlay(
-                    rt, enemy,
-                    () => KillingMahjong.Managers.VoltageSystem.ApplyDiscardResult(enemy, true)))
+            // **光が出せない場面でも同じ包みを通す。** 直に
+            // `ApplyDiscardResult` を呼ぶと、そちらの経路だけ心音が鳴らなくなる。
+            if (!VoltageTileFlightEffect.TryPlay(rt, enemy, () => ApplyVoltageWithHeartbeat(enemy)))
             {
-                KillingMahjong.Managers.VoltageSystem.ApplyDiscardResult(enemy, true);
+                ApplyVoltageWithHeartbeat(enemy);
             }
+        }
+
+        /// <summary>
+        /// ゲージへ反映し、**実際にポイントが増えたときだけ**心音を鳴らす。
+        ///
+        /// 増えたかどうかを前後で比べているのは、鳴らしてはいけない場合が
+        /// 3つあるから。既出牌で途切れたとき（ここは `NotifyDiscard` 側を通るので
+        /// そもそも来ない）、最大値（14点）に張り付いていて増えないとき、
+        /// そして将来 `ApplyDiscardResult` の条件が増えたとき。
+        /// **「呼んだから鳴らす」ではなく「増えたから鳴らす」にしておく。**
+        ///
+        /// 段が上がった回（2/5/9/14 に届いた回）だけ強い方にする。
+        /// </summary>
+        private static void ApplyVoltageWithHeartbeat(bool enemy)
+        {
+            int beforePoints = KillingMahjong.Managers.VoltageSystem.GetPoints(enemy);
+            int beforeLevel = KillingMahjong.Managers.VoltageSystem.GetLevel(enemy);
+
+            KillingMahjong.Managers.VoltageSystem.ApplyDiscardResult(enemy, true);
+
+            int afterPoints = KillingMahjong.Managers.VoltageSystem.GetPoints(enemy);
+            int afterLevel = KillingMahjong.Managers.VoltageSystem.GetLevel(enemy);
+
+            if (afterPoints <= beforePoints) return;
+
+            var audio = KillingMahjong.Managers.AudioManager.Instance;
+            if (audio != null) audio.PlayVoltageHeartbeat(afterLevel > beforeLevel);
         }
 
         private void ApplyRiverLayout(RectTransform rt)

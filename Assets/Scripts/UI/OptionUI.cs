@@ -23,6 +23,9 @@ namespace KillingMahjong.UI
         [SerializeField] private Toggle effectToggle;
 
         [Header("Window Settings")]
+        // **いまは選択欄のひな形としてだけ使う（2026-09-27）。**
+        // 解像度の切り替え自体は「画面サイズ」へ移した。この欄は画面には出さないが、
+        // 見た目をそろえるための複製元なので消さないこと。
         [SerializeField] private TMP_Dropdown resolutionDropdown;
         [SerializeField] private Toggle fullscreenToggle;
 
@@ -32,6 +35,30 @@ namespace KillingMahjong.UI
         [SerializeField] private Button returnToTitleButton; // タイトル（または別シーン）に戻る
         [SerializeField] private Button quitButton; // ゲーム終了
 
+        // シーンを編集せず、既存の保存ボタンをひな形にして実行時に追加する。
+        private Button tutorialArchiveButton;
+        private TutorialArchiveUI tutorialArchiveUI;
+
+        // 対局BGMの選択欄。**解像度の選択欄をひな形にして実行時に作る。**
+        // シーンに置くと、対局シーンとOpeningSceneの2つを同じように直す必要があり、
+        // 片方だけ古いままになる（セリフの影で実際に起きた）。
+        private TMP_Dropdown matchBgmDropdown;
+        private TMP_Dropdown textSpeedDropdown;
+        private TMP_Dropdown screenModeDropdown;
+        private TMP_Dropdown dialogueBubbleDropdown;
+
+        /// <summary>
+        /// 選択欄の行の位置（anchoredPosition の y）。
+        ///
+        /// 音量3つが 195 / 140 / 80 に並んでいる。その下に選択欄を4つ続けるので、
+        /// **刻みを 55 から 50 に詰めた（2026-09-27）。** 55 のままだと4行目が
+        /// ボタンの段（-160）に噛む。
+        /// </summary>
+        private const float RowMatchBgm = 32f;
+        private const float RowTextSpeed = -18f;
+        private const float RowScreenMode = -68f;
+        private const float RowDialogueBubble = -118f;
+
         [Header("Scene Transition Settings")]
         [Tooltip("このシーンで『戻る』ボタンを表示するかどうか")]
         [SerializeField] private bool showReturnButton = true;
@@ -40,6 +67,28 @@ namespace KillingMahjong.UI
 
         private CanvasGroup _canvasGroup;
         private RectTransform _rectTransform;
+
+        // --- チュートリアルの誘導用（2026-09-24、フロー図シート3） ---
+        //
+        // 資料を読んでいる間 `OpenTutorialArchive` が自分を SetActive(false) するので、
+        // **activeSelf では「閉じた」と「資料を読んでいる」が見分けられない。**
+        // 開いたか閉じたかは自分で覚えておく。
+
+        private bool _isOpen;
+
+        /// <summary>オプション画面が開いているか。資料を読んでいる間も開いている扱い。</summary>
+        public bool IsOpen => _isOpen;
+
+        /// <summary>資料を読んでいる最中か。</summary>
+        public bool IsTutorialArchiveOpen =>
+            tutorialArchiveUI != null && tutorialArchiveUI.gameObject.activeInHierarchy;
+
+        /// <summary>開いている資料そのもの。**中で目線を運ぶ誘導が見に来る。**</summary>
+        public TutorialArchiveUI TutorialArchive => tutorialArchiveUI;
+
+        /// <summary>「チュートリアル資料」ボタン。実行時に作るので外から取れるようにしておく。</summary>
+        public RectTransform TutorialArchiveButtonRect =>
+            tutorialArchiveButton != null ? tutorialArchiveButton.transform as RectTransform : null;
 
         private void Awake()
         {
@@ -63,6 +112,11 @@ namespace KillingMahjong.UI
         {
             InitializeUI();
 
+            // ひな形の Button にはまだ Start 内のクリック処理が入っていない段階で複製する。
+            // こうして資料ボタンへ「保存して閉じる」の処理が混ざるのを防ぐ。
+            CreateTutorialArchiveButton();
+            BuildSettingRows();
+
             // --- スライダーのイベント登録 ---
             if (bgmSlider != null) bgmSlider.onValueChanged.AddListener(OnBgmChanged);
             if (seSlider != null) seSlider.onValueChanged.AddListener(OnSeChanged);
@@ -74,7 +128,6 @@ namespace KillingMahjong.UI
             if (fullscreenToggle != null) fullscreenToggle.onValueChanged.AddListener(OnFullscreenChanged);
 
             // --- ドロップダウンのイベント登録 ---
-            if (resolutionDropdown != null) resolutionDropdown.onValueChanged.AddListener(OnResolutionChanged);
 
             // --- ボタンのイベント登録 ---
             if (closeButton != null) closeButton.onClick.AddListener(CloseWithoutSave);
@@ -88,6 +141,15 @@ namespace KillingMahjong.UI
             if (quitButton != null) quitButton.onClick.AddListener(QuitGame);
         }
 
+        private void OnDestroy()
+        {
+            // 資料は独立した Overlay Canvas なので、オプションだけが破棄された場合にも残さない。
+            if (tutorialArchiveUI != null)
+            {
+                Destroy(tutorialArchiveUI.gameObject);
+            }
+        }
+
         private void OnEnable()
         {
             InitializeUI();
@@ -99,6 +161,7 @@ namespace KillingMahjong.UI
         public void Open()
         {
             Debug.Log("[OptionUI] Open() が呼ばれました。");
+            _isOpen = true;
             gameObject.SetActive(true);
             
             if (_canvasGroup == null) 
@@ -145,6 +208,7 @@ namespace KillingMahjong.UI
 
         public void Close()
         {
+            _isOpen = false;
             if (_canvasGroup == null) return;
 
             _canvasGroup.blocksRaycasts = false;
@@ -191,7 +255,25 @@ namespace KillingMahjong.UI
                 
                 if (resolutionDropdown != null) resolutionDropdown.value = 0;
                 if (fullscreenToggle != null) fullscreenToggle.isOn = settings.IsFullScreen;
+
+                // **通知を止めてから入れる。** そのまま代入すると onValueChanged が走り、
+                // 画面を開いただけで曲が鳴り直したり、画面サイズが切り替わったりする
+                SetDropdown(matchBgmDropdown, settings.MatchBgmSet);
+                SetDropdown(textSpeedDropdown, settings.TextSpeed);
+                SetDropdown(screenModeDropdown, settings.ScreenMode);
+                SetDropdown(dialogueBubbleDropdown, settings.DialogueBubble);
             }
+        }
+
+        /// <summary>
+        /// 選択欄に値を入れる。**表示の更新まで面倒を見る。**
+        /// `SetValueWithoutNotify` だけだと、複製直後は見出しの文字がひな形のまま残る。
+        /// </summary>
+        private static void SetDropdown(TMP_Dropdown dropdown, int value)
+        {
+            if (dropdown == null) return;
+            dropdown.SetValueWithoutNotify(Mathf.Clamp(value, 0, Mathf.Max(0, dropdown.options.Count - 1)));
+            dropdown.RefreshShownValue();
         }
 
         // --- 値が変更された時に呼ばれる処理（SettingsManagerの仮の値を更新） ---
@@ -225,9 +307,234 @@ namespace KillingMahjong.UI
             if (Core.SettingsManager.Instance != null) Core.SettingsManager.Instance.SetFullScreen(isOn);
         }
 
-        private void OnResolutionChanged(int index)
+
+        /// <summary>
+        /// 設定画面を組み直す（2026-09-27）。
+        ///
+        /// **読む所が無い設定を画面から下ろし、実際に効くものだけ並べる。**
+        /// 下ろしたのは High Speed Mode / Show Effects（どちらも値を持つだけで
+        /// 誰も読んでいなかった）と Window Resolution（選択肢が 800x600 の1つだけで、
+        /// しかも ApplyResolution が値を無視していた）。Fullscreen は「画面サイズ」に統合した。
+        ///
+        /// **保存値（PlayerPrefs）は消していない。** あとで機能を作ったときに
+        /// そのまま復活できるようにしてある。
+        ///
+        /// 参考にしたのは NEEDY GIRL OVERDOSE の設定で、あちらは BGM / SE / 解像度 /
+        /// 進行の速さ / 言語 の5項目だけだった。絞る方向に倣っている。
+        /// </summary>
+        private void BuildSettingRows()
         {
-            if (Core.SettingsManager.Instance != null) Core.SettingsManager.Instance.SetResolutionIndex(index);
+            if (resolutionDropdown == null)
+            {
+                Debug.LogWarning("[OptionUI] 選択欄のひな形（解像度の欄）が見つかりません。");
+                return;
+            }
+
+            // **ひな形を隠すのは、複製を作り終えてから。** 先に消すと複製元が無くなる
+            // **いまの設定をここで入れる。** 画面を開いたときの当て直し（LoadSettingsToUI）は
+            // この欄を作るより前に走るので、そちらだけに任せると常に先頭のまま出る
+            // （実機で「文字送り」が既定の「ふつう」ではなく「ゆっくり」と表示された）。
+            var current = Core.SettingsManager.Instance;
+            matchBgmDropdown = CreateDropdownRow("MatchBgm", "対局BGM",
+                Core.SettingsManager.MatchBgmSetLabels, RowMatchBgm,
+                current != null ? current.MatchBgmSet : 0, OnMatchBgmChanged);
+            textSpeedDropdown = CreateDropdownRow("TextSpeed", "文字送り",
+                Core.SettingsManager.TextSpeedLabels, RowTextSpeed,
+                current != null ? current.TextSpeed : 1, OnTextSpeedChanged);
+            screenModeDropdown = CreateDropdownRow("ScreenMode", "画面サイズ",
+                Core.SettingsManager.ScreenModeLabels, RowScreenMode,
+                current != null ? current.ScreenMode : 0, OnScreenModeChanged);
+            // **枠は既定で出さない（プランナーの判断）。**
+            // 感触を見比べたいという話なので、切り替えだけ残してある。
+            dialogueBubbleDropdown = CreateDropdownRow("DialogueBubble", "吹き出し",
+                Core.SettingsManager.DialogueBubbleLabels, RowDialogueBubble,
+                current != null ? current.DialogueBubble : 0, OnDialogueBubbleChanged);
+
+            HideRetiredRows();
+            ArrangeSystemButtons();
+            MakeBackdropOpaque();
+        }
+
+        /// <summary>
+        /// 見出しと選択欄が1つずつの行を作る。
+        /// **解像度の欄を複製する。** 同じ見た目・同じ大きさになるので、自前で組むより早く、
+        /// あとでデザインが変わっても勝手に追従する。
+        /// </summary>
+        private TMP_Dropdown CreateDropdownRow(string name, string label, string[] options,
+                                               float anchoredY, int initialValue,
+                                               UnityEngine.Events.UnityAction<int> onChanged)
+        {
+            var go = Instantiate(resolutionDropdown.gameObject, resolutionDropdown.transform.parent, false);
+            go.name = name + "Dropdown";
+            var dd = go.GetComponent<TMP_Dropdown>();
+            dd.onValueChanged.RemoveAllListeners();
+            dd.ClearOptions();
+            dd.AddOptions(new System.Collections.Generic.List<string>(options));
+
+            var src = resolutionDropdown.transform as RectTransform;
+            var rt = go.transform as RectTransform;
+            if (src != null && rt != null) rt.anchoredPosition = new Vector2(src.anchoredPosition.x, anchoredY);
+
+            var srcLabel = FindSiblingLabel(resolutionDropdown.transform);
+            if (srcLabel != null)
+            {
+                var lgo = Instantiate(srcLabel.gameObject, srcLabel.transform.parent, false);
+                lgo.name = name + "Label";
+                var txt = lgo.GetComponent<TMP_Text>();
+                if (txt != null) txt.text = label;
+                var lsrc = srcLabel.transform as RectTransform;
+                var lrt = lgo.transform as RectTransform;
+                if (lsrc != null && lrt != null) lrt.anchoredPosition = new Vector2(lsrc.anchoredPosition.x, anchoredY);
+            }
+
+            // **値を入れてから listener を付ける。** 逆にすると、作った瞬間に
+            // 設定変更として走ってしまう（画面サイズなら勝手に切り替わる）
+            SetDropdown(dd, initialValue);
+            dd.onValueChanged.AddListener(onChanged);
+            return dd;
+        }
+
+        /// <summary>画面から下ろした行を隠す。**消さずに隠す**ので、戻すのは1行で済む。</summary>
+        private void HideRetiredRows()
+        {
+            foreach (var n in new string[] { "SpeedText", "HighSpeedToggle", "EffectText", "EffectToggle",
+                                             "FullscreenText", "FullscreenToggle", "ResolutionText" })
+            {
+                var t = FindChildByName(transform, n);
+                if (t != null) t.gameObject.SetActive(false);
+            }
+            // ひな形にした解像度の欄は、複製が済んでから隠す
+            if (resolutionDropdown != null) resolutionDropdown.gameObject.SetActive(false);
+            // 「やめる」は不要との判断（2026-09-27）
+            if (quitButton != null) quitButton.gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// 背景を不透明にする。
+        ///
+        /// **0.60 のままだと後ろが透ける。** チュートリアル中に開くと契約書の本文と
+        /// 「次へ」ボタンが浮かび上がって、設定のボタンと重なって見えていた。
+        /// </summary>
+        private void MakeBackdropOpaque()
+        {
+            var img = GetComponent<Image>();
+            if (img == null) return;
+            var c = img.color;
+            c.a = 1f;
+            img.color = c;
+        }
+
+        private static Transform FindChildByName(Transform root, string name)
+        {
+            foreach (var t in root.GetComponentsInChildren<Transform>(true))
+                if (t.name == name) return t;
+            return null;
+        }
+
+        /// <summary>選択欄の見出しらしき TMP_Text を、同じ親の中から探す。</summary>
+        private static TMP_Text FindSiblingLabel(Transform dropdown)
+        {
+            var parent = dropdown.parent;
+            if (parent == null) return null;
+            var dRect = dropdown as RectTransform;
+            if (dRect == null) return null;
+
+            TMP_Text best = null;
+            float bestDist = float.MaxValue;
+            for (int i = 0; i < parent.childCount; i++)
+            {
+                var child = parent.GetChild(i);
+                if (child == dropdown) continue;
+                if (child.GetComponentInParent<TMP_Dropdown>() != null) continue;
+                var txt = child.GetComponent<TMP_Text>();
+                if (txt == null) continue;
+                var r = child as RectTransform;
+                if (r == null) continue;
+                float d = Mathf.Abs(r.anchoredPosition.y - dRect.anchoredPosition.y);
+                if (d < bestDist) { bestDist = d; best = txt; }
+            }
+            return bestDist <= 40f ? best : null;
+        }
+
+        private void OnMatchBgmChanged(int index)
+        {
+            if (Core.SettingsManager.Instance != null) Core.SettingsManager.Instance.SetMatchBgmSet(index);
+        }
+
+        private void OnTextSpeedChanged(int index)
+        {
+            if (Core.SettingsManager.Instance != null) Core.SettingsManager.Instance.SetTextSpeed(index);
+        }
+
+        private void OnScreenModeChanged(int index)
+        {
+            if (Core.SettingsManager.Instance != null) Core.SettingsManager.Instance.SetScreenMode(index);
+        }
+
+        private void OnDialogueBubbleChanged(int index)
+        {
+            if (Core.SettingsManager.Instance != null) Core.SettingsManager.Instance.SetDialogueBubble(index);
+        }
+
+        private void CreateTutorialArchiveButton()
+        {
+            if (tutorialArchiveButton != null) return;
+
+            // 保存ボタンは長い日本語ラベルを収められる横幅なので、見た目のひな形に使う。
+            Button template = saveAndCloseButton != null ? saveAndCloseButton : returnToTitleButton;
+            if (template == null)
+            {
+                Debug.LogWarning("[OptionUI] チュートリアル資料のひな形ボタンが見つかりません。");
+                return;
+            }
+
+            GameObject buttonObject = Instantiate(template.gameObject, template.transform.parent, false);
+            buttonObject.name = "TutorialArchiveButton";
+            tutorialArchiveButton = buttonObject.GetComponent<Button>();
+            tutorialArchiveButton.onClick.RemoveAllListeners();
+
+            TMP_Text label = buttonObject.GetComponentInChildren<TMP_Text>(true);
+            if (label != null) label.text = "チュートリアル資料";
+
+            if (buttonObject.GetComponent<UIButtonHoverEffect>() == null)
+            {
+                buttonObject.AddComponent<UIButtonHoverEffect>();
+            }
+
+            ArrangeSystemButtons();
+            tutorialArchiveButton.onClick.AddListener(OpenTutorialArchive);
+        }
+
+        private void ArrangeSystemButtons()
+        {
+            // **「やめる」を下ろしたので3つ（2026-09-27）。**
+            // 上段に「タイトルへ」と「チュートリアル資料」、下段の中央に「保存して閉じる」。
+            // 保存がいちばん押す操作なので、単独で目立つ位置に置く。
+            //
+            // 以前は4つを2段2列に並べ、いちばん下が画面の端に張り付いていた。
+            SetButtonPosition(returnToTitleButton, new Vector2(-135f, -172f));
+            SetButtonPosition(tutorialArchiveButton, new Vector2(135f, -172f));
+            SetButtonPosition(saveAndCloseButton, new Vector2(0f, -232f));
+        }
+
+        private static void SetButtonPosition(Button button, Vector2 position)
+        {
+            if (button == null) return;
+
+            RectTransform rect = button.transform as RectTransform;
+            if (rect != null) rect.anchoredPosition = position;
+        }
+
+        private void OpenTutorialArchive()
+        {
+            if (tutorialArchiveUI == null)
+            {
+                tutorialArchiveUI = TutorialArchiveUI.Create();
+            }
+
+            // 資料を読んでいる間は、背後の設定を誤って操作できないようオプション自体を伏せる。
+            gameObject.SetActive(false);
+            tutorialArchiveUI.Open(Open);
         }
 
         // --- ボタン処理 ---

@@ -16,6 +16,16 @@ namespace KillingMahjong.UI
         private List<int> _pendingHandIndexes;
         private List<int> _pendingHandTiles;
 
+        // 即席の役名表示は確定処理とは別の、13枚選択中だけの問い合わせ。
+        // 応答に request id はないため、送信時の山牌indexと現在の13枚を照合して
+        // 選び直し後の古い応答を画面に出さない。
+        private List<int> _rankRequestIndexes;
+        private List<int> _rankResultIndexes;
+        private bool _rankRequestInFlight;
+        private bool _hasRankResult;
+        private bool _ignoreNextRankResponse;
+        private HandRankCallUI _rankCallUI;
+
         /// <summary>
         /// もう取り下げられないか。**相手を待っている間は取り下げてよい**（`select_cancel` は
         /// そのためにある）。手遅れになるのは相手も確定して掛け金フェイズへ移る直前だけ。
@@ -30,39 +40,25 @@ namespace KillingMahjong.UI
             this.uiManager = manager;
         }
 
+        private void OnDestroy()
+        {
+            // HandRankCallUI は既存Canvasの座標を継承しない独立Canvas。
+            // コントローラだけが途中で破棄される場合にも残さない。
+            if (_rankCallUI != null)
+            {
+                Destroy(_rankCallUI.gameObject);
+            }
+        }
+
         public void CompleteHandSelection()
         {
             if (uiManager.CurrentPhaseStatus != RoundStatus.HandSelection) return;
             if (uiManager.DialogueUI != null && uiManager.DialogueUI.IsLogOpen) return;
-            
+
+            StopInstantRankCallForSubmission();
             if (uiManager.HandUI != null) uiManager.HandUI.SetSubmittedState(true);
 
-            if (BoardStateManager.Instance.TargetHandIndexes != null && BoardStateManager.Instance.TargetHandIndexes.Count == 13)
-            {
-                _pendingHandIndexes = new List<int>(BoardStateManager.Instance.TargetHandIndexes);
-            }
-            else
-            {
-                _pendingHandIndexes = new List<int>();
-                HashSet<int> usedIndexes = new HashSet<int>();
-                foreach(int tileId in BoardStateManager.Instance.CurrentHandTiles) {
-                     var wallTiles = BoardStateManager.Instance.OriginalWallTiles;
-                     int idx = -1;
-                     for (int i = 0; i < wallTiles.Count; i++)
-                     {
-                         if (wallTiles[i] == tileId && !usedIndexes.Contains(i))
-                         {
-                             idx = i;
-                             break;
-                         }
-                     }
-                     if (idx >= 0) {
-                         _pendingHandIndexes.Add(idx);
-                         usedIndexes.Add(idx);
-                     }
-                }
-            }
-            _pendingHandTiles = new List<int>(BoardStateManager.Instance.CurrentHandTiles);
+            if (!TryCaptureCurrentHandSelection(out _pendingHandIndexes, out _pendingHandTiles)) return;
 
             if (uiManager.IsTutorialMode)
             {
@@ -98,6 +94,228 @@ namespace KillingMahjong.UI
             }
         }
 
+        /// <summary>
+        /// 手牌の増減後に HandUI.UpdateLayout から呼ばれる。
+        /// 本編ではサーバーへ問い合わせ、返ってきた待ちの中で**いちばん上の格**を役名として出す
+        /// （2026-09-20 の仕様書「即席満貫以上判定システム」のフロー図）。
+        /// チュートリアルにはサーバーが存在しないため、誤って通信エラーを出さないよう出さない
+        /// （確定時の既存チュートリアル処理は変更しない）。
+        /// </summary>
+        public void UpdateInstantRankCallForCurrentHand()
+        {
+            // **出ている役名は途中で消さない。**（2026-09-20）
+            // 牌を1枚戻して13枚を割ったときに消していたが、仕様書のフロー図で
+            // 表示が消えるのは「2秒後のフェードアウト」と「次の役名が出るとき」だけ。
+            if (!CanShowInstantRankCall())
+            {
+                _hasRankResult = false;
+                // **手牌選択を抜けたら片付ける。** 13枚を割っただけなら消さない（自分の2秒で消える）が、
+                // フェイズが変わったら役名は用済み。残すと決着画面まで出続ける（2026-09-20）
+                if (uiManager != null && uiManager.CurrentPhaseStatus != RoundStatus.HandSelection
+                    && _rankCallUI != null) _rankCallUI.HideImmediate();
+                return;
+            }
+
+            if (!TryCaptureCurrentHandSelection(out List<int> currentIndexes, out _))
+            {
+                _hasRankResult = false;
+                return;
+            }
+
+            if (_rankRequestInFlight)
+            {
+                if (!SameHandIndexes(currentIndexes, _rankRequestIndexes)) _hasRankResult = false;
+                return;
+            }
+
+            if (_hasRankResult && SameHandIndexes(currentIndexes, _rankResultIndexes)) return;
+
+            _rankRequestIndexes = new List<int>(currentIndexes);
+            _rankRequestInFlight = true;
+            _hasRankResult = false;
+            // 待っている間は何も出さない。フロー図に「確認中」の表示は無い
+            uiManager.SendActionToServer("is_tenpai", new KillingMahjong.Network.ActionPayload
+            {
+                wall_indexes = _rankRequestIndexes
+            });
+        }
+
+        private bool CanShowInstantRankCall()
+        {
+            return uiManager != null
+                && !uiManager.IsTutorialMode
+                && uiManager.CurrentPhaseStatus == RoundStatus.HandSelection
+                && (uiManager.HandUI == null || !uiManager.HandUI.IsSubmitted)
+                && BoardStateManager.Instance != null
+                && BoardStateManager.Instance.CurrentHandTiles != null
+                && BoardStateManager.Instance.CurrentHandTiles.Count == 13;
+        }
+
+        private bool TryCaptureCurrentHandSelection(out List<int> handIndexes, out List<int> handTiles)
+        {
+            handIndexes = new List<int>();
+            handTiles = new List<int>();
+
+            if (BoardStateManager.Instance == null || BoardStateManager.Instance.CurrentHandTiles == null)
+            {
+                return false;
+            }
+
+            handTiles = new List<int>(BoardStateManager.Instance.CurrentHandTiles);
+            if (handTiles.Count != 13) return false;
+
+            if (BoardStateManager.Instance.TargetHandIndexes != null
+                && BoardStateManager.Instance.TargetHandIndexes.Count == 13)
+            {
+                handIndexes = new List<int>(BoardStateManager.Instance.TargetHandIndexes);
+                return true;
+            }
+
+            var wallTiles = BoardStateManager.Instance.OriginalWallTiles;
+            if (wallTiles == null) return false;
+
+            HashSet<int> usedIndexes = new HashSet<int>();
+            foreach (int tileId in handTiles)
+            {
+                int index = -1;
+                for (int i = 0; i < wallTiles.Count; i++)
+                {
+                    if (wallTiles[i] == tileId && !usedIndexes.Contains(i))
+                    {
+                        index = i;
+                        break;
+                    }
+                }
+
+                if (index < 0) return false;
+                handIndexes.Add(index);
+                usedIndexes.Add(index);
+            }
+
+            return handIndexes.Count == 13;
+        }
+
+        private static bool SameHandIndexes(List<int> first, List<int> second)
+        {
+            if (first == null || second == null || first.Count != second.Count) return false;
+            for (int i = 0; i < first.Count; i++)
+            {
+                if (first[i] != second[i]) return false;
+            }
+            return true;
+        }
+
+        private HandRankCallUI GetRankCallUI()
+        {
+            if (_rankCallUI == null)
+            {
+                _rankCallUI = HandRankCallUI.Create();
+            }
+            return _rankCallUI;
+        }
+
+        /// <summary>
+        /// 待ちの一覧から、**届きうる中でいちばん上の格**を役名として出す（2026-09-20 の仕様書）。
+        ///
+        /// 満貫に届かないなら何も出さない（フロー図の「if それが満貫以上であるか → NO → なにもしない」）。
+        /// 倍率は 満貫1 / 跳満1.5 / 倍満2 / 三倍満3 / 役満4（<see cref="Managers.GameRules.GetMultiplier"/>）。
+        /// **フロー図は三倍満を分けていない**ので、3倍は「倍満以上」に含めて倍満と出す。
+        /// </summary>
+        private void ShowRankCall(EngineData.WaitData[] waits)
+        {
+            if (waits == null || waits.Length == 0) return;
+
+            float best = 0f;
+            bool manganOrMore = false;
+            for (int i = 0; i < waits.Length; i++)
+            {
+                if (waits[i] == null) continue;
+                if (waits[i].mangan_or_more) manganOrMore = true;
+                if (waits[i].multiplier > best) best = waits[i].multiplier;
+            }
+
+            if (!manganOrMore) return;
+
+            string rank;
+            if (best >= 4f) rank = "役満";
+            else if (best >= 2f) rank = "倍満";
+            else if (best >= 1.5f) rank = "跳満";
+            else rank = "満貫";
+
+            GetRankCallUI().ShowRank(rank);
+        }
+
+        private void StopInstantRankCallForSubmission()
+        {
+            if (_rankRequestInFlight)
+            {
+                // 直後に確定用の is_tenpai をもう一度送る。先に返るプレビュー応答だけを
+                // 捨て、確定用の応答は従来どおり確認ダイアログへ渡す。
+                _ignoreNextRankResponse = true;
+                _rankRequestInFlight = false;
+            }
+            _hasRankResult = false;
+            if (_rankCallUI != null) _rankCallUI.HideImmediate();
+        }
+
+        private bool TryHandleInstantRankCall(IsTenpaiData data)
+        {
+            if (_ignoreNextRankResponse)
+            {
+                _ignoreNextRankResponse = false;
+                return true;
+            }
+            if (!_rankRequestInFlight) return false;
+
+            _rankRequestInFlight = false;
+            if (!CanShowInstantRankCall()
+                || !TryCaptureCurrentHandSelection(out List<int> currentIndexes, out _))
+            {
+                // 返事が来た時にはもう13枚ではない。出ているものはそのまま消えさせる
+                return true;
+            }
+
+            if (!SameHandIndexes(currentIndexes, _rankRequestIndexes))
+            {
+                UpdateInstantRankCallForCurrentHand();
+                return true;
+            }
+
+            _rankResultIndexes = new List<int>(currentIndexes);
+            _hasRankResult = true;
+            ShowRankCall(data != null ? data.waits : null);
+            return true;
+        }
+
+        private bool TryHandleInstantNotTenpai(string reason)
+        {
+            if (_ignoreNextRankResponse)
+            {
+                _ignoreNextRankResponse = false;
+                return true;
+            }
+            if (!_rankRequestInFlight) return false;
+
+            _rankRequestInFlight = false;
+            if (!CanShowInstantRankCall()
+                || !TryCaptureCurrentHandSelection(out List<int> currentIndexes, out _))
+            {
+                // 返事が来た時にはもう13枚ではない。出ているものはそのまま消えさせる
+                return true;
+            }
+
+            if (!SameHandIndexes(currentIndexes, _rankRequestIndexes))
+            {
+                UpdateInstantRankCallForCurrentHand();
+                return true;
+            }
+
+            _rankResultIndexes = new List<int>(currentIndexes);
+            _hasRankResult = true;
+            // 聴牌していないなら、フロー図どおり「なにもしない」
+            return true;
+        }
+
 
         public void CancelHandSelection()
         {
@@ -125,6 +343,7 @@ namespace KillingMahjong.UI
 
         public void HandleIsTenpaiReceived(IsTenpaiData data)
         {
+            if (TryHandleInstantRankCall(data)) return;
             if (uiManager.CurrentPhaseStatus != RoundStatus.HandSelection) return;
 
             // **応答を待っている間に「選び直す」を押されていたら、もう出さない。**
@@ -258,6 +477,7 @@ namespace KillingMahjong.UI
 
         public void HandleNotTenpaiReceived(string reason)
         {
+            if (TryHandleInstantNotTenpai(reason)) return;
             if (uiManager.CurrentPhaseStatus != RoundStatus.HandSelection) return;
 
             string message = $"ノーテン（聴牌していません）\n\nこのまま決定しますか？";

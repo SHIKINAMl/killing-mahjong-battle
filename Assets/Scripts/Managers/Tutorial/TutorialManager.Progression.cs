@@ -85,9 +85,11 @@ namespace KillingMahjong.Managers
         {
             // --- 局の初期化 ---
             HasClickedAutoMangan = false;
+            IsAutoButtonLocked = false;
             _hasRejectedFirstConfirm = false;
             _isWaitingForHandSelectionComplete = true;
             _lastPlayerDiscardBaseId = -1;
+            _hasMovedTileThisRound = false;
 
             // 前局の透視マークがプールの牌に残らないようにする
             ClearPerspectiveMarks();
@@ -98,28 +100,49 @@ namespace KillingMahjong.Managers
             // 手牌は空の状態で開始する（プレイヤーが山牌から選ぶ）
             SetupBoard(data, null);
 
+            // 能力ベルはフロー図で「初期非表示UI」。能力の話に入る局まで伏せておき、
+            // 一度出したらそれ以降は出したままにする。
+            if (data.enemyUsesAbility) _abilityBellRevealed = true;
+            SetAbilityBellVisible(_abilityBellRevealed);
+
             // 開幕は女の子とセリフだけ。盤面はイントロの途中で出す。
             SetBoardVisible(false);
             yield return null;
 
-            // **立ち絵は1行目のセリフの後に出す（2026-09-12、フロー図どおり）。**
-            // 契約書を閉じた直後は誰もいない画面で、最初の一言だけが聞こえる。
-            // 立ち絵を持っているのはシーン側なので、こちらは合図を出すだけ。
+            // フロー図シート3の頭。対局フェイズ①が終わって手牌選択フェイズ②へ来たところで、
+            // ゲームの流れをまとめ、資料の開き方を実際に開かせて教える。
+            // **第2局の台本より前。** 第1局の締めくくりなので、盤面を出してから話す。
+            if (IsSecondTutorialRound(data))
+            {
+                SetBoardVisible(true);
+                yield return StartCoroutine(RunAfterFirstRoundWrapUp());
+                if (_aborted) yield break;
+            }
+
+            // **立ち絵が出きってから台詞を出す（2026-09-27 の指示）。**
+            // 2026-09-12 のフロー図は「契約書を閉じる → セリフ1行 → 立ち絵」だったが、
+            // 順番を入れ替えた。誰もいない画面に声だけが出るのではなく、
+            // 先に相手が滲み出てきて、そのあとで喋り出す。
+            // 曲も1行目の合図で鳴り始めるので、無音のまま立ち絵が浮かぶことになる。
+            //
+            // 立ち絵を持っているのはシーン側なので、こちらは合図を出して待つだけ。
             // 合図を受け取る人がいない（局を指定して始めた等）ときは、何も起きずに素通りする。
             var introLines = data.introLines;
             int reveal = data.revealBoardAfterLineIndex;
 
             if (CharacterRevealRequested != null && introLines != null && introLines.Count > 0)
             {
-                yield return StartCoroutine(PlayLines(introLines.GetRange(0, 1)));
-
                 var reveal1 = CharacterRevealRequested;
                 CharacterRevealRequested = null;     // 出すのは一度きり
+                CharacterRevealFinished = false;
                 reveal1();
 
-                // 1行ぶん先に送ったので、残りと「盤面を出す行」の番号をずらす
-                introLines = introLines.GetRange(1, introLines.Count - 1);
-                if (reveal >= 0) reveal -= 1;
+                // **出し終わりを待つ。** 相手がいないところに台詞が出ないように。
+                // シーン側が旗を立て損ねても止まらないよう、上限だけ決めておく。
+                float revealLimit = Time.time + 5f;
+                yield return new WaitUntil(
+                    () => CharacterRevealFinished || Time.time > revealLimit);
+                if (_aborted) yield break;
             }
 
             if (reveal >= 0 && reveal < introLines.Count - 1)
@@ -200,6 +223,11 @@ namespace KillingMahjong.Managers
 
             if (data.allowManualHandSelection)
             {
+                // 第1局は、フロー図どおり4秒間まったく牌を取らなかったときだけ
+                // 「クリックすると手牌に登録できる」ことを補足する。
+                if (IsFirstTutorialRound(data))
+                    StartCoroutine(RunFirstRoundHandIdleHint(data));
+
                 yield return new WaitUntil(() =>
                     GetHandTileCount() >= HandSize || !_isWaitingForHandSelectionComplete);
 
@@ -207,9 +235,20 @@ namespace KillingMahjong.Managers
                 {
                     selfMadeMangan = IsSelfMadeManganHand();
 
-                    yield return StartCoroutine(PlayLines(selfMadeMangan
-                        ? ResolveSelfManganLines(data)
-                        : ResolveHandFilledLines(data)));
+                    var lines = selfMadeMangan ? ResolveSelfManganLines(data) : ResolveHandFilledLines(data);
+
+                    if (data.freeHandBuilding)
+                    {
+                        yield return StartCoroutine(PlayLines(lines));
+                    }
+                    else
+                    {
+                        // **フロー図の順番（2026-09-23 のユーザー指示）。**
+                        //   「じゃあ、コレ使ってよ」まで → ボタンを出す → 4秒ハイライト
+                        //   → 「これはおまかせボタン」以降
+                        // ボタンが無い状態で「これはおまかせボタン」と言っても指す先が無い。
+                        yield return StartCoroutine(PlayLinesUntilAutoIntro(data, lines));
+                    }
                 }
             }
 
@@ -226,10 +265,18 @@ namespace KillingMahjong.Managers
             }
             else if (selfMadeMangan)
             {
-                // 自力で満貫手を組めたなら『自動』を挟ませる理由がない。そのまま決定へ通す。
-                // HasClickedAutoMangan は「台本の満貫手が盤面にそろっている」ことを表すフラグとして
-                // 待ち牌の公開と決定の解禁に使われているので、ここでも立てておく。
+                // 『おまかせ』の紹介（ボタン表示＋4秒ハイライト＋紹介セリフ）は
+                // PlayLinesUntilAutoIntro で済んでいる。ここでは決定へ進めるだけ。
+                // HasClickedAutoMangan は待ち牌の公開と決定の解禁に使われているので、ここで立てる。
                 HasClickedAutoMangan = true;
+                IsAutoButtonLocked = false;   // ここから先は『自動』を出さないので旗も下ろす
+
+                // フロー図どおり、**ハイライトの前に**決定を促す一言を入れる（2026-09-23）。
+                // 『おまかせ』を押した経路では ApplyMockAutoMangan が同じ言葉を言う。
+                yield return StartCoroutine(PlayLines(new List<TutorialLine>
+                {
+                    new TutorialLine(DecidePromptLine),
+                }));
 
                 SetHandButtonStage(HandButtonStage.DecideOnly);
                 GuideTo(gameUIManager != null && gameUIManager.HandUI != null
@@ -277,19 +324,35 @@ namespace KillingMahjong.Managers
             if (hideChrome) SetFirstRoundChromeVisible(true);
 
             // --- 打牌フェイズ ---
+            // **黒帯で隠してから入る（2026-09-28 の指示）。**
+            // 本編は賭けが決まると `TriggerBettingAnimationPhase` から
+            // `PhaseTransitionUI.PlayTransition` を通り、一本線 →「対局開始」→
+            // 市松模様が画面を覆う、という段取りで打牌フェイズへ移る。
+            // チュートリアルは `SetPhase` を直接呼んでいたので**そこだけ素通りで、
+            // 賭け金の次の瞬間に打牌が始まっていた。** 本編と同じ見え方に揃える。
+            //
+            // フェイズの切り替えは、本編と同じく**覆い切った時点（onMidpoint）**で行う。
+            // 先に切り替えると、盤面が組み替わる様子が見えてしまう。
+            yield return StartCoroutine(RunDiscardEntryTransition());
+
             // GameUIPhaseController は IsTutorialMode のとき HP パネルを出さないので、
             // フェイズを切り替えたあとに毎回こちらで表示し直す（手順⑦の説明に必要）。
-            SetPhase(RoundStatus.Discard);
             ApplyHpToUI();
             yield return new WaitForSeconds(phaseSettleTime);
-            yield return StartCoroutine(PlayLines(data.onBattleStartLines));
+            // 第1局の対局導入は、フロー図どおり山牌／待ち牌の誘導を挟む専用シーケンスで進める。
+            // 2局目以降は従来どおり各局の台本をそのまま表示する。
+            if (!IsFirstTutorialRound(data))
+                yield return StartCoroutine(PlayLines(data.onBattleStartLines));
 
             yield return StartCoroutine(RunBattle(data));
 
             // 流局なら賭け金は場に残したまま次局へ持ち越す
             _prevRoundWasDraw = data.outcome == TutorialOutcome.Draw;
 
-            yield return StartCoroutine(PlayLines(data.outroLines));
+            // 第1局はロン後の40手順を RunPlayerRon 側で完結させる。
+            // ここで旧 outroLines を続けると、フロー図に無い別の締めが追加されてしまう。
+            if (!IsFirstTutorialRound(data))
+                yield return StartCoroutine(PlayLines(data.outroLines));
         }
 
         /// <summary>
@@ -427,11 +490,19 @@ namespace KillingMahjong.Managers
 
         // ==================== 対局 ====================
 
+        private bool IsFirstTutorialRound(TutorialRoundData data)
+        {
+            return _scenario != null && _scenario.rounds != null
+                   && _scenario.rounds.Count > 0 && _scenario.rounds[0] == data;
+        }
+
         private IEnumerator RunBattle(TutorialRoundData data)
         {
             var board = BoardStateManager.Instance;
             int turns = data.enemyDiscardBaseIds.Count;
             int autoTurns = Mathf.Clamp(data.autoDiscardTurns, 0, turns);
+            bool isFirstTutorialRound = IsFirstTutorialRound(data);
+            int lastReactionIndex = -1;
 
             for (int turn = 1; turn <= turns; turn++)
             {
@@ -452,13 +523,44 @@ namespace KillingMahjong.Managers
                 }
                 else
                 {
+                    if (isFirstTutorialRound && turn == 1)
+                        yield return StartCoroutine(RunFirstRoundOpening());
+
+                    if (isFirstTutorialRound && (turn == 1 || turn == 2))
+                        GuideTo(GetWallGuideTarget(), true, new Vector2(0f, 10f));
+
                     _isWaitingForDiscard = true;
                     _lastPlayerDiscardBaseId = -1;
 
                     yield return new WaitUntil(() => !_isWaitingForDiscard);
+
+                    if (isFirstTutorialRound && (turn == 1 || turn == 2))
+                        ClearGuide();
                 }
 
                 yield return new WaitForSeconds(isAutoTurn ? autoDiscardInterval : discardInterval);
+
+                if (isFirstTutorialRound && !isAutoTurn)
+                {
+                    if (turn == 1)
+                    {
+                        yield return StartCoroutine(PlayLines(new List<TutorialLine>
+                        {
+                            new TutorialLine($"おっ{GetTileName(_lastPlayerDiscardBaseId)}かぁ"),
+                            new TutorialLine("それじゃあ　あたしはこれ"),
+                        }));
+                    }
+                    else
+                    {
+                        // フロー図の繰り返しループは
+                        //   プレイヤーの打牌 → ランダム2行 → 「それじゃあ　あたしはこれ」 → 相手の打牌
+                        // の順。**この1行が相手の打牌の合図**なので、ランダム2行だけで打たせない。
+                        // 1巡目は上の分岐が同じ並びを直接書いている。
+                        var reaction = BuildDiscardReaction(_lastPlayerDiscardBaseId, ref lastReactionIndex);
+                        reaction.Add(new TutorialLine("それじゃあ　あたしはこれ"));
+                        yield return StartCoroutine(PlayLines(reaction));
+                    }
+                }
 
                 // --- 敵のロン（プレイヤーの打牌に反応する。手順⑮） ---
                 if (data.outcome == TutorialOutcome.EnemyRon && turn >= data.enemyRonOnPlayerDiscardTurn)
@@ -479,11 +581,32 @@ namespace KillingMahjong.Managers
 
                 yield return new WaitForSeconds(isAutoTurn ? autoDiscardInterval : discardInterval);
 
+                if (isFirstTutorialRound && turn == 1)
+                {
+                    yield return StartCoroutine(PlayLines(new List<TutorialLine>
+                    {
+                        new TutorialLine($"フフフ　あたしは{GetTileName(discardBase)}を打ったよ"),
+                    }));
+                    yield return StartCoroutine(RunFirstRoundWaitExplanation());
+                }
+
                 // --- プレイヤーのロン（手順⑥ / ㉓） ---
                 if (data.outcome == TutorialOutcome.PlayerRon && discardBase == data.playerWinningTileBaseId)
                 {
                     yield return StartCoroutine(RunPlayerRon(data, discardId));
                     yield break;
+                }
+
+                // フロー図では、相手が打ってロンにならなかったとき
+                // 「プレイヤーの打牌選択フェイズ」へ戻る手前にこの1行が入る。
+                // **1巡目には言わない。** あちらは待ち牌の説明のあとの
+                // 「じゃ　再開しようかとりま打牌よろしくー」が同じ役目をしている。
+                if (isFirstTutorialRound && !isAutoTurn && turn >= 2)
+                {
+                    yield return StartCoroutine(PlayLines(new List<TutorialLine>
+                    {
+                        new TutorialLine("次は後輩ちゃんねー"),
+                    }));
                 }
 
                 if (!isAutoTurn) yield return new WaitForSeconds(0.4f);
@@ -493,6 +616,231 @@ namespace KillingMahjong.Managers
             {
                 yield return StartCoroutine(RunDraw(data));
             }
+        }
+
+        /// <summary>
+        /// 『おまかせ』の紹介を、フロー図の順番で流す（2026-09-23）。
+        ///
+        /// 「これはおまかせボタン」と言い出す**手前**でボタンを出し、
+        /// そのまま4秒ハイライトしてから残りのセリフを続ける。
+        /// 目印の語が見つからない台本（差し替え時など）では、全部言ってからボタンを出す。
+        /// </summary>
+        private IEnumerator PlayLinesUntilAutoIntro(TutorialRoundData data, List<TutorialLine> lines)
+        {
+            int introIndex = IndexOfAutoIntro(lines);
+
+            if (lines == null || introIndex < 0)
+            {
+                // 自力で満貫を作れたときの台本には『おまかせ』の紹介が入っていない。
+                // フロー図ではどちらの道も紹介セリフへ合流するので、
+                // 手牌が足りないときの台本から**紹介の2行だけ**を借りて言う（2026-09-23）。
+                if (lines != null) yield return StartCoroutine(PlayLines(lines));
+
+                // **見せるだけ。押させない。** 自分で組んだ満貫手が置き換わらないようにする。
+                // 紹介中は絵の複製しか出ないが、飛び終わって本物が出たあとも押させない
+                IsAutoButtonLocked = true;
+                yield return StartCoroutine(PresentAutoManganButton(
+                    () => PlayLines(BuildAutoIntroLines(data))));
+                yield break;
+            }
+
+            if (introIndex > 0) yield return StartCoroutine(PlayLines(lines.GetRange(0, introIndex)));
+
+            yield return StartCoroutine(PresentAutoManganButton(
+                () => PlayLines(lines.GetRange(introIndex, lines.Count - introIndex))));
+        }
+
+        /// <summary>
+        /// 『おまかせ』を紹介する（2026-09-29 のユーザー指示）。
+        ///
+        /// **絵の複製を中央にバッと出す → 紹介セリフ → 本来の位置へ飛ばす → 本物を出す。**
+        ///
+        /// 以前は本物をその場に出して4秒ハイライトしていた。押せる見た目のまま
+        /// 4秒光っているので「押せそうな雰囲気だし、その間押しそうになる」と言われた。
+        /// 複製は当たり判定を持たないので、紹介のあいだは押しようがない。
+        /// **4秒の無言の間も無くなる** — 紹介セリフを読んでいる間が、そのまま見せる時間になる。
+        /// </summary>
+        private IEnumerator PresentAutoManganButton(System.Func<IEnumerator> playIntroLines)
+        {
+            var target = gameUIManager != null && gameUIManager.HandUI != null
+                ? gameUIManager.HandUI.AutoManganButtonRect : null;
+
+            // ボタンが取れない場面（台本の差し替えなど）では、今までどおり出して話すだけ。
+            // **黙って何も出さないより、押せるボタンが出ているほうがまだ通じる。**
+            if (target == null)
+            {
+                SetHandButtonStage(HandButtonStage.AutoOnly);
+                if (playIntroLines != null) yield return StartCoroutine(playIntroLines());
+                yield break;
+            }
+
+            var intro = UI.TutorialButtonIntroUI.Show(target);
+            if (intro != null) yield return StartCoroutine(intro.PopIn());
+
+            if (playIntroLines != null) yield return StartCoroutine(playIntroLines());
+
+            if (intro != null) yield return StartCoroutine(intro.MoveToPlace(target));
+
+            // **飛び終わってから本物を出す。** ここで初めて押せるようになる
+            SetHandButtonStage(HandButtonStage.AutoOnly);
+        }
+
+        /// <summary>この語を含むセリフの手前で『おまかせ』を出す。</summary>
+        private const string AutoButtonIntroKeyword = "おまかせボタン";
+
+        /// <summary>
+        /// 決定ボタンへ促す一言（フロー図 y=9360）。
+        /// **『おまかせ』を押した場合も、自力で満貫を作れた場合も、同じ言葉で促す。**
+        /// </summary>
+        internal const string DecidePromptLine = "手牌が決まったら決定ボタンを押してね";
+
+        /// <summary>『おまかせ』の紹介が始まる行。無ければ -1。</summary>
+        private static int IndexOfAutoIntro(List<TutorialLine> lines)
+        {
+            if (lines == null) return -1;
+            for (int i = 0; i < lines.Count; i++)
+            {
+                if (lines[i] != null && !string.IsNullOrEmpty(lines[i].text)
+                    && lines[i].text.Contains(AutoButtonIntroKeyword))
+                {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        /// <summary>
+        /// 『おまかせ』の紹介だけを取り出す。
+        /// **「これを押して」は入れない。** 自分で満貫を作れた人には押す必要が無いため。
+        /// </summary>
+        private List<TutorialLine> BuildAutoIntroLines(TutorialRoundData data)
+        {
+            var source = ResolveHandFilledLines(data);
+            int start = IndexOfAutoIntro(source);
+            var result = new List<TutorialLine>();
+            if (source == null || start < 0) return result;
+
+            for (int i = start; i < source.Count; i++)
+            {
+                if (source[i] == null || string.IsNullOrEmpty(source[i].text)) continue;
+                if (source[i].text.Contains("押して")) continue;
+                result.Add(source[i]);
+            }
+            return result;
+        }
+
+        // フロー図の「４秒間オート満貫ボタンハイライト」はここにあったが、
+        // 2026-09-29 に <see cref="PresentAutoManganButton"/> へ置き換えて消した。
+        // 本物を出して4秒光らせる作りだったので、押せそうに見えて実際に押されかけていた。
+
+        private IEnumerator RunFirstRoundOpening()
+        {
+            GuideTo(GetWallGuideTarget(), false, new Vector2(0f, 10f));
+            yield return StartCoroutine(PlayLines(new List<TutorialLine>
+            {
+                new TutorialLine("よっし　対局だね"),
+                new TutorialLine($"対局では交互に牌をこの{HighlightOpen}山牌{HighlightClose}から打ってくよ"),
+                new TutorialLine("試しに適当に打ってみな"),
+            }));
+            ClearGuide();
+        }
+
+        private IEnumerator RunFirstRoundWaitExplanation()
+        {
+            // **矢印はフロー図どおり「待ち牌はここに表示されるから」の手前で出す**（2026-09-23）。
+            // 図の並びは チキンレース → 待ち牌UIハイライト → 「待ち牌はここに表示されるから」。
+            // 以前はこの3行より前から出していたので、まだ話題になっていない枠を指していた。
+            yield return StartCoroutine(PlayLines(new List<TutorialLine>
+            {
+                new TutorialLine($"とまぁこんな感じでお互い{HighlightOpen}１ターンに１枚{HighlightClose}牌を打っていって"),
+                new TutorialLine($"{HighlightOpen}先に{HighlightClose}{HighlightOpen}相手に自分の待ち牌を出させた人の勝ち{HighlightClose}"),
+                new TutorialLine("というチキンレースなギャンブルなんだこれは"),
+            }));
+
+            GuideTo(GetWaitGuideTarget(), false, new Vector2(0f, 10f));
+            yield return StartCoroutine(PlayLines(new List<TutorialLine>
+            {
+                new TutorialLine($"{HighlightOpen}待ち牌はここに表示{HighlightClose}されるから"),
+                new TutorialLine("相手がその牌を出すのを祈りながら牌を打っていってね"),
+            }));
+            ClearGuide();
+
+            yield return StartCoroutine(PlayLines(new List<TutorialLine>
+            {
+                new TutorialLine("じゃ　再開しようか"),
+                new TutorialLine("とりま打牌よろしくー"),
+            }));
+        }
+
+        private RectTransform GetWallGuideTarget()
+        {
+            return gameUIManager != null && gameUIManager.WallUI != null
+                ? gameUIManager.WallUI.GuideTargetRect
+                : null;
+        }
+
+        private RectTransform GetWaitGuideTarget()
+        {
+            return gameUIManager != null && gameUIManager.WaitUI != null
+                ? gameUIManager.WaitUI.GuideTargetRect
+                : null;
+        }
+
+        private static string GetTileName(int tileId)
+        {
+            return tileId >= 0 ? new TileData(tileId).GetTileName() : "その牌";
+        }
+
+        private static List<TutorialLine> BuildDiscardReaction(int tileId, ref int previousIndex)
+        {
+            string tileName = GetTileName(tileId);
+            int reactionIndex = UnityEngine.Random.Range(0, 3);
+            if (previousIndex >= 0 && reactionIndex >= previousIndex) reactionIndex++;
+            previousIndex = reactionIndex;
+
+            switch (reactionIndex)
+            {
+                case 0:
+                    return new List<TutorialLine>
+                    {
+                        new TutorialLine($"おっ{tileName}かぁ"),
+                        new TutorialLine("あたし的にはセーフ！"),
+                    };
+                case 1:
+                    return new List<TutorialLine>
+                    {
+                        new TutorialLine($"うーん{tileName}ね"),
+                        new TutorialLine("くぅーおしいっ！"),
+                    };
+                case 2:
+                    return new List<TutorialLine>
+                    {
+                        new TutorialLine($"はぁ{tileName}…？"),
+                        new TutorialLine("ぜんぜんロンできんなぁ"),
+                    };
+                default:
+                    return new List<TutorialLine>
+                    {
+                        new TutorialLine($"へぇ{tileName}？"),
+                        new TutorialLine("あたしも同じの打と"),
+                    };
+            }
+        }
+
+        private IEnumerator RunFirstRoundHandIdleHint(TutorialRoundData data)
+        {
+            yield return new WaitForSeconds(4f);
+
+            if (!IsFirstTutorialRound(data) || _round != data || _hasMovedTileThisRound ||
+                !_isWaitingForHandSelectionComplete)
+            {
+                yield break;
+            }
+
+            yield return StartCoroutine(PlayLines(new List<TutorialLine>
+            {
+                new TutorialLine("そうそう　牌をクリックすると手牌に登録できるよ"),
+            }));
         }
 
         /// <summary>

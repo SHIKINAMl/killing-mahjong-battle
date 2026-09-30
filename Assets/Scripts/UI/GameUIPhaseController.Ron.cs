@@ -14,6 +14,10 @@ namespace KillingMahjong.UI
 
         private bool _hasExecutedRonAnimation = false;
 
+        // Time.timeScale を触らずに、ロン成立を読み取るための短い静止だけを作る。
+        // 実時間で待つため、サーバー通信や保留キューを止めず、値を戻す処理も不要になる。
+        private const float RonHitStopSeconds = 0.13f;
+
         public void ExecuteRonAction()
         {
             if (_hasExecutedRonAnimation) return;
@@ -106,6 +110,10 @@ namespace KillingMahjong.UI
 
         private IEnumerator PlayRonWithPreDialogue(bool isLocalWin, List<int> winningHand, int ronTile, List<string> yaku, string formula, string rank)
         {
+            // 本編のロンだけがこの入口を通る。チュートリアルの台本の間合いは変えない。
+            // 演出の開始を実時間で一拍だけ遅らせ、既存の進行順・完了コールバックはそのまま保つ。
+            yield return new WaitForSecondsRealtime(RonHitStopSeconds);
+
             // ロンの一撃を予感させる合図。自分のロン（ExecuteRonAction）も
             // 相手のロン（HandleAgari）もここを通るので、1箇所で両方に効く。
             // **白フラッシュは止めた（2026-08-20 の演出削減バッチ1）。**

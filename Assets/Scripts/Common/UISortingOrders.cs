@@ -141,8 +141,20 @@ namespace KillingMahjong.Common
         /// <summary>TutorialMaskUI: 誘導先だけを切り抜く集中マスク</summary>
         public const int TutorialMask = 60;
 
+        /// <summary>
+        /// TutorialHighlightUI: 説明している範囲を塗る／囲む強調（2026-09-24）。
+        /// 点数計算表（ResultPanel 55）の上に重ね、矢印(65)よりは奥。
+        /// </summary>
+        public const int TutorialHighlight = 63;
+
         /// <summary>TutorialArrowUI: 誘導矢印。穴の外にはみ出すので必ずマスクより手前に置く</summary>
         public const int TutorialArrow = 65;
+
+        /// <summary>
+        /// TutorialButtonIntroUI: ボタンを紹介するとき、中央に大きく出す**絵だけの複製**（2026-09-29）。
+        /// 矢印(65)より手前。紹介が終わると本来の位置へ飛んでいって消える。
+        /// </summary>
+        public const int TutorialButtonIntro = 66;
 
         // ---- 70 - 79 牌アニメーション・実況 ----
 
@@ -155,6 +167,12 @@ namespace KillingMahjong.Common
 
         /// <summary>GameUISkillController: マリガン中のプロンプトテキスト (独立Canvas)</summary>
         public const int MulliganPromptText = 78;
+
+        /// <summary>
+        /// HandRankCallUI: 手牌が13枚そろった瞬間に出る役名（満貫／跳満／倍満／役満）。
+        /// 牌より手前・ダイアログより奥。2秒で自分から消える一瞬の表示。
+        /// </summary>
+        public const int HandRankCall = 79;
 
         // ---- 80 - 89 ダイアログ・最前面パネル ----
 
@@ -179,7 +197,8 @@ namespace KillingMahjong.Common
         /// 原因が見えにくい。
         ///
         /// タイトルシーンには 80 番台の住人が他に居ないのでここを使う。
-        /// カーソル(99)より奥なのは意図どおりで、カーソルはメニューの上に出てよい。
+        /// カーソル（<see cref="MouseCursor"/>）より奥なのは意図どおりで、
+        /// カーソルはメニューの上に出てよい。
         /// </summary>
         public const int TitleMenuOverlay = 81;
 
@@ -190,6 +209,19 @@ namespace KillingMahjong.Common
         /// 閉じるまで奥の部屋を触らせないため。カーソル(99)より奥なのは意図どおり。
         /// </summary>
         public const int CollectionScreen = 82;
+
+        /// <summary>
+        /// TutorialArchiveUI: オプションから開くチュートリアル資料。
+        /// オプション画面より前で操作を受け、タイトルのコレクション画面とは重ならない。
+        /// </summary>
+        public const int TutorialArchive = 83;
+
+        /// <summary>
+        /// 資料の中で範囲を示す強調（2026-09-29）。**資料より手前に置く。**
+        /// 通常の `TutorialHighlight`(63) のままだと資料(83)の下に潜って見えない。
+        /// 実機で band を出しても画面に出ず、これで気づいた。
+        /// </summary>
+        public const int TutorialArchiveHighlight = 84;
 
         /// <summary>WaitUI: 待ち牌表示を最前面に出す際のレイヤー</summary>
         public const int WaitDisplayFront = 84;
@@ -269,12 +301,28 @@ namespace KillingMahjong.Common
         /// <summary>TutorialIntro: チュートリアル開始前の問いかけと案内板。
         ///
         /// 対局が始まる前に全画面を覆う。答えるまで先へ進ませないので、
-        /// 盤面やダイアログ(97)より手前に置く。カーソル(99)より奥なのは
-        /// 押している間もカーソルが見えていてよいため。</summary>
+        /// 盤面やダイアログ(97)より手前に置く。カーソル（<see cref="MouseCursor"/>）より
+        /// 奥なのは、押している間もカーソルが見えていてよいため。</summary>
         public const int TutorialIntro = 98;
 
-        /// <summary>CustomCusor: 自前マウスカーソル。常に全UIより手前</summary>
-        public const int MouseCursor = 99;
+        /// <summary>
+        /// CustomCusor: 自前マウスカーソル。常に全UIより手前。
+        ///
+        /// **99 では足りない（2026-09-29 に実機で判明）。**
+        /// Unity の `TMP_Dropdown` は、開いた一覧の Canvas を
+        /// `overrideSorting = true` / `sortingOrder = 30000` で作る（遮蔽板は 29999）。
+        /// これは Unity 側に焼かれている値で、こちらからは動かせない。
+        /// そのため 99 のままだと**設定のドロップダウンを開くとカーソルが下に潜り**、
+        /// 何を指しているか見えないまま選ばされることになる（ユーザー報告）。
+        ///
+        /// この Canvas は GraphicRaycaster を**意図的に切って**あるので
+        /// （カーソルの絵がクリックを食わないように）、手前へ出しても
+        /// 下の UI の当たり判定は奪わない。
+        ///
+        /// **他の番号と比べるときは 99 のつもりで読むこと。** ここだけ桁が違うのは
+        /// Unity の固定値を越えるためで、UIの重なりの設計が変わったわけではない。
+        /// </summary>
+        public const int MouseCursor = 30100;
 
         // ---- SpriteRenderer 用 (Canvas とは別系統) ----
         // ScreenSpace-Overlay の Canvas とは描画パスが違うため、上の値とは比較できない。

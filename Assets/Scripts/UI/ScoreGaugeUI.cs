@@ -83,6 +83,19 @@ namespace KillingMahjong.UI
         public int SelfScore => _selfScore;
         public int EnemyScore => _enemyScore;
 
+        /// <summary>
+        /// チュートリアルの誘導先。ゲージの生成前でも既存の組み立てを通してから返すため、
+        /// シーン側に専用の目印を置かずに済む。
+        /// </summary>
+        public RectTransform GuideTargetRect
+        {
+            get
+            {
+                EnsureBuilt();
+                return _bar;
+            }
+        }
+
         private void Awake()
         {
             EnsureBuilt();

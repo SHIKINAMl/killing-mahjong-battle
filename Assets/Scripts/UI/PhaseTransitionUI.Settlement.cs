@@ -8,15 +8,29 @@ namespace KillingMahjong.UI
     public partial class PhaseTransitionUI
     {
 
+        /// <summary>
+        /// 画面を揺らす。チュートリアルの演出から呼ぶ（2026-09-28）。
+        /// `axis` で向きを選ぶ。(0,1)=縦だけ / (1,0)=横だけ / (1,1)=両方。
+        /// </summary>
+        public void PlayScreenShake(float duration, float magnitude, Vector2 axis)
+        {
+            StartCoroutine(ScreenShakeRoutine(duration, magnitude, axis));
+        }
+
         private IEnumerator ScreenShakeRoutine(float duration, float magnitude)
+        {
+            return ScreenShakeRoutine(duration, magnitude, Vector2.one);
+        }
+
+        private IEnumerator ScreenShakeRoutine(float duration, float magnitude, Vector2 axis)
         {
             Vector3 originalPos = transform.localPosition;
             float elapsed = 0.0f;
             
             while (elapsed < duration)
             {
-                float x = UnityEngine.Random.Range(-1f, 1f) * magnitude;
-                float y = UnityEngine.Random.Range(-1f, 1f) * magnitude;
+                float x = UnityEngine.Random.Range(-1f, 1f) * magnitude * axis.x;
+                float y = UnityEngine.Random.Range(-1f, 1f) * magnitude * axis.y;
                 
                 transform.localPosition = new Vector3(originalPos.x + x, originalPos.y + y, originalPos.z);
                 elapsed += Time.deltaTime;

@@ -58,6 +58,41 @@ namespace KillingMahjong.UI
         private bool isWaitingForDeal = false;
         private float dealWaitTimer = 0f;
 
+        /// <summary>
+        /// 実行時に作ったマテリアルの複製。**後始末のために持っておく。**
+        /// </summary>
+        private Material checkerMaterialInstance;
+
+        private void Awake()
+        {
+            EnsureCheckerMaterialInstance();
+        }
+
+        /// <summary>
+        /// 市松模様のマテリアルを、実行時だけの複製に差し替える。
+        ///
+        /// **共有アセットを直接触ってはいけない。** `checkerMaterial` はシーンから
+        /// `Assets/Resources/市松模様.mat` を直に指していて、そこへ `SetFloat("_Progress", ...)`
+        /// を書くと**アセットそのものが書き換わる**。エディタでは再生するたびに
+        /// `_Progress: 0` が `1` になってファイルが汚れ、毎回 git に差分が出ていた
+        /// （2026-09-27 に原因を特定）。
+        ///
+        /// 複製に差し替えれば、演出は同じまま、アセットには何も書かれない。
+        /// **`Start` ではなく `Awake` でやる。** 演出は `Start` より前に走ることがある。
+        /// </summary>
+        private void EnsureCheckerMaterialInstance()
+        {
+            if (checkerMaterialInstance != null) return;
+            if (checkerMaterial == null) return;
+
+            checkerMaterialInstance = new Material(checkerMaterial);
+            checkerMaterialInstance.name = checkerMaterial.name + " (実行時の複製)";
+            checkerMaterial = checkerMaterialInstance;
+
+            // 画像側も複製を使うようにする。ここを忘れると、見た目は元のまま動かない
+            if (fullScreenCheckerImage != null) fullScreenCheckerImage.material = checkerMaterialInstance;
+        }
+
         private void Start()
         {
             // UIの被り対策: トランジション演出を最前面に表示するためCanvasを追加してSortingOrderを高く設定
@@ -92,10 +127,21 @@ namespace KillingMahjong.UI
 
         private void OnDestroy()
         {
+            // **立てたまま消さない。** 残ると次の場面でセリフ送りが効かなくなる
+            IsScreenDarkened = false;
+
             if (NetworkMessageHandler.Instance != null)
             {
                 NetworkMessageHandler.Instance.OnDealingStarted -= HandleDealingStarted;
                 NetworkMessageHandler.Instance.OnDealingCompleted -= HandleDealingCompleted;
+            }
+
+            // 複製は自分で捨てる。放っておくと再生のたびに積もる
+            if (checkerMaterialInstance != null)
+            {
+                if (Application.isPlaying) Destroy(checkerMaterialInstance);
+                else DestroyImmediate(checkerMaterialInstance);
+                checkerMaterialInstance = null;
             }
         }
 
@@ -180,6 +226,19 @@ namespace KillingMahjong.UI
 
         public bool IsDarkenTransitioning { get; private set; }
 
+        /// <summary>
+        /// 局頭の黒幕が降りているあいだ true（2026-09-27）。
+        ///
+        /// **黒幕の裏でセリフ送りが走ると、見えないのに音だけ「ポポポポ」と鳴る。**
+        /// それを止めるために <see cref="DialogueUI"/> から見に来る。
+        /// 場面をまたいで見る必要があるので static にしてある。
+        ///
+        /// **必ず降ろすこと。** 立てたまま消えると、そこから先ずっと
+        /// セリフ送りが無くなる（同じ作りの `SuppressStartupBgm` で実際にやった）。
+        /// `OnDestroy` でも降ろしている。
+        /// </summary>
+        public static bool IsScreenDarkened { get; private set; }
+
         public void PlayRoundStartDarken(string text, Action onDarkened = null)
         {
             if (isDarkened)
@@ -188,6 +247,7 @@ namespace KillingMahjong.UI
                 return;
             }
             isDarkened = true;
+            IsScreenDarkened = true;
             IsDarkenTransitioning = true;
             StartCoroutine(RoundStartDarkenRoutine(text, onDarkened));
         }
@@ -201,6 +261,7 @@ namespace KillingMahjong.UI
                 return;
             }
             isDarkened = false;
+            IsScreenDarkened = false;
             StartCoroutine(RoundStartFadeOutRoutine(onComplete));
         }
 

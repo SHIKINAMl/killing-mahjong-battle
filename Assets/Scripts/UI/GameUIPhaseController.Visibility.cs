@@ -111,7 +111,11 @@ namespace KillingMahjong.UI
                                          status == RoundStatus.Ron ||
                                          status == RoundStatus.Result ||
                                          status == RoundStatus.Draw;
-                if (!isSettlementPhase) Effects.ScreenFlash.Play();
+                if (!isSettlementPhase)
+                {
+                    // この経路は対局中に繰り返し出るため、毎回の「ピン！」で盤面への集中を妨げないよう音は鳴らさない。
+                    Effects.ScreenFlash.Play(playSound: false);
+                }
             }
 
             if (status != RoundStatus.Betting && uiManager.BettingUI != null)

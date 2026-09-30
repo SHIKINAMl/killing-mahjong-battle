@@ -29,7 +29,20 @@ namespace KillingMahjong.Managers
             enemyCharacterObj.SetActive(false); // 最初は女の子がいない
             if (largePaperUI != null) largePaperUI.SetActive(false); // 大きな紙も最初は隠す
 
-            if (dialogueUI != null) dialogueUI.gameObject.SetActive(false); // 吹き出しを最初は消す
+            if (dialogueUI != null)
+            {
+                dialogueUI.gameObject.SetActive(false); // 吹き出しを最初は消す
+
+                // チュートリアルの文字は読みやすさを優先して固定する。
+                // DialoguePanel 自体を揺らすと、子の TMP 文字まで毎フレーム 3px / 5px
+                // 動いて録画でも読みにくくなるため、他画面の浮遊演出は変えずにここだけ止める。
+                Transform dialoguePanel = dialogueUI.transform.Find("DialoguePanel");
+                if (dialoguePanel != null)
+                {
+                    var floatingAnimator = dialoguePanel.GetComponent<FloatingAnimator>();
+                    if (floatingAnimator != null) floatingAnimator.enabled = false;
+                }
+            }
 
             // 不要なロード表示やマッチメイキングUIを強制オフ
             GameUIManager uiManager = UnityEngine.Object.FindFirstObjectByType<GameUIManager>();
@@ -68,9 +81,14 @@ namespace KillingMahjong.Managers
 
         private IEnumerator SequenceRoutine()
         {
-            // 開始時（契約書中）はBGMを止めて静かにする
+            // **目を開けてから紙を取るまでは無音にする（2026-09-23 のユーザー指示）。**
+            // 一度は「時計じかけの謎」を流したが、要らないと言われて戻した。
+            // 曲は契約書のあと、台本の1行目で TutorialAudioDirector が流し始める。
             if (KillingMahjong.Managers.AudioManager.Instance != null)
             {
+                // **旗を先に立てる。** AudioManager.Start はこのあとに走り、
+                // 何も鳴っていなければタイトル曲を流し始めてしまう（2026-09-23 に実機で確認）
+                KillingMahjong.Managers.AudioManager.Instance.SuppressStartupBgm = true;
                 KillingMahjong.Managers.AudioManager.Instance.StopBGM();
             }
 
@@ -122,8 +140,7 @@ namespace KillingMahjong.Managers
             {
                 KillingMahjong.Managers.AudioManager.Instance.PlayPaperSlideSE();
                 // 契約書が迫り上がる厚みを足す（2026-09-11）。
-                // **この場面は無音のままにしておく。** 冒頭で StopBGM しているのは意図で、
-                // 音楽を置くと目覚めの生々しさが死ぬ。足すのは環境音だけにする。
+                // **ここまでは無音。** 契約書の場面は、この効果音だけで静かに進める。
                 KillingMahjong.Managers.AudioManager.Instance.PlayStinger("se_paper");
             }
             largePaperUI.SetActive(true);
@@ -195,17 +212,17 @@ namespace KillingMahjong.Managers
         }
 
         /// <summary>
-        /// 契約書を閉じたあと。**ここでは立ち絵を出さない（2026-09-12）。**
+        /// 契約書を閉じたあと。**ここでは立ち絵を出さない。**
         ///
-        /// フロー図の順序は「契約書を閉じる → セリフ1行 → 女の子立ち絵表示」。
-        /// 誰もいない画面に最初の一言だけが出て、そのあとに相手が現れる。
+        /// 順序は「契約書を閉じる → 女の子がフェードイン → セリフ（と同時に曲）」
+        /// （2026-09-27 の指示。2026-09-12 のフロー図とは逆になっている）。
         /// フェードインは <see cref="TutorialManager.CharacterRevealRequested"/> 経由で
-        /// TutorialManager が1行目を送り終えた時点で呼び戻してくる。
+        /// TutorialManager が台詞を出す前に呼び戻してくる。
         /// </summary>
         private IEnumerator ShowEnemyRoutine()
         {
-            // 吹き出しだけ先に出しておく。立ち絵はまだ出さない
-            if (dialogueUI != null) dialogueUI.gameObject.SetActive(true);
+            // **吹き出しはまだ出さない。** 立ち絵より先に枠だけ出ると、
+            // 誰もいない画面に喋る場所だけがある絵になる。
             yield return null;
 
             if (tutorialManager != null)
@@ -216,29 +233,90 @@ namespace KillingMahjong.Managers
             StartConversation();
         }
 
-        /// <summary>女の子をうっすら浮かび上がらせる。**1行目のセリフの後に呼ばれる。**</summary>
+        /// <summary>フェードインにかける時間（秒）。</summary>
+        private const float EnemyFadeInSeconds = 1.5f;
+
+        /// <summary>
+        /// 女の子をうっすら浮かび上がらせる。**台詞より先に呼ばれる。**
+        ///
+        /// 立ち絵は UI の Image ではなく **SpriteRenderer**（体と、子の顔の2枚）。
+        /// 以前は Image だけを探していたので必ず null になり、フェードを素通りして
+        /// SetActive(true) の瞬間にぱっと出ていた。子まで含めて両方を拾う。
+        ///
+        /// 出し終わったら <see cref="TutorialManager.CharacterRevealFinished"/> を立てる。
+        /// **どの抜け方をしても必ず立てること。** 立て忘れると台詞が出なくなる。
+        /// </summary>
         private IEnumerator FadeInEnemyRoutine()
         {
             enemyCharacterObj.SetActive(true);
 
-            Image enemyImg = enemyCharacterObj.GetComponent<Image>();
-            if (enemyImg != null)
+            var sprites = enemyCharacterObj.GetComponentsInChildren<SpriteRenderer>(true);
+            var images = enemyCharacterObj.GetComponentsInChildren<Image>(true);
+
+            // **元の不透明度を覚えておく。** 半透明で置いてある部品を
+            // 勝手に不透明にしてしまわないため。
+            var spriteAlpha = new float[sprites.Length];
+            for (int i = 0; i < sprites.Length; i++) spriteAlpha[i] = sprites[i].color.a;
+            var imageAlpha = new float[images.Length];
+            for (int i = 0; i < images.Length; i++) imageAlpha[i] = images[i].color.a;
+
+            if (sprites.Length == 0 && images.Length == 0)
             {
-                Color c = enemyImg.color;
-                c.a = 0f;
-                enemyImg.color = c;
-                
-                float duration = 1.5f; // フェードインにかける時間
-                float elapsed = 0f;
-                while (elapsed < duration)
-                {
-                    elapsed += Time.deltaTime;
-                    c.a = Mathf.Lerp(0f, 1f, elapsed / duration);
-                    enemyImg.color = c;
-                    yield return null;
-                }
-                c.a = 1f;
-                enemyImg.color = c;
+                NotifyRevealFinished();
+                yield break;
+            }
+
+            ApplyEnemyAlpha(sprites, spriteAlpha, images, imageAlpha, 0f);
+
+            float elapsed = 0f;
+            while (elapsed < EnemyFadeInSeconds)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / EnemyFadeInSeconds);
+                // 立ち上がりを緩めて、滲み出てくるように見せる
+                ApplyEnemyAlpha(sprites, spriteAlpha, images, imageAlpha, t * t * (3f - 2f * t));
+                yield return null;
+            }
+            ApplyEnemyAlpha(sprites, spriteAlpha, images, imageAlpha, 1f);
+
+            NotifyRevealFinished();
+
+            // 出し終わってから跳ねる部品を付ける。**シーンには足さない。**
+            // 対局シーンが `UIテストシーン` と `OpeningScene` の2つあるので、
+            // シーンに置くと片方にだけ入れる事故になる（ScreenFlash と同じ理由）。
+            // フェードが終わってからなら、立ち絵の大きさも確定している。
+            if (enemyCharacterObj.GetComponent<UI.TalkBobAnimator>() == null)
+                enemyCharacterObj.AddComponent<UI.TalkBobAnimator>();
+
+            // **髪の黄色だけを蛍光色に光らせる**（2026-09-30 のユーザー指示）。
+            // **フェードが終わってから付けること。** 先に付けると、上の
+            // `ApplyEnemyAlpha` が光の板まで掴んで不透明度を上書きしてしまう
+            // （あの配列はここより前に作られていて、光の板は入っていない）。
+            foreach (var sr in sprites)
+            {
+                UI.Effects.HairNeonGlow.Attach(sr);
+            }
+        }
+
+        private void NotifyRevealFinished()
+        {
+            if (tutorialManager != null) tutorialManager.CharacterRevealFinished = true;
+        }
+
+        private static void ApplyEnemyAlpha(SpriteRenderer[] sprites, float[] spriteAlpha,
+                                            Image[] images, float[] imageAlpha, float t)
+        {
+            for (int i = 0; i < sprites.Length; i++)
+            {
+                Color c = sprites[i].color;
+                c.a = spriteAlpha[i] * t;
+                sprites[i].color = c;
+            }
+            for (int i = 0; i < images.Length; i++)
+            {
+                Color c = images[i].color;
+                c.a = imageAlpha[i] * t;
+                images[i].color = c;
             }
         }
 

@@ -93,8 +93,9 @@ namespace KillingMahjong.Managers
 
         private static readonly List<TutorialLine> DefaultSelfManganLines = new List<TutorialLine>
         {
-            new TutorialLine("あら、自分で満貫手を組めたのね。やるじゃない。"),
-            new TutorialLine("それなら『自動』は要らないわ。そのまま決定しなさい。"),
+            new TutorialLine("おっきっちりできたね"),
+            new TutorialLine("さすがは後輩ちゃん 飲み込み早いねー"),
+            new TutorialLine("じゃあまぁいらないと思うけど"),
         };
 
         private static List<TutorialLine> ResolveSelfManganLines(TutorialRoundData data)
@@ -118,6 +119,61 @@ namespace KillingMahjong.Managers
 
             if (gameUIManager != null && gameUIManager.HandUI != null)
                 gameUIManager.HandUI.UpdateLayout(gameUIManager.CurrentPhaseStatus);
+        }
+
+        /// <summary>
+        /// 打牌フェイズへ入るときの黒帯（2026-09-28 の指示）。
+        ///
+        /// 本編と**同じ演出を同じ手順で**通す。`PhaseTransitionUI.PlayTransition` は
+        /// 一本線 →「対局開始」→ 市松模様が画面を覆う、と進み、覆い切った時点で
+        /// `onMidpoint` を呼ぶ。**フェイズの切り替えはそこで行う。**
+        /// 先に切り替えると、盤面が組み替わる様子が黒幕の外で見えてしまう。
+        ///
+        /// 賭け額と血は本編ではサーバーから来るが、チュートリアルは繋がないので
+        /// こちらの台帳（`_playerHp` / `_enemyHp` / `_lastBetAmount`）から作る。
+        /// **null を渡してはいけない。** 演出の中で中身を読んでいる。
+        ///
+        /// 演出そのものが出せない場面（UIが無い等）では、**待たずにフェイズだけ進める。**
+        /// ここで待つと、盤面が揃っていない入り方をしたときに止まってしまう。
+        /// </summary>
+        private IEnumerator RunDiscardEntryTransition()
+        {
+            var transition = gameUIManager != null ? gameUIManager.PhaseTransitionUI : null;
+            if (transition == null)
+            {
+                SetPhase(RoundStatus.Discard);
+                yield break;
+            }
+
+            int bet = _lastBetAmount > 0 ? _lastBetAmount : 0;
+            var info = new EngineData.BettingCompletedInfo
+            {
+                LocalBet = bet,
+                EnemyBet = bet,
+                LocalHpBefore = _playerHp + bet,
+                EnemyHpBefore = _enemyHp + bet,
+                LocalHpAfter = _playerHp,
+                EnemyHpAfter = _enemyHp,
+            };
+
+            bool midpointDone = false;
+            bool finished = false;
+            transition.PlayTransition(
+                "対局開始",
+                gameUIManager.PlayerInfoUI,
+                info,
+                onMidpoint: () => { SetPhase(RoundStatus.Discard); midpointDone = true; },
+                onComplete: () => finished = true);
+
+            // **覆い切るまでは必ず待つ。** ここを待たないと、黒帯が降りている最中に
+            // 次の台詞が走り、見えないところで喋ることになる。
+            float limit = Time.time + 8f;
+            yield return new WaitUntil(() => midpointDone || Time.time > limit);
+            if (!midpointDone) SetPhase(RoundStatus.Discard);
+
+            // 晴れるまでも待つ。上限を置いてあるので、演出が壊れても止まらない
+            float limit2 = Time.time + 8f;
+            yield return new WaitUntil(() => finished || Time.time > limit2);
         }
 
         private void SetPhase(RoundStatus status)

@@ -33,7 +33,13 @@ namespace KillingMahjong.UI
             if (!IsTutorialMode && KillingMahjong.Managers.AudioManager.Instance != null)
             {
                 bool willOpen = (status == RoundStatus.Discard);
-                if (willOpen && IsBusyWithTransition)
+                if (willOpen && holdDiscardBgmOpeningForBattleStart)
+                {
+                    // 賭け確定の暗転中だけは、盤面が見え始める瞬間まで開かない。
+                    // onMidpoint は進行を先に Discard へ進めるため、ここで止めないと
+                    // 暗転の裏で 2 秒のローパス解除が終わってしまう。
+                }
+                else if (willOpen && IsBusyWithTransition)
                 {
                     DeferUntilIdle(BgmFilterDeferKey, ApplyBgmFilterForCurrentPhase);
                 }
@@ -46,6 +52,37 @@ namespace KillingMahjong.UI
 
         /// <summary>保留キューでの識別名。後勝ちで畳みたいので固定の1本にする。</summary>
         private const string BgmFilterDeferKey = "bgmFilter";
+
+        // 賭け確定の既存シーケンスだけが、暗転解除の瞬間まで Discard の開放を持つ。
+        // SetIsTransitioning は所有者を数えない bool なので、同じ目的に流用しない。
+        private bool holdDiscardBgmOpeningForBattleStart;
+
+        /// <summary>
+        /// 賭け確定後の BGM 開放を、盤面が見え始める瞬間まで待たせる。
+        ///
+        /// onMidpoint の進行順や DeferUntilIdle の保留順を変えずに、音だけを演出の起点へ揃える。
+        /// </summary>
+        public void HoldDiscardBgmOpeningForBattleStart()
+        {
+            if (IsTutorialMode) return;
+            holdDiscardBgmOpeningForBattleStart = true;
+        }
+
+        /// <summary>
+        /// 賭け確定後の BGM 開放を実行する。
+        ///
+        /// 保留時点のフェイズを焼き込まず、既存どおり実行時点の状態を読むことで、
+        /// 演出中に別フェイズへ進んだ場合も古い Discard 用 BGM を開かない。
+        /// </summary>
+        public void ReleaseDiscardBgmOpeningForBattleStart()
+        {
+            if (!holdDiscardBgmOpeningForBattleStart) return;
+
+            holdDiscardBgmOpeningForBattleStart = false;
+            if (IsTutorialMode) return;
+
+            ApplyBgmFilterForCurrentPhase();
+        }
 
         /// <summary>
         /// 今のフェイズに合わせてBGMのこもりを当てる。

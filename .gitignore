@@ -104,6 +104,11 @@ test.py
 # GitHub Pages WebGL Build Output
 /docs/
 
+# 原因調査用の WebGL ビルド（KillingMahjong/Build/Build WebGL (Development)）
+# **配布物ではない。** シンボルを埋め込むので wasm が 200MB を超え、
+# GitHub の「1ファイル100MBまで」に引っかかる。ローカルで開いて読むだけのもの。
+/build-dev/
+
 # ローカル管理の AI 向け指示・記録（本体: C:\Unity\km-docs\）
 /AGENTS.md
 /.agents/

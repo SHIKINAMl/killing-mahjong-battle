@@ -99,6 +99,12 @@ namespace KillingMahjong.Managers
             // **135.00 ちょうど・1拍目がサンプル0**。実測ではなく設計値。
             { "tut_lesson",       new Tempo(135f, 4) },
 
+            // プランナー採用の2曲（2026-09-26）。**AudioManager.PairBgm.cs がここから拍を引く。**
+            // 2本は同じ素材から書き出した同尺・同テンポ・同調で、それが重ねられる条件。
+            // 実測 136.000 BPM / 4拍子 / 80小節ちょうど / 141.1765 秒。
+            { "bgm_phase_normal", new Tempo(136f, 4) },
+            { "bgm_phase_turn",   new Tempo(136f, 4) },
+
             // 層のステム。**ここに無いと拍が引けず、音ハメが効かない。**
             // 4本とも同じ編曲を分けたものなので当然おなじテンポ。
             { "field_base",       new Tempo(118f, 4) },
@@ -185,6 +191,19 @@ namespace KillingMahjong.Managers
         /// </summary>
         private void ApplyPhaseBgm()
         {
+            // **採用した2曲が担当するフェイズは、こちらより先に2曲方式へ渡す（2026-09-26）。**
+            // 2曲は最初から同時に鳴っていて、フェイズが変わっても止めない。
+            // 曲を差し替えるこの下の処理へ落とすと、せっかく重ねた2本が止まってしまう。
+            if (UsePairBgm && PairHandles(currentBgmPhase))
+            {
+                bool hot = PairIsTurnPhase[currentBgmPhase];
+                if (!IsPairBgmRunning) StartPairBgm(hot);
+                else ApplyPairMix(hot, instant: false);
+                return;
+            }
+            // 2曲の担当外のフェイズ（流局・結果など）へ出たら畳む
+            if (IsPairBgmRunning) StopPairBgm();
+
             string want = ResolveBgmName(currentBgmPhase);
 
             // **場のBGMは層で鳴らす。** 濃さが変わっても曲は変わらないので、
@@ -464,6 +483,7 @@ namespace KillingMahjong.Managers
             if (bgmSwapCoroutine != null) { StopCoroutine(bgmSwapCoroutine); bgmSwapCoroutine = null; }
             if (bgmSource != null) bgmSource.Stop();
             StopLayeredBgm();             // 層で鳴っていたらそれも断つ
+            StopPairBgm();                // 採用した2曲で鳴っていたらそれも断つ
             currentPhaseBgmName = null;   // 同じ曲を鳴らし直せるようにしておく
         }
 

@@ -256,6 +256,38 @@ namespace KillingMahjong.UI
 
         // HP履歴・勝敗判定・結果画面 → GameUIManager.GameResult.cs
 
+        private RectTransform _optionButtonRect;
+
+        /// <summary>
+        /// オプション（設定）を開くボタン。チュートリアルの誘導先に使う。
+        ///
+        /// **シーンを触らずに済ませるため、参照は持たずに探す。**
+        /// 名前ではなく「押すと <see cref="OpenOptionUI"/> が呼ばれること」で見つけるので、
+        /// ボタンの名前や置き場所が変わっても追従する。
+        /// </summary>
+        public RectTransform OptionButtonRect
+        {
+            get
+            {
+                if (_optionButtonRect != null) return _optionButtonRect;
+
+                var buttons = FindObjectsByType<UnityEngine.UI.Button>(
+                    FindObjectsInactive.Include, FindObjectsSortMode.None);
+                foreach (var b in buttons)
+                {
+                    if (b == null) continue;
+                    int count = b.onClick.GetPersistentEventCount();
+                    for (int i = 0; i < count; i++)
+                    {
+                        if (b.onClick.GetPersistentMethodName(i) != nameof(OpenOptionUI)) continue;
+                        _optionButtonRect = b.transform as RectTransform;
+                        return _optionButtonRect;
+                    }
+                }
+                return null;
+            }
+        }
+
         public void OpenOptionUI()
         {
             if (optionUI != null)
