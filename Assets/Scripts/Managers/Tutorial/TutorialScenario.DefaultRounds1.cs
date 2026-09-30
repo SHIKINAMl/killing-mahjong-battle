@@ -107,12 +107,20 @@ namespace KillingMahjong.Managers
                 waitBaseIds = new List<int>(waits),
                 doraBaseId = dora,
 
-                allowManualHandSelection = false,
+                // **この局は「もう一回 手牌選択の練習」**（2026-09-30 のフロー図改訂）。
+                // 以前は『自動』を押させるだけだったが、改訂版では自分で13枚組ませる。
+                // 詰まった人には時間で声をかけ、最後は『おまかせ』へ逃がす
+                // （TutorialManager.RunSecondRoundHandTimerHints）。
+                allowManualHandSelection = true,
+                freeHandBuilding = true,
                 rejectFirstConfirm = false,
-                requireAutoManganToConfirm = true,
+                requireAutoManganToConfirm = false,
 
                 // 流局ぶんは次局へ積み増されるので少額にしておく。
                 // 第3局は単騎の2倍が効くため、ここを大きくすると自分が死ぬ。
+                // **この額は賭け金フェイズが使えなかったときの保険。**
+                // 改訂版ではプレイヤーが自分で決めるので、実際に積まれるのは
+                // 確定した額（賭けすぎは 3000 で止める）。
                 betAmount = 600,
                 // 17手ぶん。うち最初の15手は自動で流し、残り2手をプレイヤーに打たせる。
                 enemyDiscardBaseIds = new List<int>(drawDiscards),
@@ -124,8 +132,19 @@ namespace KillingMahjong.Managers
 
                 introLines = new List<TutorialLine>
                 {
-                    new TutorialLine("次は、誰も死なない局を見せてあげる。"),
-                    new TutorialLine("『自動』を押しなさい。"),
+                    new TutorialLine("まずはもう一回 手牌選択の練習 をしよっか"),
+                    new TutorialLine("13枚の牌を選んで手牌を作ってねー"),
+                },
+                // 13枚そろったとき。自力でも『おまかせ』でも同じ言葉をかける
+                onHandFilledLines = new List<TutorialLine>
+                {
+                    new TutorialLine("よーしできたね"),
+                    new TutorialLine("ほいじゃ決定ボタンを押して"),
+                },
+                onSelfManganLines = new List<TutorialLine>
+                {
+                    new TutorialLine("よーしできたね"),
+                    new TutorialLine("ほいじゃ決定ボタンを押して"),
                 },
                 onBattleStartLines = new List<TutorialLine>
                 {

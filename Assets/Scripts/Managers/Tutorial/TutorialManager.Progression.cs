@@ -228,6 +228,12 @@ namespace KillingMahjong.Managers
                 if (IsFirstTutorialRound(data))
                     StartCoroutine(RunFirstRoundHandIdleHint(data));
 
+                // 第2局は「もう一回の練習」なので、詰まっている人へ段階的に声をかける
+                // （20秒 → 満貫以上だと念を押す、1分 → 『おまかせ』へ逃がす）。
+                // 2026-09-30 のフロー図改訂で入った。
+                if (IsSecondTutorialRound(data))
+                    StartCoroutine(RunSecondRoundHandTimerHints(data));
+
                 yield return new WaitUntil(() =>
                     GetHandTileCount() >= HandSize || !_isWaitingForHandSelectionComplete);
 
@@ -261,7 +267,15 @@ namespace KillingMahjong.Managers
                 if (selfMadeMangan) HasClickedAutoMangan = true;
 
                 SetHandButtonStage(HandButtonStage.AutoAndDecide);
-                ClearGuide();
+
+                // **第2局だけは決定ボタンを指す**（2026-09-30 のフロー図改訂）。
+                // 「ほいじゃ決定ボタンを押して」のあとに矢印が続く。
+                // ここまで『おまかせ』を指していることがあるので、指し先を差し替える。
+                if (IsSecondTutorialRound(data))
+                    GuideTo(gameUIManager != null && gameUIManager.HandUI != null
+                        ? gameUIManager.HandUI.DecideButtonRect : null);
+                else
+                    ClearGuide();
             }
             else if (selfMadeMangan)
             {
@@ -306,7 +320,13 @@ namespace KillingMahjong.Managers
             else
             {
                 yield return StartCoroutine(PlayLines(data.beforeBetLines));
-                yield return StartCoroutine(RunBettingPhase(data));
+
+                // 第2局からは**自分で賭け金を決めさせる**（2026-09-30 のフロー図改訂）。
+                // 第1局は固定額のまま。まだ額の意味を教えていない。
+                if (IsSecondTutorialRound(data))
+                    yield return StartCoroutine(RunFreeBettingPhase(data));
+                else
+                    yield return StartCoroutine(RunBettingPhase(data));
 
                 // 実際に確定した額で積む（UIの表示額と場の額を必ず一致させる）
                 int bet = _lastConfirmedBet > 0 ? _lastConfirmedBet : data.betAmount;
@@ -444,6 +464,121 @@ namespace KillingMahjong.Managers
         /// 「セリフを送る → スマホを拡大 → 固定額の賭け金UI → 決定ボタンへ誘導」。
         /// GameUIPhaseController 側はチュートリアル時にこの拡大とベット開始をしない。
         /// </summary>
+        /// <summary>賭けすぎを止める体力の境目。フロー図の「HP8000以下」。</summary>
+        private const int BetWarnHpThreshold = 8000;
+
+        /// <summary>止めに入る賭け金。フロー図の「賭け金4000以上」。</summary>
+        private const int BetWarnAmount = 4000;
+
+        /// <summary>止めたあとに下げてやる額。フロー図の「3000まで減少」。</summary>
+        private const int BetWarnReducedAmount = 3000;
+
+        /// <summary>賭け金が下がっていく様子を見せる時間。一瞬で書き換えると気づけない。</summary>
+        private const float BetReduceSeconds = 0.8f;
+
+        /// <summary>
+        /// 自分で賭け金を決めさせる（2026-09-30 のフロー図改訂、シート3）。
+        ///
+        /// これまでチュートリアルの賭けは `ShowFixedBettingPhase` の固定額で、
+        /// 決定を押すだけだった。改訂版では**自分で増やして決める**ところまでやらせる。
+        ///
+        /// **賭けすぎたら止める。** 体力が {BetWarnHpThreshold} 以下なのに
+        /// {BetWarnAmount} 以上を賭けて決定を押したら、いったん押し戻して
+        /// {BetWarnReducedAmount} まで下げ、代わりに決定を押す。
+        /// チュートリアルで身を削らせないための歯止めで、フロー図にもそう描いてある。
+        /// </summary>
+        private IEnumerator RunFreeBettingPhase(TutorialRoundData data)
+        {
+            SetPhase(RoundStatus.Betting);
+
+            yield return StartCoroutine(PlayLines(new List<TutorialLine>
+            {
+                new TutorialLine("じゃあこんどは自分で賭け金を決めてみようか"),
+            }));
+
+            var betting = gameUIManager != null ? gameUIManager.BettingUI : null;
+            if (betting == null)
+            {
+                Debug.LogWarning("[TutorialManager] BettingUI が未設定のため賭け金フェイズをスキップします。");
+                _lastConfirmedBet = data.betAmount;
+                yield break;
+            }
+
+            bool confirmed = false;
+            _lastConfirmedBet = data.betAmount;
+            betting.ShowFreeBettingPhase(_playerHp, _playerHp, amount =>
+            {
+                _lastConfirmedBet = amount;
+                confirmed = true;
+            });
+
+            yield return betting.WaitForSlideAnimation();
+
+            // 増やし方を指してから、決め方を言う
+            GuideTo(betting.IncreaseButtonRect);
+            yield return StartCoroutine(PlayLines(new List<TutorialLine>
+            {
+                new TutorialLine("賭け金が決まったら決定ボタンを押してね"),
+            }));
+            ClearGuide();
+
+            // **押し戻しがあるので、決定を1回で終わりにしない。**
+            while (true)
+            {
+                yield return new WaitUntil(() => confirmed || _aborted);
+                if (_aborted) yield break;
+
+                bool tooMuch = _playerHp <= BetWarnHpThreshold && _lastConfirmedBet >= BetWarnAmount;
+                if (!tooMuch) break;
+
+                // いったん止めて、下げてから代わりに押す
+                confirmed = false;
+
+                yield return StartCoroutine(PlayLines(new List<TutorialLine>
+                {
+                    new TutorialLine("ちょっとちょっと！　そんなに賭けたら危ないよ！"),
+                    new TutorialLine($"気持ちはわかるけどここは{BetWarnReducedAmount}くらいにしとこう？"),
+                }));
+
+                yield return StartCoroutine(SlideBetDownTo(betting, BetWarnReducedAmount));
+
+                betting.PressConfirm();
+                yield return null;
+            }
+
+            ClearGuide();
+            betting.HideBettingPhase();
+            yield return betting.WaitForSlideAnimation();
+
+            yield return StartCoroutine(PlayLines(new List<TutorialLine>
+            {
+                new TutorialLine("まっ気軽にはじめよっか"),
+            }));
+
+            yield return new WaitForSeconds(phaseSettleTime);
+        }
+
+        /// <summary>賭け金を目当ての額まで滑らかに下げる。「減少する演出」の実体。</summary>
+        private IEnumerator SlideBetDownTo(UI.BettingUI betting, int target)
+        {
+            int from = betting.CurrentBet;
+            if (from <= target)
+            {
+                betting.ForceSetBet(target);
+                yield break;
+            }
+
+            float t = 0f;
+            while (t < BetReduceSeconds)
+            {
+                t += Time.deltaTime;
+                float u = Mathf.Clamp01(t / BetReduceSeconds);
+                betting.ForceSetBet(Mathf.RoundToInt(Mathf.Lerp(from, target, u)));
+                yield return null;
+            }
+            betting.ForceSetBet(target);
+        }
+
         private IEnumerator RunBettingPhase(TutorialRoundData data)
         {
             SetPhase(RoundStatus.Betting);
@@ -841,6 +976,75 @@ namespace KillingMahjong.Managers
             {
                 new TutorialLine("そうそう　牌をクリックすると手牌に登録できるよ"),
             }));
+        }
+
+        /// <summary>2回目の練習で「満貫以上だぞ」と念を押すまで。フロー図の「20秒以上経過」。</summary>
+        private const float SecondRoundManganHintSeconds = 20f;
+
+        /// <summary>『おまかせ』へ逃がすまで。フロー図の「１分以上経過」。</summary>
+        private const float SecondRoundAutoHintSeconds = 60f;
+
+        /// <summary>
+        /// 2回目の手牌選択の練習で、詰まっている人へ段階的に声をかける
+        /// （2026-09-30 のフロー図改訂、シート3）。
+        ///
+        ///   20秒 …「ちゃんと満貫以上になる13牌だぞー」
+        ///   1分  …「……無理そうなら左下のボタンを押してちょ」（『おまかせ』へ逃がす）
+        ///
+        /// **満貫が出来た時点で打ち切る。** フロー図の
+        /// 「内部にタイマーを設けて、プレイヤーが満貫以上を作った時にブレークする処理です」。
+        /// 出来ている人に「まだできてないの？」と言わせないための条件。
+        ///
+        /// **数えるのは選び始めてからの時間で、手が止まっている時間ではない。**
+        /// 途中まで組んで悩んでいる人にも同じように声をかけたいため
+        /// （手を動かしている間は黙る、だと永久に助けが来ない）。
+        /// </summary>
+        private IEnumerator RunSecondRoundHandTimerHints(TutorialRoundData data)
+        {
+            yield return StartCoroutine(WaitWhileBuildingHand(data, SecondRoundManganHintSeconds));
+            if (!CanHintSecondRoundHand(data)) yield break;
+
+            yield return StartCoroutine(PlayLines(new List<TutorialLine>
+            {
+                new TutorialLine($"ちゃんと{HighlightOpen}満貫以上{HighlightClose}になる13牌だぞー"),
+            }));
+
+            yield return StartCoroutine(WaitWhileBuildingHand(
+                data, SecondRoundAutoHintSeconds - SecondRoundManganHintSeconds));
+            if (!CanHintSecondRoundHand(data)) yield break;
+
+            // **『おまかせ』を出してから指す。** 逃げ道を指したのにボタンが無い、
+            // ということが起きないように
+            SetHandButtonStage(HandButtonStage.AutoAndDecide);
+
+            yield return StartCoroutine(PlayLines(new List<TutorialLine>
+            {
+                new TutorialLine($"……無理そうなら{HighlightOpen}左下のボタン{HighlightClose}を押してちょ"),
+            }));
+
+            GuideTo(gameUIManager != null && gameUIManager.HandUI != null
+                ? gameUIManager.HandUI.AutoManganButtonRect : null);
+        }
+
+        /// <summary>満貫が出来たら早めに抜ける待ち。1秒ごとに見る。</summary>
+        private IEnumerator WaitWhileBuildingHand(TutorialRoundData data, float seconds)
+        {
+            float waited = 0f;
+            while (waited < seconds)
+            {
+                if (!CanHintSecondRoundHand(data)) yield break;
+                yield return new WaitForSeconds(1f);
+                waited += 1f;
+            }
+        }
+
+        /// <summary>まだ声をかけてよいか。局が変わった・満貫が出来た・選択が終わったら黙る。</summary>
+        private bool CanHintSecondRoundHand(TutorialRoundData data)
+        {
+            return _round == data
+                   && !_aborted
+                   && _isWaitingForHandSelectionComplete
+                   && !IsSelfMadeManganHand();
         }
 
         /// <summary>

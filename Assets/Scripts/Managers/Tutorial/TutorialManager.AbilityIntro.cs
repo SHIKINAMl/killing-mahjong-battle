@@ -90,9 +90,13 @@ namespace KillingMahjong.Managers
                     "透視は相手の山牌を３枚だけ透かしてみれるよ",
                     "透視した牌は手牌に組み込まれると手牌も透けて見えるから",
                     "うっかりロンされにくくなったりするよ" } },
+                // **役強化の2行目以降は 2026-09-30 の改訂で差し替えた。**
+                // 旧「よく出る役に使ってより高い手を目指すのが定石かな」は
+                // 使いどころの話だったが、改訂版は**値段の話**に寄せている。
                 { SkillNames.BoostHand, new[] {
                     "役強化は指定の役の点を上げる能力",
-                    "よく出る役に使ってより高い手を目指すのが定石かな" } },
+                    "簡単に強い役を作れるようになるけど…ちょっとお高いね",
+                    "最初に使ってもいいし儲けた分を回すのもいいかもね" } },
             };
 
         private const string AbilityMoreQuestion = "「まぁこんな感じかな まだ知りたい？」";
@@ -118,10 +122,20 @@ namespace KillingMahjong.Managers
             new TutorialLine("そうそう重要なことだから言っとくけど"),
         };
 
+        /// <summary>
+        /// フラッシュのあとの締め（2026-09-30 の改訂）。
+        ///
+        /// **「負けないように注意」から「最低賭け金が払えなくならないように」へ変えた。**
+        /// 何がまずいのかが曖昧だったのを、負け方まで言い切る形にしている。
+        /// そのあと「点が０になっても負け」まで補足して、能力の話を締める。
+        /// </summary>
         private static readonly List<TutorialLine> AbilityCostWarnAfterLines = new List<TutorialLine>
         {
             new TutorialLine("能力の発動には点を消費するからね"),
-            new TutorialLine("能力の使いすぎで負けないように注意！"),
+            new TutorialLine("能力の使いすぎで最低賭け金が払えなくならないように！"),
+            new TutorialLine("賭け金を支払って点が０になっても負けだからね…"),
+            new TutorialLine("イカサマ能力についてはこんなもんかな"),
+            new TutorialLine("他にも何個かオモシロルールはあるけど…"),
         };
 
         /// <summary>
