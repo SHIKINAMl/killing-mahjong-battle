@@ -75,14 +75,18 @@ namespace KillingMahjong.UI
         {
             // 0段: 出さない
             new Tuning( 0f,  0f,  0f,  0, 0f, Color.clear, Color.clear, new Color32(255, 150,  40, 255)),
+            // **粒数は 2026-09-30 に約2.5倍へ増やした。**
+            // 湧き口を上辺中央の11pxから外周（20x8なら56px）へ広げたので、
+            // 元の数のままでは密度が5分の1になり、炎ではなく火花が散って見えた。
+            //
             // 1段: 赤
-            new Tuning(20f, 26f, 12f, 16, 2f, new Color32(235,  80,  35, 255), new Color32(150,  25,  20, 255), new Color32(230,  70,  50, 255)),
+            new Tuning(20f, 26f, 12f, 42, 2f, new Color32(235,  80,  35, 255), new Color32(150,  25,  20, 255), new Color32(230,  70,  50, 255)),
             // 2段: 橙
-            new Tuning(26f, 32f, 16f, 22, 2f, new Color32(255, 140,  35, 255), new Color32(180,  45,  25, 255), new Color32(255, 150,  40, 255)),
+            new Tuning(26f, 32f, 16f, 56, 2f, new Color32(255, 140,  35, 255), new Color32(180,  45,  25, 255), new Color32(255, 150,  40, 255)),
             // 3段: 黄
-            new Tuning(32f, 40f, 20f, 28, 2f, new Color32(255, 205,  60, 255), new Color32(210,  85,  30, 255), new Color32(255, 225,  70, 255)),
+            new Tuning(32f, 40f, 20f, 72, 2f, new Color32(255, 205,  60, 255), new Color32(210,  85,  30, 255), new Color32(255, 225,  70, 255)),
             // 4段: 青白（一番熱い）
-            new Tuning(40f, 50f, 25f, 34, 2f, new Color32(120, 195, 255, 255), new Color32( 40,  80, 200, 255), new Color32(120, 195, 255, 255)),
+            new Tuning(40f, 50f, 25f, 88, 2f, new Color32(120, 195, 255, 255), new Color32( 40,  80, 200, 255), new Color32(120, 195, 255, 255)),
         };
 
         /// <summary>
@@ -98,8 +102,8 @@ namespace KillingMahjong.UI
         /// <summary>根元の色。**段によらず白寄り**にしてある（一番熱い場所なので）。</summary>
         private static readonly Color CoreColor = new Color32(255, 248, 225, 255);
 
-        /// <summary>粒が出てくる幅[px]。四角（20px）より細くして、乗っている感を出す。</summary>
-        private const float BaseWidth = 11f;
+        // 粒が出てくる幅[px]。上辺の中央から1本だけ立ち上げていた頃の値。
+        // 2026-09-30 に外周から湧かせる作りへ変えたので、もう使っていない。
 
         /// <summary>
         /// ノイズの細かさ。小さいほど大きなうねりになる。
@@ -126,6 +130,9 @@ namespace KillingMahjong.UI
         private bool _broken;
         private float _fieldOffset;
 
+        /// <summary>燃えている四角。**外周から粒を湧かせる**ので、大きさを毎回ここから読む。</summary>
+        private RectTransform _pip;
+
         /// <summary>四角の上に炎を1つ作る。すでに付いていればそれを返す。</summary>
         public static VoltageFlame Attach(RectTransform pip)
         {
@@ -142,14 +149,21 @@ namespace KillingMahjong.UI
             var rect = (RectTransform)go.transform;
             rect.SetParent(pip, false);
 
-            // 四角の上辺に足を置く。下から上へ伸ばす
-            rect.anchorMin = new Vector2(0.5f, 1f);
-            rect.anchorMax = new Vector2(0.5f, 1f);
-            rect.pivot = new Vector2(0.5f, 0f);
-            rect.anchoredPosition = new Vector2(0f, -2f);   // 少し埋めて、浮いて見えないように
-            rect.sizeDelta = new Vector2(BaseWidth, 1f);
+            // **四角の全体に重ねる（2026-09-30 のユーザー指示）。**
+            // 以前は上辺の中央に幅11pxの足を置いて、そこから1本だけ立ち上げていた。
+            // 「四角形の４隅全体から炎が出ている感じ」にするため、四角そのものを
+            // 枠にして、外周のどこからでも湧けるようにする。
+            //
+            // **メッシュは枠からはみ出して構わない。** `Graphic` は矩形で切られない
+            // （切るのは `RectMask2D` だが、ゲージには付いていない）。
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            rect.pivot = new Vector2(0.5f, 0.5f);
 
             var flame = go.GetComponent<VoltageFlame>();
+            flame._pip = pip;
             flame.raycastTarget = false;                    // 牌のクリック判定を吸わない
             flame.ApplyVisibility();
             return flame;
@@ -239,11 +253,43 @@ namespace KillingMahjong.UI
             }
         }
 
-        private static void Spawn(ref Particle p, Tuning t)
+        /// <summary>
+        /// 粒を四角の**外周のどこか**から湧かせる（2026-09-30 のユーザー指示）。
+        ///
+        /// 周の長さで場所を選ぶので、辺の長さに応じて均等にばらけ、
+        /// **四隅も必ず含まれる。** 以前は上辺の中央 11px だけから出していたので、
+        /// 四角の上に細い炎が1本立っているようにしか見えなかった。
+        /// </summary>
+        private void Spawn(ref Particle p, Tuning t)
         {
-            // 中央ほど濃く撒く。端から同じだけ出すと、根元が四角く見える
-            float x = (Random.value + Random.value - 1f) * BaseWidth * 0.5f;
-            p.Pos = new Vector2(x, Random.Range(-1f, 1f));
+            Rect r = _pip != null ? _pip.rect : new Rect(-10f, -10f, 20f, 20f);
+            float hw = r.width * 0.5f;
+            float hh = r.height * 0.5f;
+
+            // 周を1本の線に伸ばして、その上の1点を選ぶ
+            float perimeter = (r.width + r.height) * 2f;
+            float s = Random.value * perimeter;
+
+            float x, y;
+            if (s < r.width)                      // 下辺
+            {
+                x = -hw + s; y = -hh;
+            }
+            else if (s < r.width + r.height)      // 右辺
+            {
+                x = hw; y = -hh + (s - r.width);
+            }
+            else if (s < r.width * 2f + r.height) // 上辺
+            {
+                x = hw - (s - r.width - r.height); y = hh;
+            }
+            else                                   // 左辺
+            {
+                x = -hw; y = hh - (s - r.width * 2f - r.height);
+            }
+
+            // 縁にぴったり並ぶと輪郭線に見えるので、少しだけ内外へ散らす
+            p.Pos = new Vector2(x + Random.Range(-1f, 1f), y + Random.Range(-1f, 1f));
             p.Age = 0f;
             p.Life = t.Height / Mathf.Max(1f, t.Rise) * Random.Range(0.75f, 1.25f);
         }
