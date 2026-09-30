@@ -113,6 +113,9 @@ namespace KillingMahjong.UI
         private Image[] _pips;
         private Image[] _pipFills;
         private VoltageFlame[] _flames;
+
+        /// <summary>点いたブロックの中で脈打つ心臓（2026-09-30 の指示）。中身は VoltageHeart.cs。</summary>
+        private VoltageHeart[] _hearts;
         private TextMeshProUGUI _multiplierText;
 
         /// <summary>
@@ -221,6 +224,7 @@ namespace KillingMahjong.UI
             _pips = new Image[PipCount];
             _pipFills = new Image[PipCount];
             _flames = new VoltageFlame[PipCount];
+            _hearts = new VoltageHeart[PipCount];
 
             for (int i = 0; i < PipCount; i++)
             {
@@ -257,6 +261,10 @@ namespace KillingMahjong.UI
                 // 点いた四角の上で炎を揺らす（2026-09-13 の指示）。
                 // 絵は使わず丸を積んで作っている。中身は VoltageFlame.cs。
                 _flames[i] = VoltageFlame.Attach(pipRect);
+
+                // **炎より後に付けること。** 兄弟の並び順がそのまま描く順になるので、
+                // 先に付けると心臓が炎の粒の下に潜って見えなくなる
+                _hearts[i] = VoltageHeart.Attach(pipRect);
             }
 
             // 下段の入れ物。中身は段が変わるたびに作り直す
@@ -329,6 +337,7 @@ namespace KillingMahjong.UI
                 // **炎は点いた四角にだけ。** 段が上がるほど、どの炎も激しくなる。
                 // 「本数が増える」と「1本ずつ強くなる」の両方で段の差を出している。
                 if (_flames[i] != null) _flames[i].SetLevel(lit ? level : 0, broken);
+                if (_hearts != null && _hearts[i] != null) _hearts[i].SetLevel(lit ? level : 0, broken);
 
                 // **上段の中は塗らない（2026-09-29）。** 途中経過は下段が受け持つ。
                 // ここで半透明を横に伸ばしていたが、薄すぎて見えていなかった。
