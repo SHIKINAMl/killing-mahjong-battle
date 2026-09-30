@@ -1,6 +1,7 @@
 """
 手牌の聴牌判定と役計算
 """
+import random
 from collections import Counter
 from functools import lru_cache
 from typing import List, Tuple, Generator
@@ -27,6 +28,8 @@ class HandAnalyzer:
         wall: List[int],
         agari_wall: List[int] | None = None,
         dora: int | None = None,
+        limit: int | None = None,
+        rng: random.Random | None = None,
     ) -> List[list[int]]:
         """
         34枚の山牌から聴牌形を検索する
@@ -38,6 +41,9 @@ class HandAnalyzer:
             wall: 山牌のリスト（34枚を想定）
             agari_wall: 和了判定に使う残り牌のリスト。指定時は満貫以上の聴牌形のみ返す
             dora: ドラの牌ID。agari_wall 指定時に利用する
+            limit: 指定時はランダムな順で探索し、この件数が見つかった時点で打ち切る。
+                配牌では満貫聴牌形が通常数千通りあり、全列挙は不要なため 1 を指定する
+            rng: limit 指定時の探索順に使う乱数生成器（未指定時は random モジュール）
 
         Returns:
             聴牌形のリスト
@@ -53,6 +59,14 @@ class HandAnalyzer:
 
         # 34枚から順番に面子候補を抽出
         mentsu = HandAnalyzer._extract_mentsu_dp(wall_counter, 0, 0)
+
+        if limit is not None:
+            # 最初に見つかったものが偏らないよう、面子・残り形の探索順をシャッフルする
+            shuffler = rng if rng is not None else random
+            mentsu = list(mentsu)
+            shuffler.shuffle(mentsu)
+            residual_catalog = list(residual_catalog)
+            shuffler.shuffle(residual_catalog)
 
         for pattern in mentsu:
             removed_wall_counter = HandAnalyzer._subtract_tiles(wall_counter, pattern)
@@ -77,6 +91,8 @@ class HandAnalyzer:
 
                 results.append(HandAnalyzer._decorate_hand_from_index(candidate, source_tile_index))
                 seen.add(candidate)
+                if limit is not None and len(results) >= limit:
+                    return results
 
         return results
 

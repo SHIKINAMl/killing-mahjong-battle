@@ -134,7 +134,8 @@ class GameSession:
 	def _find_any_tenpai_example_indexes(self, wall: List[int], dora_id: int) -> Optional[List[int]]:
 		"""wall から満貫以上の聴牌形を再探索して、最初に index 変換できる例を返す。"""
 		try:
-			candidates = HandAnalyzer.search_tenpai(wall, wall, dora_id)
+			# 全列挙すると数秒かかりイベントループを止めるため、数件見つかれば打ち切る
+			candidates = HandAnalyzer.search_tenpai(wall, wall, dora_id, limit=5)
 		except Exception:
 			return None
 
@@ -196,7 +197,9 @@ class GameSession:
 			破棄したマッチ（既に破棄済みなら None）
 		"""
 		match = self._matches.pop(match_id, None)
-		self._game_engines.pop(match_id, None)
+		engine = self._game_engines.pop(match_id, None)
+		if engine is not None:
+			engine.dispose()
 		self._confirmed_hand_players_by_match.pop(match_id, None)
 		self._last_activity_by_match.pop(match_id, None)
 
@@ -305,6 +308,14 @@ class GameSession:
 			async def _wait_and_start_deal() -> None:
 				await round_start_done.wait()
 				await dealing_phase_done.wait()
+				# 配牌の生成（別スレッド）の完了をイベントループを止めずに待つ。
+				# 通常は前局中に生成済みなので即座に進む。失敗時は _deal_tiles 内で再生成される。
+				try:
+					await asyncio.wrap_future(engine.prepare_next_deal())
+				except asyncio.CancelledError:
+					raise
+				except Exception:
+					pass
 				original_deal_tiles()
 
 			self._spawn(match.match_id, _notify_round_start())
