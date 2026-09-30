@@ -5779,6 +5779,9 @@ MonoBehaviour:
   floatAmplitudeX: 3
   rotationSpeed: 1
   rotationAmplitude: 1
+  followMusic: 1
+  beatsPerCycleY: 4
+  beatsPerCycleX: 8
 --- !u!114 &385541341
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -10408,6 +10411,10 @@ MonoBehaviour:
   seVolume: 0.5
   voiceVolume: 0.5
   isHighSpeedMode: 0
+  matchBgmSet: 0
+  textSpeed: 1
+  dialogueBubble: 0
+  screenMode: 1
   isEffectEnabled: 1
   resolutionIndex: 0
   isFullScreen: 0
@@ -14061,6 +14068,18 @@ MonoBehaviour:
   paperSlideSE: {fileID: 8300000, guid: 20523512c44165445be27fa1b439a844, type: 3}
   stopBgmOnScenes:
   - "\u30BF\u30A4\u30C8\u30EB\u30B7\u30FC\u30F3"
+  drumVolume: 0.7
+  heartbeatWeakCompact: {fileID: 8300000, guid: 978b9a0e4d2eb274b851c01284a398fd, type: 3}
+  heartbeatWeakSpaced: {fileID: 8300000, guid: 498236cfe746ee34480b6e25ac6e187a, type: 3}
+  heartbeatMediumCompact: {fileID: 8300000, guid: 7ee242cc121c4124f93a98753175be55, type: 3}
+  heartbeatMediumSpaced: {fileID: 8300000, guid: adca47be170117f418a3c121d374346a, type: 3}
+  heartbeatStrongCompact: {fileID: 8300000, guid: c0108c45b56c43e4caa48992d9ad5868, type: 3}
+  heartbeatStrongSpaced: {fileID: 8300000, guid: 85791ccb3858827489f1f1582883adf6, type: 3}
+  UseBgmLayers: 1
+  AudioEnabled: 1
+  UsePairBgm: 1
+  UsePhaseBgm: 1
+  stingerVolume: 1
 --- !u!4 &1007755307
 Transform:
   m_ObjectHideFlags: 0
@@ -18504,6 +18523,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c008c508780e68149a27fa3a5559d51c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.Managers.TutorialManager
+  CharacterRevealFinished: 0
   gameUIManager: {fileID: 536350430}
   dialogueUI: {fileID: 1566128114}
   arrowUI: {fileID: 399943608}
@@ -22831,6 +22851,9 @@ MonoBehaviour:
   floatAmplitudeX: 3
   rotationSpeed: 1
   rotationAmplitude: 2
+  followMusic: 1
+  beatsPerCycleY: 4
+  beatsPerCycleX: 8
 --- !u!114 &1680596215
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -25372,6 +25395,9 @@ MonoBehaviour:
   floatAmplitudeX: 3
   rotationSpeed: 0.5
   rotationAmplitude: 2
+  followMusic: 1
+  beatsPerCycleY: 4
+  beatsPerCycleX: 8
 --- !u!114 &1895046178
 MonoBehaviour:
   m_ObjectHideFlags: 0
