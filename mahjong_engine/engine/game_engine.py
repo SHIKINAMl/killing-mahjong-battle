@@ -124,13 +124,16 @@ class GameEngine:
             indexes: list[int] = []
             for tile in hand_tiles:
                 tile_base = tile & 0b11111
-                found_idx = None
-                for idx, wall_tile in enumerate(wall_tiles):
-                    if used[idx]:
-                        continue
-                    if (wall_tile & 0b11111) == tile_base:
-                        found_idx = idx
-                        break
+                # ドラ/赤ドラを取り違えると翻数が変わり満貫を割るため、同一の牌を優先する
+                found_idx = next(
+                    (idx for idx, wall_tile in enumerate(wall_tiles) if not used[idx] and wall_tile == tile),
+                    None,
+                )
+                if found_idx is None:
+                    found_idx = next(
+                        (idx for idx, wall_tile in enumerate(wall_tiles) if not used[idx] and (wall_tile & 0b11111) == tile_base),
+                        None,
+                    )
                 if found_idx is None:
                     raise ValueError("deal が返した聴牌例を wall index へ変換できませんでした")
                 used[found_idx] = True

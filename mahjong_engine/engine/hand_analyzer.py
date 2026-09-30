@@ -187,31 +187,39 @@ class HandAnalyzer:
     @lru_cache(maxsize=_CACHE_MAXSIZE)
     def _extract_mentsu_dp(
         counter_tuple: Tuple[int, ...],
-        start_tile: int = 0,
+        start_key: int = 0,
         depth: int = 0,
     ) -> Tuple[Tuple[int, ...], ...]:
-        """面子3つ分の候補を DP で列挙する。"""
+        """
+        面子3つ分の候補を DP で列挙する。
+
+        面子を key = 牌ID * 2 + (0: 刻子, 1: 順子) で表し、key が減らない順に選ぶ。
+        これで同じ面子の組を重複なく列挙しつつ、次の形も漏らさない。
+        - 1萬 (牌ID 0) から始まる面子
+        - 同じ面子の繰り返し（一盃口など）
+        - 3枚以上ある牌からの順子
+        """
         if depth == 3:
             return ((),)
 
         results: list[Tuple[int, ...]] = []
-        for tile_id in range(start_tile + 1, HandAnalyzer.TILE_KIND_COUNT):
-            if counter_tuple[tile_id] <= 0:
-                continue
+        for key in range(start_key, HandAnalyzer.TILE_KIND_COUNT * 2):
+            tile_id, is_run = divmod(key, 2)
 
-            if counter_tuple[tile_id] >= 3:
-                next_counter = list(counter_tuple)
-                next_counter[tile_id] -= 3
-                for melds in HandAnalyzer._extract_mentsu_dp(tuple(next_counter), tile_id, depth + 1):
-                    results.append((tile_id, tile_id, tile_id) + melds)
+            if is_run:
+                if not HandAnalyzer._can_form_run_from_tuple(counter_tuple, tile_id) or counter_tuple[tile_id] <= 0:
+                    continue
+                meld = (tile_id, tile_id + 1, tile_id + 2)
+            else:
+                if counter_tuple[tile_id] < 3:
+                    continue
+                meld = (tile_id, tile_id, tile_id)
 
-            elif HandAnalyzer._can_form_run_from_tuple(counter_tuple, tile_id):
-                next_counter = list(counter_tuple)
-                next_counter[tile_id] -= 1
-                next_counter[tile_id + 1] -= 1
-                next_counter[tile_id + 2] -= 1
-                for melds in HandAnalyzer._extract_mentsu_dp(tuple(next_counter), tile_id, depth + 1):
-                    results.append((tile_id, tile_id + 1, tile_id + 2) + melds)
+            next_counter = list(counter_tuple)
+            for t in meld:
+                next_counter[t] -= 1
+            for melds in HandAnalyzer._extract_mentsu_dp(tuple(next_counter), key, depth + 1):
+                results.append(meld + melds)
 
         return tuple(results)
 
