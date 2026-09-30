@@ -309,6 +309,36 @@ public class WebSocketGameClientSample : MonoBehaviour
     }
 
     /// <summary>
+    /// 相手をもう一度探しに行く（2026-09-30）。
+    ///
+    /// **放置でマッチを捨てられたときに使う。** サーバーは無操作が続いたマッチを
+    /// 破棄して `match_cancelled` / `reason: "idle_timeout"` を送ってくるが、
+    /// **そのとき待機列へは戻してくれない**（`_cancel_idle_matches` は
+    /// `cleanup_match_locked` を呼ぶだけ）。繋ぎっぱなしのまま誰とも組まれないので、
+    /// こちらから `join` を送り直す必要がある。
+    ///
+    /// **相手の切断のときは呼ばないこと。** あちらはサーバーが
+    /// `_waiting_queue.append` で並べ直してくれるので、送ると二重に並ぶ。
+    ///
+    /// 合言葉の部屋だった場合、入り直しは失敗することがある（相手の部屋ごと
+    /// 消えているため）。そのときはサーバーが `error` を返し、
+    /// 既存の経路がタイトルへ知らせる。
+    /// </summary>
+    public async void RequestRejoin()
+    {
+        if (!IsConnected)
+        {
+            Debug.LogWarning("[WebSocket] RequestRejoin: まだ繋がっていない");
+            return;
+        }
+
+        hasSentJoin = true;
+        string joinJson = KillingMahjong.Network.MatchJoinRequest.BuildJoinJson();
+        Log($"[WebSocket] rejoin mode={KillingMahjong.Network.MatchJoinRequest.Mode}");
+        await SendAsync(joinJson);
+    }
+
+    /// <summary>
     /// テキストメッセージを送信する。
     /// </summary>
     private async Task SendTextAsync(string message)
