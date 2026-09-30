@@ -8,6 +8,11 @@ from itertools import combinations
 
 from .yaku import Yaku
 
+# 各計算キャッシュの上限件数。
+# 上限なしだと配牌ごとの聴牌探索でキャッシュが増え続け、常時稼働のサーバーがメモリ切れで落ちる
+# (40回の配牌で約 590MB)。4096 件ならキャッシュ全体で約 20MB に収まり、配牌速度の低下は約 1 割。
+_CACHE_MAXSIZE = 4096
+
 
 class HandAnalyzer:
     """手牌の分析・判定を行うクラス"""
@@ -163,7 +168,7 @@ class HandAnalyzer:
         return tuple(counts)
 
     @staticmethod
-    @lru_cache(maxsize=None)
+    @lru_cache(maxsize=_CACHE_MAXSIZE)
     def _extract_mentsu_dp(
         counter_tuple: Tuple[int, ...],
         start_tile: int = 0,
@@ -195,7 +200,7 @@ class HandAnalyzer:
         return tuple(results)
 
     @staticmethod
-    @lru_cache(maxsize=None)
+    @lru_cache(maxsize=_CACHE_MAXSIZE)
     def _select_tiles_dp(
         counter_tuple: Tuple[int, ...],
         pick_count: int,
@@ -220,7 +225,7 @@ class HandAnalyzer:
         return tuple(results)
 
     @staticmethod
-    @lru_cache(maxsize=None)
+    @lru_cache(maxsize=_CACHE_MAXSIZE)
     def _get_waiting_tiles_from_counter(
         hand_counter: Tuple[int, ...],
         skip_tiles: Tuple[int, ...],
@@ -240,7 +245,7 @@ class HandAnalyzer:
         return tuple(waiting_tiles)
 
     @staticmethod
-    @lru_cache(maxsize=None)
+    @lru_cache(maxsize=_CACHE_MAXSIZE)
     def _get_waiting_tiles_for_residual(
         residual_counter: Tuple[int, ...],
         skip_tiles: Tuple[int, ...],
@@ -260,7 +265,7 @@ class HandAnalyzer:
         return tuple(waiting_tiles)
 
     @staticmethod
-    @lru_cache(maxsize=None)
+    @lru_cache(maxsize=_CACHE_MAXSIZE)
     def _is_win_tuple(counter_tuple: Tuple[int, ...]) -> bool:
         """牌種カウントタプルから和了形かどうかを判定する。"""
         if HandAnalyzer._is_titoitsu_tuple(counter_tuple):
@@ -278,7 +283,7 @@ class HandAnalyzer:
         return False
 
     @staticmethod
-    @lru_cache(maxsize=None)
+    @lru_cache(maxsize=_CACHE_MAXSIZE)
     def _is_meld_plus_head(counter_tuple: Tuple[int, ...]) -> bool:
         """5枚が 1 面子 + 1 雀頭へ分解できるかを判定する。"""
         for tile_id, count in enumerate(counter_tuple):
@@ -293,7 +298,7 @@ class HandAnalyzer:
         return False
 
     @staticmethod
-    @lru_cache(maxsize=None)
+    @lru_cache(maxsize=_CACHE_MAXSIZE)
     def _is_single_meld(counter_tuple: Tuple[int, ...]) -> bool:
         """3枚がちょうど1面子かどうかを判定する。"""
         tile_id = None
@@ -317,7 +322,7 @@ class HandAnalyzer:
         )
 
     @staticmethod
-    @lru_cache(maxsize=None)
+    @lru_cache(maxsize=_CACHE_MAXSIZE)
     def _can_form_all_melds(counter_tuple: Tuple[int, ...]) -> bool:
         """残り牌がすべて面子へ分解できるかを DP で判定する。"""
         tile_id = None
@@ -544,7 +549,7 @@ class HandAnalyzer:
         return HandAnalyzer._check_mangan_from_counter_tuple(counter_tuple, winning_tile, bonus_han)
 
     @staticmethod
-    @lru_cache(maxsize=None)
+    @lru_cache(maxsize=_CACHE_MAXSIZE)
     def _check_mangan_from_counter_tuple(
         counter_tuple: Tuple[int, ...],
         winning_tile: int | None,
@@ -559,7 +564,7 @@ class HandAnalyzer:
         return HandAnalyzer._max_han_from_counter_tuple(counter_tuple, winning_tile) >= target
 
     @staticmethod
-    @lru_cache(maxsize=None)
+    @lru_cache(maxsize=_CACHE_MAXSIZE)
     def _max_han_from_counter_tuple(
         counter_tuple: Tuple[int, ...],
         winning_tile: int | None,
