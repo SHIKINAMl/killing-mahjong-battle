@@ -123,6 +123,24 @@ namespace KillingMahjong.UI
                 uiManager.BettingUI.HideBettingPhase(true);
             }
 
+            // **待ち用の裏牌の山は、局が動き出したら必ず片付ける（2026-10-01）。**
+            //
+            // あれは「配牌が届くまで手持ち無沙汰にしない」ための山なので、
+            // 局が進んだ時点で用は無い。以前は `RoundStartFadeOutRoutine` の
+            // `Hide` だけに任せていたが、**置く側と片付ける側が同じ瞬間に動く**ため、
+            //
+            //     片付け(Hide) → DealingRoutine が Attach
+            //
+            // の順に入れ替わると山が残り続けた。サーバーの配牌が 4.8秒から
+            // 十数ms になって順序が揺れるようになり、実際に手牌選択フェイズまで
+            // 残った（2026-10-01 のユーザー報告）。
+            //
+            // **順序に頼らず、フェイズを見て消す。** 何度呼ばれても害は無い。
+            if (status != RoundStatus.Dealing)
+            {
+                HideWaitingTileClatter();
+            }
+
             bool showBoardElements = status == RoundStatus.Discard || 
                                      status == RoundStatus.Agari || 
                                      status == RoundStatus.Ron || 
@@ -269,6 +287,26 @@ namespace KillingMahjong.UI
             // **出したあとに必ず伏せ直す**ほうが取りこぼしが無い。
             // 伏せているあいだ以外は何もしない（FirstRoundChromeHidden を見る）。
             ReHideTutorialChrome();
+        }
+
+        /// <summary>
+        /// 配牌待ちの裏牌の山を、置かれている全部の場所から片付ける。
+        ///
+        /// **置き場所が3つある**（マッチング待ち・局頭の暗転・DealingRoutine）ので、
+        /// 1か所ずつ消すと取りこぼす。シーン内の実体を全部たどって落とす。
+        /// マッチング待ち用のものは親ごと伏せられるが、伏せ忘れても害が無いよう
+        /// ここでも一緒に落としておく。
+        /// </summary>
+        private void HideWaitingTileClatter()
+        {
+            foreach (var clatter in Object.FindObjectsByType<Effects.TileClatterEffect>(
+                         FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                if (clatter != null && clatter.gameObject.activeSelf)
+                {
+                    clatter.gameObject.SetActive(false);
+                }
+            }
         }
     }
 }

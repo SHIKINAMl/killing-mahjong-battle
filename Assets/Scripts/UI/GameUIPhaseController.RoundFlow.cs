@@ -211,7 +211,17 @@ namespace KillingMahjong.UI
                 // 配牌待ちのあいだ、手で混ぜる裏牌の山を重ねる。
                 // **2026-09-20 に全局へ広げた**（以前は第1局だけ。2局目以降も
                 // サーバー待ちで文字だけの画面になるため）。チュートリアルには出さない。
-                if (!uiManager.IsTutorialMode)
+                //
+                // **もう暗転が明けているなら置かない（2026-10-01）。**
+                // ここと「配牌が届いたときの片付け」(RoundStartFadeOutRoutine の
+                // TileClatterEffect.Hide) は、どちらも「暗転の入りが終わった瞬間」に
+                // 動き出す。サーバーの配牌が 4.8秒から十数ms になったことで同時になり、
+                //
+                //     片付け(Hide) → ここで Attach
+                //
+                // の順に入れ替わると、待ち用の山が**手牌選択フェイズまで残り続ける**
+                // （2026-10-01 のユーザー報告）。もう待っていないなら置かない、で塞ぐ。
+                if (!uiManager.IsTutorialMode && PhaseTransitionUI.IsScreenDarkened)
                 {
                     var transitionRect = uiManager.PhaseTransitionUI.transform as RectTransform;
                     if (transitionRect != null)
