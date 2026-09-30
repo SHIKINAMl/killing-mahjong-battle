@@ -77,6 +77,17 @@ namespace KillingMahjong.UI
             board.OnSelectionChanged += UpdateSelectedTileVisuals;
             board.OnTileMovedToHand += HandleTileMovedToHand;
             board.OnTileMovedToWall += HandleTileMovedToWall;
+
+            // **購読した直後に一度描き直す（2026-09-30）。**
+            // 購読より前に盤面へ入れられた状態は、イベントを聞き逃しているので
+            // そのままでは一生描かれない。取りこぼしがあっても、ここで拾える。
+            //
+            // まだ何も配られていなければ山は空なので、呼んでも何も起きない。
+            // 二重に描くこともない（`RebuildAllTilesFromState` は毎回作り直す）。
+            if (board.OriginalWallTiles != null && board.OriginalWallTiles.Count > 0)
+            {
+                RebuildAllTilesFromState();
+            }
         }
 
 

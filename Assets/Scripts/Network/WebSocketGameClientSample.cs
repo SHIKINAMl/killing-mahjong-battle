@@ -432,8 +432,12 @@ public class WebSocketGameClientSample : MonoBehaviour
     /// </summary>
     private void DeliverToUI(string raw)
     {
+        // **「居る」だけでは足りない。初期化が終わるまで待つ。**
+        // 山牌などを描く購読は GameUIManager の Start で張られる。Awake と Start の
+        // 隙間に流すと、盤面の状態は入るのに誰も描き直さないまま終わる
+        // （2026-09-30、サーバーの配牌高速化で実際に踏んだ）。
         var gameUIManager = FindFirstObjectByType<KillingMahjong.UI.GameUIManager>();
-        if (gameUIManager == null)
+        if (gameUIManager == null || !gameUIManager.IsReadyForServerMessages)
         {
             pendingMessages.Add(raw);
             return;
@@ -464,7 +468,7 @@ public class WebSocketGameClientSample : MonoBehaviour
         if (pendingMessages.Count == 0) return;
 
         var gameUIManager = FindFirstObjectByType<KillingMahjong.UI.GameUIManager>();
-        if (gameUIManager == null) return;
+        if (gameUIManager == null || !gameUIManager.IsReadyForServerMessages) return;
 
         var queued = pendingMessages.ToArray();
         pendingMessages.Clear();

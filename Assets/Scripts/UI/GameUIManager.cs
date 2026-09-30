@@ -74,11 +74,29 @@ namespace KillingMahjong.UI
 
         public bool IsMulliganSelection => SkillController != null && SkillController.IsMulliganSelection;
 
+        /// <summary>
+        /// サーバーからのメッセージを渡してよい状態か（2026-09-30）。
+        ///
+        /// **`GameUIManager` が居る＝受け取れる、ではない。**
+        /// 山牌などを描く購読は `Start` の `SetupControllers` で張られるので、
+        /// `Awake` と `Start` の隙間にメッセージを流すと、盤面の状態は更新されるのに
+        /// **誰も描き直さないまま終わる。**
+        ///
+        /// 配牌が 4.8 秒かかっていた頃はこの隙間に入りようがなかったが、
+        /// 2026-09-30 のサーバー側の高速化（約14ms）で実際に踏むようになり、
+        /// 「手牌選択フェイズで山牌が出ない」という形で出た。
+        /// </summary>
+        public bool IsReadyForServerMessages { get; private set; }
+
         private void Start()
         {
             SetupManagers();
             SetupControllers();
             SetupUI();
+
+            // **ここから先は受け取ってよい。** 貯めていたぶんは
+            // WebSocketGameClientSample が次のフレームで流す
+            IsReadyForServerMessages = true;
 
             // ボルテージのゲージを画面左に出す。**河からではなくここで作る。**
             // 河は手牌を選んでいる間は消えているので、河側の OnEnable に任せると
