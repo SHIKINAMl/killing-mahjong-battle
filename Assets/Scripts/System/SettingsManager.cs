@@ -111,15 +111,26 @@ namespace KillingMahjong.Core
 
         // --- 画面サイズ ---
         //
-        // **ドット絵なので整数倍だけにする。** 1.5倍のような半端な倍率にすると
-        // 1ドットが画素に割り切れず、目が潰れて滲む（クリックの波紋でも同じ問題が出た）。
+        // **既定を「画面に合わせる」にした（2026-09-30）。**
+        // プランナーから「比率はいいがサイズが小さい」と言われたため。
+        // 以前の既定は 800×600 の等倍で、いまどきの画面では小さすぎた。
+        //
+        // **整数倍だけに絞るのはやめた。** ドット絵は整数倍で拡大するのが本来だが、
+        // 1920×1080 の画面には 2倍（1200px）が入らず、整数倍だと 1倍のまま
+        // 何も変わらない。いちばん多い画面で効果が無いので、半端な倍率を許して
+        // 大きくするほうを選んだ（ユーザーの判断）。
+        // 半端な倍率ではドットの幅が 1px と 2px で混ざる。
         [Header("Screen")]
-        [SerializeField] private int screenMode = (int)ScreenModeKind.X1;
+        [SerializeField] private int screenMode = (int)ScreenModeKind.Fit;
         public int ScreenMode => screenMode;
 
-        public enum ScreenModeKind { X1 = 0, X2 = 1, FullScreen = 2 }
+        /// <summary>
+        /// 画面の出し方。**並び順は保存値なので入れ替えないこと**
+        /// （`PlayerPrefs` に数値で入っている）。
+        /// </summary>
+        public enum ScreenModeKind { X1 = 0, Fit = 1, FullScreen = 2 }
 
-        public static readonly string[] ScreenModeLabels = { "800×600　等倍", "1600×1200　2倍", "全画面" };
+        public static readonly string[] ScreenModeLabels = { "800×600　等倍", "画面に合わせて大きく", "全画面" };
 
         // --- 表示・システム設定 ---
         [Header("System Settings")]
@@ -333,28 +344,57 @@ namespace KillingMahjong.Core
         /// <summary>
         /// 画面サイズを当てる。
         ///
-        /// **倍率は整数だけ。** ドット絵なので、1.5倍のような半端な倍率にすると
-        /// 1ドットが画素に割り切れず目が潰れる。全画面のときは倍率を指定できないので、
-        /// ディスプレイ側の拡大に任せる（そのぶん滲むが、全画面はユーザーが選んだ結果）。
+        /// **WebGL では何もしない。** ブラウザの窓の大きさはページ側が決めるので、
+        /// ここから `Screen.SetResolution` を呼んでも効かない。
+        /// Web 版の大きさは `Assets/WebGLTemplates/KillingMahjong/index.html` の
+        /// CSS が受け持っている（4:3 を保ったまま窓いっぱいに広げる）。
         /// </summary>
         private void ApplyResolution()
         {
-            const int baseWidth = 800;
-            const int baseHeight = 600;
 #if !UNITY_WEBGL
             switch ((ScreenModeKind)screenMode)
             {
-                case ScreenModeKind.X2:
-                    Screen.SetResolution(baseWidth * 2, baseHeight * 2, false);
+                case ScreenModeKind.Fit:
+                    Vector2Int fit = LargestFittingSize();
+                    Screen.SetResolution(fit.x, fit.y, false);
                     break;
                 case ScreenModeKind.FullScreen:
                     Screen.SetResolution(Screen.currentResolution.width, Screen.currentResolution.height, true);
                     break;
                 default:
-                    Screen.SetResolution(baseWidth, baseHeight, false);
+                    Screen.SetResolution(BaseWidth, BaseHeight, false);
                     break;
             }
 #endif
+        }
+
+        private const int BaseWidth = 800;
+        private const int BaseHeight = 600;
+
+        /// <summary>
+        /// ディスプレイに収まる、いちばん大きい 4:3 の窓の大きさ。
+        ///
+        /// **画面の高さいっぱいには広げない。** タイトルバーとタスクバーのぶんが要る。
+        /// 9割にしておくと、1080p で 972px 高（約1.62倍）になり、窓の枠が画面から出ない。
+        ///
+        /// **800×600 より小さくはしない。** 小さい画面で縮めると、UI の文字が読めなくなる。
+        /// </summary>
+        private static Vector2Int LargestFittingSize()
+        {
+            int screenW = Screen.currentResolution.width;
+            int screenH = Screen.currentResolution.height;
+            if (screenW <= 0 || screenH <= 0) return new Vector2Int(BaseWidth, BaseHeight);
+
+            float usableW = screenW * 0.9f;
+            float usableH = screenH * 0.9f;
+
+            // 縦横の入るほうに合わせる
+            float scale = Mathf.Min(usableW / BaseWidth, usableH / BaseHeight);
+            if (scale < 1f) scale = 1f;
+
+            return new Vector2Int(
+                Mathf.RoundToInt(BaseWidth * scale),
+                Mathf.RoundToInt(BaseHeight * scale));
         }
     }
 }

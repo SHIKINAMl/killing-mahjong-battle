@@ -45,8 +45,12 @@ namespace KillingMahjong.Editor
             // WebGLの基本解像度を800x600 (4:3)に固定
             PlayerSettings.defaultScreenWidth = 800;
             PlayerSettings.defaultScreenHeight = 600;
-            // 余計なフッター(960x600固定)を消し、画面全体にフィットするMinimalテンプレートを使用する
-            PlayerSettings.WebGL.template = "APPLICATION:Minimal";
+            // **自前のテンプレートを使う（2026-09-30）。**
+            // 内蔵の Minimal は canvas を 800x600 の直書きで出すため、どんな大きさの
+            // 画面でも小さいままだった（プランナーから「比率はいいがサイズが小さい」）。
+            // `Assets/WebGLTemplates/KillingMahjong/index.html` で、4:3 を保ったまま
+            // ブラウザいっぱいに広げている。
+            PlayerSettings.WebGL.template = "PROJECT:KillingMahjong";
 
             // RuntimeError: null function などのWASMクラッシュ対策
             // **`stripEngineCode` は false のまま触らないこと。** 過去にこれを有効にして
