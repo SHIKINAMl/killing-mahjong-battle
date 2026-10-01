@@ -200,9 +200,15 @@ namespace KillingMahjong.UI
         /// <see cref="AddExistingTile"/> は自分・相手・チュートリアルの
         /// すべての打牌が通る場所なので、`GameUIManager.HandleDiscardEvent` や
         /// `TutorialManager` 側にも足すと二重に鳴る。
+        ///
+        /// **鳴らすのは自分の打牌だけ**（2026-10-01 の指示）。
+        /// 相手の打牌でも鳴らしていたが、自分が切る緊張を表す音なので、
+        /// 両方で鳴ると打牌のたびに鳴り続けて意味が薄れる。
         /// </summary>
         private void PlayPlacedHeartbeat()
         {
+            if (isEnemyRiver) return;
+
             var audio = KillingMahjong.Managers.AudioManager.Instance;
             if (audio != null) audio.PlayDiscardHeartbeat();
         }
