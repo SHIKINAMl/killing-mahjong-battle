@@ -221,7 +221,13 @@ namespace KillingMahjong.UI
                 //
                 // の順に入れ替わると、待ち用の山が**手牌選択フェイズまで残り続ける**
                 // （2026-10-01 のユーザー報告）。もう待っていないなら置かない、で塞ぐ。
-                if (!uiManager.IsTutorialMode && PhaseTransitionUI.IsScreenDarkened)
+                //
+                // **暗転中かどうかだけでは足りなかった（同日、2度目の報告）。**
+                // 暗転が明ける前に片付けが走ることがあり、そのときここはまだ
+                // 「暗転中」に見える。片付け済みの旗も見る。
+                if (!uiManager.IsTutorialMode && PhaseTransitionUI.IsScreenDarkened
+                    && uiManager.PhaseTransitionUI != null
+                    && !uiManager.PhaseTransitionUI.IsRoundStartCleanupDone)
                 {
                     var transitionRect = uiManager.PhaseTransitionUI.transform as RectTransform;
                     if (transitionRect != null)

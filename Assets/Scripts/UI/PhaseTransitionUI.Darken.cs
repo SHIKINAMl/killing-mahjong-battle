@@ -55,8 +55,30 @@ namespace KillingMahjong.UI
         /// </summary>
         private const float RoundDarkenAlpha = 1.0f;
 
+        /// <summary>
+        /// 配牌後の片付け（<see cref="RoundStartFadeOutRoutine"/>）がもう走ったか。
+        ///
+        /// **置く側と片付ける側が競る。** 裏牌の山を置くのは局名を出したあと、
+        /// 片付けるのは配牌が届いたとき。サーバーの配牌が 4.8秒から十数ms になり、
+        /// 「片付け → そのあと置く」の順で入れ替わると、置いた山が誰にも片付けられず
+        /// 手牌選択フェイズまで残る（2026-10-01 のユーザー報告、2度目）。
+        ///
+        /// フェイズを見て消す対策を入れてあるが、**あれは置かれる前に走ると効かない**。
+        /// 順序に頼らず、片付けが済んでいたら最初から置かないことで断つ。
+        /// </summary>
+        private bool _roundStartCleanupDone;
+
+        /// <summary>
+        /// 配牌後の片付けが済んだか。**裏牌の山を置く側は、置く直前にこれを見る。**
+        /// `IsScreenDarkened` だけでは足りない（暗転が明ける前に片付けが走ることがある）。
+        /// </summary>
+        public bool IsRoundStartCleanupDone { get { return _roundStartCleanupDone; } }
+
         private IEnumerator RoundStartDarkenRoutine(string text, Action onDarkened)
         {
+            // **ここで旗を倒さない。** 倒すのは配牌が始まったとき
+            // （HandleDealingStarted）。配牌が暗転より先に終わっている場合に
+            // ここで倒すと、「もう待っていないのに山を置く」が復活する。
             ResetVisuals();
 
             // 濃さを抑える。ResetVisuals のあとに当てないと戻される
@@ -121,7 +143,8 @@ namespace KillingMahjong.UI
             // ここから配牌が届くまではサーバー待ちで、長いと画面が文字だけで止まる。
             // 第1局だけでなく**どの局でも**混ぜられるようにする。
             // 片付けは配牌後の RoundStartFadeOutRoutine が Hide でやっている。
-            if (!IsTutorialScene())
+            // **片付けが先に走っていたら、もう置かない。** 置いても片付ける人がいない
+            if (!IsTutorialScene() && !_roundStartCleanupDone)
             {
                 var selfRect = transform as RectTransform;
                 if (selfRect != null) Effects.TileClatterEffect.Attach(selfRect, RoundWaitClatterOffsetY);
@@ -138,12 +161,33 @@ namespace KillingMahjong.UI
             return ui != null && ui.IsTutorialMode;
         }
 
+        /// <summary>
+        /// 配牌が済んだ印を立て、裏牌の山を片付ける。
+        ///
+        /// **暗転していなくても呼べるように切り出してある。** 片付けの引き金は
+        /// 配牌完了の1回きりで、暗転していないと素通りしていた。
+        /// </summary>
+        /// <summary>配牌待ちの始まり。ここからは裏牌の山を置いてよい。</summary>
+        internal void BeginRoundStartWait()
+        {
+            _roundStartCleanupDone = false;
+        }
+
+        internal void MarkRoundStartCleanupDone()
+        {
+            _roundStartCleanupDone = true;
+
+            // TileClatterEffect は破棄せず、次のマッチング待ちで再利用できる。
+            var selfRect = transform as RectTransform;
+            if (selfRect != null) Effects.TileClatterEffect.Hide(selfRect);
+        }
+
         private IEnumerator RoundStartFadeOutRoutine(Action onComplete)
         {
             // 配牌が完了したら、局名と一緒に手混ぜ用の牌の山も消す。
-            // TileClatterEffect は破棄せず、次のマッチング待ちで再利用できる。
-            var transitionRect = transform as RectTransform;
-            if (transitionRect != null) Effects.TileClatterEffect.Hide(transitionRect);
+            // 呼び出し元（PlayRoundStartFadeOut）が先に済ませているが、
+            // 直接呼ばれても困らないようにここでも通しておく。
+            MarkRoundStartCleanupDone();
 
             // テキストを隠す
             if (centerText != null) centerText.gameObject.SetActive(false);

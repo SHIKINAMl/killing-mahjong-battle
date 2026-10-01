@@ -148,7 +148,11 @@ namespace KillingMahjong.UI
         private void HandleDealingStarted()
         {
             isWaitingForDeal = true;
-            // Removed: loadingText
+
+            // **待ちがここから始まる。** 裏牌の山は、この待ちを埋めるためだけに置く。
+            // 旗を倒すのは暗転の開始ではなくここ。配牌が暗転より先に終わっていると、
+            // 暗転側で倒したぶん「もう待っていないのに置く」が起きていた。
+            BeginRoundStartWait();
         }
 
         private void HandleDealingCompleted()
@@ -255,6 +259,17 @@ namespace KillingMahjong.UI
 
         public void PlayRoundStartFadeOut(Action onComplete = null)
         {
+            // **暗転していなくても、裏牌の山だけは必ず片付ける（2026-10-01）。**
+            //
+            // 配牌完了（HandleDealingCompleted）はここを1回しか叩かない。
+            // 暗転していないと下の `return` で抜けていたため、
+            // そのあとに置かれた山を片付ける人が誰もいなくなり、
+            // **手牌選択フェイズの盤面に散らばったまま残った**（実機で確認）。
+            //
+            // 旗も先に立てる。これ以降は「置く側」が置かずに済む
+            // （PhaseTransitionUI.Darken / GameUIPhaseController.RoundFlow）。
+            MarkRoundStartCleanupDone();
+
             if (!isDarkened)
             {
                 onComplete?.Invoke();
