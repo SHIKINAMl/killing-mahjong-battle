@@ -136,10 +136,10 @@ MonoBehaviour:
     - "\u6E05\u4E00\u8272"
     manganHandHan: 6
     doraBaseId: 13
-    allowManualHandSelection: 0
-    freeHandBuilding: 0
+    allowManualHandSelection: 1
+    freeHandBuilding: 1
     rejectFirstConfirm: 0
-    requireAutoManganToConfirm: 1
+    requireAutoManganToConfirm: 0
     betAmount: 600
     betPromptText: "{0}\u5186\u8CED\u3051\u3066\u3061\u3087\u3046\u3060\u3044\u3002"
     inheritedBetLines: []
@@ -166,12 +166,21 @@ MonoBehaviour:
     drawDamageToPlayer: 0
     introLines:
     - speaker: 0
-      text: "\u6B21\u306F\u3001\u8AB0\u3082\u6B7B\u306A\u306A\u3044\u5C40\u3092\u898B\u305B\u3066\u3042\u3052\u308B\u3002"
+      text: "\u307E\u305A\u306F\u3082\u3046\u4E00\u56DE \u624B\u724C\u9078\u629E\u306E\u7DF4\u7FD2
+        \u3092\u3057\u3088\u3063\u304B"
     - speaker: 0
-      text: "\u300E\u81EA\u52D5\u300F\u3092\u62BC\u3057\u306A\u3055\u3044\u3002"
+      text: "13\u679A\u306E\u724C\u3092\u9078\u3093\u3067\u624B\u724C\u3092\u4F5C\u3063\u3066\u306D\u30FC"
     revealBoardAfterLineIndex: 0
-    onHandFilledLines: []
-    onSelfManganLines: []
+    onHandFilledLines:
+    - speaker: 0
+      text: "\u3088\u30FC\u3057\u3067\u304D\u305F\u306D"
+    - speaker: 0
+      text: "\u307B\u3044\u3058\u3083\u6C7A\u5B9A\u30DC\u30BF\u30F3\u3092\u62BC\u3057\u3066"
+    onSelfManganLines:
+    - speaker: 0
+      text: "\u3088\u30FC\u3057\u3067\u304D\u305F\u306D"
+    - speaker: 0
+      text: "\u307B\u3044\u3058\u3083\u6C7A\u5B9A\u30DC\u30BF\u30F3\u3092\u62BC\u3057\u3066"
     beforeBetLines: []
     onBattleStartLines:
     - speaker: 0
