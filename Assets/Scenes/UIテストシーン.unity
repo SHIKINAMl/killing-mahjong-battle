@@ -5432,6 +5432,9 @@ MonoBehaviour:
   floatAmplitudeX: 3
   rotationSpeed: 1
   rotationAmplitude: 1
+  followMusic: 1
+  beatsPerCycleY: 4
+  beatsPerCycleX: 8
 --- !u!114 &385541341
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -14011,7 +14014,7 @@ MonoBehaviour:
   hpDeductionDuration: 1.5
   bloodSplatterSprite: {fileID: 21300000, guid: ad1bb6e518a432f45944c8b8506f56c7, type: 3}
   dimmerColor: {r: 0, g: 0, b: 0, a: 0.7}
-  playerCutinSprite: {fileID: 21300000, guid: be41e9041388c584eb273a059116c378, type: 3}
+  playerCutinSprite: {fileID: 21300000, guid: 5bbf81386133a9d48a0e14c949429374, type: 3}
   playerTroubledSprite: {fileID: 0}
 --- !u!114 &1075082341
 MonoBehaviour:
@@ -21889,6 +21892,9 @@ MonoBehaviour:
   floatAmplitudeX: 3
   rotationSpeed: 1
   rotationAmplitude: 2
+  followMusic: 1
+  beatsPerCycleY: 4
+  beatsPerCycleX: 8
 --- !u!114 &1680596215
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -24153,6 +24159,9 @@ MonoBehaviour:
   floatAmplitudeX: 3
   rotationSpeed: 0.5
   rotationAmplitude: 2
+  followMusic: 1
+  beatsPerCycleY: 4
+  beatsPerCycleX: 8
 --- !u!114 &1895046178
 MonoBehaviour:
   m_ObjectHideFlags: 0

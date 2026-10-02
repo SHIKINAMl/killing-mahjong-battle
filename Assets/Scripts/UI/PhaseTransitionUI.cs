@@ -446,7 +446,16 @@ namespace KillingMahjong.UI
             Sprite bodySprite = null;
             Sprite faceSprite = null;
 
-            if (characterData != null)
+            // **自分のスキルは専用の絵を出す（2026-10-02 の指示）。**
+            // 以前は characterData（＝自分のキャラの立ち絵）が優先され、
+            // `playerCutinSprite` は characterData が無いときの控えでしかなかった。
+            // 自分が撃つときだけは、立ち絵ではなく専用の絵にする。
+            // 顔は重ねない（立ち絵用の差分なので、この絵には合わない）。
+            if (isLocalPlayer && playerCutinSprite != null)
+            {
+                bodySprite = playerCutinSprite;
+            }
+            else if (characterData != null)
             {
                 var bodyMatch = characterData.bodySprites?.Find(x => x.id == characterData.defaultBodyId);
                 bodySprite = bodyMatch != null ? bodyMatch.sprite : characterData.normalSprite;
