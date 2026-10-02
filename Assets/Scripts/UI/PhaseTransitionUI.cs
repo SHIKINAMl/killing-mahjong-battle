@@ -305,6 +305,10 @@ namespace KillingMahjong.UI
         [Header("Effects Settings")]
         [SerializeField] private Sprite bloodSplatterSprite;
         [SerializeField] private Color dimmerColor = new Color(0, 0, 0, 0.7f);
+        /// <summary>自分のスキルで出す専用の絵。画面の何割まで使ってよいか。</summary>
+        private const float CutinSpriteWidthRatio = 0.72f;
+        private const float CutinSpriteHeightRatio = 0.62f;
+
         [SerializeField] private Sprite playerCutinSprite;
         [SerializeField] private Sprite playerTroubledSprite;
 
@@ -451,9 +455,11 @@ namespace KillingMahjong.UI
             // `playerCutinSprite` は characterData が無いときの控えでしかなかった。
             // 自分が撃つときだけは、立ち絵ではなく専用の絵にする。
             // 顔は重ねない（立ち絵用の差分なので、この絵には合わない）。
+            bool usingCutinSprite = false;
             if (isLocalPlayer && playerCutinSprite != null)
             {
                 bodySprite = playerCutinSprite;
+                usingCutinSprite = true;
             }
             else if (characterData != null)
             {
@@ -482,21 +488,49 @@ namespace KillingMahjong.UI
                 portraitImg.SetNativeSize();
 
                 portraitRt = portraitObj.GetComponent<RectTransform>();
-                portraitRt.pivot = new Vector2(0.5f, 0f); // 下端中央
-                
-                // SetNativeSizeの直後だとrect.heightが未確定な場合があるため、spriteの実際のサイズからスケールを計算する
-                float targetHeight = 800f; // さらに少し小さめにして確実に頭が収まるようにする
-                float actualHeight = bodySprite.rect.height;
-                float scale = actualHeight > 0 ? targetHeight / actualHeight : 1f;
-                portraitRt.localScale = new Vector3(scale, scale, 1f);
-                
-                // 常に左下に配置（自分の顔のみ出るため）
-                portraitRt.anchorMin = new Vector2(0f, 0f);
-                portraitRt.anchorMax = new Vector2(0f, 0f);
-                portraitTargetPos = new Vector2(250, -150); // 少し下に移動して頭頂部が見切れないようにする
-                portraitStartPos = portraitTargetPos + new Vector2(0, -800); // 下から上がってくる
-                
-                portraitRt.anchoredPosition = portraitStartPos; 
+
+                if (usingCutinSprite)
+                {
+                    // **専用の絵は画面に収める（2026-10-02）。**
+                    // 立ち絵と違って見切れてよい絵ではないし、
+                    // CanvasScaler が幅基準（match=0・基準 800x600）なので、
+                    // 16:9 では**キャンバスの高さが 450 単位まで縮む**。
+                    // 高さ 800 の決め打ちだと、その時点ではみ出す。
+                    float areaW = containerRt.rect.width;
+                    float areaH = containerRt.rect.height;
+                    float spriteW = Mathf.Max(bodySprite.rect.width, 1f);
+                    float spriteH = Mathf.Max(bodySprite.rect.height, 1f);
+
+                    // 幅・高さの両方で頭打ちにして、狭いほうに合わせる
+                    float fit = Mathf.Min(areaW * CutinSpriteWidthRatio / spriteW,
+                                          areaH * CutinSpriteHeightRatio / spriteH);
+                    portraitRt.localScale = new Vector3(fit, fit, 1f);
+
+                    // 画面中央。看板を掲げる絵なので、寄せずに真ん中で見せる
+                    portraitRt.pivot = new Vector2(0.5f, 0.5f);
+                    portraitRt.anchorMin = new Vector2(0.5f, 0.5f);
+                    portraitRt.anchorMax = new Vector2(0.5f, 0.5f);
+                    portraitTargetPos = Vector2.zero;
+                    portraitStartPos = portraitTargetPos + new Vector2(0f, -areaH);
+                }
+                else
+                {
+                    portraitRt.pivot = new Vector2(0.5f, 0f); // 下端中央
+
+                    // SetNativeSizeの直後だとrect.heightが未確定な場合があるため、spriteの実際のサイズからスケールを計算する
+                    float targetHeight = 800f; // さらに少し小さめにして確実に頭が収まるようにする
+                    float actualHeight = bodySprite.rect.height;
+                    float scale = actualHeight > 0 ? targetHeight / actualHeight : 1f;
+                    portraitRt.localScale = new Vector3(scale, scale, 1f);
+
+                    // 常に左下に配置（自分の顔のみ出るため）
+                    portraitRt.anchorMin = new Vector2(0f, 0f);
+                    portraitRt.anchorMax = new Vector2(0f, 0f);
+                    portraitTargetPos = new Vector2(250, -150); // 少し下に移動して頭頂部が見切れないようにする
+                    portraitStartPos = portraitTargetPos + new Vector2(0, -800); // 下から上がってくる
+                }
+
+                portraitRt.anchoredPosition = portraitStartPos;
                 
                 // 立ち絵にテーマカラーのドロップシャドウ。
                 // Shadow は立ち絵の四角を丸ごと複製するので、半透明で塗る面積が1枚ぶん増える
