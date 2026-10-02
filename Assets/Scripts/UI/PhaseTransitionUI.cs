@@ -305,9 +305,16 @@ namespace KillingMahjong.UI
         [Header("Effects Settings")]
         [SerializeField] private Sprite bloodSplatterSprite;
         [SerializeField] private Color dimmerColor = new Color(0, 0, 0, 0.7f);
-        /// <summary>自分のスキルで出す専用の絵。画面の何割まで使ってよいか。</summary>
-        private const float CutinSpriteWidthRatio = 0.72f;
-        private const float CutinSpriteHeightRatio = 0.62f;
+        /// <summary>
+        /// 自分のスキルで出す専用の絵。画面の何割まで使ってよいか。
+        ///
+        /// **迫力を出すため 0.72/0.62 から上げた（2026-10-02）。**
+        /// 絵が横長なので、横長の画面ほど高さ側が先に効く。16:9 で画面幅の
+        /// 45%→57%、4:3 で 60%→76% になる。21:9 や縦でもはみ出さないことは
+        /// 計算で確かめてある。
+        /// </summary>
+        private const float CutinSpriteWidthRatio = 0.85f;
+        private const float CutinSpriteHeightRatio = 0.78f;
 
         [SerializeField] private Sprite playerCutinSprite;
         [SerializeField] private Sprite playerTroubledSprite;
