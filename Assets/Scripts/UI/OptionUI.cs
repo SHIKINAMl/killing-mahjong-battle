@@ -276,35 +276,71 @@ namespace KillingMahjong.UI
             dropdown.RefreshShownValue();
         }
 
+        /// <summary>
+        /// 設定の持ち主を返す。**居なければ警告を出す（2026-10-04）。**
+        ///
+        /// 以前はどの項目も `if (Instance != null) ...` で黙って捨てていた。
+        /// `SettingsManager` が OpeningScene にしか置かれておらず、タイトルから
+        /// 始めると `Instance` が null のままだったので、**設定をいじっても
+        /// 何も起きないのに、何も言わない**状態が続いた（ユーザーが対局BGMで
+        /// 気づくまで分からなかった）。持ち主はプレハブから出るようにして直したが、
+        /// また同じことが起きたときに黙って消えないよう、ここで声を上げさせる。
+        ///
+        /// **出すのは1項目につき1回だけ。** つまみを動かすたびに出すと、
+        /// スライダー1回で何十行も流れてログが読めなくなる。
+        /// </summary>
+        private Core.SettingsManager RequireSettings(string what)
+        {
+            var settings = Core.SettingsManager.Instance;
+            if (settings != null) return settings;
+
+            if (_missingSettingsWarned.Add(what))
+            {
+                Debug.LogWarning($"[OptionUI] SettingsManager が居ないため「{what}」の変更を捨てました。" +
+                                 "Resources/SettingsManager.prefab が読めているか確認してください。");
+            }
+            return null;
+        }
+
+        /// <summary>もう警告を出した項目。同じ項目で何度も出さないために持つ。</summary>
+        private readonly System.Collections.Generic.HashSet<string> _missingSettingsWarned
+            = new System.Collections.Generic.HashSet<string>();
+
         // --- 値が変更された時に呼ばれる処理（SettingsManagerの仮の値を更新） ---
         private void OnBgmChanged(float value)
         {
-            if (Core.SettingsManager.Instance != null) Core.SettingsManager.Instance.SetBgmVolume(value);
+            var settings = RequireSettings("BGM音量");
+            if (settings != null) settings.SetBgmVolume(value);
         }
 
         private void OnSeChanged(float value)
         {
-            if (Core.SettingsManager.Instance != null) Core.SettingsManager.Instance.SetSeVolume(value);
+            var settings = RequireSettings("SE音量");
+            if (settings != null) settings.SetSeVolume(value);
         }
 
         private void OnVoiceChanged(float value)
         {
-            if (Core.SettingsManager.Instance != null) Core.SettingsManager.Instance.SetVoiceVolume(value);
+            var settings = RequireSettings("ボイス音量");
+            if (settings != null) settings.SetVoiceVolume(value);
         }
 
         private void OnHighSpeedChanged(bool isOn)
         {
-            if (Core.SettingsManager.Instance != null) Core.SettingsManager.Instance.SetHighSpeedMode(isOn);
+            var settings = RequireSettings("高速モード");
+            if (settings != null) settings.SetHighSpeedMode(isOn);
         }
 
         private void OnEffectChanged(bool isOn)
         {
-            if (Core.SettingsManager.Instance != null) Core.SettingsManager.Instance.SetEffectEnabled(isOn);
+            var settings = RequireSettings("エフェクト");
+            if (settings != null) settings.SetEffectEnabled(isOn);
         }
 
         private void OnFullscreenChanged(bool isOn)
         {
-            if (Core.SettingsManager.Instance != null) Core.SettingsManager.Instance.SetFullScreen(isOn);
+            var settings = RequireSettings("フルスクリーン");
+            if (settings != null) settings.SetFullScreen(isOn);
         }
 
 
@@ -458,22 +494,26 @@ namespace KillingMahjong.UI
 
         private void OnMatchBgmChanged(int index)
         {
-            if (Core.SettingsManager.Instance != null) Core.SettingsManager.Instance.SetMatchBgmSet(index);
+            var settings = RequireSettings("対局BGM");
+            if (settings != null) settings.SetMatchBgmSet(index);
         }
 
         private void OnTextSpeedChanged(int index)
         {
-            if (Core.SettingsManager.Instance != null) Core.SettingsManager.Instance.SetTextSpeed(index);
+            var settings = RequireSettings("文字送り");
+            if (settings != null) settings.SetTextSpeed(index);
         }
 
         private void OnScreenModeChanged(int index)
         {
-            if (Core.SettingsManager.Instance != null) Core.SettingsManager.Instance.SetScreenMode(index);
+            var settings = RequireSettings("画面サイズ");
+            if (settings != null) settings.SetScreenMode(index);
         }
 
         private void OnDialogueBubbleChanged(int index)
         {
-            if (Core.SettingsManager.Instance != null) Core.SettingsManager.Instance.SetDialogueBubble(index);
+            var settings = RequireSettings("吹き出し");
+            if (settings != null) settings.SetDialogueBubble(index);
         }
 
         private void CreateTutorialArchiveButton()
@@ -540,20 +580,16 @@ namespace KillingMahjong.UI
         // --- ボタン処理 ---
         public void SaveAndClose()
         {
-            if (Core.SettingsManager.Instance != null)
-            {
-                Core.SettingsManager.Instance.SaveSettings();
-            }
+            var settings = RequireSettings("保存");
+            if (settings != null) settings.SaveSettings();
             Close();
         }
 
         public void CloseWithoutSave()
         {
             // キャンセルして閉じる場合は、変更前の値を再ロードして元に戻す
-            if (Core.SettingsManager.Instance != null)
-            {
-                Core.SettingsManager.Instance.LoadSettings();
-            }
+            var settings = RequireSettings("取り消し");
+            if (settings != null) settings.LoadSettings();
             Close();
         }
 
