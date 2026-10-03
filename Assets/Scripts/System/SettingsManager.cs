@@ -10,6 +10,41 @@ namespace KillingMahjong.Core
     {
         public static SettingsManager Instance { get; private set; }
 
+        // ------------------------------------------------------------
+        //  どのシーンから始めても設定が効くようにする（2026-10-04）
+        //
+        //  **以前は OpeningScene にしか置いていなかった。**
+        //  そのためタイトルから始めると `Instance` が null のままで、
+        //  `OptionUI` 側は軒並み `if (Instance != null)` で守ってあるので、
+        //  **設定をいじっても黙って何も起きない**状態になっていた
+        //  （ユーザー報告「設定で対局BGMを変えてもBGMが変わりません」）。
+        //  対局BGMだけでなく、音量・文字送り・画面サイズも同じく効かない。
+        //
+        //  `AudioManager` と同じく、プレハブ1つを本物にして、居なければ出す。
+        //  どちらも `AfterSceneLoad` だが、`AudioManager` を見にいくのは `Start` なので
+        //  並び順は問題にならない（`Start` は全ての `Awake` のあとに走る）。
+        // ------------------------------------------------------------
+
+        /// <summary>`Resources` から見たプレハブの場所。</summary>
+        private const string BootstrapPrefabPath = "SettingsManager";
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        private static void EnsureExists()
+        {
+            if (Instance != null) return;
+
+            var prefab = Resources.Load<GameObject>(BootstrapPrefabPath);
+            if (prefab == null)
+            {
+                Debug.LogWarning("[SettingsManager] Resources/" + BootstrapPrefabPath +
+                                 " が見つかりません。このシーンでは設定が効きません。");
+                return;
+            }
+
+            var go = Instantiate(prefab);
+            go.name = prefab.name;
+        }
+
         // --- オーディオ設定 ---
         [Header("Audio Settings")]
         // 既定値が 0.0f だったため初回起動のプレイヤーはBGMが鳴らない状態から始まっていた。
