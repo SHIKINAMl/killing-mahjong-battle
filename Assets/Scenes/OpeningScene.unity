@@ -14048,6 +14048,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fabaabe49c657e64e8575ab1767b014e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.Managers.AudioManager
+  clairvoyanceLoop: {fileID: 8300000, guid: 27df328361f7a1d47907b3194f2d02df, type: 3}
+  clairvoyanceFlashReturn: {fileID: 8300000, guid: 9cabe7c2d9a86ca42a0f6db7e03329bb, type: 3}
+  clairvoyanceHeartbeat: {fileID: 8300000, guid: 47f339ec774623943bda6d4f48212955, type: 3}
   bgmSource: {fileID: 0}
   seSource: {fileID: 0}
   voiceSource: {fileID: 0}
