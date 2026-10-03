@@ -13,9 +13,13 @@ namespace KillingMahjong.UI.Effects
     /// 見え方になってしまう。原寸のまま重ね、**見せたい所だけ青を抜く**ことで
     /// 「周りが青くなった」ように見せる。
     ///
-    /// 青を抜くのは丸く・ぼかして行う。四角で抜くと枠が見えてしまうので、
-    /// <see cref="InnerRadius"/> の内側は完全に抜き、<see cref="OuterRadius"/> へ
-    /// 向かってなだらかに戻す。
+    /// 青を抜くのはぼかして行う。四角で抜くと枠が見えてしまう。
+    ///
+    /// **抜く形は丸ではなく楕円。** 画面は横に長いので、丸で抜くと
+    /// 左右が先に青くなって上下が残り、「周りが青い」に見えない
+    /// （2026-10-03 のユーザー指摘「もっと画面の周りは青くなるように」）。
+    /// <see cref="RadiusX"/>／<see cref="RadiusY"/> の内側は完全に抜き、
+    /// そこから <see cref="OuterScale"/> 倍の所までで青を戻しきる。
     ///
     /// **抜き方は格子の頂点色でやる。** シェーダーを足さずに済むように、
     /// 板を <see cref="GridX"/>×<see cref="GridY"/> に割って、頂点ごとの
@@ -24,34 +28,42 @@ namespace KillingMahjong.UI.Effects
     [RequireComponent(typeof(CanvasRenderer))]
     public class PerspectiveGhostLayer : RawImage
     {
-        /// <summary>格子の細かさ。丸いぼかしが角張らない程度にあればよい。</summary>
+        /// <summary>格子の細かさ。ぼかしの縁が角張らない程度にあればよい。</summary>
         private const int GridX = 24;
         private const int GridY = 18;
 
-        private Vector2 _focusLocal;
-        private float _innerRadius = 120f;
-        private float _outerRadius = 260f;
+        private Vector2 _centerLocal;
+        private float _radiusX = 200f;
+        private float _radiusY = 140f;
+        private float _outerScale = 1.6f;
         private float _strength = 1f;
 
-        /// <summary>青を抜く中心。このレイヤーのローカル座標で渡す。</summary>
-        public Vector2 FocusLocal
+        /// <summary>青を抜く楕円の中心。このレイヤーのローカル座標で渡す。</summary>
+        public Vector2 CenterLocal
         {
-            get => _focusLocal;
-            set { _focusLocal = value; SetVerticesDirty(); }
+            get => _centerLocal;
+            set { _centerLocal = value; SetVerticesDirty(); }
         }
 
-        /// <summary>この距離までは完全に抜く（＝元の画面がそのまま見える）。</summary>
-        public float InnerRadius
+        /// <summary>完全に抜く楕円の横半径。</summary>
+        public float RadiusX
         {
-            get => _innerRadius;
-            set { _innerRadius = value; SetVerticesDirty(); }
+            get => _radiusX;
+            set { _radiusX = value; SetVerticesDirty(); }
         }
 
-        /// <summary>この距離から外は抜かない（＝青が全部乗る）。</summary>
-        public float OuterRadius
+        /// <summary>完全に抜く楕円の縦半径。</summary>
+        public float RadiusY
         {
-            get => _outerRadius;
-            set { _outerRadius = value; SetVerticesDirty(); }
+            get => _radiusY;
+            set { _radiusY = value; SetVerticesDirty(); }
+        }
+
+        /// <summary>楕円の何倍の所で青が乗りきるか。小さいほど急に青くなる。</summary>
+        public float OuterScale
+        {
+            get => _outerScale;
+            set { _outerScale = Mathf.Max(1.01f, value); SetVerticesDirty(); }
         }
 
         /// <summary>全体の濃さ。出入りのフェードに使う。</summary>
@@ -87,10 +99,8 @@ namespace KillingMahjong.UI.Effects
                     float x = r.xMin + r.width * fx;
                     float y = r.yMin + r.height * fy;
 
-                    float d = Vector2.Distance(new Vector2(x, y), _focusLocal);
-
                     Color c = baseColor;
-                    c.a *= GhostAlphaAt(d) * _strength;
+                    c.a *= GhostAlphaAt(x, y) * _strength;
 
                     v.position = new Vector3(x, y, 0f);
                     v.uv0 = new Vector2(uv.x + uv.width * fx, uv.y + uv.height * fy);
@@ -112,16 +122,20 @@ namespace KillingMahjong.UI.Effects
         }
 
         /// <summary>
-        /// 中心からの距離に対する青の濃さ。内側 0、外側 1。
+        /// 楕円の内側は 0、外へ向かって 1。
         ///
         /// 間は 1.6 乗で戻す。直線で戻すと、抜いた所の縁が輪になって見える。
         /// </summary>
-        private float GhostAlphaAt(float distance)
+        private float GhostAlphaAt(float x, float y)
         {
-            if (distance <= _innerRadius) return 0f;
-            if (distance >= _outerRadius) return 1f;
+            float nx = (x - _centerLocal.x) / Mathf.Max(1f, _radiusX);
+            float ny = (y - _centerLocal.y) / Mathf.Max(1f, _radiusY);
+            float dn = Mathf.Sqrt(nx * nx + ny * ny);
 
-            float t = (distance - _innerRadius) / Mathf.Max(0.0001f, _outerRadius - _innerRadius);
+            if (dn <= 1f) return 0f;
+            if (dn >= _outerScale) return 1f;
+
+            float t = (dn - 1f) / (_outerScale - 1f);
             return 1f - Mathf.Pow(1f - t, 1.6f);
         }
     }

@@ -50,7 +50,13 @@ namespace KillingMahjong.UI.Effects
         /// 元の盤面が暗いので、重ねたのがほとんど見えなくなっていた）。
         /// 青へ寄せるのは <see cref="TintBlue"/> が撮った絵そのものに対して行う。
         /// </summary>
-        private static readonly Color GhostTint = new Color(1f, 1f, 1f, 0.47f);
+        private static readonly Color GhostTint = new Color(1f, 1f, 1f, 0.56f);
+
+        /// <summary>
+        /// 青を抜く楕円の何倍の所で、青が乗りきるか。
+        /// 小さいほど急に青くなり、画面の周りがはっきり青く見える。
+        /// </summary>
+        private const float GhostOuterScale = 1.55f;
 
         /// <summary>出きるまでの秒数。</summary>
         public const float EnterDuration = 0.45f;
@@ -259,21 +265,27 @@ namespace KillingMahjong.UI.Effects
 
             // 青を抜く穴。画面中央と山牌の間に置き、山牌がすっぽり入る大きさにする。
             // **中央に固定してはいけない。** 16:9 など縦が短い画面では山牌が
-            // 穴からはみ出して、めくった牌が青くかぶってしまう
+            // 穴からはみ出して、めくった牌が青くかぶってしまう。
+            //
+            // **丸ではなく楕円で抜く（2026-10-03）。** 丸だと左右が先に青くなって
+            // 上下が残り、「画面の周りが青い」に見えなかった（ユーザー指摘）。
+            // 縦をきつめに取ると、上下の帯もちゃんと青くなる
             Vector2 holeCenter = Vector2.Lerp(Vector2.zero, wallCenter, 0.45f);
-            float wallReach = (wallCenter - holeCenter).magnitude + wallExtent.magnitude;
-            float innerRadius = Mathf.Max(minSide * 0.34f, wallReach + minSide * 0.03f);
-            float outerRadius = innerRadius + minSide * 0.30f;
+            Vector2 ghostHole = new Vector2(minSide * 0.42f + wallExtent.x * 0.55f,
+                                            minSide * 0.30f);
+            BuildGhosts(w, h, holeCenter, ghostHole);
 
-            BuildGhosts(w, h, holeCenter, innerRadius, outerRadius);
-
-            // 山牌のまわりだけ残して暗く落とす。横に長く縦に薄いので横長の楕円で抜く
+            // 山牌のまわりだけ残して暗く落とす。横に長く縦に薄いので横長の楕円で抜く。
+            //
+            // **青くない所もはっきり暗くする（2026-10-03 のユーザー指摘
+            // 「普段の画面全体ももう少し暗く」）。** 楕円を小さめにして
+            // 暗さが山牌の近くから立ち上がるようにし、いちばん暗い所も濃くした
             _darken = NewGraphic<PerspectiveDarkenLayer>("Darken");
             _darken.color = new Color(0f, 0f, 0.02f, 1f);
             _darken.CenterLocal = wallCenter;
-            _darken.RadiusX = wallExtent.x + w * 0.105f;
-            _darken.RadiusY = wallExtent.y + h * 0.175f;
-            _darken.MaxAlpha = 0.58f;
+            _darken.RadiusX = wallExtent.x + w * 0.06f;
+            _darken.RadiusY = wallExtent.y + h * 0.10f;
+            _darken.MaxAlpha = 0.72f;
             _darken.Strength = 0f;
 
             // 集中線。**空ける穴は山牌に沿った横長の楕円にする。**
@@ -289,7 +301,7 @@ namespace KillingMahjong.UI.Effects
             _lines.Progress = 0f;
         }
 
-        private void BuildGhosts(float w, float h, Vector2 holeCenter, float inner, float outer)
+        private void BuildGhosts(float w, float h, Vector2 holeCenter, Vector2 hole)
         {
             _ghosts = new PerspectiveGhostLayer[GhostOffsets.Length];
             if (_shot == null) return;
@@ -304,9 +316,10 @@ namespace KillingMahjong.UI.Effects
                 ghost.rectTransform.anchoredPosition = offset;
 
                 // 穴は**画面に対して**空ける。板をずらした分だけ、穴も逆にずらす
-                ghost.FocusLocal = holeCenter - offset;
-                ghost.InnerRadius = inner;
-                ghost.OuterRadius = outer;
+                ghost.CenterLocal = holeCenter - offset;
+                ghost.RadiusX = hole.x;
+                ghost.RadiusY = hole.y;
+                ghost.OuterScale = GhostOuterScale;
                 ghost.Strength = 0f;
 
                 _ghosts[i] = ghost;
