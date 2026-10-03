@@ -341,11 +341,13 @@ namespace KillingMahjong.Managers
         }
 
         /// <summary>
-        /// タイトル画面の曲。**追加曲の「真夜中のアーケード」**（2026-09-19 のユーザー指示）。
-        /// 元の `bgm_title` はコレクションで聴ける。
+        /// タイトル画面の曲。**追加曲の「夏の空」**（2026-10-04 のユーザー指示）。
+        ///
+        /// 2026-09-19 からは「真夜中のアーケード」(`bgm_ex_midnight`) だった。
+        /// それも元の `bgm_title` も、コレクションで聴ける。
         /// ループ用の曲ではないので、終わりの約2秒でフェードしてから頭に戻る。
         /// </summary>
-        public const string TitleBgmName = "bgm_ex_midnight";
+        public const string TitleBgmName = "bgm_ex_summer";
 
         /// <summary>タイトル・メニュー用。対局のBGMとは別系統。</summary>
         public void PlayTitleBgm()

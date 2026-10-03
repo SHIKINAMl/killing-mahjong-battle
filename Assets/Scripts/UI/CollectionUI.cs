@@ -49,7 +49,7 @@ namespace KillingMahjong.UI
         /// </summary>
         private static readonly Track[] BgmsInUse =
         {
-            new Track("Bgm", "bgm_ex_midnight",  "タイトル"),
+            new Track("Bgm", "bgm_ex_summer",    "タイトル"),
             new Track("Bgm", "bgm_ex_lofi",      "部屋の待機"),
             new Track("Bgm", "tut_lesson",       "チュートリアル"),
             new Track("Bgm", "bgm_phase_normal", "対局　通常"),
@@ -107,7 +107,7 @@ namespace KillingMahjong.UI
             new Track("Bgm", "bgm_kake_1",       "賭けの合図 I"),
             new Track("Bgm", "bgm_kake_2",       "賭けの合図 II"),
             new Track("Bgm", "bgm_ex_glitch",    "グリッチ"),
-            new Track("Bgm", "bgm_ex_summer",    "夏の空"),
+            new Track("Bgm", "bgm_ex_midnight",  "真夜中のアーケード"),
             new Track("Bgm", "bgm_ex_fantasy",   "はるかな地平線"),
             new Track("Bgm", "bgm_ex_sporty",    "カウントダウン"),
             new Track("Bgm", "bgm_ex_mystery",   "時計じかけの謎"),
@@ -314,7 +314,7 @@ namespace KillingMahjong.UI
             // 以前は対局の流れで前半・後半に割っていたが、鳴っていない曲が混ざっていて
             // どれが生きているのか分からなかった。
             //
-            // タイトルと部屋の待機画面は「追加曲」タブの曲（bgm_ex_midnight / bgm_ex_lofi）が
+            // タイトルと部屋の待機画面は「追加曲」タブの曲（bgm_ex_summer / bgm_ex_lofi）が
             // 鳴っている。こちらの列には出てこないので注意。
             BuildColumn(parent, -178f, "BGM　使用中", BgmsInUse);
             BuildColumn(parent, 178f, "BGM　未使用", BgmsUnused);
