@@ -74,6 +74,44 @@ namespace KillingMahjong.UI
         /// </summary>
         public bool IsRoundStartCleanupDone { get { return _roundStartCleanupDone; } }
 
+        /// <summary>
+        /// 配牌が「暗転が上がりきる前」に終わっていたか（2026-10-04 のユーザー報告
+        /// 「暗転する前に全部そろっている画面が映っています」）。
+        ///
+        /// **サーバーの配牌が十数msになったので、暗転より先に届くようになった。**
+        /// 以前の作りだと、暗転が降りている最中でも配牌完了がそのまま晴らしに入るか、
+        /// まだ暗転が始まってもいないと素通りしていた。どちらの場合も、
+        /// そろった盤面が暗転にかぶる前に見えてしまう。
+        ///
+        /// 晴らすのは**必ず暗転が上がりきってから**にして、
+        /// 先に終わっていた場合はこの旗に積んでおく。
+        /// </summary>
+        private bool _fadeOutPendingUntilDarkened;
+
+        /// <summary>
+        /// 暗転が降りきるのを待ってから晴らす。<see cref="PlayRoundStartFadeOut"/> が
+        /// 「降りている最中」に呼ばれたときだけ走る。
+        /// </summary>
+        private IEnumerator FadeOutAfterDarkenRoutine(Action onComplete)
+        {
+            while (IsDarkenTransitioning)
+            {
+                yield return null;
+            }
+
+            _fadeOutPendingUntilDarkened = false;
+
+            if (!isDarkened)
+            {
+                onComplete?.Invoke();
+                yield break;
+            }
+
+            isDarkened = false;
+            IsScreenDarkened = false;
+            yield return StartCoroutine(RoundStartFadeOutRoutine(onComplete));
+        }
+
         private IEnumerator RoundStartDarkenRoutine(string text, Action onDarkened)
         {
             // **ここで旗を倒さない。** 倒すのは配牌が始まったとき
@@ -171,6 +209,10 @@ namespace KillingMahjong.UI
         internal void BeginRoundStartWait()
         {
             _roundStartCleanupDone = false;
+
+            // 前の局で積んだままになっていたら降ろす。立てっぱなしだと
+            // 次の「降りている最中の配牌完了」を拾い損ねる
+            _fadeOutPendingUntilDarkened = false;
         }
 
         internal void MarkRoundStartCleanupDone()

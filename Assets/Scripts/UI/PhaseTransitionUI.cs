@@ -270,6 +270,25 @@ namespace KillingMahjong.UI
             // （PhaseTransitionUI.Darken / GameUIPhaseController.RoundFlow）。
             MarkRoundStartCleanupDone();
 
+            // **降りている最中なら、上がりきるまで晴らさない（2026-10-04）。**
+            //
+            // サーバーの配牌が十数msになり、暗転が降りきる前に配牌完了が届くように
+            // なった。そのまま晴らしに入ると、暗転が画面を覆いきらないうちに
+            // 折り返すので、**そろった盤面が暗転にかぶる前に見えてしまう**
+            // （ユーザー報告「暗転する前に全部そろっている画面が映っています」）。
+            //
+            // ここで待つのは「降りきるまで」だけ。**待ちを増やしているのではなく、
+            // 順番を戻しているだけ**で、降りきったあとはすぐ晴らしに入る。
+            if (IsDarkenTransitioning)
+            {
+                if (!_fadeOutPendingUntilDarkened)
+                {
+                    _fadeOutPendingUntilDarkened = true;
+                    StartCoroutine(FadeOutAfterDarkenRoutine(onComplete));
+                }
+                return;
+            }
+
             if (!isDarkened)
             {
                 onComplete?.Invoke();
