@@ -23,17 +23,28 @@ namespace KillingMahjong.Managers
         //  リバーブを足している。物足りなければ、こもり版のBGMを別に用意する。
         // ------------------------------------------------------------
 
-        /// <summary>透視中のカットオフ。フェイズのこもり(1000Hz)よりさらに下。</summary>
-        private const float DeepMuffledCutoff = 600f;
+        /// <summary>
+        /// 透視中のカットオフ。
+        ///
+        /// **600Hz では耳に届かなかった（2026-10-03 にユーザー報告「音変わってないです」）。**
+        /// 実測すると値そのものは 1000→600 へ動いていたので、仕組みは効いていた。
+        /// 届かなかった理由は幅で、1000→600 は 0.74 オクターブしかない。
+        /// 人の耳は対数で聞くので、**すでにこもっている所からさらに沈めるには
+        /// オクターブで稼ぐ必要がある。** 260Hz なら 1000 から約1.9オクターブ下がる。
+        /// </summary>
+        private const float DeepMuffledCutoff = 260f;
 
-        /// <summary>沈むまでの秒数。発動の見た目(0.45秒)から遅れすぎない長さ。</summary>
-        private const float DeepMuffleDuration = 0.8f;
+        /// <summary>沈むまでの秒数。長いと「いつの間にか変わっていた」になるので短めに。</summary>
+        private const float DeepMuffleDuration = 0.6f;
 
         /// <summary>戻るまでの秒数。心音3拍のあいだに戻りきるくらい。</summary>
         private const float DeepOpenDuration = 1.2f;
 
-        /// <summary>リバーブを効かせたときの room（ミリベル）。</summary>
-        private const float ReverbRoomOn = -600f;
+        /// <summary>
+        /// リバーブを効かせたときの room（ミリベル）。0 が最大。
+        /// こちらも -600 では物足りなかったので、ほぼ全開まで上げている。
+        /// </summary>
+        private const float ReverbRoomOn = -200f;
 
         /// <summary>リバーブを切ったときの room。これ以下は事実上無音。</summary>
         private const float ReverbRoomOff = -10000f;
@@ -142,9 +153,9 @@ namespace KillingMahjong.Managers
                 bgmReverbFilter.reverbPreset = AudioReverbPreset.User;
                 bgmReverbFilter.dryLevel = 0f;      // 元の音はそのまま通す
                 bgmReverbFilter.room = ReverbRoomOff;
-                bgmReverbFilter.roomHF = -2200f;    // 高い所ほど残響に乗せない。水の中らしくなる
-                bgmReverbFilter.decayTime = 2.6f;
-                bgmReverbFilter.reverbLevel = 400f;
+                bgmReverbFilter.roomHF = -3500f;    // 高い所ほど残響に乗せない。水の中らしくなる
+                bgmReverbFilter.decayTime = 3.5f;
+                bgmReverbFilter.reverbLevel = 800f;
                 bgmReverbFilter.reverbDelay = 0.02f;
                 bgmReverbFilter.diffusion = 100f;
                 bgmReverbFilter.density = 100f;

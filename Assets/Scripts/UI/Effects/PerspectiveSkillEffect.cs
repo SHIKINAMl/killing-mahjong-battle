@@ -276,9 +276,16 @@ namespace KillingMahjong.UI.Effects
             _darken.MaxAlpha = 0.58f;
             _darken.Strength = 0f;
 
+            // 集中線。**空ける穴は山牌に沿った横長の楕円にする。**
+            // 丸で空けると、横に長い山牌の上下だけ線が遠くなって締まらない。
+            //
+            // **縦は広めに取ること。** 山牌のすぐ上に相手のキャラが居るので、
+            // 山牌にぴったり沿わせると線が顔を塗りつぶしてしまう
+            // （2026-10-03、録画で確認。相手がまったく見えなくなった）
             _lines = NewGraphic<PerspectiveFocusLines>("FocusLines");
-            float lineInner = (wallExtent.magnitude) + minSide * 0.11f;
-            _lines.Build(wallCenter, lineInner, w / 800f);
+            Vector2 lineHole = new Vector2(wallExtent.x * 1.05f + minSide * 0.10f,
+                                           wallExtent.y + minSide * 0.33f);
+            _lines.Setup(wallCenter, lineHole, w / 800f);
             _lines.Progress = 0f;
         }
 
