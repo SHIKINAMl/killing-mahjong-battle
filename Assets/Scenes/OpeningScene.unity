@@ -14019,85 +14019,6 @@ MonoBehaviour:
   tileSpacingX: 25
   tileSpacingY: 20
   animationSpeed: 15
---- !u!1 &1007755305
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1007755307}
-  - component: {fileID: 1007755306}
-  m_Layer: 0
-  m_Name: AudioManager
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1007755306
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1007755305}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fabaabe49c657e64e8575ab1767b014e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.Managers.AudioManager
-  clairvoyanceLoop: {fileID: 8300000, guid: 27df328361f7a1d47907b3194f2d02df, type: 3}
-  clairvoyanceFlashReturn: {fileID: 8300000, guid: 9cabe7c2d9a86ca42a0f6db7e03329bb, type: 3}
-  clairvoyanceHeartbeat: {fileID: 8300000, guid: 47f339ec774623943bda6d4f48212955, type: 3}
-  bgmSource: {fileID: 0}
-  seSource: {fileID: 0}
-  voiceSource: {fileID: 0}
-  discardPitchStepSemitones: 0.5
-  masterVolume: 1
-  bgmVolume: 1
-  seVolume: 1
-  voiceVolume: 1
-  defaultBgm: {fileID: 0}
-  battleBgm: {fileID: 8300000, guid: 2e04b48aa88271b4fb369444169d1ad3, type: 3}
-  discardSE: {fileID: 8300000, guid: 89c9942a1cc33af4198da3b27d04bda2, type: 3}
-  selectTileSE: {fileID: 8300000, guid: 4230ad990bd415844842b3ad82b0effb, type: 3}
-  ronVoice: {fileID: 8300000, guid: 8bc296f5f1c07a349846ad715cd7bf38, type: 3}
-  hoverSE: {fileID: 8300000, guid: e01d65bd702398744825285b24f0fa6d, type: 3}
-  pickTileSE: {fileID: 0}
-  drawTileSE: {fileID: 0}
-  uiPopupSE: {fileID: 0}
-  paperSlideSE: {fileID: 8300000, guid: 20523512c44165445be27fa1b439a844, type: 3}
-  stopBgmOnScenes:
-  - "\u30BF\u30A4\u30C8\u30EB\u30B7\u30FC\u30F3"
-  drumVolume: 0.7
-  heartbeatWeakCompact: {fileID: 8300000, guid: 978b9a0e4d2eb274b851c01284a398fd, type: 3}
-  heartbeatWeakSpaced: {fileID: 8300000, guid: 498236cfe746ee34480b6e25ac6e187a, type: 3}
-  heartbeatMediumCompact: {fileID: 8300000, guid: 7ee242cc121c4124f93a98753175be55, type: 3}
-  heartbeatMediumSpaced: {fileID: 8300000, guid: adca47be170117f418a3c121d374346a, type: 3}
-  heartbeatStrongCompact: {fileID: 8300000, guid: c0108c45b56c43e4caa48992d9ad5868, type: 3}
-  heartbeatStrongSpaced: {fileID: 8300000, guid: 85791ccb3858827489f1f1582883adf6, type: 3}
-  UseBgmLayers: 1
-  AudioEnabled: 1
-  UsePairBgm: 1
-  UsePhaseBgm: 1
-  stingerVolume: 1
---- !u!4 &1007755307
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1007755305}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1008364661
 GameObject:
   m_ObjectHideFlags: 0
@@ -28467,6 +28388,63 @@ MonoBehaviour:
   m_ChildScaleWidth: 0
   m_ChildScaleHeight: 0
   m_ReverseArrangement: 0
+--- !u!1001 &5425075202675589036
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 2123001102737863306, guid: 26221c9905b3e974e9592496535fd138, type: 3}
+      propertyPath: m_Name
+      value: AudioManager
+      objectReference: {fileID: 0}
+    - target: {fileID: 4383638950467876623, guid: 26221c9905b3e974e9592496535fd138, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4383638950467876623, guid: 26221c9905b3e974e9592496535fd138, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4383638950467876623, guid: 26221c9905b3e974e9592496535fd138, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4383638950467876623, guid: 26221c9905b3e974e9592496535fd138, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4383638950467876623, guid: 26221c9905b3e974e9592496535fd138, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4383638950467876623, guid: 26221c9905b3e974e9592496535fd138, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4383638950467876623, guid: 26221c9905b3e974e9592496535fd138, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4383638950467876623, guid: 26221c9905b3e974e9592496535fd138, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4383638950467876623, guid: 26221c9905b3e974e9592496535fd138, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4383638950467876623, guid: 26221c9905b3e974e9592496535fd138, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 26221c9905b3e974e9592496535fd138, type: 3}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -28484,7 +28462,7 @@ SceneRoots:
   - {fileID: 803083765}
   - {fileID: 312065929}
   - {fileID: 326032734}
-  - {fileID: 1007755307}
+  - {fileID: 5425075202675589036}
   - {fileID: 291622811}
   - {fileID: 1377704494}
   - {fileID: 721733521}
