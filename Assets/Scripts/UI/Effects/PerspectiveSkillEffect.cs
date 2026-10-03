@@ -1,0 +1,386 @@
+using System.Collections;
+using UnityEngine;
+using UnityEngine.UI;
+using KillingMahjong.Common;
+using KillingMahjong.Managers;
+
+namespace KillingMahjong.UI.Effects
+{
+    /// <summary>
+    /// 透視スキルの画面演出（2026-10-03）。Canva の提案スライド
+    /// 「透視スキル ①発動／②1枚ずつ透視する／③フラッシュ／④もとに戻る」をそのまま組んだもの。
+    ///
+    /// 流れ:
+    ///   ① 発動      … その瞬間の画面を1枚撮り、青くして周りに重ねる。
+    ///                  敵の山牌以外を暗く落とし、集中線を山牌へ集める。BGMが沈む
+    ///   ② 1枚ずつ    … 牌をめくるのは <see cref="ExposedTileEffectPlayer"/> 側。
+    ///                  この演出は出たまま待っている
+    ///   ③ フラッシュ … 白く光らせ、その瞬間に重ねと集中線を消す
+    ///   ④ もとに戻る … 心音とともに BGM の沈みを抜く。めくった牌は見えたまま
+    ///
+    /// **シーンには置かない。** 呼ばれるたびに自前の Canvas を作り、終わったら自分を消す。
+    /// 対局シーンが `UIテストシーン` と `OpeningScene` の2つあるので、シーンに置くと
+    /// 片方にだけ入れる事故が起きる（<see cref="ScreenFlash"/> と同じ理由）。
+    ///
+    /// **AI画像生成は使っていない。** 出しているのは実機の画面そのものの複製と、
+    /// 頂点色で描いた図形だけ。
+    /// </summary>
+    public class PerspectiveSkillEffect : MonoBehaviour
+    {
+        // ------------------------------------------------------------
+        //  重ねる位置。画面の幅・高さに対する割合で持つ
+        //
+        //  **主画面は縮めない。** 原寸のまま少しずつずらして重ねるので、
+        //  画面の大きさは変わらず、外側だけが青く覆われて見える。
+        // ------------------------------------------------------------
+        private static readonly Vector2[] GhostOffsets =
+        {
+            new Vector2(-0.10f,  0.07f),
+            new Vector2( 0.10f,  0.07f),
+            new Vector2( 0.00f, -0.11f),
+            new Vector2(-0.07f, -0.05f),
+            new Vector2( 0.07f, -0.05f),
+        };
+
+        /// <summary>
+        /// 重ねる絵の濃さ。**色は付けない。**
+        ///
+        /// UI の色は元の絵との**乗算**なので、ここで青を入れても「青くする」ことはできず、
+        /// 青以外が削られて暗くなるだけになる（2026-10-03 に実機で確認。
+        /// 元の盤面が暗いので、重ねたのがほとんど見えなくなっていた）。
+        /// 青へ寄せるのは <see cref="TintBlue"/> が撮った絵そのものに対して行う。
+        /// </summary>
+        private static readonly Color GhostTint = new Color(1f, 1f, 1f, 0.47f);
+
+        /// <summary>出きるまでの秒数。</summary>
+        public const float EnterDuration = 0.45f;
+
+        /// <summary>フラッシュの長さ。<see cref="ScreenFlash"/> の短い合図より少し長くする。</summary>
+        private const float FlashDuration = 0.35f;
+
+        /// <summary>心音3拍の間合い（秒）。「どくっ　どくっ　どく」。</summary>
+        private static readonly float[] HeartbeatGaps = { 0.00f, 0.42f, 0.36f };
+
+        private RectTransform _root;
+        private Texture2D _shot;
+        private PerspectiveGhostLayer[] _ghosts;
+        private PerspectiveDarkenLayer _darken;
+        private PerspectiveFocusLines _lines;
+        private bool _released;
+
+        /// <summary>演出の入れ物を作る。まだ何も出さない。</summary>
+        public static PerspectiveSkillEffect Create()
+        {
+            if (!Application.isPlaying) return null;
+
+            var go = new GameObject("PerspectiveSkillEffect");
+            return go.AddComponent<PerspectiveSkillEffect>();
+        }
+
+        /// <summary>
+        /// ①発動。画面を撮って、青い重ね・暗落とし・集中線を出す。BGMを沈める。
+        /// </summary>
+        /// <param name="focusScreenRect">
+        /// 敵の山牌の画面上の範囲（px）。集中線の集まる先と、暗く落とさない穴に使う。
+        /// 空なら画面中央あたりを使う。
+        /// </param>
+        public IEnumerator Enter(Rect focusScreenRect)
+        {
+            // **撮るのはフレームの終わりでなければならない。** 途中で呼ぶと
+            // 描き終わっていない画面が返る。重ねが真っ黒になって原因が見えにくい
+            yield return new WaitForEndOfFrame();
+
+            _shot = ScreenCapture.CaptureScreenshotAsTexture();
+            if (_shot != null)
+            {
+                _shot.wrapMode = TextureWrapMode.Clamp;
+                TintBlue(_shot);
+            }
+
+            Build(focusScreenRect);
+
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.SetBgmDeepMuffle(true);
+            }
+
+            float t = 0f;
+            while (t < EnterDuration)
+            {
+                t += Time.deltaTime;
+                float u = Mathf.Clamp01(t / EnterDuration);
+
+                // 端をなめらかに。パッと出すと「絵が差し替わった」ように見える
+                float eased = u * u * (3f - 2f * u);
+                ApplyStrength(eased);
+
+                yield return null;
+            }
+            ApplyStrength(1f);
+        }
+
+        /// <summary>
+        /// ③フラッシュ → ④もとに戻る。光った瞬間に重ねと集中線を消し、
+        /// 心音とともに BGM の沈みを抜く。終わったら自分を片付ける。
+        /// </summary>
+        public IEnumerator Release()
+        {
+            if (_released) yield break;
+            _released = true;
+
+            ScreenFlash.Play(FlashDuration, 0.85f);
+
+            // 光が乗りきってから消す。先に消すと、戻った画面が一瞬だけ見えてしまう
+            yield return new WaitForSeconds(0.06f);
+            ApplyStrength(0f);
+
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.SetBgmDeepMuffle(false);
+            }
+
+            // 「どくっ　どくっ　どく」。最後だけ強く、間を詰める
+            var strengths = new[]
+            {
+                HeartbeatStrength.Medium,
+                HeartbeatStrength.Medium,
+                HeartbeatStrength.Strong,
+            };
+            for (int i = 0; i < strengths.Length; i++)
+            {
+                if (HeartbeatGaps[i] > 0f) yield return new WaitForSeconds(HeartbeatGaps[i]);
+                if (AudioManager.Instance != null)
+                {
+                    AudioManager.Instance.PlayHeartbeat(strengths[i], HeartbeatSpacing.Compact);
+                }
+            }
+
+            yield return new WaitForSeconds(0.25f);
+            Dispose();
+        }
+
+        /// <summary>途中で止めたいときに。音も画面も元へ戻す。</summary>
+        public void Dispose()
+        {
+            if (this != null && gameObject != null) Destroy(gameObject);
+        }
+
+        /// <summary>
+        /// **BGM を戻すのはここでやる。** 途中でシーンが変わっても、
+        /// 対局をやめても、この入れ物が消えれば必ず沈みが抜ける。
+        /// <see cref="Release"/> の中だけで戻していると、演出の途中で
+        /// 画面を離れたときに BGM がこもったまま残る。
+        /// </summary>
+        private void OnDestroy()
+        {
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.SetBgmDeepMuffle(false);
+            }
+
+            if (_shot != null)
+            {
+                Destroy(_shot);
+                _shot = null;
+            }
+        }
+
+        // ------------------------------------------------------------
+
+        /// <summary>
+        /// 撮った画面そのものを青へ寄せる。
+        ///
+        /// **色相を回すのではなく、青の板と混ぜる。** ドット絵なので、
+        /// 色数が増えすぎない混ぜ方のほうが元の形が残る。混ぜたあと少し暗くして、
+        /// 主画面より後ろに見えるようにする。
+        ///
+        /// 提案の絵を作ったときと同じ式（青 (54,126,255) へ 0.78 寄せて、
+        /// (190,200,225) を掛ける）を 1 本にまとめたもの:
+        ///
+        ///     r' = 0.164r + 31 ／ g' = 0.173g + 77 ／ b' = 0.194b + 175
+        ///
+        /// 1920x1080 で約 200 万画素ぶん回す。カットインの直後に1回だけなので
+        /// ここで止まっても対局の操作には掛からないが、**毎フレームやらないこと。**
+        /// </summary>
+        private static void TintBlue(Texture2D tex)
+        {
+            Color32[] pixels;
+            try
+            {
+                pixels = tex.GetPixels32();
+            }
+            catch (UnityException e)
+            {
+                // 読めない形式で返ってきたときは、青くできないだけで演出は続ける
+                Debug.LogWarning("[Perspective] 撮った画面を読めませんでした: " + e.Message);
+                return;
+            }
+
+            for (int i = 0; i < pixels.Length; i++)
+            {
+                Color32 c = pixels[i];
+                c.r = (byte)(c.r * 0.164f + 31f);
+                c.g = (byte)(c.g * 0.173f + 77f);
+                c.b = (byte)(c.b * 0.194f + 175f);
+                pixels[i] = c;
+            }
+
+            tex.SetPixels32(pixels);
+            tex.Apply(false, false);
+        }
+
+        private void Build(Rect focusScreenRect)
+        {
+            float w = Screen.width;
+            float h = Screen.height;
+            float minSide = Mathf.Min(w, h);
+
+            if (focusScreenRect.width <= 1f || focusScreenRect.height <= 1f)
+            {
+                // 山牌の場所が取れなかったときの逃げ道。画面の上寄り中央を狙う
+                focusScreenRect = new Rect(w * 0.28f, h * 0.60f, w * 0.44f, h * 0.10f);
+            }
+
+            var canvas = gameObject.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = UISortingOrders.PerspectiveOverlay;
+
+            // GraphicRaycaster は**わざと付けない**。付けると演出中だけ全画面の
+            // クリックを吸ってしまう（ScreenFlash と同じ）
+            var rootGo = new GameObject("Overlay", typeof(RectTransform));
+            _root = (RectTransform)rootGo.transform;
+            _root.SetParent(transform, false);
+            Stretch(_root);
+
+            // 画面座標 → このレイヤーのローカル座標。Overlay なので中心が原点
+            Vector2 center = new Vector2(w * 0.5f, h * 0.5f);
+            Vector2 wallCenter = focusScreenRect.center - center;
+            Vector2 wallExtent = focusScreenRect.size * 0.5f;
+
+            // 青を抜く穴。画面中央と山牌の間に置き、山牌がすっぽり入る大きさにする。
+            // **中央に固定してはいけない。** 16:9 など縦が短い画面では山牌が
+            // 穴からはみ出して、めくった牌が青くかぶってしまう
+            Vector2 holeCenter = Vector2.Lerp(Vector2.zero, wallCenter, 0.45f);
+            float wallReach = (wallCenter - holeCenter).magnitude + wallExtent.magnitude;
+            float innerRadius = Mathf.Max(minSide * 0.34f, wallReach + minSide * 0.03f);
+            float outerRadius = innerRadius + minSide * 0.30f;
+
+            BuildGhosts(w, h, holeCenter, innerRadius, outerRadius);
+
+            // 山牌のまわりだけ残して暗く落とす。横に長く縦に薄いので横長の楕円で抜く
+            _darken = NewGraphic<PerspectiveDarkenLayer>("Darken");
+            _darken.color = new Color(0f, 0f, 0.02f, 1f);
+            _darken.CenterLocal = wallCenter;
+            _darken.RadiusX = wallExtent.x + w * 0.105f;
+            _darken.RadiusY = wallExtent.y + h * 0.175f;
+            _darken.MaxAlpha = 0.58f;
+            _darken.Strength = 0f;
+
+            _lines = NewGraphic<PerspectiveFocusLines>("FocusLines");
+            float lineInner = (wallExtent.magnitude) + minSide * 0.11f;
+            _lines.Build(wallCenter, lineInner, w / 800f);
+            _lines.Progress = 0f;
+        }
+
+        private void BuildGhosts(float w, float h, Vector2 holeCenter, float inner, float outer)
+        {
+            _ghosts = new PerspectiveGhostLayer[GhostOffsets.Length];
+            if (_shot == null) return;
+
+            for (int i = 0; i < GhostOffsets.Length; i++)
+            {
+                var ghost = NewGraphic<PerspectiveGhostLayer>("Ghost" + i);
+                ghost.texture = _shot;
+                ghost.color = GhostTint;
+
+                Vector2 offset = new Vector2(GhostOffsets[i].x * w, GhostOffsets[i].y * h);
+                ghost.rectTransform.anchoredPosition = offset;
+
+                // 穴は**画面に対して**空ける。板をずらした分だけ、穴も逆にずらす
+                ghost.FocusLocal = holeCenter - offset;
+                ghost.InnerRadius = inner;
+                ghost.OuterRadius = outer;
+                ghost.Strength = 0f;
+
+                _ghosts[i] = ghost;
+            }
+        }
+
+        private T NewGraphic<T>(string name) where T : MaskableGraphic
+        {
+            // CanvasRenderer は自分で付ける。new GameObject 経由だと RequireComponent が
+            // 効かず、絵が一切出ない（TileSparkleEffect / VoltageFlame と同じ）
+            var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(T));
+            var rect = (RectTransform)go.transform;
+            rect.SetParent(_root, false);
+            Stretch(rect);
+
+            var graphic = go.GetComponent<T>();
+            graphic.raycastTarget = false;
+            return graphic;
+        }
+
+        private static void Stretch(RectTransform rect)
+        {
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            rect.pivot = new Vector2(0.5f, 0.5f);
+        }
+
+        private void ApplyStrength(float strength)
+        {
+            if (_ghosts != null)
+            {
+                foreach (var ghost in _ghosts)
+                {
+                    if (ghost != null) ghost.Strength = strength;
+                }
+            }
+            if (_darken != null) _darken.Strength = strength;
+            if (_lines != null) _lines.Progress = strength;
+        }
+
+        // ------------------------------------------------------------
+
+        /// <summary>
+        /// RectTransform の並びから、画面上の囲み（px）を求める。
+        /// 集中線の集まる先と、暗く落とさない穴を**実際の牌の位置**から決めるために使う。
+        /// 解像度や画面比が変わっても付いてくる。
+        /// </summary>
+        public static Rect GetScreenRect(System.Collections.Generic.IList<RectTransform> targets)
+        {
+            if (targets == null || targets.Count == 0) return new Rect();
+
+            float xMin = float.MaxValue, yMin = float.MaxValue;
+            float xMax = float.MinValue, yMax = float.MinValue;
+            var corners = new Vector3[4];
+            bool any = false;
+
+            foreach (var rt in targets)
+            {
+                if (rt == null) continue;
+
+                Canvas canvas = rt.GetComponentInParent<Canvas>();
+                Camera cam = (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
+                    ? canvas.worldCamera
+                    : null;
+
+                rt.GetWorldCorners(corners);
+                for (int i = 0; i < 4; i++)
+                {
+                    Vector2 sp = RectTransformUtility.WorldToScreenPoint(cam, corners[i]);
+                    if (sp.x < xMin) xMin = sp.x;
+                    if (sp.y < yMin) yMin = sp.y;
+                    if (sp.x > xMax) xMax = sp.x;
+                    if (sp.y > yMax) yMax = sp.y;
+                    any = true;
+                }
+            }
+
+            if (!any) return new Rect();
+            return Rect.MinMaxRect(xMin, yMin, xMax, yMax);
+        }
+    }
+}

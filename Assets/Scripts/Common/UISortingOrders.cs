@@ -260,6 +260,19 @@ namespace KillingMahjong.Common
         /// <summary>GameUISkillController: マリガン中の全画面ディマー（現在はシーン側で設定。参照用）</summary>
         public const int SkillDimmer = 93;
 
+        /// <summary>
+        /// PerspectiveSkillEffect: 透視スキルの全画面演出（2026-10-03）。
+        /// 青い重ね・暗落とし・集中線をまとめて乗せる。
+        ///
+        /// **<see cref="SkillDimmer"/>(93) と同値なのは意図的。** どちらも
+        /// 「スキル中だけ出る全画面の覆い」で、**同時に出ることがない**
+        /// （マリガンと透視は別のスキルなので、同じ瞬間には撃てない）。
+        ///
+        /// <see cref="ScreenFlash"/>(98) より必ず奥に置くこと。手前に出すと、
+        /// 白で切るはずの③フラッシュがこの青の下に潜って見えなくなる。
+        /// </summary>
+        public const int PerspectiveOverlay = 93;
+
         /// <summary>ClickFeedbackManager: クリックエフェクト</summary>
         public const int ClickFeedback = 94;
 
