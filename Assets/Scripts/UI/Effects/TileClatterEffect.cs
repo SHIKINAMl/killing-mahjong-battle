@@ -104,7 +104,17 @@ namespace KillingMahjong.UI.Effects
             if (existing != null)
             {
                 existing.gameObject.SetActive(true);
-                existing.RebuildTileListIfNeeded();
+
+                // **絵の種類が変わっていたら作り直す。** 使い回しのままだと
+                // `Art` を切り替えても前の絵が出たままになる
+                if (existing._builtArtGeneration != _artGeneration)
+                {
+                    existing.Rebuild();
+                }
+                else
+                {
+                    existing.RebuildTileListIfNeeded();
+                }
                 return existing;
             }
 
@@ -203,6 +213,7 @@ namespace KillingMahjong.UI.Effects
             }
 
             _nextHopAt = Random.Range(HopIntervalMin, HopIntervalMax);
+            _builtArtGeneration = _artGeneration;
         }
 
         /// <summary>
@@ -243,6 +254,56 @@ namespace KillingMahjong.UI.Effects
         /// 裏向きの牌の絵を借りる。**取れなければ null**（呼ぶ側で色を塗る）。
         /// `GetTileSprite(-1)` が裏牌を返す約束になっている。
         /// </summary>
+        /// <summary>じゃらじゃらに使う絵の種類。</summary>
+        public enum TileArt
+        {
+            /// <summary>手牌の絵（立てた見た目）。</summary>
+            Hand,
+
+            /// <summary>河へ捨てた絵（`自身打`／寝かせた見た目）。</summary>
+            Discard,
+        }
+
+        /// <summary>
+        /// どちらの絵を使うか。**次に <see cref="Attach"/> するときから効く。**
+        /// 見比べたいので切り替えられるようにしてある。
+        /// </summary>
+        public static TileArt Art
+        {
+            get => _art;
+            set
+            {
+                if (_art == value) return;
+                _art = value;
+                _tileSprites = null;   // 読み直させる
+                _artGeneration++;      // すでに出ている山も作り直させる
+            }
+        }
+
+        /// <summary>
+        /// 絵を切り替えた回数。使い回している山が古い絵のままかどうかを、
+        /// これで見分ける。
+        /// </summary>
+        private static int _artGeneration;
+
+        private int _builtArtGeneration = -1;
+
+        /// <summary>牌を捨てて作り直す。絵の種類を変えたときに使う。</summary>
+        private void Rebuild()
+        {
+            for (int i = transform.childCount - 1; i >= 0; i--)
+            {
+                var child = transform.GetChild(i).gameObject;
+
+                // **消す前に隠す。** `Destroy` はフレームの終わりまで効かないので、
+                // そのままだと新しい山と1フレームだけ二重に写る
+                child.SetActive(false);
+                Destroy(child);
+            }
+            _tiles.Clear();
+            Build();
+        }
+
         /// <summary>
         /// 牌の絵を読み込む（2026-09-17 のユーザー指示「もともとある牌の画像を使う」）。
         ///
@@ -250,31 +311,85 @@ namespace KillingMahjong.UI.Effects
         /// 居ないので、待ち画面では借りられず、白い札で代用していた。
         /// 絵は `Assets/Resources/麻雀牌/` にあるので、そこから直に読む。
         ///
-        /// **牌でないものを弾く。** 同じフォルダに『能力発動ボタン』が入っている。
-        /// 『自身打』は河へ捨てた見た目の別絵なので、手元の牌としては使わない。
+        /// **切り抜けていない絵を弾く（2026-10-04 のユーザー指摘
+        /// 「変なものが混じっています」）。** 同じフォルダには、牌のまわりが
+        /// 白いままの絵が混ざっている:
+        ///
+        ///   中・北・南・撥・東 … 2048x2048・透明部分なし
+        ///   赤筒5／赤索５／赤萬5 … 1024x1024 の JPG（そもそも透過が持てない）
+        ///
+        /// これらは白い四角として出るので、卓の上に紙が散らばって見えていた。
+        /// ちゃんと切り抜けている絵は全部 320x320 なので、**候補の中で
+        /// いちばん多い大きさだけを残す**という形で弾いている。
+        /// 寸法を直書きしないので、絵を描き直して大きさが変わっても付いてくる。
+        ///
+        /// 『能力発動ボタン』は牌ではないので名前で弾く。裏牌も、表を向けて
+        /// 並べたいので外す。
         /// </summary>
         private static Sprite[] LoadTileSprites()
         {
             if (_tileSprites != null) return _tileSprites;
 
             var all = Resources.LoadAll<Sprite>(TileFolder);
-            var list = new List<Sprite>();
+
+            // まず名前で絞る
+            var candidates = new List<Sprite>();
             foreach (var sprite in all)
             {
                 if (sprite == null) continue;
                 string n = sprite.name;
                 if (n.Contains("ボタン")) continue;
-                if (n.Contains("自身打")) continue;
-                if (n.Contains("裏牌")) continue;      // 表を向けて並べたいので外す
-                list.Add(sprite);
+                if (n.Contains("裏牌")) continue;
+
+                bool isDiscard = n.Contains("自身打");
+                if (isDiscard != (_art == TileArt.Discard)) continue;
+
+                candidates.Add(sprite);
             }
 
-            _tileSprites = list.ToArray();
+            _tileSprites = KeepMostCommonSize(candidates);
+            if (_tileSprites.Length == 0) _tileSprites = candidates.ToArray();
             return _tileSprites;
+        }
+
+        /// <summary>
+        /// いちばん多い大きさの絵だけを残す。**切り抜けていない絵は、
+        /// 作り直しの元データのまま入っているので寸法が違う。**
+        /// 絵の中身を読まずに（Read/Write を開けずに）仕分けられる。
+        /// </summary>
+        private static Sprite[] KeepMostCommonSize(List<Sprite> candidates)
+        {
+            var counts = new Dictionary<Vector2Int, int>();
+            foreach (var sprite in candidates)
+            {
+                var size = new Vector2Int((int)sprite.rect.width, (int)sprite.rect.height);
+                counts.TryGetValue(size, out int c);
+                counts[size] = c + 1;
+            }
+
+            var best = Vector2Int.zero;
+            int bestCount = 0;
+            foreach (var pair in counts)
+            {
+                if (pair.Value <= bestCount) continue;
+                best = pair.Key;
+                bestCount = pair.Value;
+            }
+
+            var kept = new List<Sprite>();
+            foreach (var sprite in candidates)
+            {
+                if ((int)sprite.rect.width == best.x && (int)sprite.rect.height == best.y)
+                {
+                    kept.Add(sprite);
+                }
+            }
+            return kept.ToArray();
         }
 
         private const string TileFolder = "麻雀牌";
         private static Sprite[] _tileSprites;
+        private static TileArt _art = TileArt.Hand;
 
         private void Update()
         {
