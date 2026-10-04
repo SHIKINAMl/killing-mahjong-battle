@@ -43,6 +43,10 @@ namespace KillingMahjong.Network
         private int enemyPlayerHp = 20000;
         private int lastLocalBet = 0;
         private int lastEnemyBet = 0;
+        // 本番エンジンと同じく、流局後は掛け金を選び直さず同額を持ち越す。
+        // 何局持ち越したかは、ロン時の精算額にだけ掛ける。
+        private bool carryOverBets;
+        private int carryOverDrawCount;
 
         // 手牌・山牌の状態
         private List<int> mockLocalHand = new List<int>();
@@ -94,6 +98,12 @@ namespace KillingMahjong.Network
         public void StartMockConnection()
         {
             Debug.Log("[Debug Client] 接続開始（固定マンガン手牌モード）");
+            localPlayerHp = 20000;
+            enemyPlayerHp = 20000;
+            lastLocalBet = 0;
+            lastEnemyBet = 0;
+            carryOverBets = false;
+            carryOverDrawCount = 0;
             ResetRoundState();
             StartCoroutine(MockConnectionSequence());
         }
@@ -286,10 +296,18 @@ namespace KillingMahjong.Network
             SendRawJson(json);
             Debug.Log("[Debug Client] hand_selection_completed 送信");
 
-            // 少し待ってからベッティングフェーズへ
+            // 流局の次局は本番と同じく前局の額を自動で持ち越す。
+            // ベッティングUIをもう一度出して新しい額を引くと、本番との差分が生じる。
             yield return new WaitForSeconds(0.3f);
-            SendRawJson("{\"type\":\"phase_change\",\"new_status\":\"betting\"}");
-            Debug.Log("[Debug Client] phase_change(betting) 送信");
+            if (carryOverBets)
+            {
+                yield return StartCoroutine(HandleCarryOverBet());
+            }
+            else
+            {
+                SendRawJson("{\"type\":\"phase_change\",\"new_status\":\"betting\"}");
+                Debug.Log("[Debug Client] phase_change(betting) 送信");
+            }
         }
 
         // ===================================================
@@ -320,6 +338,26 @@ namespace KillingMahjong.Network
             yield return new WaitForSeconds(0.1f);
             SendRawJson($"{{\"type\":\"discard_phase_started\",\"data\":{{\"first_player\":\"{localPlayerId}\"}}}}");
             Debug.Log("[Debug Client] discard_phase_started 送信（先攻: ローカル）");
+        }
+
+        /// <summary>
+        /// 本番の GameEngine.selected_hand が流局後に行う自動ベットを再現する。
+        /// bet_completed は届くが、この時点ではHPをもう一度引かない。
+        /// </summary>
+        private IEnumerator HandleCarryOverBet()
+        {
+            string json = $"{{\"type\":\"bet_completed\",\"data\":{{\"bets\":[" +
+                          $"{{\"client_id\":\"{localPlayerId}\",\"bet\":{lastLocalBet},\"health\":{localPlayerHp}}}," +
+                          $"{{\"client_id\":\"{enemyPlayerId}\",\"bet\":{lastEnemyBet},\"health\":{enemyPlayerHp}}}" +
+                          $"]}}}}";
+            SendRawJson(json);
+            Debug.Log($"[Debug Client] 持ち越し bet_completed 送信: local={lastLocalBet}, enemy={lastEnemyBet}, carry={carryOverDrawCount}");
+
+            yield return new WaitForSeconds(3.5f);
+            SendRawJson("{\"type\":\"phase_change\",\"new_status\":\"discard\"}");
+            yield return new WaitForSeconds(0.1f);
+            SendRawJson($"{{\"type\":\"discard_phase_started\",\"data\":{{\"first_player\":\"{localPlayerId}\"}}}}");
+            Debug.Log("[Debug Client] 持ち越し局 discard_phase_started 送信（先攻: ローカル）");
         }
 
         // ===================================================
@@ -387,7 +425,10 @@ namespace KillingMahjong.Network
             if (mockTurnCount >= MAX_TURNS)
             {
                 Debug.Log("[Debug Client] 17巻到達 → 流局");
+                carryOverDrawCount++;
+                carryOverBets = true;
                 SendRawJson("{\"type\":\"round_end\",\"data\":{\"is_draw\":true}}");
+                StartCoroutine(SendNextRoundWaitingAfterDelay(0.5f));
                 yield break;
             }
 
@@ -407,25 +448,33 @@ namespace KillingMahjong.Network
         // ロン成立時の round_end 送信（Pythonの on_round_end に相当）
         private void SendRon(string winnerId, string loserId, int ronTile)
         {
-            int winnerGain = lastLocalBet + lastEnemyBet; // 簡易計算
+            int carryRounds = carryOverDrawCount + 1;
+            int winnerBet = lastLocalBet * carryRounds;
+            int loserBet = lastEnemyBet * carryRounds;
+            const float multiplier = 2.0f;
+            int winnerGain = Mathf.RoundToInt(winnerBet * multiplier);
+            int loserLoss = Mathf.RoundToInt(loserBet * multiplier);
             int winnerNewHp = localPlayerHp + winnerGain;
-            int loserNewHp = enemyPlayerHp;
+            int loserNewHp = Mathf.Max(0, enemyPlayerHp - loserLoss);
 
             string json = $"{{\"type\":\"round_end\",\"data\":{{\"is_draw\":false," +
                           $"\"liquidation\":{{" +
                           $"\"winner_id\":\"{winnerId}\"," +
                           $"\"loser_id\":\"{loserId}\"," +
                           $"\"han\":8," +
-                          $"\"multiplier\":2.0," +
-                          $"\"winner_bet\":{lastLocalBet}," +
-                          $"\"loser_bet\":{lastEnemyBet}," +
+                          $"\"multiplier\":{multiplier}," +
+                          $"\"winner_bet\":{winnerBet}," +
+                          $"\"loser_bet\":{loserBet}," +
                           $"\"winner_gain\":{winnerGain}," +
-                          $"\"loser_loss\":{lastEnemyBet}," +
+                          $"\"loser_loss\":{loserLoss}," +
                           $"\"winner_health\":{winnerNewHp}," +
                           $"\"loser_health\":{loserNewHp}," +
                           $"\"yaku\":[\"清一色\",\"七対子\"]" +
                           $"}}}}}}";
             SendRawJson(json);
+
+            carryOverBets = false;
+            carryOverDrawCount = 0;
 
             // Pythonは round_end の後に next_round_waiting を送る
             StartCoroutine(SendNextRoundWaitingAfterDelay(0.5f));
@@ -497,22 +546,29 @@ namespace KillingMahjong.Network
         private void TriggerEnemyRon()
         {
             // 敵がロンした場合のテスト
-            int lossBet = lastLocalBet > 0 ? lastLocalBet : 1000;
+            int carryRounds = carryOverDrawCount + 1;
+            int winnerBet = (lastEnemyBet > 0 ? lastEnemyBet : 1000) * carryRounds;
+            int loserBet = (lastLocalBet > 0 ? lastLocalBet : 1000) * carryRounds;
+            const float multiplier = 1.0f;
+            int winnerGain = Mathf.RoundToInt(winnerBet * multiplier);
+            int loserLoss = Mathf.RoundToInt(loserBet * multiplier);
             string json = $"{{\"type\":\"round_end\",\"data\":{{\"is_draw\":false," +
                           $"\"liquidation\":{{" +
                           $"\"winner_id\":\"{enemyPlayerId}\"," +
                           $"\"loser_id\":\"{localPlayerId}\"," +
                           $"\"han\":5," +
-                          $"\"multiplier\":1.0," +
-                          $"\"winner_bet\":{lastEnemyBet}," +
-                          $"\"loser_bet\":{lastLocalBet}," +
-                          $"\"winner_gain\":{lossBet * 2}," +
-                          $"\"loser_loss\":{lossBet}," +
-                          $"\"winner_health\":{enemyPlayerHp + lossBet * 2}," +
-                          $"\"loser_health\":{localPlayerHp - lossBet}," +
+                          $"\"multiplier\":{multiplier}," +
+                          $"\"winner_bet\":{winnerBet}," +
+                          $"\"loser_bet\":{loserBet}," +
+                          $"\"winner_gain\":{winnerGain}," +
+                          $"\"loser_loss\":{loserLoss}," +
+                          $"\"winner_health\":{enemyPlayerHp + winnerGain}," +
+                          $"\"loser_health\":{Mathf.Max(0, localPlayerHp - loserLoss)}," +
                           $"\"yaku\":[\"混一色\",\"三暗刻\"]" +
                           $"}}}}}}";
             SendRawJson(json);
+            carryOverBets = false;
+            carryOverDrawCount = 0;
             StartCoroutine(SendNextRoundWaitingAfterDelay(0.5f));
         }
     }
