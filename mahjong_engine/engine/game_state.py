@@ -116,6 +116,9 @@ class PlayerState:
     exposed_hand_indexes: set = field(default_factory=set)  # PERSPECTIVE で公開された手牌インデックス（局ごとにリセット）
     assault_active_this_round: bool = False  # ASSAULT 発動済みなら、この局の和了時効果を有効化
     assault_used_this_round: bool = False  # ASSAULT の局内使用回数制限（1局1回）
+    voltage_points: int = 0 # 現在のボルテージ値
+    voltage_broken: bool = False # ボルテージが継続中か
+    voltage_resume_points: int = 0 # ボルテージを再開するとき、どこから再開するのか
 
 
 @dataclass

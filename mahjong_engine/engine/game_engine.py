@@ -37,6 +37,7 @@ class GameEngine:
         self._last_liquidation_result: Optional[dict] = None
         self._next_round_ready_players: set[str] = set()
         self._pending_agari: Optional[dict] = None
+        self._voltage_seen_base_ids: set[int] = set() #　両者の河に出た牌を保存する集合
         # 次局の配牌（バックグラウンドで生成中 or 生成済み）
         self._next_deal: Optional[Future] = None
 
@@ -523,6 +524,27 @@ class GameEngine:
         """
         return self.cast_skill(player, SkillType.MULLIGAN, target_hand_index=target_hand_index)
 
+    
+    def _apply_voltage_discard(self, player: PlayerState, tile_id: int) -> None:
+        """打牌に応じて、そのプレイヤーのボルテージを更新する。"""
+        base_id = tile_id & 0b11111
+        is_new = base_id not in self._voltage_seen_base_ids
+        self._voltage_seen_base_ids.add(base_id)
+
+        if is_new:
+            if player.voltage_broken:
+                player.voltage_points = player.voltage_resume_points
+
+            player.voltage_points = min(14, player.voltage_points + 1)
+            player.voltage_broken = False
+            return
+
+        player.voltage_resume_points = self._get_voltage_resume_points(
+            player.voltage_points
+        )
+        player.voltage_points = 0
+        player.voltage_broken = True
+
     def discard(self, player_id: str, wall_index: int) -> bool:
         """
         プレイヤーが牌を捨てたときの処理
@@ -561,6 +583,9 @@ class GameEngine:
         discarded_tile = discarding_player.wall[wall_index]
         discarding_player.discards.append(discarded_tile)
         discarding_player.discarded_wall_indexes.add(wall_index)
+        
+        self._apply_voltage_discard(discarding_player, discarded_tile) # ボルテージを適用する
+
 
         self._invoke_callback(self.on_discarded, player_id, discarded_tile)
 
@@ -710,6 +735,40 @@ class GameEngine:
             return "満貫"
         return "満貫未満"
 
+    def _get_voltage_multiplier(self, points: int) -> float:
+        """ボルテージポイントから勝者獲得額の倍率を返す。"""
+        if points >= 14:
+            return 2.0
+        if points >= 9:
+            return 1.6
+        if points >= 5:
+            return 1.3
+        if points >= 2:
+            return 1.1
+        return 1.0
+    
+    def _get_voltage_level(self, points: int) -> int:
+        """ボルテージポイントから段階番号を返す。0〜4。"""
+        if points >= 14:
+            return 4
+        if points >= 9:
+            return 3
+        if points >= 5:
+            return 2
+        if points >= 2:
+            return 1
+        return 0
+    
+    def _get_voltage_resume_points(self, points: int) -> int:
+        """ブレイク後、次の初出牌で再開するポイントを返す。"""
+        if points >= 14:
+            return 9
+        if points >= 9:
+            return 5
+        if points >= 5:
+            return 2
+        return 0
+
     def _is_tanki_wait_agari(self, hand: list[int], winning_tile: int, winner_waits: list[int]) -> bool:
         """単騎待ちでの和了かどうかを判定する。"""
         if winning_tile is None or not winner_waits:
@@ -805,14 +864,19 @@ class GameEngine:
         multiplier = self._get_liquidation_multiplier(han)
         logger.info("精算: winner=%s  yaku=%s  base_han=%d  bonus_han=%d  multiplier=%.1f",
                     winner.player_id, display_yaku_list, base_han, bonus_han, multiplier)
+        
+        # ボルテージの倍率
+        voltage_multiplier = self._get_voltage_multiplier(
+            winner.voltage_points
+        )
 
         # 流局持ち越しは「支払い設定額を固定」し、清算時のみ累積回数を掛ける。
         carry_rounds = self._carry_over_draw_count + 1
         winner_effective_bet = winner.bet * carry_rounds
         loser_effective_bet = loser.bet * carry_rounds
 
-        # 勝者: 累積済み掛け金 × 役倍率分を獲得
-        winner_original_gain = int(winner_effective_bet * multiplier)
+        # 勝者: 累積済み掛け金 × 役倍率分 x ボルテージ倍率を獲得
+        winner_original_gain = int(winner_effective_bet * multiplier * voltage_multiplier)
         assault_applied = winner.assault_active_this_round
         assault_bonus_damage = winner_original_gain if assault_applied else 0
         winner_gain = 0 if assault_applied else winner_original_gain
@@ -834,6 +898,9 @@ class GameEngine:
             "bonus_han": bonus_han,
             "han": han,
             "multiplier": multiplier,
+            "voltage_multiplier": voltage_multiplier,
+            "winner_voltage_points": winner.voltage_points,
+            "winner_voltage_level": self._get_voltage_level(winner.voltage_points),
             "winner_bet": winner_effective_bet,
             "loser_bet": loser_effective_bet,
             "winner_original_gain": winner_original_gain,
@@ -855,6 +922,7 @@ class GameEngine:
         """次局開始に必要な状態を準備する。"""
         self.state.round_state.round_number += 1
         self._pending_agari = None
+        self._voltage_seen_base_ids.clear()
         self.state.players = [
             PlayerState(
                 player_id=p.player_id,
