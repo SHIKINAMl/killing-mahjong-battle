@@ -25,9 +25,11 @@ namespace KillingMahjong.EngineData
     /// round_end の清算内訳。点数内訳の表示に使う対応は以下（キー名に注意）:
     ///   素点     … winner_bet   （サーバー内部名は winner_effective_bet。賭け金 × 流局持ち越し回数）
     ///   翻数倍率 … multiplier   （満貫1 / 跳満1.5 / 倍満2 / 三倍満3 / 役満4 / 26飜8）
+    ///   ボルテージ倍率 … voltage_multiplier（和了した勝者の獲得予定額に掛かる）
     ///   単騎倍率 … loser_loss_multiplier（単騎待ちなら2、それ以外1。敗者の支払いにだけ掛かる）
-    /// 勝者の獲得 = winner_bet × multiplier
+    /// 勝者の獲得 = winner_bet × multiplier × voltage_multiplier
     /// 敗者の損失 = loser_bet × multiplier × loser_loss_multiplier
+    /// 強襲時は、ボルテージ込みの勝者獲得予定額が assault_bonus_damage へ回る。
     ///
     /// **強襲（assault）を撃っていた局はこの式が崩れる**（2026-08-04 にサーバーへ追加）。
     /// 勝者の獲得が 0 になり、得るはずだった額がそのまま敗者への追加ダメージへ回る:
@@ -45,6 +47,12 @@ namespace KillingMahjong.EngineData
         public int bonus_han;
         public int han;
         public float multiplier;
+
+        /// <summary>和了時点の勝者ボルテージ倍率。精算済みの winner_gain を表示するための内訳。</summary>
+        public float voltage_multiplier;
+        public int winner_voltage_points;
+        public int winner_voltage_level;
+
         public int winner_bet;   // = winner_effective_bet（持ち越し込みの素点）
         public int loser_bet;    // = loser_effective_bet
         public int winner_gain;
