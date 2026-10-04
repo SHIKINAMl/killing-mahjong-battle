@@ -180,20 +180,16 @@ namespace KillingMahjong.UI
         }
 
         /// <summary>
-        /// 「どん！どん！どん！」を叩いてから、次へ渡す（2026-10-04、`ロン演出.pdf`）。
+        /// 手の三段階を見せ、指差しのあとに吹き出しと体力表示だけを揺らして次へ渡す。
         ///
-        /// **叩き終わってから送る。** サーバーはロン入力を待ち続ける（手番のタイムアウトが無い）ので、
-        /// 1秒ほど遅れても取りこぼさない。先に送ると、確定が返ってきたカットインと
-        /// 3発が重なって、どちらも読めなくなる。
-        ///
-        /// 「ロン！」のボイスは**3発のあと**に鳴らす。以前はボタンを押した瞬間に
-        /// 鳴らしていたが、それだと順番が資料と逆になる。
+        /// サーバーへはこの短い入力演出の後に送る。返答で始まる既存の決着カットインと
+        /// 重ならず、入力が受理されたことも盤面上で読み取れる。
         /// </summary>
         private System.Collections.IEnumerator RonImpactThen(System.Action next)
         {
             var hpPanels = new System.Collections.Generic.List<RectTransform>();
-            if (PlayerInfoUI != null) hpPanels.Add(PlayerInfoUI.transform as RectTransform);
-            if (EnemyInfoUI != null) hpPanels.Add(EnemyInfoUI.transform as RectTransform);
+            if (PlayerInfoUI != null && PlayerInfoUI.HpAnchor != null) hpPanels.Add(PlayerInfoUI.HpAnchor);
+            if (EnemyInfoUI != null && EnemyInfoUI.HpAnchor != null) hpPanels.Add(EnemyInfoUI.HpAnchor);
 
             yield return Effects.RonImpactEffect.Play(this, hpPanels);
 

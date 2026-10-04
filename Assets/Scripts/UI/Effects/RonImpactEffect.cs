@@ -1,110 +1,243 @@
 using System.Collections;
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
-using KillingMahjong.Managers;
+using UnityEngine.UI;
+using KillingMahjong.Common;
 
 namespace KillingMahjong.UI.Effects
 {
     /// <summary>
-    /// ロンを押したあとの「どん！どん！どん！」（2026-10-04、`ロン演出.pdf` より）。
-    ///
-    ///   ロン！（どん！どん！どん！と順番にでる）
-    ///   このとき敵の体力や自分の体力の UI を大きく揺らしたい
-    ///
-    /// 3発を**間を置いて**叩き、そのたびに画面を揺らし、体力のUIを大きく振る。
-    /// 3発目が終わったら、これまでどおり <see cref="RonAnimationUI"/> の
-    /// カットイン（「ロン！」）へ渡す。
-    ///
-    /// **揺らすのは体力のUIだけ。** 盤面ごと揺らすのは <see cref="ScreenQuake"/> が
-    /// やっているので、ここで一緒に振ると二重に効いて何が揺れているか分からなくなる。
+    /// ロン入力直後の手振り、破裂吹き出し、体力表示の揺れ。
+    /// 画面、盤面、立ち絵には ScreenQuake / ScreenFlash を使わない。
     /// </summary>
     public static class RonImpactEffect
     {
-        /// <summary>何発叩くか。</summary>
-        private const int BeatCount = 3;
+        private const float HandFrameSeconds = 0.22f;
+        private const float FinalHandLeadSeconds = 0.16f;
+        private const float HpShakeSeconds = 0.30f;
+        private const float CalloutHoldSeconds = 0.56f;
+        private const float HpShakePixels = 12f;
 
-        /// <summary>叩く間隔（秒）。**詰めすぎない。** 1発に見えてしまう。</summary>
-        private const float BeatInterval = 0.30f;
-
-        /// <summary>最後の1発のあと、カットインへ渡すまでの間（秒）。</summary>
-        private const float TailWait = 0.24f;
-
-        /// <summary>体力UIが振れる幅（px）。発を追うごとに大きくする。</summary>
-        private const float ShakeFirst = 10f;
-        private const float ShakeLast = 26f;
-
-        /// <summary>1発ぶんの揺れの長さ（秒）。次の発までに収まる長さにする。</summary>
-        private const float ShakeDuration = 0.26f;
-
-        /// <summary>画面の揺れの強さ。こちらも発を追うごとに上げる。</summary>
-        private const float QuakeFirst = 9f;
-        private const float QuakeLast = 22f;
+        private static readonly string[] HandFrameNames =
+        {
+            "UI/RonHands/ron_hand_01",
+            "UI/RonHands/ron_hand_02",
+            "UI/RonHands/ron_hand_03",
+        };
 
         /// <summary>
-        /// 3発叩く。終わるまで待てるようにコルーチンで返す。
+        /// 手1、手2、手3を順に出した後、指差しのまま「ロン!!!」を出す。
+        /// 体力表示だけを同時に一度揺らしてから、既存の決着処理へ返す。
         /// </summary>
-        /// <param name="runner">コルーチンを回す相手（呼び出し元の MonoBehaviour）</param>
-        /// <param name="hpPanels">大きく揺らす体力のUI。null や空でもよい</param>
         public static IEnumerator Play(MonoBehaviour runner, IList<RectTransform> hpPanels)
         {
             if (runner == null) yield break;
 
-            for (int i = 0; i < BeatCount; i++)
+            GameObject overlay = CreateOverlay(out RectTransform overlayRt);
+            Image handImage = CreateImage("RonHand", overlayRt);
+            handImage.preserveAspect = true;
+            SetRect(handImage.rectTransform, Vector2.zero, new Vector2(800f, 600f));
+
+            bool displayedAnyHand = false;
+            Sprite handSprite = null;
+            for (int i = 0; i < HandFrameNames.Length; i++)
             {
-                float t = BeatCount <= 1 ? 1f : i / (float)(BeatCount - 1);
-
-                ScreenQuake.Play(Mathf.Lerp(QuakeFirst, QuakeLast, t), ShakeDuration);
-
-                // 光は薄く短く。ここで白く飛ばすと、このあとのカットインが霞む
-                ScreenFlash.Play(0.10f, 0.35f, playSound: false);
-
-                if (AudioManager.Instance != null)
+                Texture2D handTexture = Resources.Load<Texture2D>(HandFrameNames[i]);
+                if (handTexture == null)
                 {
-                    // 叩くごとに体力が減っていく想定の音。発が進むほど低く重くなる
-                    AudioManager.Instance.PlayHitSE(Mathf.Lerp(0.8f, 0.2f, t));
+                    Debug.LogError("[RonImpactEffect] ロン用の手画像が見つかりません: Resources/" + HandFrameNames[i]);
+                    continue;
                 }
 
-                if (hpPanels != null)
-                {
-                    float amplitude = Mathf.Lerp(ShakeFirst, ShakeLast, t);
-                    foreach (var panel in hpPanels)
-                    {
-                        if (panel != null) runner.StartCoroutine(ShakeRoutine(panel, amplitude));
-                    }
-                }
-
-                if (i < BeatCount - 1) yield return new WaitForSeconds(BeatInterval);
+                Sprite previousHandSprite = handImage.sprite;
+                handSprite = Sprite.Create(
+                    handTexture,
+                    new Rect(0f, 0f, handTexture.width, handTexture.height),
+                    new Vector2(0.5f, 0.5f),
+                    100f);
+                handImage.sprite = handSprite;
+                if (previousHandSprite != null) Object.Destroy(previousHandSprite);
+                handImage.gameObject.SetActive(true);
+                displayedAnyHand = true;
+                yield return new WaitForSeconds(i == HandFrameNames.Length - 1
+                    ? FinalHandLeadSeconds : HandFrameSeconds);
             }
 
-            yield return new WaitForSeconds(TailWait);
+            if (!displayedAnyHand) handImage.gameObject.SetActive(false);
+
+            Texture2D burstTexture = CreateBurstTexture();
+            Sprite burstSprite = Sprite.Create(
+                burstTexture,
+                new Rect(0f, 0f, burstTexture.width, burstTexture.height),
+                new Vector2(0.5f, 0.5f),
+                100f);
+            CreateBurstCallout(overlayRt, burstSprite);
+
+            if (hpPanels != null)
+            {
+                for (int i = 0; i < hpPanels.Count; i++)
+                {
+                    if (hpPanels[i] != null)
+                        runner.StartCoroutine(ShakeHpRoutine(hpPanels[i], HpShakePixels));
+                }
+            }
+
+            yield return new WaitForSeconds(CalloutHoldSeconds);
+            Object.Destroy(overlay);
+            if (handSprite != null) Object.Destroy(handSprite);
+            Object.Destroy(burstSprite);
+            Object.Destroy(burstTexture);
+        }
+
+        private static GameObject CreateOverlay(out RectTransform overlayRt)
+        {
+            GameObject overlay = new GameObject(
+                "RonInputCinematicOverlay",
+                typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+            Canvas canvas = overlay.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = UISortingOrders.RonAnimation - 1;
+
+            CanvasScaler scaler = overlay.GetComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(800f, 600f);
+            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.Expand;
+            overlay.GetComponent<GraphicRaycaster>().enabled = false;
+
+            overlayRt = overlay.GetComponent<RectTransform>();
+            overlayRt.anchorMin = Vector2.zero;
+            overlayRt.anchorMax = Vector2.one;
+            overlayRt.offsetMin = Vector2.zero;
+            overlayRt.offsetMax = Vector2.zero;
+            return overlay;
+        }
+
+        private static Image CreateImage(string name, Transform parent)
+        {
+            GameObject go = new GameObject(name, typeof(RectTransform), typeof(Image));
+            go.transform.SetParent(parent, false);
+            Image image = go.GetComponent<Image>();
+            image.raycastTarget = false;
+            return image;
+        }
+
+        private static void CreateBurstCallout(RectTransform parent, Sprite burstSprite)
+        {
+            Vector2 position = new Vector2(202f, 62f);
+
+            Image outline = CreateImage("RonBurstOutline", parent);
+            outline.sprite = burstSprite;
+            outline.color = new Color32(52, 19, 25, 255);
+            SetRect(outline.rectTransform, position, new Vector2(292f, 234f));
+
+            Image inner = CreateImage("RonBurstInner", parent);
+            inner.sprite = burstSprite;
+            inner.color = new Color32(255, 248, 225, 255);
+            SetRect(inner.rectTransform, position, new Vector2(252f, 202f));
+
+            GameObject textObject = new GameObject("RonBurstText", typeof(RectTransform), typeof(TextMeshProUGUI));
+            textObject.transform.SetParent(parent, false);
+            TextMeshProUGUI text = textObject.GetComponent<TextMeshProUGUI>();
+            text.text = "\u30ed\u30f3!!!";
+            text.fontSize = 57f;
+            text.fontStyle = FontStyles.Bold;
+            text.color = new Color32(46, 17, 24, 255);
+            text.alignment = TextAlignmentOptions.Center;
+            text.enableWordWrapping = false;
+            text.raycastTarget = false;
+            SetRect(text.rectTransform, position, new Vector2(230f, 138f));
+            text.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -5f);
+        }
+
+        private static void SetRect(RectTransform rect, Vector2 position, Vector2 size)
+        {
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = position;
+            rect.sizeDelta = size;
         }
 
         /// <summary>
-        /// 1つのUIを振る。**元の位置は呼ばれた時点で控える。**
-        /// 振っている最中に重ねて呼ばれても、最後に終わったものが元へ戻す。
+        /// PDF最終ページの太い輪郭を、既存UIだけで再現する不規則な破裂形。
+        /// 外側と内側で同じスプライトを重ね、濃色の太枠を作る。
         /// </summary>
-        private static IEnumerator ShakeRoutine(RectTransform target, float amplitude)
+        private static Texture2D CreateBurstTexture()
         {
-            Vector2 home = target.anchoredPosition;
+            const int width = 292;
+            const int height = 234;
+            const int pointCount = 20;
+            Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
+            texture.filterMode = FilterMode.Point;
 
+            float[] px = new float[pointCount];
+            float[] py = new float[pointCount];
+            float[] jitter =
+            {
+                1.00f, 0.92f, 1.08f, 0.88f, 1.04f,
+                0.93f, 1.10f, 0.87f, 1.02f, 0.94f,
+                1.09f, 0.89f, 1.05f, 0.91f, 1.07f,
+                0.86f, 1.03f, 0.90f, 1.11f, 0.88f
+            };
+            for (int i = 0; i < pointCount; i++)
+            {
+                float angle = (-90f + 360f * i / pointCount) * Mathf.Deg2Rad;
+                float baseRadius = i % 2 == 0 ? 112f : 88f;
+                float radius = baseRadius * jitter[i];
+                px[i] = width * 0.5f + Mathf.Cos(angle) * radius;
+                py[i] = height * 0.5f + Mathf.Sin(angle) * radius;
+            }
+
+            Color transparent = new Color(0f, 0f, 0f, 0f);
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    bool inside = false;
+                    int previous = pointCount - 1;
+                    for (int i = 0; i < pointCount; i++)
+                    {
+                        bool crosses = ((py[i] > y) != (py[previous] > y)) &&
+                            x < (px[previous] - px[i]) * (y - py[i]) /
+                            (py[previous] - py[i]) + px[i];
+                        if (crosses) inside = !inside;
+                        previous = i;
+                    }
+                    texture.SetPixel(x, y, inside ? Color.white : transparent);
+                }
+            }
+
+            texture.Apply(false, false);
+            return texture;
+        }
+
+        /// <summary>
+        /// FloatingAnimator が位置を上書きするため、体力表示だけ一時停止して揺らす。
+        /// </summary>
+        private static IEnumerator ShakeHpRoutine(RectTransform target, float amplitude)
+        {
+            if (target == null) yield break;
+
+            Behaviour floatingAnimator = target.GetComponent("FloatingAnimator") as Behaviour;
+            bool wasFloating = floatingAnimator != null && floatingAnimator.enabled;
+            if (floatingAnimator != null) floatingAnimator.enabled = false;
+
+            Vector2 home = target.anchoredPosition;
             float elapsed = 0f;
-            while (elapsed < ShakeDuration)
+            while (elapsed < HpShakeSeconds && target != null)
             {
                 elapsed += Time.deltaTime;
-                if (target == null) yield break;
-
-                // 減衰させる。最後まで同じ幅で振ると、止まった瞬間が不自然になる
-                float decay = 1f - Mathf.Clamp01(elapsed / ShakeDuration);
-                float power = amplitude * decay * decay;
-
-                target.anchoredPosition = home + new Vector2(
-                    Random.Range(-power, power),
-                    Random.Range(-power, power));
-
+                float progress = Mathf.Clamp01(elapsed / HpShakeSeconds);
+                float decay = 1f - progress;
+                float offset = Mathf.Sin(progress * Mathf.PI * 8f) * amplitude * decay;
+                target.anchoredPosition = home + new Vector2(offset, -offset * 0.35f);
                 yield return null;
             }
 
             if (target != null) target.anchoredPosition = home;
+            if (floatingAnimator != null) floatingAnimator.enabled = wasFloating;
         }
     }
 }
