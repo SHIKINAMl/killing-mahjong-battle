@@ -124,7 +124,7 @@ namespace KillingMahjong.Common
         /// <summary>LoadingManager: ローディング画面</summary>
         public const int LoadingScreen = 30;
 
-        // ---- 40 - 49 ロンの猶予演出 ----
+        // ---- 40 - 49 ロンの猶予演出（暗幕） ----
 
         /// <summary>
         /// RonChanceEffect: ロンできる牌が出たときに盤面を落とす暗幕（2026-10-04）。
@@ -135,12 +135,12 @@ namespace KillingMahjong.Common
         public const int RonChanceDimmer = 40;
 
         /// <summary>
-        /// RonChanceEffect: 暗幕の上に1枚だけ浮かせる、ロンできる牌。
+        /// RonChanceEffect: ロン待機パネルより前に出す、ロンできる牌。
         /// 牌そのものに Canvas を足して一時的に上げ、演出が終わったら外す。
         /// </summary>
-        public const int RonChanceTile = 41;
+        public const int RonChanceTile = 51;
 
-        // ---- 50 - 59 ロン待機・結果パネル・軽い演出 ----
+        // ---- 50 - 59 ロン待機・結果パネル・牌の前面表示 ----
 
         /// <summary>GameUIManager: ロン待機パネル (DialogueUI / BloodMeter より手前)</summary>
         public const int RonWaitPanel = 50;

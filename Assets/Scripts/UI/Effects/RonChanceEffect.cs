@@ -38,9 +38,6 @@ namespace KillingMahjong.UI.Effects
         /// <summary>点滅で縮む側の明るさ。1.0 が元の色。</summary>
         private const float BlinkDimFactor = 0.62f;
 
-        /// <summary>点滅に合わせて牌が膨らむ量。</summary>
-        private const float BlinkScaleUp = 0.10f;
-
         /// <summary>きらきらの1秒あたりの粒数。</summary>
         private const float SparkleRate = 16f;
 
@@ -52,8 +49,8 @@ namespace KillingMahjong.UI.Effects
         private bool _addedTileCanvas;
         private Image _tileImage;
         private Color _tileBaseColor;
-        private Vector3 _tileBaseScale;
         private TileSparkleEffect _sparkle;
+        private bool _tileBaseRaycastTarget;
 
         /// <summary>
         /// 出す。すでに出ていれば何もしない。
@@ -121,10 +118,14 @@ namespace KillingMahjong.UI.Effects
             if (tile == null) return;
 
             _tile = tile;
-            _tileBaseScale = tile.localScale;
-
             _tileImage = tile.GetComponent<Image>();
-            if (_tileImage != null) _tileBaseColor = _tileImage.color;
+            if (_tileImage != null)
+            {
+                _tileBaseColor = _tileImage.color;
+                _tileBaseRaycastTarget = _tileImage.raycastTarget;
+                // 牌がボタンと重なっても、ロン入力を横取りしない。
+                _tileImage.raycastTarget = false;
+            }
 
             _tileCanvas = tile.GetComponent<Canvas>();
             if (_tileCanvas == null)
@@ -153,8 +154,11 @@ namespace KillingMahjong.UI.Effects
 
             if (_tile != null)
             {
-                _tile.localScale = _tileBaseScale;
-                if (_tileImage != null) _tileImage.color = _tileBaseColor;
+                if (_tileImage != null)
+                {
+                    _tileImage.color = _tileBaseColor;
+                    _tileImage.raycastTarget = _tileBaseRaycastTarget;
+                }
 
                 if (_tileCanvas != null)
                 {
@@ -194,7 +198,7 @@ namespace KillingMahjong.UI.Effects
             }
         }
 
-        /// <summary>明るさと大きさを一緒に動かす。色だけだと暗幕の上では目立たない。</summary>
+        /// <summary>牌の大きさは変えず、明るさだけを点滅させる。</summary>
         private void Blink(float elapsed)
         {
             if (_tile == null) return;
@@ -211,8 +215,6 @@ namespace KillingMahjong.UI.Effects
                                              _tileBaseColor.b * k + (1f - k) * 0.25f,
                                              _tileBaseColor.a);
             }
-
-            _tile.localScale = _tileBaseScale * (1f + BlinkScaleUp * eased);
         }
     }
 }
