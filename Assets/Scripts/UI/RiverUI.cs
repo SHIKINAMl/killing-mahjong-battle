@@ -35,6 +35,23 @@ namespace KillingMahjong.UI
 
         private List<Transform> discardedTiles = new List<Transform>();
 
+        /// <summary>
+        /// いちばん最後に置いた牌。**ロン演出で「その牌だけ光らせる」ために使う**（2026-10-04）。
+        /// まだ1枚も置いていなければ null。
+        /// </summary>
+        public RectTransform LastTile
+        {
+            get
+            {
+                for (int i = discardedTiles.Count - 1; i >= 0; i--)
+                {
+                    var rt = discardedTiles[i] as RectTransform;
+                    if (rt != null) return rt;
+                }
+                return null;
+            }
+        }
+
         // ボルテージのゲージはここでは作らない。**GameUIManager.Start が作る。**
         // 河から作ると河のキャンバスの下にぶら下がり、手牌を選んでいる間は
         // 河ごと消えてゲージまで見えなくなる（実際そうなった）。

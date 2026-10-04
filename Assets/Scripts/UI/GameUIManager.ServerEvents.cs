@@ -74,6 +74,11 @@ namespace KillingMahjong.UI
             RonWaitPanel.SetActive(true);
             RonWaitPanel.transform.SetAsLastSibling();
 
+            // **画面を落として、ロンできる牌だけを光らせる**（2026-10-04、`ロン演出.pdf`）。
+            // 光らせるのは敵がいま捨てた牌＝敵の河のいちばん最後。
+            // 暗幕はクリックを吸わないので、ロンボタンはこれまでどおり押せる。
+            Effects.RonChanceEffect.Show(EnemyRiverUI != null ? EnemyRiverUI.LastTile : null);
+
             // 最前面に表示するためにCanvasを追加してソート順を強制する
             Canvas canvas = RonWaitPanel.GetComponent<Canvas>();
             if (canvas == null)
@@ -145,10 +150,9 @@ namespace KillingMahjong.UI
         {
             Debug.Log($"[GameUIManager] ExecuteRonAction called. _isAgariPending={_isAgariPending}");
 
-            if (KillingMahjong.Managers.AudioManager.Instance != null)
-            {
-                KillingMahjong.Managers.AudioManager.Instance.PlayVoice(KillingMahjong.Managers.AudioManager.Instance.ronVoice);
-            }
+            // 暗幕と牌の点滅をここで畳む。押したのに光ったままだと、
+            // 「まだ押せていない」のか分からない
+            Effects.RonChanceEffect.HideCurrent();
 
             // チュートリアルはサーバーに繋がっていないので、進行役へ返すだけ
             if (_tutorialRonCallback != null)
@@ -156,7 +160,7 @@ namespace KillingMahjong.UI
                 var cb = _tutorialRonCallback;
                 _tutorialRonCallback = null;
                 if (RonWaitPanel != null) RonWaitPanel.SetActive(false);
-                cb();
+                StartCoroutine(RonImpactThen(cb));
                 return;
             }
 
@@ -164,12 +168,41 @@ namespace KillingMahjong.UI
             {
                 _isAgariPending = false;
                 if (RonWaitPanel != null) RonWaitPanel.SetActive(false);
-                SendActionToServer("agari", new KillingMahjong.Network.ActionPayload { accept = true });
-                Debug.Log("[GameUIManager] Sent 'agari' action to server. Waiting for server response to play animation.");
+                StartCoroutine(RonImpactThen(() =>
+                {
+                    SendActionToServer("agari", new KillingMahjong.Network.ActionPayload { accept = true });
+                    Debug.Log("[GameUIManager] Sent 'agari' action to server. Waiting for server response to play animation.");
+                }));
                 return; // サーバーからの確定（役のデータ等）を待ってからアニメーションを再生するため、ここでは抜ける
             }
 
             PhaseController?.ExecuteRonAction();
+        }
+
+        /// <summary>
+        /// 「どん！どん！どん！」を叩いてから、次へ渡す（2026-10-04、`ロン演出.pdf`）。
+        ///
+        /// **叩き終わってから送る。** サーバーはロン入力を待ち続ける（手番のタイムアウトが無い）ので、
+        /// 1秒ほど遅れても取りこぼさない。先に送ると、確定が返ってきたカットインと
+        /// 3発が重なって、どちらも読めなくなる。
+        ///
+        /// 「ロン！」のボイスは**3発のあと**に鳴らす。以前はボタンを押した瞬間に
+        /// 鳴らしていたが、それだと順番が資料と逆になる。
+        /// </summary>
+        private System.Collections.IEnumerator RonImpactThen(System.Action next)
+        {
+            var hpPanels = new System.Collections.Generic.List<RectTransform>();
+            if (PlayerInfoUI != null) hpPanels.Add(PlayerInfoUI.transform as RectTransform);
+            if (EnemyInfoUI != null) hpPanels.Add(EnemyInfoUI.transform as RectTransform);
+
+            yield return Effects.RonImpactEffect.Play(this, hpPanels);
+
+            if (KillingMahjong.Managers.AudioManager.Instance != null)
+            {
+                KillingMahjong.Managers.AudioManager.Instance.PlayVoice(KillingMahjong.Managers.AudioManager.Instance.ronVoice);
+            }
+
+            next?.Invoke();
         }
     }
 }
