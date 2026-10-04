@@ -89,7 +89,9 @@ namespace KillingMahjong.UI
                 }
             }
 
-            if (winnerSprite != null)
+            // 自分ロンは、入力直後に RonImpactEffect の手と「ロン!!!」を見せ終えている。
+            // ここで同じ内容のカットインを重ねず、役表示へ直行する。
+            if (!isLocalPlayerWin && winnerSprite != null)
             {
                 // カットインと同時に「ロン！」ボイスを再生
                 if (KillingMahjong.Managers.AudioManager.Instance != null)
@@ -110,7 +112,7 @@ namespace KillingMahjong.UI
                 // カットインが終わるまで待機
                 while (!cutinFinished) yield return null;
             }
-            else
+            else if (!isLocalPlayerWin)
             {
                 // **立ち絵が無いときはカットインが出ない。** そのときは
                 // 揺れる相手が居なくなるので、ここで直接鳴らす。
