@@ -14,6 +14,9 @@ namespace KillingMahjong.UI
         public void OnGameStarted()
         {
             _currentRoundIndex = 1;
+            _pendingDrawTransition = false;
+            roundStart.Reset();
+            BeginRoundStart();
             ResetPhaseReadyMarks();
 
             // 前の対局で覚えたスキルコストは持ち越さない（特殊勝利の回数が 0 に戻るため）
@@ -49,10 +52,7 @@ namespace KillingMahjong.UI
                     uiManager.EnemyInfoUI.ShowReadyBox(false);
                 }
                 
-                if (uiManager.PhaseTransitionUI != null)
-                {
-                    uiManager.PhaseTransitionUI.PlayRoundStartDarken("対局開始");
-                }
+                StartRoundStartTransition("対局開始", afterDraw: false);
 
                 if (ReactionController.Instance != null)
                 {
@@ -101,8 +101,6 @@ namespace KillingMahjong.UI
         }
 
 
-        private bool _isStartingNextRound = false;
-
         public void HandleNextRoundWaitingReceived(NextRoundWaitingData data = null)
         {
             Debug.Log("[GameUIPhaseController] HandleNextRoundWaitingReceived: 相手が次ラウンド準備完了（またはロンボタン押下）しました。");
@@ -128,28 +126,6 @@ namespace KillingMahjong.UI
                 {
                     uiManager.PlayerInfoUI.SetReadyCheck(localIsReady);
                 }
-            }
-        }
-
-
-        private void StartNextRoundTransitionForDealing()
-        {
-            if (_isStartingNextRound) return;
-            _isStartingNextRound = true;
-
-            if (uiManager.PhaseTransitionUI != null)
-            {
-                uiManager.PhaseTransitionUI.PlayRoundStartDarken($"第{_currentRoundIndex}局...", () => {
-                    BoardStateManager.Instance.ClearAllBoardData();
-                    uiManager.ClearAllTiles();
-                    StartCoroutine(DealingRoutine());
-                });
-            }
-            else
-            {
-                BoardStateManager.Instance.ClearAllBoardData();
-                uiManager.ClearAllTiles();
-                StartCoroutine(DealingRoutine());
             }
         }
 
@@ -192,54 +168,16 @@ namespace KillingMahjong.UI
             }
         }
 
-        // 第1局の配牌待ちで、局名を隠さずに牌の山を置く高さ。
-        // 4:3 の画面下端から測るため、待ち画面と同じ卓の手前側に収まる。
-        private const float FirstRoundClatterOffsetY = 112f;
-
-        private IEnumerator DealingRoutine()
+        private void ShowDealingWaitUI()
         {
-            _isStartingNextRound = false;
-
             if (uiManager.PhaseTransitionUI != null)
             {
-                while (uiManager.PhaseTransitionUI.IsDarkenTransitioning)
-                {
-                    yield return null;
-                }
                 uiManager.PhaseTransitionUI.ChangeDarkenText($"第{_currentRoundIndex}局進行中...");
 
-                // 配牌待ちのあいだ、手で混ぜる裏牌の山を重ねる。
-                // **2026-09-20 に全局へ広げた**（以前は第1局だけ。2局目以降も
-                // サーバー待ちで文字だけの画面になるため）。チュートリアルには出さない。
-                //
-                // **もう暗転が明けているなら置かない（2026-10-01）。**
-                // ここと「配牌が届いたときの片付け」(RoundStartFadeOutRoutine の
-                // TileClatterEffect.Hide) は、どちらも「暗転の入りが終わった瞬間」に
-                // 動き出す。サーバーの配牌が 4.8秒から十数ms になったことで同時になり、
-                //
-                //     片付け(Hide) → ここで Attach
-                //
-                // の順に入れ替わると、待ち用の山が**手牌選択フェイズまで残り続ける**
-                // （2026-10-01 のユーザー報告）。もう待っていないなら置かない、で塞ぐ。
-                //
-                // **暗転中かどうかだけでは足りなかった（同日、2度目の報告）。**
-                // 暗転が明ける前に片付けが走ることがあり、そのときここはまだ
-                // 「暗転中」に見える。片付け済みの旗も見る。
-                if (!uiManager.IsTutorialMode && PhaseTransitionUI.IsScreenDarkened
-                    && uiManager.PhaseTransitionUI != null
-                    && !uiManager.PhaseTransitionUI.IsRoundStartCleanupDone)
-                {
-                    var transitionRect = uiManager.PhaseTransitionUI.transform as RectTransform;
-                    if (transitionRect != null)
-                    {
-                        Effects.TileClatterEffect.Attach(transitionRect, FirstRoundClatterOffsetY);
-                    }
-                }
+                uiManager.PhaseTransitionUI.ShowRoundStartWaitTiles();
             }
             
-            // 牌のリセットは、この Routine を起動する各遷移の暗転中に済ませている。
-            // ここで改めて消すと、サーバー高速化後に暗転明けで反映された新局の牌を
-            // 後から消してしまうため、待機UIだけを整える。
+            // 進行管理が反映待ちを解除する前に、待機UIの準備を同期的に済ませる。
             SetMatchUIVisibility(false);
             if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetPanelVisible(true);
             if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.gameObject.SetActive(true);

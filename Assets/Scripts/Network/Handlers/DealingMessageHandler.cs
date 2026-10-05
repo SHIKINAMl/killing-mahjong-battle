@@ -15,23 +15,11 @@ namespace KillingMahjong.Network.Handlers
 
         public void Handle(string messageType, string jsonString, NetworkMessageHandler network)
         {
-            // サーバーの配牌が速くなると、phase_change(dealing) の暗転が終わる前に
-            // dealing_completed が届く。暗転の完了コールバックは前局の牌を消すため、
-            // ここで先に盤面へ入れると **新しい配牌まで後から消されてしまう**。
-            //
-            // 局頭のリセットが済むまで payload 全体を保留し、完了後に状態・描画・
-            // 暗転解除の順で適用する。サーバー側の到着順を前提にしない。
+            // 局頭の進行管理が反映可能になるまで、通知全体を保留する。
             var uiManager = Object.FindFirstObjectByType<GameUIManager>();
-            if (uiManager != null && (uiManager.IsBusyWithTransition
-                || (uiManager.PhaseTransitionUI != null && uiManager.PhaseTransitionUI.IsRoundStartResetPending)))
-            {
-                uiManager.DeferUntilIdle(
-                    "dealingCompleted",
-                    // 同じ保留の前に別のフェイズ遷移が始まることがあるため、
-                    // 実行時にも改めて busy 状態を確認する。
-                    () => Handle(messageType, jsonString, network));
-                return;
-            }
+            if (uiManager != null && uiManager.DeferRoundStartBoardUpdate(
+                RoundStartCoordinator.BoardUpdateKind.DealingCompleted,
+                () => Handle(messageType, jsonString, network))) return;
 
             ApplyDealingCompleted(jsonString, network);
         }

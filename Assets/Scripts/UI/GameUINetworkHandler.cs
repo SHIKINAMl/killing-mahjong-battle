@@ -26,6 +26,8 @@ namespace KillingMahjong.UI
                 NetworkMessageHandler.Instance.OnMatchCancelled += HandleMatchCancelled;
                 
                 NetworkMessageHandler.Instance.OnPhaseStatusChanged += HandlePhaseStatusChanged;
+                NetworkMessageHandler.Instance.OnDealingStarted += HandleDealingStarted;
+                NetworkMessageHandler.Instance.OnDealingCompleted += HandleDealingCompleted;
                 NetworkMessageHandler.Instance.OnIsTenpaiReceived += HandleIsTenpaiReceived;
                 NetworkMessageHandler.Instance.OnNotTenpaiReceived += HandleNotTenpaiReceived;
                 NetworkMessageHandler.Instance.OnNextRoundWaitingReceived += HandleNextRoundWaitingReceived;
@@ -59,6 +61,8 @@ namespace KillingMahjong.UI
                 NetworkMessageHandler.Instance.OnMatchCancelled -= HandleMatchCancelled;
                 
                 NetworkMessageHandler.Instance.OnPhaseStatusChanged -= HandlePhaseStatusChanged;
+                NetworkMessageHandler.Instance.OnDealingStarted -= HandleDealingStarted;
+                NetworkMessageHandler.Instance.OnDealingCompleted -= HandleDealingCompleted;
                 NetworkMessageHandler.Instance.OnIsTenpaiReceived -= HandleIsTenpaiReceived;
                 NetworkMessageHandler.Instance.OnNotTenpaiReceived -= HandleNotTenpaiReceived;
                 NetworkMessageHandler.Instance.OnNextRoundWaitingReceived -= HandleNextRoundWaitingReceived;
@@ -109,6 +113,16 @@ namespace KillingMahjong.UI
         private void HandlePhaseStatusChanged(RoundStatus newStatus)
         {
             uiManager.PhaseController?.UpdatePhaseStatus(newStatus);
+        }
+
+        private void HandleDealingStarted()
+        {
+            uiManager.PhaseController?.HandleDealingStarted();
+        }
+
+        private void HandleDealingCompleted()
+        {
+            uiManager.PhaseController?.HandleDealingCompleted();
         }
 
         private void HandleIsTenpaiReceived(IsTenpaiData data)

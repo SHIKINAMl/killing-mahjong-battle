@@ -63,7 +63,6 @@ namespace KillingMahjong.UI
             // === 3. 暗転中のコールバック (UIリセットなど) ===
             Debug.Log("[DrawTransition] Midpoint invoked");
             onMidpoint?.Invoke();
-            IsRoundStartResetPending = false;
 
             isDarkened = true; // 暗転状態を記録
 

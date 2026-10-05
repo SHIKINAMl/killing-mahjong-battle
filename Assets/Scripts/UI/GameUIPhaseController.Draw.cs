@@ -90,51 +90,5 @@ namespace KillingMahjong.UI
             }
         }
 
-        private void ExecuteDrawTransitionForDealing()
-        {
-            if (uiManager.PhaseTransitionUI != null)
-            {
-                uiManager.SetIsTransitioning(true);
-                uiManager.PhaseTransitionUI.PlayDrawTransition(
-                    onMidpoint: () => {
-                        BoardStateManager.Instance.ClearAllBoardData();
-                        uiManager.ClearAllTiles();
-                        SetMatchUIVisibility(false);
-                        
-                        if (ReactionController.Instance != null)
-                        {
-                            ReactionController.Instance.Setup(uiManager.DialogueUI, uiManager.EnemyInfoUI, uiManager.PlayerInfoUI);
-                        }
-                    },
-                    onComplete: () => {
-                        uiManager.SetIsTransitioning(false);
-                        StartCoroutine(DealingRoutine());
-                    }
-                );
-            }
-            else
-            {
-                StartCoroutine(DrawSequence());
-            }
-        }
-
-        private IEnumerator DrawSequence()
-        {
-            yield return new WaitForSeconds(3.0f);
-            if (ReactionController.Instance != null)
-            {
-                ReactionController.Instance.Setup(uiManager.DialogueUI, uiManager.EnemyInfoUI, uiManager.PlayerInfoUI);
-            }
-
-            if (uiManager.PlayerInfoUI != null) 
-            {
-                uiManager.PlayerInfoUI.ShowReadyBox(true);
-                uiManager.PlayerInfoUI.SetReadyCheck(true);
-            }
-            if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.ShowReadyBox(true);
-
-            Debug.Log("[GameUIManager] 流局演出完了 - 次ラウンド待ち承認自動送信");
-            SendNextRoundAction();
-        }
     }
 }

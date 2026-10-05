@@ -115,11 +115,6 @@ namespace KillingMahjong.UI
                 loadingText.gameObject.SetActive(false);
             }
 
-            if (NetworkMessageHandler.Instance != null)
-            {
-                NetworkMessageHandler.Instance.OnDealingStarted += HandleDealingStarted;
-                NetworkMessageHandler.Instance.OnDealingCompleted += HandleDealingCompleted;
-            }
         }
 
         private void OnDestroy()
@@ -127,11 +122,6 @@ namespace KillingMahjong.UI
             // **立てたまま消さない。** 残ると次の場面でセリフ送りが効かなくなる
             IsScreenDarkened = false;
 
-            if (NetworkMessageHandler.Instance != null)
-            {
-                NetworkMessageHandler.Instance.OnDealingStarted -= HandleDealingStarted;
-                NetworkMessageHandler.Instance.OnDealingCompleted -= HandleDealingCompleted;
-            }
 
             // 複製は自分で捨てる。放っておくと再生のたびに積もる
             if (checkerMaterialInstance != null)
@@ -140,20 +130,6 @@ namespace KillingMahjong.UI
                 else DestroyImmediate(checkerMaterialInstance);
                 checkerMaterialInstance = null;
             }
-        }
-
-        private void HandleDealingStarted()
-        {
-            // **待ちがここから始まる。** 裏牌の山は、この待ちを埋めるためだけに置く。
-            // 旗を倒すのは暗転の開始ではなくここ。配牌が暗転より先に終わっていると、
-            // 暗転側で倒したぶん「もう待っていないのに置く」が起きていた。
-            BeginRoundStartWait();
-        }
-
-        private void HandleDealingCompleted()
-        {
-            // 山牌構築完了後、画面が暗転していれば晴らす
-            PlayRoundStartFadeOut();
         }
 
         // 空の Update() があると Unity から毎フレーム呼ばれるだけ無駄なので削除した。
@@ -237,25 +213,28 @@ namespace KillingMahjong.UI
         /// </summary>
         public static bool IsScreenDarkened { get; private set; }
 
-        public void PlayRoundStartDarken(string text, Action onDarkened = null)
+        public void PlayRoundStartDarken(string text, Action onDarkened = null, Action onReady = null)
         {
             if (isDarkened)
             {
                 // isDarkened は暗転の開始時点で立つ。進行中の暗転へ合流した
                 // 局頭リセットも、画面を覆いきるまで実行しない。
                 if (IsDarkenTransitioning)
+                {
                     _additionalRoundStartDarkenedCallbacks += onDarkened;
+                    _additionalRoundStartReadyCallbacks += onReady;
+                }
                 else
                 {
                     onDarkened?.Invoke();
-                    IsRoundStartResetPending = false;
+                    onReady?.Invoke();
                 }
                 return;
             }
             isDarkened = true;
             IsScreenDarkened = true;
             IsDarkenTransitioning = true;
-            StartCoroutine(RoundStartDarkenRoutine(text, onDarkened));
+            StartCoroutine(RoundStartDarkenRoutine(text, onDarkened, onReady));
         }
 
 
@@ -263,7 +242,7 @@ namespace KillingMahjong.UI
         {
             // **暗転していなくても、裏牌の山だけは必ず片付ける（2026-10-01）。**
             //
-            // 配牌完了（HandleDealingCompleted）はここを1回しか叩かない。
+            // 配牌完了の進行管理はここを1回しか叩かない。
             // 暗転していないと下の `return` で抜けていたため、
             // そのあとに置かれた山を片付ける人が誰もいなくなり、
             // **手牌選択フェイズの盤面に散らばったまま残った**（実機で確認）。

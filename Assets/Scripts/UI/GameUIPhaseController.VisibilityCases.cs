@@ -49,15 +49,9 @@ namespace KillingMahjong.UI
             // 賭け金を確定しないままフェイズが進むと伏せたままになるので、局の頭で戻す
             SetReadyBadgesSuppressed(false);
 
-            if (_pendingDrawTransition)
-            {
-                _pendingDrawTransition = false;
-                ExecuteDrawTransitionForDealing();
-            }
-            else
-            {
-                StartNextRoundTransitionForDealing();
-            }
+            bool afterDraw = _pendingDrawTransition;
+            _pendingDrawTransition = false;
+            StartRoundStartTransition($"第{_currentRoundIndex}局...", afterDraw);
         }
 
         /// <summary>手牌構築フェイズ。待ち牌UI・ドラ・「手牌を選んでください」。</summary>

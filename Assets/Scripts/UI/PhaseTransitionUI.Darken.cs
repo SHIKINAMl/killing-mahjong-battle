@@ -68,10 +68,8 @@ namespace KillingMahjong.UI
         /// </summary>
         private bool _roundStartCleanupDone;
 
-        // 配牌開始の通知で立て、画面を覆って前局の盤面を消したあとに解除する。
-        // 暗転の開始自体が別の演出待ちになっている場合も、配牌の反映を保留する。
-        public bool IsRoundStartResetPending { get; private set; }
         private Action _additionalRoundStartDarkenedCallbacks;
+        private Action _additionalRoundStartReadyCallbacks;
 
         /// <summary>
         /// 配牌後の片付けが済んだか。**裏牌の山を置く側は、置く直前にこれを見る。**
@@ -117,10 +115,10 @@ namespace KillingMahjong.UI
             yield return StartCoroutine(RoundStartFadeOutRoutine(onComplete));
         }
 
-        private IEnumerator RoundStartDarkenRoutine(string text, Action onDarkened)
+        private IEnumerator RoundStartDarkenRoutine(string text, Action onDarkened, Action onReady)
         {
             // **ここで旗を倒さない。** 倒すのは配牌が始まったとき
-            // （HandleDealingStarted）。配牌が暗転より先に終わっている場合に
+            // （進行管理の BeginRoundStart）。配牌が暗転より先に終わっている場合に
             // ここで倒すと、「もう待っていないのに山を置く」が復活する。
             ResetVisuals();
 
@@ -155,7 +153,6 @@ namespace KillingMahjong.UI
             var additionalCallbacks = _additionalRoundStartDarkenedCallbacks;
             _additionalRoundStartDarkenedCallbacks = null;
             additionalCallbacks?.Invoke();
-            IsRoundStartResetPending = false;
             IsDarkenTransitioning = false;
 
             // ドン！とテキスト表示。画面揺れと同じ「着弾」なので打撃音を当てる
@@ -165,7 +162,16 @@ namespace KillingMahjong.UI
                 centerText.text = text;
                 centerText.gameObject.SetActive(true);
                 centerText.color = Color.white;
-                
+            }
+
+            // 盤面リセットと黒幕の準備を終えてから、進行管理へ反映可能を通知する。
+            onReady?.Invoke();
+            var additionalReadyCallbacks = _additionalRoundStartReadyCallbacks;
+            _additionalRoundStartReadyCallbacks = null;
+            additionalReadyCallbacks?.Invoke();
+
+            if (centerText != null)
+            {
                 t = 0;
                 float duration = 0.4f;
                 Vector3 initialScale = new Vector3(3f, 3f, 1f);
@@ -190,15 +196,19 @@ namespace KillingMahjong.UI
             // 第1局だけでなく**どの局でも**混ぜられるようにする。
             // 片付けは配牌後の RoundStartFadeOutRoutine が Hide でやっている。
             // **片付けが先に走っていたら、もう置かない。** 置いても片付ける人がいない
-            if (!IsTutorialScene() && !_roundStartCleanupDone)
-            {
-                var selfRect = transform as RectTransform;
-                if (selfRect != null) Effects.TileClatterEffect.Attach(selfRect, RoundWaitClatterOffsetY);
-            }
+            ShowRoundStartWaitTiles();
         }
 
         /// <summary>局名を出したあとに置く裏牌の高さ。**画面の下端から測る**（待ち画面と同じ）。</summary>
         private const float RoundWaitClatterOffsetY = 112f;
+
+        /// <summary>局頭の待機用牌の配置条件と位置は、演出UIだけが管理する。</summary>
+        internal void ShowRoundStartWaitTiles()
+        {
+            if (!IsScreenDarkened || IsTutorialScene() || _roundStartCleanupDone) return;
+            var selfRect = transform as RectTransform;
+            if (selfRect != null) Effects.TileClatterEffect.Attach(selfRect, RoundWaitClatterOffsetY);
+        }
 
         /// <summary>チュートリアルには出さない。台本が進む画面なので、触らせる時間が無い。</summary>
         private bool IsTutorialScene()
@@ -207,23 +217,17 @@ namespace KillingMahjong.UI
             return ui != null && ui.IsTutorialMode;
         }
 
-        /// <summary>
-        /// 配牌が済んだ印を立て、裏牌の山を片付ける。
-        ///
-        /// **暗転していなくても呼べるように切り出してある。** 片付けの引き金は
-        /// 配牌完了の1回きりで、暗転していないと素通りしていた。
-        /// </summary>
-        /// <summary>配牌待ちの始まり。ここからは裏牌の山を置いてよい。</summary>
-        internal void BeginRoundStartWait()
+        /// <summary>進行管理の局開始に合わせて、待機表示の片付け済みフラグを戻す。</summary>
+        internal void PrepareRoundStartWait()
         {
             _roundStartCleanupDone = false;
-            IsRoundStartResetPending = true;
 
             // 前の局で積んだままになっていたら降ろす。立てっぱなしだと
             // 次の「降りている最中の配牌完了」を拾い損ねる
             _fadeOutPendingUntilDarkened = false;
         }
 
+        /// <summary>待機用の牌を片付け、後から再配置しないようにする。</summary>
         internal void MarkRoundStartCleanupDone()
         {
             _roundStartCleanupDone = true;

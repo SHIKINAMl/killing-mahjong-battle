@@ -146,6 +146,19 @@ namespace KillingMahjong.UI
             !ignoreBusyForForcedFlush
             && (isTransitioning || (phaseTransitionUI != null && phaseTransitionUI.IsDarkenTransitioning));
 
+        /// <summary>配牌・状態同期の共通入口。再実行時にも局頭の進行管理へ確認する。</summary>
+        public bool DeferRoundStartBoardUpdate(RoundStartCoordinator.BoardUpdateKind kind, Action retry)
+        {
+            bool shouldDefer = PhaseController != null
+                ? PhaseController.ShouldDeferRoundStartBoardUpdate(kind, IsBusyWithTransition)
+                : IsBusyWithTransition;
+            if (!shouldDefer) return false;
+            string key = kind == RoundStartCoordinator.BoardUpdateKind.DealingCompleted
+                ? "dealingCompleted" : "roundStartStatus";
+            DeferUntilIdle(key, retry);
+            return true;
+        }
+
         /// <summary>
         /// 演出が明けるまで処理を保留する。
         /// 同じ key の保留は後勝ちで上書きするので、連続して届いても積み上がらない。
