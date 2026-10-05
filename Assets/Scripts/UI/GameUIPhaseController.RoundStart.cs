@@ -21,7 +21,12 @@ namespace KillingMahjong.UI
 
         private void BeginRoundStart()
         {
-            if (roundStart.BeginRound()) uiManager.PhaseTransitionUI?.PrepareRoundStartWait();
+            if (roundStart.BeginRound())
+            {
+                ResetPhasePresentation(); // 前の局の入場・確定コールバックを失効させる。
+                ResetBettingTransition();
+                uiManager.PhaseTransitionUI?.PrepareRoundStartWait();
+            }
         }
 
         private void StartRoundStartTransition(string text, bool afterDraw)

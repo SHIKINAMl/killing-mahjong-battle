@@ -15,6 +15,7 @@ namespace KillingMahjong.UI
     ///   GameUIPhaseController.Matchmaking.cs    … マッチング待ち・中止
     ///   GameUIPhaseController.RoundFlow.cs      … 対局開始・局から局への繋ぎ
     ///   GameUIPhaseController.RoundStart.cs     … 局頭の順序・反映条件・暗転解除
+    ///   GameUIPhaseController.Entry.cs          … 入場一回と手番タイマー
     ///   GameUIPhaseController.Visibility.cs     … フェイズ切り替え時の表示（共通部分）
     ///   GameUIPhaseController.VisibilityCases.cs … 同・フェイズごとの中身
     ///   GameUIPhaseController.ReadyMarks.cs     … 「準備完了」の印と札

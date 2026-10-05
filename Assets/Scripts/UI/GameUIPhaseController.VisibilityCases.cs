@@ -7,14 +7,10 @@ using KillingMahjong.Network;
 
 namespace KillingMahjong.UI
 {
-    // HandlePhaseVisibility のフェイズごとの中身。
-    //
-    // **この7本は HandlePhaseVisibility の switch から丸ごと切り出したもので、
-    // 呼ばれる順・条件は switch のときと変わらない。** 元は1メソッドで282行あり、
-    // どのフェイズを読んでいるのか見失うので分けた（2026-08-30）。
+    // 現在フェイズの表示だけを更新する。タイマー・演出開始は Entry.cs が担当する。
     public partial class GameUIPhaseController
     {
-        /// <summary>賭け金フェイズ。スマホ型の賭け金パネルを画面下から出す。</summary>
+        /// <summary>賭け金フェイズの盤面・情報パネルの表示。</summary>
         private void ApplyBettingVisibility()
         {
             SetMatchUIVisibility(true);
@@ -23,38 +19,10 @@ namespace KillingMahjong.UI
             if (uiManager.WaitUI != null) uiManager.WaitUI.gameObject.SetActive(false);
             if (uiManager.AbilityUI != null) uiManager.AbilityUI.gameObject.SetActive(false);
 
-            // チュートリアルでは TutorialManager が「セリフ → 賭け金UI」の順で進める。
-            // ここでベット開始をしてしまうと、セリフを送る前にパネルがせり上がってしまう。
-            if (!uiManager.IsTutorialMode)
-            {
-                StartBettingPhase(Managers.BoardStateManager.Instance.LocalPlayerHp);
-
-                // 賭け金パネルが前面に出ている間は札を伏せる。
-                // 確定後、パネルが下へ戻ってから出す（OnBetConfirmed）。
-                SetReadyBadgesSuppressed(true);
-                ApplyPhaseReadyMarks(RoundStatus.Betting);
-            }
+            if (!uiManager.IsTutorialMode) ApplyPhaseReadyMarks(RoundStatus.Betting);
         }
 
-        /// <summary>局の頭。前の局の後始末をして、次局の入りの演出を始める。</summary>
-        private void ApplyDealingVisibility()
-        {
-            _hasShownHandSelectionPrompt = false; // 次の局のためにフラグをリセット
-            _hasExecutedRonAnimation = false; // ロン演出の二重再生防止フラグをリセット
-            // 待ち候補UIは実行時生成を止めている。再有効化時だけ局ごとに初期化する。
-            if (uiManager.IsWaitDeductionUIEnabled) uiManager.WaitDeduction.ResetForNewRound();
-            if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.ShowReadyBox(false);
-            if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.ShowReadyBox(false);
-            ResetPhaseReadyMarks(); // 手牌選択・ベットの印は局ごとに引き直す
-            // 賭け金を確定しないままフェイズが進むと伏せたままになるので、局の頭で戻す
-            SetReadyBadgesSuppressed(false);
-
-            bool afterDraw = _pendingDrawTransition;
-            _pendingDrawTransition = false;
-            StartRoundStartTransition($"第{_currentRoundIndex}局...", afterDraw);
-        }
-
-        /// <summary>手牌構築フェイズ。待ち牌UI・ドラ・「手牌を選んでください」。</summary>
+        /// <summary>手牌構築フェイズ。待ち牌UI・ドラの表示。</summary>
         private void ApplyHandSelectionVisibility()
         {
             SetMatchUIVisibility(true);
@@ -65,7 +33,6 @@ namespace KillingMahjong.UI
                 if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetPanelVisible(true);
                 if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.gameObject.SetActive(true);
                 if (uiManager.AbilityUI != null) uiManager.AbilityUI.gameObject.SetActive(true);
-                if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.StartTurnTimer(15f);
                 SetReadyBadgesSuppressed(false); // 手牌選択ではスマホは拡大しない
                 ApplyPhaseReadyMarks(RoundStatus.HandSelection);
             }
@@ -89,18 +56,6 @@ namespace KillingMahjong.UI
                 uiManager.WaitUI.gameObject.SetActive(false);
             }
             UpdateDoraDisplay();
-
-            if (ReactionController.Instance != null && !uiManager.IsTutorialMode)
-            {
-                ReactionController.Instance.StartHandSelectionTimer();
-            }
-
-            // 黒幕が晴れて手牌フェイズに入った時に表示（1局につき1回のみ）
-            if (uiManager.PhaseTransitionUI != null && !_hasShownHandSelectionPrompt && !uiManager.IsTutorialMode)
-            {
-                uiManager.PhaseTransitionUI.PlayPromptText("手牌を選んでください", 1.5f);
-                _hasShownHandSelectionPrompt = true;
-            }
         }
 
         /// <summary>親決め。スマホを引っ込める。</summary>
@@ -113,12 +68,11 @@ namespace KillingMahjong.UI
             if (uiManager.PlayerInfoUI != null)
             {
                 uiManager.PlayerInfoUI.gameObject.SetActive(false);
-                uiManager.PlayerInfoUI.StopTurnTimer();
             }
             if (uiManager.WaitUI != null) uiManager.WaitUI.gameObject.SetActive(false);
         }
 
-        /// <summary>打牌フェイズ。盤面を出し、手番側のタイマーを回す。</summary>
+        /// <summary>打牌フェイズ。盤面・待ち牌・手番の表示。</summary>
         private void ApplyDiscardVisibility()
         {
             // TurnDecision が保留で飛ばされた場合に備えて、ここでも閉じておく
@@ -135,17 +89,6 @@ namespace KillingMahjong.UI
             {
                 if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.gameObject.SetActive(true);
                 if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetPanelVisible(true);
-                if (uiManager.PlayerInfoUI != null)
-                {
-                    if (Managers.BoardStateManager.Instance.IsLocalTurn)
-                    {
-                        uiManager.PlayerInfoUI.StartTurnTimer(10f); // 10秒
-                    }
-                    else
-                    {
-                        uiManager.PlayerInfoUI.StopTurnTimer();
-                    }
-                }
             }
 
             if (uiManager.WaitUI != null && BoardStateManager.Instance.CurrentWaitTiles != null && BoardStateManager.Instance.CurrentWaitTiles.Count > 0)
@@ -157,26 +100,12 @@ namespace KillingMahjong.UI
             UpdateDoraDisplay();
         }
 
-        /// <summary>和了（Agari / Ron / Result）。本編ならここからロン演出へ入る。</summary>
+        /// <summary>和了（Agari / Ron / Result）の表示。</summary>
         private void ApplyAgariVisibility()
         {
             if (uiManager.WaitUI != null) uiManager.WaitUI.gameObject.SetActive(false);
             if (uiManager.AbilityUI != null) uiManager.AbilityUI.gameObject.SetActive(false);
             if (uiManager.DoraDisplayUI != null) uiManager.DoraDisplayUI.Hide();
-
-            // チュートリアルではロンボタンを押させてから TutorialManager が演出を出す。
-            // ここで実行すると、ボタンを押す前にロンが走ってしまう。
-            // （LastIsLocalWin はサーバー通信でしか更新されず、チュートリアルでは
-            //   初期値の true のままなので、敵のロンでも自分の勝ちとして走ってしまう）
-            if (!uiManager.IsTutorialMode && uiManager.RonAnimationUI != null)
-            {
-                bool isLocalWin = BoardStateManager.Instance.LastIsLocalWin;
-
-                if (isLocalWin)
-                {
-                    uiManager.ExecuteRonAction();
-                }
-            }
         }
 
         /// <summary>流局。</summary>
@@ -188,12 +117,7 @@ namespace KillingMahjong.UI
 
             if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.gameObject.SetActive(true);
             if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetPanelVisible(true);
-
-            if (uiManager.DialogueUI != null)
-            {
-                uiManager.DialogueUI.gameObject.SetActive(true);
-                uiManager.DialogueUI.ShowText("流局…次の対局へ");
-            }
+            if (uiManager.DialogueUI != null) uiManager.DialogueUI.gameObject.SetActive(true);
         }
     }
 }

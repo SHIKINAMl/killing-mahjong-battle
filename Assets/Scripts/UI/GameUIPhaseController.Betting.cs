@@ -46,6 +46,8 @@ namespace KillingMahjong.UI
 
         public void OnBettingCompleteFromServer(KillingMahjong.EngineData.BettingCompletedInfo info)
         {
+            if (info == null || hasReceivedBettingResult) return;
+            hasReceivedBettingResult = true;
             int playerBet = info.LocalBet;
             int enemyBet = info.EnemyBet;
 
@@ -86,78 +88,112 @@ namespace KillingMahjong.UI
         /// 演出が後回し（`DeferUntilIdle`）になっても値がずれないよう、
         /// そのとき盤面を見に行くのではなく、届いた時点の値をそのまま持ち回す。
         /// </summary>
-        public void TriggerBettingAnimationPhase(string roundString, KillingMahjong.EngineData.BettingCompletedInfo info)
+        private enum BettingStage { Waiting, Playing, Covered, Completed }
+        private sealed class BettingTransition
         {
-             // このメソッドは演出だけでなく進行の責務も持っている（onMidpoint で
-             // UpdatePhaseStatus(Discard) を呼ぶ）。捨てると打牌フェイズへ進めず Betting で固まる。
-             if (uiManager.IsBusyWithTransition)
-             {
-                 uiManager.DeferUntilIdle("bettingAnimation",
-                     () => TriggerBettingAnimationPhase(roundString, info));
-                 return;
-             }
+            public int Generation;
+            public string Title;
+            public BettingCompletedInfo Info;
+            public BettingStage Stage;
+        }
 
-             if (uiManager.PhaseTransitionUI != null)
-             {
-                 uiManager.SetIsTransitioning(true);
-                 
-                  if (uiManager.AbilityUI != null) uiManager.AbilityUI.gameObject.SetActive(false);
-                 if (uiManager.DialogueUI != null) uiManager.DialogueUI.gameObject.SetActive(false);
+        private BettingTransition activeBettingTransition;
+        private bool hasReceivedBettingResult;
 
-                 uiManager.PhaseTransitionUI.PlayTransition(roundString, uiManager.PlayerInfoUI, info,
-                    onMidpoint: () => {
-                         uiManager.SetIsTransitioning(false);
-                         
-                         // UIのみクリア（BoardStateManagerのデータを消さないようにする）
-                         if (uiManager.RiverUI != null) uiManager.RiverUI.Clear();
-                         if (uiManager.EnemyRiverUI != null) uiManager.EnemyRiverUI.Clear();
-                         if (uiManager.WaitUI != null) uiManager.WaitUI.gameObject.SetActive(false);
-                         
-                         // 牌を再構築する前にフェーズをDiscardへ進める
-                         if (uiManager.CurrentPhaseStatus == RoundStatus.Betting)
-                         {
-                             UpdatePhaseStatus(RoundStatus.Discard);
-                         }
-                         
-                         if (uiManager.VisualController != null) uiManager.VisualController.RebuildAllTilesFromState();
-                         
-                         if (uiManager.HandUI != null) uiManager.HandUI.UpdateLayout(uiManager.CurrentPhaseStatus);
-                         if (uiManager.EnemyHandUI != null) uiManager.EnemyHandUI.UpdateLayout(uiManager.CurrentPhaseStatus);
-                         if (uiManager.WallUI != null)
-                         {
-                             uiManager.WallUI.UpdateContainerPosition(uiManager.CurrentPhaseStatus == RoundStatus.Discard);
-                             uiManager.WallUI.UpdateWallHighlights(BoardStateManager.Instance.CurrentWaitTiles, uiManager.CurrentPhaseStatus == RoundStatus.Discard);
-                         }
-                         
-                         SetMatchUIVisibility(true); 
-                         HandlePhaseVisibility(uiManager.CurrentPhaseStatus);
-                         
-                         uiManager.SetIsTransitioning(true);
-                         
-                         if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.SetHP(Managers.BoardStateManager.Instance.LocalPlayerHp);
-                         if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetHP(Managers.BoardStateManager.Instance.EnemyPlayerHp);
-                    },
-                    onComplete: () => {
-                         uiManager.SetIsTransitioning(false);
-                         
-                         // Catch any missed updates
-                         if (uiManager.VisualController != null) uiManager.VisualController.RebuildAllTilesFromState();
-                         
-                         if (uiManager.HandUI != null) uiManager.HandUI.UpdateLayout(uiManager.CurrentPhaseStatus);
-                         if (uiManager.WallUI != null)
-                         {
-                             uiManager.WallUI.UpdateContainerPosition(uiManager.CurrentPhaseStatus == RoundStatus.Discard);
-                             uiManager.WallUI.UpdateWallHighlights(BoardStateManager.Instance.CurrentWaitTiles, uiManager.CurrentPhaseStatus == RoundStatus.Discard);
-                             uiManager.WallUI.UpdateDiscardTurnIndicator(BoardStateManager.Instance.IsLocalTurn, uiManager.CurrentPhaseStatus == RoundStatus.Discard);
-                         }
-                         
-                         HandlePhaseVisibility(uiManager.CurrentPhaseStatus);
-                         if (uiManager.DialogueUI != null) uiManager.DialogueUI.gameObject.SetActive(true);
-                         if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.gameObject.SetActive(true);
-                         if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetPanelVisible(true);
-                    }
-                 );
-             }
+        private void ResetBettingTransition()
+        {
+            hasReceivedBettingResult = false;
+            activeBettingTransition = null;
+        }
+
+        public void TriggerBettingAnimationPhase(string roundString, BettingCompletedInfo info)
+        {
+            if (info == null) return;
+            if (activeBettingTransition != null && activeBettingTransition.Generation == PresentationGeneration) return;
+            var transition = new BettingTransition
+            {
+                Generation = PresentationGeneration, Title = roundString,
+                Info = new BettingCompletedInfo
+                {
+                    LocalBet = info.LocalBet, EnemyBet = info.EnemyBet,
+                    LocalHpBefore = info.LocalHpBefore, EnemyHpBefore = info.EnemyHpBefore,
+                    LocalHpAfter = info.LocalHpAfter, EnemyHpAfter = info.EnemyHpAfter,
+                    HasServerHealth = info.HasServerHealth
+                }
+            };
+            activeBettingTransition = transition;
+            PlayBettingTransition(transition);
+        }
+
+        private bool IsCurrentBettingTransition(BettingTransition transition)
+        {
+            return activeBettingTransition == transition && transition.Generation == PresentationGeneration;
+        }
+
+        private void PlayBettingTransition(BettingTransition transition)
+        {
+            if (!IsCurrentBettingTransition(transition) || transition.Stage != BettingStage.Waiting) return;
+            if (uiManager.IsBusyWithTransition)
+            {
+                uiManager.DeferUntilIdle("bettingAnimation", () => PlayBettingTransition(transition));
+                return;
+            }
+            transition.Stage = BettingStage.Playing;
+            uiManager.SetIsTransitioning(true);
+            if (uiManager.AbilityUI != null) uiManager.AbilityUI.gameObject.SetActive(false);
+            if (uiManager.DialogueUI != null) uiManager.DialogueUI.gameObject.SetActive(false);
+            if (uiManager.PhaseTransitionUI != null)
+                uiManager.PhaseTransitionUI.PlayTransition(transition.Title, uiManager.PlayerInfoUI, transition.Info,
+                    () => ApplyBettingMidpoint(transition), () => CompleteBettingTransition(transition));
+            else
+            {
+                ApplyBettingMidpoint(transition);
+                CompleteBettingTransition(transition);
+            }
+        }
+
+        private void ApplyBettingMidpoint(BettingTransition transition)
+        {
+            if (!IsCurrentBettingTransition(transition) || transition.Stage != BettingStage.Playing) return;
+            transition.Stage = BettingStage.Covered;
+            uiManager.RunCoveredBoardUpdate(() => {
+                if (uiManager.RiverUI != null) uiManager.RiverUI.Clear();
+                if (uiManager.EnemyRiverUI != null) uiManager.EnemyRiverUI.Clear();
+                if (uiManager.WaitUI != null) uiManager.WaitUI.gameObject.SetActive(false);
+                if (uiManager.CurrentPhaseStatus == RoundStatus.Betting) UpdatePhaseStatus(RoundStatus.Discard);
+                RefreshBettingBoard(includeEnemyHand: true);
+                SetMatchUIVisibility(true);
+                RefreshPhaseView(uiManager.CurrentPhaseStatus);
+                uiManager.PlayerInfoUI?.SetHP(BoardStateManager.Instance.LocalPlayerHp);
+                uiManager.EnemyInfoUI?.SetHP(BoardStateManager.Instance.EnemyPlayerHp);
+            });
+        }
+
+        private void CompleteBettingTransition(BettingTransition transition)
+        {
+            if (!IsCurrentBettingTransition(transition) || transition.Stage != BettingStage.Covered) return;
+            transition.Stage = BettingStage.Completed;
+            uiManager.SetIsTransitioning(false);
+            // 演出中の状態同期を拾うため、完了時の再構築も残す。
+            RefreshBettingBoard(includeEnemyHand: false);
+            RefreshPhaseView(uiManager.CurrentPhaseStatus);
+            if (uiManager.DialogueUI != null) uiManager.DialogueUI.gameObject.SetActive(true);
+            if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.gameObject.SetActive(true);
+            uiManager.EnemyInfoUI?.SetPanelVisible(true);
+        }
+
+        private void RefreshBettingBoard(bool includeEnemyHand)
+        {
+            uiManager.VisualController?.RebuildAllTilesFromState();
+            uiManager.HandUI?.UpdateLayout(uiManager.CurrentPhaseStatus);
+            if (includeEnemyHand) uiManager.EnemyHandUI?.UpdateLayout(uiManager.CurrentPhaseStatus);
+            if (uiManager.WallUI != null)
+            {
+                bool discard = uiManager.CurrentPhaseStatus == RoundStatus.Discard;
+                uiManager.WallUI.UpdateContainerPosition(discard);
+                uiManager.WallUI.UpdateWallHighlights(BoardStateManager.Instance.CurrentWaitTiles, discard);
+                uiManager.WallUI.UpdateDiscardTurnIndicator(BoardStateManager.Instance.IsLocalTurn, discard);
+            }
         }
     }
 }

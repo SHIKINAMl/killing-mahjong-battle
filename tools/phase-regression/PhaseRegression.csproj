@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="../../Assets/Scripts/EngineData/PhaseStateEnums.cs" />
+    <Compile Include="../../Assets/Scripts/UI/GameUIPhaseController.Entry.cs" />
+    <Compile Include="../../Assets/Scripts/UI/GameUIPhaseController.Visibility.cs" />
+    <Compile Include="../../Assets/Scripts/UI/GameUIPhaseController.VisibilityCases.cs" />
+    <Compile Include="../../Assets/Scripts/UI/GameUIPhaseController.Betting.cs" />
+    <Compile Include="../../Assets/Scripts/UI/GameUIHandSelectionController.Confirmation.cs" />
+    <Compile Include="../../Assets/Scripts/Network/Handlers/LiquidationMessageApplier.cs" />
+    <Compile Include="../../Assets/Scripts/Network/Handlers/DiscardMessageHandler.cs" />
+    <Compile Include="../../Assets/Scripts/Network/Handlers/RoundLifecycleMessageHandler.cs" />
+    <Compile Include="$(GeneratedSourceDirectory)/*.cs" />
+  </ItemGroup>
+</Project>

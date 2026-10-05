@@ -18,7 +18,7 @@ namespace KillingMahjong.UI
             }
             _activeAnimationCleanups.Clear();
 
-            if (uiManager.IsTransitioning)
+            if (!uiManager.CanRebuildBoard)
             {
                 Debug.Log("[GameUIVisualController] IsTransitioning is true. Skipping RebuildAllTilesFromState to prevent visible tile movement.");
                 return;

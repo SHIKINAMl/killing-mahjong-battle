@@ -49,6 +49,7 @@ static class Probe
         UI.Flush();
         Check(Events.SequenceEqual(new[] { "reset", "wait", "status:early", "deal:initial", "reveal" }), "Initial reset still depends on queue position");
         Check(UI.ResetCount == 1 && UI.PhaseTransitionUI.DarkenStarts == 1, "Initial phase restarted blackout/reset");
+        Check(UI.PhaseController.PresentationResets == 1, "Initial round generation reset more than once");
         Pass("initial reset independent of phase visibility queue order");
 
         // Previous animation postpones the next round; even a forced flush must not bypass cover/reset.
@@ -61,6 +62,7 @@ static class Probe
         UI.PhaseTransitionUI.FinishDarken(); UI.Flush();
         Check(Events.SequenceEqual(new[] { "reset", "wait", "deal:next", "reveal", "status:next" }), "Next round order changed");
         Check(UI.ResetCount == 2, "Round reset ran more than once");
+        Check(UI.PhaseController.PresentationResets == 2, "New round did not invalidate old presentation callbacks");
         Pass("next round after other animation / forced flush / reset once");
 
         // Draw has separate cover and completion callbacks.
@@ -78,6 +80,7 @@ static class Probe
         Check(UI.QueueCount == 0 && Events.SequenceEqual(new[] { "reset", "wait", "deal:late", "reveal", "status:late" }), "Late notifications blocked");
         Dealing(); Network.RaiseDealingCompleted();
         Check(UI.QueueCount == 0 && UI.ResetCount == 1 && UI.RevealCount == 1, "Duplicate phase/completion restarted the round");
+        Check(UI.PhaseController.PresentationResets == 1, "Duplicate phase invalidated the active round");
         Pass("late payload / duplicate phase and completion");
 
         Fresh(); Dealing();
@@ -189,6 +192,9 @@ namespace KillingMahjong.UI
         public void StartInitialMatch() { roundStart.Reset(); BeginRoundStart(); StartRoundStartTransition("initial",false); }
         public void StartDealingVisibility() { StartRoundStartTransition("round",uiManager.AfterDraw); }
         private void SetMatchUIVisibility(bool value) {}
+        private void ResetBettingTransition() {}
+        public int PresentationResets;
+        private void ResetPhasePresentation() { PresentationResets++; }
         private void ShowDealingWaitUI() { Probe.Events.Add("wait"); uiManager.WaitUIReady=true; }
     }
     public partial class GameUIManager

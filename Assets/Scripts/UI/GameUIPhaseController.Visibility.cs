@@ -44,7 +44,7 @@ namespace KillingMahjong.UI
                                   newStatus == RoundStatus.Result || 
                                   newStatus == RoundStatus.Draw;
 
-            if (!isGameEndPhase && !uiManager.IsTransitioning)
+            if (!isGameEndPhase && uiManager.CanRebuildBoard)
             {
                 // コンテナ切り替えはBetting時にHandBaseUI.UpdateLayout内部でガードされる。
                 // ここでは呼び出しをスキップしない（ボタン表示の更新のために必要）。
@@ -57,65 +57,19 @@ namespace KillingMahjong.UI
                 }
             }
             
-            // ここは :177 の同値ガードを抜けた先＝本当に段が進んだときだけ通る。
-            // フラッシュの可否をここで決め、実際に光らせるのは表示が切り替わる瞬間に任せる。
-            _flashOnNextPhaseVisibility = true;
-
-            HandlePhaseVisibility(newStatus);
+            EnterPhase(newStatus);
         }
 
-        /// <summary>
-        /// 次の HandlePhaseVisibility でフラッシュを出すか。UpdatePhaseStatus だけが立てる。
-        /// 表示の作り直し目的の呼び出しでは立たないので、透視の公開後などには光らない。
-        /// </summary>
-        private bool _flashOnNextPhaseVisibility = false;
+        // 既存の呼び出し口は保持する。再描画では入場処理を再実行しない。
+        public void HandlePhaseVisibility(RoundStatus status) => RefreshPhaseView(status);
 
-        public void HandlePhaseVisibility(RoundStatus status)
+        public void RefreshPhaseView(RoundStatus status)
         {
-            // UpdatePhaseStatus は :176 で先に status を確定させてからここへ来るため、
-            // ここで捨てると「status だけ進んで演出が出ない」状態になる。
-            // しかも同じ status の再通知は :164 の同値ガードで弾かれるので二度と復帰しない。
-            // 保留して演出明けに実行する。
-            //
-            // キーに status を含めて畳まないこと。フェイズごとに本体の処理が違い、しかも
-            // 冪等ではない（Dealing は _hasShownHandSelectionPrompt / _hasExecutedRonAnimation の
-            // リセットと次局の暗転開始を担っている）。1つのキーで畳むと Dealing が
-            // HandSelection に上書きされて消え、次局が始まらなくなる。
-            // 到着順に積んでおけば、演出が無かった場合と同じ順序で再生される。
-            if (uiManager.IsBusyWithTransition)
+            if (status != uiManager.CurrentPhaseStatus) return;
+            if (uiManager.IsBusyWithTransition && !uiManager.IsUpdatingCoveredBoard)
             {
-                uiManager.DeferUntilIdle($"phaseVisibility:{status}", () => HandlePhaseVisibility(status));
+                uiManager.DeferUntilIdle($"phaseVisibility:{status}", () => RefreshPhaseView(status));
                 return;
-            }
-
-            // フェイズが切り替わる合図として一瞬だけ光らせる。
-            //
-            // **このメソッドは「フェイズが変わった」ときだけでなく「今のフェイズの表示を
-            // 作り直す」ときにも呼ばれる**（透視演出の後の ExposedTileEffectPlayer:91、
-            // 手牌決定後の GameUIHandSelectionController:345 など）。
-            // 無条件に光らせると、透視で3枚公開したあとにも光ってしまう。
-            // 実際に段が進んだときだけ立つ印を見て、その場合に限って光らせる。
-            //
-            // 印はフラグで持ち、引数では渡さない。保留は同じ key で後勝ちに上書きされるので、
-            // ラムダに焼き込むと「進行」の保留が後から来た「作り直し」の保留に潰される。
-            //
-            // **保留から復帰した場合も、捨てずにここで光らせる。** 上の分岐より前に置くと
-            // 別の演出で画面が覆われている最中に光ることになり、何の合図か分からなくなる。
-            if (_flashOnNextPhaseVisibility)
-            {
-                _flashOnNextPhaseVisibility = false;
-
-                // 決着系（Agari / Ron / Result / Draw）は除く。それぞれロン演出・流局演出という
-                // 専用の入りを持っていて、そちらでも光らせるため、ここで光らせると二度光る。
-                bool isSettlementPhase = status == RoundStatus.Agari ||
-                                         status == RoundStatus.Ron ||
-                                         status == RoundStatus.Result ||
-                                         status == RoundStatus.Draw;
-                if (!isSettlementPhase)
-                {
-                    // この経路は対局中に繰り返し出るため、毎回の「ピン！」で盤面への集中を妨げないよう音は鳴らさない。
-                    Effects.ScreenFlash.Play(playSound: false);
-                }
             }
 
             if (status != RoundStatus.Betting && uiManager.BettingUI != null)
@@ -186,7 +140,7 @@ namespace KillingMahjong.UI
             switch (status)
             {
                 case RoundStatus.Betting:      ApplyBettingVisibility();       break;
-                case RoundStatus.Dealing:      ApplyDealingVisibility();       break;
+                case RoundStatus.Dealing:      break; // 局頭準備は EnterPhase のみ。
                 case RoundStatus.HandSelection: ApplyHandSelectionVisibility(); break;
                 case RoundStatus.TurnDecision: ApplyTurnDecisionVisibility();  break;
                 case RoundStatus.Discard:      ApplyDiscardVisibility();       break;

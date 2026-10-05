@@ -42,35 +42,11 @@ namespace KillingMahjong.Network.Handlers
                     {
                         if (daMsg.data.is_win && !network.AgariProcessed)
                         {
-                            // ロン判定時のみ、フェーズがAgariに変わる前に打牌を反映させる
-                            // 牌IDは 0 始まり（0 = 一萬）。0 を「未設定」と誤判定すると
-                            // 一萬で放銃したときに打牌が河へ反映されない。
-                            if (daMsg.data.tile >= 0)
-                            {
-                                network.RaiseTileDiscarded(daMsg.data.tile, true);
-                            }
-                            network.AgariProcessed = true;
-                            Debug.Log($"[Network] discard_accepted: ロン成立 (is_win=true)");
-                            // discard_accepted にも liquidation が含まれている場合はここで処理
-                            LiquidationData daLiq = daMsg.data.liquidation;
-                            if (daLiq == null || string.IsNullOrEmpty(daLiq.winner_id))
-                            {
-                                daLiq = ServerJsonParser.ParseLiquidationFromJson(jsonString);
-                            }
-                            if (daLiq != null && !string.IsNullOrEmpty(daLiq.winner_id))
-                            {
-                                Debug.Log($"[Network] discard_accepted ロン: winner={daLiq.winner_id}");
-                                bool isLocalWinDa = (daLiq.winner_id == network.LocalPlayerId);
-                                board.LastIsLocalWin = isLocalWinDa;
-                                board.LastLiquidationData = daLiq;
-
-                                int newLocalHpDa = isLocalWinDa ? daLiq.winner_health : daLiq.loser_health;
-                                int newEnemyHpDa = isLocalWinDa ? daLiq.loser_health : daLiq.winner_health;
-                                board.UpdateHp(newLocalHpDa, newEnemyHpDa);
-
-                                network.RaisePhaseStatusChanged(RoundStatus.Agari);
-                                network.RaiseAgari(isLocalWinDa);
-                            }
+                            LiquidationMessageApplier.TryApply(daMsg.data.liquidation, jsonString, network,
+                                beforeApply: () => {
+                                    // 一萬のID=0も有効。清算によるフェイズ変更より先に打牌を反映する。
+                                    if (daMsg.data.tile >= 0) network.RaiseTileDiscarded(daMsg.data.tile, true);
+                                });
                         }
                     }
                     break;

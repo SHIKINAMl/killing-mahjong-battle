@@ -21,7 +21,7 @@ namespace KillingMahjong.UI
             //
             // **開くのは演出が明けてから（2026-08-26）。**
             //
-            // `UpdatePhaseStatus` はここを呼んだ直後に `HandlePhaseVisibility` を呼ぶが、
+            // `UpdatePhaseStatus` はここを呼んだ直後に `EnterPhase` を呼ぶが、
             // あちらは演出中なら `DeferUntilIdle` で演出明けまで保留される。
             // ここで即座にフェードを始めると、**2秒のフェードが暗転に覆われている
             // あいだに走り切ってしまい**、プレイヤーが盤面を見たときには既に開き切っている。
@@ -116,6 +116,19 @@ namespace KillingMahjong.UI
             // 能力パネルと説明ツールチップは通常 20/25 で、フェーズ演出の帯(19)より手前に出る。
             // 演出のあいだだけ帯より下へ退避させる（2026-08-19 のプランナー要望 R-2）。
             if (abilityUI != null) abilityUI.SetSuppressedForTransition(value);
+            if (!value) PhaseController?.SynchronizeDiscardTurnTimer();
+        }
+
+        private int coveredBoardUpdateDepth;
+        internal bool IsUpdatingCoveredBoard => coveredBoardUpdateDepth > 0;
+        internal bool CanRebuildBoard => !IsTransitioning || IsUpdatingCoveredBoard;
+
+        /// <summary>黒幕内の同期更新だけを許可する。操作ロックは演出完了まで保持する。</summary>
+        internal void RunCoveredBoardUpdate(Action update)
+        {
+            coveredBoardUpdateDepth++;
+            try { update(); }
+            finally { coveredBoardUpdateDepth--; }
         }
 
         // --- 演出中に届いたサーバーイベントの保留 ---
@@ -197,8 +210,7 @@ namespace KillingMahjong.UI
         private IEnumerator FlushDeferredActionsRoutine()
         {
 
-            // 演出の途中で一瞬だけ isTransitioning が false に戻る箇所があるため
-            // （TriggerBettingAnimationPhase の onMidpoint）、必ず1フレーム待ってから判定する。
+            // 同じフレーム内の遷移・保留追加をそろえるため、必ず1フレーム待ってから判定する。
             float waited = 0f;
             do
             {

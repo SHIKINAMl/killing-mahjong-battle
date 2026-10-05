@@ -120,23 +120,11 @@ namespace KillingMahjong.UI
 
         private void HandleTurnChanged(bool isLocalTurn)
         {
+            PhaseController?.HandleDiscardTurnChanged(); // 演出中の手番変更も記録する。
             if (IsTransitioning) return; // アニメーション演出中は矢印を消さない
             if (wallUI != null)
             {
                 wallUI.UpdateDiscardTurnIndicator(isLocalTurn, currentPhaseStatus == RoundStatus.Discard);
-            }
-
-            // 打牌フェイズ中にターンが変わった場合、タイマーをリセット・開始/停止する
-            if (currentPhaseStatus == RoundStatus.Discard && playerInfoUI != null)
-            {
-                if (isLocalTurn)
-                {
-                    playerInfoUI.StartTurnTimer(10f); // 10秒でリセットして開始
-                }
-                else
-                {
-                    playerInfoUI.StopTurnTimer();
-                }
             }
 
             // 手番の側の体力表示を光らせ直す。

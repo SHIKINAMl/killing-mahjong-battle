@@ -6,7 +6,7 @@ using KillingMahjong.Managers;
 namespace KillingMahjong.UI
 {
     [RequireComponent(typeof(GameUIManager))]
-    public class GameUIHandSelectionController : MonoBehaviour
+    public partial class GameUIHandSelectionController : MonoBehaviour
     {
         private GameUIManager uiManager;
 
@@ -55,6 +55,7 @@ namespace KillingMahjong.UI
             if (uiManager.CurrentPhaseStatus != RoundStatus.HandSelection) return;
             if (uiManager.DialogueUI != null && uiManager.DialogueUI.IsLogOpen) return;
 
+            submissionVersion++;
             StopInstantRankCallForSubmission();
             if (uiManager.HandUI != null) uiManager.HandUI.SetSubmittedState(true);
 
@@ -323,6 +324,7 @@ namespace KillingMahjong.UI
             if (uiManager.IsTransitioning) return;
             // ボタン側でも隠しているが、連打で滑り込まれると手牌が消えるのでここでも弾く
             if (IsSelectionLockedIn) return;
+            submissionVersion++;
 
             if (uiManager.HandUI != null) uiManager.HandUI.SetSubmittedState(false);
             if (uiManager.WaitUI != null) uiManager.WaitUI.gameObject.SetActive(false);
@@ -400,80 +402,13 @@ namespace KillingMahjong.UI
             // **2026-08-29 に WaitUI.MoveToCenter / MoveToOriginalPosition ごと削除した。**
             if (uiManager.ConfirmationDialogUI != null)
             {
-                uiManager.ConfirmationDialogUI.ShowDialogWithWaits(
-                    message,
-                    waitInfos,
-                    waitTileIds,
-                    () => {
-                        if (ReactionController.Instance != null) ReactionController.Instance.StopHandSelectionTimer(true);
-                        _autoConfirmNextHandSelection = true;
-                        if (uiManager.HandUI != null) uiManager.HandUI.SetSubmittedState(true);
-
-                        if (uiManager.PhaseTransitionUI != null)
-                        {
-                            uiManager.SetIsTransitioning(true);
-                            uiManager.PhaseTransitionUI.PlayCenterTextAnim("手牌決定！", 2.0f, () =>
-                            {
-                                uiManager.SetIsTransitioning(false);
-                                
-                                // 手牌決定演出が終わったタイミングで、左下のプレイヤー情報UIに待ち牌を表示する
-                                BoardStateManager.Instance.SetLocalState(null, null, new System.Collections.Generic.List<int>(waitTileIds));
-                                BoardStateManager.Instance.FireRebuildEvent();
-
-                                if (uiManager.IsTutorialMode && uiManager.TutorialManager != null)
-                                {
-                                    uiManager.TutorialManager.ConfirmHandSelectionComplete();
-                                }
-                                else
-                                {
-                                    uiManager.SendActionToServer("select", new KillingMahjong.Network.ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
-                                }
-                            });
-                        }
-                        else
-                        {
-                            BoardStateManager.Instance.SetLocalState(null, null, new System.Collections.Generic.List<int>(waitTileIds));
-                            BoardStateManager.Instance.FireRebuildEvent();
-
-                            if (uiManager.IsTutorialMode && uiManager.TutorialManager != null)
-                            {
-                                uiManager.TutorialManager.ConfirmHandSelectionComplete();
-                            }
-                            else
-                            {
-                                uiManager.SendActionToServer("select", new KillingMahjong.Network.ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
-                            }
-                        }
-                    },
-                    () => {
-                        _autoConfirmNextHandSelection = false;
-                        if (uiManager.HandUI != null) uiManager.HandUI.SetSubmittedState(false);
-                        BoardStateManager.Instance.ClearWaitTiles();
-                        if (uiManager.PhaseController != null) uiManager.PhaseController.SetMatchUIVisibility(true);
-                    }
-                );
+                uiManager.ConfirmationDialogUI.ShowDialogWithWaits(message, waitInfos, waitTileIds,
+                    GuardSelectionConfirmation(() => ConfirmSelection(waitTileIds, notifyTutorial: true)),
+                    GuardSelectionConfirmation(() => CancelSelectionConfirmation(clearWaits: true)));
             }
-            else
-            {
-                if (ReactionController.Instance != null) ReactionController.Instance.StopHandSelectionTimer(true);
-                _autoConfirmNextHandSelection = true;
-                if (uiManager.HandUI != null) uiManager.HandUI.SetSubmittedState(true);
-
-                if (uiManager.PhaseTransitionUI != null)
-                {
-                    uiManager.SetIsTransitioning(true);
-                    uiManager.PhaseTransitionUI.PlayCenterTextAnim("手牌決定！", 2.0f, () =>
-                    {
-                        uiManager.SetIsTransitioning(false);
-                        uiManager.SendActionToServer("select", new KillingMahjong.Network.ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
-                    });
-                }
-                else
-                {
-                    uiManager.SendActionToServer("select", new KillingMahjong.Network.ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
-                }
-            }
+            else ConfirmSelection();
         }
+
 
         public void HandleNotTenpaiReceived(string reason)
         {
@@ -483,55 +418,12 @@ namespace KillingMahjong.UI
             string message = $"ノーテン（聴牌していません）\n\nこのまま決定しますか？";
             if (uiManager.ConfirmationDialogUI != null)
             {
-                uiManager.ConfirmationDialogUI.ShowDialog(
-                    message,
-                    () => {
-                        if (ReactionController.Instance != null) ReactionController.Instance.StopHandSelectionTimer(true);
-                        _autoConfirmNextHandSelection = true;
-                        if (uiManager.HandUI != null) uiManager.HandUI.SetSubmittedState(true);
-
-                        if (uiManager.PhaseTransitionUI != null)
-                        {
-                            uiManager.SetIsTransitioning(true);
-                            uiManager.PhaseTransitionUI.PlayCenterTextAnim("手牌決定！", 2.0f, () =>
-                            {
-                                uiManager.SetIsTransitioning(false);
-                                uiManager.SendActionToServer("select", new KillingMahjong.Network.ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
-                            });
-                        }
-                        else
-                        {
-                            uiManager.SendActionToServer("select", new KillingMahjong.Network.ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
-                        }
-                    },
-                    () => {
-                        _autoConfirmNextHandSelection = false;
-                        if (uiManager.HandUI != null) uiManager.HandUI.SetSubmittedState(false);
-                        if (uiManager.PhaseController != null) uiManager.PhaseController.SetMatchUIVisibility(true);
-                    }
-                );
+                uiManager.ConfirmationDialogUI.ShowDialog(message, GuardSelectionConfirmation(() => ConfirmSelection()),
+                    GuardSelectionConfirmation(() => CancelSelectionConfirmation(clearWaits: false)));
             }
-            else
-            {
-                if (ReactionController.Instance != null) ReactionController.Instance.StopHandSelectionTimer(true);
-                _autoConfirmNextHandSelection = true;
-                if (uiManager.HandUI != null) uiManager.HandUI.SetSubmittedState(true);
-
-                if (uiManager.PhaseTransitionUI != null)
-                {
-                    uiManager.SetIsTransitioning(true);
-                    uiManager.PhaseTransitionUI.PlayCenterTextAnim("手牌決定！", 2.0f, () =>
-                    {
-                        uiManager.SetIsTransitioning(false);
-                        uiManager.SendActionToServer("select", new KillingMahjong.Network.ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
-                    });
-                }
-                else
-                {
-                    uiManager.SendActionToServer("select", new KillingMahjong.Network.ActionPayload { hand_indexes = _pendingHandIndexes, hand = _pendingHandTiles });
-                }
-            }
+            else ConfirmSelection();
         }
+
 
         public void HandleHandSelectionConfirmation(HandSelectionConfirmationData data)
         {
