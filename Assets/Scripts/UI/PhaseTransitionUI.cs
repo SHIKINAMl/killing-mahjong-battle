@@ -55,9 +55,6 @@ namespace KillingMahjong.UI
         [SerializeField] private float checkerFadeDuration = 1.0f;
         [SerializeField] private float hpDeductionDuration = 1.5f;
 
-        private bool isWaitingForDeal = false;
-        private float dealWaitTimer = 0f;
-
         /// <summary>
         /// 実行時に作ったマテリアルの複製。**後始末のために持っておく。**
         /// </summary>
@@ -147,8 +144,6 @@ namespace KillingMahjong.UI
 
         private void HandleDealingStarted()
         {
-            isWaitingForDeal = true;
-
             // **待ちがここから始まる。** 裏牌の山は、この待ちを埋めるためだけに置く。
             // 旗を倒すのは暗転の開始ではなくここ。配牌が暗転より先に終わっていると、
             // 暗転側で倒したぶん「もう待っていないのに置く」が起きていた。
@@ -157,7 +152,6 @@ namespace KillingMahjong.UI
 
         private void HandleDealingCompleted()
         {
-            isWaitingForDeal = false;
             // 山牌構築完了後、画面が暗転していれば晴らす
             PlayRoundStartFadeOut();
         }

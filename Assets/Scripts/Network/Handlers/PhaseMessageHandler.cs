@@ -23,6 +23,7 @@ namespace KillingMahjong.Network.Handlers
                         if (pMsg.new_status == "dealing")
                         {
                             network.AgariProcessed = false; // 新ラウンドでリセット
+                            // 暗転の開始が保留されても配牌を先に描かないよう、待ちを先に登録する。
                             network.RaiseDealingStarted();
                             network.RaisePhaseStatusChanged(RoundStatus.Dealing);
                         }
