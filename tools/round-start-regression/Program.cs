@@ -136,7 +136,16 @@ static class Probe
             Check(order.SequenceEqual(new[] { "covered", "ready" }), "Presentation callbacks reversed or lost");
             Pass("production darken completion callbacks " + (withText ? "with text" : "without text"));
         }
-        Console.WriteLine("All 12 control-flow regressions passed (graphics/transport simulated).");
+        Fresh(); UI.PhaseController.StartInitialMatch();
+        var otherLock = UI.BeginTransition("other");
+        UI.PhaseController.CancelRoundStartForTest();
+        Check(UI.IsTransitioning && otherLock.IsActive, "Round-start cancellation released another owner");
+        otherLock.Dispose();
+        Check(!UI.IsTransitioning, "Cancelled round-start lock remained active");
+        UI.PhaseTransitionUI.FinishDarken();
+        Check(Events.Count == 0 && !UI.IsTransitioning, "Cancelled callback still reset the board");
+        Pass("round-start cancellation releases only its owner and ignores stale callbacks");
+        Console.WriteLine("All 13 control-flow regressions passed (graphics/transport simulated).");
     }
 }
 namespace UnityEngine
@@ -188,9 +197,12 @@ namespace KillingMahjong.UI
     public partial class GameUIPhaseController
     {
         private GameUIManager uiManager;
+        private readonly RoundEndCoordinator roundEnd = new RoundEndCoordinator();
+        private TransitionLockSet.Lease ronTransition;
         public GameUIPhaseController(GameUIManager manager) { uiManager=manager; }
         public void StartInitialMatch() { roundStart.Reset(); BeginRoundStart(); StartRoundStartTransition("initial",false); }
         public void StartDealingVisibility() { StartRoundStartTransition("round",uiManager.AfterDraw); }
+        public void CancelRoundStartForTest() { roundStart.Reset(); CancelRoundStartTransition(); }
         private void SetMatchUIVisibility(bool value) {}
         private void ResetBettingTransition() {}
         public int PresentationResets;
@@ -205,12 +217,16 @@ namespace KillingMahjong.UI
         public bool IsTransitioning, ForceFlush, WaitUIReady, AfterDraw;
         public int ResetCount, RevealCount;
         public object DialogueUI, EnemyInfoUI, PlayerInfoUI;
+        public ConfirmationProbe HandSelectionController;
+        private TransitionLockSet locks;
+        private TransitionLockSet.Lease compatibility;
         private readonly List<KeyValuePair<string,Action>> deferredActions = new List<KeyValuePair<string,Action>>();
-        public GameUIManager(bool hasTransition) { PhaseController=new GameUIPhaseController(this); if(hasTransition) PhaseTransitionUI=new PhaseTransitionUI(); }
+        public GameUIManager(bool hasTransition) { locks=new TransitionLockSet(()=>IsTransitioning=locks.IsLocked); PhaseController=new GameUIPhaseController(this); if(hasTransition) PhaseTransitionUI=new PhaseTransitionUI(); }
         public bool IsBusyWithTransition => !ForceFlush && (IsTransitioning || (PhaseTransitionUI != null && PhaseTransitionUI.IsDarkenTransitioning));
         public int QueueCount => deferredActions.Count;
         private void EnsureFlushWatcher() {}
-        public void SetIsTransitioning(bool value) { IsTransitioning=value; }
+        public TransitionLockSet.Lease BeginTransition(string owner) => locks.Acquire(owner);
+        public void SetIsTransitioning(bool value) { if(value){if(compatibility==null||!compatibility.IsActive)compatibility=BeginTransition("compat");}else{compatibility?.Dispose();compatibility=null;} }
         public void ClearAllTiles() { ResetCount++; WaitUIReady=false; Probe.Events.Add("reset"); }
         public void ApplyPhaseVisibility(RoundStatus status)
         {
@@ -233,4 +249,5 @@ namespace KillingMahjong.UI
         public void FinishDraw() { readyCallback(); }
         public void PlayRoundStartFadeOut() { Probe.UI.RevealCount++; Probe.Events.Add("reveal"); }
     }
+    public class ConfirmationProbe { public void CancelPendingConfirmation(){} }
 }

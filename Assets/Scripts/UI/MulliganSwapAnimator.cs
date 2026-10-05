@@ -253,8 +253,7 @@ namespace KillingMahjong.UI
                 }
             }
 
-            uiManager.SetIsTransitioning(false); // ★ここで解除してRebuildを許可する
-            uiManager.VisualController?.RebuildAllTilesFromState(null);
+            // 親のスキル処理が、自分のロックを解除してから再構築する。
         }
     }
 }

@@ -18,13 +18,28 @@ function Read-Block([string]$source, [string]$signature) {
     $source.Substring($taskStart, $taskEnd - $taskStart)
 }
 $taskSource = Read-Source 'Assets/Scripts/UI/GameUIManager.Transitions.cs'
-$taskLock = Read-Block $taskSource 'public void SetIsTransitioning('
 $taskCovered = Read-Block $taskSource 'internal void RunCoveredBoardUpdate('
 $taskQueue = Read-Block $taskSource 'public void DeferUntilIdle('
 $taskPropertiesStart = $taskSource.IndexOf('private int coveredBoardUpdateDepth;')
 $taskPropertiesEnd = $taskSource.IndexOf('/// <summary>', $taskPropertiesStart)
 $taskProperties = $taskSource.Substring($taskPropertiesStart, $taskPropertiesEnd - $taskPropertiesStart)
-[IO.File]::WriteAllText((Join-Path $taskGenerated 'Manager.cs'), "using System; using System.Collections.Generic; using UnityEngine; namespace KillingMahjong.UI { public partial class GameUIManager { $taskProperties $taskLock $taskCovered $taskQueue } }")
+[IO.File]::WriteAllText((Join-Path $taskGenerated 'Manager.cs'), "using System; using System.Collections.Generic; using UnityEngine; namespace KillingMahjong.UI { public partial class GameUIManager { $taskProperties $taskCovered $taskQueue } }")
+$taskFlow = Read-Source 'Assets/Scripts/UI/GameUIPhaseController.RoundFlow.cs'
+$taskReady = Read-Block $taskFlow 'public void HandleNextRoundWaitingReceived('
+$taskSend = Read-Block $taskFlow 'private void SendNextRoundAction('
+$taskRon = Read-Source 'Assets/Scripts/UI/GameUIPhaseController.Ron.cs'
+$taskRonFinish = Read-Block $taskRon 'private void CompleteRonPresentation('
+$taskRonComplete = Read-Block $taskRon 'private void OnRonAnimationComplete('
+$taskRoundStartCancel = Read-Block (Read-Source 'Assets/Scripts/UI/GameUIPhaseController.RoundStart.cs') 'private void CancelRoundStartTransition('
+[IO.File]::WriteAllText((Join-Path $taskGenerated 'NextRoundMessages.cs'), "using KillingMahjong.Network; using KillingMahjong.EngineData; using KillingMahjong.Managers; using UnityEngine; namespace KillingMahjong.UI { public partial class GameUIPhaseController { $taskReady $taskSend $taskRonFinish $taskRonComplete $taskRoundStartCancel } }")
+$taskSkill = Read-Source 'Assets/Scripts/UI/GameUISkillController.Transitions.cs'
+$taskSkillRequest = Read-Block $taskSkill 'public void CancelPendingSkillRequest('
+$taskSkillCancel = Read-Block $taskSkill 'internal void CancelActiveTransitions('
+$taskSkillRoutine = Read-Block $taskSkill 'private System.Collections.IEnumerator HandleSkillCastedRoutine('
+[IO.File]::WriteAllText((Join-Path $taskGenerated 'SkillLifetime.cs'), "using KillingMahjong.Network; using KillingMahjong.EngineData; using System.Collections.Generic; namespace KillingMahjong.UI { public partial class GameUISkillController { $taskSkillRequest $taskSkillCancel $taskSkillRoutine } }")
+$taskNetwork = Read-Source 'Assets/Scripts/UI/GameUINetworkHandler.cs'
+$taskError = Read-Block $taskNetwork 'private void HandleError('
+[IO.File]::WriteAllText((Join-Path $taskGenerated 'NetworkError.cs'), "namespace KillingMahjong.UI { public partial class GameUINetworkHandler { $taskError } }")
 $taskDtos = Read-Source 'Assets/Scripts/EngineData/ServerMessages.cs'
 $taskNames = @('LiquidationData','BettingCompletedInfo','DiscardCompletedMessage','DiscardCompletedData','DiscardAcceptedMessage','DiscardAcceptedData','RoundEndMessage','RoundEndData','AgariPendingMessage','AgariPendingData','GameEndInfo','DrawPlayerData')
 $taskBlocks = foreach ($taskName in $taskNames) { Read-Block $taskDtos "public class $taskName" }

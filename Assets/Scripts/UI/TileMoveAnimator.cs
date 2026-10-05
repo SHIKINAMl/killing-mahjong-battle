@@ -230,115 +230,117 @@ namespace KillingMahjong.UI
                 yield break;
             }
 
-            uiManager.SetIsTransitioning(true);
-
-            // 1. 状態更新前の配置を記録
-            List<int> oldHand = new List<int>(BoardStateManager.Instance.CurrentHandTiles);
-            List<int> oldWall = new List<int>(BoardStateManager.Instance.CurrentWallTiles);
-
-            // 2. 状態を更新（IsTransitioning=true なので RebuildAllTilesFromState はスキップされる）
-            onUpdateState?.Invoke();
-
-            List<int> newHand = new List<int>(BoardStateManager.Instance.CurrentHandTiles);
-            List<int> newWall = new List<int>(BoardStateManager.Instance.CurrentWallTiles);
-
-            List<int> movedToHand = new List<int>();
-            List<int> oldHandTemp = new List<int>(oldHand);
-            foreach (int id in newHand)
+            using (var ownedLock = uiManager.BeginTransition("tile-move"))
             {
-                if (oldHandTemp.Contains(id)) oldHandTemp.Remove(id);
-                else movedToHand.Add(id);
-            }
 
-            List<int> movedToWall = new List<int>();
-            List<int> oldWallTemp = new List<int>(oldWall);
-            foreach (int id in newWall)
-            {
-                if (oldWallTemp.Contains(id)) oldWallTemp.Remove(id);
-                else movedToWall.Add(id);
-            }
+                // 1. 状態更新前の配置を記録
+                List<int> oldHand = new List<int>(BoardStateManager.Instance.CurrentHandTiles);
+                List<int> oldWall = new List<int>(BoardStateManager.Instance.CurrentWallTiles);
 
-            // 3. 手牌から山牌へ戻る牌を視覚的に移動
-            foreach (int id in movedToWall)
-            {
-                if (uiManager.WallUI != null && uiManager.HandUI != null)
+                // 2. 状態を更新（IsTransitioning=true なので RebuildAllTilesFromState はスキップされる）
+                onUpdateState?.Invoke();
+
+                List<int> newHand = new List<int>(BoardStateManager.Instance.CurrentHandTiles);
+                List<int> newWall = new List<int>(BoardStateManager.Instance.CurrentWallTiles);
+
+                List<int> movedToHand = new List<int>();
+                List<int> oldHandTemp = new List<int>(oldHand);
+                foreach (int id in newHand)
                 {
-                    RectTransform tileRt = null;
-                    foreach (var slot in uiManager.HandUI.GetHandSlots())
-                    {
-                        var inter = slot.GetComponent<TileInteraction>();
-                        if (inter != null && inter.TileId == id) { tileRt = slot; break; }
-                    }
-                    if (tileRt != null)
-                    {
-                        Vector2 startScreenPos = GetScreenPosition(tileRt);
+                    if (oldHandTemp.Contains(id)) oldHandTemp.Remove(id);
+                    else movedToHand.Add(id);
+                }
 
-                        uiManager.HandUI.RemoveTileFromHand(tileRt, id);
-                        uiManager.WallUI.ReturnTileToWall(tileRt, id);
+                List<int> movedToWall = new List<int>();
+                List<int> oldWallTemp = new List<int>(oldWall);
+                foreach (int id in newWall)
+                {
+                    if (oldWallTemp.Contains(id)) oldWallTemp.Remove(id);
+                    else movedToWall.Add(id);
+                }
 
-                        // アニメーションのため、親が変わった直後の位置を元に戻す
-                        Camera cam = null;
-                        Canvas canvas = uiManager.WallUI.GetComponentInParent<Canvas>();
-                        if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
+                // 3. 手牌から山牌へ戻る牌を視覚的に移動
+                foreach (int id in movedToWall)
+                {
+                    if (uiManager.WallUI != null && uiManager.HandUI != null)
+                    {
+                        RectTransform tileRt = null;
+                        foreach (var slot in uiManager.HandUI.GetHandSlots())
                         {
-                            cam = canvas.worldCamera;
-                            if (cam == null) cam = Camera.main;
+                            var inter = slot.GetComponent<TileInteraction>();
+                            if (inter != null && inter.TileId == id) { tileRt = slot; break; }
                         }
-
-                        Vector2 localPoint;
-                        RectTransform container = tileRt.parent as RectTransform;
-                        if (container != null && RectTransformUtility.ScreenPointToLocalPointInRectangle(container, startScreenPos, cam, out localPoint))
+                        if (tileRt != null)
                         {
-                            tileRt.anchoredPosition = localPoint;
+                            Vector2 startScreenPos = GetScreenPosition(tileRt);
+
+                            uiManager.HandUI.RemoveTileFromHand(tileRt, id);
+                            uiManager.WallUI.ReturnTileToWall(tileRt, id);
+
+                            // アニメーションのため、親が変わった直後の位置を元に戻す
+                            Camera cam = null;
+                            Canvas canvas = uiManager.WallUI.GetComponentInParent<Canvas>();
+                            if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
+                            {
+                                cam = canvas.worldCamera;
+                                if (cam == null) cam = Camera.main;
+                            }
+
+                            Vector2 localPoint;
+                            RectTransform container = tileRt.parent as RectTransform;
+                            if (container != null && RectTransformUtility.ScreenPointToLocalPointInRectangle(container, startScreenPos, cam, out localPoint))
+                            {
+                                tileRt.anchoredPosition = localPoint;
+                            }
                         }
                     }
                 }
-            }
 
-            // 4. 山牌から手牌へ移動する牌を視覚的に移動
-            foreach (int id in movedToHand)
-            {
-                if (uiManager.WallUI != null && uiManager.HandUI != null)
+                // 4. 山牌から手牌へ移動する牌を視覚的に移動
+                foreach (int id in movedToHand)
                 {
-                    RectTransform tileRt = uiManager.WallUI.GrabTileById(id);
-                    if (tileRt != null)
+                    if (uiManager.WallUI != null && uiManager.HandUI != null)
                     {
-                        Vector2 startScreenPos = GetScreenPosition(tileRt);
-
-                        uiManager.HandUI.AddTileToHand(tileRt, id);
-
-                        // アニメーションのため、親が変わった直後の位置を元に戻す
-                        Camera cam = null;
-                        Canvas canvas = uiManager.HandUI.GetComponentInParent<Canvas>();
-                        if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
+                        RectTransform tileRt = uiManager.WallUI.GrabTileById(id);
+                        if (tileRt != null)
                         {
-                            cam = canvas.worldCamera;
-                            if (cam == null) cam = Camera.main;
-                        }
-                        Vector2 localPoint;
-                        RectTransform container = tileRt.parent as RectTransform;
-                        if (container != null && RectTransformUtility.ScreenPointToLocalPointInRectangle(container, startScreenPos, cam, out localPoint))
-                        {
-                            tileRt.anchoredPosition = localPoint;
+                            Vector2 startScreenPos = GetScreenPosition(tileRt);
+
+                            uiManager.HandUI.AddTileToHand(tileRt, id);
+
+                            // アニメーションのため、親が変わった直後の位置を元に戻す
+                            Camera cam = null;
+                            Canvas canvas = uiManager.HandUI.GetComponentInParent<Canvas>();
+                            if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
+                            {
+                                cam = canvas.worldCamera;
+                                if (cam == null) cam = Camera.main;
+                            }
+                            Vector2 localPoint;
+                            RectTransform container = tileRt.parent as RectTransform;
+                            if (container != null && RectTransformUtility.ScreenPointToLocalPointInRectangle(container, startScreenPos, cam, out localPoint))
+                            {
+                                tileRt.anchoredPosition = localPoint;
+                            }
                         }
                     }
                 }
+
+                // 5. 新しい配置で手牌のレイアウトのみ更新（WallUIの再整列は行わず、元の位置のまま穴を開けたり埋めたりする）
+                if (uiManager.HandUI != null)
+                {
+                    uiManager.HandUI.UpdateLayout(uiManager.CurrentPhaseStatus);
+                }
+
+                // 6. ユーザー指定のアニメーション時間 (0.2秒) 待機
+                float duration = 0.2f;
+                yield return new WaitForSeconds(duration);
+
+                if (!ownedLock.IsActive) yield break;
+
+                // 7. Rebuild時にプール回収が走らないよう、内部の同期用キャッシュを最新化
+                visualController.SyncRebuildCache();
             }
-
-            // 5. 新しい配置で手牌のレイアウトのみ更新（WallUIの再整列は行わず、元の位置のまま穴を開けたり埋めたりする）
-            if (uiManager.HandUI != null)
-            {
-                uiManager.HandUI.UpdateLayout(uiManager.CurrentPhaseStatus);
-            }
-
-            // 6. ユーザー指定のアニメーション時間 (0.2秒) 待機
-            float duration = 0.2f;
-            yield return new WaitForSeconds(duration);
-
-            uiManager.SetIsTransitioning(false);
-
-            // 7. Rebuild時にプール回収が走らないよう、内部の同期用キャッシュを最新化
-            visualController.SyncRebuildCache();
         }
     }
 }

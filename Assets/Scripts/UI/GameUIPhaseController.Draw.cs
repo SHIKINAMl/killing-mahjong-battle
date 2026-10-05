@@ -15,15 +15,13 @@ namespace KillingMahjong.UI
 
         public void HandleDraw(KillingMahjong.EngineData.DrawPlayerData[] drawData = null)
         {
-            // 流局は「最後の打牌の直後」に届くので打牌アニメや能力演出と重なりやすい。
-            // ここで捨てると _currentRoundIndex++・流局ダイアログ・next_round 送信が全部飛び、
-            // サーバーが承認を待ち続けて対局が止まる。捨てずに演出明けまで保留する。
-            if (uiManager.IsBusyWithTransition)
-            {
-                uiManager.DeferUntilIdle("draw", () => HandleDraw(drawData));
-                return;
-            }
+            var ticket = roundEnd.Begin(RoundEndCoordinator.Outcome.Draw);
+            if (ticket == null) return;
+            RunRoundEndWhenIdle(ticket, () => PresentDraw(ticket, drawData));
+        }
 
+        private void PresentDraw(RoundEndCoordinator.Ticket ticket, DrawPlayerData[] drawData)
+        {
             // 待機中などの表示は消す
             if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.ShowReadyBox(false);
             if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.ShowReadyBox(false);
@@ -52,42 +50,15 @@ namespace KillingMahjong.UI
                 uiManager.EnemyWaitUI.DisplayWaits(Managers.BoardStateManager.Instance.CurrentEnemyWaitTiles);
             }
 
-            // 既存の手牌データソート
-            Managers.BoardStateManager.Instance.SortTileIds(Managers.BoardStateManager.Instance.CurrentHandTiles);
-            Managers.BoardStateManager.Instance.SortTileIds(Managers.BoardStateManager.Instance.CurrentEnemyHandTiles);
-            
-            if (uiManager.HandUI != null) uiManager.HandUI.SortHandSlots();
-            if (uiManager.EnemyHandUI != null) uiManager.EnemyHandUI.SortHandSlots();
-
-            // 相手の手牌強制公開
-            if (uiManager.EnemyHandUI != null)
-            {
-                uiManager.EnemyHandUI.RevealAllHands(uiManager.TileResourceManager);
-            }
-
-            // このOKが出ている時点で、準備完了という文字を出してほしい
-            if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.ShowReadyBox(true);
-            if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.ShowReadyBox(true);
+            RevealRoundEndHands();
 
             // ダイアログを出してOKボタンを待つ
             if (uiManager.DialogueUI != null)
             {
                 uiManager.DialogueUI.gameObject.SetActive(true);
                 uiManager.DialogueUI.ShowText("流局しました。\nお互いの手牌と待ちを確認してください。");
-                uiManager.DialogueUI.ShowNextRoundButton(() => {
-                    if (uiManager.WaitUI != null) uiManager.WaitUI.gameObject.SetActive(false);
-                    if (uiManager.EnemyWaitUI != null) uiManager.EnemyWaitUI.gameObject.SetActive(false);
-                    
-                    if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.SetReadyCheck(true);
-                    _pendingDrawTransition = true;
-                    SendNextRoundAction();
-                });
             }
-            else
-            {
-                _pendingDrawTransition = true;
-                SendNextRoundAction();
-            }
+            ShowNextRoundWait(ticket);
         }
 
     }

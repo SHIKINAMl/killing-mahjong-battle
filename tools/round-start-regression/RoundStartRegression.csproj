@@ -7,6 +7,8 @@
   <ItemGroup>
     <Compile Include="Program.cs" />
     <Compile Include="../../Assets/Scripts/UI/RoundStartCoordinator.cs" Link="RoundStartCoordinator.cs" />
+    <Compile Include="../../Assets/Scripts/UI/TransitionLockSet.cs" />
+    <Compile Include="../../Assets/Scripts/UI/RoundEndCoordinator.cs" />
     <Compile Include="../../Assets/Scripts/UI/GameUIPhaseController.RoundStart.cs" Link="GameUIPhaseController.RoundStart.cs" />
     <Compile Include="../../Assets/Scripts/Network/Handlers/PhaseMessageHandler.cs" Link="PhaseMessageHandler.cs" />
     <Compile Include="$(GeneratedSourceDirectory)/*.cs" />

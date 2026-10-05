@@ -19,6 +19,7 @@ namespace KillingMahjong.UI.Effects
         private PhaseManager subscribedPhaseManager;
         private Coroutine subscribeRoutine;
         private bool battleStartReleasePrepared;
+        private TransitionLockSet.Lease inputTransition;
 
         // 既存の遷移に足す時間は 0.6 秒以内という制約のうち、静止に使う時間。
         // 以降の揺れ・BGM解除・手牌せり上がりは同じフレームから並行して始める。
@@ -70,6 +71,8 @@ namespace KillingMahjong.UI.Effects
 
         private void OnDisable()
         {
+            inputTransition?.Dispose();
+            inputTransition = null;
             SceneManager.sceneLoaded -= HandleSceneLoaded;
             StopSubscribeRoutine();
             UnsubscribeFromPhaseManager();
@@ -387,7 +390,17 @@ namespace KillingMahjong.UI.Effects
         private void SetInputTransitionLock(bool value)
         {
             var uiManager = FindFirstObjectByType<GameUIManager>();
-            if (uiManager != null) uiManager.SetIsTransitioning(value);
+            if (uiManager == null) return;
+            if (value)
+            {
+                if (inputTransition == null || !inputTransition.IsActive)
+                    inputTransition = uiManager.BeginTransition("phase-director");
+            }
+            else
+            {
+                inputTransition?.Dispose();
+                inputTransition = null;
+            }
         }
     }
 }

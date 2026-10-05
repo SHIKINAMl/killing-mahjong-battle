@@ -95,6 +95,7 @@ namespace KillingMahjong.UI
             public string Title;
             public BettingCompletedInfo Info;
             public BettingStage Stage;
+            public TransitionLockSet.Lease Lock;
         }
 
         private BettingTransition activeBettingTransition;
@@ -102,6 +103,7 @@ namespace KillingMahjong.UI
 
         private void ResetBettingTransition()
         {
+            activeBettingTransition?.Lock?.Dispose();
             hasReceivedBettingResult = false;
             activeBettingTransition = null;
         }
@@ -139,7 +141,7 @@ namespace KillingMahjong.UI
                 return;
             }
             transition.Stage = BettingStage.Playing;
-            uiManager.SetIsTransitioning(true);
+            transition.Lock = uiManager.BeginTransition("betting");
             if (uiManager.AbilityUI != null) uiManager.AbilityUI.gameObject.SetActive(false);
             if (uiManager.DialogueUI != null) uiManager.DialogueUI.gameObject.SetActive(false);
             if (uiManager.PhaseTransitionUI != null)
@@ -173,7 +175,18 @@ namespace KillingMahjong.UI
         {
             if (!IsCurrentBettingTransition(transition) || transition.Stage != BettingStage.Covered) return;
             transition.Stage = BettingStage.Completed;
-            uiManager.SetIsTransitioning(false);
+            transition.Lock?.Dispose();
+            RestoreBettingBoard(transition);
+        }
+
+        private void RestoreBettingBoard(BettingTransition transition)
+        {
+            if (!IsCurrentBettingTransition(transition)) return;
+            if (uiManager.IsBusyWithTransition)
+            {
+                uiManager.DeferUntilIdle("bettingRestore", () => RestoreBettingBoard(transition));
+                return;
+            }
             // 演出中の状態同期を拾うため、完了時の再構築も残す。
             RefreshBettingBoard(includeEnemyHand: false);
             RefreshPhaseView(uiManager.CurrentPhaseStatus);

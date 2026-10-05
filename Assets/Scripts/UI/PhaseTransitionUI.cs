@@ -198,6 +198,22 @@ namespace KillingMahjong.UI
 
         private bool isDarkened = false;
 
+        internal void CancelTransitions()
+        {
+            StopAllCoroutines();
+            isDarkened = false;
+            IsDarkenTransitioning = false;
+            IsScreenDarkened = false;
+            _additionalRoundStartDarkenedCallbacks = null;
+            _additionalRoundStartReadyCallbacks = null;
+            _roundStartCleanupDone = false;
+            if (fullScreenCheckerImage != null) fullScreenCheckerImage.gameObject.SetActive(false);
+            if (horizontalLineRt != null) horizontalLineRt.gameObject.SetActive(false);
+            if (centerText != null) centerText.gameObject.SetActive(false);
+            if (promptText != null) promptText.gameObject.SetActive(false);
+            if (hpBetContainer != null) hpBetContainer.SetActive(false);
+        }
+
         public bool IsDarkenTransitioning { get; private set; }
 
         /// <summary>

@@ -6,6 +6,13 @@ namespace KillingMahjong.UI
     public partial class GameUIPhaseController
     {
         private readonly RoundStartCoordinator roundStart = new RoundStartCoordinator();
+        private TransitionLockSet.Lease roundStartTransition;
+
+        private void CancelRoundStartTransition()
+        {
+            roundStartTransition?.Dispose();
+            roundStartTransition = null;
+        }
 
         public bool ShouldDeferRoundStartBoardUpdate(RoundStartCoordinator.BoardUpdateKind kind, bool isBusyWithTransition)
         {
@@ -25,6 +32,11 @@ namespace KillingMahjong.UI
             {
                 ResetPhasePresentation(); // 前の局の入場・確定コールバックを失効させる。
                 ResetBettingTransition();
+                CancelRoundStartTransition();
+                roundEnd.Reset();
+                ronTransition?.Dispose();
+                ronTransition = null;
+                uiManager.HandSelectionController?.CancelPendingConfirmation();
                 uiManager.PhaseTransitionUI?.PrepareRoundStartWait();
             }
         }
@@ -32,6 +44,7 @@ namespace KillingMahjong.UI
         private void StartRoundStartTransition(string text, bool afterDraw)
         {
             var transition = uiManager.PhaseTransitionUI;
+            TransitionLockSet.Lease ownedLock = null;
             roundStart.TryStartTransition(
                 (onCovered, onReady) =>
                 {
@@ -42,11 +55,12 @@ namespace KillingMahjong.UI
                     }
                     else if (afterDraw)
                     {
-                        uiManager.SetIsTransitioning(true);
+                        ownedLock = roundStartTransition = uiManager.BeginTransition("round-start");
                         transition.PlayDrawTransition(onCovered, onReady);
                     }
                     else
                     {
+                        ownedLock = roundStartTransition = uiManager.BeginTransition("round-start");
                         transition.PlayRoundStartDarken(text, onCovered, onReady);
                     }
                 },
@@ -63,8 +77,9 @@ namespace KillingMahjong.UI
                 },
                 () =>
                 {
-                    if (afterDraw) uiManager.SetIsTransitioning(false);
                     ShowDealingWaitUI();
+                    ownedLock?.Dispose();
+                    if (roundStartTransition == ownedLock) roundStartTransition = null;
                 });
         }
 

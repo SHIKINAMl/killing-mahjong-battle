@@ -13,6 +13,10 @@ namespace KillingMahjong.UI
 
         public void OnGameStarted()
         {
+            CancelPhasePresentations();
+            uiManager.HandSelectionController?.CancelPendingConfirmation();
+            uiManager.SkillController?.CancelActiveTransitions();
+            uiManager.ResetTransitionLocks();
             _currentRoundIndex = 1;
             _pendingDrawTransition = false;
             roundStart.Reset();
@@ -103,30 +107,19 @@ namespace KillingMahjong.UI
 
         public void HandleNextRoundWaitingReceived(NextRoundWaitingData data = null)
         {
-            Debug.Log("[GameUIPhaseController] HandleNextRoundWaitingReceived: 相手が次ラウンド準備完了（またはロンボタン押下）しました。");
-            
-            if (data != null && data.ready_players != null)
+            if (data == null || data.ready_players == null) return;
+            var phase = uiManager.CurrentPhaseStatus;
+            if (phase != RoundStatus.Agari && phase != RoundStatus.Ron && phase != RoundStatus.Result
+                && phase != RoundStatus.Draw) return;
+            string localId = NetworkMessageHandler.Instance.LocalPlayerId;
+            bool localReady = false, enemyReady = false;
+            foreach (var id in data.ready_players)
             {
-                // 自分以外のIDが ready_players に含まれているか確認
-                string localId = NetworkMessageHandler.Instance.LocalPlayerId;
-                bool enemyIsReady = false;
-                bool localIsReady = false;
-                foreach (var playerId in data.ready_players)
-                {
-                    if (playerId != localId) enemyIsReady = true;
-                    if (playerId == localId) localIsReady = true;
-                }
-                
-                if (uiManager.EnemyInfoUI != null)
-                {
-                    uiManager.EnemyInfoUI.SetReadyCheck(enemyIsReady);
-                }
-                
-                if (uiManager.PlayerInfoUI != null)
-                {
-                    uiManager.PlayerInfoUI.SetReadyCheck(localIsReady);
-                }
+                if (id == localId) localReady = true;
+                else enemyReady = true;
             }
+            roundEnd.SetReady(localReady, enemyReady);
+            ApplyNextRoundReadyMarks();
         }
 
 

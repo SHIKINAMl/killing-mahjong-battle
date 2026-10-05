@@ -16,7 +16,7 @@ static class Probe
     static int passed;
     public static void Check(bool value, string message) { if (!value) throw new Exception(message); }
     static void Test(string name, Action run) { Fresh(); run(); passed++; Console.WriteLine("PASS " + name); }
-    static void Fresh() { BoardStateManager.Instance=new BoardStateManager(); ReactionController.Instance=new ReactionController(); KillingMahjong.Effects.ScreenFlash.Count=0; }
+    static void Fresh() { BoardStateManager.Instance=new BoardStateManager(); ReactionController.Instance=new ReactionController(); KillingMahjong.Effects.ScreenFlash.Count=0; NetworkMessageHandler.Instance=new NetworkMessageHandler(); }
     static GameUIManager UI(bool transition=true) { var ui=new GameUIManager(); if(!transition) ui.PhaseTransitionUI=null; return ui; }
     static void Repaint(GameUIManager ui) { for(int i=0;i<5;i++) ui.PhaseController.HandlePhaseVisibility(ui.CurrentPhaseStatus); }
     static BettingCompletedInfo Bet() => new BettingCompletedInfo { LocalBet=100, EnemyBet=200, LocalHpBefore=1000, EnemyHpBefore=2000, LocalHpAfter=900, EnemyHpAfter=1800, HasServerHealth=true };
@@ -84,7 +84,7 @@ static class Probe
         });
         Test("old betting callbacks cannot mutate new round or unlock its animation", () => {
             var u=UI(); u.CurrentPhaseStatus=RoundStatus.Betting; u.PhaseController.OnBettingCompleteFromServer(Bet()); var mid=u.PhaseTransitionUI.Midpoint; var done=u.PhaseTransitionUI.Complete;
-            u.PhaseController.ResetRound(); mid(); done(); Check(u.IsTransitioning && u.VisualController.Rebuilds==0,"old callback touched new round");
+            var other=u.BeginTransition("next-round-animation"); u.PhaseController.ResetRound(); mid(); done(); Check(u.IsTransitioning && u.VisualController.Rebuilds==0,"old callback touched new round"); other.Dispose();
             u.SetIsTransitioning(false); u.PhaseController.OnBettingCompleteFromServer(Bet()); Check(u.BetPotUI.Stakes==2,"new round result blocked");
         });
         Test("covered scope is nested and exception-safe without unlocking input", () => {
@@ -112,7 +112,7 @@ static class Probe
             c.Indexes[0]=99; c.Tiles.Clear(); waits[0]=99; done(); done(); Check(u.Sends.Count==1 && u.Sends[0].hand_indexes[0]==1 && u.Sends[0].hand.Count==2 && BoardStateManager.Instance.CurrentWaitTiles.SequenceEqual(new[]{7,8}),"confirmation data drift/repeat");
         });
         Test("confirmation stale generation or phase cannot send/unlock", () => {
-            var u=UI(); u.CurrentPhaseStatus=RoundStatus.HandSelection; var c=new GameUIHandSelectionController(u); c.Confirm(); var done=u.PhaseTransitionUI.CenterComplete; u.PhaseController.ResetMatch(); done(); Check(u.Sends.Count==0 && u.IsTransitioning,"previous match submit/unlock");
+            var u=UI(); u.CurrentPhaseStatus=RoundStatus.HandSelection; var c=new GameUIHandSelectionController(u); c.Confirm(); var done=u.PhaseTransitionUI.CenterComplete; var other=u.BeginTransition("other"); u.PhaseController.ResetMatch(); done(); Check(u.Sends.Count==0 && u.IsTransitioning,"previous match submit/unlock");
             c.Confirm(); done=u.PhaseTransitionUI.CenterComplete; u.CurrentPhaseStatus=RoundStatus.Betting; done(); Check(u.Sends.Count==0 && u.IsTransitioning,"stale phase submit/unlock");
         });
         Test("cancel/reselection invalidates pending confirmation", () => {
@@ -128,13 +128,101 @@ static class Probe
             var u=UI(false); u.CurrentPhaseStatus=RoundStatus.HandSelection; new GameUIHandSelectionController(u).Confirm(); Check(u.Sends.Count==1 && !u.IsTransitioning,"confirmation fallback failed");
             u=UI(); u.CurrentPhaseStatus=RoundStatus.HandSelection; u.IsTutorialMode=true; new GameUIHandSelectionController(u).Confirm(new[]{7},true); u.PhaseTransitionUI.CenterComplete(); Check(u.Sends.Count==0 && u.TutorialManager.Confirmations==1,"tutorial routing changed");
         });
+        Test("overlapping owners release only their own ticket, including duplicate release", () => {
+            int changed=0; var locks=new TransitionLockSet(()=>changed++); var a=locks.Acquire("a"); var b=locks.Acquire("b");
+            a.Dispose(); a.Dispose(); Check(locks.IsLocked && b.IsActive && changed==1,"first owner released second"); b.Dispose(); Check(!locks.IsLocked && changed==2,"aggregate lock change wrong");
+        });
+        Test("same owner name still has independent tickets", () => {
+            var locks=new TransitionLockSet(); var a=locks.Acquire("skill"); var b=locks.Acquire("skill"); b.Dispose(); Check(a.IsActive && locks.IsLocked,"same owner tokens conflated"); a.Dispose(); Check(!locks.IsLocked,"same owner stranded");
+        });
+        Test("reset invalidates old tickets without letting them release new ones", () => {
+            var locks=new TransitionLockSet(); var old=locks.Acquire("old"); locks.Reset(); var current=locks.Acquire("new"); old.Dispose(); Check(!old.IsActive && current.IsActive && locks.IsLocked,"old generation released current"); current.Dispose();
+        });
+        Test("lock owner required; exception releases using scope", () => {
+            var locks=new TransitionLockSet(); bool rejected=false; try{locks.Acquire("");}catch(ArgumentException){rejected=true;} Check(rejected && !locks.IsLocked,"unnamed owner accepted");
+            try{using(locks.Acquire("throw")){throw new InvalidOperationException();}}catch(InvalidOperationException){} Check(!locks.IsLocked,"exception stranded lock");
+        });
+        Test("compatibility false cannot release a migrated owner", () => {
+            var u=UI(); var owned=u.BeginTransition("owned"); u.SetIsTransitioning(true); u.SetIsTransitioning(true); u.SetIsTransitioning(false); Check(u.IsTransitioning && owned.IsActive,"legacy false unlocked owner"); owned.Dispose(); Check(!u.IsTransitioning,"legacy true acquired twice");
+        });
+        Test("network error cancels waiting request but preserves betting animation", () => {
+            var u=UI(); u.CurrentPhaseStatus=RoundStatus.Betting; u.SkillController.WaitForMulligan(); var skill=u.SkillController; var n=new GameUINetworkHandler(u); var other=u.BeginTransition("betting-in-progress");
+            n.Error(); Check(!skill.RequestPending && u.IsTransitioning && other.IsActive,"error released animation"); other.Dispose(); Check(!u.IsTransitioning,"request error stranded lock");
+        });
+        Test("skill request transfers continuously to its animation", () => {
+            var u=UI(); u.SkillController.WaitForMulligan(); var r=u.SkillController.StartSkill(); Check(r.MoveNext(),"skill did not start"); Check(!u.SkillController.RequestPending && u.IsTransitioning,"transfer temporarily unlocked");
+            Check(!r.MoveNext() && !u.IsTransitioning && u.VisualController.Rebuilds==1,"skill did not release/refresh");
+        });
+        Test("enemy skill response cannot release local pending request", () => {
+            var u=UI(); u.SkillController.WaitForMulligan(); var r=u.SkillController.StartSkill("mulligan","enemy"); r.MoveNext(); Check(u.SkillController.RequestPending,"enemy response cleared local request");
+            ((IDisposable)r).Dispose(); Check(u.IsTransitioning,"enemy completion cleared local request"); u.SkillController.CancelPendingSkillRequest(); Check(!u.IsTransitioning,"pending request stuck");
+        });
+        Test("skill coroutine disposal releases its lease and preserves another owner", () => {
+            var u=UI(); var other=u.BeginTransition("other"); var r=u.SkillController.StartSkill("boost_hand"); r.MoveNext(); ((IDisposable)r).Dispose(); Check(u.IsTransitioning && other.IsActive,"skill cancellation unlocked another owner"); other.Dispose(); Check(!u.IsTransitioning,"disposed coroutine retained lock");
+        });
+        Test("skill cancellation invalidates active work without late refresh", () => {
+            var u=UI(); var other=u.BeginTransition("other"); var r=u.SkillController.StartSkill("perspective"); r.MoveNext(); u.SkillController.CancelActiveTransitions(); Check(u.IsTransitioning && other.IsActive,"skill disable unlocked other owner"); r.MoveNext(); Check(u.VisualController.Rebuilds==0 && u.QueueCount==0,"cancelled skill refreshed new state"); other.Dispose();
+        });
+        Test("skill completion queues board refresh until other owner finishes", () => {
+            var u=UI(); var other=u.BeginTransition("other"); var r=u.SkillController.StartSkill("assault"); r.MoveNext(); r.MoveNext(); Check(u.IsTransitioning && u.QueueCount==1 && u.VisualController.Rebuilds==0,"board rebuilt under another animation"); other.Dispose(); u.Flush(); Check(u.VisualController.Rebuilds==1,"final board refresh lost");
+        });
+        Test("betting completion cannot unlock or restore UI through another owner", () => {
+            var u=UI(); u.CurrentPhaseStatus=RoundStatus.Betting; u.PhaseController.TriggerBettingAnimationPhase("round",Bet()); u.PhaseTransitionUI.Midpoint(); var other=u.BeginTransition("skill"); u.PhaseTransitionUI.Complete();
+            Check(u.IsTransitioning && u.VisualController.Rebuilds==1 && u.QueueCount==1,"bet restored board through other lock"); other.Dispose(); u.Flush(); Check(u.VisualController.Rebuilds==2,"bet restore lost");
+        });
+        Test("manager disable cancels presentation and invalidates every old ticket", () => {
+            var u=UI(); var old=u.BeginTransition("tile-move"); u.CurrentPhaseStatus=RoundStatus.HandSelection; u.HandSelectionController.Confirm(); u.SkillController.WaitForMulligan();
+            u.DisableForTest();
+            Check(!u.IsTransitioning && !old.IsActive && !u.SkillController.RequestPending,"disable left lock active"); var current=u.BeginTransition("new-match"); old.Dispose(); u.PhaseTransitionUI.CenterComplete(); Check(current.IsActive && u.Sends.Count==0,"old callbacks released new match"); current.Dispose();
+        });
+        Test("duplicate draw prepares/publicizes once and sends next round once", () => {
+            var u=UI(); u.CurrentPhaseStatus=RoundStatus.Draw; BoardStateManager.Instance.CurrentWaitTiles.Add(7); BoardStateManager.Instance.CurrentEnemyWaitTiles.Add(8);
+            u.PhaseController.HandleDraw(); var click=u.DialogueUI.NextRoundButton; u.PhaseController.HandleDraw(); Check(u.PhaseController.RoundIndex==2 && u.EnemyHandUI.Reveals==1 && u.PlayerInfoUI.ReadyShows==1,"duplicate draw side effects");
+            click(); click(); Check(NetworkMessageHandler.Instance.NextRounds==1 && u.PhaseController.DrawTransitionPending && !u.WaitUI.gameObject.activeSelf && !u.EnemyWaitUI.gameObject.activeSelf,"draw OK repeat/lost carryover");
+        });
+        Test("early opponent readiness survives ready-box creation after draw animation", () => {
+            var u=UI(); u.CurrentPhaseStatus=RoundStatus.Draw; var other=u.BeginTransition("last-discard"); u.PhaseController.HandleDraw();
+            u.PhaseController.HandleNextRoundWaitingReceived(new NextRoundWaitingData{ready_players=new List<string>{"enemy"}}); other.Dispose(); u.Flush(); Check(u.EnemyInfoUI.Ready && !u.PlayerInfoUI.Ready,"early ready mark reset by ShowReadyBox");
+        });
+        Test("old next-round OK cannot confirm the following round", () => {
+            var u=UI(); u.CurrentPhaseStatus=RoundStatus.Draw; u.PhaseController.HandleDraw(); var old=u.DialogueUI.NextRoundButton; u.PhaseController.ResetRound(); u.PhaseController.HandleDraw();
+            old(); Check(NetworkMessageHandler.Instance.NextRounds==0 && !u.PlayerInfoUI.Ready,"old OK confirmed new round"); u.DialogueUI.NextRoundButton(); Check(NetworkMessageHandler.Instance.NextRounds==1,"new OK blocked");
+        });
+        Test("late ready notification ignored during live play", () => {
+            var u=UI(); u.CurrentPhaseStatus=RoundStatus.Dealing; u.PhaseController.HandleNextRoundWaitingReceived(new NextRoundWaitingData{ready_players=new List<string>{"enemy"}});
+            u.CurrentPhaseStatus=RoundStatus.Draw; u.PhaseController.HandleDraw(); Check(!u.EnemyInfoUI.Ready,"previous-round readiness carried into next ending");
+        });
+        Test("OK waits for overlapping animation; repeated clicks queue one confirmation", () => {
+            var u=UI(); u.CurrentPhaseStatus=RoundStatus.Draw; u.PhaseController.HandleDraw(); var other=u.BeginTransition("other"); u.DialogueUI.NextRoundButton(); u.DialogueUI.NextRoundButton();
+            Check(NetworkMessageHandler.Instance.NextRounds==0 && u.QueueCount==1,"OK bypassed input lock or queued twice"); other.Dispose(); u.Flush(); Check(NetworkMessageHandler.Instance.NextRounds==1,"delayed OK lost");
+        });
+        foreach(bool draw in new[]{true,false}) Test("server game-over result replaces next-round send: "+(draw?"draw":"agari"), () => {
+            var u=UI(); u.CurrentPhaseStatus=draw?RoundStatus.Draw:RoundStatus.Agari; if(draw)u.PhaseController.HandleDraw();else u.PhaseController.ShowAgariWait();
+            u.IsGameOver=true; u.DialogueUI.NextRoundButton(); u.DialogueUI.NextRoundButton(); Check(u.Results==1 && NetworkMessageHandler.Instance.NextRounds==0,"game-end OK sent next round/replayed result");
+        });
+        Test("missing dialogue UI automatically confirms draw and agari wait", () => {
+            var u=UI(); u.DialogueUI=null; u.CurrentPhaseStatus=RoundStatus.Draw; u.PhaseController.HandleDraw(); Check(NetworkMessageHandler.Instance.NextRounds==1,"draw fallback stalled");
+            u.PhaseController.ResetRound(); u.CurrentPhaseStatus=RoundStatus.Agari; u.PhaseController.ShowAgariWait(); Check(NetworkMessageHandler.Instance.NextRounds==2,"agari fallback stalled");
+        });
+        Test("ron completion is once and waits until other owner finishes", () => {
+            var u=UI(); u.CurrentPhaseStatus=RoundStatus.Agari; var done=u.PhaseController.PrepareRonCompletion(); var other=u.BeginTransition("other"); done(); done(); Check(u.PhaseController.RoundIndex==1 && u.QueueCount==1 && u.IsTransitioning,"ron completion bypassed other owner");
+            other.Dispose(); u.Flush(); done(); Check(u.PhaseController.RoundIndex==2 && u.PlayerInfoUI.ReadyShows==1,"ron completion repeated");
+        });
+        Test("old ron completion cannot clear a new round lock or increment its index", () => {
+            var u=UI(); u.CurrentPhaseStatus=RoundStatus.Agari; var old=u.PhaseController.PrepareRonCompletion(); u.PhaseController.ResetRound(); u.ResetTransitionLocks(); var current=u.BeginTransition("new-round"); old(); Check(current.IsActive && u.PhaseController.RoundIndex==1,"stale ron completion affected new round"); current.Dispose();
+        });
+        Test("round ending rejects premature confirm and preserves local confirmation against older ready data", () => {
+            var flow=new RoundEndCoordinator(); var ticket=flow.Begin(RoundEndCoordinator.Outcome.Draw); Check(!flow.Confirm(ticket) && flow.Begin(RoundEndCoordinator.Outcome.Agari)==null,"invalid ending stage accepted");
+            flow.FinishPresentation(ticket); Check(flow.Confirm(ticket) && !flow.Confirm(ticket),"confirm not once"); flow.SetReady(false,true); Check(flow.LocalReady && flow.EnemyReady,"server readiness cleared local OK");
+            flow.Reset(); var current=flow.Begin(RoundEndCoordinator.Outcome.Agari); Check(!flow.FinishPresentation(ticket) && !flow.Confirm(ticket) && flow.IsCurrent(current),"old ending ticket accepted");
+        });
         Console.WriteLine($"All {passed} phase regressions passed (graphics/transport simulated).");
     }
 }
 namespace UnityEngine
 {
     public class GameObject { public bool activeSelf=true; public void SetActive(bool v){activeSelf=v;} }
-    public class MonoBehaviour { protected object StartCoroutine(IEnumerator e)=>e; }
+    public class MonoBehaviour { protected object StartCoroutine(IEnumerator e)=>e; protected void StopAllCoroutines(){} }
     public static class Debug { public static void Log(string s){} public static void LogWarning(string s){} }
     public enum FindObjectsInactive { Include } public enum FindObjectsSortMode { None }
     public static class Object { public static T[] FindObjectsByType<T>(FindObjectsInactive a, FindObjectsSortMode b)=>Array.Empty<T>(); }
@@ -152,6 +240,7 @@ namespace KillingMahjong.Managers
     {
         public static BoardStateManager Instance;
         public int LocalPlayerHp=1000, EnemyPlayerHp=2000, LocalPlayerSpecialVictoryCount, CurrentDoraId=-1, HpSaves, BeforeLocal, BeforeEnemy;
+        public List<int> CurrentHandTiles=new List<int>(), CurrentEnemyHandTiles=new List<int>(), CurrentEnemyWaitTiles=new List<int>(); public void SortTileIds(List<int> tiles){tiles.Sort();}
         public bool IsLocalTurn, LastIsLocalWin; public LiquidationData LastLiquidationData; public List<int> CurrentWaitTiles=new List<int>();
         public void RememberHpBeforeLiquidation(){HpSaves++; BeforeLocal=LocalPlayerHp; BeforeEnemy=EnemyPlayerHp;}
         public void UpdateHp(int a,int b){LocalPlayerHp=a;EnemyPlayerHp=b;} public void SetLocalTurn(bool b){IsLocalTurn=b;}
@@ -162,6 +251,8 @@ namespace KillingMahjong.Managers
         public static ReactionController Instance; public int HandStarts,BetStarts;
         public void StartHandSelectionTimer(){HandStarts++;} public void StartBetPhaseTimer(){BetStarts++;}
         public void StopHandSelectionTimer(bool v){} public void CheckAndPlayBetReaction(int a,int b,bool c){} public void SetPlayerHp(int v){} public void SetEnemyHp(int v){}
+        public void SetCurrentRound(int v){} public void CheckAndPlayDrawReaction(){} public void HandleRoundStart(int v){}
+        public void HandleGameEnd(bool local){}
     }
     public class AudioManager { public static AudioManager Instance; public void UpdateBgmIntensityFromHp(int a,int b){} }
     public class PhaseManager { public static PhaseManager Instance; public void ChangeRoundStatus(RoundStatus v){} }
@@ -173,6 +264,8 @@ namespace KillingMahjong.Network
     public class NextRoundWaitingData { public int ready_count; public List<string> ready_players; }
     public class NetworkMessageHandler
     {
+        public static NetworkMessageHandler Instance; public int NextRounds; public void SendActionToServer(string action,ActionPayload payload){if(action=="next_round")NextRounds++;}
+        public event Action<StatusData> OnStatusReceived;
         public string LocalPlayerId="self"; public bool AgariProcessed; public int Agaris; public List<string> Events=new List<string>();
         public void RaisePhaseStatusChanged(RoundStatus s){Events.Add("phase:"+s);} public void RaiseAgari(bool local){Agaris++;Events.Add("agari");}
         public void RaiseTileDiscarded(int tile,bool local){Events.Add("tile:"+tile);} public void RaiseDraw(DrawPlayerData[] v){}
@@ -191,10 +284,13 @@ namespace KillingMahjong.UI
     {
         public UnityEngine.GameObject gameObject=new UnityEngine.GameObject(); public int Starts,Stops,Stakes,BetShows,TextShows,Confirmations; public float LastDuration;
         public bool FirstRoundChromeHidden, IsHandSelectionConfirmed;
+        public void StopAllCoroutines(){}
+        public bool Ready; public int ReadyShows,Reveals; public Action NextRoundButton;
         public void StartTurnTimer(float seconds){Starts++;LastDuration=seconds;} public void StopTurnTimer(){Stops++;}
         public void ShowBettingPhase(int max,int hp,int sv,Action<int> done){BetShows++;} public void HideBettingPhase(bool instant=false){}
         public void SetPanelVisible(bool v){} public void SetSubmittedState(bool v){} public void SetSuppressedForTransition(bool v){}
-        public void SetBackgroundRaycast(bool v){} public void ShowReadyBox(bool v){} public void DisplayWaits(List<int> v){}
+        public void SetBackgroundRaycast(bool v){} public void ShowReadyBox(bool v){if(v){ReadyShows++;Ready=false;}} public void DisplayWaits(List<int> v){}
+        public void SetReadyCheck(bool v){Ready=v;} public void ShowNextRoundButton(Action a){NextRoundButton=a;} public void SortHandSlots(){} public void RevealAllHands(object r){Reveals++;}
         public void UpdateLayout(RoundStatus s){} public void UpdateContainerPosition(bool v){} public void UpdateWallHighlights(List<int> waits,bool v){} public void UpdateDiscardTurnIndicator(bool a,bool b){}
         public void Clear(){} public void SetHP(int v){} public void AddStakes(int a,int b){Stakes++;} public void SetVisible(bool v){} public void SetVitalsVisible(bool v){}
         public void Hide(){} public void ShowDora(int v){} public void CloseYakuList(){} public void UpdateTurnText(){} public void ShowText(string s){TextShows++;}
@@ -203,6 +299,7 @@ namespace KillingMahjong.UI
     public class PhaseTransitionUI
     {
         public bool IsDarkenTransitioning; public int Prompts; public Action Midpoint,Complete,CenterComplete; public BettingCompletedInfo Info;
+        public void CancelTransitions(){IsDarkenTransitioning=false;}
         public void PlayTransition(string t,Widget p,BettingCompletedInfo b,Action mid,Action done){Info=b;Midpoint=mid;Complete=done;}
         public void PlayCenterTextAnim(string t,float seconds,Action done){CenterComplete=done;} public void PlayPromptText(string t,float seconds){Prompts++;}
     }
@@ -217,22 +314,29 @@ namespace KillingMahjong.UI
         public RoundStatus CurrentPhaseStatus; private bool isTransitioning; public bool IsTransitioning=>isTransitioning;
         public bool IsBusyWithTransition=>isTransitioning || (PhaseTransitionUI?.IsDarkenTransitioning??false);
         public bool IsTutorialMode,IsWaitDeductionUIEnabled; public int Rons;
+        public bool IsGameOver; public int Results; public Widget EnemyWaitUI=new Widget(); public object TileResourceManager; public void ShowGameResult(){Results++;}
         public Widget HandUI=new Widget(),WallUI=new Widget(),EnemyHandUI=new Widget(),EnemyWallUI=new Widget(),RiverUI=new Widget(),EnemyRiverUI=new Widget(),WaitUI=new Widget(),DialogueUI=new Widget(),BettingUI=new Widget(),PlayerInfoUI=new Widget(),EnemyInfoUI=new Widget(),AbilityUI=new Widget(),DoraDisplayUI=new Widget(),YakuListUI=new Widget(),ScoreGauge=new Widget(),BetPotUI=new Widget(),WaitDeduction=new Widget(),TutorialManager=new Widget(),RonAnimationUI=new Widget();
         private Widget abilityUI=>AbilityUI; public PhaseTransitionUI PhaseTransitionUI=new PhaseTransitionUI();
-        public GameUIPhaseController PhaseController; public VisualProbe VisualController; public List<ActionPayload> Sends=new List<ActionPayload>();
+        public GameUIPhaseController PhaseController; public VisualProbe VisualController; public List<ActionPayload> Sends=new List<ActionPayload>(); public GameUIHandSelectionController HandSelectionController; public GameUISkillController SkillController;
         private readonly List<KeyValuePair<string,Action>> deferredActions=new List<KeyValuePair<string,Action>>();
         public int QueueCount=>deferredActions.Count;
-        public GameUIManager(){PhaseController=new GameUIPhaseController(this); VisualController=new VisualProbe(this);}
+        public GameUIManager(){PhaseController=new GameUIPhaseController(this); VisualController=new VisualProbe(this); HandSelectionController=new GameUIHandSelectionController(this); SkillController=new GameUISkillController(this);}
         private void UpdateTurnIndicatorVisibility(){} private void EnsureFlushWatcher(){}
         public void Flush(){var snapshot=deferredActions.ToArray();deferredActions.Clear();foreach(var p in snapshot)p.Value();}
         public void SetCurrentPhaseStatus(RoundStatus v){CurrentPhaseStatus=v;} public void RecordHpHistory(int a,int b){}
         public void SendActionToServer(string action,ActionPayload data){Sends.Add(data);} public void ExecuteRonAction(){Rons++;}
+        public void DisableForTest(){OnDisable();}
     }
     public partial class GameUIPhaseController : UnityEngine.MonoBehaviour
     {
-        private GameUIManager uiManager; private bool _hasSentNextRoundForCurrentPhase,_hasShownHandSelectionPrompt,_hasExecutedRonAnimation,_isCarryOverNextRound,_pendingDrawTransition; private int _currentRoundIndex=1;
+        private GameUIManager uiManager; private bool _hasSentNextRoundForCurrentPhase,_hasShownHandSelectionPrompt,_hasExecutedRonAnimation,_isCarryOverNextRound; private int _currentRoundIndex=1;
         public int RoundStarts; public GameUIPhaseController(GameUIManager m){uiManager=m;}
-        public void ResetMatch(){ResetPhasePresentation();ResetBettingTransition();} public void ResetRound(){ResetPhasePresentation();ResetBettingTransition();}
+        private readonly RoundStartCoordinator roundStart=new RoundStartCoordinator(); private TransitionLockSet.Lease ronTransition; private TransitionLockSet.Lease roundStartTransition;
+        public void ResetMatch(){ResetRound();} public void ResetRound(){ResetPhasePresentation();ResetBettingTransition();roundEnd.Reset();_hasSentNextRoundForCurrentPhase=false;}
+        public int RoundIndex=>_currentRoundIndex; public bool DrawTransitionPending=>_pendingDrawTransition;
+        private void OnScoreSettlementComplete(RoundEndCoordinator.Ticket ticket,bool local){ShowNextRoundWait(ticket);}
+        public Action PrepareRonCompletion(){var ticket=roundEnd.Begin(RoundEndCoordinator.Outcome.Agari);var lease=uiManager.BeginTransition("ron");return ()=>CompleteRonPresentation(ticket,lease,true);}
+        public void ShowAgariWait(){var ticket=roundEnd.Begin(RoundEndCoordinator.Outcome.Agari);if(ticket!=null){RevealRoundEndHands();ShowNextRoundWait(ticket);}}
         private void SetReadyBadgesSuppressed(bool v){} private void ApplyPhaseReadyMarks(RoundStatus v){} private void ResetPhaseReadyMarks(){} private void HideReadyBoxes(){}
         private void StartRoundStartTransition(string title,bool draw){RoundStarts++;} private IEnumerator ShowReadyBadgesAfterBettingPanelSlideOut(){yield break;}
     }
@@ -243,4 +347,22 @@ namespace KillingMahjong.UI
         public GameUIHandSelectionController(GameUIManager m){uiManager=m;} public void Confirm(int[] waits=null,bool tutorial=false){ConfirmSelection(waits,tutorial);} public void Cancel(){CancelSelectionConfirmation(true);}
         public Action DialogConfirmation()=>GuardSelectionConfirmation(()=>ConfirmSelection());
     }
+    public partial class GameUISkillController : UnityEngine.MonoBehaviour
+    {
+        private GameUIManager uiManager; private TransitionLockSet.Lease pendingMulligan;
+        private readonly HashSet<TransitionLockSet.Lease> skillTransitions=new HashSet<TransitionLockSet.Lease>();
+        private readonly HashSet<Action<StatusData>> skillStatusHandlers=new HashSet<Action<StatusData>>();
+        private object _lastMulliganOutSlotRt; private int _lastMulliganOutTileId,_lastMulliganTargetIndex;
+        public GameUISkillController(GameUIManager u){uiManager=u;} private void CancelSkillSelection(){}
+        public void WaitForMulligan(){pendingMulligan=uiManager.BeginTransition("mulligan-request");}
+        public bool RequestPending=>pendingMulligan?.IsActive??false;
+        public IEnumerator StartSkill(string type="mulligan",string player="self")=>HandleSkillCastedRoutine(new SkillCastedData{skillType=type,player_id=player});
+        private IEnumerator HandleSkillEffectsRoutine(SkillCastedData data,TransitionLockSet.Lease lease){yield return null;}
+    }
+    public partial class GameUINetworkHandler
+    {
+        private GameUIManager uiManager; public GameUINetworkHandler(GameUIManager u){uiManager=u;} public void Error(){HandleError("error");}
+    }
+    public class LoadingManager { public static LoadingManager Instance; public void ForceHide(){} }
 }
+namespace KillingMahjong.EngineData { public class StatusData{} public class SkillCastedData { public string skillType,player_id; } }

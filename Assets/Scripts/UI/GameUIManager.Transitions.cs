@@ -54,7 +54,7 @@ namespace KillingMahjong.UI
         private const string BgmFilterDeferKey = "bgmFilter";
 
         // 賭け確定の既存シーケンスだけが、暗転解除の瞬間まで Discard の開放を持つ。
-        // SetIsTransitioning は所有者を数えない bool なので、同じ目的に流用しない。
+        // BGMの開放待ちは入力ロックと別の責任なので、ロックの取得数には含めない。
         private bool holdDiscardBgmOpeningForBattleStart;
 
         /// <summary>
@@ -108,16 +108,7 @@ namespace KillingMahjong.UI
             audio.SetPhaseDrum(currentPhaseStatus);
         }
 
-        public void SetIsTransitioning(bool value)
-        {
-            isTransitioning = value;
-            UpdateTurnIndicatorVisibility();
 
-            // 能力パネルと説明ツールチップは通常 20/25 で、フェーズ演出の帯(19)より手前に出る。
-            // 演出のあいだだけ帯より下へ退避させる（2026-08-19 のプランナー要望 R-2）。
-            if (abilityUI != null) abilityUI.SetSuppressedForTransition(value);
-            if (!value) PhaseController?.SynchronizeDiscardTurnTimer();
-        }
 
         private int coveredBoardUpdateDepth;
         internal bool IsUpdatingCoveredBoard => coveredBoardUpdateDepth > 0;

@@ -12,6 +12,12 @@
     <Compile Include="../../Assets/Scripts/UI/GameUIPhaseController.VisibilityCases.cs" />
     <Compile Include="../../Assets/Scripts/UI/GameUIPhaseController.Betting.cs" />
     <Compile Include="../../Assets/Scripts/UI/GameUIHandSelectionController.Confirmation.cs" />
+    <Compile Include="../../Assets/Scripts/UI/TransitionLockSet.cs" />
+    <Compile Include="../../Assets/Scripts/UI/GameUIManager.TransitionLocks.cs" />
+    <Compile Include="../../Assets/Scripts/UI/RoundEndCoordinator.cs" />
+    <Compile Include="../../Assets/Scripts/UI/RoundStartCoordinator.cs" />
+    <Compile Include="../../Assets/Scripts/UI/GameUIPhaseController.NextRound.cs" />
+    <Compile Include="../../Assets/Scripts/UI/GameUIPhaseController.Draw.cs" />
     <Compile Include="../../Assets/Scripts/Network/Handlers/LiquidationMessageApplier.cs" />
     <Compile Include="../../Assets/Scripts/Network/Handlers/DiscardMessageHandler.cs" />
     <Compile Include="../../Assets/Scripts/Network/Handlers/RoundLifecycleMessageHandler.cs" />
