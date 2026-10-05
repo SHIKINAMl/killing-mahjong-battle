@@ -35,6 +35,8 @@ namespace KillingMahjong.UI
 
         private readonly GameUIManager uiManager;
         private readonly GameUIVisualController visualController;
+        private readonly PresentationScopeSet presentations = new PresentationScopeSet(Debug.LogException);
+        public void CancelPresentation() { presentations.CancelAll(); }
 
         public ExposedTileEffectPlayer(GameUIManager uiManager, GameUIVisualController visualController)
         {
@@ -45,6 +47,12 @@ namespace KillingMahjong.UI
         /// <param name="newlyExposed">今回新たに公開された敵山のインデックス一覧</param>
         public IEnumerator PlayPerspectiveAnimation(List<int> newlyExposed)
         {
+            using (var scope = presentations.Begin())
+                yield return scope.Run(PlayPerspectiveVisuals(scope, newlyExposed));
+        }
+
+        private IEnumerator PlayPerspectiveVisuals(PresentationScope scope, List<int> newlyExposed)
+        {
             if (uiManager.EnemyWallUI == null) yield break;
 
             // まだ返さないまま並べ直す。撮る画面は「返す前」でなければならない
@@ -54,6 +62,7 @@ namespace KillingMahjong.UI
 
             // ---- ① 発動 ----
             PerspectiveSkillEffect effect = PerspectiveSkillEffect.Create();
+            if (effect != null) scope.AddCleanup(() => { if (effect != null) effect.Dispose(); });
             if (effect != null)
             {
                 // 集中線の集まる先と、暗く落とさない穴は**実際の牌の位置**から決める。
@@ -83,7 +92,7 @@ namespace KillingMahjong.UI
                 var img = rt.GetComponent<UnityEngine.UI.Image>();
                 if (img != null) glowingImages.Add(img);
 
-                yield return PopTile(rt);
+                yield return PopTile(scope, rt);
 
                 // 最後の1枚のあとは、フラッシュまでの間でまとめて待つ
                 if (n < newlyExposed.Count - 1) yield return new WaitForSeconds(TileRevealGap);
@@ -102,7 +111,7 @@ namespace KillingMahjong.UI
             }
 
             // 透視できた牌がどれだったかを、戻ったあとにもう一度見せる
-            yield return GlowAppeal(glowingImages);
+            yield return GlowAppeal(scope, glowingImages);
 
             if (uiManager.PhaseController != null)
             {
@@ -111,9 +120,10 @@ namespace KillingMahjong.UI
         }
 
         /// <summary>1枚ぶんの拡大ポップ。返った瞬間を目に留まらせる。</summary>
-        private IEnumerator PopTile(RectTransform rt)
+        private IEnumerator PopTile(PresentationScope scope, RectTransform rt)
         {
             Vector3 origScale = rt.localScale;
+            scope.AddCleanup(() => { if (rt != null) rt.localScale = origScale; });
 
             for (float t = 0f; t < PopDuration; t += Time.deltaTime)
             {
@@ -127,9 +137,16 @@ namespace KillingMahjong.UI
         }
 
         /// <summary>透視できた牌を黄色く明滅させる。</summary>
-        private IEnumerator GlowAppeal(List<UnityEngine.UI.Image> images)
+        private IEnumerator GlowAppeal(PresentationScope scope, List<UnityEngine.UI.Image> images)
         {
             if (images.Count == 0) yield break;
+            foreach (var image in images)
+            {
+                if (image == null) continue;
+                var ownedImage = image;
+                Color before = image.color;
+                scope.AddCleanup(() => { if (ownedImage != null) ownedImage.color = before; });
+            }
 
             Color originalColor = Color.white;
             Color glowColor = new Color(1.0f, 0.8f, 0.2f);

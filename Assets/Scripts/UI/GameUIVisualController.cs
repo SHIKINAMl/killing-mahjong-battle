@@ -32,6 +32,8 @@ namespace KillingMahjong.UI
         private TileMoveAnimator _moveAnimator;
         /// <summary>透視スキルの公開牌演出（分離クラス）</summary>
         private ExposedTileEffectPlayer _exposedEffectPlayer;
+        internal void CancelSkillPresentations() { _exposedEffectPlayer?.CancelPresentation(); }
+        private void OnDisable() { CancelSkillPresentations(); }
 
         public void Setup(GameUIManager manager)
         {

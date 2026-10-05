@@ -179,7 +179,11 @@ namespace KillingMahjong.UI
         /// <summary>表だけを閉じる。第1局の説明を抜けたあとに本編のUIを残さないために呼ぶ。</summary>
         public void HideTutorialSettlement()
         {
-            if (_tutorialSettlementContainer != null) Destroy(_tutorialSettlementContainer);
+            if (_tutorialSettlementContainer != null)
+            {
+                _tutorialSettlementContainer.SetActive(false);
+                Destroy(_tutorialSettlementContainer);
+            }
             ClearTutorialSettlementReferences();
         }
 
@@ -213,7 +217,8 @@ namespace KillingMahjong.UI
         {
             if (enemyInfo == null || enemyInfo.HpAnchor == null || damage <= 0) return;
 
-            GameObject stage = new GameObject("TutorialDamagePreview");
+            var scope = presentations.Begin();
+            GameObject stage = scope.Own(new GameObject("TutorialDamagePreview"));
             stage.transform.SetParent(transform, false);
             stage.transform.SetAsLastSibling();
             RectTransform stageRt = stage.AddComponent<RectTransform>();
@@ -227,7 +232,12 @@ namespace KillingMahjong.UI
             canvas.sortingOrder = UISortingOrders.RonAnimation;
 
             SpawnHpDeltaLabel(stageRt, enemyInfo.HpAnchor, -damage, AccentThem, placeLeft: false);
-            StartCoroutine(DestroyTutorialDamagePreview(stage));
+            StartCoroutine(FinishTutorialDamagePreview(scope, stage));
+        }
+
+        private IEnumerator FinishTutorialDamagePreview(PresentationScope scope, GameObject stage)
+        {
+            using (scope) yield return scope.Run(DestroyTutorialDamagePreview(stage));
         }
 
         private static IEnumerator DestroyTutorialDamagePreview(GameObject stage)

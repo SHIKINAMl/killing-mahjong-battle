@@ -14,6 +14,15 @@ namespace KillingMahjong.UI
             PlayerInfoUI playerInfo, EnemyInfoUI enemyInfo,
             int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp)
         {
+            using (var scope = presentations.Begin())
+                yield return scope.Run(BloodTransferVisualsRoutine(scope, panelContainer, s, myBetText, theirBetText,
+                    playerInfo, enemyInfo, prevLocalHp, newLocalHp, prevEnemyHp, newEnemyHp));
+        }
+
+        private IEnumerator BloodTransferVisualsRoutine(PresentationScope scope, GameObject panelContainer, RonSettlementInfo s,
+            TextMeshProUGUI myBetText, TextMeshProUGUI theirBetText, PlayerInfoUI playerInfo, EnemyInfoUI enemyInfo,
+            int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp)
+        {
             // どちらの数字を飛ばすか。通常は自分。
             // **強襲で自分の獲得が 0 に潰れた局だけ相手側を飛ばす。**
             // 0 を満貫サイズまで拡大しても何も伝わらないし、強襲が何をしたのかは
@@ -43,11 +52,21 @@ namespace KillingMahjong.UI
 
             // 浮き数字を止める。**着弾点に増減ラベルを自分で出すので、重なると額が同じぶんかえって読めない。**
             // SEもここで止まるので、下で鳴らし直す（ずらして鳴らすのが目的でもある）
-            if (playerInfo != null) playerInfo.SuppressHpPopup = true;
-            if (enemyInfo != null) enemyInfo.SuppressHpPopup = true;
+            if (playerInfo != null)
+            {
+                bool before = playerInfo.SuppressHpPopup;
+                scope.AddCleanup(() => { if (playerInfo != null) playerInfo.SuppressHpPopup = before; });
+                playerInfo.SuppressHpPopup = true;
+            }
+            if (enemyInfo != null)
+            {
+                bool before = enemyInfo.SuppressHpPopup;
+                scope.AddCleanup(() => { if (enemyInfo != null) enemyInfo.SuppressHpPopup = before; });
+                enemyInfo.SuppressHpPopup = true;
+            }
 
             // パネルが消えても残る入れ物。**ディマーは置かない**（盤面を見せたまま血を動かす）
-            GameObject stage = new GameObject("BloodTransferStage");
+            GameObject stage = scope.Own(new GameObject("BloodTransferStage"));
             stage.transform.SetParent(transform, false);
             stage.transform.SetAsLastSibling();
             RectTransform stageRt = stage.AddComponent<RectTransform>();

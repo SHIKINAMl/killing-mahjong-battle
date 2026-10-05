@@ -9,6 +9,24 @@ namespace KillingMahjong.UI
 {
     public partial class RonAnimationUI : MonoBehaviour
     {
+        private readonly PresentationScopeSet presentations = new PresentationScopeSet(Debug.LogException);
+        private CutinAnimationUI activeCutin;
+
+        public void CancelPresentation()
+        {
+            presentations.CancelAll();
+            StopAllCoroutines();
+            if (activeCutin != null)
+            {
+                activeCutin.CancelPresentation();
+                Destroy(activeCutin);
+                activeCutin = null;
+            }
+            HideTutorialSettlement();
+            ShowPlayerRonBubble(false);
+        }
+
+        private void OnDisable() { CancelPresentation(); }
         // ロンの決着は、カットイン・清算・血の移動を順番に見せて因果を読ませる。
         // 同じ状態を渡しながら各段階を独立して読めるように、責務ごとに partial を分けている。
         //

@@ -12,8 +12,12 @@ namespace KillingMahjong.UI
         internal void CancelPhasePresentations()
         {
             StopAllCoroutines();
-            uiManager?.PhaseTransitionUI?.CancelTransitions();
-            uiManager?.RonAnimationUI?.StopAllCoroutines();
+            // 終了時は子UIが先に破棄される場合がある。Unityの破棄済み判定を使う。
+            if (uiManager != null)
+            {
+                if (uiManager.PhaseTransitionUI != null) uiManager.PhaseTransitionUI.CancelTransitions();
+                if (uiManager.RonAnimationUI != null) uiManager.RonAnimationUI.CancelPresentation();
+            }
             ResetPhasePresentation();
             roundEnd.Reset();
             roundStart.Reset();

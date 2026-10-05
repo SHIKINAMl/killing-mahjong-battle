@@ -62,6 +62,16 @@ namespace KillingMahjong.UI
             string scoreFormula, RonSettlementInfo settlement = null,
             bool suppressSettlementPanel = false, bool deferHpUpdate = false)
         {
+            using (var scope = presentations.Begin())
+                yield return scope.Run(SequenceVisualsRoutine(scope, handTiles, ronTile, yakuList, formula, rankName, score, isLocalPlayerWin,
+                    playerInfo, enemyInfo, prevLocalHp, newLocalHp, prevEnemyHp, newEnemyHp, onComplete, scoreFormula, settlement,
+                    suppressSettlementPanel, deferHpUpdate));
+        }
+
+        private IEnumerator SequenceVisualsRoutine(PresentationScope scope, List<int> handTiles, int ronTile, List<string> yakuList, string formula, string rankName, int score, bool isLocalPlayerWin,
+            PlayerInfoUI playerInfo, EnemyInfoUI enemyInfo, int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp, System.Action onComplete,
+            string scoreFormula, RonSettlementInfo settlement, bool suppressSettlementPanel, bool deferHpUpdate)
+        {
             // 0. カットイン演出（勝者の顔と「ロン！」を表示）
             bool cutinFinished = false;
             
@@ -104,6 +114,11 @@ namespace KillingMahjong.UI
                 // 絵が揃った瞬間に当てたいので、カットイン側へ強さだけ渡す。
 
                 CutinAnimationUI cutinUI = gameObject.AddComponent<CutinAnimationUI>();
+                activeCutin = cutinUI;
+                scope.AddCleanup(() => {
+                    if (cutinUI != null) { cutinUI.CancelPresentation(); Destroy(cutinUI); }
+                    if (activeCutin == cutinUI) activeCutin = null;
+                });
                 cutinUI.PlayCutin(winnerSprite, faceSprite, customFont, cutinText, () => {
                     cutinFinished = true;
                     Destroy(cutinUI);
@@ -120,7 +135,7 @@ namespace KillingMahjong.UI
             }
 
             // 1. 大枠コンテナの生成（すべてを包括する最前面キャンバス）
-            GameObject container = new GameObject("RonCinematicContainer");
+            GameObject container = scope.Own(new GameObject("RonCinematicContainer"));
             container.transform.SetParent(transform, false);
             container.transform.SetAsLastSibling();
             RectTransform containerRt = container.AddComponent<RectTransform>();

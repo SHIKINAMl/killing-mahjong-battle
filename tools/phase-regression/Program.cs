@@ -216,16 +216,60 @@ static class Probe
             flow.FinishPresentation(ticket); Check(flow.Confirm(ticket) && !flow.Confirm(ticket),"confirm not once"); flow.SetReady(false,true); Check(flow.LocalReady && flow.EnemyReady,"server readiness cleared local OK");
             flow.Reset(); var current=flow.Begin(RoundEndCoordinator.Outcome.Agari); Check(!flow.FinishPresentation(ticket) && !flow.Confirm(ticket) && flow.IsCurrent(current),"old ending ticket accepted");
         });
+        Test("presentation cleanup is reverse order and once", () => {
+            var calls=new List<int>(); var scope=new PresentationScope(); scope.AddCleanup(()=>calls.Add(1)); scope.AddCleanup(()=>calls.Add(2));
+            scope.Dispose(); scope.Dispose(); Check(!scope.IsActive && calls.SequenceEqual(new[]{2,1}),"cleanup order or duplicate disposal");
+        });
+        Test("one cleanup failure cannot strand other resources", () => {
+            int errors=0,cleaned=0; var scope=new PresentationScope(e=>errors++); scope.AddCleanup(()=>cleaned++); scope.AddCleanup(()=>throw new Exception("cleanup"));
+            scope.Dispose(); Check(errors==1 && cleaned==1,"cleanup stopped after exception");
+        });
+        Test("late resource registration on cancelled presentation cleans immediately", () => {
+            var scope=new PresentationScope(); scope.Dispose(); var owned=new UnityEngine.GameObject(); scope.Own(owned);
+            Check(!owned.activeSelf && owned.DestroyCalls==1,"late resource leaked");
+        });
+        Test("presentation destroys only its registered objects", () => {
+            var own=new UnityEngine.GameObject(); var other=new UnityEngine.GameObject(); var scope=new PresentationScope(); scope.Own(own); scope.Dispose(); scope.Dispose();
+            Check(!own.activeSelf && own.DestroyCalls==1 && other.activeSelf && other.DestroyCalls==0,"foreign presentation destroyed");
+        });
+        Test("cancelled nested presentation cannot resume mutation or completion", () => {
+            int mutations=0,finished=0,disposed=0; var scope=new PresentationScope(); var run=scope.Run(NestedProbe(()=>mutations++,()=>finished++,()=>disposed++));
+            Check(run.MoveNext() && run.Current is IEnumerator,"nested coroutine not yielded"); var child=(IEnumerator)run.Current; Check(child.MoveNext() && mutations==1,"child did not enter");
+            scope.Dispose(); Check(!child.MoveNext() && !run.MoveNext() && mutations==1 && finished==0 && disposed==1,"cancelled nested coroutine resumed");
+        });
+        Test("normal nested presentation finishes once with its finally", () => {
+            int mutations=0,finished=0,disposed=0; using(var scope=new PresentationScope()) Drain(scope.Run(NestedProbe(()=>mutations++,()=>finished++,()=>disposed++)));
+            Check(mutations==2 && finished==1 && disposed==1,"normal presentation lost completion");
+        });
+        Test("presentation set cancellation does not invalidate subsequent playback", () => {
+            var set=new PresentationScopeSet(); var old=set.Begin(); var owned=new UnityEngine.GameObject(); old.Own(owned); set.CancelAll(); var current=set.Begin();
+            old.Dispose(); Check(!old.IsActive && !owned.activeSelf && current.IsActive,"old cancellation affected replay"); current.Dispose();
+        });
+        Test("exception in presentation body still restores registered state", () => {
+            float alpha=0.4f; var owned=new UnityEngine.GameObject(); bool caught=false;var scope=new PresentationScope();
+            try { scope.AddCleanup(()=>alpha=0.4f);scope.Own(owned);alpha=0;Drain(scope.Run(FailingPresentation())); }
+            catch(InvalidOperationException){caught=true;}
+            Check(caught && !scope.IsActive && alpha==0.4f && !owned.activeSelf && owned.DestroyCalls==1,"exception stranded presentation without parent disposal");
+        });
+        Test("nested presentation cancellation restores shared state in acquisition reverse order", () => {
+            bool suppressed=false;var set=new PresentationScopeSet();var first=set.Begin();bool firstBefore=suppressed;first.AddCleanup(()=>suppressed=firstBefore);suppressed=true;
+            var second=set.Begin();bool secondBefore=suppressed;second.AddCleanup(()=>suppressed=secondBefore);set.CancelAll();
+            Check(!suppressed,"overlapping restoration left shared state suppressed");
+        });
         Console.WriteLine($"All {passed} phase regressions passed (graphics/transport simulated).");
     }
+    static IEnumerator NestedProbe(Action mutation,Action complete,Action disposed) {yield return ChildProbe(mutation,disposed);complete();}
+    static IEnumerator ChildProbe(Action mutation,Action disposed) {try {mutation();yield return null;mutation();}finally{disposed();}}
+    static IEnumerator FailingPresentation() {yield return null;throw new InvalidOperationException("presentation");}
+    static void Drain(IEnumerator routine) {while(routine.MoveNext()) if(routine.Current is IEnumerator child) Drain(child);}
 }
 namespace UnityEngine
 {
-    public class GameObject { public bool activeSelf=true; public void SetActive(bool v){activeSelf=v;} }
+    public class GameObject { public bool activeSelf=true; public int DestroyCalls; public void SetActive(bool v){activeSelf=v;} }
     public class MonoBehaviour { protected object StartCoroutine(IEnumerator e)=>e; protected void StopAllCoroutines(){} }
     public static class Debug { public static void Log(string s){} public static void LogWarning(string s){} }
     public enum FindObjectsInactive { Include } public enum FindObjectsSortMode { None }
-    public static class Object { public static T[] FindObjectsByType<T>(FindObjectsInactive a, FindObjectsSortMode b)=>Array.Empty<T>(); }
+    public static class Object { public static void Destroy(GameObject g){g.DestroyCalls++;} public static T[] FindObjectsByType<T>(FindObjectsInactive a, FindObjectsSortMode b)=>Array.Empty<T>(); }
     public static class JsonUtility { public static T FromJson<T>(string json)=>JsonSerializer.Deserialize<T>(json,new JsonSerializerOptions{IncludeFields=true}); }
 }
 namespace UnityEngine.UI { public class LayoutGroup { public bool enabled; } }
@@ -284,7 +328,7 @@ namespace KillingMahjong.UI
     {
         public UnityEngine.GameObject gameObject=new UnityEngine.GameObject(); public int Starts,Stops,Stakes,BetShows,TextShows,Confirmations; public float LastDuration;
         public bool FirstRoundChromeHidden, IsHandSelectionConfirmed;
-        public void StopAllCoroutines(){}
+        public void StopAllCoroutines(){} public void CancelPresentation(){}
         public bool Ready; public int ReadyShows,Reveals; public Action NextRoundButton;
         public void StartTurnTimer(float seconds){Starts++;LastDuration=seconds;} public void StopTurnTimer(){Stops++;}
         public void ShowBettingPhase(int max,int hp,int sv,Action<int> done){BetShows++;} public void HideBettingPhase(bool instant=false){}
@@ -300,12 +344,14 @@ namespace KillingMahjong.UI
     {
         public bool IsDarkenTransitioning; public int Prompts; public Action Midpoint,Complete,CenterComplete; public BettingCompletedInfo Info;
         public void CancelTransitions(){IsDarkenTransitioning=false;}
+        public void CancelSkillPresentations(){}
         public void PlayTransition(string t,Widget p,BettingCompletedInfo b,Action mid,Action done){Info=b;Midpoint=mid;Complete=done;}
         public void PlayCenterTextAnim(string t,float seconds,Action done){CenterComplete=done;} public void PlayPromptText(string t,float seconds){Prompts++;}
     }
     public class VisualProbe
     {
         GameUIManager manager; public int Rebuilds; public VisualProbe(GameUIManager m){manager=m;}
+        public void CancelSkillPresentations(){}
         public void RebuildAllTilesFromState(){Probe.Check(manager.CanRebuildBoard,"board rebuild outside allowed scope");Rebuilds++;}
     }
     public static class VoltageUI { public static void SetCanvasVisible(bool v){} }
@@ -353,6 +399,7 @@ namespace KillingMahjong.UI
         private readonly HashSet<TransitionLockSet.Lease> skillTransitions=new HashSet<TransitionLockSet.Lease>();
         private readonly HashSet<Action<StatusData>> skillStatusHandlers=new HashSet<Action<StatusData>>();
         private object _lastMulliganOutSlotRt; private int _lastMulliganOutTileId,_lastMulliganTargetIndex;
+        private Widget _mulliganSwapAnimator;
         public GameUISkillController(GameUIManager u){uiManager=u;} private void CancelSkillSelection(){}
         public void WaitForMulligan(){pendingMulligan=uiManager.BeginTransition("mulligan-request");}
         public bool RequestPending=>pendingMulligan?.IsActive??false;

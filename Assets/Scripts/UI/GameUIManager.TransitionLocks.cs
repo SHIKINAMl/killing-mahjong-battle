@@ -28,7 +28,7 @@ namespace KillingMahjong.UI
             isTransitioning = transitionLocks != null && transitionLocks.IsLocked;
             UpdateTurnIndicatorVisibility();
             if (abilityUI != null) abilityUI.SetSuppressedForTransition(isTransitioning);
-            if (!isTransitioning) PhaseController?.SynchronizeDiscardTurnTimer();
+            if (!isTransitioning && PhaseController != null) PhaseController.SynchronizeDiscardTurnTimer();
         }
 
         internal void ResetTransitionLocks()
@@ -49,9 +49,9 @@ namespace KillingMahjong.UI
 
         private void OnDisable()
         {
-            PhaseController?.CancelPhasePresentations();
-            HandSelectionController?.CancelPendingConfirmation();
-            SkillController?.CancelActiveTransitions();
+            if (PhaseController != null) PhaseController.CancelPhasePresentations();
+            if (HandSelectionController != null) HandSelectionController.CancelPendingConfirmation();
+            if (SkillController != null) SkillController.CancelActiveTransitions();
             ResetTransitionLocks();
         }
     }

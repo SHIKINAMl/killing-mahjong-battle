@@ -157,8 +157,8 @@ namespace KillingMahjong.UI
             if (mulliganCanvas != null) mulliganCanvas.SetActive(false);
             if (uiManager != null)
             {
-                _sortingScope.Restore(uiManager.HandUI?.gameObject);
-                _sortingScope.Restore(uiManager.WallUI?.gameObject);
+                if (uiManager.HandUI != null) _sortingScope.Restore(uiManager.HandUI.gameObject);
+                if (uiManager.WallUI != null) _sortingScope.Restore(uiManager.WallUI.gameObject);
             }
             
             foreach (var go in hiddenUIs)

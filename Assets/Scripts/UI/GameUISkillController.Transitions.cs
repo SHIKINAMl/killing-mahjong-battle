@@ -27,6 +27,13 @@ namespace KillingMahjong.UI
 
         internal void CancelActiveTransitions()
         {
+            // 子の演出は別のMonoBehaviour上で進む場合もある。入力ロックより先に表示を片付ける。
+            if (uiManager != null)
+            {
+                if (uiManager.PhaseTransitionUI != null) uiManager.PhaseTransitionUI.CancelSkillPresentations();
+                if (uiManager.VisualController != null) uiManager.VisualController.CancelSkillPresentations();
+            }
+            _mulliganSwapAnimator?.CancelPresentation();
             StopAllCoroutines();
             foreach (var lease in skillTransitions) lease.Dispose();
             skillTransitions.Clear();

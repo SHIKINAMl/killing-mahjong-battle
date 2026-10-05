@@ -15,6 +15,8 @@ namespace KillingMahjong.UI
     public class MulliganSwapAnimator
     {
         private readonly GameUIManager uiManager;
+        private readonly PresentationScopeSet presentations = new PresentationScopeSet(Debug.LogException);
+        public void CancelPresentation() { presentations.CancelAll(); }
 
         public MulliganSwapAnimator(GameUIManager uiManager)
         {
@@ -26,7 +28,13 @@ namespace KillingMahjong.UI
         /// <param name="originalSlotRt">元の牌のUIスロット（選択時に保存したもの）。null可</param>
         public IEnumerator PlayRoutine(int outTileId, int inTileId, RectTransform originalSlotRt)
         {
-            GameObject animContainer = new GameObject("MulliganAnimationContainer");
+            using (var scope = presentations.Begin())
+                yield return scope.Run(PlayVisualsRoutine(scope, outTileId, inTileId, originalSlotRt));
+        }
+
+        private IEnumerator PlayVisualsRoutine(PresentationScope scope, int outTileId, int inTileId, RectTransform originalSlotRt)
+        {
+            GameObject animContainer = scope.Own(new GameObject("MulliganAnimationContainer"));
             Canvas canvas = animContainer.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = UISortingOrders.MulliganSwapAnimation;
@@ -62,6 +70,8 @@ namespace KillingMahjong.UI
                 // 元のスロットの画像を一時的に透明にする
                 var cg = originalSlotRt.GetComponent<CanvasGroup>();
                 if (cg == null) cg = originalSlotRt.gameObject.AddComponent<CanvasGroup>();
+                float before = cg.alpha;
+                scope.AddCleanup(() => { if (cg != null) cg.alpha = before; });
                 cg.alpha = 0;
             }
 

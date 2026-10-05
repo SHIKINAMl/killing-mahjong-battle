@@ -201,8 +201,12 @@ namespace KillingMahjong.UI.Effects
         /// <summary>途中で止めたいときに。音も画面も元へ戻す。</summary>
         public void Dispose()
         {
-            if (this != null && gameObject != null) Destroy(gameObject);
+            if (this == null || gameObject == null) return;
+            gameObject.SetActive(false);
+            Destroy(gameObject);
         }
+
+        private void OnDisable() { RestoreAudio(); }
 
         /// <summary>
         /// **BGM を戻すのはここでやる。** 途中でシーンが変わっても、
@@ -212,17 +216,22 @@ namespace KillingMahjong.UI.Effects
         /// </summary>
         private void OnDestroy()
         {
+            RestoreAudio();
+            if (_shot != null)
+            {
+                Destroy(_shot);
+                _shot = null;
+            }
+        }
+
+        private void RestoreAudio()
+        {
             if (AudioManager.Instance != null)
             {
                 AudioManager.Instance.SetBgmDeepMuffle(false);
                 AudioManager.Instance.StopClairvoyanceLoop();
             }
 
-            if (_shot != null)
-            {
-                Destroy(_shot);
-                _shot = null;
-            }
         }
 
         // ------------------------------------------------------------

@@ -197,9 +197,14 @@ namespace KillingMahjong.UI
 
 
         private bool isDarkened = false;
+        private readonly PresentationScopeSet skillPresentations = new PresentationScopeSet(Debug.LogException);
+
+        private void OnDisable() { CancelTransitions(); }
+        internal void CancelSkillPresentations() { skillPresentations.CancelAll(); }
 
         internal void CancelTransitions()
         {
+            skillPresentations.CancelAll();
             StopAllCoroutines();
             isDarkened = false;
             IsDarkenTransitioning = false;
@@ -212,6 +217,7 @@ namespace KillingMahjong.UI
             if (centerText != null) centerText.gameObject.SetActive(false);
             if (promptText != null) promptText.gameObject.SetActive(false);
             if (hpBetContainer != null) hpBetContainer.SetActive(false);
+            Effects.TileClatterEffect.Hide(transform as RectTransform);
         }
 
         public bool IsDarkenTransitioning { get; private set; }
@@ -374,10 +380,16 @@ namespace KillingMahjong.UI
 
         public IEnumerator PlaySkillCutinAnimationRoutine(string skillName, bool isLocalPlayer, CharacterData characterData = null, float duration = 2.0f, Action onComplete = null, string subText = null)
         {
+            using (var scope = skillPresentations.Begin())
+                yield return scope.Run(SkillCutinVisualsRoutine(scope, skillName, isLocalPlayer, characterData, duration, onComplete, subText));
+        }
+
+        private IEnumerator SkillCutinVisualsRoutine(PresentationScope scope, string skillName, bool isLocalPlayer, CharacterData characterData, float duration, Action onComplete, string subText)
+        {
             ResetVisuals();
 
             // 1. コンテナ作成
-            GameObject container = new GameObject("DeathGameCutinContainer");
+            GameObject container = scope.Own(new GameObject("DeathGameCutinContainer"));
             container.transform.SetParent(transform, false);
             container.transform.SetAsLastSibling();
             RectTransform containerRt = container.AddComponent<RectTransform>();
