@@ -34,6 +34,7 @@ namespace KillingMahjong.UI
 
         private void HandleGameEnded(GameEndInfo info)
         {
+            if (info == null) return;
             IsGameOver = true;
             lastGameEndInfo = info;
 
@@ -50,6 +51,7 @@ namespace KillingMahjong.UI
 
             // 決着時の最終HPも記録しておく
             RecordHpHistory(localScore, enemyScore);
+            ShowGameResult();
         }
 
         /// <summary>
@@ -98,17 +100,41 @@ namespace KillingMahjong.UI
         }
 
         private bool gameResultShown = false;
+        private bool gameResultRequested;
+        private int gameResultGeneration;
+        private Coroutine gameResultRoutine;
 
         public void ShowGameResult()
         {
-            // 呼び出し経路が2つ（ダイアログのOKと即時分岐）あるため、二重表示を防ぐ
-            if (gameResultShown) return;
-            gameResultShown = true;
-
-            StartCoroutine(ShowGameResultRoutine());
+            // 受信とOKを同じ入口へ集め、同じフレームの局終了通知を受けてから判定する。
+            gameResultRequested = true;
         }
 
-        private System.Collections.IEnumerator ShowGameResultRoutine()
+        private void TryStartGameResult()
+        {
+            if (!gameResultRequested || gameResultShown || !IsGameOver || IsTutorialMode) return;
+            if (PhaseController != null && PhaseController.IsWaitingForRoundEndConfirmation()) return;
+            // 保留キューの強制実行中でも、実際の演出ロックを越えて結果を表示しない。
+            if (IsTransitioning || (PhaseTransitionUI != null && PhaseTransitionUI.IsDarkenTransitioning)) return;
+            gameResultShown = true;
+            if (PlayerInfoUI != null) PlayerInfoUI.StopTurnTimer();
+            if (DialogueUI != null) DialogueUI.HideNextRoundButton();
+            gameResultRoutine = StartCoroutine(ShowGameResultRoutine(gameResultGeneration));
+        }
+
+        internal void ResetGameResultState()
+        {
+            gameResultGeneration++;
+            if (gameResultRoutine != null) StopCoroutine(gameResultRoutine);
+            gameResultRoutine = null;
+            gameResultRequested = gameResultShown = IsGameOver = false;
+            lastGameEndInfo = null;
+            LocalFinalScore = EnemyFinalScore = 0;
+            playerHpHistory.Clear();
+            enemyHpHistory.Clear();
+        }
+
+        private System.Collections.IEnumerator ShowGameResultRoutine(int generation)
         {
             // 決着したら瀕死ビネットを消す（結果画面より手前に描画されるため）
             if (playerInfoUI != null) playerInfoUI.StopHeartbeatEffect();
@@ -121,6 +147,7 @@ namespace KillingMahjong.UI
                 yield return new WaitForSeconds(3.0f);
             }
 
+            if (generation != gameResultGeneration) yield break;
             bool isWin = DetermineLocalWin();
             Debug.Log($"[GameUIManager] 決着: {(isWin ? "勝ち" : "負け")} / HP 自分 {LocalFinalScore} 相手 {EnemyFinalScore} / 理由 '{(lastGameEndInfo != null ? lastGameEndInfo.VictoryMethod : "")}'");
 

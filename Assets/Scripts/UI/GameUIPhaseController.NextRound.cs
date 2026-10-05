@@ -9,6 +9,16 @@ namespace KillingMahjong.UI
     {
         private readonly RoundEndCoordinator roundEnd = new RoundEndCoordinator();
 
+        internal bool IsWaitingForRoundEndConfirmation()
+        {
+            if (roundEnd.CurrentStage == RoundEndCoordinator.Stage.Confirmed) return false;
+            if (roundEnd.CurrentStage != RoundEndCoordinator.Stage.Idle) return true;
+            // フェイズだけ先に届いた場合も、清算演出とOKの準備を追い越さない。
+            var phase = uiManager.CurrentPhaseStatus;
+            return phase == RoundStatus.Agari || phase == RoundStatus.Ron
+                || phase == RoundStatus.Result || phase == RoundStatus.Draw;
+        }
+
         internal void CancelPhasePresentations()
         {
             StopAllCoroutines();

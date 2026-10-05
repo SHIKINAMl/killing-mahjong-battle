@@ -193,6 +193,7 @@ namespace KillingMahjong.UI
 
         private void Update()
         {
+            TryStartGameResult();
             // コルーチンが外から止められても、保留が残っていれば必ず拾い直す。
             // これが最後の砦で、ここが無いと「進行が止まったまま何も起きない」に戻る。
             if (deferredActions.Count > 0) EnsureFlushWatcher();

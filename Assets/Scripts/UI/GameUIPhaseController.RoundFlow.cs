@@ -13,6 +13,7 @@ namespace KillingMahjong.UI
 
         public void OnGameStarted()
         {
+            uiManager.ResetGameResultState();
             CancelPhasePresentations();
             uiManager.HandSelectionController?.CancelPendingConfirmation();
             uiManager.SkillController?.CancelActiveTransitions();

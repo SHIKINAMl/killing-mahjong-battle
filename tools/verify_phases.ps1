@@ -40,6 +40,13 @@ $taskSkillRoutine = Read-Block $taskSkill 'private System.Collections.IEnumerato
 $taskNetwork = Read-Source 'Assets/Scripts/UI/GameUINetworkHandler.cs'
 $taskError = Read-Block $taskNetwork 'private void HandleError('
 [IO.File]::WriteAllText((Join-Path $taskGenerated 'NetworkError.cs'), "namespace KillingMahjong.UI { public partial class GameUINetworkHandler { $taskError } }")
+$taskResult = Read-Source 'Assets/Scripts/UI/GameUIManager.GameResult.cs'
+$taskResultMethods = foreach ($signature in @('private void HandleGameEnded(', 'public void ShowGameResult(', 'private void TryStartGameResult(', 'internal void ResetGameResultState(', 'private System.Collections.IEnumerator ShowGameResultRoutine(', 'public void RecordHpHistory(')) { Read-Block $taskResult $signature }
+$taskResultFieldsStart = $taskResult.IndexOf('private bool gameResultShown')
+$taskResultFieldsEnd = $taskResult.IndexOf('public void ShowGameResult(', $taskResultFieldsStart)
+$taskResultFields = $taskResult.Substring($taskResultFieldsStart, $taskResultFieldsEnd - $taskResultFieldsStart)
+$taskUpdate = Read-Block (Read-Source 'Assets/Scripts/UI/GameUIManager.Transitions.cs') 'private void Update('
+[IO.File]::WriteAllText((Join-Path $taskGenerated 'GameResult.cs'), "using UnityEngine; using KillingMahjong.EngineData; using KillingMahjong.Managers; namespace KillingMahjong.UI { public partial class GameUIManager { $taskResultFields $($taskResultMethods -join "`n") $taskUpdate } }")
 $taskDtos = Read-Source 'Assets/Scripts/EngineData/ServerMessages.cs'
 $taskNames = @('LiquidationData','BettingCompletedInfo','DiscardCompletedMessage','DiscardCompletedData','DiscardAcceptedMessage','DiscardAcceptedData','RoundEndMessage','RoundEndData','AgariPendingMessage','AgariPendingData','GameEndInfo','DrawPlayerData')
 $taskBlocks = foreach ($taskName in $taskNames) { Read-Block $taskDtos "public class $taskName" }

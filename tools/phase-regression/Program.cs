@@ -198,7 +198,7 @@ static class Probe
         });
         foreach(bool draw in new[]{true,false}) Test("server game-over result replaces next-round send: "+(draw?"draw":"agari"), () => {
             var u=UI(); u.CurrentPhaseStatus=draw?RoundStatus.Draw:RoundStatus.Agari; if(draw)u.PhaseController.HandleDraw();else u.PhaseController.ShowAgariWait();
-            u.IsGameOver=true; u.DialogueUI.NextRoundButton(); u.DialogueUI.NextRoundButton(); Check(u.Results==1 && NetworkMessageHandler.Instance.NextRounds==0,"game-end OK sent next round/replayed result");
+            u.IsGameOver=true; u.DialogueUI.NextRoundButton(); u.DialogueUI.NextRoundButton(); u.TickResults(); Check(u.Results==1 && NetworkMessageHandler.Instance.NextRounds==0,"game-end OK sent next round/replayed result");
         });
         Test("missing dialogue UI automatically confirms draw and agari wait", () => {
             var u=UI(); u.DialogueUI=null; u.CurrentPhaseStatus=RoundStatus.Draw; u.PhaseController.HandleDraw(); Check(NetworkMessageHandler.Instance.NextRounds==1,"draw fallback stalled");
@@ -256,8 +256,57 @@ static class Probe
             var second=set.Begin();bool secondBefore=suppressed;second.AddCleanup(()=>suppressed=secondBefore);set.CancelAll();
             Check(!suppressed,"overlapping restoration left shared state suppressed");
         });
+        foreach(bool draw in new[]{true,false}) Test("late game_end after confirmed OK starts result once: "+draw, () => {
+            var u=UI(); u.CurrentPhaseStatus=draw?RoundStatus.Draw:RoundStatus.Agari;
+            if(draw) u.PhaseController.HandleDraw(); else u.PhaseController.ShowAgariWait();
+            u.DialogueUI.NextRoundButton(); Check(NetworkMessageHandler.Instance.NextRounds==1,"next round not requested");
+            u.ReceiveGameEnd(End()); u.TickResults(); u.ReceiveGameEnd(End()); u.TickResults();
+            Check(u.Results==1 && u.LocalFinalScore==1500 && u.EnemyFinalScore==500,"late result lost or repeated");
+        });
+        Test("game_end during hand selection starts result without a next-round OK", () => {
+            var u=UI(); u.CurrentPhaseStatus=RoundStatus.HandSelection; u.ReceiveGameEnd(End());
+            Check(u.Results==0,"result started inside network callback"); u.TickResults();
+            Check(u.Results==1 && u.PlayerInfoUI.Stops==1 && NetworkMessageHandler.Instance.NextRounds==0,"hand-selection result stalled");
+        });
+        Test("game_end preserves ron presentation and confirmation order", () => {
+            var u=UI(); u.CurrentPhaseStatus=RoundStatus.Agari; var done=u.PhaseController.PrepareRonCompletion();
+            u.ReceiveGameEnd(End()); u.TickResults(); Check(u.Results==0,"result interrupted ron");
+            done(); u.TickResults(); Check(u.Results==0,"result skipped OK");
+            u.DialogueUI.NextRoundButton(); u.TickResults(); Check(u.Results==1 && NetworkMessageHandler.Instance.NextRounds==0,"confirmed end did not finish");
+        });
+        Test("game_end waits when settlement phase precedes presentation ticket", () => {
+            var u=UI(); u.CurrentPhaseStatus=RoundStatus.Draw; u.ReceiveGameEnd(End()); u.TickResults();
+            Check(u.Results==0,"result overtook delayed draw presentation");
+            u.PhaseController.HandleDraw(); u.TickResults(); Check(u.Results==0,"draw confirmation skipped");
+            u.DialogueUI.NextRoundButton(); u.TickResults(); Check(u.Results==1,"draw result missing");
+        });
+        Test("result waits for actual lock and darkening even if busy is bypassed", () => {
+            var u=UI(); u.CurrentPhaseStatus=RoundStatus.HandSelection; var lease=u.BeginTransition("skill");
+            u.ForceBusyBypass=true; u.ReceiveGameEnd(End()); u.TickResults(); Check(u.Results==0,"live owner bypassed");
+            lease.Dispose(); u.PhaseTransitionUI.IsDarkenTransitioning=true; u.TickResults(); Check(u.Results==0,"darkening bypassed");
+            u.PhaseTransitionUI.IsDarkenTransitioning=false; u.TickResults(); Check(u.Results==1,"result failed after animation");
+        });
+        Test("missing controller and dialogue still allow a server-confirmed result", () => {
+            var u=UI(); u.PhaseController=null; u.DialogueUI=null; u.ReceiveGameEnd(End()); u.TickResults(); Check(u.Results==1,"fallback result stalled");
+        });
+        Test("tutorial and absent end payload do not start automatic result", () => {
+            var u=UI(); u.ReceiveGameEnd(null); u.ShowGameResult(); u.TickResults(); Check(!u.IsGameOver && u.Results==0,"invalid end accepted");
+            u.IsTutorialMode=true; u.ReceiveGameEnd(End()); u.TickResults(); Check(u.Results==0,"tutorial scenario interrupted");
+        });
+        Test("new match clears pending result and final values", () => {
+            var u=UI(); u.CurrentPhaseStatus=RoundStatus.HandSelection; u.ReceiveGameEnd(End()); u.ResetGameResultState(); u.TickResults();
+            Check(u.Results==0 && !u.IsGameOver && u.LocalFinalScore==0 && u.HistoryCount==0,"pending old result survived reset");
+            u.ReceiveGameEnd(End()); u.TickResults(); Check(u.Results==1,"new match result suppressed");
+        });
+        Test("new match stops old momentum continuation before victory display", () => {
+            var u=UI(); u.UseMomentum(); u.RecordHpHistory(2000,2000); u.ReceiveGameEnd(End()); u.TickResults();
+            Check(u.Results==0 && u.ResultRoutineCount==1,"momentum did not defer victory");
+            u.ResetGameResultState(); u.ResumeResultRoutines(); Check(u.Results==0,"old match displayed victory");
+            u.ReceiveGameEnd(End()); u.TickResults(); Check(u.Results==1,"subsequent match could not display result");
+        });
         Console.WriteLine($"All {passed} phase regressions passed (graphics/transport simulated).");
     }
+    static GameEndInfo End()=>new GameEndInfo{LocalScoreFound=true,EnemyScoreFound=true,LocalScore=1500,EnemyScore=500};
     static IEnumerator NestedProbe(Action mutation,Action complete,Action disposed) {yield return ChildProbe(mutation,disposed);complete();}
     static IEnumerator ChildProbe(Action mutation,Action disposed) {try {mutation();yield return null;mutation();}finally{disposed();}}
     static IEnumerator FailingPresentation() {yield return null;throw new InvalidOperationException("presentation");}
@@ -265,6 +314,8 @@ static class Probe
 }
 namespace UnityEngine
 {
+    public class Coroutine { public IEnumerator Routine; public bool Stopped; }
+    public class WaitForSeconds { public WaitForSeconds(float seconds){} }
     public class GameObject { public bool activeSelf=true; public int DestroyCalls; public void SetActive(bool v){activeSelf=v;} }
     public class MonoBehaviour { protected object StartCoroutine(IEnumerator e)=>e; protected void StopAllCoroutines(){} }
     public static class Debug { public static void Log(string s){} public static void LogWarning(string s){} }
@@ -329,7 +380,9 @@ namespace KillingMahjong.UI
         public UnityEngine.GameObject gameObject=new UnityEngine.GameObject(); public int Starts,Stops,Stakes,BetShows,TextShows,Confirmations; public float LastDuration;
         public bool FirstRoundChromeHidden, IsHandSelectionConfirmed;
         public void StopAllCoroutines(){} public void CancelPresentation(){}
-        public bool Ready; public int ReadyShows,Reveals; public Action NextRoundButton;
+        public bool Ready; public int ReadyShows,Reveals,AnimationCalls; public Action NextRoundButton;
+        public void HideNextRoundButton(){} public void StopHeartbeatEffect(){} public void ShowMomentum(List<int> a,List<int> b){}
+        public void PlayAnimation(VictoryType type,int local,int enemy){AnimationCalls++;}
         public void StartTurnTimer(float seconds){Starts++;LastDuration=seconds;} public void StopTurnTimer(){Stops++;}
         public void ShowBettingPhase(int max,int hp,int sv,Action<int> done){BetShows++;} public void HideBettingPhase(bool instant=false){}
         public void SetPanelVisible(bool v){} public void SetSubmittedState(bool v){} public void SetSuppressedForTransition(bool v){}
@@ -355,12 +408,22 @@ namespace KillingMahjong.UI
         public void RebuildAllTilesFromState(){Probe.Check(manager.CanRebuildBoard,"board rebuild outside allowed scope");Rebuilds++;}
     }
     public static class VoltageUI { public static void SetCanvasVisible(bool v){} }
+    public enum VictoryType { NormalVictory, NormalDefeat }
     public partial class GameUIManager
     {
         public RoundStatus CurrentPhaseStatus; private bool isTransitioning; public bool IsTransitioning=>isTransitioning;
-        public bool IsBusyWithTransition=>isTransitioning || (PhaseTransitionUI?.IsDarkenTransitioning??false);
+        public bool ForceBusyBypass; public bool IsBusyWithTransition=>!ForceBusyBypass && (isTransitioning || (PhaseTransitionUI?.IsDarkenTransitioning??false));
         public bool IsTutorialMode,IsWaitDeductionUIEnabled; public int Rons;
-        public bool IsGameOver; public int Results; public Widget EnemyWaitUI=new Widget(); public object TileResourceManager; public void ShowGameResult(){Results++;}
+        public bool IsGameOver; public int Results=>victoryUI.AnimationCalls; public Widget EnemyWaitUI=new Widget(); public object TileResourceManager;
+        public int LocalFinalScore,EnemyFinalScore; private GameEndInfo lastGameEndInfo;
+        private List<int> playerHpHistory=new List<int>(),enemyHpHistory=new List<int>(); public int HistoryCount=>playerHpHistory.Count;
+        private Widget playerInfoUI=>PlayerInfoUI; private Widget matchMomentumUI; private Widget victoryUI=new Widget();
+        private bool DetermineLocalWin()=>false; public void UseMomentum(){matchMomentumUI=new Widget();}
+        private List<UnityEngine.Coroutine> resultRoutines=new List<UnityEngine.Coroutine>(); public int ResultRoutineCount=>resultRoutines.Count;
+        private UnityEngine.Coroutine StartCoroutine(IEnumerator routine){var c=new UnityEngine.Coroutine{Routine=routine};resultRoutines.Add(c);routine.MoveNext();return c;}
+        private void StopCoroutine(UnityEngine.Coroutine c){c.Stopped=true;}
+        public void ResumeResultRoutines(){foreach(var c in resultRoutines) if(!c.Stopped)c.Routine.MoveNext();}
+        public void ReceiveGameEnd(GameEndInfo info){HandleGameEnded(info);} public void TickResults(){Update();}
         public Widget HandUI=new Widget(),WallUI=new Widget(),EnemyHandUI=new Widget(),EnemyWallUI=new Widget(),RiverUI=new Widget(),EnemyRiverUI=new Widget(),WaitUI=new Widget(),DialogueUI=new Widget(),BettingUI=new Widget(),PlayerInfoUI=new Widget(),EnemyInfoUI=new Widget(),AbilityUI=new Widget(),DoraDisplayUI=new Widget(),YakuListUI=new Widget(),ScoreGauge=new Widget(),BetPotUI=new Widget(),WaitDeduction=new Widget(),TutorialManager=new Widget(),RonAnimationUI=new Widget();
         private Widget abilityUI=>AbilityUI; public PhaseTransitionUI PhaseTransitionUI=new PhaseTransitionUI();
         public GameUIPhaseController PhaseController; public VisualProbe VisualController; public List<ActionPayload> Sends=new List<ActionPayload>(); public GameUIHandSelectionController HandSelectionController; public GameUISkillController SkillController;
@@ -369,7 +432,7 @@ namespace KillingMahjong.UI
         public GameUIManager(){PhaseController=new GameUIPhaseController(this); VisualController=new VisualProbe(this); HandSelectionController=new GameUIHandSelectionController(this); SkillController=new GameUISkillController(this);}
         private void UpdateTurnIndicatorVisibility(){} private void EnsureFlushWatcher(){}
         public void Flush(){var snapshot=deferredActions.ToArray();deferredActions.Clear();foreach(var p in snapshot)p.Value();}
-        public void SetCurrentPhaseStatus(RoundStatus v){CurrentPhaseStatus=v;} public void RecordHpHistory(int a,int b){}
+        public void SetCurrentPhaseStatus(RoundStatus v){CurrentPhaseStatus=v;}
         public void SendActionToServer(string action,ActionPayload data){Sends.Add(data);} public void ExecuteRonAction(){Rons++;}
         public void DisableForTest(){OnDisable();}
     }
