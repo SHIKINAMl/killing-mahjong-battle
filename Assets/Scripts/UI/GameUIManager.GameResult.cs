@@ -114,7 +114,7 @@ namespace KillingMahjong.UI
         {
             if (!gameResultRequested || gameResultShown || !IsGameOver || IsTutorialMode) return;
             if (PhaseController != null && PhaseController.IsWaitingForRoundEndConfirmation()) return;
-            // 保留キューの強制実行中でも、実際の演出ロックを越えて結果を表示しない。
+            // 保留処理とは独立して、実際の演出ロックと暗転の解除を待つ。
             if (IsTransitioning || (PhaseTransitionUI != null && PhaseTransitionUI.IsDarkenTransitioning)) return;
             gameResultShown = true;
             if (PlayerInfoUI != null) PlayerInfoUI.StopTurnTimer();

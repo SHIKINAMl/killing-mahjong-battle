@@ -16,7 +16,7 @@ static class Probe
     static int passed;
     public static void Check(bool value, string message) { if (!value) throw new Exception(message); }
     static void Test(string name, Action run) { Fresh(); run(); passed++; Console.WriteLine("PASS " + name); }
-    static void Fresh() { BoardStateManager.Instance=new BoardStateManager(); ReactionController.Instance=new ReactionController(); KillingMahjong.Effects.ScreenFlash.Count=0; NetworkMessageHandler.Instance=new NetworkMessageHandler(); }
+    static void Fresh() { BoardStateManager.Instance=new BoardStateManager(); ReactionController.Instance=new ReactionController(); KillingMahjong.Effects.ScreenFlash.Count=0; NetworkMessageHandler.Instance=new NetworkMessageHandler(); UnityEngine.Time.frameCount=0; UnityEngine.Debug.Warnings=UnityEngine.Debug.Errors=0; }
     static GameUIManager UI(bool transition=true) { var ui=new GameUIManager(); if(!transition) ui.PhaseTransitionUI=null; return ui; }
     static void Repaint(GameUIManager ui) { for(int i=0;i<5;i++) ui.PhaseController.HandlePhaseVisibility(ui.CurrentPhaseStatus); }
     static BettingCompletedInfo Bet() => new BettingCompletedInfo { LocalBet=100, EnemyBet=200, LocalHpBefore=1000, EnemyHpBefore=2000, LocalHpAfter=900, EnemyHpAfter=1800, HasServerHealth=true };
@@ -280,9 +280,9 @@ static class Probe
             u.PhaseController.HandleDraw(); u.TickResults(); Check(u.Results==0,"draw confirmation skipped");
             u.DialogueUI.NextRoundButton(); u.TickResults(); Check(u.Results==1,"draw result missing");
         });
-        Test("result waits for actual lock and darkening even if busy is bypassed", () => {
+        Test("result waits for actual lock and darkening", () => {
             var u=UI(); u.CurrentPhaseStatus=RoundStatus.HandSelection; var lease=u.BeginTransition("skill");
-            u.ForceBusyBypass=true; u.ReceiveGameEnd(End()); u.TickResults(); Check(u.Results==0,"live owner bypassed");
+            u.ReceiveGameEnd(End()); u.TickResults(); Check(u.Results==0,"live owner bypassed");
             lease.Dispose(); u.PhaseTransitionUI.IsDarkenTransitioning=true; u.TickResults(); Check(u.Results==0,"darkening bypassed");
             u.PhaseTransitionUI.IsDarkenTransitioning=false; u.TickResults(); Check(u.Results==1,"result failed after animation");
         });
@@ -304,6 +304,57 @@ static class Probe
             u.ResetGameResultState(); u.ResumeResultRoutines(); Check(u.Results==0,"old match displayed victory");
             u.ReceiveGameEnd(End()); u.TickResults(); Check(u.Results==1,"subsequent match could not display result");
         });
+        Test("deferred actions wait one frame and preserve latest payload order", () => {
+            var u=UI(); var log=new List<int>();
+            u.DeferUntilIdle("a",()=>log.Add(1)); u.DeferUntilIdle("b",()=>log.Add(2)); u.DeferUntilIdle("a",()=>log.Add(3));
+            u.PumpThisFrame(); Check(log.Count==0,"executed inside enqueue frame");
+            u.Flush(); Check(log.SequenceEqual(new[]{3,2}) && u.QueueCount==0,"coalescing reordered payloads");
+        });
+        Test("timeout warns once without bypassing lock; release restores board execution", () => {
+            var u=UI(); var lease=u.BeginTransition("long-animation");
+            u.DeferUntilIdle("board",()=>u.VisualController.RebuildAllTilesFromState());
+            for(int i=0;i<20;i++)u.AdvanceDeferredFrame(1f);
+            Check(UnityEngine.Debug.Warnings==1 && u.QueueCount==1 && u.VisualController.Rebuilds==0 && lease.IsActive,"timeout bypassed lock or spammed warnings");
+            lease.Dispose(); u.Flush(); Check(u.VisualController.Rebuilds==1 && u.QueueCount==0,"unlocked queue did not resume");
+        });
+        Test("queue stops between actions when an action acquires a new lock", () => {
+            var u=UI(); TransitionLockSet.Lease lease=null; int applied=0;
+            u.DeferUntilIdle("start",()=>lease=u.BeginTransition("new-animation")); u.DeferUntilIdle("after",()=>applied++);
+            u.Flush(); Check(applied==0 && u.QueueCount==1,"snapshot crossed newly acquired lock");
+            lease.Dispose();u.Flush();Check(applied==1,"remaining action lost");
+        });
+        Test("queued retry is bounded to one attempt per frame", () => {
+            var u=UI();int attempts=0;Action retry=null;retry=()=>{attempts++;u.DeferUntilIdle("retry",retry);};
+            u.DeferUntilIdle("retry",retry);u.Flush();Check(attempts==1 && u.QueueCount==1,"retry looped in one frame");
+            u.Flush();Check(attempts==2 && u.QueueCount==1,"retry failed next frame");
+        });
+        Test("failure in one queued callback does not lose the next callback", () => {
+            var u=UI();int applied=0;u.DeferUntilIdle("bad",()=>throw new InvalidOperationException("probe"));u.DeferUntilIdle("good",()=>applied++);
+            u.Flush();Check(applied==1 && u.QueueCount==0 && UnityEngine.Debug.Errors==1,"exception stranded queue");
+        });
+        Test("disabled manager retains notifications and resumes latest payload through Update", () => {
+            var u=UI();int value=0;u.BeginTransition("cancelled-on-disable");u.DeferUntilIdle("status",()=>value=1);
+            u.DisableForTest();u.DeferUntilIdle("status",()=>value=2);u.AdvanceDeferredFrame(30f);
+            Check(value==0 && u.QueueCount==1,"disabled manager ran or dropped notification");
+            u.EnableForTest();u.TickResults();Check(value==2 && u.QueueCount==0,"reenable left stopped watcher");
+        });
+        Test("callback disabling UI leaves remaining queue for reenable", () => {
+            var u=UI();int applied=0;u.DeferUntilIdle("disable",()=>u.DisableForTest());u.DeferUntilIdle("after",()=>applied++);
+            u.Flush();Check(applied==0 && u.QueueCount==1,"ran after disable");u.EnableForTest();u.Flush();Check(applied==1,"remaining queue lost");
+        });
+        Test("queue reset during callback drops old work and delays new work", () => {
+            var u=UI();int old=0,fresh=0;u.DeferUntilIdle("reset",()=>{u.ResetDeferredActions();u.DeferUntilIdle("new",()=>fresh++);});u.DeferUntilIdle("old",()=>old++);
+            u.Flush();Check(old==0 && fresh==0 && u.QueueCount==1,"new-match reset leaked old work or ran new work immediately");
+            u.Flush();Check(old==0 && fresh==1,"new queue did not execute");
+        });
+        Test("callback reentry cannot pump remaining actions recursively", () => {
+            var u=UI();var log=new List<int>();u.DeferUntilIdle("outer",()=>{log.Add(1);u.PumpThisFrame();log.Add(2);});u.DeferUntilIdle("next",()=>log.Add(3));
+            u.Flush();Check(log.SequenceEqual(new[]{1,2,3}),"recursive queue changed order");
+        });
+        Test("darkening blocks queue without an owner lock", () => {
+            var u=UI();int applied=0;u.PhaseTransitionUI.IsDarkenTransitioning=true;u.DeferUntilIdle("wait",()=>applied++);u.AdvanceDeferredFrame(10f);
+            Check(applied==0 && u.QueueCount==1,"darkening guard bypassed");u.PhaseTransitionUI.IsDarkenTransitioning=false;u.Flush();Check(applied==1,"darkening completion failed");
+        });
         Console.WriteLine($"All {passed} phase regressions passed (graphics/transport simulated).");
     }
     static GameEndInfo End()=>new GameEndInfo{LocalScoreFound=true,EnemyScoreFound=true,LocalScore=1500,EnemyScore=500};
@@ -314,11 +365,13 @@ static class Probe
 }
 namespace UnityEngine
 {
+    public static class Time { public static int frameCount; public static float unscaledDeltaTime=1f/60f; }
+    public static class Mathf { public static float Max(float a,float b)=>Math.Max(a,b); }
     public class Coroutine { public IEnumerator Routine; public bool Stopped; }
     public class WaitForSeconds { public WaitForSeconds(float seconds){} }
     public class GameObject { public bool activeSelf=true; public int DestroyCalls; public void SetActive(bool v){activeSelf=v;} }
     public class MonoBehaviour { protected object StartCoroutine(IEnumerator e)=>e; protected void StopAllCoroutines(){} }
-    public static class Debug { public static void Log(string s){} public static void LogWarning(string s){} }
+    public static class Debug { public static int Warnings,Errors; public static void Log(string s){} public static void LogWarning(string s){Warnings++;} public static void LogError(string s){Errors++;} }
     public enum FindObjectsInactive { Include } public enum FindObjectsSortMode { None }
     public static class Object { public static void Destroy(GameObject g){g.DestroyCalls++;} public static T[] FindObjectsByType<T>(FindObjectsInactive a, FindObjectsSortMode b)=>Array.Empty<T>(); }
     public static class JsonUtility { public static T FromJson<T>(string json)=>JsonSerializer.Deserialize<T>(json,new JsonSerializerOptions{IncludeFields=true}); }
@@ -412,7 +465,7 @@ namespace KillingMahjong.UI
     public partial class GameUIManager
     {
         public RoundStatus CurrentPhaseStatus; private bool isTransitioning; public bool IsTransitioning=>isTransitioning;
-        public bool ForceBusyBypass; public bool IsBusyWithTransition=>!ForceBusyBypass && (isTransitioning || (PhaseTransitionUI?.IsDarkenTransitioning??false));
+        public bool isActiveAndEnabled=true; public bool IsBusyWithTransition=>isTransitioning || (PhaseTransitionUI?.IsDarkenTransitioning??false);
         public bool IsTutorialMode,IsWaitDeductionUIEnabled; public int Rons;
         public bool IsGameOver; public int Results=>victoryUI.AnimationCalls; public Widget EnemyWaitUI=new Widget(); public object TileResourceManager;
         public int LocalFinalScore,EnemyFinalScore; private GameEndInfo lastGameEndInfo;
@@ -427,14 +480,16 @@ namespace KillingMahjong.UI
         public Widget HandUI=new Widget(),WallUI=new Widget(),EnemyHandUI=new Widget(),EnemyWallUI=new Widget(),RiverUI=new Widget(),EnemyRiverUI=new Widget(),WaitUI=new Widget(),DialogueUI=new Widget(),BettingUI=new Widget(),PlayerInfoUI=new Widget(),EnemyInfoUI=new Widget(),AbilityUI=new Widget(),DoraDisplayUI=new Widget(),YakuListUI=new Widget(),ScoreGauge=new Widget(),BetPotUI=new Widget(),WaitDeduction=new Widget(),TutorialManager=new Widget(),RonAnimationUI=new Widget();
         private Widget abilityUI=>AbilityUI; public PhaseTransitionUI PhaseTransitionUI=new PhaseTransitionUI();
         public GameUIPhaseController PhaseController; public VisualProbe VisualController; public List<ActionPayload> Sends=new List<ActionPayload>(); public GameUIHandSelectionController HandSelectionController; public GameUISkillController SkillController;
-        private readonly List<KeyValuePair<string,Action>> deferredActions=new List<KeyValuePair<string,Action>>();
         public int QueueCount=>deferredActions.Count;
         public GameUIManager(){PhaseController=new GameUIPhaseController(this); VisualController=new VisualProbe(this); HandSelectionController=new GameUIHandSelectionController(this); SkillController=new GameUISkillController(this);}
-        private void UpdateTurnIndicatorVisibility(){} private void EnsureFlushWatcher(){}
-        public void Flush(){var snapshot=deferredActions.ToArray();deferredActions.Clear();foreach(var p in snapshot)p.Value();}
+        private void UpdateTurnIndicatorVisibility(){}
+        public void Flush(){AdvanceDeferredFrame(0f);}
+        public void AdvanceDeferredFrame(float delta){UnityEngine.Time.frameCount++;ProcessDeferredActions(delta);}
+        public void PumpThisFrame(float delta=0f){ProcessDeferredActions(delta);}
         public void SetCurrentPhaseStatus(RoundStatus v){CurrentPhaseStatus=v;}
         public void SendActionToServer(string action,ActionPayload data){Sends.Add(data);} public void ExecuteRonAction(){Rons++;}
-        public void DisableForTest(){OnDisable();}
+        public void DisableForTest(){isActiveAndEnabled=false;OnDisable();}
+        public void EnableForTest(){isActiveAndEnabled=true;}
     }
     public partial class GameUIPhaseController : UnityEngine.MonoBehaviour
     {

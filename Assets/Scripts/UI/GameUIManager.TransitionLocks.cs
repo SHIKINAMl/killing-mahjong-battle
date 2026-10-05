@@ -49,6 +49,8 @@ namespace KillingMahjong.UI
 
         private void OnDisable()
         {
+            // 保留通知は維持する。非表示中の時間をタイムアウトに数えない。
+            ResetDeferredWait();
             if (PhaseController != null) PhaseController.CancelPhasePresentations();
             if (HandSelectionController != null) HandSelectionController.CancelPendingConfirmation();
             if (SkillController != null) SkillController.CancelActiveTransitions();

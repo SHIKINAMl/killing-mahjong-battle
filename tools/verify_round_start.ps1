@@ -25,7 +25,12 @@ function Read-Method([string]$source, [string]$signature) {
 $taskTransitions = Read-Source 'Assets/Scripts/UI/GameUIManager.Transitions.cs'
 $taskGuard = Read-Method $taskTransitions 'public bool DeferRoundStartBoardUpdate('
 $taskQueue = Read-Method $taskTransitions 'public void DeferUntilIdle('
-[IO.File]::WriteAllText((Join-Path $taskGenerated 'ManagerGuards.cs'), "using System; using System.Collections.Generic; using UnityEngine; namespace KillingMahjong.UI { public partial class GameUIManager { $taskGuard $taskQueue } }")
+$taskQueueMethods = foreach ($signature in @('private void ResetDeferredWait(', 'private void ProcessDeferredActions(')) { Read-Method $taskTransitions $signature }
+$taskQueueFieldsStart = $taskTransitions.IndexOf('private readonly List<KeyValuePair<string, Action>> deferredActions')
+$taskQueueFieldsEnd = $taskTransitions.IndexOf('/// <summary>', $taskQueueFieldsStart)
+$taskQueueFields = $taskTransitions.Substring($taskQueueFieldsStart, $taskQueueFieldsEnd - $taskQueueFieldsStart)
+$taskQueueTimeout = $taskTransitions.Substring($taskTransitions.IndexOf('private const float DeferredActionTimeoutSeconds =')).Split(';')[0] + ';'
+[IO.File]::WriteAllText((Join-Path $taskGenerated 'ManagerGuards.cs'), "using System; using System.Collections.Generic; using UnityEngine; namespace KillingMahjong.UI { public partial class GameUIManager { $taskGuard $taskQueueFields $taskQueueTimeout $taskQueue $($taskQueueMethods -join "`n") } }")
 $taskDeal = Read-Source 'Assets/Scripts/Network/Handlers/DealingMessageHandler.cs'
 $taskDealEnd = $taskDeal.IndexOf('private static void ApplyDealingCompleted(')
 if ($taskDealEnd -lt 0) { throw 'Dealing application marker missing' }

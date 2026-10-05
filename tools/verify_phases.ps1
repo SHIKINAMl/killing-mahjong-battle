@@ -20,10 +20,15 @@ function Read-Block([string]$source, [string]$signature) {
 $taskSource = Read-Source 'Assets/Scripts/UI/GameUIManager.Transitions.cs'
 $taskCovered = Read-Block $taskSource 'internal void RunCoveredBoardUpdate('
 $taskQueue = Read-Block $taskSource 'public void DeferUntilIdle('
+$taskQueueMethods = foreach ($signature in @('private void ResetDeferredWait(', 'internal void ResetDeferredActions(', 'private void ProcessDeferredActions(')) { Read-Block $taskSource $signature }
+$taskQueueFieldsStart = $taskSource.IndexOf('private readonly List<KeyValuePair<string, Action>> deferredActions')
+$taskQueueFieldsEnd = $taskSource.IndexOf('/// <summary>', $taskQueueFieldsStart)
+$taskQueueFields = $taskSource.Substring($taskQueueFieldsStart, $taskQueueFieldsEnd - $taskQueueFieldsStart)
+$taskQueueTimeout = $taskSource.Substring($taskSource.IndexOf('private const float DeferredActionTimeoutSeconds =')).Split(';')[0] + ';'
 $taskPropertiesStart = $taskSource.IndexOf('private int coveredBoardUpdateDepth;')
 $taskPropertiesEnd = $taskSource.IndexOf('/// <summary>', $taskPropertiesStart)
 $taskProperties = $taskSource.Substring($taskPropertiesStart, $taskPropertiesEnd - $taskPropertiesStart)
-[IO.File]::WriteAllText((Join-Path $taskGenerated 'Manager.cs'), "using System; using System.Collections.Generic; using UnityEngine; namespace KillingMahjong.UI { public partial class GameUIManager { $taskProperties $taskCovered $taskQueue } }")
+[IO.File]::WriteAllText((Join-Path $taskGenerated 'Manager.cs'), "using System; using System.Collections.Generic; using UnityEngine; namespace KillingMahjong.UI { public partial class GameUIManager { $taskProperties $taskCovered $taskQueueFields $taskQueueTimeout $taskQueue $($taskQueueMethods -join "`n") } }")
 $taskFlow = Read-Source 'Assets/Scripts/UI/GameUIPhaseController.RoundFlow.cs'
 $taskReady = Read-Block $taskFlow 'public void HandleNextRoundWaitingReceived('
 $taskSend = Read-Block $taskFlow 'private void SendNextRoundAction('

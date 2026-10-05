@@ -150,7 +150,9 @@ static class Probe
 }
 namespace UnityEngine
 {
-    public static class Debug { public static void Log(string value) {} }
+    public static class Time { public static int frameCount; }
+    public static class Mathf { public static float Max(float a,float b)=>Math.Max(a,b); }
+    public static class Debug { public static void Log(string value) {} public static void LogWarning(string value) {} public static void LogError(string value) {} }
     public static class Object { public static T FindFirstObjectByType<T>() { return (T)(object)Probe.UI; } }
     public static class JsonUtility { public static T FromJson<T>(string json) { return (T)(object)new PhaseChangeMessage { new_status=json }; } }
 }
@@ -220,11 +222,10 @@ namespace KillingMahjong.UI
         public ConfirmationProbe HandSelectionController;
         private TransitionLockSet locks;
         private TransitionLockSet.Lease compatibility;
-        private readonly List<KeyValuePair<string,Action>> deferredActions = new List<KeyValuePair<string,Action>>();
+        public bool isActiveAndEnabled = true;
         public GameUIManager(bool hasTransition) { locks=new TransitionLockSet(()=>IsTransitioning=locks.IsLocked); PhaseController=new GameUIPhaseController(this); if(hasTransition) PhaseTransitionUI=new PhaseTransitionUI(); }
         public bool IsBusyWithTransition => !ForceFlush && (IsTransitioning || (PhaseTransitionUI != null && PhaseTransitionUI.IsDarkenTransitioning));
         public int QueueCount => deferredActions.Count;
-        private void EnsureFlushWatcher() {}
         public TransitionLockSet.Lease BeginTransition(string owner) => locks.Acquire(owner);
         public void SetIsTransitioning(bool value) { if(value){if(compatibility==null||!compatibility.IsActive)compatibility=BeginTransition("compat");}else{compatibility?.Dispose();compatibility=null;} }
         public void ClearAllTiles() { ResetCount++; WaitUIReady=false; Probe.Events.Add("reset"); }
@@ -234,7 +235,7 @@ namespace KillingMahjong.UI
             if(status == RoundStatus.Dealing) PhaseController.StartDealingVisibility();
         }
         public void MovePhaseVisibilityLast() { var phase=deferredActions.Where(x=>x.Key.StartsWith("phaseVisibility:")).ToArray(); deferredActions.RemoveAll(x=>x.Key.StartsWith("phaseVisibility:")); deferredActions.AddRange(phase); }
-        public void Flush() { var copy=deferredActions.ToArray(); deferredActions.Clear(); foreach(var entry in copy) entry.Value(); }
+        public void Flush() { UnityEngine.Time.frameCount++; ProcessDeferredActions(0f); }
     }
     public class PhaseTransitionUI
     {
