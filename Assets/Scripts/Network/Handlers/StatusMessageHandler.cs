@@ -14,6 +14,16 @@ namespace KillingMahjong.Network.Handlers
 
         public void Handle(string messageType, string jsonString, NetworkMessageHandler network)
         {
+            // status にも新局の山牌が含まれる。暗転と盤面リセットより先に
+            // 反映すると、dealing_completed を保留していても配牌が見えてしまう。
+            var uiManager = Object.FindFirstObjectByType<KillingMahjong.UI.GameUIManager>();
+            var transition = uiManager != null ? uiManager.PhaseTransitionUI : null;
+            if (transition != null && (transition.IsDarkenTransitioning || transition.IsRoundStartResetPending))
+            {
+                uiManager.DeferUntilIdle("roundStartStatus", () => Handle(messageType, jsonString, network));
+                return;
+            }
+
             StatusMessage statusMsg = JsonUtility.FromJson<StatusMessage>(jsonString);
             if (statusMsg == null || statusMsg.data == null) return;
 

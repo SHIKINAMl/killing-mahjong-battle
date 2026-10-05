@@ -22,7 +22,8 @@ namespace KillingMahjong.Network.Handlers
             // 局頭のリセットが済むまで payload 全体を保留し、完了後に状態・描画・
             // 暗転解除の順で適用する。サーバー側の到着順を前提にしない。
             var uiManager = Object.FindFirstObjectByType<GameUIManager>();
-            if (uiManager != null && uiManager.IsBusyWithTransition)
+            if (uiManager != null && (uiManager.IsBusyWithTransition
+                || (uiManager.PhaseTransitionUI != null && uiManager.PhaseTransitionUI.IsRoundStartResetPending)))
             {
                 uiManager.DeferUntilIdle(
                     "dealingCompleted",

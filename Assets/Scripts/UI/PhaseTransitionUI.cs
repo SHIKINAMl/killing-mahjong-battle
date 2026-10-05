@@ -247,7 +247,15 @@ namespace KillingMahjong.UI
         {
             if (isDarkened)
             {
-                onDarkened?.Invoke();
+                // isDarkened は暗転の開始時点で立つ。進行中の暗転へ合流した
+                // 局頭リセットも、画面を覆いきるまで実行しない。
+                if (IsDarkenTransitioning)
+                    _additionalRoundStartDarkenedCallbacks += onDarkened;
+                else
+                {
+                    onDarkened?.Invoke();
+                    IsRoundStartResetPending = false;
+                }
                 return;
             }
             isDarkened = true;

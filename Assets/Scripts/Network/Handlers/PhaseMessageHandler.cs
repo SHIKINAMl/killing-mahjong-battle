@@ -23,8 +23,8 @@ namespace KillingMahjong.Network.Handlers
                         if (pMsg.new_status == "dealing")
                         {
                             network.AgariProcessed = false; // 新ラウンドでリセット
-                            network.RaisePhaseStatusChanged(RoundStatus.Dealing);
                             network.RaiseDealingStarted();
+                            network.RaisePhaseStatusChanged(RoundStatus.Dealing);
                         }
                         else if (pMsg.new_status == "hand_selection") network.RaisePhaseStatusChanged(RoundStatus.HandSelection);
                         else if (pMsg.new_status == "betting") network.RaisePhaseStatusChanged(RoundStatus.Betting);

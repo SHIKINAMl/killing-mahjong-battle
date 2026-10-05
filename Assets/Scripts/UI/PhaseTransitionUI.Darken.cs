@@ -68,6 +68,11 @@ namespace KillingMahjong.UI
         /// </summary>
         private bool _roundStartCleanupDone;
 
+        // 配牌開始の通知で立て、画面を覆って前局の盤面を消したあとに解除する。
+        // 暗転の開始自体が別の演出待ちになっている場合も、配牌の反映を保留する。
+        public bool IsRoundStartResetPending { get; private set; }
+        private Action _additionalRoundStartDarkenedCallbacks;
+
         /// <summary>
         /// 配牌後の片付けが済んだか。**裏牌の山を置く側は、置く直前にこれを見る。**
         /// `IsScreenDarkened` だけでは足りない（暗転が明ける前に片付けが走ることがある）。
@@ -145,10 +150,13 @@ namespace KillingMahjong.UI
             }
             if (checkerMaterial != null) checkerMaterial.SetFloat("_Progress", 1f);
 
-            IsDarkenTransitioning = false;
-            
             // 暗転完了のコールバック（ここで盤面をクリアする）
             onDarkened?.Invoke();
+            var additionalCallbacks = _additionalRoundStartDarkenedCallbacks;
+            _additionalRoundStartDarkenedCallbacks = null;
+            additionalCallbacks?.Invoke();
+            IsRoundStartResetPending = false;
+            IsDarkenTransitioning = false;
 
             // ドン！とテキスト表示。画面揺れと同じ「着弾」なので打撃音を当てる
             if (centerText != null)
@@ -209,6 +217,7 @@ namespace KillingMahjong.UI
         internal void BeginRoundStartWait()
         {
             _roundStartCleanupDone = false;
+            IsRoundStartResetPending = true;
 
             // 前の局で積んだままになっていたら降ろす。立てっぱなしだと
             // 次の「降りている最中の配牌完了」を拾い損ねる
