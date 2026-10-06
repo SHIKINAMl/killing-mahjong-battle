@@ -49,14 +49,16 @@ namespace KillingMahjong.UI
         private bool _isCheckingRoom;
 
         private Action<MatchJoinMode> _onDecided;
+        private Action _onClosed;
 
         /// <summary>
         /// メニューを出す。<paramref name="onDecided"/> は入り方が決まったときに呼ばれる
         /// （`MatchJoinRequest` はその前に設定済み）。
         /// </summary>
-        public void Open(Action<MatchJoinMode> onDecided)
+        public void Open(Action<MatchJoinMode> onDecided, Action onClosed = null)
         {
             _onDecided = onDecided;
+            _onClosed = onClosed;
 
             if (_root == null) Build();
             if (_root == null) return;
@@ -70,6 +72,7 @@ namespace KillingMahjong.UI
         {
             if (_root != null) _root.SetActive(false);
             SetTruthNameHookVisible(true);
+            _onClosed?.Invoke();
         }
 
         // ------------------------------------------------------------------

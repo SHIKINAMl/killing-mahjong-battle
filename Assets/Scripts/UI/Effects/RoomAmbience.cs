@@ -347,7 +347,7 @@ namespace KillingMahjong.UI.Effects
             float sinceDue = -_murmurTimer;
             if (sinceDue < MurmurHold)
             {
-                if (_bubbleText.text.Length == 0 || _bubbleGroup.alpha <= 0f)
+                if (string.IsNullOrEmpty(_bubbleText.text) || _bubbleGroup.alpha <= 0f)
                 {
                     _bubbleText.text = Murmurs[_murmurIndex % Murmurs.Length];
                     _murmurIndex++;
