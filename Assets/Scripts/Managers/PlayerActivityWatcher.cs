@@ -295,7 +295,7 @@ namespace KillingMahjong.Managers
             DetectTurnChange();
             DetectInput();
             DetectIdle();
-            DetectThinkTimeout();
+            // 現在は打牌の制限時間がないため、時間切れを促す反応は発火させない。
             DetectMute();
         }
 
