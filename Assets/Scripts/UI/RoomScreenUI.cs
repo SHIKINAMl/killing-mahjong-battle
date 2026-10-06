@@ -382,7 +382,26 @@ namespace KillingMahjong.UI
                 float x = -370f + slot * (i + 0.5f);
                 CreateMenuItem(bar.transform, it.Name, it.Label, new Vector2(x, -8f), new Vector2(122f, 44f), it.Size,
                     () => it.Act()?.Invoke());
+                if (i < 2)
+                    CreateMenuSign(bar.transform, x, i == 0 ? "対戦したい方" : "ルールを知りたい方");
             }
+        }
+
+        private void CreateMenuSign(Transform parent, float x, string label)
+        {
+            Sprite sprite = Resources.Load<Sprite>("Room/MenuSignGirl");
+            if (sprite == null) return;
+
+            // 矢印の先をメニューの上に合わせ、看板の傾きに沿って文字を載せる。
+            var sign = CreateCenteredImage(parent, "RoomMenuSign_" + label,
+                new Vector2(x + 2f, 114f), new Vector2(192f, 144f), Color.white);
+            sign.sprite = sprite;
+            sign.preserveAspect = true;
+            CreateText(sign.transform, "SignLabel", label, new Vector2(-21.6f, 36f),
+                new Vector2(76f, 24f), 8.5f, TextAlignmentOptions.Center, new Color32(69, 37, 26, 255));
+            var text = sign.transform.Find("SignLabel").GetComponent<TextMeshProUGUI>();
+            text.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 22f);
+            text.textWrappingMode = TextWrappingModes.NoWrap;
         }
 
         private void BuildTutorialModal()
