@@ -382,6 +382,14 @@ namespace KillingMahjong.UI
                 float x = -370f + slot * (i + 0.5f);
                 CreateMenuItem(bar.transform, it.Name, it.Label, new Vector2(x, -8f), new Vector2(122f, 44f), it.Size,
                     () => it.Act()?.Invoke());
+                if (it.Name == "RoomMenu_Exit")
+                {
+                    var exit = bar.transform.Find(it.Name);
+                    exit.GetComponent<Button>().interactable = false;
+                    exit.GetComponent<Button>().onClick.RemoveAllListeners();
+                    exit.Find("Label").GetComponent<TextMeshProUGUI>().color = new Color32(125, 120, 123, 255);
+                    exit.Find("Marker").GetComponent<Image>().color = new Color32(125, 120, 123, 255);
+                }
                 if (i < 2)
                     CreateMenuSign(bar.transform, x, i == 0 ? "対戦したい方" : "ルールを知りたい方");
             }
