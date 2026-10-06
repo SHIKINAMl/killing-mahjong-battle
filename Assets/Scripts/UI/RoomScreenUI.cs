@@ -19,6 +19,7 @@ namespace KillingMahjong.UI
         private static readonly Color RoomFloor = new Color32(35, 20, 27, 255);
         private static readonly Color WoodDark = new Color32(48, 28, 28, 255);
         private static readonly Color WoodLight = new Color32(91, 53, 45, 255);
+        private const float GirlBaseY = -54f;
 
         private GameObject root;
         private GameObject content;
@@ -292,8 +293,13 @@ namespace KillingMahjong.UI
             if (openFace == null) openFace = fallback;
             if (closedFace == null) closedFace = openFace;
 
+            // 足元は下のメニュー境界で隠す。画像自体の切れ目を部屋の中に見せない。
+            var viewport = new GameObject("RoomGirlViewport", typeof(RectTransform), typeof(RectMask2D));
+            viewport.transform.SetParent(content.transform, false);
+            Stretch(viewport.GetComponent<RectTransform>());
+            viewport.GetComponent<RectMask2D>().padding = new Vector4(0, 92, 0, 0);
             var girl = new GameObject("RoomGirl", typeof(RectTransform));
-            girl.transform.SetParent(content.transform, false);
+            girl.transform.SetParent(viewport.transform, false);
             var girlRect = girl.GetComponent<RectTransform>();
             ConfigureGirlRect(girlRect);
             CreateGirlLayer(girl.transform, "RoomGirlBody", body, Color.white);
@@ -303,7 +309,7 @@ namespace KillingMahjong.UI
 
             var walker = girl.AddComponent<RoomGirlWalker>();
             walker.Initialize(face, openFace, closedFace,
-                new Vector2(-200f, -30f), new Vector2(40f, -30f));
+                new Vector2(-200f, GirlBaseY), new Vector2(40f, GirlBaseY));
         }
 
         private static void ConfigureGirlRect(RectTransform rect)
@@ -311,7 +317,7 @@ namespace KillingMahjong.UI
             rect.anchorMin = new Vector2(0.5f, 0.5f);
             rect.anchorMax = new Vector2(0.5f, 0.5f);
             rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = new Vector2(-100f, -30f);
+            rect.anchoredPosition = new Vector2(-100f, GirlBaseY);
             rect.sizeDelta = new Vector2(340f, 340f);
         }
 
