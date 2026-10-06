@@ -355,7 +355,62 @@ static class Probe
             var u=UI();int applied=0;u.PhaseTransitionUI.IsDarkenTransitioning=true;u.DeferUntilIdle("wait",()=>applied++);u.AdvanceDeferredFrame(10f);
             Check(applied==0 && u.QueueCount==1,"darkening guard bypassed");u.PhaseTransitionUI.IsDarkenTransitioning=false;u.Flush();Check(applied==1,"darkening completion failed");
         });
+        foreach (bool localWin in new[]{true,false})
+        {
+            foreach (string method in new[]{"hp_zero","cumulative_earned_points","unknown"})
+            {
+                Test($"actual result parser and winner selection: {method}, localWin={localWin}", () => {
+                    var u=UI(); u.CurrentPhaseStatus=RoundStatus.HandSelection;
+                    var b=BoardStateManager.Instance;
+                    b.LocalCumulativeEarnedPoints=localWin?31000:25000;
+                    b.EnemyCumulativeEarnedPoints=localWin?25000:31000;
+                    // Cumulative winner deliberately has less HP, unlike normal outcomes.
+                    int local=method=="cumulative_earned_points"?(localWin?13000:49200):(localWin?1000:0);
+                    int enemy=method=="cumulative_earned_points"?(localWin?49200:13000):(localWin?0:1000);
+                    string json=JsonSerializer.Serialize(new {type="game_end",victory_method=method,final_scores=new Dictionary<string,int>{{"other",enemy},{"self",local}}});
+                    Check(ServerJsonParser.TryParseGameEnd(json,"self",out var info),"parse failed");
+                    u.ReceiveGameEnd(info);u.TickResults();u.ReceiveGameEnd(info);u.TickResults();
+                    Check(u.Results==1 && u.ResultType==(localWin?VictoryType.NormalVictory:VictoryType.NormalDefeat),"wrong or duplicate result");
+                    Check(u.LocalFinalScore==local && u.EnemyFinalScore==enemy,"final HP reversed");
+                });
+            }
+        }
         Console.WriteLine($"All {passed} phase regressions passed (graphics/transport simulated).");
+        AuditServerOutcomes();
+    }
+    // Optional diagnostic: real server payloads plus the last client-side status.
+    // Keep failures visible; do not encode today's incorrect result as expected behavior.
+    static void AuditServerOutcomes()
+    {
+        string path=Environment.GetEnvironmentVariable("KM_OUTCOME_FIXTURES");
+        if(string.IsNullOrEmpty(path))return;
+        using var doc=JsonDocument.Parse(System.IO.File.ReadAllText(path));
+        int failures=0;
+        foreach(var item in doc.RootElement.EnumerateArray())
+        {
+            string name=item.GetProperty("name").GetString();
+            var end=item.GetProperty("gameEnd");
+            if(end.ValueKind==JsonValueKind.Null)
+            {
+                Console.WriteLine($"FAIL outcome {name}: HP reached zero but no game_end; phase={item.GetProperty("phase").GetString()}");
+                failures++;
+                if(!item.TryGetProperty("delayedGameEnd",out end) || end.ValueKind==JsonValueKind.Null)continue;
+                name+=" (after next hand selection)";
+            }
+            Fresh();var u=UI();u.CurrentPhaseStatus=RoundStatus.HandSelection;
+            var oldPoints=item.GetProperty("staleCumulative");
+            BoardStateManager.Instance.LocalCumulativeEarnedPoints=oldPoints[0].GetInt32();
+            BoardStateManager.Instance.EnemyCumulativeEarnedPoints=oldPoints[1].GetInt32();
+            bool parsed=ServerJsonParser.TryParseGameEnd(end.GetRawText(),"self",out var info);
+            if(parsed){u.ReceiveGameEnd(info);u.TickResults();}
+            bool expected=item.GetProperty("expectedWin").GetBoolean();
+            bool actual=u.ResultType==VictoryType.NormalVictory;
+            bool ok=parsed && u.Results==1 && actual==expected;
+            if(!ok)failures++;
+            Console.WriteLine($"{(ok?"PASS":"FAIL")} outcome {name}: expectedWin={expected}, actualWin={actual}, resultCalls={u.Results}");
+        }
+        Console.WriteLine($"Outcome audit: {failures} failures (server payload replay; no live transport).");
+        if(failures>0)Environment.ExitCode=1;
     }
     static GameEndInfo End()=>new GameEndInfo{LocalScoreFound=true,EnemyScoreFound=true,LocalScore=1500,EnemyScore=500};
     static IEnumerator NestedProbe(Action mutation,Action complete,Action disposed) {yield return ChildProbe(mutation,disposed);complete();}
@@ -387,6 +442,7 @@ namespace KillingMahjong.Managers
     public class BoardStateManager
     {
         public static BoardStateManager Instance;
+        public const int CumulativeVictoryPoints=30000; public int LocalCumulativeEarnedPoints,EnemyCumulativeEarnedPoints;
         public int LocalPlayerHp=1000, EnemyPlayerHp=2000, LocalPlayerSpecialVictoryCount, CurrentDoraId=-1, HpSaves, BeforeLocal, BeforeEnemy;
         public List<int> CurrentHandTiles=new List<int>(), CurrentEnemyHandTiles=new List<int>(), CurrentEnemyWaitTiles=new List<int>(); public void SortTileIds(List<int> tiles){tiles.Sort();}
         public bool IsLocalTurn, LastIsLocalWin; public LiquidationData LastLiquidationData; public List<int> CurrentWaitTiles=new List<int>();
@@ -419,10 +475,9 @@ namespace KillingMahjong.Network
         public void RaiseTileDiscarded(int tile,bool local){Events.Add("tile:"+tile);} public void RaiseDraw(DrawPlayerData[] v){}
         public void RaiseAgariPendingReceived(AgariPendingData v){} public void RaiseNextRoundWaitingReceived(NextRoundWaitingData v){} public void RaiseGameEnded(GameEndInfo v){}
     }
-    public static class ServerJsonParser
+    public static partial class ServerJsonParser
     {
         public static LiquidationData ParseLiquidationFromJson(string json) { using var doc=JsonDocument.Parse(json); if(!doc.RootElement.TryGetProperty("data",out var d)||!d.TryGetProperty("liquidation",out var l))return null; return JsonSerializer.Deserialize<LiquidationData>(l.GetRawText(),new JsonSerializerOptions{IncludeFields=true}); }
-        public static bool TryParseGameEnd(string json,string local,out GameEndInfo info){info=null;return false;}
     }
 }
 namespace KillingMahjong.Network.Handlers { public interface IServerMessageHandler{} }
@@ -435,7 +490,7 @@ namespace KillingMahjong.UI
         public void StopAllCoroutines(){} public void CancelPresentation(){}
         public bool Ready; public int ReadyShows,Reveals,AnimationCalls; public Action NextRoundButton;
         public void HideNextRoundButton(){} public void StopHeartbeatEffect(){} public void ShowMomentum(List<int> a,List<int> b){}
-        public void PlayAnimation(VictoryType type,int local,int enemy){AnimationCalls++;}
+        public VictoryType ResultType; public void PlayAnimation(VictoryType type,int local,int enemy){AnimationCalls++;ResultType=type;}
         public void StartTurnTimer(float seconds){Starts++;LastDuration=seconds;} public void StopTurnTimer(){Stops++;}
         public void ShowBettingPhase(int max,int hp,int sv,Action<int> done){BetShows++;} public void HideBettingPhase(bool instant=false){}
         public void SetPanelVisible(bool v){} public void SetSubmittedState(bool v){} public void SetSuppressedForTransition(bool v){}
@@ -471,7 +526,7 @@ namespace KillingMahjong.UI
         public int LocalFinalScore,EnemyFinalScore; private GameEndInfo lastGameEndInfo;
         private List<int> playerHpHistory=new List<int>(),enemyHpHistory=new List<int>(); public int HistoryCount=>playerHpHistory.Count;
         private Widget playerInfoUI=>PlayerInfoUI; private Widget matchMomentumUI; private Widget victoryUI=new Widget();
-        private bool DetermineLocalWin()=>false; public void UseMomentum(){matchMomentumUI=new Widget();}
+        public VictoryType ResultType=>victoryUI.ResultType; public void UseMomentum(){matchMomentumUI=new Widget();}
         private List<UnityEngine.Coroutine> resultRoutines=new List<UnityEngine.Coroutine>(); public int ResultRoutineCount=>resultRoutines.Count;
         private UnityEngine.Coroutine StartCoroutine(IEnumerator routine){var c=new UnityEngine.Coroutine{Routine=routine};resultRoutines.Add(c);routine.MoveNext();return c;}
         private void StopCoroutine(UnityEngine.Coroutine c){c.Stopped=true;}

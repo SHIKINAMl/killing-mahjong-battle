@@ -1,0 +1,708 @@
+[
+  {
+    "name": "negative_self",
+    "kind": "negative",
+    "expectedWin": true,
+    "staleCumulative": [
+      0,
+      0
+    ],
+    "finalCumulative": [
+      0,
+      0
+    ],
+    "health": [
+      1000,
+      -1
+    ],
+    "phase": "liquidation",
+    "messages": [
+      {
+        "type": "round_end",
+        "data": {
+          "is_draw": false,
+          "liquidation": null
+        }
+      },
+      {
+        "type": "game_end",
+        "final_scores": {
+          "self": 1000,
+          "other": -1
+        },
+        "player_healths": [
+          {
+            "client_id": "self",
+            "health": 1000
+          },
+          {
+            "client_id": "other",
+            "health": -1
+          }
+        ],
+        "health_zero_players": [
+          "other"
+        ],
+        "victory_method": "hp_zero"
+      }
+    ],
+    "gameEnd": {
+      "type": "game_end",
+      "final_scores": {
+        "self": 1000,
+        "other": -1
+      },
+      "player_healths": [
+        {
+          "client_id": "self",
+          "health": 1000
+        },
+        {
+          "client_id": "other",
+          "health": -1
+        }
+      ],
+      "health_zero_players": [
+        "other"
+      ],
+      "victory_method": "hp_zero"
+    }
+  },
+  {
+    "name": "negative_other",
+    "kind": "negative",
+    "expectedWin": false,
+    "staleCumulative": [
+      0,
+      0
+    ],
+    "finalCumulative": [
+      0,
+      0
+    ],
+    "health": [
+      -1,
+      1000
+    ],
+    "phase": "liquidation",
+    "messages": [
+      {
+        "type": "round_end",
+        "data": {
+          "is_draw": false,
+          "liquidation": null
+        }
+      },
+      {
+        "type": "game_end",
+        "final_scores": {
+          "self": -1,
+          "other": 1000
+        },
+        "player_healths": [
+          {
+            "client_id": "self",
+            "health": -1
+          },
+          {
+            "client_id": "other",
+            "health": 1000
+          }
+        ],
+        "health_zero_players": [
+          "self"
+        ],
+        "victory_method": "hp_zero"
+      }
+    ],
+    "gameEnd": {
+      "type": "game_end",
+      "final_scores": {
+        "self": -1,
+        "other": 1000
+      },
+      "player_healths": [
+        {
+          "client_id": "self",
+          "health": -1
+        },
+        {
+          "client_id": "other",
+          "health": 1000
+        }
+      ],
+      "health_zero_players": [
+        "self"
+      ],
+      "victory_method": "hp_zero"
+    }
+  },
+  {
+    "name": "normal_zero_self",
+    "kind": "normal_zero",
+    "expectedWin": true,
+    "staleCumulative": [
+      0,
+      0
+    ],
+    "finalCumulative": [
+      800,
+      0
+    ],
+    "health": [
+      1800,
+      0
+    ],
+    "phase": "round_end_waiting",
+    "messages": [
+      {
+        "type": "phase_change",
+        "new_status": "round_end_waiting"
+      },
+      {
+        "type": "round_end",
+        "data": {
+          "is_draw": false,
+          "liquidation": {
+            "winner_id": "self",
+            "loser_id": "other",
+            "yaku": [
+              "\u56db\u6697\u523b"
+            ],
+            "base_yaku": [
+              "\u56db\u6697\u523b"
+            ],
+            "display_yaku": [
+              "\u56db\u6697\u523b"
+            ],
+            "base_han": 13,
+            "bonus_han": 0,
+            "han": 13,
+            "multiplier": 4.0,
+            "voltage_multiplier": 1.0,
+            "winner_voltage_points": 0,
+            "winner_voltage_level": 0,
+            "winner_bet": 200,
+            "loser_bet": 200,
+            "winner_original_gain": 800,
+            "winner_gain": 800,
+            "loser_loss": 800,
+            "loser_loss_multiplier": 1,
+            "assault_applied": false,
+            "assault_bonus_damage": 0,
+            "is_tanki_wait": false,
+            "carry_over_draw_count": 0,
+            "winner_health": 1800,
+            "loser_health": 0
+          }
+        }
+      },
+      {
+        "type": "next_round_waiting",
+        "data": {
+          "ready_players": [],
+          "ready_count": 0,
+          "required_count": 2
+        }
+      }
+    ],
+    "gameEnd": null,
+    "nextHandMessages": [
+      {
+        "type": "game_end",
+        "final_scores": {
+          "self": 1800,
+          "other": 0
+        },
+        "player_healths": [
+          {
+            "client_id": "self",
+            "health": 1800
+          },
+          {
+            "client_id": "other",
+            "health": 0
+          }
+        ],
+        "health_zero_players": [],
+        "victory_method": "unknown"
+      }
+    ],
+    "delayedGameEnd": {
+      "type": "game_end",
+      "final_scores": {
+        "self": 1800,
+        "other": 0
+      },
+      "player_healths": [
+        {
+          "client_id": "self",
+          "health": 1800
+        },
+        {
+          "client_id": "other",
+          "health": 0
+        }
+      ],
+      "health_zero_players": [],
+      "victory_method": "unknown"
+    }
+  },
+  {
+    "name": "normal_zero_other",
+    "kind": "normal_zero",
+    "expectedWin": false,
+    "staleCumulative": [
+      0,
+      0
+    ],
+    "finalCumulative": [
+      0,
+      800
+    ],
+    "health": [
+      0,
+      1800
+    ],
+    "phase": "round_end_waiting",
+    "messages": [
+      {
+        "type": "phase_change",
+        "new_status": "round_end_waiting"
+      },
+      {
+        "type": "round_end",
+        "data": {
+          "is_draw": false,
+          "liquidation": {
+            "winner_id": "other",
+            "loser_id": "self",
+            "yaku": [
+              "\u56db\u6697\u523b"
+            ],
+            "base_yaku": [
+              "\u56db\u6697\u523b"
+            ],
+            "display_yaku": [
+              "\u56db\u6697\u523b"
+            ],
+            "base_han": 13,
+            "bonus_han": 0,
+            "han": 13,
+            "multiplier": 4.0,
+            "voltage_multiplier": 1.0,
+            "winner_voltage_points": 0,
+            "winner_voltage_level": 0,
+            "winner_bet": 200,
+            "loser_bet": 200,
+            "winner_original_gain": 800,
+            "winner_gain": 800,
+            "loser_loss": 800,
+            "loser_loss_multiplier": 1,
+            "assault_applied": false,
+            "assault_bonus_damage": 0,
+            "is_tanki_wait": false,
+            "carry_over_draw_count": 0,
+            "winner_health": 1800,
+            "loser_health": 0
+          }
+        }
+      },
+      {
+        "type": "next_round_waiting",
+        "data": {
+          "ready_players": [],
+          "ready_count": 0,
+          "required_count": 2
+        }
+      }
+    ],
+    "gameEnd": null,
+    "nextHandMessages": [
+      {
+        "type": "game_end",
+        "final_scores": {
+          "self": 0,
+          "other": 1800
+        },
+        "player_healths": [
+          {
+            "client_id": "self",
+            "health": 0
+          },
+          {
+            "client_id": "other",
+            "health": 1800
+          }
+        ],
+        "health_zero_players": [],
+        "victory_method": "unknown"
+      }
+    ],
+    "delayedGameEnd": {
+      "type": "game_end",
+      "final_scores": {
+        "self": 0,
+        "other": 1800
+      },
+      "player_healths": [
+        {
+          "client_id": "self",
+          "health": 0
+        },
+        {
+          "client_id": "other",
+          "health": 1800
+        }
+      ],
+      "health_zero_players": [],
+      "victory_method": "unknown"
+    }
+  },
+  {
+    "name": "cumulative_self",
+    "kind": "cumulative",
+    "expectedWin": true,
+    "staleCumulative": [
+      19000,
+      25000
+    ],
+    "finalCumulative": [
+      31000,
+      25000
+    ],
+    "health": [
+      13000,
+      49200
+    ],
+    "phase": "liquidation",
+    "messages": [
+      {
+        "type": "round_end",
+        "data": {
+          "is_draw": false,
+          "liquidation": {
+            "winner_id": "self",
+            "loser_id": "other",
+            "yaku": [
+              "\u56db\u6697\u523b"
+            ],
+            "base_yaku": [
+              "\u56db\u6697\u523b"
+            ],
+            "display_yaku": [
+              "\u56db\u6697\u523b"
+            ],
+            "base_han": 13,
+            "bonus_han": 0,
+            "han": 13,
+            "multiplier": 4.0,
+            "voltage_multiplier": 1.0,
+            "winner_voltage_points": 0,
+            "winner_voltage_level": 0,
+            "winner_bet": 3000,
+            "loser_bet": 200,
+            "winner_original_gain": 12000,
+            "winner_gain": 12000,
+            "loser_loss": 800,
+            "loser_loss_multiplier": 1,
+            "assault_applied": false,
+            "assault_bonus_damage": 0,
+            "is_tanki_wait": false,
+            "carry_over_draw_count": 0,
+            "winner_health": 13000,
+            "loser_health": 49200
+          }
+        }
+      },
+      {
+        "type": "game_end",
+        "final_scores": {
+          "self": 13000,
+          "other": 49200
+        },
+        "player_healths": [
+          {
+            "client_id": "self",
+            "health": 13000
+          },
+          {
+            "client_id": "other",
+            "health": 49200
+          }
+        ],
+        "health_zero_players": [],
+        "victory_method": "cumulative_earned_points"
+      }
+    ],
+    "gameEnd": {
+      "type": "game_end",
+      "final_scores": {
+        "self": 13000,
+        "other": 49200
+      },
+      "player_healths": [
+        {
+          "client_id": "self",
+          "health": 13000
+        },
+        {
+          "client_id": "other",
+          "health": 49200
+        }
+      ],
+      "health_zero_players": [],
+      "victory_method": "cumulative_earned_points"
+    }
+  },
+  {
+    "name": "cumulative_other",
+    "kind": "cumulative",
+    "expectedWin": false,
+    "staleCumulative": [
+      25000,
+      19000
+    ],
+    "finalCumulative": [
+      25000,
+      31000
+    ],
+    "health": [
+      49200,
+      13000
+    ],
+    "phase": "liquidation",
+    "messages": [
+      {
+        "type": "round_end",
+        "data": {
+          "is_draw": false,
+          "liquidation": {
+            "winner_id": "other",
+            "loser_id": "self",
+            "yaku": [
+              "\u56db\u6697\u523b"
+            ],
+            "base_yaku": [
+              "\u56db\u6697\u523b"
+            ],
+            "display_yaku": [
+              "\u56db\u6697\u523b"
+            ],
+            "base_han": 13,
+            "bonus_han": 0,
+            "han": 13,
+            "multiplier": 4.0,
+            "voltage_multiplier": 1.0,
+            "winner_voltage_points": 0,
+            "winner_voltage_level": 0,
+            "winner_bet": 3000,
+            "loser_bet": 200,
+            "winner_original_gain": 12000,
+            "winner_gain": 12000,
+            "loser_loss": 800,
+            "loser_loss_multiplier": 1,
+            "assault_applied": false,
+            "assault_bonus_damage": 0,
+            "is_tanki_wait": false,
+            "carry_over_draw_count": 0,
+            "winner_health": 13000,
+            "loser_health": 49200
+          }
+        }
+      },
+      {
+        "type": "game_end",
+        "final_scores": {
+          "self": 49200,
+          "other": 13000
+        },
+        "player_healths": [
+          {
+            "client_id": "self",
+            "health": 49200
+          },
+          {
+            "client_id": "other",
+            "health": 13000
+          }
+        ],
+        "health_zero_players": [],
+        "victory_method": "cumulative_earned_points"
+      }
+    ],
+    "gameEnd": {
+      "type": "game_end",
+      "final_scores": {
+        "self": 49200,
+        "other": 13000
+      },
+      "player_healths": [
+        {
+          "client_id": "self",
+          "health": 49200
+        },
+        {
+          "client_id": "other",
+          "health": 13000
+        }
+      ],
+      "health_zero_players": [],
+      "victory_method": "cumulative_earned_points"
+    }
+  },
+  {
+    "name": "carry_self",
+    "kind": "carry",
+    "expectedWin": true,
+    "staleCumulative": [
+      0,
+      0
+    ],
+    "finalCumulative": [
+      0,
+      0
+    ],
+    "health": [
+      200,
+      0
+    ],
+    "phase": "hand_selection",
+    "messages": [
+      {
+        "type": "phase_change",
+        "new_status": "round_end_waiting"
+      },
+      {
+        "type": "round_end",
+        "data": {
+          "is_draw": true,
+          "liquidation": null
+        }
+      },
+      {
+        "type": "next_round_waiting",
+        "data": {
+          "ready_players": [],
+          "ready_count": 0,
+          "required_count": 2
+        }
+      },
+      {
+        "type": "game_end",
+        "final_scores": {
+          "self": 200,
+          "other": 0
+        },
+        "player_healths": [
+          {
+            "client_id": "self",
+            "health": 200
+          },
+          {
+            "client_id": "other",
+            "health": 0
+          }
+        ],
+        "health_zero_players": [],
+        "victory_method": "unknown"
+      }
+    ],
+    "gameEnd": {
+      "type": "game_end",
+      "final_scores": {
+        "self": 200,
+        "other": 0
+      },
+      "player_healths": [
+        {
+          "client_id": "self",
+          "health": 200
+        },
+        {
+          "client_id": "other",
+          "health": 0
+        }
+      ],
+      "health_zero_players": [],
+      "victory_method": "unknown"
+    }
+  },
+  {
+    "name": "carry_other",
+    "kind": "carry",
+    "expectedWin": false,
+    "staleCumulative": [
+      0,
+      0
+    ],
+    "finalCumulative": [
+      0,
+      0
+    ],
+    "health": [
+      0,
+      200
+    ],
+    "phase": "hand_selection",
+    "messages": [
+      {
+        "type": "phase_change",
+        "new_status": "round_end_waiting"
+      },
+      {
+        "type": "round_end",
+        "data": {
+          "is_draw": true,
+          "liquidation": null
+        }
+      },
+      {
+        "type": "next_round_waiting",
+        "data": {
+          "ready_players": [],
+          "ready_count": 0,
+          "required_count": 2
+        }
+      },
+      {
+        "type": "game_end",
+        "final_scores": {
+          "self": 0,
+          "other": 200
+        },
+        "player_healths": [
+          {
+            "client_id": "self",
+            "health": 0
+          },
+          {
+            "client_id": "other",
+            "health": 200
+          }
+        ],
+        "health_zero_players": [],
+        "victory_method": "unknown"
+      }
+    ],
+    "gameEnd": {
+      "type": "game_end",
+      "final_scores": {
+        "self": 0,
+        "other": 200
+      },
+      "player_healths": [
+        {
+          "client_id": "self",
+          "health": 0
+        },
+        {
+          "client_id": "other",
+          "health": 200
+        }
+      ],
+      "health_zero_players": [],
+      "victory_method": "unknown"
+    }
+  }
+]
