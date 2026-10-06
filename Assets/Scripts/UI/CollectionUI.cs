@@ -19,7 +19,7 @@ namespace KillingMahjong.UI
     /// そこへ試聴を混ぜると状態が食い違う。開いている間だけタイトルBGMを止め、
     /// 閉じるときに戻す。
     /// </summary>
-    public sealed class CollectionUI : MonoBehaviour
+    public sealed partial class CollectionUI : MonoBehaviour
     {
         private static readonly Color TextMain = new Color32(240, 232, 236, 255);
         private static readonly Color TextDim = new Color32(170, 156, 164, 255);
@@ -166,6 +166,7 @@ namespace KillingMahjong.UI
 
         private GameObject root;
         private GameObject musicPage;
+        private GameObject playerBar;       // 下の試聴バー。音のあるタブでだけ出す
         private GameObject sePage;          // 「効果音」タブ
         private GameObject cgPage;
         private GameObject yakuPage;
@@ -204,6 +205,11 @@ namespace KillingMahjong.UI
         public void Close()
         {
             StopPreview();
+
+            // **CGタブの絵はここで手放す。** 抱えたままだと、開くたびに
+            // テクスチャが積もる（2048px のものが混ざっている）
+            ReleaseCgThumbs();
+
             if (root != null) root.SetActive(false);
 
             var audio = KillingMahjong.Managers.AudioManager.Instance;
@@ -261,8 +267,7 @@ namespace KillingMahjong.UI
 
             cgPage = NewEmpty(panel.transform, "CgPage");
             Stretch(cgPage.GetComponent<RectTransform>());
-            Label(cgPage.transform, "Soon", "準備中", new Vector2(0f, 20f), new Vector2(400f, 40f),
-                20f, TextAlignmentOptions.Center, TextDim);
+            BuildCgPage(cgPage.transform);
 
             yakuPage = NewEmpty(panel.transform, "YakuPage");
             Stretch(yakuPage.GetComponent<RectTransform>());
@@ -300,6 +305,14 @@ namespace KillingMahjong.UI
             if (sePage != null) sePage.SetActive(index == 1);
             if (cgPage != null) cgPage.SetActive(index == 2);
             if (yakuPage != null) yakuPage.SetActive(index == 3);
+
+            // **試聴バーは音のあるタブだけ。** CG や役のタブに「曲を選んでください」が
+            // 残っていると、何を選ぶ画面なのか分からなくなる。
+            // 鳴らしたまま移ると音だけ残るので、ここで止める
+            bool hasAudio = index == 0 || index == 1;
+            if (playerBar != null) playerBar.SetActive(hasAudio);
+            if (!hasAudio) StopPreview();
+
             for (int i = 0; i < tabMarks.Count; i++)
                 if (tabMarks[i] != null) tabMarks[i].enabled = (i == index);
         }
@@ -446,6 +459,7 @@ namespace KillingMahjong.UI
             Center(bar.rectTransform, new Vector2(700f, 86f));
             bar.rectTransform.anchoredPosition = new Vector2(0f, -218f);
             bar.raycastTarget = false;
+            playerBar = bar.gameObject;
 
             Button(bar.transform, "PlayPause", "▶", new Vector2(-316f, 20f), new Vector2(40f, 32f), 20f, TogglePlay);
             playLabel = bar.transform.Find("PlayPause/Text").GetComponent<TextMeshProUGUI>();
