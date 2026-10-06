@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -19,10 +20,13 @@ namespace KillingMahjong.UI
         private string[] pages;
         private Action returnToTitle;
         private bool returned;
+        private const float ResultFadeDuration = 0.8f;
+        private Coroutine resultFade;
 
         public void Show(VictoryConfig config, TMP_FontAsset font, Action onReturnToTitle)
         {
             if (background == null) Build(font);
+            StopResultFade();
             returnToTitle = onReturnToTitle;
             returned = false;
             pages = config != null && config.dialoguePages != null && config.dialoguePages.Length > 0
@@ -42,12 +46,55 @@ namespace KillingMahjong.UI
         /// <summary>本文は1クリック1ページ。結果名の次のクリックでクレジットへ進む。</summary>
         public void Advance()
         {
+            if (resultFade != null) return;
             if (Stage == EndingStage.Dialogue)
             {
-                if (++PageIndex >= pages.Length) Stage = EndingStage.Result;
+                if (++PageIndex >= pages.Length)
+                {
+                    Stage = EndingStage.Result;
+                    SetResultAlpha(0f);
+                    Render();
+                    resultFade = StartCoroutine(FadeInResult());
+                    return;
+                }
             }
             else if (Stage == EndingStage.Result) Stage = EndingStage.Credits;
             Render();
+        }
+
+        private IEnumerator FadeInResult()
+        {
+            advanceButton.interactable = false;
+            float elapsed = 0f;
+            while (elapsed < ResultFadeDuration)
+            {
+                yield return null;
+                // 読み込みなどで1フレーム止まっても、一瞬で表示完了に飛ばさない。
+                elapsed += Mathf.Min(Time.unscaledDeltaTime, 1f / 30f);
+                SetResultAlpha(Mathf.SmoothStep(0f, 1f, elapsed / ResultFadeDuration));
+            }
+            SetResultAlpha(1f);
+            resultFade = null;
+            advanceButton.interactable = true;
+        }
+
+        private void SetResultAlpha(float alpha)
+        {
+            resultTitle.alpha = alpha;
+            endingName.alpha = alpha;
+        }
+
+        private void StopResultFade()
+        {
+            if (resultFade != null) StopCoroutine(resultFade);
+            resultFade = null;
+            SetResultAlpha(1f);
+            advanceButton.interactable = true;
+        }
+
+        private void OnDisable()
+        {
+            if (background != null) StopResultFade();
         }
 
         public void ReturnToTitle()
