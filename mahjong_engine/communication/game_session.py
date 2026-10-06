@@ -1200,7 +1200,7 @@ class GameSession:
 		self._clear_hand_selection_confirmations(match_id)
 		if engine:
 			self._clear_pending_confirmations_for_engine(engine)
-			if any(p.health < 0 for p in engine.state.players):
+			if any(p.health <= 0 for p in engine.state.players):
 				victory_method = "hp_zero"
 			elif any(p.cumulative_earned_points >= 30000 for p in engine.state.players):
 				victory_method = "cumulative_earned_points"
@@ -1220,7 +1220,7 @@ class GameSession:
 					"client_id": score_key,
 					"health": p.health,
 				})
-				if p.health < 0:
+				if p.health <= 0:
 					health_zero_players.append(score_key)
 
 			await self._broadcast_match_members(

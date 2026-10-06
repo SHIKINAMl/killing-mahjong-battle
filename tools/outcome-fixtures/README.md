@@ -1,5 +1,20 @@
 # 勝敗経路の診断データ
 
+## HP0即時終了の修正後検査
+
+現在のサーバーソースを直接検査し、その実通知をUnity判定へ通す:
+
+```powershell
+./tools/verify_hp_zero.ps1 -OutputDirectory "$env:TEMP/km-hp-zero-check"
+./tools/verify_game_outcomes.ps1 -FixturesPath "$env:TEMP/km-hp-zero-check/server-fixtures.json"
+```
+
+サーバー境界検査15件と、清算時HP0による通常勝敗2件は修正後に成功。
+賭け金支払い直後のHP0だけでは対局を打ち切らず、局終了地点で判定する。
+下の保存済みJSONは修正前の証拠として維持している。既定のverify_game_outcomesはその過去データを診断するため、修正後の確認には上記コマンドを使うこと。累計決着の勝敗逆転は今回の修正対象外。
+
+## 修正前の記録
+
 `server-current-20261006.json` は main `4fa8f17` の実GameEngine/GameSessionを別プロセスで呼び、送信関数に届いたJSONを保存したもの。実サーバーの通信や対局データは使っていない。サーバーのソース変更、判定の差し替えは行っていない。
 
 ## 実行

@@ -980,10 +980,10 @@ class GameEngine:
             self._on_game_end()
             return
 
-        # 精算後に HP がマイナスのプレイヤーがいればゲーム終了
-        if any(p.health < 0 for p in self.state.players):
-            dead = [p.player_id for p in self.state.players if p.health < 0]
-            logger.info("HPマイナスによるゲーム終了: players=%s", dead)
+        # 清算は HP を 0 で止めるため、0 到達もこの局で終了させる。
+        if any(p.health <= 0 for p in self.state.players):
+            dead = [p.player_id for p in self.state.players if p.health <= 0]
+            logger.info("HP枯渇によるゲーム終了: players=%s", dead)
             self._invoke_callback(self.on_round_end, is_draw)
             self._on_game_end()
             return
