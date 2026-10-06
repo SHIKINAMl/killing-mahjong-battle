@@ -88,8 +88,7 @@ namespace KillingMahjong.UI
         }
 
         /// <summary>
-        /// フレンドと遊ぶための入口。ここを専用パネルにしておくと、将来の部屋設定を
-        /// サーバーの契約が決まった時点で安全に追加できる。
+        /// フレンドと遊ぶための、部屋作成／合言葉入力の入口。
         /// </summary>
         private void ShowFriendPanel()
         {
@@ -360,7 +359,6 @@ namespace KillingMahjong.UI
             CreateHeading(_friendPanel.transform, "フレンドマッチ", ItemHeight * 2f);
             CreateMenuItem(_friendPanel.transform, "部屋を作る", ItemHeight * 0.9f, OnPrivateCreateSelected);
             CreateMenuItem(_friendPanel.transform, "あいことばで入る", -ItemHeight * 0.2f, ShowPasswordPanel);
-            CreateCaption(_friendPanel.transform, "部屋設定は今後追加予定", -ItemHeight * 1.15f);
             CreateMenuItem(_friendPanel.transform, "もどる", -ItemHeight * 2.1f, ShowModePanel);
 
             _friendPanel.SetActive(false);
