@@ -25614,14 +25614,24 @@ MonoBehaviour:
     image: {fileID: 0}
     text: "\u52DD\u5229\uFF01"
   - victoryType: 1
-    image: {fileID: 0}
-    text: "\u6557\u5317..."
+    image: {fileID: 21300000, guid: 0350fe3715e052f478dba4b5b13869f6, type: 3}
+    text: "対局が終了しました。"
+    dialoguePages:
+    - "対局が終了しました。"
+    - "これは共通エンディングの仮内容です。"
+    resultTitle: DEAD END
+    endingName: "共通ED（仮）"
   - victoryType: 2
     image: {fileID: 0}
     text: "\u7279\u6B8A\u52DD\u5229\uFF01"
   - victoryType: 3
-    image: {fileID: 0}
-    text: "\u7279\u6B8A\u6557\u5317..."
+    image: {fileID: 21300000, guid: 0350fe3715e052f478dba4b5b13869f6, type: 3}
+    text: "対局が終了しました。"
+    dialoguePages:
+    - "対局が終了しました。"
+    - "これは共通エンディングの仮内容です。"
+    resultTitle: DEAD END
+    endingName: "共通ED（仮）"
 --- !u!225 &1987867889
 CanvasGroup:
   m_ObjectHideFlags: 0

@@ -60,6 +60,8 @@ namespace KillingMahjong.UI
 
         public void PlayAnimation(VictoryType type, int localScore, int enemyScore)
         {
+            // special_victory_won に続いて game_end が届いてもEDを再開しない。
+            if (resultRecorded) return;
             gameObject.SetActive(true);
             if (!resultRecorded)
             {
