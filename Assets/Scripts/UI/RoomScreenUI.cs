@@ -397,8 +397,9 @@ namespace KillingMahjong.UI
                 new Vector2(x + 2f, 114f), new Vector2(192f, 144f), Color.white);
             sign.sprite = sprite;
             sign.preserveAspect = true;
-            CreateText(sign.transform, "SignLabel", label, new Vector2(-21.6f, 36f),
-                new Vector2(76f, 24f), 8.5f, TextAlignmentOptions.Center, new Color32(69, 37, 26, 255));
+            string signText = label == "ルールを知りたい方" ? "ルールを\n知りたい方" : label;
+            CreateText(sign.transform, "SignLabel", signText, new Vector2(-21.6f, 36f),
+                new Vector2(68f, 30f), 9f, TextAlignmentOptions.Center, new Color32(69, 37, 26, 255));
             var text = sign.transform.Find("SignLabel").GetComponent<TextMeshProUGUI>();
             text.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 22f);
             text.textWrappingMode = TextWrappingModes.NoWrap;
