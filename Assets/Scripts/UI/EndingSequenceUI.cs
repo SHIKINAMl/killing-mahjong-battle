@@ -52,7 +52,7 @@ namespace KillingMahjong.UI
                 if (++PageIndex >= pages.Length)
                 {
                     Stage = EndingStage.Result;
-                    SetResultAlpha(0f);
+                    SetResultTitleAlpha(0f);
                     Render();
                     resultFade = StartCoroutine(FadeInResult());
                     return;
@@ -71,24 +71,23 @@ namespace KillingMahjong.UI
                 yield return null;
                 // 読み込みなどで1フレーム止まっても、一瞬で表示完了に飛ばさない。
                 elapsed += Mathf.Min(Time.unscaledDeltaTime, 1f / 30f);
-                SetResultAlpha(Mathf.SmoothStep(0f, 1f, elapsed / ResultFadeDuration));
+                SetResultTitleAlpha(Mathf.SmoothStep(0f, 1f, elapsed / ResultFadeDuration));
             }
-            SetResultAlpha(1f);
+            SetResultTitleAlpha(1f);
             resultFade = null;
             advanceButton.interactable = true;
         }
 
-        private void SetResultAlpha(float alpha)
+        private void SetResultTitleAlpha(float alpha)
         {
             resultTitle.alpha = alpha;
-            endingName.alpha = alpha;
         }
 
         private void StopResultFade()
         {
             if (resultFade != null) StopCoroutine(resultFade);
             resultFade = null;
-            SetResultAlpha(1f);
+            SetResultTitleAlpha(1f);
             advanceButton.interactable = true;
         }
 
