@@ -38,9 +38,12 @@ namespace KillingMahjong.UI
         [SerializeField] private Button titleButton;
         [SerializeField] private CanvasGroup canvasGroup;
         [SerializeField] private VictoryConfig[] configs;
+        [Tooltip("勝利用の演出案。未設定の間は、対応する敗北演出の内容を仮に使用する。")]
+        [SerializeField] private VictoryConfig[] victoryEndingConfigs;
 
         private bool resultRecorded;
-        private EndingSequenceUI sequence;
+        private EndingSequenceUI victorySequence;
+        private EndingSequenceUI defeatSequence;
 
         private void Awake()
         {
@@ -66,14 +69,45 @@ namespace KillingMahjong.UI
                     type == VictoryType.SpecialVictory);
             }
 
-            VictoryConfig selected = null;
-            if (configs != null)
-                foreach (var config in configs)
-                    if (config != null && config.victoryType == type) { selected = config; break; }
+            if (type == VictoryType.NormalVictory || type == VictoryType.SpecialVictory)
+                PlayVictoryEnding(type);
+            else
+                PlayDefeatEnding(type);
+        }
 
+        private void PlayVictoryEnding(VictoryType type)
+        {
+            var selected = FindConfig(victoryEndingConfigs, type);
+            if (selected == null)
+            {
+                // 勝利案ができるまでは演出内容だけ借用し、勝利の記録・経路は維持する。
+                var placeholderType = type == VictoryType.NormalVictory
+                    ? VictoryType.NormalDefeat : VictoryType.SpecialDefeat;
+                selected = FindConfig(configs, placeholderType) ?? FindConfig(configs, type);
+            }
+            if (defeatSequence != null) defeatSequence.gameObject.SetActive(false);
+            ShowSequence(ref victorySequence, "VictoryEndingSequence", selected);
+        }
+
+        private void PlayDefeatEnding(VictoryType type)
+        {
+            if (victorySequence != null) victorySequence.gameObject.SetActive(false);
+            ShowSequence(ref defeatSequence, "DefeatEndingSequence", FindConfig(configs, type));
+        }
+
+        private static VictoryConfig FindConfig(VictoryConfig[] source, VictoryType type)
+        {
+            if (source != null)
+                foreach (var config in source)
+                    if (config != null && config.victoryType == type) return config;
+            return null;
+        }
+
+        private void ShowSequence(ref EndingSequenceUI sequence, string name, VictoryConfig selected)
+        {
             if (sequence == null)
             {
-                var root = new GameObject("EndingSequence", typeof(RectTransform));
+                var root = new GameObject(name, typeof(RectTransform));
                 // 独立した全画面 Canvas。旧結果パネルの矩形や透明度を引き継がない。
                 sequence = root.AddComponent<EndingSequenceUI>();
             }
@@ -82,7 +116,8 @@ namespace KillingMahjong.UI
 
         private void OnDestroy()
         {
-            if (sequence != null) Destroy(sequence.gameObject);
+            if (victorySequence != null) Destroy(victorySequence.gameObject);
+            if (defeatSequence != null) Destroy(defeatSequence.gameObject);
         }
 
         private void OnTitleButtonClicked()
