@@ -170,6 +170,7 @@ namespace KillingMahjong.UI
         private GameObject sePage;          // 「効果音」タブ
         private GameObject cgPage;
         private GameObject yakuPage;
+        private GameObject unusedPage;
         private TMP_FontAsset font;
         private Action onClosed;
 
@@ -274,6 +275,10 @@ namespace KillingMahjong.UI
             Label(yakuPage.transform, "Soon", "準備中", new Vector2(0f, 20f), new Vector2(400f, 40f),
                 20f, TextAlignmentOptions.Center, TextDim);
 
+            unusedPage = NewEmpty(panel.transform, "UnusedPage");
+            Stretch(unusedPage.GetComponent<RectTransform>());
+            BuildUnusedPage(unusedPage.transform);
+
             BuildPlayer(panel.transform);
             EnsurePreviewSource();
         }
@@ -283,7 +288,7 @@ namespace KillingMahjong.UI
         private void BuildTabs(Transform parent)
         {
             // **「追加曲」タブは畳んだ**（2026-09-27 の指示で、曲を全部「音楽」へまとめた）。
-            string[] names = { "音楽", "効果音", "CG", "役" };
+            string[] names = { "音楽", "効果音", "CG", "役", "没案" };
             for (int i = 0; i < names.Length; i++)
             {
                 int index = i;
@@ -305,6 +310,7 @@ namespace KillingMahjong.UI
             if (sePage != null) sePage.SetActive(index == 1);
             if (cgPage != null) cgPage.SetActive(index == 2);
             if (yakuPage != null) yakuPage.SetActive(index == 3);
+            if (unusedPage != null) unusedPage.SetActive(index == 4);
 
             // **試聴バーは音のあるタブだけ。** CG や役のタブに「曲を選んでください」が
             // 残っていると、何を選ぶ画面なのか分からなくなる。
