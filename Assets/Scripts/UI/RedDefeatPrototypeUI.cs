@@ -18,6 +18,8 @@ namespace KillingMahjong.UI
         private EyelidClosureGraphic eyelids;
         private AudioSource sound;
         private AudioClip thud;
+        private Canvas cursorCanvas;
+        private bool cursorWasEnabled;
 
         public static RedDefeatPrototypeUI Play()
         {
@@ -42,6 +44,16 @@ namespace KillingMahjong.UI
             var canvas = gameObject.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = 30000;
+            var cursor = GameObject.Find("UICursorCanvas");
+            if (cursor != null)
+            {
+                cursorCanvas = cursor.GetComponent<Canvas>();
+                if (cursorCanvas != null)
+                {
+                    cursorWasEnabled = cursorCanvas.enabled;
+                    cursorCanvas.enabled = false;
+                }
+            }
             var scaler = gameObject.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(800, 600);
@@ -54,6 +66,9 @@ namespace KillingMahjong.UI
             picture = new GameObject("Picture", typeof(RectTransform)).GetComponent<RectTransform>();
             picture.SetParent(transform, false);
             picture.sizeDelta = new Vector2(800, 600);
+            // 雀卓の手前を回転の支点にする。画像の大きさは変えない。
+            picture.pivot = new Vector2(.5f, .35f);
+            picture.anchoredPosition = new Vector2(0, -90);
             var image = new GameObject("Silhouette", typeof(RectTransform), typeof(RawImage)).GetComponent<RawImage>();
             image.transform.SetParent(picture, false);
             Stretch(image.rectTransform);
@@ -95,9 +110,10 @@ namespace KillingMahjong.UI
             Stage = SequenceStage.Silhouette;
             yield return new WaitForSecondsRealtime(.7f);
             Stage = SequenceStage.EyesOpening;
-            yield return Animate(1.8f, t => {
-                leftEye.sizeDelta = new Vector2(27, 19 * t);
-                rightEye.sizeDelta = new Vector2(24, 20 * t);
+            yield return Animate(.12f, t => {
+                float opening = 1 - (1 - t) * (1 - t);
+                leftEye.sizeDelta = new Vector2(27, 19 * opening);
+                rightEye.sizeDelta = new Vector2(24, 20 * opening);
             });
             Stage = SequenceStage.Laugh;
             // このパスに録音を置けば、間の代わりに笑い声を再生する。
@@ -105,12 +121,16 @@ namespace KillingMahjong.UI
             if (laugh != null) sound.PlayOneShot(laugh);
             yield return new WaitForSecondsRealtime(laugh != null ? laugh.length : 1.6f);
             Stage = SequenceStage.Tilt;
-            yield return Animate(1f, t => {
-                picture.localRotation = Quaternion.Euler(0, 0, -18 * t);
-                picture.localScale = Vector3.one * (1 + .5f * t);
+            yield return Animate(1.1f, t => {
+                // 視点が下に落ちるので、雀卓と女の子は画面上方へ流れる。
+                ApplyFall(t * t);
+                eyelids.Amount = .45f * Mathf.SmoothStep(0, 1, Mathf.Clamp01((t - .3f) / .7f));
             });
             Stage = SequenceStage.EyesClosing;
-            yield return Animate(1.2f, t => eyelids.Amount = t);
+            yield return Animate(.65f, t => {
+                ApplyFall(1 + .3f * t);
+                eyelids.Amount = .45f + .55f * Mathf.SmoothStep(0, 1, t);
+            });
             Stage = SequenceStage.Thud;
             sound.PlayOneShot(thud);
             yield return new WaitForSecondsRealtime(thud.length);
@@ -129,10 +149,16 @@ namespace KillingMahjong.UI
             while (elapsed < duration)
             {
                 elapsed += Time.unscaledDeltaTime;
-                apply(Mathf.SmoothStep(0, 1, Mathf.Clamp01(elapsed / duration)));
+                apply(Mathf.Clamp01(elapsed / duration));
                 yield return null;
             }
             apply(1);
+        }
+
+        private void ApplyFall(float amount)
+        {
+            picture.localRotation = Quaternion.Euler(0, 0, -26 * amount);
+            picture.anchoredPosition = new Vector2(-80 * amount, -90 + 180 * amount);
         }
 
         private static void Stretch(RectTransform rect)
@@ -164,6 +190,7 @@ namespace KillingMahjong.UI
 
         private void OnDestroy()
         {
+            if (cursorCanvas != null) cursorCanvas.enabled = cursorWasEnabled;
             if (thud != null) Destroy(thud);
         }
     }
