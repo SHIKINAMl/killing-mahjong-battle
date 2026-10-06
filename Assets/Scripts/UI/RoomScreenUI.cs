@@ -292,15 +292,6 @@ namespace KillingMahjong.UI
             if (openFace == null) openFace = fallback;
             if (closedFace == null) closedFace = openFace;
 
-            var outline = new GameObject("RoomGirlOutline", typeof(RectTransform));
-            outline.transform.SetParent(content.transform, false);
-            var outlineRect = outline.GetComponent<RectTransform>();
-            ConfigureGirlRect(outlineRect);
-            outlineRect.localScale = Vector3.one * 1.035f;
-            CreateGirlLayer(outline.transform, "RoomGirlOutlineBody", body, new Color(1f, 1f, 1f, 0.90f));
-            Image outlineFace = CreateGirlLayer(outline.transform, "RoomGirlOutlineFace", openFace,
-                new Color(1f, 1f, 1f, 0.90f));
-
             var girl = new GameObject("RoomGirl", typeof(RectTransform));
             girl.transform.SetParent(content.transform, false);
             var girlRect = girl.GetComponent<RectTransform>();
@@ -311,7 +302,7 @@ namespace KillingMahjong.UI
             girlRectForAmbience = girlRect;
 
             var walker = girl.AddComponent<RoomGirlWalker>();
-            walker.Initialize(outlineRect, outlineFace, face, openFace, closedFace,
+            walker.Initialize(face, openFace, closedFace,
                 new Vector2(-200f, -30f), new Vector2(40f, -30f));
         }
 
@@ -559,8 +550,6 @@ namespace KillingMahjong.UI
         public bool IsBlinking { get; private set; }
 
         private RectTransform girl;
-        private RectTransform outline;
-        private Image outlineFace;
         private Image face;
         private Sprite openFace;
         private Sprite closedFace;
@@ -574,12 +563,10 @@ namespace KillingMahjong.UI
         private float nextBlinkAt;
         private bool initialized;
 
-        public void Initialize(RectTransform outlineRect, Image outlineFaceImage, Image faceImage, Sprite openFaceSprite,
+        public void Initialize(Image faceImage, Sprite openFaceSprite,
             Sprite closedFaceSprite, Vector2 min, Vector2 max)
         {
             girl = GetComponent<RectTransform>();
-            outline = outlineRect;
-            outlineFace = outlineFaceImage;
             face = faceImage;
             openFace = openFaceSprite;
             closedFace = closedFaceSprite;
@@ -589,7 +576,7 @@ namespace KillingMahjong.UI
             targetPosition = basePosition;
             idleRemaining = UnityEngine.Random.Range(2.5f, 4.5f);
             nextBlinkAt = Time.unscaledTime + UnityEngine.Random.Range(3.5f, 5.5f);
-            initialized = girl != null && outline != null;
+            initialized = girl != null;
             ApplyVisuals();
         }
 
@@ -634,14 +621,12 @@ namespace KillingMahjong.UI
             {
                 IsBlinking = true;
                 blinkEndsAt = now + 0.12f;
-                if (outlineFace != null) outlineFace.sprite = closedFace;
                 if (face != null) face.sprite = closedFace;
             }
             else if (IsBlinking && now >= blinkEndsAt)
             {
                 IsBlinking = false;
                 nextBlinkAt = now + UnityEngine.Random.Range(4f, 7f);
-                if (outlineFace != null) outlineFace.sprite = openFace;
                 if (face != null) face.sprite = openFace;
             }
         }
@@ -658,8 +643,6 @@ namespace KillingMahjong.UI
 
             girl.anchoredPosition = visualPosition;
             girl.localRotation = Quaternion.Euler(0f, 0f, tilt);
-            outline.anchoredPosition = visualPosition;
-            outline.localRotation = Quaternion.Euler(0f, 0f, tilt);
         }
     }
 }
