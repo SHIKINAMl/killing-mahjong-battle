@@ -20,8 +20,9 @@ namespace KillingMahjong.UI
         private AudioClip thud;
         private Canvas cursorCanvas;
         private bool cursorWasEnabled;
+        private System.Action onPreviewCompleted;
 
-        public static RedDefeatPrototypeUI Play()
+        public static RedDefeatPrototypeUI Play(System.Action onPreviewCompleted = null)
         {
             var existing = FindFirstObjectByType<RedDefeatPrototypeUI>();
             if (existing != null) return existing;
@@ -34,6 +35,7 @@ namespace KillingMahjong.UI
             }
             var root = new GameObject("RedDefeatPrototype", typeof(RectTransform));
             var sequence = root.AddComponent<RedDefeatPrototypeUI>();
+            sequence.onPreviewCompleted = onPreviewCompleted;
             sequence.Build(closed, open);
             sequence.StartCoroutine(sequence.Run());
             return sequence;
@@ -45,7 +47,7 @@ namespace KillingMahjong.UI
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = 30000;
             var cursor = GameObject.Find("UICursorCanvas");
-            if (cursor != null)
+            if (cursor != null && onPreviewCompleted == null)
             {
                 cursorCanvas = cursor.GetComponent<Canvas>();
                 if (cursorCanvas != null)
@@ -140,7 +142,8 @@ namespace KillingMahjong.UI
             CompletedAt = Time.unscaledTime;
             Stage = SequenceStage.Completed;
             Debug.Log($"[RedDefeatPrototypeUI] 終了。着地音の終了から {CompletedAt - ThudFinishedAt:F2} 秒後にタイトルへ戻ります。");
-            SceneManager.LoadScene("タイトルシーン");
+            if (onPreviewCompleted != null) onPreviewCompleted();
+            else SceneManager.LoadScene("タイトルシーン");
         }
 
         private IEnumerator Animate(float duration, System.Action<float> apply)

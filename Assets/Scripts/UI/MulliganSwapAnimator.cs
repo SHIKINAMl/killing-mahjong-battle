@@ -15,13 +15,18 @@ namespace KillingMahjong.UI
     public class MulliganSwapAnimator
     {
         private readonly GameUIManager uiManager;
+        private readonly TileResourceManager resources;
         private readonly PresentationScopeSet presentations = new PresentationScopeSet(Debug.LogException);
         public void CancelPresentation() { presentations.CancelAll(); }
 
         public MulliganSwapAnimator(GameUIManager uiManager)
         {
             this.uiManager = uiManager;
+            resources = uiManager.TileResourceManager;
         }
+
+        /// <summary>演出の試写用。盤面の更新や手牌ソートを実行しない。</summary>
+        public MulliganSwapAnimator(TileResourceManager resources) { this.resources = resources; }
 
         /// <param name="outTileId">交換で出ていく牌のID</param>
         /// <param name="inTileId">交換で入ってくる牌のID</param>
@@ -121,9 +126,9 @@ namespace KillingMahjong.UI
             outRt.localScale = initialScale;
             var outImg = outObj.AddComponent<UnityEngine.UI.Image>();
             var outVis = outObj.AddComponent<TileVisual>();
-            if (uiManager.TileResourceManager != null)
+            if (resources != null)
             {
-                outVis.SetTile(outTileId, uiManager.TileResourceManager.GetTileSprite(outTileId), uiManager.TileResourceManager);
+                outVis.SetTile(outTileId, resources.GetTileSprite(outTileId), resources);
             }
 
             // IN Tile (最初は非表示)
@@ -135,9 +140,9 @@ namespace KillingMahjong.UI
             var inImg = inObj.AddComponent<UnityEngine.UI.Image>();
             inImg.color = new Color(1, 1, 1, 0); // 初期は透明
             var inVis = inObj.AddComponent<TileVisual>();
-            if (uiManager.TileResourceManager != null)
+            if (resources != null)
             {
-                inVis.SetTile(inTileId, uiManager.TileResourceManager.GetTileSprite(inTileId), uiManager.TileResourceManager);
+                inVis.SetTile(inTileId, resources.GetTileSprite(inTileId), resources);
             }
 
             // --- アニメーション開始 ---
@@ -225,9 +230,9 @@ namespace KillingMahjong.UI
 
                 var interaction = originalSlotRt.GetComponent<TileInteraction>();
                 var visual = originalSlotRt.GetComponent<TileVisual>();
-                if (visual != null && uiManager.TileResourceManager != null)
+                if (visual != null && resources != null)
                 {
-                    visual.SetTile(inTileId, uiManager.TileResourceManager.GetTileSprite(inTileId), uiManager.TileResourceManager);
+                    visual.SetTile(inTileId, resources.GetTileSprite(inTileId), resources);
                 }
                 if (interaction != null)
                 {
@@ -241,11 +246,11 @@ namespace KillingMahjong.UI
                 // 「oldId が newId になった」ともう一度判定され、
                 // TileId で検索された**別の同じ牌**が巻き添えで書き換わる。
                 // （状態は1枚しか変わっていないので、次の完全リビルドで戻る＝一時的に絵だけ化ける）
-                uiManager.VisualController?.SyncRebuildCache();
+                uiManager?.VisualController?.SyncRebuildCache();
             }
 
             // スライドアニメーションを実行（VisualControllerで定義）
-            if (uiManager.VisualController != null)
+            if (uiManager != null && uiManager.VisualController != null)
             {
                 yield return uiManager.VisualController.PlayHandSortAnimationRoutine();
             }
@@ -255,7 +260,7 @@ namespace KillingMahjong.UI
             if (baseId == 28 || baseId >= 30)
             {
                 var reactionController = Managers.ReactionController.Instance;
-                if (reactionController != null)
+                if (uiManager != null && reactionController != null)
                 {
                     var tileData = new TileData(inTileId);
                     string tileName = tileData.GetTileName();

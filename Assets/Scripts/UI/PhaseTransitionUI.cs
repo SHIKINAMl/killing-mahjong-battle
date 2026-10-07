@@ -177,10 +177,10 @@ namespace KillingMahjong.UI
 
         private PlayerInfoUI targetPlayerInfoUI;
 
-        public void PlayTransition(string roundName, PlayerInfoUI playerInfoUI, KillingMahjong.EngineData.BettingCompletedInfo bet, Action onMidpoint, Action onComplete)
+        public void PlayTransition(string roundName, PlayerInfoUI playerInfoUI, KillingMahjong.EngineData.BettingCompletedInfo bet, Action onMidpoint, Action onComplete, bool? displayIsLocalTurn = null)
         {
             this.targetPlayerInfoUI = playerInfoUI;
-            StartCoroutine(SequenceRoutine(roundName, bet, onMidpoint, onComplete));
+            StartCoroutine(SequenceRoutine(roundName, bet, onMidpoint, onComplete, displayIsLocalTurn));
         }
 
         public void PlayCenterTextAnim(string text, float duration = 1.5f, Action onComplete = null)

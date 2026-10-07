@@ -79,10 +79,10 @@ namespace KillingMahjong.UI
         /// ノイズの器を作る。すでに作ってあればそれを返す。
         /// 盤面のどの UI にもぶら下げず、専用の Canvas を1枚持つ。
         /// </summary>
-        public static HpDamageGlitch Ensure()
+        public static HpDamageGlitch Ensure(bool preview = false)
         {
             // 器ごと作らない。作ると毎フレーム画面を保存し続けるため
-            if (!EffectEnabled) return null;
+            if (!EffectEnabled && !preview) return null;
             if (_instance != null) return _instance;
 
             var go = new GameObject("HpDamageGlitch", typeof(RectTransform));
@@ -112,6 +112,14 @@ namespace KillingMahjong.UI
             float ratio = (maxHp > 0) ? Mathf.Abs(lostAmount) / (float)maxHp : 1f;
             g._strength = Mathf.Clamp01(ratio / FullStrengthDamageRatio);
             g._remain = Duration;
+        }
+
+        /// <summary>コレクション専用。本編の無効設定は変更しない。</summary>
+        public static HpDamageGlitch PlayPreview()
+        {
+            var g = Ensure(true);
+            g._strength = 1f; g._remain = Duration;
+            return g;
         }
 
         private void Build()

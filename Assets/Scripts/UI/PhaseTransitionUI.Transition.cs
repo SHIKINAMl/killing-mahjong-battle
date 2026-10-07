@@ -13,7 +13,7 @@ namespace KillingMahjong.UI
         /// </summary>
         private const float BattleStartImpactAtFadeRatio = 0.55f;
 
-        private IEnumerator SequenceRoutine(string roundName, KillingMahjong.EngineData.BettingCompletedInfo bet, Action onMidpoint, Action onComplete)
+        private IEnumerator SequenceRoutine(string roundName, KillingMahjong.EngineData.BettingCompletedInfo bet, Action onMidpoint, Action onComplete, bool? displayIsLocalTurn)
         {
             ResetVisuals();
 
@@ -176,7 +176,7 @@ namespace KillingMahjong.UI
 
             if (centerText != null)
             {
-                bool isFirst = KillingMahjong.Managers.BoardStateManager.Instance.IsLocalTurn;
+                bool isFirst = displayIsLocalTurn ?? KillingMahjong.Managers.BoardStateManager.Instance.IsLocalTurn;
                 centerText.text = isFirst ? "先攻" : "後攻";
                 centerText.gameObject.SetActive(true);
             }

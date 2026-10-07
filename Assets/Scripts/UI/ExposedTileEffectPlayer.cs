@@ -60,6 +60,22 @@ namespace KillingMahjong.UI
 
             List<RectTransform> slots = uiManager.EnemyWallUI.GetEnemyWallSlots();
 
+            yield return PlayReveal(scope, slots, newlyExposed, (index, rt) =>
+            {
+                var boardState = Managers.BoardStateManager.Instance;
+                if (boardState != null && index < boardState.OriginalEnemyWallTiles.Count)
+                    visualController.InitializeTileComponent(rt, boardState.OriginalEnemyWallTiles[index], false);
+            });
+
+            if (uiManager.PhaseController != null)
+                uiManager.PhaseController.HandlePhaseVisibility(uiManager.CurrentPhaseStatus);
+        }
+
+        /// <summary>本編とコレクション共通。公開する値は呼び出し元が渡し、ここでは判定しない。</summary>
+        public static IEnumerator PlayReveal(PresentationScope scope, List<RectTransform> slots,
+            List<int> newlyExposed, System.Action<int, RectTransform> reveal)
+        {
+
             // ---- ① 発動 ----
             PerspectiveSkillEffect effect = PerspectiveSkillEffect.Create();
             if (effect != null) scope.AddCleanup(() => { if (effect != null) effect.Dispose(); });
@@ -82,12 +98,7 @@ namespace KillingMahjong.UI
                 RectTransform rt = slots[index];
                 if (rt == null) continue;
 
-                var boardState = Managers.BoardStateManager.Instance;
-                if (boardState != null && index < boardState.OriginalEnemyWallTiles.Count)
-                {
-                    int actualTileId = boardState.OriginalEnemyWallTiles[index];
-                    visualController.InitializeTileComponent(rt, actualTileId, false); // 壁牌なので isHandTile = false
-                }
+                reveal(index, rt);
 
                 var img = rt.GetComponent<UnityEngine.UI.Image>();
                 if (img != null) glowingImages.Add(img);
@@ -113,14 +124,10 @@ namespace KillingMahjong.UI
             // 透視できた牌がどれだったかを、戻ったあとにもう一度見せる
             yield return GlowAppeal(scope, glowingImages);
 
-            if (uiManager.PhaseController != null)
-            {
-                uiManager.PhaseController.HandlePhaseVisibility(uiManager.CurrentPhaseStatus);
-            }
         }
 
         /// <summary>1枚ぶんの拡大ポップ。返った瞬間を目に留まらせる。</summary>
-        private IEnumerator PopTile(PresentationScope scope, RectTransform rt)
+        private static IEnumerator PopTile(PresentationScope scope, RectTransform rt)
         {
             Vector3 origScale = rt.localScale;
             scope.AddCleanup(() => { if (rt != null) rt.localScale = origScale; });
@@ -137,7 +144,7 @@ namespace KillingMahjong.UI
         }
 
         /// <summary>透視できた牌を黄色く明滅させる。</summary>
-        private IEnumerator GlowAppeal(PresentationScope scope, List<UnityEngine.UI.Image> images)
+        private static IEnumerator GlowAppeal(PresentationScope scope, List<UnityEngine.UI.Image> images)
         {
             if (images.Count == 0) yield break;
             foreach (var image in images)

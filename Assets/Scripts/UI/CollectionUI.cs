@@ -8,7 +8,7 @@ using KillingMahjong.Common;
 namespace KillingMahjong.UI
 {
     /// <summary>
-    /// コレクション画面（2026-09-11）。いまは音楽だけ中身がある。
+    /// コレクション画面。音楽・効果音・CG・演出・没案を一覧から確認する。
     ///
     /// **シーンには保存せず、実行時に専用 Canvas として組み立てる。**
     /// RoomScreenUI と同じ作りにしてある。シーンの YAML を触らずに済むので、
@@ -205,6 +205,7 @@ namespace KillingMahjong.UI
 
         public void Close()
         {
+            if (EffectPreviewPlayer.Current != null) EffectPreviewPlayer.Current.Close();
             StopPreview();
 
             // **CGタブの絵はここで手放す。** 抱えたままだと、開くたびに
@@ -249,7 +250,7 @@ namespace KillingMahjong.UI
             edge.rectTransform.anchoredPosition = new Vector2(0f, 276f);
             edge.raycastTarget = false;
 
-            Label(panel.transform, "Heading", "コレクション", new Vector2(-250f, 244f), new Vector2(240f, 34f),
+            Label(panel.transform, "Heading", "コレクション", new Vector2(-200f, 244f), new Vector2(300f, 34f),
                 24f, TextAlignmentOptions.Left, TextMain);
             Button(panel.transform, "Close", "もどる", new Vector2(300f, 244f), new Vector2(110f, 32f), 17f, Close);
 
@@ -279,6 +280,10 @@ namespace KillingMahjong.UI
             Stretch(unusedPage.GetComponent<RectTransform>());
             BuildUnusedPage(unusedPage.transform);
 
+            effectsPage = NewEmpty(panel.transform, "EffectsPage");
+            Stretch(effectsPage.GetComponent<RectTransform>());
+            BuildEffectsPage(effectsPage.transform);
+
             BuildPlayer(panel.transform);
             EnsurePreviewSource();
         }
@@ -288,7 +293,7 @@ namespace KillingMahjong.UI
         private void BuildTabs(Transform parent)
         {
             // **「追加曲」タブは畳んだ**（2026-09-27 の指示で、曲を全部「音楽」へまとめた）。
-            string[] names = { "音楽", "効果音", "CG", "役", "没案" };
+            string[] names = { "音楽", "効果音", "CG", "役", "没案", "演出" };
             for (int i = 0; i < names.Length; i++)
             {
                 int index = i;
@@ -311,6 +316,7 @@ namespace KillingMahjong.UI
             if (cgPage != null) cgPage.SetActive(index == 2);
             if (yakuPage != null) yakuPage.SetActive(index == 3);
             if (unusedPage != null) unusedPage.SetActive(index == 4);
+            if (effectsPage != null) effectsPage.SetActive(index == 5);
 
             // **試聴バーは音のあるタブだけ。** CG や役のタブに「曲を選んでください」が
             // 残っていると、何を選ぶ画面なのか分からなくなる。
@@ -585,7 +591,7 @@ namespace KillingMahjong.UI
 
         private void StopPreview()
         {
-            if (preview != null) { preview.Stop(); preview.time = 0f; }
+            if (preview != null) { preview.Stop(); if (preview.clip != null) preview.time = 0f; }
             if (playLabel != null) playLabel.text = "▶";
         }
 
@@ -598,6 +604,7 @@ namespace KillingMahjong.UI
 
         private void Update()
         {
+            if (EffectPreviewPlayer.IsOpen) return;
             if (root == null || !root.activeSelf || preview == null) return;
 
             if (preview.clip != null)
@@ -614,7 +621,8 @@ namespace KillingMahjong.UI
                 if (!preview.isPlaying && pos <= 0f && playLabel != null) playLabel.text = "▶";
             }
 
-            if (Input.GetKeyDown(KeyCode.Escape)) Close();
+            var keyboard = UnityEngine.InputSystem.Keyboard.current;
+            if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame) Close();
         }
 
         private static string Fmt(float seconds)

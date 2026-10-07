@@ -189,26 +189,7 @@ namespace KillingMahjong.UI
                 slot.anchoredPosition = startPositions[slot];
             }
 
-            float duration = 0.4f;
-            float elapsed = 0f;
-
-            while (elapsed < duration)
-            {
-                elapsed += Time.deltaTime;
-                float t = Mathf.Clamp01(elapsed / duration);
-                t = 1f - Mathf.Pow(1f - t, 3f);
-
-                foreach (var slot in sortedSlots)
-                {
-                    slot.anchoredPosition = Vector2.Lerp(startPositions[slot], targetPositions[slot], t);
-                }
-                yield return null;
-            }
-
-            foreach (var slot in sortedSlots)
-            {
-                slot.anchoredPosition = targetPositions[slot];
-            }
+            yield return AnimatePositions(startPositions, targetPositions);
 
             if (layoutGroup != null)
             {
@@ -219,6 +200,32 @@ namespace KillingMahjong.UI
             uiManager.HandUI.GetHandSlots().AddRange(sortedSlots);
 
             visualController.RebuildAllTilesFromState(null);
+        }
+
+        /// <summary>盤面に依存しない並べ替えの描画。本編とコレクションで共用。</summary>
+        public static IEnumerator AnimatePositions(Dictionary<RectTransform, Vector2> startPositions,
+            Dictionary<RectTransform, Vector2> targetPositions, float duration = 0.4f)
+        {
+            float elapsed = 0f;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+                t = 1f - Mathf.Pow(1f - t, 3f);
+
+                foreach (var slot in targetPositions.Keys)
+                {
+                    slot.anchoredPosition = Vector2.Lerp(startPositions[slot], targetPositions[slot], t);
+                }
+                yield return null;
+            }
+
+            foreach (var slot in targetPositions.Keys)
+            {
+                slot.anchoredPosition = targetPositions[slot];
+            }
+
         }
 
         /// <summary>状態更新（onUpdateState）の前後差分を検出し、移動した牌を視覚的に移動させる</summary>
