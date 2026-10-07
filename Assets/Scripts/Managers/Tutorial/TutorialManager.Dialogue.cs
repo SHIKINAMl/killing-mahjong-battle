@@ -78,12 +78,17 @@ namespace KillingMahjong.Managers
 
         private static string Decorate(TutorialLine line)
         {
+            // **強調はここで掛ける（2026-10-08）。** フロー図で青い太字の語句を、黄色の太字にする。
+            // どの語句かは図から起こした表（Tutorial.TutorialEmphasis）が持っているので、
+            // 台本の文には何も書き足さない。
+            string text = Tutorial.TutorialEmphasis.Apply(line.text);
+
             switch (line.speaker)
             {
                 case TutorialSpeaker.System:
-                    return line.text;
+                    return text;
                 default:
-                    return line.text.Contains("「") ? line.text : $"「{line.text}」";
+                    return text.Contains("「") ? text : $"「{text}」";
             }
         }
 

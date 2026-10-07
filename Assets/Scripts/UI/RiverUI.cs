@@ -435,6 +435,15 @@ namespace KillingMahjong.UI
             }
         }
 
+        /// <summary>
+        /// 打牌数（「後：五打目」）の置き場所。チュートリアルで囲んで見せるのに使う（2026-10-08）。
+        /// この河が打牌数を持っていなければ null。
+        /// </summary>
+        public RectTransform TurnTextRect
+        {
+            get { return turnText != null ? turnText.rectTransform : null; }
+        }
+
         public void UpdateTurnText()
         {
             if (turnText != null)

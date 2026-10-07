@@ -161,7 +161,13 @@ namespace KillingMahjong.UI
             // 挟まる**ので、外すと1手ごとにゲージが点いたり消えたりする。
             bool duringDiscard = status == RoundStatus.Discard
                               || status == RoundStatus.TurnDecision;
-            VoltageUI.SetCanvasVisible(duringDiscard && !uiManager.IsTutorialMode);
+            //
+            // チュートリアルでは、**先輩がボルテージを紹介するまで伏せておく**
+            // （フロー図「初期非表示UI：ボルテージUI」→ 第2局「ボルテージUI表示」）。
+            bool tutorialAllows = !uiManager.IsTutorialMode
+                                  || (uiManager.TutorialManager != null
+                                      && uiManager.TutorialManager.IsVoltageUiRevealed);
+            VoltageUI.SetCanvasVisible(duringDiscard && tutorialAllows);
 
             ReHideTutorialChrome();
         }

@@ -74,9 +74,14 @@ namespace KillingMahjong.Managers
 
         // ここから下はフロー図の続き（2026-09-19 に追加）。
         // 「わかった？…」のあと、手牌を選ばせる直前までの案内。
-        // 使用フォントは Regular のみなので、青太字の指定は黄色 + 1pt で表現する。
-        private const string HighlightOpen = "<color=#FFD700><size=16>";
-        private const string HighlightClose = "</size></color>";
+        //
+        // **強調のタグは、ここでは付けない（2026-10-08）。** 以前は青太字の語句を
+        // 1行ずつ手で囲んでいた（黄色 + 1pt）が、フロー図の青太字は70行あり、
+        // 手で追うと必ず漏れる。いまは図から起こした表（Tutorial.TutorialEmphasis）が
+        // セリフを出すときにまとめて掛ける。この2つは空にしてあり、文は素のまま通る。
+        // 既存の行で使っているので定数は残してある。**新しい行では使わないこと。**
+        private const string HighlightOpen = "";
+        private const string HighlightClose = "";
 
         /// <summary>山牌を見せてから、何をさせるかを言う。**どちらの経路でも共通。**</summary>
         private static readonly List<TutorialLine> ShowWallLines = new List<TutorialLine>

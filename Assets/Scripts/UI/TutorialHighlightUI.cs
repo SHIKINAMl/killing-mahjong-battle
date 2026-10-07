@@ -55,6 +55,12 @@ namespace KillingMahjong.UI
 
         private static TutorialHighlightUI _instance;
 
+        /// <summary>
+        /// 2か所目（2026-10-08）。ボルテージのゲージのように、**離れた2つを同時に示す**ときに使う。
+        /// 1つの枠で両方を囲むと、あいだの盤面まで囲ってしまう。
+        /// </summary>
+        private static TutorialHighlightUI _second;
+
         private RectTransform _area;
         private Image _band;
         private Image[] _edges;
@@ -72,15 +78,30 @@ namespace KillingMahjong.UI
         public static void Show(RectTransform target, Style style, int? sortingOrder = null)
         {
             if (target == null) { HideCurrent(); return; }
+            // 対象を差し替えるときは、前の「2か所目」を残さない
+            if (_second != null) _second.HideInternal();
             if (_instance == null) _instance = Create();
             _instance._canvas.sortingOrder = sortingOrder ?? UISortingOrders.TutorialHighlight;
             _instance.ShowInternal(target, style);
         }
 
-        /// <summary>出ていれば消す。出ていなければ何もしない。</summary>
+        /// <summary>
+        /// 2か所目を示す。先に <see cref="Show"/> で1か所目を出してから呼ぶこと
+        /// （<see cref="Show"/> は2か所目を消すので、順番を逆にすると消える）。
+        /// </summary>
+        public static void ShowSecond(RectTransform target, Style style)
+        {
+            if (target == null) { if (_second != null) _second.HideInternal(); return; }
+            if (_second == null) _second = Create();
+            _second._canvas.sortingOrder = UISortingOrders.TutorialHighlight;
+            _second.ShowInternal(target, style);
+        }
+
+        /// <summary>出ていれば消す（2か所目も）。出ていなければ何もしない。</summary>
         public static void HideCurrent()
         {
             if (_instance != null) _instance.HideInternal();
+            if (_second != null) _second.HideInternal();
         }
 
         private static TutorialHighlightUI Create()

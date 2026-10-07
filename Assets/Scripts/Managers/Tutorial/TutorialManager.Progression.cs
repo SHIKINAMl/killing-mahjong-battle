@@ -93,6 +93,11 @@ namespace KillingMahjong.Managers
             _lastPlayerDiscardBaseId = -1;
             _hasMovedTileThisRound = false;
 
+            // ボルテージのゲージは、第2局の説明で先輩が紹介するまで伏せておく（2026-10-08）。
+            // 第1・2局を始め直したときに、前回見せたままにならないようここで下ろす。
+            // 第3局以降は、紹介が済んでいれば出たままでよい
+            if (IsFirstTutorialRound(data) || IsSecondTutorialRound(data)) IsVoltageUiRevealed = false;
+
             // 前局の透視マークがプールの牌に残らないようにする
             ClearPerspectiveMarks();
 

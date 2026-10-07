@@ -194,6 +194,17 @@ namespace KillingMahjong.UI
             _canvasObject.SetActive(visible);
         }
 
+        /// <summary>
+        /// ゲージの置き場所。チュートリアルで「これがボルテージ」と指すのに使う（2026-10-08）。
+        /// まだ作られていなければ null。
+        /// </summary>
+        public static RectTransform GetGaugeRect(bool isEnemy)
+        {
+            if (_canvasObject == null) return null;
+            var found = _canvasObject.transform.Find(isEnemy ? "VoltageUI_Enemy" : "VoltageUI_Self");
+            return found as RectTransform;
+        }
+
         private static VoltageUI Attach(RectTransform parent, bool isEnemy)
         {
             if (parent == null) return null;

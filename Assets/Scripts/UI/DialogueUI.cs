@@ -110,10 +110,13 @@ namespace KillingMahjong.UI
 
         // セリフの影の設定。対局シーンが2つ（UIテストシーン / OpeningScene）あるので
         // SerializeField にせずコードに持つ。シーンに焼くと片方だけ古い値になる。
-        private const float UnderlayOffsetX = 1f;
-        private const float UnderlayOffsetY = -1f;
-        private const float UnderlayDilate = 0.25f;
-        private const float UnderlaySoftness = 0f;
+        //
+        // **internal にしてある（2026-10-08）。** チュートリアルの強調で使う太字のフォント
+        // （TutorialEmphasis）にも同じ影を付けるため。値を二重に持つと片方だけ変えて食い違う。
+        internal const float UnderlayOffsetX = 1f;
+        internal const float UnderlayOffsetY = -1f;
+        internal const float UnderlayDilate = 0.25f;
+        internal const float UnderlaySoftness = 0f;
 
         private bool shadowApplied = false;
 

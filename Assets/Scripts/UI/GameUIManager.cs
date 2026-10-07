@@ -125,6 +125,8 @@ namespace KillingMahjong.UI
             // 出っぱなしになる。
             //
             // **チュートリアルでは一度も出さない**（2026-09-15 の指示）。
+            // → 2026-10-08 のフロー図で、第2局の説明の途中から出すことになった。
+            //   出すのは TutorialManager（RevealVoltageUi）。ここは作った直後なので伏せたまま。
             bool showVoltageNow = !IsTutorialMode
                                   && (CurrentPhaseStatus == RoundStatus.Discard
                                       || CurrentPhaseStatus == RoundStatus.TurnDecision);
