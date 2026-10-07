@@ -14,7 +14,16 @@ namespace KillingMahjong.UI
             public string Source { get; }
             public Entry(string id, string group, string name, string source)
             { Id = id; Group = group; Name = name; Source = source; }
+
+            /// <summary>没案・旧演出か。コレクションでは「演出」ではなく「没案」タブに並べる。</summary>
+            public bool IsUnused => Group == UnusedGroup;
         }
+
+        /// <summary>
+        /// 没案の分類名。**この分類を付けた演出だけが「没案」タブへ移る**（2026-10-07 のユーザー指示）。
+        /// 没案を増やすときは、下の表でこの分類を付けるだけでよい。
+        /// </summary>
+        public const string UnusedGroup = "没案・旧演出";
 
         private static readonly Entry[] entries = {
             new Entry("skill.perspective", "スキル", "透視：集中 → 3枚公開 → 解除", "ExposedTileEffectPlayer.PlayReveal"),
@@ -86,8 +95,8 @@ namespace KillingMahjong.UI
             new Entry("scene.aurora", "キャラクター・背景", "光のゆらぎ・色の変化", "AuroraLightAnimator"),
             new Entry("ui.button_hover", "画面効果", "ボタンの拡大・押し込み", "UIButtonHoverEffect"),
             new Entry("ui.menu_hover", "画面効果", "メニューの発光・目印", "MenuButtonHover"),
-            new Entry("unused.red_defeat", "没案・旧演出", "赤い目の敗北（本編EDでは未使用）", "RedDefeatPrototypeUI.Play"),
-            new Entry("unused.special_victory", "没案・旧演出", "旧・特殊勝利の能力カットイン", "PhaseTransitionUI.PlaySkillCutinAnimationRoutine")
+            new Entry("unused.red_defeat", UnusedGroup, "赤い目の敗北（本編EDでは未使用）", "RedDefeatPrototypeUI.Play"),
+            new Entry("unused.special_victory", UnusedGroup, "旧・特殊勝利の能力カットイン", "PhaseTransitionUI.PlaySkillCutinAnimationRoutine")
         };
         public static IReadOnlyList<Entry> Entries { get; } = Array.AsReadOnly(entries);
         public static Entry Find(string id)
