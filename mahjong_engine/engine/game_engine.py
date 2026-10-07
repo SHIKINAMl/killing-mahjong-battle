@@ -8,7 +8,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from typing import Callable, Optional
 import random
 
-from .game_state import GameState, RoundStatus, SkillType, PlayerState, get_skill_cost, get_bet_rule
+from .game_state import GameState, RoundStatus, SkillType, PlayerState, get_skill_cost, get_bet_rule, apply_skill_cost_rate
 from .tile_wall import RoundDeal, generate_round_deal
 from .hand_analyzer import HandAnalyzer
 from .yaku import Yaku
@@ -39,6 +39,8 @@ class GameEngine:
         self._pending_agari: Optional[dict] = None
         # 次局の配牌（バックグラウンドで生成中 or 生成済み）
         self._next_deal: Optional[Future] = None
+        # この局の配牌時に特典で公開した牌（initial_perspective_count を持つプレイヤーの分）
+        self._initial_perspective_reveals: list[dict] = []
         # 対局が終わった理由（game_end の victory_method になる）
         self.game_end_reason: Optional[str] = None
 
@@ -148,6 +150,7 @@ class GameEngine:
 
         self.state.round_state.dora_id = deal.dora_id
         self._pending_agari = None
+        self._apply_initial_perspectives()
 
         # 局中に次局の配牌を用意しておき、局開始時にすぐ配れるようにする
         self.prepare_next_deal()
@@ -155,6 +158,26 @@ class GameEngine:
         self._invoke_callback(self.on_dealt)
 
         self._set_phase(RoundStatus.HAND_SELECTION)
+
+    def _apply_initial_perspectives(self) -> None:
+        """配牌時に、特典を持つプレイヤーへ相手の牌を無料で公開する。"""
+        self._initial_perspective_reveals = []
+        for player in self.state.players:
+            if player.initial_perspective_count <= 0:
+                continue
+            target = next((p for p in self.state.players if p.player_id != player.player_id), None)
+            if target is None:
+                continue
+            exposed = self._expose_random_tiles(target, player.initial_perspective_count)
+            self._initial_perspective_reveals.append({
+                "player_id": player.player_id,
+                "target_id": target.player_id,
+                "exposed_indexes": exposed,
+            })
+
+    def get_initial_perspective_reveals(self) -> list[dict]:
+        """この局の配牌時に特典で公開した牌を返す。"""
+        return [dict(reveal) for reveal in self._initial_perspective_reveals]
 
     def selected_hand(self) -> None:
         """手牌の選択フェーズを完了"""
@@ -364,7 +387,7 @@ class GameEngine:
         """
         # HP コスト計算
         try:
-            cost = get_skill_cost(skill_type, user.special_victory_count)
+            cost = self.get_skill_cost(user, skill_type)
         except KeyError:
             logger.error("スキルコスト取得失敗: skill_type=%s", skill_type)
             return None
@@ -394,6 +417,11 @@ class GameEngine:
 
         return cost
 
+    def get_skill_cost(self, player: PlayerState, skill_type: SkillType) -> int:
+        """プレイヤーの特典（スキルコストの倍率）を反映したスキルコストを返す。"""
+        base_cost = get_skill_cost(skill_type, player.special_victory_count)
+        return apply_skill_cost_rate(base_cost, player.skill_cost_rate)
+
     def _validate_skill_cast(self, user: PlayerState, skill_type: SkillType, target: PlayerState | None, options: dict) -> bool:
         """
         スキル発動の前提条件をチェック
@@ -402,12 +430,16 @@ class GameEngine:
             エラーがあれば True、正常ならば False
         """
         if skill_type == SkillType.BOOST_HAND:
-            if "yaku_name" not in options or not options["yaku_name"]:
+            # 1回で強化できる役の数は boost_hand_targets まで（同じ役を重ねて指定してもよい）
+            yaku_names = options.get("yaku_names")
+            if yaku_names is None:
+                yaku_names = [options.get("yaku_name")]
+            if not isinstance(yaku_names, list) or not 1 <= len(yaku_names) <= user.boost_hand_targets:
                 return True
-            normalized_yaku_name = self.normalize_boost_target_yaku_name(options["yaku_name"])
-            if normalized_yaku_name is None:
+            normalized_names = [self.normalize_boost_target_yaku_name(name) for name in yaku_names]
+            if any(name is None for name in normalized_names):
                 return True
-            options["yaku_name"] = normalized_yaku_name
+            options["yaku_names"] = normalized_names
 
         elif skill_type == SkillType.MULLIGAN:
             target_index = options.get("target_hand_index")
@@ -447,20 +479,13 @@ class GameEngine:
                 self._invoke_callback(self.on_special_victory_won, user.player_id)
 
         elif skill_type == SkillType.BOOST_HAND:
-            yaku_name = options["yaku_name"]
-            user.boost_hand_bonus[yaku_name] = user.boost_hand_bonus.get(yaku_name, 0) + 1
+            for yaku_name in options["yaku_names"]:
+                user.boost_hand_bonus[yaku_name] = user.boost_hand_bonus.get(yaku_name, 0) + 1
 
         elif skill_type == SkillType.PERSPECTIVE:
             # 使用者の牌は公開しない。相手（target）の山牌全体から未公開の index を公開する
             if target is not None and target.player_id != user.player_id and target.wall:
-                unrevealed_indexes = [
-                    idx for idx in range(len(target.wall))
-                    if idx not in target.exposed_hand_indexes
-                ]
-                if unrevealed_indexes:
-                    exposed = random.sample(unrevealed_indexes, min(3, len(unrevealed_indexes)))
-                    target.exposed_hand_indexes.update(exposed)
-                exposed_tiles[target.player_id] = set(target.exposed_hand_indexes)
+                exposed_tiles[target.player_id] = set(self._expose_random_tiles(target, 3))
 
         elif skill_type == SkillType.MULLIGAN:
             target_index = options["target_hand_index"]
@@ -484,19 +509,42 @@ class GameEngine:
 
         return exposed_tiles
 
-    def use_skill(self, player: PlayerState, skill_type: SkillType, yaku_name: str | None = None) -> Optional[int]:
+    def _expose_random_tiles(self, target: PlayerState, count: int) -> list[int]:
+        """
+        相手の山から未公開の牌を count 枚ランダムに公開する。
+
+        Returns:
+            公開済みを含む、相手の全公開 index（昇順）
+        """
+        unrevealed_indexes = [
+            idx for idx in range(len(target.wall))
+            if idx not in target.exposed_hand_indexes
+        ]
+        if unrevealed_indexes:
+            exposed = random.sample(unrevealed_indexes, min(count, len(unrevealed_indexes)))
+            target.exposed_hand_indexes.update(exposed)
+        return sorted(target.exposed_hand_indexes)
+
+    def use_skill(
+        self,
+        player: PlayerState,
+        skill_type: SkillType,
+        yaku_name: str | None = None,
+        yaku_names: list[str] | None = None,
+    ) -> Optional[int]:
         """
         プレイヤーがスキルを使用する（自分を対象とするスキル）
 
         Args:
             player: 使用プレイヤー
             skill_type: スキル種別（BOOST_HAND, SPECIAL_VICTORY など）
-            yaku_name: BOOST_HAND 使用時に必須。翻を上げる対象役名
+            yaku_name: BOOST_HAND 使用時に、翻を上げる対象役名
+            yaku_names: BOOST_HAND で複数の役を同時に上げるときの対象役名（boost_hand_targets 件まで）
 
         Returns:
             実際に支払ったHP コスト。失敗時は None
         """
-        return self.cast_skill(player, skill_type, yaku_name=yaku_name)
+        return self.cast_skill(player, skill_type, yaku_name=yaku_name, yaku_names=yaku_names)
 
     def use_skill_on_opponent(self, user: PlayerState, opponent: PlayerState, skill_type: SkillType) -> Optional[int]:
         """
@@ -907,6 +955,10 @@ class GameEngine:
                 special_victory_count=p.special_victory_count,
                 boost_hand_bonus=p.boost_hand_bonus.copy(),
                 exposed_hand_indexes=set(),  # 局が変わるたびにリセット（手牌が変わるため古い indexes は無効）
+                skill_cost_rate=p.skill_cost_rate,
+                boost_hand_targets=p.boost_hand_targets,
+                opening_boost_count=p.opening_boost_count,
+                initial_perspective_count=p.initial_perspective_count,
             )
             for p in self.state.players
         ]
