@@ -50,7 +50,12 @@ namespace KillingMahjong.UI.Effects
         /// 元の盤面が暗いので、重ねたのがほとんど見えなくなっていた）。
         /// 青へ寄せるのは <see cref="TintBlue"/> が撮った絵そのものに対して行う。
         /// </summary>
-        private static readonly Color GhostTint = new Color(1f, 1f, 1f, 0.56f);
+        private static readonly Color GhostTint = new Color(1f, 1f, 1f, 0.62f);
+
+        // 撮った画面を青へ寄せる式の係数。意味は <see cref="TintBlue"/> に書いた
+        private const float TintMulR = 0.10f, TintAddR = 16f;
+        private const float TintMulG = 0.14f, TintAddG = 32f;
+        private const float TintMulB = 0.22f, TintAddB = 96f;
 
         /// <summary>
         /// 青を抜く楕円の何倍の所で、青が乗りきるか。
@@ -109,11 +114,11 @@ namespace KillingMahjong.UI.Effects
             // 描き終わっていない画面が返る。重ねが真っ黒になって原因が見えにくい
             yield return new WaitForEndOfFrame();
 
-            _shot = ScreenCapture.CaptureScreenshotAsTexture();
-            if (_shot != null)
+            Texture2D captured = ScreenCapture.CaptureScreenshotAsTexture();
+            if (captured != null)
             {
-                _shot.wrapMode = TextureWrapMode.Clamp;
-                TintBlue(_shot);
+                _shot = TintBlue(captured);
+                Destroy(captured);
             }
 
             Build(focusScreenRect);
@@ -243,15 +248,27 @@ namespace KillingMahjong.UI.Effects
         /// 色数が増えすぎない混ぜ方のほうが元の形が残る。混ぜたあと少し暗くして、
         /// 主画面より後ろに見えるようにする。
         ///
-        /// 提案の絵を作ったときと同じ式（青 (54,126,255) へ 0.78 寄せて、
-        /// (190,200,225) を掛ける）を 1 本にまとめたもの:
+        /// **寄せる先は水色ではなく、濃い青（2026-10-07 のユーザー指摘「もっと青く」）。**
+        /// 前の式（r' = 0.164r + 31 ／ g' = 0.173g + 77 ／ b' = 0.194b + 175）は
+        /// 緑が多くて水色に寄り、上から掛ける黒と合わさって灰色がかって見えていた。
+        /// 提案の絵の周りを測ると、集中線を除いて (33, 50, 105) あたり。
+        /// 青に対して赤が 0.3、緑が 0.5 ほどしか無い。それに合わせたのが今の式:
         ///
-        ///     r' = 0.164r + 31 ／ g' = 0.173g + 77 ／ b' = 0.194b + 175
+        ///     r' = TintMulR·r + TintAddR （緑・青も同じ形）
+        ///
+        /// **青くした絵は、新しく作ったテクスチャに入れて返す（2026-10-07）。**
+        /// `CaptureScreenshotAsTexture` が返すテクスチャにそのまま書き戻すと、
+        /// このプロジェクト（リニア色空間）では中身が「リニアの値」として読まれ、
+        /// 画面に出るときにもう一度明るく持ち上げられる。式で (29, 48, 112) を
+        /// 狙っても実機では (93, 108, 164) の白っぽい水色になっていた。
+        /// 「青が薄い」の本当の原因はこれだった。sRGB として作ったテクスチャなら、
+        /// 入れた色がそのまま画面に出る。
         ///
         /// 1920x1080 で約 200 万画素ぶん回す。カットインの直後に1回だけなので
         /// ここで止まっても対局の操作には掛からないが、**毎フレームやらないこと。**
         /// </summary>
-        private static void TintBlue(Texture2D tex)
+        /// <returns>青くした絵。読めなかったときは null（重ねを出さずに演出は続ける）。</returns>
+        private static Texture2D TintBlue(Texture2D tex)
         {
             Color32[] pixels;
             try
@@ -260,22 +277,25 @@ namespace KillingMahjong.UI.Effects
             }
             catch (UnityException e)
             {
-                // 読めない形式で返ってきたときは、青くできないだけで演出は続ける
                 Debug.LogWarning("[Perspective] 撮った画面を読めませんでした: " + e.Message);
-                return;
+                return null;
             }
 
             for (int i = 0; i < pixels.Length; i++)
             {
                 Color32 c = pixels[i];
-                c.r = (byte)(c.r * 0.164f + 31f);
-                c.g = (byte)(c.g * 0.173f + 77f);
-                c.b = (byte)(c.b * 0.194f + 175f);
+                c.r = (byte)(c.r * TintMulR + TintAddR);
+                c.g = (byte)(c.g * TintMulG + TintAddG);
+                c.b = (byte)(c.b * TintMulB + TintAddB);
                 pixels[i] = c;
             }
 
-            tex.SetPixels32(pixels);
-            tex.Apply(false, false);
+            // 最後の引数 linear: false が「sRGB として扱う」の指定
+            var tinted = new Texture2D(tex.width, tex.height, TextureFormat.RGBA32, false, false);
+            tinted.wrapMode = TextureWrapMode.Clamp;
+            tinted.SetPixels32(pixels);
+            tinted.Apply(false, true);
+            return tinted;
         }
 
         private void Build(Rect focusScreenRect)
@@ -313,10 +333,15 @@ namespace KillingMahjong.UI.Effects
             // **丸ではなく楕円で抜く（2026-10-03）。** 丸だと左右が先に青くなって
             // 上下が残り、「画面の周りが青い」に見えなかった（ユーザー指摘）。
             // 縦をきつめに取ると、上下の帯もちゃんと青くなる
+            //
+            // **横も欲張らない（2026-10-07）。** 横半径を広く取っていたときは、
+            // 青が乗りきる所が画面の外に出てしまい、左右の端が薄いままだった
             Vector2 holeCenter = Vector2.Lerp(Vector2.zero, wallCenter, 0.45f);
-            Vector2 ghostHole = new Vector2(minSide * 0.42f + wallExtent.x * 0.55f,
-                                            minSide * 0.30f);
-            BuildGhosts(w, h, holeCenter, ghostHole);
+            //
+            // 縦は少しだけ広げた。青が濃くなったぶん、手牌の下の段の端が
+            // 読めなくなっていたため（提案の絵でも手牌は青の外にある）
+            Vector2 ghostHole = new Vector2(minSide * 0.30f + wallExtent.x * 0.55f,
+                                            minSide * 0.34f);
 
             // 山牌のまわりだけ残して暗く落とす。横に長く縦に薄いので横長の楕円で抜く。
             //
@@ -330,6 +355,11 @@ namespace KillingMahjong.UI.Effects
             _darken.RadiusY = wallExtent.y + h * 0.10f;
             _darken.MaxAlpha = 0.72f;
             _darken.Strength = 0f;
+
+            // **青い重ねは、暗落としの上に乗せる（2026-10-07）。**
+            // 逆だと青の上から黒が掛かって、青が濁って灰色に見える。
+            // 青の濃さは <see cref="TintBlue"/> の式だけで決まるようにしておく
+            BuildGhosts(w, h, holeCenter, ghostHole);
 
             // 集中線。**空ける穴は山牌に沿った横長の楕円にする。**
             // 丸で空けると、横に長い山牌の上下だけ線が遠くなって締まらない。
