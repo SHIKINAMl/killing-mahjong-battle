@@ -103,6 +103,36 @@ namespace KillingMahjong.UI
             rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0f);
             rect.sizeDelta = new Vector2(400f, 48f);
             shortcut.GetComponentInChildren<TMP_Text>().fontSize = 20f;
+
+            // 開発用の入口（2026-10-07 のユーザー指示）。コレクションの「演出」タブ＝
+            // 演出だけを試写できる画面へ、部屋を経由せずに行けるようにする。
+            // 来場者向けの導線ではないので、右下の隅に小さく、目立たない色で置く。
+            var debug = SessionPrompt.CreateButton(titleClickTarget.transform,
+                "デバッグ部屋", new Vector2(-70f, 22f), OpenDebugRoom);
+            var debugRect = debug.GetComponent<RectTransform>();
+            debugRect.anchorMin = debugRect.anchorMax = new Vector2(1f, 0f);
+            debugRect.sizeDelta = new Vector2(124f, 28f);
+            debug.GetComponent<Image>().color = new Color32(30, 18, 26, 170);
+            var debugLabel = debug.GetComponentInChildren<TMP_Text>();
+            debugLabel.rectTransform.sizeDelta = debugRect.sizeDelta;
+            debugLabel.fontSize = 14f;
+            debugLabel.color = new Color32(200, 188, 196, 255);
+        }
+
+        /// <summary>
+        /// タイトルから「デバッグ部屋」（コレクションの演出タブ）を開く。
+        ///
+        /// **開いている間は、タイトルの「どこでも押せば開始」を止める。**
+        /// 止めないと、試写を閉じた瞬間のクリックでチュートリアルが始まってしまう。
+        /// </summary>
+        private void OpenDebugRoom()
+        {
+            if (isStartingTutorial) return;
+            if (titleClickTarget != null) titleClickTarget.SetActive(false);
+            OpenCollection(CollectionUI.EffectsTab, () =>
+            {
+                if (titleClickTarget != null && !isStartingTutorial) titleClickTarget.SetActive(true);
+            });
         }
 
         private void OpenPreservedRoom()
@@ -130,7 +160,9 @@ namespace KillingMahjong.UI
         /// **開いている間は部屋の絵を畳む。** 畳まないと、全画面モーダルの下で
         /// 部屋のメニューが押せてしまう（設定パネルを開くときと同じ扱い）。
         /// </summary>
-        private void OpenCollection()
+        private void OpenCollection() { OpenCollection(0, null); }
+
+        private void OpenCollection(int startTab, System.Action afterClose)
         {
             if (collection == null)
             {
@@ -146,7 +178,9 @@ namespace KillingMahjong.UI
                 // コレクションは閉じるときにタイトル曲を流すので、部屋にいるなら部屋の曲へ戻す
                 var audio = KillingMahjong.Managers.AudioManager.Instance;
                 if (audio != null && roomScreen != null && roomScreen.IsOpen) audio.PlayRoomBgm();
-            });
+
+                if (afterClose != null) afterClose();
+            }, startTab);
         }
 
         private GameObject truthNameHook;
