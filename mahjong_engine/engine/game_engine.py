@@ -39,6 +39,8 @@ class GameEngine:
         self._pending_agari: Optional[dict] = None
         # 次局の配牌（バックグラウンドで生成中 or 生成済み）
         self._next_deal: Optional[Future] = None
+        # 対局が終わった理由（game_end の victory_method になる）
+        self.game_end_reason: Optional[str] = None
 
         # 各種コールバック
         # 準備フェーズ
@@ -162,7 +164,7 @@ class GameEngine:
             # 流局後は同じ掛け金を維持し、ベットフェーズをスキップ
             if not self._can_all_players_cover_carry_over_bet():
                 logger.warning("持ち越し掛け金を支払えないプレイヤーがいるためゲーム終了")
-                self._on_game_end()
+                self._on_game_end("bet_unpayable")
                 return
             self.bet()
             return
@@ -170,7 +172,7 @@ class GameEngine:
         # 通常局は最低掛け金を支払えるかチェック
         if not self._can_all_players_cover_min_bet():
             logger.warning("最低掛け金を支払えないプレイヤーがいるためゲーム終了")
-            self._on_game_end()
+            self._on_game_end("bet_unpayable")
             return
 
         self._set_phase(RoundStatus.BETTING)
@@ -180,7 +182,7 @@ class GameEngine:
         dead_players = [player.player_id for player in self.state.players if player.health < 0]
         if dead_players:
             logger.info("ベット確定時のHPマイナスによるゲーム終了: players=%s", dead_players)
-            self._on_game_end()
+            self._on_game_end("hp_zero")
             return
 
         self._invoke_callback(self.on_bet)
@@ -576,6 +578,7 @@ class GameEngine:
             winning_player is not None
             and discarded_tile_base in winning_waits
             and discarded_tile_base not in winning_discard_bases
+            and self.can_agari(winning_player, discarding_player, discarded_tile)
         ):
             logger.info(
                 "和了入力待ち: discarder=%s winner=%s tile=%d tile_base=%d",
@@ -766,6 +769,44 @@ class GameEngine:
 
         return context_yaku
 
+    def _calc_agari_han(
+        self,
+        winner: PlayerState,
+        loser: PlayerState,
+        hand: list[int],
+        winning_tile: Optional[int],
+    ) -> tuple[list[str], int, int, dict[str, int]]:
+        """
+        和了したときの役と翻数を数える（状況役・役強化を含む）。
+
+        Returns:
+            (役のリスト, 素の翻数, 役強化による翻数, 役強化の辞書)
+        """
+        base_yaku_list = HandAnalyzer.enum_yaku(hand, winning_tile=winning_tile)
+        base_yaku_list += self._get_win_context_yaku(winner, loser, winning_tile, base_yaku_list)
+
+        # 満貫判定にはスキルによる翻上昇分も含める
+        boost_bonus_map = self._effective_boost_bonus_map(winner)
+        base_han = sum(Yaku.get_han_by_name(name) for name in base_yaku_list)
+        bonus_han = sum(boost_bonus_map.get(name, 0) for name in base_yaku_list)
+        return base_yaku_list, base_han, bonus_han, boost_bonus_map
+
+    def can_agari(self, winner: PlayerState, loser: PlayerState, winning_tile: int) -> bool:
+        """
+        その牌でロンしたら満貫以上で精算されるか。
+
+        満貫未満の手は和了れない。打牌の時点でこれを確かめ、和了れない牌ではロン確認を出さない。
+        数え方は liquidation と同じ（状況役の一発・河底撈魚、役強化を含む）。
+        """
+        try:
+            hand = [winner.wall[idx] for idx in winner.hand] + [winning_tile]
+        except (IndexError, TypeError):
+            return False
+        if not HandAnalyzer.is_win(hand):
+            return False
+        _, base_han, bonus_han, _ = self._calc_agari_han(winner, loser, hand, winning_tile)
+        return base_han + bonus_han >= 4
+
     def liquidation(self, player_id: str, hand: list[int], winning_tile: Optional[int] = None) -> bool:
         """
         清算処理
@@ -785,13 +826,7 @@ class GameEngine:
             return False
 
         is_win = HandAnalyzer.is_win(hand)
-        base_yaku_list = HandAnalyzer.enum_yaku(hand, winning_tile=winning_tile)
-        base_yaku_list += self._get_win_context_yaku(winner, loser, winning_tile, base_yaku_list)
-
-        # 満貫判定にはスキルによる翻上昇分も含める
-        boost_bonus_map = self._effective_boost_bonus_map(winner)
-        base_han = sum(Yaku.get_han_by_name(name) for name in base_yaku_list)
-        bonus_han = sum(boost_bonus_map.get(name, 0) for name in base_yaku_list)
+        base_yaku_list, base_han, bonus_han, boost_bonus_map = self._calc_agari_han(winner, loser, hand, winning_tile)
         han = base_han + bonus_han
         is_mangan = han >= 4
         if not is_win or not is_mangan:
@@ -822,7 +857,9 @@ class GameEngine:
         # 敗者: 単騎待ち和了時のみ支払いを倍化（勝者獲得量は据え置き）
         loser_loss_multiplier = 2 if is_tanki_wait else 1
         loser_loss = int(loser_effective_bet * multiplier * loser_loss_multiplier) + assault_bonus_damage
-        loser.health = max(0, loser.health - loser_loss)
+        # 残りの HP を超える損失は、マイナスのまま記録する（どれだけ超えたかを見せるため）。
+        # 0 以下になれば end_round でその場でゲーム終了になる
+        loser.health = loser.health - loser_loss
 
         self._last_liquidation_result = {
             "winner_id": winner.player_id,
@@ -909,15 +946,16 @@ class GameEngine:
         if self.state.round_state.round_number >= self.max_rounds:
             logger.info("最大ラウンド到達によるゲーム終了: round=%d", self.state.round_state.round_number)
             self._invoke_callback(self.on_round_end, is_draw)
-            self._on_game_end()
+            self._on_game_end("max_rounds")
             return
 
-        # 精算後に HP がマイナスのプレイヤーがいればゲーム終了
-        if any(p.health < 0 for p in self.state.players):
-            dead = [p.player_id for p in self.state.players if p.health < 0]
-            logger.info("HPマイナスによるゲーム終了: players=%s", dead)
+        # 精算後に HP が 0 以下のプレイヤーがいれば、その場でゲーム終了。
+        # 流局では HP は減らない（全額を賭けて 0 になった場合は、下の「次局の掛け金を払えない」で終わる）
+        if not is_draw and any(p.health <= 0 for p in self.state.players):
+            dead = [p.player_id for p in self.state.players if p.health <= 0]
+            logger.info("HP 0 によるゲーム終了: players=%s", dead)
             self._invoke_callback(self.on_round_end, is_draw)
-            self._on_game_end()
+            self._on_game_end("hp_zero")
             return
 
         # 勝利時の獲得累計点数が 30000 に到達したらゲーム終了
@@ -929,7 +967,19 @@ class GameEngine:
                 point_winner.cumulative_earned_points,
             )
             self._invoke_callback(self.on_round_end, is_draw)
-            self._on_game_end()
+            self._on_game_end("cumulative_earned_points")
+            return
+
+        # 次の局の掛け金（流局後は持ち越しの掛け金、それ以外は最低掛け金）を払えなければ、その場でゲーム終了。
+        # 次の局を始めてから手牌選択の後に気づくのでは遅い
+        unpayable = [
+            p.player_id for p in self.state.players
+            if p.health < (p.bet if is_draw else self.get_minimum_bet(p))
+        ]
+        if unpayable:
+            logger.info("次局の掛け金を払えないためゲーム終了: players=%s is_draw=%s", unpayable, is_draw)
+            self._invoke_callback(self.on_round_end, is_draw)
+            self._on_game_end("bet_unpayable")
             return
 
         if is_draw:
@@ -942,8 +992,15 @@ class GameEngine:
         self._set_phase(RoundStatus.ROUND_END_WAITING)
         self._invoke_callback(self.on_round_end, is_draw)
 
-    def _on_game_end(self) -> None:
-        """ゲーム終了時の処理"""
+    def _on_game_end(self, reason: str = "unknown") -> None:
+        """
+        ゲーム終了時の処理
+
+        Args:
+            reason: 終わった理由（"hp_zero" / "cumulative_earned_points" / "bet_unpayable" / "max_rounds"）
+        """
+        if self.game_end_reason is None:
+            self.game_end_reason = reason
         self._invoke_callback(self.on_game_end)
 
     def _set_phase(self, new_status: RoundStatus) -> None:
