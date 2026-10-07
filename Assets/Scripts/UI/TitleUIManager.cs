@@ -9,6 +9,7 @@ namespace KillingMahjong.UI
     public class TitleUIManager : MonoBehaviour
     {
         private const string TutorialSceneName = "OpeningScene";
+        private const string RoomSceneName = "部屋シーン";
         private const string TutorialReturnToRoomKey = TutorialNavigation.ReturnKey;
 
         [Header("遷移先のシーン名")]
@@ -50,7 +51,7 @@ namespace KillingMahjong.UI
                 PlayerPrefs.DeleteKey(TutorialReturnToRoomKey);
                 PlayerPrefs.Save();
                 if (tutorialReturn == 2)
-                    SceneManager.LoadScene("部屋シーン");
+                    SceneManager.LoadScene(RoomSceneName);
                 else
                     OpenMatchMenu();
             }
@@ -104,8 +105,9 @@ namespace KillingMahjong.UI
             rect.sizeDelta = new Vector2(400f, 48f);
             shortcut.GetComponentInChildren<TMP_Text>().fontSize = 20f;
 
-            // 開発用の入口（2026-10-07 のユーザー指示）。コレクションの「演出」タブ＝
-            // 演出だけを試写できる画面へ、部屋を経由せずに行けるようにする。
+            // 開発用の入口（2026-10-07 のユーザー指示）。部屋シーンへ直接行く。
+            // 展示用タイトルはチュートリアルか対局メニューにしか進めず、部屋
+            // （コレクションや演出の試写がある）へ行く道が無かった。
             // 来場者向けの導線ではないので、右下の隅に小さく、目立たない色で置く。
             var debug = SessionPrompt.CreateButton(titleClickTarget.transform,
                 "デバッグ部屋", new Vector2(-70f, 22f), OpenDebugRoom);
@@ -120,19 +122,16 @@ namespace KillingMahjong.UI
         }
 
         /// <summary>
-        /// タイトルから「デバッグ部屋」（コレクションの演出タブ）を開く。
+        /// タイトルから「デバッグ部屋」＝部屋シーンへ移る。
         ///
-        /// **開いている間は、タイトルの「どこでも押せば開始」を止める。**
-        /// 止めないと、試写を閉じた瞬間のクリックでチュートリアルが始まってしまう。
+        /// **押したらタイトルの「どこでも押せば開始」を止める。**
+        /// 止めないと、暗転している間のクリックでチュートリアルも始まってしまう。
         /// </summary>
         private void OpenDebugRoom()
         {
             if (isStartingTutorial) return;
             if (titleClickTarget != null) titleClickTarget.SetActive(false);
-            OpenCollection(CollectionUI.EffectsTab, () =>
-            {
-                if (titleClickTarget != null && !isStartingTutorial) titleClickTarget.SetActive(true);
-            });
+            StartScene(RoomSceneName);
         }
 
         private void OpenPreservedRoom()
@@ -160,9 +159,7 @@ namespace KillingMahjong.UI
         /// **開いている間は部屋の絵を畳む。** 畳まないと、全画面モーダルの下で
         /// 部屋のメニューが押せてしまう（設定パネルを開くときと同じ扱い）。
         /// </summary>
-        private void OpenCollection() { OpenCollection(0, null); }
-
-        private void OpenCollection(int startTab, System.Action afterClose)
+        private void OpenCollection()
         {
             if (collection == null)
             {
@@ -178,9 +175,7 @@ namespace KillingMahjong.UI
                 // コレクションは閉じるときにタイトル曲を流すので、部屋にいるなら部屋の曲へ戻す
                 var audio = KillingMahjong.Managers.AudioManager.Instance;
                 if (audio != null && roomScreen != null && roomScreen.IsOpen) audio.PlayRoomBgm();
-
-                if (afterClose != null) afterClose();
-            }, startTab);
+            });
         }
 
         private GameObject truthNameHook;

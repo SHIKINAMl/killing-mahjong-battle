@@ -190,19 +190,16 @@ namespace KillingMahjong.UI
         public bool IsOpen { get { return root != null && root.activeSelf; } }
 
         /// <summary>「演出」タブの番号。<see cref="BuildTabs"/> の並びと揃えること。</summary>
-        public const int EffectsTab = 4;
+        private const int EffectsTab = 4;
 
-        public void Open(Action closed) { Open(closed, 0); }
-
-        /// <param name="startTab">最初に開くタブ。タイトルの「デバッグ部屋」は演出タブから開く。</param>
-        public void Open(Action closed, int startTab)
+        public void Open(Action closed)
         {
             onClosed = closed;
             if (root == null) Build();
             if (root == null) return;
 
             root.SetActive(true);
-            ShowTab(startTab);
+            ShowTab(0);
 
             // 試聴の邪魔になるので、開いている間はゲーム側のBGMを止める
             var audio = KillingMahjong.Managers.AudioManager.Instance;
