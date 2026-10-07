@@ -76,6 +76,7 @@ namespace KillingMahjong.UI
             Stretch(image.rectTransform);
             image.texture = closed;
             image.raycastTarget = false;
+            Effects.PixelToneUI.Attach(image);
             leftEye = Eye(open, new Rect(359, 391, 27, 19), "LeftEye");
             rightEye = Eye(open, new Rect(405, 395, 24, 20), "RightEye");
             eyelids = new GameObject("Eyelids", typeof(RectTransform)).AddComponent<EyelidClosureGraphic>();
@@ -103,6 +104,7 @@ namespace KillingMahjong.UI
             image.texture = texture;
             image.uvRect = new Rect(pixels.x / 800, pixels.y / 600, pixels.width / 800, pixels.height / 600);
             image.raycastTarget = false;
+            Effects.PixelToneUI.Attach(image);
             return mask;
         }
 

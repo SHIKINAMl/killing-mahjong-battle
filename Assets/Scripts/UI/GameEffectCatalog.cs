@@ -40,6 +40,7 @@ namespace KillingMahjong.UI
             new Entry("ending.special_win", "勝敗・ED", "点数勝利（現在は共通EDの仮内容）", "EndingSequenceUI.Show"),
             new Entry("ending.special_lose", "勝敗・ED", "点数敗北：共通ED", "EndingSequenceUI.Show"),
             new Entry("screen.flash", "画面効果", "白フラッシュ", "ScreenFlash.Play"),
+            new Entry("screen.pixel_tone", "画面効果", "細かなドット・ディザ", "PixelToneUI.Attach"),
             new Entry("screen.scene_break", "画面効果", "場面の切れ目：白飛ばし", "ScreenFlash.PlaySceneBreak"),
             new Entry("screen.quake", "画面効果", "画面の揺れ", "ScreenQuake.Play"),
             new Entry("screen.tint", "画面効果", "赤い色かぶり", "ScreenTint.Set / Clear"),

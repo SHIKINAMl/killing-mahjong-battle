@@ -54,6 +54,13 @@ namespace KillingMahjong.UI
                     }
                     break;
                 case "screen.flash": ScreenFlash.Play(); break;
+                case "screen.pixel_tone":
+                    var pixelImage = new GameObject("PixelToneSample", typeof(RectTransform), typeof(RawImage)).GetComponent<RawImage>();
+                    pixelImage.transform.SetParent(rig.surface, false);
+                    pixelImage.rectTransform.sizeDelta = new Vector2(640, 480);
+                    pixelImage.texture = Resources.Load<Texture2D>("UnusedEndings/RedDefeat/closed");
+                    pixelImage.raycastTarget = false;
+                    PixelToneUI.Attach(pixelImage); break;
                 case "screen.scene_break": ScreenFlash.PlaySceneBreak(); break;
                 case "screen.quake": ScreenQuake.Play(12f, 1f); break;
                 case "screen.tint": ScreenTint.Set(Color.red, .45f); yield return new WaitForSeconds(2f); ScreenTint.Clear(); break;
