@@ -47,6 +47,7 @@ namespace KillingMahjong.UI
 
         /// <summary>確認中に二重で送らないための印。</summary>
         private bool _isCheckingRoom;
+        private bool _hasDecided;
 
         private Action<MatchJoinMode> _onDecided;
         private Action _onClosed;
@@ -58,6 +59,7 @@ namespace KillingMahjong.UI
         public void Open(Action<MatchJoinMode> onDecided, Action onClosed = null)
         {
             _onDecided = onDecided;
+            _hasDecided = false;
             _onClosed = onClosed;
 
             if (_root == null) Build();
@@ -123,21 +125,21 @@ namespace KillingMahjong.UI
 
         private void OnPublicSelected()
         {
-            if (_isCheckingRoom) return;
+            if (_isCheckingRoom || _hasDecided) return;
             MatchJoinRequest.RequestPublic();
             Decide(MatchJoinMode.Public);
         }
 
         private void OnPrivateCreateSelected()
         {
-            if (_isCheckingRoom) return;
+            if (_isCheckingRoom || _hasDecided) return;
             MatchJoinRequest.RequestPrivateCreate();
             Decide(MatchJoinMode.PrivateCreate);
         }
 
         private void OnPasswordSubmit()
         {
-            if (_isCheckingRoom) return;
+            if (_isCheckingRoom || _hasDecided) return;
 
             string input = _passwordInput != null ? _passwordInput.text : "";
 
@@ -295,6 +297,8 @@ namespace KillingMahjong.UI
 
         private void Decide(MatchJoinMode mode)
         {
+            if (_hasDecided) return;
+            _hasDecided = true;
             Close();
             _onDecided?.Invoke(mode);
         }

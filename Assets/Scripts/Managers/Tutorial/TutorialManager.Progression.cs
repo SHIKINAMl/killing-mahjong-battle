@@ -38,6 +38,8 @@ namespace KillingMahjong.Managers
             // ScreenTint は DontDestroyOnLoad で生き残るため、抜かないとタイトルが灰色のままになる。
             Tutorial.TutorialAudioDirector.ResetVisuals();
 
+            if (_aborted) yield break;
+            TutorialNavigation.Complete();
             SceneManager.LoadScene(_scenario.titleSceneName);
         }
 

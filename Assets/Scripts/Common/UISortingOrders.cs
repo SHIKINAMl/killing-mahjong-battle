@@ -127,6 +127,9 @@ namespace KillingMahjong.Common
         /// <summary>LoadingManager: ローディング画面</summary>
         public const int LoadingScreen = 30;
 
+        /// <summary>接続失敗・離席予告。チュートリアルやEDの入力より手前。</summary>
+        public const int SessionPrompt = 31000;
+
         // ---- 40 - 49 ロンの猶予演出（暗幕） ----
 
         /// <summary>

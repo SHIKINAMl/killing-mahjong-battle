@@ -9,6 +9,9 @@ namespace KillingMahjong.UI
     {
         private GameUIManager uiManager;
         private bool isEventsRegistered = false;
+        private bool receivedInitialResponse;
+        private bool connectionFailed;
+        private const float InitialResponseTimeout = 30f;
 
         public void Setup(GameUIManager manager)
         {
@@ -50,6 +53,24 @@ namespace KillingMahjong.UI
         {
             // Setup()が呼ばれなかった場合のフェイルセーフとしてここでも呼ぶ
             RegisterEvents();
+            if (uiManager != null && !uiManager.IsTutorialMode &&
+                (NetworkMessageHandler.Instance == null || !NetworkMessageHandler.Instance.UseDebugClient))
+                StartCoroutine(WatchInitialConnection());
+        }
+
+        private System.Collections.IEnumerator WatchInitialConnection()
+        {
+            float deadline = Time.realtimeSinceStartup + InitialResponseTimeout;
+            while (!receivedInitialResponse && Time.realtimeSinceStartup < deadline) yield return null;
+            if (receivedInitialResponse) yield break;
+            connectionFailed = true;
+            LoadingManager.Instance?.ForceHide();
+            SessionPrompt prompt = null;
+            prompt = SessionPrompt.Show("サーバーから応答がありません。\n通信環境を確認し、タイトルからやり直してください。",
+                "タイトルへ戻る", () => prompt.ReturnToTitle());
+            // 遅れて成立した対局を、このエラー画面の裏で開始させない。
+            var client = WebSocketGameClientSample.Instance;
+            if (client != null) _ = client.ResetConnectionAsync();
         }
 
         private void OnDestroy()
@@ -82,6 +103,8 @@ namespace KillingMahjong.UI
 
         private void HandleGameStarted()
         {
+            if (connectionFailed) return;
+            receivedInitialResponse = true;
             Debug.Log("[GameUINetworkHandler] HandleGameStarted called.");
             KillingMahjong.UI.LoadingManager.Instance.ForceHide();
             uiManager.PhaseController?.OnGameStarted();
@@ -89,6 +112,8 @@ namespace KillingMahjong.UI
 
         private void HandleMatchmakingWaiting(KillingMahjong.EngineData.MatchingWaitingData data)
         {
+            if (connectionFailed) return;
+            receivedInitialResponse = true;
             Debug.Log("[GameUINetworkHandler] HandleMatchmakingWaiting called.");
 
             // 暗転を明けさせつつ、マッチング待機画面を出す

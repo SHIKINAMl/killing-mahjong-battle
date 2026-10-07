@@ -206,9 +206,9 @@ namespace KillingMahjong.Managers
                 PlayerPrefs.Save();
             }
 
-            // 局を指定して呼ばれたときは、そのまま始める。
+            // 途中の局を指定して呼ばれたときは、そのまま始める（0 は最初からの説明を通す）。
             // コレクションやデバッグから途中の局へ飛ぶ入口なので、問いかけは邪魔になる。
-            if (requestedRound >= 0)
+            if (requestedRound > 0)
             {
                 StartTutorialFrom(requestedRound);
                 return;
@@ -273,6 +273,7 @@ namespace KillingMahjong.Managers
         /// <summary>チュートリアルを打ち切ってタイトルへ戻す（スキップボタン用）。</summary>
         public void SkipTutorial()
         {
+            KillingMahjong.UI.TutorialNavigation.Cancel();
             _aborted = true;
 
             if (_scenarioRoutine != null) { StopCoroutine(_scenarioRoutine); _scenarioRoutine = null; }

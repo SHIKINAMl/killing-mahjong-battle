@@ -9,7 +9,7 @@ namespace KillingMahjong.UI
     public class TitleUIManager : MonoBehaviour
     {
         private const string TutorialSceneName = "OpeningScene";
-        private const string TutorialReturnToRoomKey = "Title_ReturnToRoom";
+        private const string TutorialReturnToRoomKey = TutorialNavigation.ReturnKey;
 
         [Header("遷移先のシーン名")]
         [SerializeField] private string nextSceneName = "UIテストシーン"; // 実際のメインゲームのシーン名に合わせてください
@@ -41,6 +41,7 @@ namespace KillingMahjong.UI
             }
 
             BuildTitleClickTarget();
+            ExhibitionIdleReturn.EnableSession();
 
             // 既存の帰還キーを一度だけ消費し、チュートリアル後は対局メニューへ進む。
             int tutorialReturn = PlayerPrefs.GetInt(TutorialReturnToRoomKey, 0);
@@ -94,6 +95,14 @@ namespace KillingMahjong.UI
             button.targetGraphic = image;
             button.transition = Selectable.Transition.None;
             button.onClick.AddListener(OnClickStartButton);
+
+            // 繰り返し遊ぶ来場者は、練習を通さず対局メニューを開ける。
+            var shortcut = SessionPrompt.CreateButton(titleClickTarget.transform,
+                "ルールを知っている方：対局へ", new Vector2(0f, 40f), OpenMatchMenu);
+            var rect = shortcut.GetComponent<RectTransform>();
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0f);
+            rect.sizeDelta = new Vector2(400f, 48f);
+            shortcut.GetComponentInChildren<TMP_Text>().fontSize = 20f;
         }
 
         private void OpenPreservedRoom()
@@ -221,9 +230,8 @@ namespace KillingMahjong.UI
         {
             // OpeningScene は冒頭演出の後に StartTutorial() を呼ぶ。
             // シーンをまたいで「最初から／続きから」の選択を渡すための一回限りの要求。
+            TutorialNavigation.Begin(startInPreservedRoom ? 2 : 1);
             TutorialManager.RequestStartFrom(roundIndex);
-            PlayerPrefs.SetInt(TutorialReturnToRoomKey, startInPreservedRoom ? 2 : 1);
-            PlayerPrefs.Save();
 
             if (roomScreen != null) roomScreen.SetContentVisible(false);
             StartScene(TutorialSceneName);
@@ -363,6 +371,8 @@ namespace KillingMahjong.UI
 
         private void StartScene(string sceneName)
         {
+            if (isLoadingScene) return;
+            isLoadingScene = true;
             if (KillingMahjong.UI.LoadingManager.Instance != null)
             {
                 KillingMahjong.UI.LoadingManager.Instance.FadeOutScreen(() => 
@@ -375,6 +385,8 @@ namespace KillingMahjong.UI
                 StartCoroutine(LoadSceneAsyncCoroutine(sceneName));
             }
         }
+
+        private bool isLoadingScene;
 
         private System.Collections.IEnumerator LoadSceneAsyncCoroutine(string sceneName)
         {
