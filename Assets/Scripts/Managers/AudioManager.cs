@@ -151,9 +151,15 @@ namespace KillingMahjong.Managers
             // 曲の差し替え中は音量を一瞬 0 まで落としている最中なので触らない。
             // ここで上書きすると、その 50ms のあいだに設定を変えられたとき
             // 落としたはずの音量が戻ってプツッと鳴る。差し替えが終われば向こうが戻す。
-            if (bgmSource != null && !IsSwappingPhaseBgm) bgmSource.volume = bgmVolume * masterVolume;
-            ApplyLayerVolumes();
-            ApplyPairVolumes();
+            //
+            // 第3案へ移るために既存案の音を下げている最中（0.25 秒）も同じ理由で触らない。
+            if (!_p3FadingLegacy)
+            {
+                if (bgmSource != null && !IsSwappingPhaseBgm) bgmSource.volume = bgmVolume * masterVolume;
+                ApplyLayerVolumes();
+                ApplyPairVolumes();
+            }
+            ApplyProposal3Volumes();
             if (seSource != null) seSource.volume = seVolume * masterVolume;
             if (voiceSource != null) voiceSource.volume = voiceVolume * masterVolume;
             if (discardSeSource != null) discardSeSource.volume = seVolume * masterVolume;

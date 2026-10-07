@@ -85,6 +85,8 @@ namespace KillingMahjong.Managers
             // 対局からタイトルへ戻っても対局の曲が鳴り続けていた
             StopLayeredBgm();
             StopPairBgm();   // 採用した2曲も別の音源で鳴っているので、同じ理由でここで止める
+            StopProposal3(); // 第3案も別の音源。待っている切り替えごと止める
+            if (_matchBgmSet >= 0 && !UseProposal3Bgm) _legacySoundingKind = _matchBgmSet;
             if (drumSource != null && drumSource.isPlaying) drumSource.Stop();
 
             // 止めたあと同じフェイズで呼び直されても鳴らし直せるようにしておく。

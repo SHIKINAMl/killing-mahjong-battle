@@ -81,12 +81,22 @@ namespace KillingMahjong.Managers
         /// </summary>
         public void ApplyMatchBgmSet(int kind)
         {
+            bool wantP3 = kind == (int)Core.SettingsManager.MatchBgmSetKind.Proposal3;
             bool wantPair = kind == (int)Core.SettingsManager.MatchBgmSetKind.Pair;
-            // **層なしを選んだときだけ層を切る。** 層を鳴らしたままだと
+            // **層を使うのは「新2曲」と「従来（層あり）」だけ。** 層を鳴らしたままだと
             // bgm_field_1〜4 は一度も鳴らない（層のステムが先に使われるため）。
-            bool wantLayers = kind != (int)Core.SettingsManager.MatchBgmSetKind.PerPhaseNoLayers;
+            // 第3案はフルミックスだけを鳴らすので、2曲方式も層も使わない。
+            bool wantLayers = kind == (int)Core.SettingsManager.MatchBgmSetKind.Pair
+                              || kind == (int)Core.SettingsManager.MatchBgmSetKind.PerPhase;
 
-            if (wantPair == UsePairBgm && wantLayers == UseBgmLayers) return;
+            // 初めて呼ばれたときは、いまの旗から案の番号を起こす
+            if (_matchBgmSet < 0) _matchBgmSet = MatchBgmKindFromLegacyFlags();
+            if (_legacySoundingKind < 0) _legacySoundingKind = _matchBgmSet;
+
+            // **案の番号も見て判定する（2026-10-08）。** 鳴らし方の旗だけで比べると、
+            // 旗の組み合わせが同じ別の案へ替えたときに「変わっていない」と読んでしまう。
+            if (kind == _matchBgmSet && wantP3 == UseProposal3Bgm
+                && wantPair == UsePairBgm && wantLayers == UseBgmLayers) return;
 
             // **いま鳴っていないなら、鳴らし始めてはいけない。**
             // この処理は設定を変えたときだけでなく、起動時の当て直しからも呼ばれる。
@@ -94,11 +104,35 @@ namespace KillingMahjong.Managers
             // 保存された選択が既定と違うだけで、そこで場のBGMが鳴り出していた
             // （2026-09-26 に実機で確認。PlayerPrefs に 1 が残っていて層が 4/4 で鳴った）。
             // 旗だけ差し替えて、音は次に誰かがフェイズを指定したときに任せる。
-            bool wasPlaying = IsPairBgmRunning || AreLayersRunning
+            bool wasPlaying = IsPairBgmRunning || AreLayersRunning || IsProposal3Running
                               || (bgmSource != null && bgmSource.isPlaying);
 
+            // 行きか帰りのどちらかが第3案か。途中で取り消された切り替えが残っている場合も含む
+            bool proposal3Involved = wantP3 || Proposal3Owns;
+
+            _matchBgmSet = kind;
+            UseProposal3Bgm = wantP3;
             UsePairBgm = wantPair;
             UseBgmLayers = wantLayers;
+
+            if (!wasPlaying)
+            {
+                // 旗だけ差し替える。音は次に誰かがフェイズを指定したときに任せる
+                if (!wantP3) _legacySoundingKind = kind;
+                return;
+            }
+
+            // **第3案が絡む切り替えは監督に任せる（AudioManager.Proposal3.cs）。**
+            // テンポが違う相手なので、ここで畳んで鳴らし直すと切れ目が聞こえる。
+            // 監督は、いまの曲の小節頭まで待ってから重ねて入れ替える。
+            // 続けて選び直されたときに最後の選択だけを鳴らすのも監督の仕事。
+            if (proposal3Involved)
+            {
+                NotifyProposal3();
+                return;
+            }
+
+            _legacySoundingKind = kind;
 
             // いま鳴らしているもののうち、行き先で使わないものを先に畳む。
             // 畳まずに鳴らし直すと、前の鳴らし方が残ったまま上に重なる。
@@ -120,7 +154,7 @@ namespace KillingMahjong.Managers
             //
             // そもそも `wasPlaying` が真なら音は鳴っている＝無音にしておく時間は
             // もう終わっている。旗を見る意味がない。
-            if (wasPlaying && CanPlay && UsePhaseBgm) ApplyPhaseBgm();
+            if (wasPlaying && CanPlay && UsePhaseBgm) ApplyLegacyPhaseBgm();
         }
 
         /// <summary>

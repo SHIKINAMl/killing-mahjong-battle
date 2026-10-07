@@ -111,6 +111,27 @@ namespace KillingMahjong.Managers
             { "field_melody",     new Tempo(118f, 4) },
             { "field_drums",      new Tempo(118f, 4) },
             { "field_sparkle",    new Tempo(118f, 4) },
+
+            // **第3案（2026-10-08）。** 既存の曲とは別の `p3_` 名で引く。全曲4拍子。
+            // 値は受け取った音源一式の一覧表（manifest）のもの。
+            // 濃度1〜4 と betting / draw / win などは同テンポ・同尺で、
+            // それが「再生位置を保ったまま入れ替えられる」条件（AudioManager.Proposal3.cs）。
+            { "p3_bgm_field_1",      new Tempo(124f, 4) },
+            { "p3_bgm_field_2",      new Tempo(124f, 4) },
+            { "p3_bgm_field_3",      new Tempo(124f, 4) },
+            { "p3_bgm_field_4",      new Tempo(124f, 4) },
+            { "p3_bgm_phase_normal", new Tempo(124f, 4) },
+            { "p3_bgm_phase_turn",   new Tempo(124f, 4) },
+            { "p3_bgm_betting",      new Tempo(124f, 4) },
+            { "p3_bgm_discard",      new Tempo(124f, 4) },
+            { "p3_bgm_ron",          new Tempo(124f, 4) },
+            { "p3_bgm_draw",         new Tempo(124f, 4) },
+            { "p3_bgm_win",          new Tempo(124f, 4) },
+            { "p3_bgm_prepare",      new Tempo(105f, 4) },
+            { "p3_bgm_result",       new Tempo(105f, 4) },
+            { "p3_bgm_tension",      new Tempo(132f, 4) },
+            { "p3_bgm_discard_hot",  new Tempo(132f, 4) },
+            { "p3_bgm_lose",         new Tempo(92f,  4) },
         };
 
         /// <summary>拍の情報が無い曲のときの既定。すぐ切り替える方に倒す。</summary>
@@ -160,6 +181,7 @@ namespace KillingMahjong.Managers
             if (!CanPlay) return;
             if (!UsePhaseBgm) return;
 
+            if (status != RoundStatus.Result) _resultBgmOverride = null;
             currentBgmPhase = status;
             ApplyPhaseBgm();
         }
@@ -190,6 +212,23 @@ namespace KillingMahjong.Managers
         /// 古い行き先へ切り替わらないようにするため。
         /// </summary>
         private void ApplyPhaseBgm()
+        {
+            // **第3案が絡むあいだは、監督（AudioManager.Proposal3.cs）に任せる（2026-10-08）。**
+            // 第3案を選んでいるときだけでなく、第3案から既存案へ戻る途中もここで止める。
+            // 下へ流すと、第3案が鳴っている上に既存案が重なって二重に鳴る。
+            if (Proposal3Owns)
+            {
+                NotifyProposal3();
+                return;
+            }
+            ApplyLegacyPhaseBgm();
+        }
+
+        /// <summary>
+        /// 既存案（2曲方式・層・1本もの）でいまのフェイズの曲を当てる。
+        /// 第3案の監督が既存案へ戻すときにも、ここを直接呼ぶ。
+        /// </summary>
+        private void ApplyLegacyPhaseBgm()
         {
             // **採用した2曲が担当するフェイズは、こちらより先に2曲方式へ渡す（2026-09-26）。**
             // 2曲は最初から同時に鳴っていて、フェイズが変わっても止めない。
@@ -337,6 +376,7 @@ namespace KillingMahjong.Managers
 
             currentBgmPhase = status;
             currentPhaseBgmName = null;   // 同じ曲でも鳴らし直せるようにする
+            _resultBgmOverride = null;
             ApplyPhaseBgm();
         }
 
@@ -379,6 +419,10 @@ namespace KillingMahjong.Managers
 
             var clip = GetPhaseBgmClip(name);
             if (clip == null) { PlayBGM(defaultBgm); return; }
+
+            // 対局の外の曲を鳴らすので、第3案が鳴っていたら畳む（待っている切り替えも消す）
+            StopProposal3();
+
             if (bgmSource.isPlaying && bgmSource.clip == clip) return;
 
             currentPhaseBgmName = name;
@@ -430,10 +474,26 @@ namespace KillingMahjong.Managers
             if (!CanPlay) return;
             if (!UsePhaseBgm) return;
 
-            var clip = GetPhaseBgmClip(isLocalWin ? "bgm_win" : "bgm_lose");
+            // 第3案へ切り替えたときも同じ場面の曲を選べるよう、勝敗を覚えておく
+            _resultBgmOverride = isLocalWin ? "bgm_win" : "bgm_lose";
+
+            if (Proposal3Owns)
+            {
+                NotifyProposal3();
+                return;
+            }
+            ApplyLegacyResultBgm();
+        }
+
+        /// <summary>既存案で、結果画面の曲を勝敗の曲へ替える。</summary>
+        private void ApplyLegacyResultBgm()
+        {
+            if (_resultBgmOverride == null) return;
+
+            var clip = GetPhaseBgmClip(_resultBgmOverride);
             if (clip == null) return;
 
-            currentPhaseBgmName = isLocalWin ? "bgm_win" : "bgm_lose";
+            currentPhaseBgmName = _resultBgmOverride;
             if (bgmSwapCoroutine != null) StopCoroutine(bgmSwapCoroutine);
             bgmSwapCoroutine = StartCoroutine(SwapBgmAtNextBar(clip));
         }
@@ -466,6 +526,8 @@ namespace KillingMahjong.Managers
             if (bgmSwapCoroutine != null) { StopCoroutine(bgmSwapCoroutine); bgmSwapCoroutine = null; }
             currentPhaseBgmName = name;
 
+            StopProposal3();   // チュートリアルは第3案を使わない。鳴っていたら畳む
+
             bgmSource.clip = clip;
             bgmSource.loop = true;
             bgmSource.timeSamples = 0;
@@ -486,6 +548,7 @@ namespace KillingMahjong.Managers
             if (bgmSource != null) bgmSource.Stop();
             StopLayeredBgm();             // 層で鳴っていたらそれも断つ
             StopPairBgm();                // 採用した2曲で鳴っていたらそれも断つ
+            StopProposal3();              // 第3案で鳴っていたらそれも断つ
             currentPhaseBgmName = null;   // 同じ曲を鳴らし直せるようにしておく
         }
 
@@ -493,6 +556,7 @@ namespace KillingMahjong.Managers
         private void ResetPhaseBgmState()
         {
             currentPhaseBgmName = null;
+            _resultBgmOverride = null;
             if (bgmSwapCoroutine != null) { StopCoroutine(bgmSwapCoroutine); bgmSwapCoroutine = null; }
         }
     }
