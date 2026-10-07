@@ -20,6 +20,8 @@ namespace KillingMahjong.UI
         private Scene sourceScene, previewScene;
         private EffectPreviewRig rig;
         private bool loop, closing;
+        // 試写を開いた時点でBGMが鳴っていたか。鳴っていなければ、演出が鳴らし始めた曲は試写の持ち物。
+        private bool bgmWasPlayingAtOpen;
         private readonly List<Behaviour> hidden = new List<Behaviour>();
         private readonly List<Renderer> hiddenRenderers = new List<Renderer>();
         private Action closed;
@@ -37,6 +39,9 @@ namespace KillingMahjong.UI
             Current = player;
             player.EffectId = id; player.loop = repeat; player.closed = onClosed;
             player.sourceScene = SceneManager.GetActiveScene();
+            var audio = KillingMahjong.Managers.AudioManager.Instance;
+            player.bgmWasPlayingAtOpen = audio != null && (audio.IsBgmPlaying || audio.IsPairBgmRunning
+                || audio.AreLayersRunning || audio.IsProposal3Running);
             player.HideOriginal();
             player.previewScene = SceneManager.CreateScene("EffectPreview");
             SceneManager.SetActiveScene(player.previewScene);
@@ -63,6 +68,7 @@ namespace KillingMahjong.UI
                 State = "preparing";
                 // 前の再生で変えたHP・牌・立ち絵も、保存済みの舞台から取り直す。
                 CleanupPresentation();
+                StopPreviewMusic();
                 foreach (var root in previewScene.GetRootGameObjects()) Destroy(root);
                 yield return null;
                 var prefab = Resources.Load<GameObject>("Presentation/EffectPreviewRig");
@@ -113,10 +119,20 @@ namespace KillingMahjong.UI
             ScreenQuake.Stop(); ScreenTint.Clear(0f);
         }
 
+        // 清算やロンは本編と同じ処理で勝敗の曲を鳴らし始める（SetResultBgm）。舞台は捨てても
+        // 曲は AudioManager 側で鳴り続けるので、試写を抜けるときと再生し直すときにここで止める。
+        // 再生が終わった直後には止めない（「再生終了」の画面で曲の余韻が切れるのを避ける）。
+        private void StopPreviewMusic()
+        {
+            var audio = KillingMahjong.Managers.AudioManager.Instance;
+            if (audio == null || bgmWasPlayingAtOpen) return;
+            audio.StopBGM();
+        }
+
         public void Close()
         {
             if (closing) return;
-            closing = true; StopAllCoroutines(); CleanupPresentation();
+            closing = true; StopAllCoroutines(); CleanupPresentation(); StopPreviewMusic();
             if (sourceScene.IsValid() && sourceScene.isLoaded) SceneManager.SetActiveScene(sourceScene);
             if (previewScene.IsValid() && previewScene.isLoaded) SceneManager.UnloadSceneAsync(previewScene);
             foreach (var item in hidden) if (item != null) item.enabled = true;
