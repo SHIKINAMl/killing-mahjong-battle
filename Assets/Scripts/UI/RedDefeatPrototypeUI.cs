@@ -28,7 +28,8 @@ namespace KillingMahjong.UI
             if (existing != null) return existing;
             var closed = Resources.Load<Texture2D>("UnusedEndings/RedDefeat/closed");
             var open = Resources.Load<Texture2D>("UnusedEndings/RedDefeat/open");
-            if (closed == null || open == null)
+            var background = Resources.Load<Texture2D>("UnusedEndings/RedDefeat/background");
+            if (closed == null || open == null || background == null)
             {
                 Debug.LogError("[RedDefeatPrototypeUI] 没案の画像がありません。");
                 return null;
@@ -36,12 +37,12 @@ namespace KillingMahjong.UI
             var root = new GameObject("RedDefeatPrototype", typeof(RectTransform));
             var sequence = root.AddComponent<RedDefeatPrototypeUI>();
             sequence.onPreviewCompleted = onPreviewCompleted;
-            sequence.Build(closed, open);
+            sequence.Build(closed, open, background);
             sequence.StartCoroutine(sequence.Run());
             return sequence;
         }
 
-        private void Build(Texture2D closed, Texture2D open)
+        private void Build(Texture2D closed, Texture2D open, Texture2D background)
         {
             var canvas = gameObject.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
@@ -71,12 +72,18 @@ namespace KillingMahjong.UI
             // 雀卓の手前を回転の支点にする。画像の大きさは変えない。
             picture.pivot = new Vector2(.5f, .35f);
             picture.anchoredPosition = new Vector2(0, -90);
+            // 提供されたドット背景は再加工せず描画。人物・雀卓とは別レイヤーにする。
+            var backdrop = new GameObject("Background", typeof(RectTransform), typeof(RawImage)).GetComponent<RawImage>();
+            backdrop.transform.SetParent(picture, false);
+            Stretch(backdrop.rectTransform);
+            backdrop.texture = background;
+            backdrop.raycastTarget = false;
             var image = new GameObject("Silhouette", typeof(RectTransform), typeof(RawImage)).GetComponent<RawImage>();
             image.transform.SetParent(picture, false);
             Stretch(image.rectTransform);
             image.texture = closed;
             image.raycastTarget = false;
-            Effects.PixelToneUI.Attach(image);
+            Effects.PixelToneUI.Attach(image, silhouetteOnly: true);
             leftEye = Eye(open, new Rect(359, 391, 27, 19), "LeftEye");
             rightEye = Eye(open, new Rect(405, 395, 24, 20), "RightEye");
             eyelids = new GameObject("Eyelids", typeof(RectTransform)).AddComponent<EyelidClosureGraphic>();

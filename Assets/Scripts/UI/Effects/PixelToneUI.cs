@@ -10,7 +10,7 @@ namespace KillingMahjong.UI.Effects
         private RawImage image;
         private Material original, owned;
 
-        public static PixelToneUI Attach(RawImage target, float pixelSize = 2f, float colorSteps = 8f)
+        public static PixelToneUI Attach(RawImage target, float pixelSize = 2f, float colorSteps = 8f, bool silhouetteOnly = false)
         {
             var effect = target.GetComponent<PixelToneUI>();
             if (effect == null) effect = target.gameObject.AddComponent<PixelToneUI>();
@@ -18,6 +18,7 @@ namespace KillingMahjong.UI.Effects
             {
                 effect.owned.SetFloat("_PixelSize", Mathf.Clamp(pixelSize, 1f, 8f));
                 effect.owned.SetFloat("_ColorSteps", Mathf.Clamp(colorSteps, 2f, 32f));
+                effect.owned.SetFloat("_SilhouetteOnly", silhouetteOnly ? 1f : 0f);
             }
             return effect;
         }

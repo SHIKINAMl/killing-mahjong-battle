@@ -6,6 +6,7 @@ Shader "UI/KillingMahjong/PixelTone"
         _Color ("Tint", Color) = (1,1,1,1)
         _PixelSize ("Source pixels per dot", Range(1,8)) = 2
         _ColorSteps ("Color steps", Range(2,32)) = 8
+        _SilhouetteOnly ("Keep only black silhouette", Float) = 0
         _StencilComp ("Stencil Comparison", Float) = 8
         _Stencil ("Stencil ID", Float) = 0
         _StencilOp ("Stencil Operation", Float) = 0
@@ -59,7 +60,7 @@ Shader "UI/KillingMahjong/PixelTone"
             sampler2D _MainTex;
             float4 _MainTex_TexelSize, _ClipRect;
             fixed4 _Color;
-            float _PixelSize, _ColorSteps;
+            float _PixelSize, _ColorSteps, _SilhouetteOnly;
 
             v2f vert(appdata input)
             {
@@ -87,6 +88,9 @@ Shader "UI/KillingMahjong/PixelTone"
                 float tone = saturate(floor(value * _ColorSteps + threshold) / _ColorSteps);
                 // RGBを別々に丸めると黄色い点が出るため、元の色相を維持する。
                 c.rgb *= tone / max(value, .00001);
+                // 元絵の黒い人物・卓だけを残し、別レイヤーの背景へ重ねられる。
+                if (_SilhouetteOnly > .5)
+                    c = fixed4(0, 0, 0, c.a * (1 - step(.02, value)));
                 c *= input.color;
                 #ifdef UNITY_UI_CLIP_RECT
                 c.a *= UnityGet2DClipping(input.localPosition.xy, _ClipRect);
