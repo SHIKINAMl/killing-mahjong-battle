@@ -9,7 +9,7 @@ namespace KillingMahjong.UI
 {
     /// <summary>
     /// コレクション画面。音楽・効果音・CG・役・没案・演出を一覧から確認する。
-    /// 没案と演出は同じ一覧表（<see cref="GameEffectCatalog"/>）から、分類で振り分けている。
+    /// 没案と演出は同じ一覧表（<see cref="GameEffectCatalog"/>）から、没案の印で振り分けている。
     ///
     /// **シーンには保存せず、実行時に専用 Canvas として組み立てる。**
     /// RoomScreenUI と同じ作りにしてある。シーンの YAML を触らずに済むので、
