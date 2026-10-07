@@ -366,7 +366,13 @@ namespace KillingMahjong.Managers
             if (!IsFirstTutorialRound(data))
                 yield return StartCoroutine(PlayLines(data.onBattleStartLines));
 
-            yield return StartCoroutine(RunBattle(data));
+            // 第2局は**敵が先に打つ**うえ、5打目の手前でボルテージの説明が入る
+            // （2026-10-06 のフロー図改訂・4枚目「対局フェイズ②」）。
+            // 打つ順番が逆なので、RunBattle に分岐を足さず専用の運びへ渡す。
+            if (UsesSecondRoundBattle(data))
+                yield return StartCoroutine(RunSecondRoundBattle(data));
+            else
+                yield return StartCoroutine(RunBattle(data));
 
             // 流局なら賭け金は場に残したまま次局へ持ち越す
             _prevRoundWasDraw = data.outcome == TutorialOutcome.Draw;
@@ -1069,6 +1075,10 @@ namespace KillingMahjong.Managers
             var interaction = slots[0] != null ? slots[0].GetComponent<TileInteraction>() : null;
             int tileId = interaction != null ? interaction.TileId : -1;
             if (tileId < 0) yield break;
+
+            // どの牌種を捨てたかを残す。第2局は「まだ川に出ていない牌」を
+            // 敵に打たせるので、自動で捨てたぶんも数えに入れる必要がある
+            _lastAutoDiscardBaseId = TutorialTiles.BaseOf(tileId);
 
             RectTransform tileRt = wall.GrabTileById(tileId);
             if (tileRt != null) river.AddExistingTile(tileRt, tileId);

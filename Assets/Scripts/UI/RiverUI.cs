@@ -52,6 +52,71 @@ namespace KillingMahjong.UI
             }
         }
 
+        private RectTransform _tilesBoundsProxy;
+
+        /// <summary>
+        /// いま置いてある牌ぜんぶを囲む矩形（2026-10-07）。
+        /// **チュートリアルで「河をハイライト」するときの的に使う。**
+        ///
+        /// 河の入れ物（riverContainer）そのものは的にできない。牌は自前の座標で
+        /// 並べていて、入れ物の矩形は牌の並びと大きさが合っていないので、
+        /// そこを囲むと何も無い所に枠が出る。実際に置いてある牌の四隅から測る。
+        ///
+        /// 返すのは**この河の直下に置いた、見えない目印**。牌の親（riverContainer）の
+        /// 下には置かない。あちらは並び順や枚数を子の並びで見ているので、
+        /// 牌でないものを混ぜると数え違いの元になる。
+        ///
+        /// 1枚も置いていなければ null。
+        /// </summary>
+        public RectTransform GetTilesBoundsRect()
+        {
+            var self = transform as RectTransform;
+            if (self == null) return null;
+
+            bool any = false;
+            Vector2 min = new Vector2(float.MaxValue, float.MaxValue);
+            Vector2 max = new Vector2(float.MinValue, float.MinValue);
+            var corners = new Vector3[4];
+
+            foreach (var t in discardedTiles)
+            {
+                var rt = t as RectTransform;
+                if (rt == null || !rt.gameObject.activeInHierarchy) continue;
+
+                // 敵の河は180度回してあるので、ローカルの大きさではなく世界座標の四隅で測る
+                rt.GetWorldCorners(corners);
+                for (int i = 0; i < 4; i++)
+                {
+                    Vector2 p = self.InverseTransformPoint(corners[i]);
+                    min = Vector2.Min(min, p);
+                    max = Vector2.Max(max, p);
+                    any = true;
+                }
+            }
+
+            if (!any) return null;
+
+            if (_tilesBoundsProxy == null)
+            {
+                var go = new GameObject("TilesBounds", typeof(RectTransform));
+                _tilesBoundsProxy = (RectTransform)go.transform;
+                _tilesBoundsProxy.SetParent(self, false);
+            }
+
+            // 親の矩形の大きさに引きずられないよう、アンカーは親のピボットの位置に寄せる。
+            // こうすると anchoredPosition が、そのまま親のローカル座標になる
+            Vector2 pivot = self.pivot;
+            _tilesBoundsProxy.anchorMin = pivot;
+            _tilesBoundsProxy.anchorMax = pivot;
+            _tilesBoundsProxy.pivot = new Vector2(0.5f, 0.5f);
+            _tilesBoundsProxy.localRotation = Quaternion.identity;
+            _tilesBoundsProxy.localScale = Vector3.one;
+            _tilesBoundsProxy.sizeDelta = max - min;
+            _tilesBoundsProxy.anchoredPosition = (min + max) * 0.5f;
+
+            return _tilesBoundsProxy;
+        }
+
         // ボルテージのゲージはここでは作らない。**GameUIManager.Start が作る。**
         // 河から作ると河のキャンバスの下にぶら下がり、手牌を選んでいる間は
         // 河ごと消えてゲージまで見えなくなる（実際そうなった）。

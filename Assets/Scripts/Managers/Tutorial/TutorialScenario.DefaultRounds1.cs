@@ -122,7 +122,12 @@ namespace KillingMahjong.Managers
                 // 改訂版ではプレイヤーが自分で決めるので、実際に積まれるのは
                 // 確定した額（賭けすぎは 3000 で止める）。
                 betAmount = 600,
-                // 17手ぶん。うち最初の15手は自動で流し、残り2手をプレイヤーに打たせる。
+                // 17手ぶん。**最初の4手は自分で打たせる**（2026-10-06 のフロー図改訂）。
+                // 敵の5打目の手前でボルテージの説明が入り、そこから15手目までを自動で流して、
+                // 残り2手をまたプレイヤーに打たせる。運びは TutorialManager.RunSecondRoundBattle。
+                //
+                // この並びは**優先順位**として使われる。敵は「まだ川に出ていない牌」を
+                // 打つ仕様なので、プレイヤーが先に捨てた牌種は飛ばして次を打つ。
                 enemyDiscardBaseIds = new List<int>(drawDiscards),
                 autoDiscardTurns = 15,
                 outcome = TutorialOutcome.Draw,
@@ -146,9 +151,14 @@ namespace KillingMahjong.Managers
                     new TutorialLine("よーしできたね"),
                     new TutorialLine("ほいじゃ決定ボタンを押して"),
                 },
+                // 対局フェイズ②の頭（2026-10-06 のフロー図改訂・4枚目）。
+                // 「プレイヤー後攻から」なので、この2行のあと敵が先に打つ。
+                // 旧「しばらく黙って見ていなさい。勝手に進めるわ。」は、ボルテージの説明の
+                // あと自動で流し始める所へ移した（TutorialManager.SecondBattleResumeLines）。
                 onBattleStartLines = new List<TutorialLine>
                 {
-                    new TutorialLine("しばらく黙って見ていなさい。勝手に進めるわ。"),
+                    new TutorialLine("じゃあ早速対局開始！"),
+                    new TutorialLine("今度はアタシから"),
                 },
                 beforeManualDiscardLines = new List<TutorialLine>
                 {
