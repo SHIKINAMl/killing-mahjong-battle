@@ -5,7 +5,7 @@ Shader "UI/KillingMahjong/PixelTone"
         [PerRendererData] _MainTex ("Texture", 2D) = "white" {}
         _Color ("Tint", Color) = (1,1,1,1)
         _PixelSize ("Source pixels per dot", Range(1,8)) = 2
-        _ColorSteps ("Color steps", Range(2,32)) = 12
+        _ColorSteps ("Color steps", Range(2,32)) = 8
         _StencilComp ("Stencil Comparison", Float) = 8
         _Stencil ("Stencil ID", Float) = 0
         _StencilOp ("Stencil Operation", Float) = 0
@@ -80,9 +80,9 @@ Shader "UI/KillingMahjong/PixelTone"
                 float2 dot = floor(input.uv * _MainTex_TexelSize.zw / _PixelSize);
                 float2 uv = (dot + .5) * _PixelSize * _MainTex_TexelSize.xy;
                 fixed4 c = tex2D(_MainTex, uv);
-                float2 p = fmod(dot, 4);
-                float threshold = (4 * Bayer2(fmod(p, 2)) + Bayer2(floor(p / 2)) + .5) / 16;
-                // 静止した規則的な点で階調をつなぐ。黒は黒のまま、ちらつかせない。
+                float2 p = fmod(dot, 2);
+                float threshold = (Bayer2(p) + .5) / 4.0;
+                // 静止した市松模様（Bayer 2x2）で階調をつなぐ。黒は黒のまま、ちらつかせない。
                 float value = max(c.r, max(c.g, c.b));
                 float tone = saturate(floor(value * _ColorSteps + threshold) / _ColorSteps);
                 // RGBを別々に丸めると黄色い点が出るため、元の色相を維持する。

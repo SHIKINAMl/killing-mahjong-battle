@@ -161,7 +161,8 @@ namespace KillingMahjong.UI.Effects
 
             // **光ると同時に、集中が抜ける音を鳴らして沈んだループを切る。**
             // ループを先に切ると、無音の一拍があってから光ることになる
-            ScreenFlash.Play(FlashDuration, 0.85f);
+            // 透視解除は専用の「さーーーーっ」を持つため、共通のキーンと重ねない。
+            ScreenFlash.Play(FlashDuration, 0.85f, playSound: !hasSe);
             if (audio != null)
             {
                 audio.StopClairvoyanceLoop();

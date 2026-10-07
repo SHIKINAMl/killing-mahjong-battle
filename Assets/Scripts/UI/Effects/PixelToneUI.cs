@@ -10,7 +10,7 @@ namespace KillingMahjong.UI.Effects
         private RawImage image;
         private Material original, owned;
 
-        public static PixelToneUI Attach(RawImage target, float pixelSize = 2f, float colorSteps = 12f)
+        public static PixelToneUI Attach(RawImage target, float pixelSize = 2f, float colorSteps = 8f)
         {
             var effect = target.GetComponent<PixelToneUI>();
             if (effect == null) effect = target.gameObject.AddComponent<PixelToneUI>();
