@@ -208,8 +208,8 @@ namespace KillingMahjong.UI
             Destroy(flyObj);
 
             // ④ 着弾。**両方のHPの隣に増減が出て、両方のメーターが同時に動き出す**
-            if (playerInfo != null) SpawnHpDeltaLabel(stageRt, playerInfo.HpAnchor, s.MyDelta, AccentMine, placeLeft: true);
-            if (enemyInfo != null) SpawnHpDeltaLabel(stageRt, enemyInfo.HpAnchor, s.TheirDelta, AccentThem, placeLeft: false);
+            if (playerInfo != null) SpawnHpDeltaLabel(stageRt, playerInfo.HpAnchor, s.MyDelta, AccentMine);
+            if (enemyInfo != null) SpawnHpDeltaLabel(stageRt, enemyInfo.HpAnchor, s.TheirDelta, AccentThem);
 
             PlayBloodSE(isLocalSide: true, delta: s.MyDelta, newHp: newLocalHp,
                         maxHp: playerInfo != null ? playerInfo.MaxHp : 0);

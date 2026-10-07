@@ -231,7 +231,7 @@ namespace KillingMahjong.UI
             canvas.overrideSorting = true;
             canvas.sortingOrder = UISortingOrders.RonAnimation;
 
-            SpawnHpDeltaLabel(stageRt, enemyInfo.HpAnchor, -damage, AccentThem, placeLeft: false);
+            SpawnHpDeltaLabel(stageRt, enemyInfo.HpAnchor, -damage, AccentThem);
             StartCoroutine(FinishTutorialDamagePreview(scope, stage));
         }
 
