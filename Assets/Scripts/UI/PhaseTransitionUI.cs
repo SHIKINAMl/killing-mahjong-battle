@@ -387,18 +387,23 @@ namespace KillingMahjong.UI
         /// <summary>
         /// 相手のカットインの立ち絵の高さ（Canvas の単位、4:3 のとき）。絵の全体でこの高さ。
         ///
-        /// **相手のロンのカットイン（CutinAnimationUI）と同じ 1000**（2026-10-09 のユーザー指示）。
-        /// 同じ日に、膨らんでいた 1406 を 2026-09-27 より前の 400 へ戻したが、
-        /// 400 は「小さい」と言われた。ロンのときの大きさが基準。
+        /// **全身が帯の中に収まる大きさ**（2026-10-09 のユーザー指示:
+        /// 「もう少し小さくて、体全体が映るように。体はカットインの中だけで」）。
+        /// 帯は太さ 600・傾き 15 度。立ち絵には幅があるので、帯の中で使える縦の幅は
+        /// 600 ÷ cos15° − 絵の幅 × tan15° ≒ 500。全身（絵の高さの 94%）がそこへ入るのが 480 あたり。
+        /// 同じ日の経緯: 1406（膨らんでいた）→ 400（小さいと言われた）→ 1000（ロンと同じ。顔と胸元だけ）→ 480。
         /// </summary>
-        private const float EnemyCutinPortraitHeight = 1000f;
+        private const float EnemyCutinPortraitHeight = 480f;
 
         /// <summary>
-        /// 相手のカットインの立ち絵を置く位置（絵の下端の中央。画面の左下から、4:3 のとき）。
-        /// ロンのカットインと同じ収まり方になる位置: 顔が画面の上のほうに来て、胸元まで映る。
-        /// 高さを変えたら、ここも合わせて動かすこと（そのままだと顔が画面の外へ出る）。
+        /// 相手のカットインの立ち絵を置く位置（絵の下端の中央。**画面の中心から**、4:3 のとき）。
+        /// 左寄り。右側のスキル名の文字に重ならず、全身が帯の縦の真ん中に来る位置。
+        /// 高さを変えたら、ここも合わせて動かすこと。
         /// </summary>
-        private static readonly Vector2 EnemyCutinPortraitPosition = new Vector2(250f, -400f);
+        private static readonly Vector2 EnemyCutinPortraitPosition = new Vector2(-150f, -266f);
+
+        /// <summary>カットインの帯の傾き（度）。立ち絵を帯の中に置くときの座標の向きに使う。</summary>
+        private const float CutinStripeTilt = 15f;
 
         /// <summary>カットインの寸法を決めたときの Canvas の高さ（800x600 の 600）。</summary>
         private const float CutinReferenceHeight = 600f;
@@ -466,7 +471,7 @@ namespace KillingMahjong.UI
             RectTransform stripeRt = bgStripeObj.GetComponent<RectTransform>();
             // 画面を覆い尽くす長方形から、帯状（バナー）に変更
             stripeRt.sizeDelta = new Vector2(6000f, 600f);
-            stripeRt.localRotation = Quaternion.Euler(0, 0, 15f); // 傾きを少し緩やかに
+            stripeRt.localRotation = Quaternion.Euler(0, 0, CutinStripeTilt); // 傾きを少し緩やかに
             
             // 下から斜めに突き抜けるように配置
             Vector2 stripeTarget = new Vector2(0, 0);
@@ -604,11 +609,38 @@ namespace KillingMahjong.UI
                     float scale = nativeHeight > 0f ? EnemyCutinPortraitHeight * k / nativeHeight : 1f;
                     portraitRt.localScale = new Vector3(scale, scale, 1f);
 
-                    // 左寄りに置く。下から上がってきて、顔から胸元までが大きく映る
-                    portraitRt.anchorMin = new Vector2(0f, 0f);
-                    portraitRt.anchorMax = new Vector2(0f, 0f);
-                    portraitTargetPos = EnemyCutinPortraitPosition * k;
-                    portraitStartPos = portraitTargetPos + new Vector2(0f, -800f * k); // 下から上がってくる
+                    // **立ち絵は帯の中だけに映す（2026-10-09 のユーザー指示）。**
+                    // 帯と同じ形の「切り抜き枠」を重ね、立ち絵をその子にする。帯そのものの子にしないのは、
+                    // 帯のすぐ上に血飛沫が描かれるため（子にすると、立ち絵の上に血飛沫が乗る）。
+                    // 枠は帯と同じ動きをさせるので、立ち絵は帯に乗ったまま下から突き上がってくる
+                    var maskObj = new GameObject("PortraitMask", typeof(RectTransform), typeof(Image), typeof(Mask));
+                    maskObj.transform.SetParent(containerRt, false);
+                    var maskRt = (RectTransform)maskObj.transform;
+                    maskRt.sizeDelta = stripeRt.sizeDelta;
+                    maskRt.localRotation = stripeRt.localRotation;
+                    maskRt.anchoredPosition = stripeStart;
+                    maskObj.GetComponent<Image>().raycastTarget = false;
+                    maskObj.GetComponent<Mask>().showMaskGraphic = false;   // 枠そのものは描かない
+                    bgElements.Add(maskRt);
+                    bgStartPos.Add(stripeStart);
+                    bgTargetPos.Add(stripeTarget);
+
+                    portraitObj.transform.SetParent(maskRt, false);
+                    portraitRt.anchorMin = new Vector2(0.5f, 0.5f);
+                    portraitRt.anchorMax = new Vector2(0.5f, 0.5f);
+
+                    // 枠は傾いているので、立ち絵は逆へ同じだけ回してまっすぐ立たせる。
+                    // 置く位置も、画面の向きで決めた値を枠の向きへ直す
+                    portraitRt.localRotation = Quaternion.Euler(0f, 0f, -CutinStripeTilt);
+                    Vector2 onScreen = EnemyCutinPortraitPosition * k;
+                    float rad = CutinStripeTilt * Mathf.Deg2Rad;
+                    Vector2 inBand = new Vector2(
+                        onScreen.x * Mathf.Cos(rad) + onScreen.y * Mathf.Sin(rad),
+                        -onScreen.x * Mathf.Sin(rad) + onScreen.y * Mathf.Cos(rad));
+
+                    // 帯の中では動かさない（帯ごと出入りする）
+                    portraitTargetPos = inBand;
+                    portraitStartPos = inBand;
                 }
 
                 portraitRt.anchoredPosition = portraitStartPos;
