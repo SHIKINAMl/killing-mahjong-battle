@@ -23,6 +23,10 @@ namespace KillingMahjong.UI.Effects
     ///   ⑤ 残す     … 暗幕と線が引き、**照準だけが残る**（<see cref="AssaultMarkUI"/> に引き継ぐ）
     ///
     /// 動きは刻む（1/20 秒ごと、位置は1ドット単位）。出しているのは図形と文字だけ。
+    ///
+    /// **音は、透視と同じ段取りを掛ける**（<see cref="SkillTranceAudio"/>、2026-10-09 のユーザー指示）。
+    /// ①で BGM が水の中のように沈み、⑤で白く光って抜け、そのあと心音とともに元へ戻る。
+    /// 心音は演出が終わったあとも鳴り続ける（ゲームは待たせない）。
     /// </summary>
     public class AssaultSkillEffect : MonoBehaviour
     {
@@ -45,6 +49,14 @@ namespace KillingMahjong.UI.Effects
         private static readonly Color PlateFill = new Color(0.05f, 0f, 0f, 0.88f);
 
         private SkillEffectStage _stage;
+        private SkillTranceAudio _trance;
+
+        private void OnDestroy()
+        {
+            // 光る前に打ち切られたら、沈めた音を戻す。光ったあとは向こうが自分で鳴らしきる
+            if (_trance != null && !_trance.IsReleased) _trance.Dispose();
+            _trance = null;
+        }
 
         public static AssaultSkillEffect Create()
         {
@@ -94,11 +106,15 @@ namespace KillingMahjong.UI.Effects
             costText.rectTransform.anchoredPosition = costPos;
 
             var audio = AudioManager.Instance;
+
+            // BGM を沈め、深く沈んだ音を流し始める（透視と同じ段取り）
+            _trance = SkillTranceAudio.Begin(0.3f);
+
             ScreenQuake.Play(4f, 0.15f);
             if (audio != null) audio.PlaySynthSound(SynthWaveType.Sawtooth, 1200f, 1800f, 0.3f, 0.5f);
 
             int beeps = 0;
-            bool lockCue = false, costCue = false;
+            bool lockCue = false, costCue = false, leaveCue = false;
             float clock = 0f;
             int lastStep = -1;
 
@@ -132,6 +148,12 @@ namespace KillingMahjong.UI.Effects
                 {
                     costCue = true;
                     if (audio != null) audio.PlaySynthSound(SynthWaveType.Sawtooth, 150f, 90f, 0.3f, 0.8f);
+                }
+                if (!leaveCue && t >= LeaveAt)
+                {
+                    leaveCue = true;
+                    // 白く光って、沈んでいた音が抜ける。心音と BGM の戻りは向こうが鳴らしきる
+                    if (_trance != null) _trance.ReleaseDetached();
                 }
 
                 // ---- 暗幕 ----

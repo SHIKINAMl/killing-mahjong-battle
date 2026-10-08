@@ -21,6 +21,10 @@ namespace KillingMahjong.UI.Effects
     ///   ④ 刻印         … 役名の横に「+1翻」がドスンと落ちてくる。画面が揺れる
     ///   ⑤ 戻る         … 白く光って暗幕が消え、役名は手牌のほうへ縮みながら消える
     ///
+    /// **音は、透視と同じ段取りを掛ける**（<see cref="SkillTranceAudio"/>、2026-10-09 のユーザー指示）。
+    /// ①で BGM が水の中のように沈み、⑤の白い光で抜け、そのあと心音とともに元へ戻る。
+    /// 心音は演出が終わったあとも鳴り続ける（ゲームは待たせない）。
+    ///
     /// **動きは刻む。** 1/20 秒ごとにしか絵を進めず、位置は1ドット単位に置く（ドット絵の画面なので）。
     ///
     /// シーンには置かない。呼ばれるたびに自前の舞台を作り、終わったら自分を消す。
@@ -63,6 +67,7 @@ namespace KillingMahjong.UI.Effects
 
         private SkillEffectStage _stage;
         private bool _tintSet;
+        private SkillTranceAudio _trance;
 
         public static BoostHandSkillEffect Create()
         {
@@ -83,6 +88,10 @@ namespace KillingMahjong.UI.Effects
             // 赤い色かぶりを出したまま消えると、画面が赤いまま残る
             if (_tintSet) ScreenTint.Clear(0.2f);
             _tintSet = false;
+
+            // 光る前に打ち切られたら、沈めた音を戻す。光ったあとは向こうが自分で鳴らしきる
+            if (_trance != null && !_trance.IsReleased) _trance.Dispose();
+            _trance = null;
         }
 
         /// <param name="yakuName">強めた役の名前。分からなければ空でよい（その場合は「役強化」と出す）</param>
@@ -133,6 +142,9 @@ namespace KillingMahjong.UI.Effects
 
             var audio = AudioManager.Instance;
 
+            // BGM を沈め、深く沈んだ音を流し始める（透視と同じ段取り）
+            _trance = SkillTranceAudio.Begin(0.3f);
+
             // ① 画面を赤く沈める。血が抜ける音
             ScreenTint.Set(new Color(0.55f, 0f, 0.02f), 0.22f, 0.15f);
             _tintSet = true;
@@ -174,7 +186,9 @@ namespace KillingMahjong.UI.Effects
                 if (!flashCue && t >= FlashAt)
                 {
                     flashCue = true;
-                    ScreenFlash.Play(0.3f, 0.75f, playSound: false);
+                    // 白く光って、沈んでいた音が抜ける。心音と BGM の戻りは向こうが鳴らしきる
+                    if (_trance != null) _trance.ReleaseDetached();
+                    else ScreenFlash.Play(0.3f, 0.75f, playSound: false);
                 }
 
                 // ---- 暗幕 ----

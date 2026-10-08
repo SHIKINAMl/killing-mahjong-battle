@@ -39,6 +39,12 @@ namespace KillingMahjong.UI
 
         private IEnumerator PlayVisualsRoutine(PresentationScope scope, int outTileId, int inTileId, RectTransform originalSlotRt)
         {
+            // **音は、透視と同じ段取りを掛ける**（2026-10-09 のユーザー指示）。
+            // 入れ替えのあいだ BGM が水の中のように沈み、牌が戻った所で白く光って抜け、
+            // そのあと心音とともに元へ戻る。途中で打ち切られたら、沈めた音はここで戻す
+            var trance = Effects.SkillTranceAudio.Begin(0.3f);
+            scope.AddCleanup(() => { if (trance != null && !trance.IsReleased) trance.Dispose(); });
+
             GameObject animContainer = scope.Own(new GameObject("MulliganAnimationContainer"));
             Canvas canvas = animContainer.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
@@ -221,6 +227,10 @@ namespace KillingMahjong.UI
             }
 
             UnityEngine.Object.Destroy(animContainer);
+
+            // 牌が戻った。白く光って、沈んでいた音が抜ける。
+            // 心音と BGM の戻りは向こうが鳴らしきるので、ここでは待たない
+            if (trance != null) trance.ReleaseDetached();
 
             // アニメーション終了後に元のスロットの画像を復活し、先行して絵柄を更新する
             if (originalSlotRt != null)

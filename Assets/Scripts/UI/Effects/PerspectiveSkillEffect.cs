@@ -66,24 +66,9 @@ namespace KillingMahjong.UI.Effects
         /// <summary>出きるまでの秒数。</summary>
         public const float EnterDuration = 0.45f;
 
-        /// <summary>フラッシュの長さ。<see cref="ScreenFlash"/> の短い合図より少し長くする。</summary>
-        private const float FlashDuration = 0.35f;
-
-        /// <summary>心音3拍の間合い（秒）。「どくっ　どくっ　どく」。SE素材が無いときの代替。</summary>
-        private static readonly float[] HeartbeatGaps = { 0.00f, 0.42f, 0.36f };
-
-        /// <summary>
-        /// 白フラッシュの「さーーーーっ」から、心音3拍を鳴らし始めるまでの間（秒）。
-        /// 受け取った連結プレビュー（`clairvoyance_sequence_preview_v1.wav`）を測ると、
-        /// 抜ける音が 0.00 秒、最初の「どくっ」が 0.95 秒だった。
-        /// </summary>
-        private const float FlashToHeartbeat = 0.95f;
-
-        /// <summary>
-        /// 心音と一緒に BGM を戻すのにかける秒数。
-        /// 心音の素材は 1.84 秒・3拍なので、だいたい最後の拍で戻りきる長さにする。
-        /// </summary>
-        private const float BgmReturnDuration = 1.7f;
+        // 音の段取り（沈む → 光って抜ける → 心音で戻る）は SkillTranceAudio に切り出した（2026-10-09）。
+        // ほかのスキルも同じ段取りを使うため。秒数もそちらにある。
+        private SkillTranceAudio _trance;
 
         private RectTransform _root;
         private Texture2D _shot;
@@ -123,14 +108,8 @@ namespace KillingMahjong.UI.Effects
 
             Build(focusScreenRect);
 
-            if (AudioManager.Instance != null)
-            {
-                AudioManager.Instance.SetBgmDeepMuffle(true);
-
-                // 集中しているあいだ、深く沈んだ音を流し続ける。
-                // BGMのこもりだけだと「沈んだ」が音として立たなかった
-                AudioManager.Instance.StartClairvoyanceLoop(EnterDuration);
-            }
+            // BGM を沈め、深く沈んだ音を流し続ける
+            _trance = SkillTranceAudio.Begin(EnterDuration);
 
             float t = 0f;
             while (t < EnterDuration)
@@ -156,49 +135,17 @@ namespace KillingMahjong.UI.Effects
             if (_released) yield break;
             _released = true;
 
-            var audio = AudioManager.Instance;
-            bool hasSe = audio != null && audio.HasClairvoyanceSe;
-
-            // **光ると同時に、集中が抜ける音を鳴らして沈んだループを切る。**
-            // ループを先に切ると、無音の一拍があってから光ることになる
-            // 透視解除は専用の「さーーーーっ」を持つため、共通のキーンと重ねない。
-            ScreenFlash.Play(FlashDuration, 0.85f, playSound: !hasSe);
-            if (audio != null)
+            if (_trance != null)
             {
-                audio.StopClairvoyanceLoop();
-                if (hasSe) audio.PlayClairvoyanceFlashReturn();
-            }
-
-            // 光が乗りきってから消す。先に消すと、戻った画面が一瞬だけ見えてしまう
-            yield return new WaitForSeconds(0.06f);
-            ApplyStrength(0f);
-
-            if (hasSe)
-            {
-                // 抜ける音が鳴っているあいだは待つ。素材の連結プレビューで
-                // 「さー」から最初の「どくっ」までが 0.95 秒だった
-                yield return new WaitForSeconds(FlashToHeartbeat - 0.06f);
-                audio.PlayClairvoyanceHeartbeat();
-                audio.SetBgmDeepMuffle(false, BgmReturnDuration);
-                yield return new WaitForSeconds(BgmReturnDuration);
+                // 光って、心音とともに BGM が戻りきるまで待つ。
+                // 重ねと集中線は、光が乗りきってから消す（先に消すと、戻った画面が一瞬だけ見えてしまう）
+                yield return _trance.Release(() => ApplyStrength(0f));
             }
             else
             {
-                // SE素材が挿さっていないときの段取り。合成の心音で間に合わせる
-                if (audio != null) audio.SetBgmDeepMuffle(false);
-
-                var strengths = new[]
-                {
-                    HeartbeatStrength.Medium,
-                    HeartbeatStrength.Medium,
-                    HeartbeatStrength.Strong,
-                };
-                for (int i = 0; i < strengths.Length; i++)
-                {
-                    if (HeartbeatGaps[i] > 0f) yield return new WaitForSeconds(HeartbeatGaps[i]);
-                    if (audio != null) audio.PlayHeartbeat(strengths[i], HeartbeatSpacing.Compact);
-                }
-                yield return new WaitForSeconds(0.25f);
+                ScreenFlash.Play();
+                yield return new WaitForSeconds(0.06f);
+                ApplyStrength(0f);
             }
 
             Dispose();
@@ -232,12 +179,9 @@ namespace KillingMahjong.UI.Effects
 
         private void RestoreAudio()
         {
-            if (AudioManager.Instance != null)
-            {
-                AudioManager.Instance.SetBgmDeepMuffle(false);
-                AudioManager.Instance.StopClairvoyanceLoop();
-            }
-
+            // 音を戻すのは SkillTranceAudio の役目。こちらは手放すだけでよい
+            if (_trance != null) _trance.Dispose();
+            _trance = null;
         }
 
         // ------------------------------------------------------------

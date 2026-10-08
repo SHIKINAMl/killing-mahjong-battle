@@ -78,6 +78,7 @@ namespace KillingMahjong.Managers
 
             ApplyFilterTarget(fadeDuration);
             FadeReverb(on, fadeDuration);
+            FadeDeepExtras(on, fadeDuration);
         }
 
         /// <summary>いま出ているべきカットオフへ向かわせる。</summary>
@@ -189,6 +190,144 @@ namespace KillingMahjong.Managers
             {
                 bgmReverbFilter.enabled = false;
             }
+        }
+
+        // ------------------------------------------------------------
+        //  深いこもりを、ほかの対局BGMの音源にも掛ける（2026-10-09）
+        //
+        //  **上のフィルターは BGM_Source（1本ものの曲）にしか付いていない。**
+        //  Unity のフィルターは「同じ GameObject に付いている音源」にしか効かないので、
+        //  別の GameObject で鳴る対局BGM（新2曲＝BGM_Pair、層＝BGM_Layers、
+        //  第3案・第4案＝BGM_Proposal3、流局のモチーフ）は、透視を使っても沈まなかった。
+        //  スキルの演出すべてに「水の中」を掛ける指示を受けて調べ、分かった。
+        //
+        //  **掛けるのは深いこもりだけ。** フェイズのこもり（打牌以外で 1000Hz）は足さない。
+        //  あちらまで足すと、新2曲・第3案・第4案の普段の聞こえ方が変わってしまう
+        //  （これらは今までこもり無しで鳴っていて、その音で採用が決まっている）。
+        //  だからここのフィルターは、深いこもりの間だけ入れて、抜けたら切る。
+        // ------------------------------------------------------------
+
+        private readonly List<AudioLowPassFilter> _deepExtraLowPass = new List<AudioLowPassFilter>();
+        private readonly List<AudioReverbFilter> _deepExtraReverb = new List<AudioReverbFilter>();
+        private Coroutine _deepExtraFade;
+
+        /// <summary>深いこもりを掛けたフィルターの数。確認用。</summary>
+        public int DeepMuffleExtraCount { get { return _deepExtraLowPass.Count; } }
+
+        /// <summary>いま深いこもりの最中か。確認用。</summary>
+        public bool IsBgmDeepMuffled { get { return _deepMuffle; } }
+
+        /// <summary>
+        /// 対局BGMを鳴らしている、BGM_Source 以外の置き場にフィルターを用意する。
+        /// 置き場は鳴らし始めたときに作られるので、沈めるたびに見直す。
+        /// </summary>
+        private void EnsureDeepExtraFilters()
+        {
+            _deepExtraLowPass.RemoveAll(f => f == null);
+            _deepExtraReverb.RemoveAll(f => f == null);
+
+            AddDeepExtraHost(_pairNormalSource);
+            if (_layerSources != null && _layerSources.Length > 0) AddDeepExtraHost(_layerSources[0]);
+            if (_p3Decks != null && _p3Decks.Length > 0) AddDeepExtraHost(_p3Decks[0]);
+            AddDeepExtraHost(_p4Motif);
+        }
+
+        private void AddDeepExtraHost(AudioSource source)
+        {
+            if (source == null) return;
+            GameObject host = source.gameObject;
+            if (bgmSource != null && host == bgmSource.gameObject) return;   // こちらは上のフィルターが受け持つ
+
+            var lowPass = host.GetComponent<AudioLowPassFilter>();
+            if (lowPass == null)
+            {
+                lowPass = host.AddComponent<AudioLowPassFilter>();
+                lowPass.cutoffFrequency = OpenCutoff;
+                lowPass.enabled = false;
+            }
+            if (!_deepExtraLowPass.Contains(lowPass)) _deepExtraLowPass.Add(lowPass);
+
+            var reverb = host.GetComponent<AudioReverbFilter>();
+            if (reverb == null)
+            {
+                reverb = host.AddComponent<AudioReverbFilter>();
+                // 値は BGM_Source のものと同じ（FadeReverb）
+                reverb.reverbPreset = AudioReverbPreset.User;
+                reverb.dryLevel = 0f;
+                reverb.room = ReverbRoomOff;
+                reverb.roomHF = -3500f;
+                reverb.decayTime = 3.5f;
+                reverb.reverbLevel = 800f;
+                reverb.reverbDelay = 0.02f;
+                reverb.diffusion = 100f;
+                reverb.density = 100f;
+                reverb.enabled = false;
+            }
+            if (!_deepExtraReverb.Contains(reverb)) _deepExtraReverb.Add(reverb);
+        }
+
+        private void FadeDeepExtras(bool on, float duration)
+        {
+            if (on) EnsureDeepExtraFilters();
+            if (_deepExtraLowPass.Count == 0 && _deepExtraReverb.Count == 0) return;
+
+            if (_deepExtraFade != null) StopCoroutine(_deepExtraFade);
+            _deepExtraFade = StartCoroutine(DeepExtraFadeRoutine(on, duration));
+        }
+
+        private System.Collections.IEnumerator DeepExtraFadeRoutine(bool on, float duration)
+        {
+            float targetFreq = on ? DeepMuffledCutoff : OpenCutoff;
+            float targetRoom = on ? ReverbRoomOn : ReverbRoomOff;
+
+            // いまの値から動かす。沈みきる前に抜ける（その逆も）ことがある
+            float startFreq = OpenCutoff;
+            float startRoom = ReverbRoomOff;
+            foreach (var f in _deepExtraLowPass)
+            {
+                if (f == null) continue;
+                if (f.enabled) startFreq = Mathf.Max(f.cutoffFrequency, 20f);
+                f.cutoffFrequency = startFreq;
+                f.enabled = true;
+            }
+            foreach (var r in _deepExtraReverb)
+            {
+                if (r == null) continue;
+                if (r.enabled) startRoom = r.room;
+                r.room = startRoom;
+                r.enabled = true;
+            }
+
+            float logStart = Mathf.Log(startFreq);
+            float logTarget = Mathf.Log(targetFreq);
+
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / Mathf.Max(0.0001f, duration));
+                t = t * t * (3f - 2f * t);
+                float freq = Mathf.Exp(Mathf.Lerp(logStart, logTarget, t));
+                float room = Mathf.Lerp(startRoom, targetRoom, t);
+                foreach (var f in _deepExtraLowPass) if (f != null) f.cutoffFrequency = freq;
+                foreach (var r in _deepExtraReverb) if (r != null) r.room = room;
+                yield return null;
+            }
+
+            foreach (var f in _deepExtraLowPass)
+            {
+                if (f == null) continue;
+                f.cutoffFrequency = targetFreq;
+                // 抜けきったら切る。入れたままだと、普段の音まで少し変わる
+                if (!on) f.enabled = false;
+            }
+            foreach (var r in _deepExtraReverb)
+            {
+                if (r == null) continue;
+                r.room = targetRoom;
+                if (!on) r.enabled = false;
+            }
+            _deepExtraFade = null;
         }
     }
 }

@@ -229,6 +229,9 @@ namespace KillingMahjong.Managers
 
             // 強襲の「1局1回」は局をまたいだら戻す
             LocalAssaultUsedThisRound = false;
+
+            // 強襲で相手の血の表示に残した照準の印も、局をまたいだら消す（2026-10-09）
+            KillingMahjong.UI.Effects.AssaultMarkUI.Clear();
         }
 
         public void ClearBoosts()

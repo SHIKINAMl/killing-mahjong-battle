@@ -13,6 +13,10 @@ namespace KillingMahjong.UI
     public partial class GameUISkillController
     {
         private TransitionLockSet.Lease pendingMulligan;
+
+        // 再生中の役強化・強襲の演出。途中で打ち切るときに片付けるために持つ
+        private Effects.BoostHandSkillEffect _boostEffect;
+        private Effects.AssaultSkillEffect _assaultEffect;
         private readonly HashSet<TransitionLockSet.Lease> skillTransitions = new HashSet<TransitionLockSet.Lease>();
         private readonly HashSet<System.Action<StatusData>> skillStatusHandlers = new HashSet<System.Action<StatusData>>();
 
@@ -34,6 +38,11 @@ namespace KillingMahjong.UI
                 if (uiManager.VisualController != null) uiManager.VisualController.CancelSkillPresentations();
             }
             _mulliganSwapAnimator?.CancelPresentation();
+            // 役強化・強襲の演出は自前の入れ物で動いている。コルーチンを止めるだけだと画面に残る
+            if (_boostEffect != null) _boostEffect.Dispose();
+            if (_assaultEffect != null) _assaultEffect.Dispose();
+            _boostEffect = null;
+            _assaultEffect = null;
             StopAllCoroutines();
             foreach (var lease in skillTransitions) lease.Dispose();
             skillTransitions.Clear();
@@ -102,6 +111,9 @@ namespace KillingMahjong.UI
 
             string subText = null;
 
+            // 役強化で強まった役の名前。発動後の演出でも出すので、外に出しておく
+            string boostedYakuName = "";
+
             if (data.skillType == "boost_hand")
             {
                 var oldLocalBonus = Managers.BoardStateManager.Instance.LocalBoostHandBonus != null ?
@@ -136,7 +148,6 @@ namespace KillingMahjong.UI
                 var targetOldBonus = isLocalPlayer ? oldLocalBonus : oldEnemyBonus;
                 var targetNewBonus = isLocalPlayer ? newLocalBonus : newEnemyBonus;
 
-                string boostedYakuName = "";
                 foreach (var kvp in targetNewBonus)
                 {
                     if (!targetOldBonus.ContainsKey(kvp.Key) || targetOldBonus[kvp.Key] < kvp.Value)
@@ -298,6 +309,38 @@ namespace KillingMahjong.UI
                         }
                     }
 
+                }
+            }
+            else if (data.skillType == "boost_hand")
+            {
+                // **発動後の演出（2026-10-09）。** それまではカットインが出て血が減るだけだった。
+                // 自分が使ったときだけ（相手のときはカットインのまま。ユーザーの判断）
+                if (isLocalPlayer && uiManager.PlayerInfoUI != null)
+                {
+                    _boostEffect = Effects.BoostHandSkillEffect.Create();
+                    if (_boostEffect != null)
+                    {
+                        yield return _boostEffect.Play(boostedYakuName, uiManager.PlayerInfoUI.HpGaugeAnchor);
+                        _boostEffect = null;
+                        if (!ownedLock.IsActive) yield break;
+                    }
+                }
+            }
+            else if (data.skillType == SkillNames.Assault)
+            {
+                // 同上。相手の血の表示に照準を合わせ、局の終わりまで印を残す
+                // （印を消すのは局の頭。BoardStateManager.ClearAllBoardData）
+                if (isLocalPlayer && uiManager.PlayerInfoUI != null && uiManager.EnemyInfoUI != null)
+                {
+                    _assaultEffect = Effects.AssaultSkillEffect.Create();
+                    if (_assaultEffect != null)
+                    {
+                        var enemyInfo = uiManager.EnemyInfoUI;
+                        yield return _assaultEffect.Play(enemyInfo.HpGaugeAnchor, uiManager.PlayerInfoUI.HpGaugeAnchor,
+                            () => { if (enemyInfo != null) enemyInfo.PlayBounceAnimation(0.4f); });
+                        _assaultEffect = null;
+                        if (!ownedLock.IsActive) yield break;
+                    }
                 }
             }
             else if (data.skillType == "mulligan")
