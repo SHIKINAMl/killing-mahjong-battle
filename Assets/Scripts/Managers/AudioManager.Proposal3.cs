@@ -39,6 +39,11 @@ namespace KillingMahjong.Managers
     /// **切り替えは「監督」のコルーチン1本が順に片付ける。**
     /// 設定を続けて変えられても、予約を積まない。監督は小節頭の直前まで待ってから
     /// **その時点の最新の行き先**を読むので、最後に選んだものだけが鳴る。
+    ///
+    /// **この仕組み（音源2本・予約・監督）は第4案も使う（2026-10-08）。**
+    /// ここの `_p3〜` `P3〜` という名前は「第3案・第4案の共用」と読むこと。
+    /// 第4案だけの決まり（位置を必ず保つ、入れ替えの長さ、流局の2本立て）は
+    /// AudioManager.Proposal4.cs にある。上に書いた「主旋律は全曲同じ」は**第3案だけの話**。
     /// </summary>
     public partial class AudioManager
     {
@@ -96,9 +101,10 @@ namespace KillingMahjong.Managers
         private readonly List<AudioSource> _p3LegacyFadeSources = new List<AudioSource>();
         private readonly List<float> _p3LegacyFadeFrom = new List<float>();
 
+        /// <summary>第3案か第4案が鳴っているか（音源を共用しているので、どちらでも true）。</summary>
         public bool IsProposal3Running { get { return _p3Running; } }
 
-        /// <summary>いま鳴っている第3案の曲名（`p3_` 付き）。鳴っていなければ null。確認用。</summary>
+        /// <summary>いま鳴っている第3案・第4案の曲名（`p3_` / `p4_` 付き）。鳴っていなければ null。確認用。</summary>
         public string Proposal3ClipName { get { return _p3Running ? _p3ClipName : null; } }
 
         /// <summary>切り替えの途中か（小節頭を待っている、または入れ替えている）。確認用。</summary>
@@ -112,7 +118,7 @@ namespace KillingMahjong.Managers
         /// </summary>
         private bool Proposal3Owns
         {
-            get { return UseProposal3Bgm || _p3Running || _p3Director != null; }
+            get { return ProposalWanted || _p3Running || _p3Director != null; }
         }
 
         private float P3Master { get { return bgmVolume * masterVolume; } }
@@ -126,13 +132,13 @@ namespace KillingMahjong.Managers
             }
         }
 
-        /// <summary>いまのフェイズと濃度で、第3案のどの曲を鳴らすか。</summary>
+        /// <summary>いまのフェイズと濃度で、選んでいる案（第3案 / 第4案）のどの曲を鳴らすか。</summary>
         private string ResolveProposal3Name()
         {
             string baseName = (currentBgmPhase == RoundStatus.Result && _resultBgmOverride != null)
                 ? _resultBgmOverride
                 : ResolveBgmName(currentBgmPhase);
-            return P3Prefix + baseName;
+            return UseProposal4Bgm ? P4NameFor(baseName) : P3Prefix + baseName;
         }
 
         private AudioClip GetProposal3Clip(string name)
@@ -140,10 +146,11 @@ namespace KillingMahjong.Managers
             AudioClip clip;
             if (!_p3Clips.TryGetValue(name, out clip))
             {
-                clip = Resources.Load<AudioClip>(P3Folder + name);
+                string folder = name.StartsWith(P4Prefix) ? P4Folder : P3Folder;
+                clip = Resources.Load<AudioClip>(folder + name);
                 _p3Clips[name] = clip;
                 if (clip == null)
-                    Debug.LogWarning("[AudioManager] 第3案の曲が見つかりません: Resources/" + P3Folder + name);
+                    Debug.LogWarning("[AudioManager] 対局BGMの曲が見つかりません: Resources/" + folder + name);
             }
 
             // **予約より前に読み込みを済ませる。** 取り込み設定が「先読みしない」なので、
@@ -173,6 +180,9 @@ namespace KillingMahjong.Managers
         /// <summary>行き先が変わったことを監督に知らせる。監督が居なければ起こす。</summary>
         private void NotifyProposal3()
         {
+            // 流局のモチーフだけは監督を待たない。流局でなくなっていたら、ここで止める
+            P4OnDestinationChanged();
+
             if (!CanPlay) return;
             _p3Stuck = false;
             if (_p3Director == null) _p3Director = StartCoroutine(Proposal3Director());
@@ -197,17 +207,19 @@ namespace KillingMahjong.Managers
                     _p3Decks[i].volume = 0f;
                 }
             }
+            P4StopMotifNow();
             _p3Running = false;
             _p3Fading = false;
             _p3ClipName = null;
         }
 
-        /// <summary>音量設定が変わったとき、鳴っている第3案にも反映する。</summary>
+        /// <summary>音量設定が変わったとき、鳴っている第3案・第4案にも反映する。</summary>
         private void ApplyProposal3Volumes()
         {
             // 入れ替え中は毎フレーム音量を計算し直しているので、ここでは触らない
             if (!_p3Running || _p3Fading || _p3Decks == null) return;
             _p3Decks[_p3Active].volume = P3Master;
+            P4SyncMotifVolume();
         }
 
         // ------------------------------------------------------------
@@ -218,7 +230,7 @@ namespace KillingMahjong.Managers
         {
             while (!_p3Stuck)
             {
-                if (UseProposal3Bgm)
+                if (ProposalWanted)
                 {
                     if (!_p3Running)
                     {
@@ -228,6 +240,11 @@ namespace KillingMahjong.Managers
                     else if (ResolveProposal3Name() != _p3ClipName)
                     {
                         yield return P3ChangeClip();
+                    }
+                    else if (_p3ClipName == P4DrawBaseName && !_p4MotifAlive)
+                    {
+                        // 流局の土台は鳴っているのに、モチーフが止まっている（第4案）
+                        yield return P4ResumeMotif();
                     }
                     else break;   // もう行き先の曲が鳴っている
                 }
@@ -268,6 +285,7 @@ namespace KillingMahjong.Managers
             deck.timeSamples = 0;
             deck.volume = P3Master;
             deck.PlayScheduled(at);
+            P4StartMotifWith(deck, want, at, 0);
 
             _p3AnchorDsp = at;
             _p3AnchorSample = 0;
@@ -284,28 +302,43 @@ namespace KillingMahjong.Managers
             // 鳴り出す前（予約しただけ）の音源からは小節が数えられない
             while (AudioSettings.dspTime < _p3AnchorDsp)
             {
-                if (!UseProposal3Bgm) yield break;
+                if (!ProposalWanted) yield break;
                 yield return null;
             }
 
             double dspAt, barPos, barSeconds;
+            string want;
+            AudioClip clip;
             while (true)
             {
-                if (!UseProposal3Bgm) yield break;
-                if (ResolveProposal3Name() == _p3ClipName) yield break;   // 元へ戻された
+                if (!ProposalWanted) yield break;
+
+                // **行き先は毎コマ読み直す。** 待っているあいだに変わっていれば新しい方になる
+                want = ResolveProposal3Name();
+                if (want == _p3ClipName) yield break;   // 元へ戻された
+
+                // **待っているうちに読み込ませておく。** 予約の直前に読みに行くと、
+                // 予約した時刻に間に合わないことがある。読み込み中なら次の小節頭へ回す
+                clip = GetProposal3Clip(want);
+                if (clip == null) { _p3Stuck = true; yield break; }
+                bool loading = clip.loadState == AudioDataLoadState.Loading;
+                if (want == P4DrawBaseName)
+                {
+                    var motif = GetProposal3Clip(P4DrawMotifName);
+                    if (motif != null && motif.loadState == AudioDataLoadState.Loading) loading = true;
+                }
 
                 P3NextBar(out dspAt, out barPos, out barSeconds);
-                if (dspAt - AudioSettings.dspTime <= P3CommitWindow) break;
+                if (!loading && dspAt - AudioSettings.dspTime <= P3CommitWindow) break;
                 yield return null;
             }
 
-            // **ここで初めて行き先を確定する。** 待っているあいだに変わっていれば新しい方になる
-            string want = ResolveProposal3Name();
-            var clip = GetProposal3Clip(want);
-            if (clip == null) { _p3Stuck = true; yield break; }
+            // 流局のモチーフは、行き先が流局でなければここまでに止まっている。念のためもう一度見る
+            if (want != P4DrawBaseName) P4KillMotif();
 
             var cur = _p3Decks[_p3Active];
             var next = _p3Decks[1 - _p3Active];
+            string from = _p3ClipName;
 
             bool sameFamily = cur.clip != null
                               && cur.clip.samples == clip.samples
@@ -323,11 +356,13 @@ namespace KillingMahjong.Managers
             next.timeSamples = startSample;
             next.volume = sameFamily ? 0f : P3Master;   // 予約の時刻までは鳴らないので、先に上げておいてよい
             next.PlayScheduled(dspAt);
+            P4StartMotifWith(next, want, dspAt, startSample);
 
             _p3Fading = true;
             while (AudioSettings.dspTime < dspAt)
             {
                 if (!sameFamily) next.volume = P3Master;
+                P4SyncMotifVolume();
                 yield return null;
             }
 
@@ -337,7 +372,8 @@ namespace KillingMahjong.Managers
             _p3AnchorSample = startSample;
             _p3ClipName = want;
 
-            double fade = sameFamily ? Math.Max(barSeconds, P3ShortFade) : P3ShortFade;
+            // 入れ替えの長さは案と曲の組み合わせで決まる（AudioManager.Proposal4.cs）
+            double fade = ProposalFadeSeconds(from, want, sameFamily, barSeconds);
             while (true)
             {
                 double u = (AudioSettings.dspTime - dspAt) / fade;
@@ -347,12 +383,14 @@ namespace KillingMahjong.Managers
                 float master = P3Master;
                 cur.volume = master * (float)(1.0 - u);
                 next.volume = sameFamily ? master * (float)u : master;
+                P4SyncMotifVolume();
                 yield return null;
             }
 
             cur.Stop();
             cur.volume = 0f;
             next.volume = P3Master;
+            P4SyncMotifVolume();
             _p3Fading = false;
         }
 
@@ -365,7 +403,7 @@ namespace KillingMahjong.Managers
             double dspAt;
             while (true)
             {
-                if (!UseProposal3Bgm) yield break;      // 待っているあいだに戻された。まだ何も変えていない
+                if (!ProposalWanted) yield break;       // 待っているあいだに戻された。まだ何も変えていない
                 if (!LegacyBgmAudible) yield break;     // 止められた。監督が「何も無い所から」で始め直す
 
                 double wait = LegacySecondsToNextBar();
@@ -396,10 +434,12 @@ namespace KillingMahjong.Managers
             deck.timeSamples = 0;
             deck.volume = P3Master;
             deck.PlayScheduled(dspAt);
+            P4StartMotifWith(deck, want, dspAt, 0);
 
             while (AudioSettings.dspTime < dspAt)
             {
                 deck.volume = P3Master;
+                P4SyncMotifVolume();
                 yield return null;
             }
 
@@ -431,14 +471,14 @@ namespace KillingMahjong.Managers
         {
             while (AudioSettings.dspTime < _p3AnchorDsp)
             {
-                if (UseProposal3Bgm) yield break;
+                if (ProposalWanted) yield break;
                 yield return null;
             }
 
             double dspAt, barPos, barSeconds;
             while (true)
             {
-                if (UseProposal3Bgm) yield break;   // 戻された。まだ何も変えていない
+                if (ProposalWanted) yield break;    // 戻された。まだ何も変えていない
 
                 P3NextBar(out dspAt, out barPos, out barSeconds);
                 if (dspAt - AudioSettings.dspTime <= P3CommitWindow) break;
@@ -453,7 +493,7 @@ namespace KillingMahjong.Managers
                 yield return null;
             }
 
-            if (UseProposal3Bgm) yield break;
+            if (ProposalWanted) yield break;
 
             currentPhaseBgmName = null;   // 「もうその曲を鳴らしている」と誤判定させない
             if (CanPlay && UsePhaseBgm)
@@ -537,8 +577,9 @@ namespace KillingMahjong.Managers
             double now = AudioSettings.dspTime;
             double pos = P3PositionAt(now);
 
-            Tempo t = TempoOf(_p3ClipName);
-            if (t.Bpm <= 0f)
+            // 第4案は実際の曲の長さから1小節を割り出す（AudioManager.Proposal4.cs）
+            barSeconds = ProposalBarSeconds(_p3ClipName, _p3Decks[_p3Active].clip);
+            if (barSeconds <= 0.0)
             {
                 barSeconds = 0.0;
                 dspAt = now + P3ScheduleLead;
@@ -546,7 +587,6 @@ namespace KillingMahjong.Managers
                 return;
             }
 
-            barSeconds = 60.0 / t.Bpm * t.BeatsPerBar;
             double index = Math.Floor(pos / barSeconds + 1e-9) + 1.0;
             double wait = index * barSeconds - pos;
             if (wait < P3ScheduleLead)

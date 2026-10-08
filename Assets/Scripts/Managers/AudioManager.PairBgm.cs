@@ -82,10 +82,11 @@ namespace KillingMahjong.Managers
         public void ApplyMatchBgmSet(int kind)
         {
             bool wantP3 = kind == (int)Core.SettingsManager.MatchBgmSetKind.Proposal3;
+            bool wantP4 = kind == (int)Core.SettingsManager.MatchBgmSetKind.Proposal4;
             bool wantPair = kind == (int)Core.SettingsManager.MatchBgmSetKind.Pair;
             // **層を使うのは「新2曲」と「従来（層あり）」だけ。** 層を鳴らしたままだと
             // bgm_field_1〜4 は一度も鳴らない（層のステムが先に使われるため）。
-            // 第3案はフルミックスだけを鳴らすので、2曲方式も層も使わない。
+            // 第3案・第4案はフルミックスだけを鳴らすので、2曲方式も層も使わない。
             bool wantLayers = kind == (int)Core.SettingsManager.MatchBgmSetKind.Pair
                               || kind == (int)Core.SettingsManager.MatchBgmSetKind.PerPhase;
 
@@ -95,7 +96,7 @@ namespace KillingMahjong.Managers
 
             // **案の番号も見て判定する（2026-10-08）。** 鳴らし方の旗だけで比べると、
             // 旗の組み合わせが同じ別の案へ替えたときに「変わっていない」と読んでしまう。
-            if (kind == _matchBgmSet && wantP3 == UseProposal3Bgm
+            if (kind == _matchBgmSet && wantP3 == UseProposal3Bgm && wantP4 == UseProposal4Bgm
                 && wantPair == UsePairBgm && wantLayers == UseBgmLayers) return;
 
             // **いま鳴っていないなら、鳴らし始めてはいけない。**
@@ -107,22 +108,23 @@ namespace KillingMahjong.Managers
             bool wasPlaying = IsPairBgmRunning || AreLayersRunning || IsProposal3Running
                               || (bgmSource != null && bgmSource.isPlaying);
 
-            // 行きか帰りのどちらかが第3案か。途中で取り消された切り替えが残っている場合も含む
-            bool proposal3Involved = wantP3 || Proposal3Owns;
+            // 行きか帰りのどちらかが第3案・第4案か。途中で取り消された切り替えが残っている場合も含む
+            bool proposal3Involved = wantP3 || wantP4 || Proposal3Owns;
 
             _matchBgmSet = kind;
             UseProposal3Bgm = wantP3;
+            UseProposal4Bgm = wantP4;
             UsePairBgm = wantPair;
             UseBgmLayers = wantLayers;
 
             if (!wasPlaying)
             {
                 // 旗だけ差し替える。音は次に誰かがフェイズを指定したときに任せる
-                if (!wantP3) _legacySoundingKind = kind;
+                if (!wantP3 && !wantP4) _legacySoundingKind = kind;
                 return;
             }
 
-            // **第3案が絡む切り替えは監督に任せる（AudioManager.Proposal3.cs）。**
+            // **第3案・第4案が絡む切り替えは監督に任せる（AudioManager.Proposal3.cs）。**
             // テンポが違う相手なので、ここで畳んで鳴らし直すと切れ目が聞こえる。
             // 監督は、いまの曲の小節頭まで待ってから重ねて入れ替える。
             // 続けて選び直されたときに最後の選択だけを鳴らすのも監督の仕事。

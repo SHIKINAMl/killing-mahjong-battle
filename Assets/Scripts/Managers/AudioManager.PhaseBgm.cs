@@ -132,6 +132,28 @@ namespace KillingMahjong.Managers
             { "p3_bgm_tension",      new Tempo(132f, 4) },
             { "p3_bgm_discard_hot",  new Tempo(132f, 4) },
             { "p3_bgm_lose",         new Tempo(92f,  4) },
+
+            // **第4案（2026-10-08）。** `p4_` 名で引く。**全曲 136BPM・4拍子・64小節・同じ長さ。**
+            // だから第4案の中では、どの曲へ移るときも再生位置を保てる（AudioManager.Proposal4.cs）。
+            // 流局は土台とモチーフの2本に分けて鳴らすので、その2本も載せる。
+            { "p4_bgm_field_1",      new Tempo(136f, 4) },
+            { "p4_bgm_field_2",      new Tempo(136f, 4) },
+            { "p4_bgm_field_3",      new Tempo(136f, 4) },
+            { "p4_bgm_field_4",      new Tempo(136f, 4) },
+            { "p4_bgm_phase_normal", new Tempo(136f, 4) },
+            { "p4_bgm_phase_turn",   new Tempo(136f, 4) },
+            { "p4_bgm_prepare",      new Tempo(136f, 4) },
+            { "p4_bgm_betting",      new Tempo(136f, 4) },
+            { "p4_bgm_tension",      new Tempo(136f, 4) },
+            { "p4_bgm_discard",      new Tempo(136f, 4) },
+            { "p4_bgm_discard_hot",  new Tempo(136f, 4) },
+            { "p4_bgm_ron",          new Tempo(136f, 4) },
+            { "p4_bgm_draw",         new Tempo(136f, 4) },
+            { "p4_bgm_draw_base",    new Tempo(136f, 4) },
+            { "p4_bgm_draw_motif",   new Tempo(136f, 4) },
+            { "p4_bgm_result",       new Tempo(136f, 4) },
+            { "p4_bgm_win",          new Tempo(136f, 4) },
+            { "p4_bgm_lose",         new Tempo(136f, 4) },
         };
 
         /// <summary>拍の情報が無い曲のときの既定。すぐ切り替える方に倒す。</summary>
