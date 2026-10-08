@@ -31,12 +31,9 @@ namespace KillingMahjong.UI
 
             if (startInPreservedRoom)
             {
-                var preview = FindSceneObjectIncludingInactive("SavedRoomPreview");
-                if (preview != null)
-                {
-                    preview.SetActive(false);
-                    Destroy(preview);
-                }
+                // **シーンに置いてある部屋をそのまま使う（2026-10-09）。**
+                // 以前はここで「見本の写し」（SavedRoomPreview）を捨て、RoomScreenUI が作り直していた。
+                // 写しはコードを変えても付いてこないので、置いてある物と再生時の物が食い違っていた。
                 OpenPreservedRoom();
                 return;
             }
@@ -83,43 +80,102 @@ namespace KillingMahjong.UI
         private bool isStartingTutorial;
         private GameObject titleClickTarget;
 
+        private const string TitleClickTargetName = "TitleClickToTutorial";
+        private const string MatchShortcutName = "ルールを知っている方：対局へ";
+        private const string DebugRoomButtonName = "デバッグ部屋";
+
+        /// <summary>
+        /// タイトルの「どこでも押せば開始」と、その上の2つのボタンを用意する。
+        ///
+        /// **シーンに置いてある物を使う（2026-10-09、<see cref="SceneFirst"/>）。**
+        /// 位置・大きさ・色はシーンのほうが正で、ここでは押したときの動きをつなぐだけ。
+        /// 下の数字は、シーンに無かったときに作るための控え。
+        /// </summary>
         private void BuildTitleClickTarget()
         {
-            titleClickTarget = new GameObject("TitleClickToTutorial", typeof(RectTransform),
+            titleClickTarget = SceneFirst.Root(TitleClickTargetName, out bool madeTarget, typeof(RectTransform),
                 typeof(Canvas), typeof(GraphicRaycaster), typeof(Image), typeof(Button));
-            var canvas = titleClickTarget.GetComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = KillingMahjong.Common.UISortingOrders.TitleStartInput;
-            var image = titleClickTarget.GetComponent<Image>();
-            image.color = Color.clear;
             var button = titleClickTarget.GetComponent<Button>();
-            button.targetGraphic = image;
-            button.transition = Selectable.Transition.None;
-            button.onClick.AddListener(OnClickStartButton);
+            if (madeTarget)
+            {
+                var canvas = titleClickTarget.GetComponent<Canvas>();
+                canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+                canvas.sortingOrder = KillingMahjong.Common.UISortingOrders.TitleStartInput;
+                var image = titleClickTarget.GetComponent<Image>();
+                image.color = Color.clear;
+                button.targetGraphic = image;
+                button.transition = Selectable.Transition.None;
+            }
+            Bind(button, OnClickStartButton);
 
             // 繰り返し遊ぶ来場者は、練習を通さず対局メニューを開ける。
-            var shortcut = SessionPrompt.CreateButton(titleClickTarget.transform,
-                "ルールを知っている方：対局へ", new Vector2(0f, 40f), OpenMatchMenu);
-            var rect = shortcut.GetComponent<RectTransform>();
-            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0f);
-            rect.sizeDelta = new Vector2(400f, 48f);
-            shortcut.GetComponentInChildren<TMP_Text>().fontSize = 20f;
+            var shortcut = SceneFirst.FindChild(titleClickTarget.transform, MatchShortcutName);
+            if (shortcut == null)
+            {
+                SceneFirst.NoteCreated(MatchShortcutName);
+                var made = SessionPrompt.CreateButton(titleClickTarget.transform,
+                    MatchShortcutName, new Vector2(0f, 40f), () => { });
+                var rect = made.GetComponent<RectTransform>();
+                rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0f);
+                rect.sizeDelta = new Vector2(400f, 48f);
+                made.GetComponentInChildren<TMP_Text>().fontSize = 20f;
+                shortcut = made.gameObject;
+            }
+            Bind(shortcut.GetComponent<Button>(), OpenMatchMenu);
 
             // 開発用の入口（2026-10-07 のユーザー指示）。部屋シーンへ直接行く。
             // 展示用タイトルはチュートリアルか対局メニューにしか進めず、部屋
             // （コレクションや演出の試写がある）へ行く道が無かった。
             // 来場者向けの導線ではないので、右下の隅に小さく、目立たない色で置く。
-            var debug = SessionPrompt.CreateButton(titleClickTarget.transform,
-                "デバッグ部屋", new Vector2(-70f, 22f), OpenDebugRoom);
-            var debugRect = debug.GetComponent<RectTransform>();
-            debugRect.anchorMin = debugRect.anchorMax = new Vector2(1f, 0f);
-            debugRect.sizeDelta = new Vector2(124f, 28f);
-            debug.GetComponent<Image>().color = new Color32(30, 18, 26, 170);
-            var debugLabel = debug.GetComponentInChildren<TMP_Text>();
-            debugLabel.rectTransform.sizeDelta = debugRect.sizeDelta;
-            debugLabel.fontSize = 14f;
-            debugLabel.color = new Color32(200, 188, 196, 255);
+            var debug = SceneFirst.FindChild(titleClickTarget.transform, DebugRoomButtonName);
+            if (debug == null)
+            {
+                SceneFirst.NoteCreated(DebugRoomButtonName);
+                var made = SessionPrompt.CreateButton(titleClickTarget.transform,
+                    DebugRoomButtonName, new Vector2(-70f, 22f), () => { });
+                var debugRect = made.GetComponent<RectTransform>();
+                debugRect.anchorMin = debugRect.anchorMax = new Vector2(1f, 0f);
+                debugRect.sizeDelta = new Vector2(124f, 28f);
+                made.GetComponent<Image>().color = new Color32(30, 18, 26, 170);
+                var debugLabel = made.GetComponentInChildren<TMP_Text>();
+                debugLabel.rectTransform.sizeDelta = debugRect.sizeDelta;
+                debugLabel.fontSize = 14f;
+                debugLabel.color = new Color32(200, 188, 196, 255);
+                debug = made.gameObject;
+            }
+            Bind(debug.GetComponent<Button>(), OpenDebugRoom);
+
+            lastBakeReport = SceneFirst.Report("TitleUIManager");
         }
+
+        /// <summary>直前の組み立てで、シーンに無くて作った物の名前。焼き込みの報告用。</summary>
+        private string lastBakeReport = "";
+
+        /// <summary>
+        /// ボタンに、押したときの動きをつなぐ。**前につないだ物は外してからつなぐ**
+        /// （シーンに置いてあるボタンは使い回すので、足すだけだと二重に走る）。
+        /// </summary>
+        private static void Bind(Button button, UnityEngine.Events.UnityAction action)
+        {
+            if (button == null) return;
+            button.onClick.RemoveAllListeners();
+            button.onClick.AddListener(action);
+        }
+
+        /// <summary>
+        /// **エディタ用。** タイトルのボタンをシーンに置く（`SceneFirstBaker` が再生していないときに呼ぶ）。
+        /// 再生中の動き（チュートリアルからの戻りなど）は走らせない。
+        /// </summary>
+        /// <returns>シーンに無くて作った物の名前。全部置いてあったら空文字</returns>
+        public string BakeTitleButtonsForEditor()
+        {
+            BuildTitleClickTarget();
+            titleClickTarget = null;
+            return lastBakeReport;
+        }
+
+        /// <summary>このシーンが部屋（再生すると部屋の画面から始まる）か。焼き込みが見る。</summary>
+        public bool StartsInRoom { get { return startInPreservedRoom; } }
 
         /// <summary>
         /// タイトルから「デバッグ部屋」＝部屋シーンへ移る。
