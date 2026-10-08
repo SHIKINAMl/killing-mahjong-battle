@@ -33,8 +33,11 @@ namespace KillingMahjong.UI
         /// <summary>対象より少し外まで見せる余白。行の文字が枠線に触れないように。</summary>
         private const float Padding = 5f;
 
-        /// <summary>枠線の太さ。1ドット＝2UI単位なので 4 でドット2つぶん。</summary>
-        private const float FrameThickness = 4f;
+        /// <summary>
+        /// 枠（<see cref="Style.Frame"/>）のときの余白。かぎ形が太いぶん、帯のときより外へ出す。
+        /// 1ドット＝2UI単位なので 8 でドット4つぶん。
+        /// </summary>
+        private const float FramePadding = 8f;
 
         /// <summary>
         /// 帯の濃さ。**このプロジェクトは Linear カラースペースなので、数字より濃く出る。**
@@ -42,8 +45,6 @@ namespace KillingMahjong.UI
         /// （実機で 0.26 を入れたら実測 0.42 相当の濃さになり、下の数字が読めなくなった）。
         /// </summary>
         private const float BandAlpha = 0.11f;
-
-        private const float FrameAlpha = 1.0f;
 
         /// <summary>明滅の深さ。基準の明るさに対する割合。</summary>
         private const float PulseDepth = 0.35f;
@@ -63,7 +64,12 @@ namespace KillingMahjong.UI
 
         private RectTransform _area;
         private Image _band;
-        private Image[] _edges;
+
+        /// <summary>
+        /// 枠の絵（2026-10-08 に作り直した）。以前は4本の線（Image）を明滅させていた。
+        /// 形と動きは <see cref="TutorialHighlightFrameGraphic"/> が持っている。
+        /// </summary>
+        private TutorialHighlightFrameGraphic _frame;
 
         private RectTransform _target;
         private Canvas _canvas;
@@ -135,25 +141,21 @@ namespace KillingMahjong.UI
             _band.rectTransform.offsetMin = Vector2.zero;
             _band.rectTransform.offsetMax = Vector2.zero;
 
-            _edges = new Image[4];
-            _edges[0] = MakeEdge("Top",    new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, FrameThickness));
-            _edges[1] = MakeEdge("Bottom", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, FrameThickness));
-            _edges[2] = MakeEdge("Left",   new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(0f, 0.5f), new Vector2(FrameThickness, 0f));
-            _edges[3] = MakeEdge("Right",  new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(1f, 0.5f), new Vector2(FrameThickness, 0f));
+            // CanvasRenderer は自分で付ける。new GameObject 経由だと RequireComponent が効かず、
+            // 絵が一切出ない（PerspectiveSkillEffect などと同じ）
+            var frameGo = new GameObject("Frame", typeof(RectTransform), typeof(CanvasRenderer),
+                typeof(TutorialHighlightFrameGraphic));
+            frameGo.transform.SetParent(_area, false);
+            var frameRect = (RectTransform)frameGo.transform;
+            frameRect.anchorMin = Vector2.zero;
+            frameRect.anchorMax = Vector2.one;
+            frameRect.offsetMin = Vector2.zero;
+            frameRect.offsetMax = Vector2.zero;
+            _frame = frameGo.GetComponent<TutorialHighlightFrameGraphic>();
+            // 説明を読みながらセリフを送るので、クリックは絶対に食わせない
+            _frame.raycastTarget = false;
 
             gameObject.SetActive(false);
-        }
-
-        private Image MakeEdge(string name, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 size)
-        {
-            Image img = MakeImage(_area, name);
-            RectTransform rt = img.rectTransform;
-            rt.anchorMin = anchorMin;
-            rt.anchorMax = anchorMax;
-            rt.pivot = pivot;
-            rt.anchoredPosition = Vector2.zero;
-            rt.sizeDelta = size;
-            return img;
         }
 
         private static Image MakeImage(RectTransform parent, string name)
@@ -169,15 +171,21 @@ namespace KillingMahjong.UI
 
         private void ShowInternal(RectTransform target, Style style)
         {
+            // **同じ相手を指し直されただけなら、出るときの動きをやり直さない。**
+            // 説明の途中で同じ場所を何度も指し直すことがあり、そのたびに枠が飛び込んでくると騒がしい
+            bool sameAsBefore = gameObject.activeSelf && _target == target && _style == style;
+
             _target = target;
             _style = style;
 
             gameObject.SetActive(true);
             _band.gameObject.SetActive(style == Style.Band);
-            foreach (var e in _edges) e.gameObject.SetActive(style == Style.Frame);
+            _frame.gameObject.SetActive(style == Style.Frame);
 
             Follow();
             Pulse();
+
+            if (style == Style.Frame && !sameAsBefore) _frame.Restart();
         }
 
         private void HideInternal()
@@ -201,13 +209,29 @@ namespace KillingMahjong.UI
             if (selfRect == null) return;
             if (!UIRectUtility.TryGetLocalRect(_target, selfRect, _canvas, out Rect local)) return;
 
-            _area.sizeDelta = new Vector2(local.width + Padding * 2f, local.height + Padding * 2f);
-            _area.anchoredPosition = local.center - selfRect.rect.center;
+            float pad = _style == Style.Frame ? FramePadding : Padding;
+
+            // **1ドット（2単位）の倍数に置く。** 半端な位置や大きさにすると、
+            // 枠の線が半画素にかかって、ドット絵の中でそこだけ滲む
+            Vector2 size = new Vector2(SnapToDot(local.width + pad * 2f), SnapToDot(local.height + pad * 2f));
+            Vector2 center = local.center - selfRect.rect.center;
+            Vector2 min = new Vector2(SnapToDot(center.x - size.x * 0.5f), SnapToDot(center.y - size.y * 0.5f));
+
+            _area.sizeDelta = size;
+            _area.anchoredPosition = min + size * 0.5f;
         }
 
+        private static float SnapToDot(float v)
+        {
+            return Mathf.Round(v * 0.5f) * 2f;
+        }
+
+        /// <summary>帯の明滅。枠のほうは <see cref="TutorialHighlightFrameGraphic"/> が自分で動く。</summary>
         private void Pulse()
         {
-            float baseAlpha = _style == Style.Band ? BandAlpha : FrameAlpha;
+            if (_style != Style.Band) return;
+
+            float baseAlpha = BandAlpha;
             // 0.5 を中心に振らせず、**基準の明るさを上限**にする。
             // 上へ振らせると帯が濃くなりすぎて下の数字が読めなくなる。
             float t = (Mathf.Sin(Time.unscaledTime * PulseSpeed) + 1f) * 0.5f;
@@ -215,8 +239,7 @@ namespace KillingMahjong.UI
 
             Color c = Gold;
             c.a = alpha;
-            if (_style == Style.Band) _band.color = c;
-            else foreach (var e in _edges) e.color = c;
+            _band.color = c;
         }
     }
 }
