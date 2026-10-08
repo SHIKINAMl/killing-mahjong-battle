@@ -28,6 +28,9 @@ namespace KillingMahjong.UI
         private const float ItemHeight = 46f;
         private const float ItemWidth = 300f;
         private const float LabelFontSize = 24f;
+        private const string FriendIllustrationResourcePath = "UI/FriendMatchIllustration";
+        private const float FriendIllustrationScale = 0.18f;
+        private const float FriendIllustrationGap = 20f;
 
         /// <summary>合言葉の確認を待つ上限。返事が無いまま固まらないようにする。</summary>
         private const float JoinTimeoutSeconds = 15f;
@@ -44,6 +47,8 @@ namespace KillingMahjong.UI
         private TMP_Text _passwordError;
         private TMP_Text _passwordStatus;
         private TMP_FontAsset _font;
+        private RectTransform _friendIllustration;
+        private TMP_Text _friendMatchLabel;
 
         /// <summary>確認中に二重で送らないための印。</summary>
         private bool _isCheckingRoom;
@@ -87,6 +92,7 @@ namespace KillingMahjong.UI
             if (_modePanel != null) _modePanel.SetActive(true);
             if (_friendPanel != null) _friendPanel.SetActive(false);
             if (_passwordPanel != null) _passwordPanel.SetActive(false);
+            PositionFriendIllustration();
         }
 
         /// <summary>
@@ -350,8 +356,43 @@ namespace KillingMahjong.UI
             CreateHeading(_modePanel.transform, "対局する", ItemHeight * 2f);
 
             CreateMenuItem(_modePanel.transform, "野良マッチ", ItemHeight * 0.9f, OnPublicSelected);
-            CreateMenuItem(_modePanel.transform, "フレンドマッチ", -ItemHeight * 0.2f, ShowFriendPanel);
+            var friendItem = CreateMenuItem(_modePanel.transform, "フレンドマッチ", -ItemHeight * 0.2f, ShowFriendPanel);
+            CreateFriendIllustration(friendItem);
             CreateMenuItem(_modePanel.transform, "もどる", -ItemHeight * 1.5f, Close);
+        }
+
+        private void CreateFriendIllustration(GameObject friendItem)
+        {
+            var texture = Resources.Load<Texture2D>(FriendIllustrationResourcePath);
+            if (texture == null) return;
+
+            _friendMatchLabel = friendItem.GetComponentInChildren<TMP_Text>();
+            var obj = new GameObject("MatchIllustration", typeof(RectTransform), typeof(RawImage));
+            obj.transform.SetParent(friendItem.transform, false);
+            _friendIllustration = obj.GetComponent<RectTransform>();
+            Center(_friendIllustration, new Vector2(texture.width, texture.height) * FriendIllustrationScale);
+
+            var image = obj.GetComponent<RawImage>();
+            image.texture = texture;
+            image.raycastTarget = false;
+        }
+
+        private void PositionFriendIllustration()
+        {
+            if (_friendIllustration == null || _friendMatchLabel == null) return;
+
+            Canvas.ForceUpdateCanvases();
+            _friendMatchLabel.ForceMeshUpdate();
+            var bounds = _friendMatchLabel.textBounds;
+            var friendRect = (RectTransform)_friendIllustration.parent;
+            float textRight = friendRect.InverseTransformPoint(_friendMatchLabel.transform.TransformPoint(
+                new Vector3(bounds.max.x, bounds.center.y, 0f))).x;
+
+            // 元の800x600画像の透明な余白は残し、見える絵の左端・中央で位置を合わせる。
+            // 承認済み配置: 文字の右端から20px、絵の高さ47.52px。クリック領域は増やさない。
+            _friendIllustration.anchoredPosition = new Vector2(
+                textRight + FriendIllustrationGap + _friendIllustration.sizeDelta.x * 0.5f - 121f * FriendIllustrationScale,
+                _friendIllustration.sizeDelta.y * 0.5f - 255f * FriendIllustrationScale);
         }
 
         private void BuildFriendPanel()
@@ -470,7 +511,7 @@ namespace KillingMahjong.UI
             tmp.raycastTarget = false;
         }
 
-        private void CreateMenuItem(Transform parent, string label, float y, Action onClick)
+        private GameObject CreateMenuItem(Transform parent, string label, float y, Action onClick)
         {
             var obj = new GameObject(label, typeof(RectTransform), typeof(Image), typeof(Button));
             obj.transform.SetParent(parent, false);
@@ -511,6 +552,7 @@ namespace KillingMahjong.UI
             mimg.raycastTarget = false;
 
             obj.GetComponent<Button>().onClick.AddListener(() => onClick?.Invoke());
+            return obj;
         }
 
         private void ApplyFont(TMP_Text tmp)
