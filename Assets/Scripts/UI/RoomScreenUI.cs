@@ -390,10 +390,22 @@ namespace KillingMahjong.UI
                     exit.Find("Label").GetComponent<TextMeshProUGUI>().color = new Color32(125, 120, 123, 255);
                     exit.Find("Marker").GetComponent<Image>().color = new Color32(125, 120, 123, 255);
                 }
-                if (i < 2)
-                    CreateMenuSign(bar.transform, x, i == 0 ? "対戦したい方" : "ルールを知りたい方");
+                // 看板は左の3項目に立てる。コレクションのぶんは 2026-10-09 に足した（ユーザーの指示）
+                if (i < MenuSignLabels.Length)
+                    CreateMenuSign(bar.transform, x, MenuSignLabels[i]);
             }
         }
+
+        /// <summary>
+        /// メニューの上に立てる看板の文字。左の項目から順（対局へ・チュートリアル・コレクション）。
+        /// **看板に入るのは1行6文字まで。** それより長いものは `\n` で2行に割って書く。
+        /// </summary>
+        private static readonly string[] MenuSignLabels =
+        {
+            "対戦したい方",
+            "ルールを\n知りたい方",
+            "資料を\n見たい方",
+        };
 
         private void CreateMenuSign(Transform parent, float x, string label)
         {
@@ -401,12 +413,11 @@ namespace KillingMahjong.UI
             if (sprite == null) return;
 
             // 矢印の先をメニューの上に合わせ、看板の傾きに沿って文字を載せる。
-            var sign = CreateCenteredImage(parent, "RoomMenuSign_" + label,
+            var sign = CreateCenteredImage(parent, "RoomMenuSign_" + label.Replace("\n", ""),
                 new Vector2(x + 2f, 114f), new Vector2(192f, 144f), Color.white);
             sign.sprite = sprite;
             sign.preserveAspect = true;
-            string signText = label == "ルールを知りたい方" ? "ルールを\n知りたい方" : label;
-            CreateText(sign.transform, "SignLabel", signText, new Vector2(-21.6f, 36f),
+            CreateText(sign.transform, "SignLabel", label, new Vector2(-21.6f, 36f),
                 new Vector2(68f, 30f), 9f, TextAlignmentOptions.Center, new Color32(69, 37, 26, 255));
             var text = sign.transform.Find("SignLabel").GetComponent<TextMeshProUGUI>();
             text.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 22f);
