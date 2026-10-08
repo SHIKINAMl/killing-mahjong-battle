@@ -1,6 +1,5 @@
 using System;
 using System.Collections;
-using TMPro;
 using UnityEngine;
 using KillingMahjong.Common;
 using KillingMahjong.Managers;
@@ -8,55 +7,50 @@ using KillingMahjong.Managers;
 namespace KillingMahjong.UI.Effects
 {
     /// <summary>
-    /// 強襲を使ったあとの演出（2026-10-08）。
+    /// 強襲を使ったあとの演出（2026-10-09 に作り直した）。
     ///
-    /// **それまで、強襲はカットインが出て血が減るだけだった。** 撃った手応えが無く、
-    /// 効果が出るのは何巡も先なので、撃ったことを忘れる（ユーザーの指摘）。
-    /// 案は Antigravity と出し合い、「相手の血に照準を合わせて固定する」に決めた
-    /// （km-docs/research/skill_effects_boost_assault_20261008.md の強襲・案1）。
+    /// **自分の血を抜いて、覚悟を決める**（ユーザーの指示）。
+    /// 絵の作りは透視・牌交換に合わせてある。最初の版は、刻む動きと照準の線
+    /// （四方から赤い線が絞り込む）で、「雰囲気が合っていない」と言われた。
     ///
-    /// 流れ（約2.5秒）
-    ///   ① 沈む     … 画面が赤黒く落ち、狙う側の血の表示のまわりだけ残る
-    ///   ② 絞る     … 画面の四方から赤い線が伸び、照準が3段で狭まる。段ごとにピッ
-    ///   ③ 固定     … 照準が血の表示にぴたりと合い、一瞬白く光る。画面が揺れ、相手が跳ねる
-    ///   ④ 代償     … 撃った側の血の表示に赤い斜線が入り、「獲得 0」が点滅する
-    ///   ⑤ 残す     … 暗幕と線が引き、**照準だけが残る**（<see cref="AssaultMarkUI"/> に引き継ぐ）
+    ///   舞台 … 透視のものを、赤い調子で借りる（<see cref="PerspectiveSkillEffect"/>）。
+    ///           その瞬間の画面を暗い赤にして周りに重ね、暗く落とし、集中線を**血が集まる所**へ集める。
+    ///           BGM が水の中のように沈み、終わりに白く光って、心音とともに戻る
+    ///   中身 … 血の粒。自分の血の表示から1つずつ抜けて、画面の真ん中に集まる
+    ///           （透視で牌を1枚ずつ返すのと同じ間合い。1つごとに心音）。
+    ///           集まった血がぎゅっと縮み、相手の血の表示へ撃ち込まれて、印になって残る
     ///
-    /// 動きは刻む（1/20 秒ごと、位置は1ドット単位）。出しているのは図形と文字だけ。
+    /// 流れ（約3.6秒。うち白く光るまでが約3.0秒）
+    ///   ① 集中     … 赤い舞台が出る
+    ///   ② 血を抜く … 血の粒が3つ、自分の血の表示から真ん中へ。1つごとに心音
+    ///   ③ 覚悟     … 集まった血が脈を打ち、外から輪が締まってきて、縮む
+    ///   ④ 撃ち込む … 筋を引いて相手の血の表示へ飛び、弾けて相手が跳ねる。印が残る（<see cref="AssaultMarkUI"/>）
+    ///   ⑤ 解除     … 白く光って舞台が消える
     ///
-    /// **音は、透視と同じ段取りを掛ける**（<see cref="SkillTranceAudio"/>、2026-10-09 のユーザー指示）。
-    /// ①で BGM が水の中のように沈み、⑤で白く光って抜け、そのあと心音とともに元へ戻る。
-    /// 心音は演出が終わったあとも鳴り続ける（ゲームは待たせない）。
+    /// シーンには置かない。出しているのは実機の画面の複製と、図形（丸）だけ。
     /// </summary>
     public class AssaultSkillEffect : MonoBehaviour
     {
-        private const float Step = 0.05f;
+        // 透視（ExposedTileEffectPlayer）と同じ間合い
+        private const float DropGap = 0.28f;
+        private const float HoldBeforeFlash = 0.45f;
 
-        private const float LinesAt = 0.20f;     // 線が画面の端から伸び始める
-        private const float LockAt = 1.20f;      // 照準が固定される
-        private const float CostAt = 1.70f;      // 代償（獲得0）を見せる
-        private const float LeaveAt = 2.10f;     // 暗幕と線が引き始める
-        private const float EndAt = 2.50f;
+        private const int DropCount = 3;
+        private const float DropFlySeconds = 0.40f;
+        private const float DropRadius = 10f;
 
-        /// <summary>照準が狭まる段。時刻と、最後の大きさからどれだけ外にいるか。</summary>
-        private static readonly float[] CloseTimes = { 0.20f, 0.30f, 0.40f, 0.65f, 0.90f };
-        private static readonly float[] ClosePads = { 150f, 110f, 70f, 40f, 18f };
+        /// <summary>集まった血の大きさ。粒が1つ届くごとに1段ふくらむ。</summary>
+        private static readonly float[] PoolRadius = { 0f, 16f, 23f, 30f };
 
-        /// <summary>段ごとに上がっていく合図の音の高さ（狭まる3段ぶん）。</summary>
-        private static readonly float[] BeepPitches = { 880f, 1040f, 1240f };
+        private const float ResolveSeconds = 0.60f;   // 脈を打って縮む
+        private const float ShootSeconds = 0.20f;     // 相手へ飛ぶ
+        private const float ResolvedScale = 0.6f;     // 縮みきった大きさ（集まった血に対して）
 
-        private static readonly Color Dark = new Color(0f, 0f, 0f, 0.85f);
-        private static readonly Color PlateFill = new Color(0.05f, 0f, 0f, 0.88f);
+        /// <summary>血の粒の後ろ（集中線の集まる先）を暗くする量。</summary>
+        private const float FocusDim = 0.6f;
 
+        private PerspectiveSkillEffect _backdrop;
         private SkillEffectStage _stage;
-        private SkillTranceAudio _trance;
-
-        private void OnDestroy()
-        {
-            // 光る前に打ち切られたら、沈めた音を戻す。光ったあとは向こうが自分で鳴らしきる
-            if (_trance != null && !_trance.IsReleased) _trance.Dispose();
-            _trance = null;
-        }
 
         public static AssaultSkillEffect Create()
         {
@@ -71,203 +65,214 @@ namespace KillingMahjong.UI.Effects
             Destroy(gameObject);
         }
 
-        /// <param name="targetHpAnchor">狙われる側の血の表示。照準はここに合う</param>
-        /// <param name="casterHpAnchor">撃った側の血の表示。「獲得 0」はここに出る</param>
-        /// <param name="onLock">照準が固定された瞬間に呼ぶ（相手の立ち絵を跳ねさせる、など）</param>
-        public IEnumerator Play(RectTransform targetHpAnchor, RectTransform casterHpAnchor, Action onLock)
+        private void OnDestroy()
         {
-            _stage = new SkillEffectStage("Stage", UISortingOrders.PerspectiveOverlay, transform);
+            // 舞台は別の入れ物なので、一緒に消す（残すと画面が赤いまま・音が沈んだままになる）
+            if (_backdrop != null) _backdrop.Dispose();
+            _backdrop = null;
+        }
 
-            var darken = _stage.AddDarken("Darken", new Color(0.10f, 0f, 0f, 1f));
-            var shapes = _stage.AddShapes("Shapes");
-            var hitText = _stage.AddText("Hit", "直撃", 26f, AssaultMarkUI.Core);
-            var costText = _stage.AddText("Cost", "獲得 0", 26f, AssaultMarkUI.Core);
-            hitText.fontStyle = FontStyles.Bold;
-            costText.fontStyle = FontStyles.Bold;
-            hitText.gameObject.SetActive(false);
-            costText.gameObject.SetActive(false);
+        /// <param name="targetHpAnchor">狙われる側の血の表示。血はここへ撃ち込まれ、印が残る</param>
+        /// <param name="casterHpAnchor">撃った側の血の表示。血の粒はここから抜ける</param>
+        /// <param name="onHit">血が当たった瞬間に呼ぶ（相手の立ち絵を跳ねさせる、など）</param>
+        public IEnumerator Play(RectTransform targetHpAnchor, RectTransform casterHpAnchor, Action onHit)
+        {
+            // 位置を測るための入れ物。まだ何も描かないので、舞台が撮る画面には写らない
+            _stage = new SkillEffectStage("Content", UISortingOrders.SkillEffectContent, transform);
+            var shapes = _stage.AddShapes("Blood");
 
-            Rect lockRect = AssaultMarkUI.ReticleRect(_stage, targetHpAnchor);
             Rect caster = _stage.LocalVisibleRectOf(casterHpAnchor);
-            bool hasCaster = caster.width > 1f;
-            Rect screen = _stage.Rect.rect;
+            Vector2 from = caster.width > 1f ? caster.center : new Vector2(300f, -120f);
+            // 血が集まる所。画面の真ん中から少し自分寄り（相手へ撃ち込む距離を取るため）
+            Vector2 pool = new Vector2(40f, -30f);
+            Vector2 to = AssaultMarkUI.MarkPosition(_stage, targetHpAnchor);
 
-            darken.CenterLocal = lockRect.center;
-            darken.RadiusX = lockRect.width * 0.5f + 80f;
-            darken.RadiusY = lockRect.height * 0.5f + 60f;
-            darken.MaxAlpha = 0.78f;
-
-            // 文字は血の表示に重ねない。「直撃」は照準の下、「獲得 0」は撃った側の血の表示の上。
-            // どちらも黒い札の上に出す（赤い壁の上にじかに置くと読めなかった）
-            Vector2 hitPos = SkillEffectStage.Snap(new Vector2(lockRect.center.x, lockRect.yMin - 28f));
-            Vector2 costPos = SkillEffectStage.Snap(new Vector2(
-                Mathf.Clamp(caster.center.x, screen.xMin + 70f, screen.xMax - 70f), caster.yMax + 28f));
-            hitText.rectTransform.anchoredPosition = hitPos;
-            costText.rectTransform.anchoredPosition = costPos;
+            // ---- ① 集中。舞台は透視と同じで、色だけ赤。集中線は血が集まる所へ集める ----
+            // 最初は自分の血の表示へ集めていたが、画面の右端に寄って、主役の血の粒が暗がりに沈んだ
+            float unit = Screen.width / Mathf.Max(1f, _stage.Rect.rect.width);
+            const float focusHalfW = 130f, focusHalfH = 50f;
+            var focus = new Rect(Screen.width * 0.5f + (pool.x - focusHalfW) * unit,
+                                 Screen.height * 0.5f + (pool.y - focusHalfH) * unit,
+                                 focusHalfW * 2f * unit, focusHalfH * 2f * unit);
+            _backdrop = PerspectiveSkillEffect.Create(PerspectiveSkillEffect.Tone.Red);
+            if (_backdrop != null)
+            {
+                _backdrop.FocusDim = FocusDim;
+                yield return _backdrop.Enter(focus);
+            }
 
             var audio = AudioManager.Instance;
 
-            // BGM を沈め、深く沈んだ音を流し始める（透視と同じ段取り）
-            _trance = SkillTranceAudio.Begin(0.3f);
-
-            ScreenQuake.Play(4f, 0.15f);
-            if (audio != null) audio.PlaySynthSound(SynthWaveType.Sawtooth, 1200f, 1800f, 0.3f, 0.5f);
-
-            int beeps = 0;
-            bool lockCue = false, costCue = false, leaveCue = false;
-            float clock = 0f;
-            int lastStep = -1;
-
-            while (clock < EndAt)
+            // ---- ② 血を抜く。1つずつ、心音と一緒に ----
+            // 粒は山なりに飛ぶ。飛び出す時刻は等間隔（透視で牌を返す間合いと同じ）
+            float drawSeconds = DropGap * (DropCount - 1) + DropFlySeconds;
+            int beats = 0;
+            float poolPop = 0f;      // 粒が届いた瞬間のふくらみ（1 → 0 へ戻る）
+            int arrived = 0;
+            for (float t = 0f; t < drawSeconds; t += Time.deltaTime)
             {
-                clock += Time.deltaTime;
-                int step = Mathf.FloorToInt(clock / Step);
-                if (step == lastStep) { yield return null; continue; }
-                lastStep = step;
-                float t = step * Step;
-
-                // ---- 音と、1回きりの合図 ----
-                // 狭まる3段（CloseTimes の後ろ3つ）に合わせて、だんだん高くなる合図を鳴らす
-                while (beeps < BeepPitches.Length && t >= CloseTimes[CloseTimes.Length - BeepPitches.Length + beeps])
+                // 心音は粒が出る瞬間に。3つ目だけ強く
+                while (beats < DropCount && t >= beats * DropGap)
                 {
-                    if (audio != null) audio.PlaySynthSound(SynthWaveType.Square, BeepPitches[beeps], BeepPitches[beeps], 0.06f, 0.5f);
-                    beeps++;
-                }
-                if (!lockCue && t >= LockAt)
-                {
-                    lockCue = true;
-                    ScreenQuake.Play(12f, 0.22f);
-                    if (onLock != null) onLock();
                     if (audio != null)
                     {
-                        audio.PlaySynthSound(SynthWaveType.Square, 1560f, 1560f, 0.18f, 0.7f);
-                        audio.PlaySynthSoundDual(SynthWaveType.Square, SynthWaveType.Noise, 200f, 60f, 0.25f, 1.1f);
+                        audio.PlayHeartbeat(beats == DropCount - 1 ? HeartbeatStrength.Strong : HeartbeatStrength.Medium,
+                                            HeartbeatSpacing.Compact);
                     }
-                }
-                if (!costCue && t >= CostAt)
-                {
-                    costCue = true;
-                    if (audio != null) audio.PlaySynthSound(SynthWaveType.Sawtooth, 150f, 90f, 0.3f, 0.8f);
-                }
-                if (!leaveCue && t >= LeaveAt)
-                {
-                    leaveCue = true;
-                    // 白く光って、沈んでいた音が抜ける。心音と BGM の戻りは向こうが鳴らしきる
-                    if (_trance != null) _trance.ReleaseDetached();
+                    beats++;
                 }
 
-                // ---- 暗幕 ----
-                float leave = Mathf.Clamp01((t - LeaveAt) / (EndAt - LeaveAt - 0.10f));
-                darken.Strength = Mathf.Clamp01(t / 0.25f) * (1f - leave);
-
-                bool locked = t >= LockAt;
-                bool flash = locked && t < LockAt + 0.10f;
-                float fadeOut = 1f - Mathf.Clamp01((t - LeaveAt) / 0.25f);
-
-                bool hitVisible = locked && t < LeaveAt;
-                bool costVisible = hasCaster && t >= CostAt && fadeOut > 0f;
-                // 「獲得 0」は点滅させる（2コマ点いて1コマ消える）。消え際は点けっぱなし
-                bool costTextVisible = costVisible && (t >= LeaveAt || step % 3 != 2);
-
-                // ---- 図形 ----
+                int nowArrived = 0;
                 shapes.Begin();
-
-                if (t >= LinesAt)
+                for (int i = 0; i < DropCount; i++)
                 {
-                    float pad = 0f;
-                    if (!locked)
-                    {
-                        for (int i = 0; i < CloseTimes.Length; i++)
-                        {
-                            if (t >= CloseTimes[i]) pad = ClosePads[i];
-                        }
-                    }
-                    Rect reticle = SkillEffectStage.Expand(lockRect, pad);
-
-                    // 固定の瞬間だけ全部白。そのあとは、線の芯を2コマおきに暗くする（走査しているように）
-                    Color rim = flash ? Color.white : AssaultMarkUI.Red;
-                    Color lineCore = flash ? Color.white : ((step % 4 < 2) ? AssaultMarkUI.Core : AssaultMarkUI.CoreDim);
-                    // 絞っている間は芯を暗めにしておき、固定で白く点く
-                    Color reticleCore = locked ? AssaultMarkUI.Core : AssaultMarkUI.CoreDim;
-
-                    // 引くときは、線だけが画面の外へ戻っていく。照準は残す
-                    float retract = t >= LeaveAt ? Mathf.Clamp01((t - LeaveAt) / 0.25f) : 0f;
-                    if (retract < 1f) DrawLines(shapes, reticle, screen, retract, lineCore, rim);
-
-                    AssaultMarkUI.DrawReticle(shapes, reticle, reticleCore, rim);
+                    float u = (t - i * DropGap) / DropFlySeconds;
+                    if (u >= 1f) { nowArrived++; continue; }
+                    if (u < 0f) continue;
+                    DrawFlyingDrop(shapes, from, pool, u, i);
                 }
+                if (nowArrived > arrived) { arrived = nowArrived; poolPop = 1f; }
+                poolPop = Mathf.MoveTowards(poolPop, 0f, Time.deltaTime / 0.15f);
 
-                // ---- 代償: 撃った側の血の表示に斜線 ----
-                if (costVisible)
-                {
-                    Rect slash = SkillEffectStage.Expand(caster, 6f);
-                    Color core = AssaultMarkUI.Core; core.a = fadeOut;
-                    Color red = AssaultMarkUI.Red; red.a = fadeOut;
-                    Color dark = Dark; dark.a *= fadeOut;
-                    // 斜線は伸びながら入る（2段）
-                    float reach = t < CostAt + 0.05f ? 0.5f : 1f;
-                    Vector2 from = new Vector2(slash.xMin, slash.yMax);
-                    Vector2 to = Vector2.Lerp(from, new Vector2(slash.xMax, slash.yMin), reach);
-                    shapes.Line(from, to, 14f, dark);
-                    shapes.Line(from, to, 10f, red);
-                    shapes.Line(from, to, 4f, core);
-                }
-
-                // ---- 文字の後ろの札 ----
-                if (hitVisible) DrawPlate(shapes, hitPos, 76f, 34f, flash ? Color.white : AssaultMarkUI.Red, 1f);
-                if (costTextVisible) DrawPlate(shapes, costPos, 112f, 34f, AssaultMarkUI.Red, fadeOut);
-
+                // 集まった血。届いた瞬間に一度ふくらむ（透視で牌を返した瞬間と同じ）
+                float r = PoolRadius[Mathf.Clamp(arrived, 0, DropCount)] * (1f + 0.3f * Mathf.PingPong(poolPop * 2f, 1f));
+                AssaultMarkUI.DrawDrop(shapes, pool, r, 1f);
                 shapes.End();
-
-                // ---- 文字 ----
-                if (hitText.gameObject.activeSelf != hitVisible) hitText.gameObject.SetActive(hitVisible);
-                if (costText.gameObject.activeSelf != costTextVisible) costText.gameObject.SetActive(costTextVisible);
-                if (costTextVisible) costText.alpha = fadeOut;
-
                 yield return null;
             }
 
-            // 照準だけを残して、自分は消える
+            // ---- ③ 覚悟。脈を1つ打って、ぎゅっと縮む ----
+            if (audio != null) audio.PlayHeartbeat(HeartbeatStrength.Strong, HeartbeatSpacing.Compact);
+            float full = PoolRadius[DropCount];
+            for (float t = 0f; t < ResolveSeconds; t += Time.deltaTime)
+            {
+                float p = Mathf.Clamp01(t / ResolveSeconds);
+                // 前半でいったん大きく脈打ち、後半で小さく固まる
+                float r = p < 0.35f
+                    ? Mathf.Lerp(full, full * 1.25f, Mathf.Sin(p / 0.35f * Mathf.PI))
+                    : Mathf.Lerp(full, full * ResolvedScale, Mathf.SmoothStep(0f, 1f, (p - 0.35f) / 0.65f));
+                shapes.Begin();
+                // 外から輪が締まってくる。腹を決める間
+                Color close = AssaultMarkUI.BloodShine;
+                close.a = p * 0.9f;
+                shapes.Ring(pool, Mathf.Lerp(110f, full * ResolvedScale + 6f, Mathf.SmoothStep(0f, 1f, p)), 4f, close);
+                AssaultMarkUI.DrawDrop(shapes, pool, r, 1f);
+                shapes.End();
+                yield return null;
+            }
+
+            // ---- ④ 撃ち込む ----
+            float small = full * ResolvedScale;
+            if (audio != null) audio.PlaySynthSoundDual(SynthWaveType.Sine, SynthWaveType.Noise, 240f, 70f, 0.22f, 0.9f);
+            for (float t = 0f; t < ShootSeconds; t += Time.deltaTime)
+            {
+                float p = Mathf.Clamp01(t / ShootSeconds);
+                float eased = p * Mathf.Sqrt(p);             // 出だしは溜めて、一気に届く
+                shapes.Begin();
+                DrawStreak(shapes, pool, to, eased, small, 1f);
+                shapes.End();
+                yield return null;
+            }
+
+            // 当たった。相手が跳ね、印が残る
+            if (onHit != null) onHit();
+            ScreenQuake.Play(10f, 0.2f);
             AssaultMarkUI.Show(targetHpAnchor);
+
+            // 着弾。白く弾けて、輪が2つ広がり、しぶきが散る。
+            // 印（AssaultMarkUI）は舞台より奥に居て、白く光るまで見えない。そのあいだはここで同じ粒を描く
+            for (float t = 0f; t < HoldBeforeFlash; t += Time.deltaTime)
+            {
+                float p = Mathf.Clamp01(t / 0.35f);
+                shapes.Begin();
+
+                // 撃った跡の筋が、少しだけ残って消える
+                float trail = 1f - Mathf.Clamp01(t / 0.12f);
+                if (trail > 0f) DrawStreak(shapes, pool, to, 1f, small, trail);
+
+                for (int k = 0; k < 2; k++)
+                {
+                    float q = Mathf.Clamp01(p - k * 0.25f);
+                    if (q <= 0f) continue;
+                    Color c = Color.Lerp(AssaultMarkUI.BloodShine, AssaultMarkUI.Blood, q);
+                    c.a = 1f - q;
+                    shapes.Ring(to, AssaultMarkUI.Radius + 6f + q * 46f, 4f, c);
+                }
+
+                for (int k = 0; k < SplashCount; k++)
+                {
+                    float a = (k + 0.5f) * Mathf.PI * 2f / SplashCount;
+                    float reach = (k % 2 == 0 ? 44f : 30f) * Mathf.Sin(p * Mathf.PI * 0.5f);
+                    Vector2 at = to + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * reach;
+                    at.y -= 26f * p * p;                      // 少し垂れる
+                    AssaultMarkUI.DrawDrop(shapes, at, 4f * (1f - p), 1f - p);
+                }
+
+                float burst = 1f - Mathf.Clamp01(t / 0.14f);
+                if (burst > 0f)
+                {
+                    Color white = Color.white;
+                    white.a = burst;
+                    shapes.Disc(to, AssaultMarkUI.Radius + 20f * burst, white);
+                }
+
+                AssaultMarkUI.DrawDrop(shapes, to, AssaultMarkUI.Radius, 1f);
+                shapes.End();
+                yield return null;
+            }
+            shapes.Begin();
+            shapes.End();
+
+            // ---- ⑤ 白く光って舞台が消える。心音と BGM の戻りは待たない ----
+            if (_backdrop != null)
+            {
+                var backdrop = _backdrop;
+                _backdrop = null;          // ここから先は舞台が自分で片付く
+                yield return backdrop.ReleaseQuick();
+            }
+            else
+            {
+                ScreenFlash.Play();
+            }
+
             Dispose();
         }
 
+        private const int SplashCount = 8;
+
         /// <summary>
-        /// 画面の四方から照準の辺へ伸びる線。<paramref name="retract"/> が 0 で照準まで届き、
-        /// 1 で画面の端まで引っ込む。
+        /// 撃ち込む血。頭の粒と、その後ろに伸びる筋。<paramref name="head"/> は 0（集まった所）〜 1（相手）。
+        /// 筋は粒を詰めて並べて作る。後ろほど細く薄い。
         /// </summary>
-        private static void DrawLines(PixelShapeGraphic g, Rect reticle, Rect screen, float retract, Color core, Color rim)
+        private static void DrawStreak(PixelShapeGraphic g, Vector2 from, Vector2 to, float head, float startRadius, float alpha)
         {
-            Vector2 c = reticle.center;
-            Color dark = Dark;
-            dark.a *= core.a;
-
-            float left = SkillEffectStage.Snap(Mathf.Lerp(reticle.xMin, screen.xMin, retract));
-            float right = SkillEffectStage.Snap(Mathf.Lerp(reticle.xMax, screen.xMax, retract));
-            float bottom = SkillEffectStage.Snap(Mathf.Lerp(reticle.yMin, screen.yMin, retract));
-            float top = SkillEffectStage.Snap(Mathf.Lerp(reticle.yMax, screen.yMax, retract));
-
-            // 外から 黒 → 赤 → 芯 の3重。赤い壁の上でも緑の卓の上でも線が残るように
-            for (int pass = 0; pass < 3; pass++)
+            const int steps = 12;
+            const float length = 0.55f;                       // 筋の長さ（道のりに対して）
+            float headRadius = Mathf.Lerp(startRadius, AssaultMarkUI.Radius, head);
+            for (int k = steps; k >= 1; k--)
             {
-                float half = pass == 0 ? 5f : (pass == 1 ? 3f : 1f);
-                Color col = pass == 0 ? dark : (pass == 1 ? rim : core);
-
-                g.Box(screen.xMin, c.y - half, left, c.y + half, col);
-                g.Box(right, c.y - half, screen.xMax, c.y + half, col);
-                g.Box(c.x - half, screen.yMin, c.x + half, bottom, col);
-                g.Box(c.x - half, top, c.x + half, screen.yMax, col);
+                float back = head - length * k / steps;
+                if (back < 0f) continue;
+                float thin = 1f - (float)k / (steps + 1);
+                AssaultMarkUI.DrawDrop(g, Vector2.Lerp(from, to, back), headRadius * (0.35f + 0.6f * thin), alpha * (0.25f + 0.6f * thin));
             }
+            AssaultMarkUI.DrawDrop(g, Vector2.Lerp(from, to, head), headRadius, alpha);
         }
 
-        /// <summary>文字の後ろに敷く黒い札。赤い枠つき。</summary>
-        private static void DrawPlate(PixelShapeGraphic g, Vector2 center, float width, float height, Color edge, float alpha)
+        /// <summary>自分の血の表示から、集まる所へ山なりに飛ぶ粒。後ろに小さな尾を引く。</summary>
+        private static void DrawFlyingDrop(PixelShapeGraphic g, Vector2 from, Vector2 to, float u, int index)
         {
-            Rect r = new Rect(center.x - width * 0.5f, center.y - height * 0.5f, width, height);
-            Color fill = PlateFill; fill.a *= alpha;
-            edge.a = alpha;
-            g.Box(r, fill);
-            g.Frame(r, 2f, edge);
+            // 粒ごとに山の高さを変える（3つが同じ線をなぞると1つに見える）
+            float arc = 70f + index * 26f;
+            for (int k = 3; k >= 0; k--)
+            {
+                float v = Mathf.Clamp01(u - k * 0.06f);
+                float eased = Mathf.SmoothStep(0f, 1f, v);
+                Vector2 p = Vector2.Lerp(from, to, eased);
+                p.y += arc * 4f * eased * (1f - eased);
+                float alpha = k == 0 ? 1f : 0.55f - k * 0.13f;
+                AssaultMarkUI.DrawDrop(g, p, DropRadius * (1f - k * 0.17f), alpha);
+            }
         }
     }
 }

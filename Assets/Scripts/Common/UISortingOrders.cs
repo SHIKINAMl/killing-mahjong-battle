@@ -304,6 +304,14 @@ namespace KillingMahjong.Common
         /// <summary>ClickFeedbackManager: クリックエフェクト</summary>
         public const int ClickFeedback = 94;
 
+        /// <summary>
+        /// 役強化・強襲の演出の中身（役名・翻数・血の粒）（2026-10-09）。
+        /// 舞台（<see cref="PerspectiveOverlay"/>、青や赤の重ねと集中線）より手前で、
+        /// カットイン（95）と白フラッシュ（98）より奥。ClickFeedback と同じ段でよい
+        /// （演出中のクリックの波紋と重なっても困らない）。
+        /// </summary>
+        public const int SkillEffectContent = 94;
+
         /// <summary>CutinAnimationUI: カットイン演出</summary>
         public const int CutinAnimation = 95;
 

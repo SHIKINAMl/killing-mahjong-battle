@@ -30,11 +30,11 @@ namespace KillingMahjong.UI
                     yield return rig.phase.PlaySkillCutinAnimationRoutine("役強化", true, rig.player.CurrentCharacterData, subText: "清一色");
                     var boost = BoostHandSkillEffect.Create();
                     scope.AddCleanup(() => { if (boost != null) boost.Dispose(); });
-                    yield return boost.Play("清一色", rig.player.HpGaugeAnchor); break;
+                    yield return boost.Play("清一色"); break;
                 case "skill.assault":
                     yield return rig.phase.PlaySkillCutinAnimationRoutine("強襲", true, rig.player.CurrentCharacterData);
                     var assault = AssaultSkillEffect.Create();
-                    // 照準は本編だと局の終わりまで残る。試写では少し見せてから、抜けるときに消す
+                    // 血の印は本編だと局の終わりまで残る。試写では少し見せてから、抜けるときに消す
                     scope.AddCleanup(() => { if (assault != null) assault.Dispose(); AssaultMarkUI.Clear(); });
                     yield return assault.Play(rig.enemy.HpGaugeAnchor, rig.player.HpGaugeAnchor, () => rig.enemy.PlayBounceAnimation(.4f));
                     yield return new WaitForSeconds(1.5f); break;

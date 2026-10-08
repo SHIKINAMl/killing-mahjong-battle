@@ -106,6 +106,35 @@ namespace KillingMahjong.UI.Effects
             Box(f.xMax - t - grow, f.yMax - arm - grow, f.xMax + grow, f.yMax + grow, color);
         }
 
+        /// <summary>塗りつぶした丸。横の帯を積んで作る（ドット絵の丸になる）。</summary>
+        public void Disc(Vector2 center, float radius, Color color)
+        {
+            if (radius <= 0.5f || color.a <= 0f) return;
+
+            const float row = 2f;
+            for (float y = -radius; y < radius; y += row)
+            {
+                float mid = y + row * 0.5f;
+                float half = Mathf.Sqrt(Mathf.Max(0f, radius * radius - mid * mid));
+                if (half < 0.5f) continue;
+                Box(center.x - half, center.y + y, center.x + half, center.y + y + row, color);
+            }
+        }
+
+        /// <summary>輪。小さな四角を円周に並べて作る。</summary>
+        public void Ring(Vector2 center, float radius, float thickness, Color color)
+        {
+            if (radius <= 0.5f || color.a <= 0f) return;
+
+            int count = Mathf.Clamp(Mathf.CeilToInt(radius * 0.9f), 12, 64);
+            for (int i = 0; i < count; i++)
+            {
+                float a = i * Mathf.PI * 2f / count;
+                Vector2 p = center + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * radius;
+                BoxCentered(p, thickness, thickness, color);
+            }
+        }
+
         protected override void OnPopulateMesh(VertexHelper vh)
         {
             vh.Clear();
