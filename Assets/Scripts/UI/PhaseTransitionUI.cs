@@ -384,8 +384,21 @@ namespace KillingMahjong.UI
                 yield return scope.Run(SkillCutinVisualsRoutine(scope, skillName, isLocalPlayer, characterData, duration, onComplete, subText));
         }
 
-        /// <summary>相手のカットインの立ち絵の高さ（Canvas の単位、4:3 のとき）。絵の全体でこの高さ。</summary>
-        private const float EnemyCutinPortraitHeight = 400f;
+        /// <summary>
+        /// 相手のカットインの立ち絵の高さ（Canvas の単位、4:3 のとき）。絵の全体でこの高さ。
+        ///
+        /// **相手のロンのカットイン（CutinAnimationUI）と同じ 1000**（2026-10-09 のユーザー指示）。
+        /// 同じ日に、膨らんでいた 1406 を 2026-09-27 より前の 400 へ戻したが、
+        /// 400 は「小さい」と言われた。ロンのときの大きさが基準。
+        /// </summary>
+        private const float EnemyCutinPortraitHeight = 1000f;
+
+        /// <summary>
+        /// 相手のカットインの立ち絵を置く位置（絵の下端の中央。画面の左下から、4:3 のとき）。
+        /// ロンのカットインと同じ収まり方になる位置: 顔が画面の上のほうに来て、胸元まで映る。
+        /// 高さを変えたら、ここも合わせて動かすこと（そのままだと顔が画面の外へ出る）。
+        /// </summary>
+        private static readonly Vector2 EnemyCutinPortraitPosition = new Vector2(250f, -400f);
 
         /// <summary>カットインの寸法を決めたときの Canvas の高さ（800x600 の 600）。</summary>
         private const float CutinReferenceHeight = 600f;
@@ -586,15 +599,15 @@ namespace KillingMahjong.UI
 
                     // **画面の高さに比例させる。** Canvas は幅基準（800 固定）なので、横長の画面では
                     // 高さが 600 より小さくなる（16:9 で 450）。決め打ちだと、そのぶん大きく見える。
-                    // 4:3 のとき k=1 で、見た目は 2026-09-27 より前と同じ
+                    // 4:3 のとき k=1
                     float k = containerRt.rect.height > 1f ? containerRt.rect.height / CutinReferenceHeight : 1f;
                     float scale = nativeHeight > 0f ? EnemyCutinPortraitHeight * k / nativeHeight : 1f;
                     portraitRt.localScale = new Vector3(scale, scale, 1f);
 
-                    // 常に左下に配置（顔と胸元だけが下から覗く）
+                    // 左寄りに置く。下から上がってきて、顔から胸元までが大きく映る
                     portraitRt.anchorMin = new Vector2(0f, 0f);
                     portraitRt.anchorMax = new Vector2(0f, 0f);
-                    portraitTargetPos = new Vector2(250f, -150f) * k;
+                    portraitTargetPos = EnemyCutinPortraitPosition * k;
                     portraitStartPos = portraitTargetPos + new Vector2(0f, -800f * k); // 下から上がってくる
                 }
 
