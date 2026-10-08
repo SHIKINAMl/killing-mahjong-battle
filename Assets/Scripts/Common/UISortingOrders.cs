@@ -119,6 +119,12 @@ namespace KillingMahjong.Common
         /// <summary>GameUISkillController: マリガン中に選択対象の手牌/山UIをディマーより手前に出すレイヤー</summary>
         public const int MulliganFocusTiles = 21;
 
+        /// <summary>AssaultMarkUI: 強襲で狙った側の血の表示に、局の終わりまで残る照準（2026-10-08）。
+        ///
+        /// 盤面と情報パネル（20以下）より手前。局のあいだ出しっぱなしなので、
+        /// ツールチップ（25）や各種パネル・演出（30以上）が出たら、その下に隠れてよい。</summary>
+        public const int AssaultMark = 22;
+
         /// <summary>AbilityUI: ツールチップ (InfoPanelHighlight より手前)</summary>
         public const int AbilityTooltip = 25;
 

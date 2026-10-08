@@ -70,6 +70,13 @@ namespace KillingMahjong.UI
             }
         }
 
+        /// <summary>
+        /// 血袋の絵そのもの。**対象をぴったり囲みたいとき（強襲の照準など）に使う。**
+        /// <see cref="HpAnchor"/> は数字の出どころで、血袋の絵より広く、中心もずれている
+        /// （2026-10-08、強襲の照準が血袋の左上へ外れて出た）。
+        /// </summary>
+        public RectTransform HpGaugeAnchor => hpFillImage != null ? hpFillImage.rectTransform : HpAnchor;
+
         private HpPopupPresenter HpPopup
         {
             get

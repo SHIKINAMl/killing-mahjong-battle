@@ -27,9 +27,17 @@ namespace KillingMahjong.UI
                     yield return swap.PlayRoutine(Tile(1), Tile(8), rig.handTiles[1]);
                     rig.handTiles[1].GetComponent<Image>().sprite = rig.tiles.GetTileSprite(Tile(8)); break;
                 case "skill.boost_hand":
-                    yield return rig.phase.PlaySkillCutinAnimationRoutine("役強化", true, rig.player.CurrentCharacterData, subText: "清一色"); break;
+                    yield return rig.phase.PlaySkillCutinAnimationRoutine("役強化", true, rig.player.CurrentCharacterData, subText: "清一色");
+                    var boost = BoostHandSkillEffect.Create();
+                    scope.AddCleanup(() => { if (boost != null) boost.Dispose(); });
+                    yield return boost.Play("清一色", rig.player.HpGaugeAnchor); break;
                 case "skill.assault":
-                    yield return rig.phase.PlaySkillCutinAnimationRoutine("強襲", true, rig.player.CurrentCharacterData); break;
+                    yield return rig.phase.PlaySkillCutinAnimationRoutine("強襲", true, rig.player.CurrentCharacterData);
+                    var assault = AssaultSkillEffect.Create();
+                    // 照準は本編だと局の終わりまで残る。試写では少し見せてから、抜けるときに消す
+                    scope.AddCleanup(() => { if (assault != null) assault.Dispose(); AssaultMarkUI.Clear(); });
+                    yield return assault.Play(rig.enemy.HpGaugeAnchor, rig.player.HpGaugeAnchor, () => rig.enemy.PlayBounceAnimation(.4f));
+                    yield return new WaitForSeconds(1.5f); break;
                 case "skill.cutin.enemy":
                     yield return rig.phase.PlaySkillCutinAnimationRoutine("透視", false, rig.enemy.CurrentCharacterData); break;
                 case "unused.special_victory":

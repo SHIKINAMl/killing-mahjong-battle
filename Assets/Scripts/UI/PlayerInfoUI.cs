@@ -121,6 +121,12 @@ namespace KillingMahjong.UI
             }
         }
 
+        /// <summary>
+        /// 血のメーターの絵そのもの。**対象をぴったり囲みたいとき（強襲の照準など）に使う。**
+        /// <see cref="HpAnchor"/> は数字の出どころで、メーターの絵より広かったりずれていたりする。
+        /// </summary>
+        public RectTransform HpGaugeAnchor => hpFillImage != null ? hpFillImage.rectTransform : HpAnchor;
+
         /// <summary>強調表示時の前面化と復元。プロジェクトルールに従いルートCanvasの overrideSorting のみを操作する。</summary>
         private readonly CanvasSortingScope _sortingScope = new CanvasSortingScope();
 
