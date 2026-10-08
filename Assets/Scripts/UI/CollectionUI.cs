@@ -386,8 +386,7 @@ namespace KillingMahjong.UI
 
             yakuPage = NewEmpty(panel.transform, "YakuPage");
             Stretch(yakuPage.GetComponent<RectTransform>());
-            Label(yakuPage.transform, "Soon", "準備中", new Vector2(0f, 20f), new Vector2(400f, 40f),
-                20f, TextAlignmentOptions.Center, TextDim);
+            BuildYakuPage(yakuPage.transform);   // CollectionUI.Yaku.cs
 
             unusedPage = NewEmpty(panel.transform, "UnusedPage");
             Stretch(unusedPage.GetComponent<RectTransform>());
