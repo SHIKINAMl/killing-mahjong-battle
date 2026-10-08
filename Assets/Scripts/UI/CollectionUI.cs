@@ -37,37 +37,145 @@ namespace KillingMahjong.UI
             public Track(string folder, string id, string label) { Folder = folder; Id = id; Label = label; }
         }
 
+        // ------------------------------------------------------------
+        //  「音楽」タブの曲。**まとまり（階層）ごとに表を分けてある**（2026-10-09）。
+        //
+        //      場面の曲            タイトル・部屋・チュートリアル
+        //      対局BGM
+        //        新2曲 / 従来 / 第3案 / 第4案   設定の「対局BGM」で選ぶ4つの案
+        //      未使用              作ったが、いまどこでも鳴っていない曲
+        //
+        //  以前は「使用中」「未使用」の2列だけで、対局の曲は従来のものしか並んでいなかった。
+        //  第3案・第4案を足したとき、同じ列へ続けて並べると32曲が混ざって探せなくなるので、
+        //  案ごとに分けた（ユーザーの指示:「無作為に追加するのではなく、階層をつくってまとめて」）。
+        //
+        //  **案を足すときは、表を1つ足して <see cref="BuildMusicGroups"/> に1行足す。** 既存の列へ混ぜないこと。
+        //  行数の上限は無い。枠からはみ出た分はスクロールで見る。
+        // ------------------------------------------------------------
+
         /// <summary>
-        /// **いま実際にゲームで鳴っている曲**（2026-09-27 にユーザーの指示で分けた）。
-        /// 並びは場面の流れ順。ファイル名ではなく場面で探せるようにする。
-        ///
-        /// どこで鳴るかはコードから追える:
-        ///   tut_lesson            TutorialAudioDirector の台本（契約書のあと）
-        ///   bgm_phase_normal/turn AudioManager.PairBgm（対局BGM「新2曲」を選んだとき）
-        ///   その他                AudioManager.PhaseBgmNames（「従来」を選んだとき）
-        ///
-        /// 行数の上限は無い。**枠からはみ出た分はスクロールで見る**（2026-09-27）。
+        /// 対局の外で鳴る曲。
+        ///   bgm_ex_summer / bgm_ex_lofi  AudioManager.PlayTitleBgm / PlayRoomBgm
+        ///   tut_lesson                   TutorialAudioDirector の台本（契約書のあと）
         /// </summary>
-        private static readonly Track[] BgmsInUse =
+        private static readonly Track[] BgmsScenes =
         {
             new Track("Bgm", "bgm_ex_summer",    "タイトル"),
             new Track("Bgm", "bgm_ex_lofi",      "部屋の待機"),
             new Track("Bgm", "tut_lesson",       "チュートリアル"),
-            new Track("Bgm", "bgm_phase_normal", "対局　通常"),
-            new Track("Bgm", "bgm_phase_turn",   "対局　高揚"),
-            new Track("Bgm", "bgm_prepare",      "配牌・手牌選択"),
-            new Track("Bgm", "bgm_betting",      "賭け"),
-            new Track("Bgm", "bgm_tension",      "先行・後攻"),
-            new Track("Bgm", "bgm_field_1",      "場 I　序盤"),
-            new Track("Bgm", "bgm_field_2",      "場 II"),
-            new Track("Bgm", "bgm_field_3",      "場 III"),
-            new Track("Bgm", "bgm_field_4",      "場 IV　終盤"),
-            new Track("Bgm", "bgm_ron",          "ロン・決着"),
-            new Track("Bgm", "bgm_draw",         "流局"),
-            new Track("Bgm", "bgm_result",       "結果"),
-            new Track("Bgm", "bgm_win",          "勝ち"),
-            new Track("Bgm", "bgm_lose",         "負け"),
         };
+
+        /// <summary>
+        /// 対局BGM「新2曲（切替）」。AudioManager.PairBgm が、通常と高揚を重ねて入れ替える。
+        /// 流局・結果・勝ち負けは受け持たないので、その場面では「従来」の曲が鳴る。
+        /// </summary>
+        private static readonly Track[] BgmsPair =
+        {
+            new Track("Bgm", "bgm_phase_normal", "通常"),
+            new Track("Bgm", "bgm_phase_turn",   "高揚"),
+        };
+
+        /// <summary>
+        /// 対局の場面と曲名の対応。**並びは対局の流れ順。**
+        /// 従来・第3案・第4案は同じ場面割り（AudioManager.PhaseBgmNames）なので、表を1つにして使い回す。
+        /// </summary>
+        private static readonly string[,] MatchScenes =
+        {
+            { "bgm_prepare", "配牌・手牌選択" },
+            { "bgm_betting", "賭け" },
+            { "bgm_tension", "先行・後攻" },
+            { "bgm_field_1", "場 I　序盤" },
+            { "bgm_field_2", "場 II" },
+            { "bgm_field_3", "場 III" },
+            { "bgm_field_4", "場 IV　終盤" },
+            { "bgm_ron",     "ロン・決着" },
+            { "bgm_draw",    "流局" },
+            { "bgm_result",  "結果" },
+            { "bgm_win",     "勝ち" },
+            { "bgm_lose",    "負け" },
+        };
+
+        /// <summary>
+        /// 第3案・第4案に入っているが、**対局では自動で鳴らない曲**（場面の割当に出番が無い）。
+        /// 聴けるように並べるだけ。
+        /// </summary>
+        private static readonly string[,] MatchExtras =
+        {
+            { "bgm_phase_normal", "通常（対局では鳴らない）" },
+            { "bgm_phase_turn",   "高揚（対局では鳴らない）" },
+            { "bgm_discard",      "打牌（対局では鳴らない）" },
+            { "bgm_discard_hot",  "打牌　激（対局では鳴らない）" },
+        };
+
+        /// <summary>場面の表から、1つの案ぶんの曲の並びを作る。</summary>
+        private static Track[] MatchTracks(string folder, string prefix, bool withExtras, params Track[] more)
+        {
+            var list = new List<Track>();
+            for (int i = 0; i < MatchScenes.GetLength(0); i++)
+                list.Add(new Track(folder, prefix + MatchScenes[i, 0], MatchScenes[i, 1]));
+            if (withExtras)
+            {
+                for (int i = 0; i < MatchExtras.GetLength(0); i++)
+                    list.Add(new Track(folder, prefix + MatchExtras[i, 0], MatchExtras[i, 1]));
+            }
+            list.AddRange(more);
+            return list.ToArray();
+        }
+
+        /// <summary>
+        /// 対局BGM「従来」。層あり・層なしで曲は同じ。違うのは打牌中の鳴らし方だけで、
+        /// 層ありは場 I〜IV の代わりに下の4本の層（土台＋旋律＋打楽器＋きらめき）を重ねる。
+        /// </summary>
+        private static readonly Track[] BgmsLegacy = MatchTracks("Bgm", "", false,
+            new Track("Bgm", "field_base",    "場の層　土台（層あり）"),
+            new Track("Bgm", "field_melody",  "場の層　旋律（層あり）"),
+            new Track("Bgm", "field_drums",   "場の層　打楽器（層あり）"),
+            new Track("Bgm", "field_sparkle", "場の層　きらめき（層あり）"));
+
+        /// <summary>対局BGM「第3案」。AudioManager.Proposal3。</summary>
+        private static readonly Track[] BgmsProposal3 = MatchTracks("Bgm/Proposal3", "p3_", true);
+
+        /// <summary>
+        /// 対局BGM「第4案」。AudioManager.Proposal4。
+        /// 流局は対局では「土台＋モチーフ」の2本で鳴る（足すと「流局」の完成版と同じ音）。
+        /// </summary>
+        private static readonly Track[] BgmsProposal4 = MatchTracks("Bgm/Proposal4", "p4_", true,
+            new Track("Bgm/Proposal4", "p4_bgm_draw_base",  "流局　土台だけ"),
+            new Track("Bgm/Proposal4", "p4_bgm_draw_motif", "流局　モチーフだけ"));
+
+        /// <summary>
+        /// 「音楽」タブの左に並べる、まとまりの1行。
+        /// </summary>
+        private sealed class MusicGroup
+        {
+            public string Label;      // 左の列に出す名前
+            public string Path;       // 右の見出しに出す道筋（「対局BGM ＞ 第4案」）
+            public int Indent;        // 字下げの段
+            public Track[] Tracks;    // null は見出しだけの行（選べない）
+            public string Note;       // 右の見出しの横に小さく出す補足。無ければ null
+        }
+
+        /// <summary>
+        /// 左の列の並び。上から順。
+        ///
+        /// **静的な配列にせず、使うときに作る。** 静的な初期化は書いた順に走るので、
+        /// 配列にすると、これより下に書いてある表（BgmsUnused）がまだ空のうちに読んでしまい、
+        /// 「未使用」が中身の無い見出しになる。
+        /// </summary>
+        private static MusicGroup[] BuildMusicGroups()
+        {
+            return new[]
+            {
+            new MusicGroup { Label = "場面の曲", Path = "場面の曲", Tracks = BgmsScenes },
+            new MusicGroup { Label = "対局BGM" },
+            new MusicGroup { Label = "新2曲", Path = "対局BGM ＞ 新2曲", Indent = 1, Tracks = BgmsPair,
+                             Note = "流局・結果・勝ち負けは「従来」の曲" },
+            new MusicGroup { Label = "従来", Path = "対局BGM ＞ 従来", Indent = 1, Tracks = BgmsLegacy },
+            new MusicGroup { Label = "第3案", Path = "対局BGM ＞ 第3案", Indent = 1, Tracks = BgmsProposal3 },
+            new MusicGroup { Label = "第4案", Path = "対局BGM ＞ 第4案", Indent = 1, Tracks = BgmsProposal4 },
+            new MusicGroup { Label = "未使用", Path = "未使用", Tracks = BgmsUnused },
+            };
+        }
 
         /// <summary>
         /// **作ったが、いまどこでも鳴っていない曲**（2026-09-27）。
@@ -338,20 +446,103 @@ namespace KillingMahjong.UI
                 if (tabMarks[i] != null) tabMarks[i].enabled = (i == index);
         }
 
+        // 「音楽」タブの割り付け。左に細い列（まとまり）、右に広い列（曲）
+        private const float GroupColumnCenterX = -264f;
+        private const float GroupColumnWidth = 160f;
+        private const float GroupRowPitch = 26f;
+        private const float GroupIndent = 16f;
+        private const float TrackColumnCenterX = 92f;
+        private const float TrackColumnWidth = 500f;
+
+        private readonly List<GameObject> musicGroupPages = new List<GameObject>();
+        private readonly List<Image> musicGroupRows = new List<Image>();
+        private int musicGroupSelected = 0;
+
+        /// <summary>
+        /// 「音楽」タブ。**左でまとまりを選び、右にその曲が並ぶ**（2026-10-09）。
+        ///
+        /// 効果音は「効果音」タブにある（2026-09-19 の指示）。
+        /// 2026-09-27 からは「使用中」「未使用」の2列だったが、対局の曲が従来のものしか無く、
+        /// 第3案・第4案を聴く場所が無かった。まとまりの中身は <see cref="BuildMusicGroups"/>。
+        /// </summary>
         private void BuildMusicPage(Transform parent)
         {
             flat.Clear();
             rowBgs.Clear();
+            musicGroupPages.Clear();
+            musicGroupRows.Clear();
 
-            // 効果音は「効果音」タブへ移した（2026-09-19 の指示）。
-            // **左が使用中、右が未使用**（2026-09-27 の指示）。
-            // 以前は対局の流れで前半・後半に割っていたが、鳴っていない曲が混ざっていて
-            // どれが生きているのか分からなかった。
-            //
-            // タイトルと部屋の待機画面は「追加曲」タブの曲（bgm_ex_summer / bgm_ex_lofi）が
-            // 鳴っている。こちらの列には出てこないので注意。
-            BuildColumn(parent, -178f, "BGM　使用中", BgmsInUse);
-            BuildColumn(parent, 178f, "BGM　未使用", BgmsUnused);
+            Label(parent, "Head_Groups", "まとまり", new Vector2(GroupColumnCenterX, 158f),
+                new Vector2(GroupColumnWidth, 22f), 14f, TextAlignmentOptions.Left, Marker);
+
+            // 左の列と右の列を分ける細い線
+            var divider = NewImage(parent, "GroupDivider", PanelEdge);
+            Center(divider.rectTransform, new Vector2(1f, ViewportHeight + 24f));
+            divider.rectTransform.anchoredPosition =
+                new Vector2(GroupColumnCenterX + GroupColumnWidth * 0.5f + 10f, ViewportCenterY + 10f);
+            divider.raycastTarget = false;
+
+            MusicGroup[] groups = BuildMusicGroups();
+            float top = ViewportCenterY + ViewportHeight * 0.5f - RowTopMargin * 0.5f;
+            for (int i = 0; i < groups.Length; i++)
+            {
+                MusicGroup group = groups[i];
+                int index = i;
+                float indent = group.Indent * GroupIndent;
+                float y = top - i * GroupRowPitch - GroupRowPitch * 0.5f;
+
+                var row = NewImage(parent, "Group_" + i, new Color(0f, 0f, 0f, 0f));
+                Center(row.rectTransform, new Vector2(GroupColumnWidth, GroupRowPitch - 2f));
+                row.rectTransform.anchoredPosition = new Vector2(GroupColumnCenterX, y);
+                musicGroupRows.Add(row);
+
+                bool selectable = group.Tracks != null;
+                row.raycastTarget = selectable;
+                if (selectable)
+                {
+                    var btn = row.gameObject.AddComponent<Button>();
+                    btn.targetGraphic = row;
+                    btn.onClick.AddListener(() => ShowMusicGroup(index));
+                }
+
+                // 見出しだけの行（「対局BGM」）は、選べないことが分かるよう色を落とす
+                Label(row.transform, "Name", group.Label,
+                    new Vector2(indent * 0.5f + 4f, 0f), new Vector2(GroupColumnWidth - indent - 12f, 20f),
+                    selectable ? 14f : 13f, TextAlignmentOptions.Left, selectable ? TextMain : TextDim);
+
+                if (!selectable)
+                {
+                    musicGroupPages.Add(null);
+                    continue;
+                }
+
+                // 右の列。まとまりごとに1枚ずつ作っておき、選ばれた1枚だけを出す
+                var page = NewEmpty(parent, "GroupPage_" + i);
+                Stretch(page.GetComponent<RectTransform>());
+                BuildColumn(page.transform, TrackColumnCenterX, group.Path, group.Tracks, TrackColumnWidth);
+                if (!string.IsNullOrEmpty(group.Note))
+                {
+                    Label(page.transform, "Note", group.Note, new Vector2(TrackColumnCenterX, 158f),
+                        new Vector2(TrackColumnWidth, 22f), 11f, TextAlignmentOptions.Right, TextDim);
+                }
+                musicGroupPages.Add(page);
+            }
+
+            ShowMusicGroup(musicGroupSelected);
+        }
+
+        /// <summary>左で選んだまとまりの曲を、右に出す。鳴っている曲は止めない。</summary>
+        private void ShowMusicGroup(int index)
+        {
+            if (index < 0 || index >= musicGroupPages.Count || musicGroupPages[index] == null) index = 0;
+            musicGroupSelected = index;
+
+            for (int i = 0; i < musicGroupPages.Count; i++)
+            {
+                if (musicGroupPages[i] != null) musicGroupPages[i].SetActive(i == index);
+                if (i < musicGroupRows.Count && musicGroupRows[i] != null)
+                    musicGroupRows[i].color = (i == index) ? RowSelected : new Color(0f, 0f, 0f, 0f);
+            }
         }
 
         /// <summary>行の間隔。</summary>
@@ -375,6 +566,16 @@ namespace KillingMahjong.UI
 
         private void BuildColumn(Transform parent, float centerX, string heading, Track[] tracks)
         {
+            BuildColumn(parent, centerX, heading, tracks, ColumnWidth);
+        }
+
+        /// <param name="width">列の幅。「効果音」タブは 330 の2列、「音楽」タブの曲の列は広い1列</param>
+        private void BuildColumn(Transform parent, float centerX, string heading, Track[] tracks, float width)
+        {
+            float ColumnWidth = width;   // 下の式はこの名前で幅を見ている
+            // ファイル名の欄。広い列では、長い名前（p4_bgm_phase_normal など）が入るよう広げる
+            float fileWidth = width > 400f ? 170f : 110f;
+
             Label(parent, "Head_" + heading, heading, new Vector2(centerX, 158f), new Vector2(ColumnWidth, 22f),
                 14f, TextAlignmentOptions.Left, Marker);
 
@@ -408,7 +609,7 @@ namespace KillingMahjong.UI
             // はみ出す列だけ、右端に細いつまみを出す。**無いとスクロールできると気づけない。**
             if (tracks.Length * RowPitch + RowTopMargin > ViewportHeight)
             {
-                scroll.verticalScrollbar = BuildScrollbar(parent, heading, centerX);
+                scroll.verticalScrollbar = BuildScrollbar(parent, heading, centerX, ColumnWidth);
                 scroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
             }
 
@@ -433,11 +634,16 @@ namespace KillingMahjong.UI
                 btn.targetGraphic = rowBg;
                 btn.onClick.AddListener(() => PlayIndex(flatIndex));
 
-                Label(rowBg.transform, "No", (i + 1).ToString("00"), new Vector2(-146f, 0f), new Vector2(28f, 18f),
+                // 位置は列の幅から決める（幅 330 のとき、番号 -146・名前 -40・ファイル名 108 で、以前と同じ）
+                float nameWidth = ColumnWidth - 40f - fileWidth;
+                Label(rowBg.transform, "No", (i + 1).ToString("00"),
+                    new Vector2(-ColumnWidth * 0.5f + 19f, 0f), new Vector2(28f, 18f),
                     11f, TextAlignmentOptions.Left, TextDim);
-                Label(rowBg.transform, "Name", tracks[i].Label, new Vector2(-40f, 0f), new Vector2(180f, 18f),
+                Label(rowBg.transform, "Name", tracks[i].Label,
+                    new Vector2(-ColumnWidth * 0.5f + 35f + nameWidth * 0.5f, 0f), new Vector2(nameWidth, 18f),
                     13f, TextAlignmentOptions.Left, TextMain);
-                Label(rowBg.transform, "File", tracks[i].Id, new Vector2(108f, 0f), new Vector2(110f, 18f),
+                Label(rowBg.transform, "File", tracks[i].Id,
+                    new Vector2(ColumnWidth * 0.5f - 2f - fileWidth * 0.5f, 0f), new Vector2(fileWidth, 18f),
                     9.5f, TextAlignmentOptions.Right, TextDim);
             }
 
@@ -449,11 +655,11 @@ namespace KillingMahjong.UI
         }
 
         /// <summary>列の右端に置く細いつまみ。</summary>
-        private Scrollbar BuildScrollbar(Transform parent, string heading, float centerX)
+        private Scrollbar BuildScrollbar(Transform parent, string heading, float centerX, float width)
         {
             var track = NewImage(parent, "Bar_" + heading, new Color32(40, 24, 34, 255));
             Center(track.rectTransform, new Vector2(4f, ViewportHeight));
-            track.rectTransform.anchoredPosition = new Vector2(centerX + ColumnWidth * 0.5f + 4f, ViewportCenterY);
+            track.rectTransform.anchoredPosition = new Vector2(centerX + width * 0.5f + 4f, ViewportCenterY);
 
             var area = NewEmpty(track.transform, "SlidingArea");
             var areaRect = area.GetComponent<RectTransform>();
@@ -570,7 +776,8 @@ namespace KillingMahjong.UI
             HighlightSelected();
 
             preview.clip = clip;
-            preview.loop = (t.Folder == "Bgm");   // スティンガーは一発物なので繰り返さない
+            // スティンガーは一発物なので繰り返さない。案ごとのフォルダ（Bgm/Proposal4 など）も曲として扱う
+            preview.loop = t.Folder.StartsWith("Bgm");
             preview.volume = PreviewVolume();
             preview.time = 0f;
             preview.Play();
