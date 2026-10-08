@@ -384,6 +384,25 @@ namespace KillingMahjong.UI
                 yield return scope.Run(SkillCutinVisualsRoutine(scope, skillName, isLocalPlayer, characterData, duration, onComplete, subText));
         }
 
+        /// <summary>相手のカットインの立ち絵の高さ（Canvas の単位、4:3 のとき）。絵の全体でこの高さ。</summary>
+        private const float EnemyCutinPortraitHeight = 400f;
+
+        /// <summary>カットインの寸法を決めたときの Canvas の高さ（800x600 の 600）。</summary>
+        private const float CutinReferenceHeight = 600f;
+
+        /// <summary>
+        /// `Image.SetNativeSize()` が決める大きさ（Canvas の単位）を、スプライトから計算する。
+        /// **`sprite.rect`（画素数）をそのまま大きさとして使ってはいけない。**
+        /// pixelsPerUnit が 100 でない絵や、取り込みで縮めた絵では、画素数と大きさが一致しない。
+        /// </summary>
+        private static Vector2 NativeSizeOf(Sprite sprite, Canvas canvas)
+        {
+            if (sprite == null) return Vector2.zero;
+            float reference = canvas != null ? canvas.referencePixelsPerUnit : 100f;
+            float ppu = sprite.pixelsPerUnit > 0f ? sprite.pixelsPerUnit : 100f;
+            return sprite.rect.size / ppu * reference;
+        }
+
         private IEnumerator SkillCutinVisualsRoutine(PresentationScope scope, string skillName, bool isLocalPlayer, CharacterData characterData, float duration, Action onComplete, string subText)
         {
             ResetVisuals();
@@ -533,8 +552,10 @@ namespace KillingMahjong.UI
                     // 高さ 800 の決め打ちだと、その時点ではみ出す。
                     float areaW = containerRt.rect.width;
                     float areaH = containerRt.rect.height;
-                    float spriteW = Mathf.Max(bodySprite.rect.width, 1f);
-                    float spriteH = Mathf.Max(bodySprite.rect.height, 1f);
+                    // 画素数ではなく、SetNativeSize が決めた大きさ（Canvas の単位）で測る。理由は下の相手側と同じ
+                    Vector2 native = NativeSizeOf(bodySprite, containerCanvas);
+                    float spriteW = Mathf.Max(native.x, 1f);
+                    float spriteH = Mathf.Max(native.y, 1f);
 
                     // 幅・高さの両方で頭打ちにして、狭いほうに合わせる
                     float fit = Mathf.Min(areaW * CutinSpriteWidthRatio / spriteW,
@@ -552,17 +573,29 @@ namespace KillingMahjong.UI
                 {
                     portraitRt.pivot = new Vector2(0.5f, 0f); // 下端中央
 
-                    // SetNativeSizeの直後だとrect.heightが未確定な場合があるため、spriteの実際のサイズからスケールを計算する
-                    float targetHeight = 800f; // さらに少し小さめにして確実に頭が収まるようにする
-                    float actualHeight = bodySprite.rect.height;
-                    float scale = actualHeight > 0 ? targetHeight / actualHeight : 1f;
+                    // **大きさは Canvas の単位で決める（2026-10-09 に直した）。**
+                    //
+                    // 以前は「絵の画素数」から倍率を出していた（800 ÷ 画素の高さ）。
+                    // ところが SetNativeSize が決める大きさは 画素数 ÷ pixelsPerUnit × 100 で、
+                    // 取り込みの上限（maxTextureSize）を下げると**画素数だけが減る**。
+                    // 2026-09-27 に上限を 4096 → 1024 にしたとき、倍率が 800/3600 → 800/1024 に変わり、
+                    // 立ち絵が 400 → 1406 単位（約3.5倍）に膨らんで、胴体しか映らなくなっていた
+                    // （コレクションの試写でユーザーが気づいた）。
+                    // SetNativeSize の直後は rect が未確定なことがあるので、スプライトから計算する。
+                    float nativeHeight = NativeSizeOf(bodySprite, containerCanvas).y;
+
+                    // **画面の高さに比例させる。** Canvas は幅基準（800 固定）なので、横長の画面では
+                    // 高さが 600 より小さくなる（16:9 で 450）。決め打ちだと、そのぶん大きく見える。
+                    // 4:3 のとき k=1 で、見た目は 2026-09-27 より前と同じ
+                    float k = containerRt.rect.height > 1f ? containerRt.rect.height / CutinReferenceHeight : 1f;
+                    float scale = nativeHeight > 0f ? EnemyCutinPortraitHeight * k / nativeHeight : 1f;
                     portraitRt.localScale = new Vector3(scale, scale, 1f);
 
-                    // 常に左下に配置（自分の顔のみ出るため）
+                    // 常に左下に配置（顔と胸元だけが下から覗く）
                     portraitRt.anchorMin = new Vector2(0f, 0f);
                     portraitRt.anchorMax = new Vector2(0f, 0f);
-                    portraitTargetPos = new Vector2(250, -150); // 少し下に移動して頭頂部が見切れないようにする
-                    portraitStartPos = portraitTargetPos + new Vector2(0, -800); // 下から上がってくる
+                    portraitTargetPos = new Vector2(250f, -150f) * k;
+                    portraitStartPos = portraitTargetPos + new Vector2(0f, -800f * k); // 下から上がってくる
                 }
 
                 portraitRt.anchoredPosition = portraitStartPos;
