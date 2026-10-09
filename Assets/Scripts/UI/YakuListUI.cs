@@ -185,6 +185,8 @@ namespace KillingMahjong.UI
 
             if (localBoost == null) localBoost = new Dictionary<string, int>();
             if (enemyBoost == null) enemyBoost = new Dictionary<string, int>();
+            _lastLocalBoost = localBoost;
+            _lastEnemyBoost = enemyBoost;
 
             for (int i = 0; i < allYakus.Length; i++)
             {
@@ -258,10 +260,40 @@ namespace KillingMahjong.UI
             return last != null && last.text.StartsWith("+") ? last.transform.parent as RectTransform : null;
         }
 
+        // **強化が枠（3つ）より多いとき。** 上位2つだけ名前で出て、3つ目の枠は「+2」（あと2件）になる。
+        // 強めたばかりの役がその「あと何件」に入ると、演出の役名は「+2」へ飛んでいくのに、
+        // ボードには何を強めたかが出ない（2026-10-09 に録画で確認）。
+        // 収まってからしばらくだけ、3つ目の枠にその役を名前で出す。時間が来たら「+2」へ戻る。
+
+        private Dictionary<string, int> _lastLocalBoost;
+        private Dictionary<string, int> _lastEnemyBoost;
+        private string _spotlightYaku;
+        private float _spotlightUntil;
+
+        /// <summary>
+        /// 強めたばかりの役を、しばらくだけ名前で出す。その役がもう名前で出ているなら、何も変わらない。
+        /// 戻すのはこの部品が自分でやる（演出は待たなくてよい）。
+        /// </summary>
+        /// <param name="seconds">名前で出しておく秒数</param>
+        public void SpotlightLocalBoost(string yakuName, float seconds)
+        {
+            if (string.IsNullOrEmpty(yakuName)) return;
+            _spotlightYaku = yakuName;
+            // 演出と同じ時計（Time.time）で数える。演出の明滅と足並みをそろえるため
+            _spotlightUntil = Time.time + seconds;
+            UpdateBoostData(_lastLocalBoost, _lastEnemyBoost);
+        }
+
         private void Update()
         {
             // 演出が途中で打ち切られても、枠が伏せたままにならないようにする
             if (_heldLocalYaku != null && Time.unscaledTime > _heldUntil) ReleaseLocalBoostChip();
+
+            if (_spotlightYaku != null && Time.time > _spotlightUntil)
+            {
+                _spotlightYaku = null;
+                UpdateBoostData(_lastLocalBoost, _lastEnemyBoost);
+            }
         }
 
         private void ApplyLocalChipHold()
@@ -555,9 +587,21 @@ namespace KillingMahjong.UI
                 {
                     // 役名と翻数を分けて、翻数だけ下の帯に入れる。
                     // 枠が足りないときの「+3」は役名が無いので、帯を隠して1行で出る
+                    string overflowText = $"+{hiddenCount}";
+                    if (isOverflowSlot && isLocal && _spotlightYaku != null)
+                    {
+                        // 強めたばかりの役が「あと何件」に埋もれているあいだだけ、その役を名前で出す
+                        for (int k = shownCount; k < activeBoosts.Count; k++)
+                        {
+                            if (activeBoosts[k].Key != _spotlightYaku) continue;
+                            overflowText = $"{activeBoosts[k].Key}+{activeBoosts[k].Value}";
+                            break;
+                        }
+                    }
+
                     BuildTile(textArray[i], isLocal);
                     ApplyTileText(textArray[i], isOverflowSlot
-                        ? $"+{hiddenCount}"
+                        ? overflowText
                         : $"{activeBoosts[i].Key}+{activeBoosts[i].Value}");
                     textArray[i].gameObject.SetActive(true);
                     

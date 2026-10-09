@@ -27,7 +27,9 @@ namespace KillingMahjong.UI.Effects
     ///             この2つは同じ大きさの同じ絵なので、重ねる位置を合わせて差し替えると「目が光った」に見える
     ///   文字   … 役名と今の翻数は牌交換の文字と同じ出し方。新しい翻数は、ベルルの板から降りてくる
     ///   ボード … 役名と新しい翻数が、右上の役強化の一覧（<see cref="YakuListUI"/>）の枠へ飛んでいく。
-    ///             枠は演出が届くまで伏せておく（<see cref="YakuListUI.HoldLocalBoostChip"/>）
+    ///             枠は演出が届くまで伏せておく（<see cref="YakuListUI.HoldLocalBoostChip"/>）。
+    ///             強化が枠（3つ）より多くて「+2」（あと2件）にまとめられているときは、その枠へ飛び、
+    ///             収まってからしばらくだけ、その枠に強めた役を名前で出す
     ///   音     … 透視と同じ段取り（<see cref="SkillTranceAudio"/>）
     ///
     /// 流れ（約4秒。うち白く光るまでが約2.9秒）
@@ -68,6 +70,11 @@ namespace KillingMahjong.UI.Effects
         /// <summary>収まってから、枠がふくらみ始めるまで（白い光が引くのを待つ）と、ふくらむ秒数。</summary>
         private const float ChipPopDelay = 0.2f;
         private const float ChipPopSeconds = 0.2f;
+        /// <summary>
+        /// 強化が枠より多いとき、明滅が終わったあとも「あと何件」の枠に役名を残しておく秒数
+        /// （<see cref="YakuListUI.SpotlightLocalBoost"/>。戻すのはボードの側で、演出は待たない）。
+        /// </summary>
+        private const float SpotlightLinger = 0.9f;
 
         // ---- ベルル ----
         //
@@ -409,6 +416,9 @@ namespace KillingMahjong.UI.Effects
                 // ---- ⑥ 収まった。枠を出して、白く光る ----
                 board.ReleaseLocalBoostChip();
                 _heldBoard = null;
+                // 強化が枠より多いと、飛んでいった先は「+2」（あと2件）の枠になる。
+                // しばらくだけ、そこに強めた役を名前で出す（明滅が終わったあとも少し残して読ませる）
+                board.SpotlightLocalBoost(yakuName, GlowSeconds + SpotlightLinger);
                 if (audio != null) audio.PlaySynthSound(SynthWaveType.Sine, 780f, 1170f, 0.14f, 0.5f);
                 ReleaseTrance(dim, demon, powered);
 
