@@ -126,6 +126,16 @@ namespace KillingMahjong.Editor
                     html = html.Replace("canvas.style.width = \"960px\";", "canvas.style.width = \"100%\";");
                     html = html.Replace("canvas.style.height = \"600px\";", "canvas.style.height = \"100%\";");
                     html = html.Replace("width: 960px; height: 600px;", "width: 100%; height: 100%; aspect-ratio: 4/3; max-width: 800px; max-height: 600px; margin: auto;");
+
+                    // **ビルドのファイルの URL に、版の印（ビルドした時刻）を付ける（2026-10-10）。**
+                    // ファイル名が毎回同じ（docs.wasm.unityweb など）で、GitHub Pages は「10分間は手元の写しを
+                    // 使ってよい」（max-age=600）と配る。上げ直した直後に開くと、ブラウザは古いプログラムを
+                    // 使い続ける（データだけ新しい、という混ざり方もする）。直したはずの不具合が
+                    // 上げ直しても直らず、原因を取り違えた。URL が変われば、必ず新しいファイルを取りに行く。
+                    string stamp = System.DateTime.Now.ToString("yyyyMMddHHmmss");
+                    html = System.Text.RegularExpressions.Regex.Replace(
+                        html, "\"(Build/[^\"?]+)\"", "\"$1?v=" + stamp + "\"");
+
                     File.WriteAllText(indexPath, html);
                     Debug.Log("[WebGL Build] index.html をレスポンシブ対応に書き換えました。");
                 }

@@ -165,6 +165,9 @@ namespace KillingMahjong.Managers
             string url = Application.streamingAssetsPath + "/" + StreamingSubFolder + "/" + set.BundleName;
             // PC 版などでは場所がファイルの道で返る。URL の形に直す
             if (!url.Contains("://")) url = "file://" + url;
+            // ビルドごとに違う印を付ける。付けないと、上げ直したあとも
+            // ブラウザが前のビルドの曲ファイルを手元の写しから使うことがある
+            else url += "?v=" + Application.buildGUID;
 
             using (UnityWebRequest request = UnityWebRequestAssetBundle.GetAssetBundle(url))
             {
