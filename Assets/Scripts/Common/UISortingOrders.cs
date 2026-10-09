@@ -373,6 +373,15 @@ namespace KillingMahjong.Common
         /// </summary>
         public const int MouseCursor = 30100;
 
+        /// <summary>
+        /// コレクションの演出の試写の操作欄（上の題名、下の「もう一度」「繰り返し」「一覧へ戻る」）。
+        ///
+        /// 試写する演出（エンディングは 30000）より手前で、**マウスの指（<see cref="MouseCursor"/>）より奥。**
+        /// 前は 32760 で指より手前にあり、指が下のボタンの後ろへ隠れた（2026-10-10 のユーザー報告）。
+        /// それまで気づかなかったのは、試写のあいだ指そのものを隠してしまっていたため。
+        /// </summary>
+        public const int EffectPreviewControls = 30090;
+
         // ---- SpriteRenderer 用 (Canvas とは別系統) ----
         // ScreenSpace-Overlay の Canvas とは描画パスが違うため、上の値とは比較できない。
         // 比較対象は PlayerInfoUI が触る SpriteRenderer (最大 InfoPanelHighlight) だけ。

@@ -155,7 +155,7 @@ namespace KillingMahjong.UI
         private void BuildControls()
         {
             var canvas = gameObject.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay; canvas.sortingOrder = 32760;
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay; canvas.sortingOrder = KillingMahjong.Common.UISortingOrders.EffectPreviewControls;
             var scaler = gameObject.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(800, 600); scaler.matchWidthOrHeight = .5f;
