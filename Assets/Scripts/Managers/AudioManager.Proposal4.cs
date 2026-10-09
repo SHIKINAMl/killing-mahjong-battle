@@ -8,7 +8,7 @@ namespace KillingMahjong.Managers
     /// <summary>
     /// 対局BGM「第4案」（2026-10-08、「回路圧」音量・強弱調整 v3 の16曲）。
     ///
-    /// 置き場所は `Resources/Bgm/Proposal4/`、名前は既存の曲名の頭に `p4_` を付けたもの。
+    /// 置き場所は `Assets/BgmBundles/Proposal4/`、名前は既存の曲名の頭に `p4_` を付けたもの。
     /// どのフェイズでどの曲かは、第3案と同じく既存の割当（<see cref="PhaseBgmNames"/>）を使う。
     ///
     /// **音源2本・小節頭の予約・監督のコルーチンは、第3案のもの（AudioManager.Proposal3.cs）を共用する。**
@@ -47,14 +47,15 @@ namespace KillingMahjong.Managers
         [Tooltip("対局BGMを第4案（Resources/Bgm/Proposal4 の16曲）で鳴らす。設定画面から切り替わる")]
         public bool UseProposal4Bgm = false;
 
-        private const string P4Prefix = "p4_";
-        private const string P4Folder = "Bgm/Proposal4/";
+        // **第4案と夜卓の灯火の曲は `Resources` に無い（2026-10-09）。** 本体と別のファイルにしてあり、
+        // <see cref="BgmBank"/> から読む。元の WAV は `Assets/BgmBundles/`。
+        private const string P4Prefix = BgmBank.P4Prefix;
 
         // ------------------------------------------------------------
         //  夜卓の灯火（2026-10-09、番号5）
         // ------------------------------------------------------------
         //
-        // 置き場所は `Resources/Bgm/ReturningTheme/`、名前は既存の曲名の頭に `rt_` を付けたもの。
+        // 置き場所は `Assets/BgmBundles/ReturningTheme/`、名前は既存の曲名の頭に `rt_` を付けたもの。
         // 掛け金（rt_bgm_betting）だけは、あとから作った「合図の余白 v2（メインなし）」。
         //
         // **仕組みは第4案と同じ物を使う**（音源2本・小節頭の予約・流局の2本立て・モチーフの即止め）。
@@ -82,8 +83,7 @@ namespace KillingMahjong.Managers
         [Tooltip("対局BGMを「夜卓の灯火」（Resources/Bgm/ReturningTheme の18本）で鳴らす。設定画面から切り替わる")]
         public bool UseReturningThemeBgm = false;
 
-        private const string RtPrefix = "rt_";
-        private const string RtFolder = "Bgm/ReturningTheme/";
+        private const string RtPrefix = BgmBank.RtPrefix;
 
         /// <summary>
         /// 曲名の頭の印（`p4_` / `rt_`）。第4案でも夜卓の灯火でもなければ null。

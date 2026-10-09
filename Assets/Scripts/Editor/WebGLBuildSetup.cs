@@ -29,6 +29,15 @@ namespace KillingMahjong.Editor
 
         private static void Build(bool development)
         {
+            // 0. 対局BGMのうち、本体と別のファイルにしてある案（第4案・夜卓の灯火）を先に作る。
+            //    `Assets/StreamingAssets/Bgm/` に出て、ビルドの `StreamingAssets/Bgm/` へそのまま写る。
+            //    これを入れないと、その案を選んだときに曲が鳴らない（KillingMahjong.Managers.BgmBank）
+            if (!KillingMahjong.EditorTools.BgmBundleBuilder.Build(BuildTarget.WebGL))
+            {
+                Debug.LogError("[WebGL Build] BGM の別ファイルが作れなかったので、ビルドを止めます。");
+                return;
+            }
+
             // 1. 転送量を減らすため Brotli で圧縮する（2026-09-27）。
             //
             // **`decompressionFallback` があるので GitHub Pages でも動く。**

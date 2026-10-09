@@ -136,3 +136,8 @@ test.py
 /bot*.txt
 /bot_supervisor.pid
 /build-dev/
+
+# 対局BGMの別ファイル（アセットバンドル）。ビルドのたびに Assets/BgmBundles から作り直すので入れない
+/Assets/StreamingAssets/Bgm/
+/Assets/StreamingAssets/Bgm.meta
+/Assets/StreamingAssets.meta

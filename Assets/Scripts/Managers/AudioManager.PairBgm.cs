@@ -122,6 +122,10 @@ namespace KillingMahjong.Managers
             UseProposal3Bgm = wantP3;
             UseProposal4Bgm = wantP4;
             UseReturningThemeBgm = wantRt;
+
+            // 第4案・夜卓の灯火の曲は、本体と別のファイルにある。選ばれた時点で取りに行かせておく
+            // （起動時の当て直しでもここを通るので、対局が始まるころには届いている）
+            if (WantedSetPrefix != null) BgmBank.Request(WantedSetPrefix);
             UsePairBgm = wantPair;
             UseBgmLayers = wantLayers;
 

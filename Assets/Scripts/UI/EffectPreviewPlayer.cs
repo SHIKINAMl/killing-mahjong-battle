@@ -52,8 +52,12 @@ namespace KillingMahjong.UI
 
         private void HideOriginal()
         {
+            // **マウスの指（CustomCursor が作る UICursorCanvas）は隠さない。**
+            // ビルドでは OS のカーソルを消して指の絵だけを出しているので、ここで一緒に止めると、
+            // 試写のあいだマウスがどこにあるか分からなくなる（2026-10-09 のユーザー報告）
             foreach (var canvas in FindObjectsByType<Canvas>(FindObjectsSortMode.None))
-                if (canvas.enabled && canvas.GetComponentInParent<ScreenTint>() == null && canvas.GetComponentInParent<HpDamageGlitch>() == null)
+                if (canvas.enabled && canvas.sortingOrder != KillingMahjong.Common.UISortingOrders.MouseCursor
+                    && canvas.GetComponentInParent<ScreenTint>() == null && canvas.GetComponentInParent<HpDamageGlitch>() == null)
                 { hidden.Add(canvas); canvas.enabled = false; }
             foreach (var camera in FindObjectsByType<Camera>(FindObjectsSortMode.None))
                 if (camera.enabled) { hidden.Add(camera); camera.enabled = false; }

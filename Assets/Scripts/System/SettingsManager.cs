@@ -432,13 +432,21 @@ namespace KillingMahjong.Core
         /// <summary>
         /// 画面サイズを当てる。
         ///
-        /// **WebGL では何もしない。** ブラウザの窓の大きさはページ側が決めるので、
-        /// ここから `Screen.SetResolution` を呼んでも効かない。
-        /// Web 版の大きさは `Assets/WebGLTemplates/KillingMahjong/index.html` の
-        /// CSS が受け持っている（4:3 を保ったまま窓いっぱいに広げる）。
+        /// **WebGL では `Screen.SetResolution` を呼ばない。** ブラウザの窓の大きさはページ側が決めるので、
+        /// 呼んでも効かない。代わりに、ページの canvas の出し方を切り替える
+        /// （`Assets/Plugins/WebGL/KmCanvas.jslib`）。
+        ///   800×600 等倍       … canvas を 800×600 で出す
+        ///   画面に合わせて大きく … 4:3 を保ったまま窓いっぱい（`index.html` の CSS のまま）
+        ///   全画面             … 窓いっぱいにしたうえで、ブラウザの全画面にする
+        /// 2026-10-09 までは Web 版では何もしておらず、「800×600 にしても最大ぐらい大きくなる」と言われた。
         /// </summary>
         private void ApplyResolution()
         {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            KmSetCanvasMode(screenMode == (int)ScreenModeKind.X1 ? 0 : 1);
+            bool wantFull = screenMode == (int)ScreenModeKind.FullScreen;
+            if (Screen.fullScreen != wantFull) Screen.fullScreen = wantFull;
+#endif
 #if !UNITY_WEBGL
             switch ((ScreenModeKind)screenMode)
             {
@@ -455,6 +463,11 @@ namespace KillingMahjong.Core
             }
 #endif
         }
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+        [System.Runtime.InteropServices.DllImport("__Internal")]
+        private static extern void KmSetCanvasMode(int mode);
+#endif
 
         private const int BaseWidth = 800;
         private const int BaseHeight = 600;

@@ -147,18 +147,43 @@ namespace KillingMahjong.Managers
             AudioClip clip;
             if (!_p3Clips.TryGetValue(name, out clip))
             {
-                string folder = name.StartsWith(RtPrefix) ? RtFolder
-                              : name.StartsWith(P4Prefix) ? P4Folder : P3Folder;
-                clip = Resources.Load<AudioClip>(folder + name);
+                string bankPrefix = SetPrefixOf(name);
+                if (bankPrefix != null)
+                {
+                    // 第4案・夜卓の灯火は、本体と別のファイル（BgmBank）にある。
+                    // **まだ届いていなければ null を返すだけ。** 「無い」と覚えてしまうと、届いたあとも鳴らない
+                    if (!BgmBank.IsReady(bankPrefix)) return null;
+                    clip = BgmBank.Load(name);
+                }
+                else
+                {
+                    clip = Resources.Load<AudioClip>(P3Folder + name);
+                }
                 _p3Clips[name] = clip;
                 if (clip == null)
-                    Debug.LogWarning("[AudioManager] 対局BGMの曲が見つかりません: Resources/" + folder + name);
+                    Debug.LogWarning("[AudioManager] 対局BGMの曲が見つかりません: " + name);
             }
 
             // **予約より前に読み込みを済ませる。** 取り込み設定が「先読みしない」なので、
             // 放っておくと鳴らす瞬間に読みに行き、予約した時刻に間に合わないことがある
             if (clip != null && clip.loadState == AudioDataLoadState.Unloaded) clip.LoadAudioData();
             return clip;
+        }
+
+        /// <summary>
+        /// その曲の入っているファイル（<see cref="BgmBank"/>）が、まだ届いていないか。
+        /// 届いていなければ取りに行かせて true を返す。呼ぶ側は、次のコマにもう一度見る。
+        ///
+        /// 読めなかった（通信が切れている、など）ときは false。そのあと曲を読むと null が返るので、
+        /// 呼ぶ側は「曲が無い」として止まる。次に行き先が変わったときに、もう一度取りに行く。
+        /// </summary>
+        private bool P3BankPending(string clipName)
+        {
+            string prefix = SetPrefixOf(clipName);
+            if (prefix == null || BgmBank.IsReady(prefix)) return false;
+
+            BgmBank.Request(prefix);
+            return !BgmBank.HasFailed(prefix);
         }
 
         private void EnsureProposal3Decks()
@@ -234,6 +259,13 @@ namespace KillingMahjong.Managers
             {
                 if (ProposalWanted)
                 {
+                    // 行き先の曲のファイルがまだ届いていない。届くまで、いま鳴っている音のままで待つ
+                    if (P3BankPending(ResolveProposal3Name()))
+                    {
+                        yield return null;
+                        continue;
+                    }
+
                     if (!_p3Running)
                     {
                         if (LegacyBgmAudible) yield return P3EnterFromLegacy();
@@ -318,6 +350,9 @@ namespace KillingMahjong.Managers
                 // **行き先は毎コマ読み直す。** 待っているあいだに変わっていれば新しい方になる
                 want = ResolveProposal3Name();
                 if (want == _p3ClipName) yield break;   // 元へ戻された
+
+                // 待っているあいだに別の案へ替えられて、そのファイルがまだ届いていない
+                if (P3BankPending(want)) { yield return null; continue; }
 
                 // **待っているうちに読み込ませておく。** 予約の直前に読みに行くと、
                 // 予約した時刻に間に合わないことがある。読み込み中なら次の小節頭へ回す
@@ -431,6 +466,8 @@ namespace KillingMahjong.Managers
             }
 
             string want = ResolveProposal3Name();
+            // 待っているあいだに別の案へ替えられて、そのファイルがまだ届いていない。監督がもう一度回す
+            if (P3BankPending(want)) yield break;
             var clip = GetProposal3Clip(want);
             if (clip == null) { _p3Stuck = true; yield break; }
 

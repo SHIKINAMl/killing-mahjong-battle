@@ -762,10 +762,35 @@ namespace KillingMahjong.UI
             EnsurePreviewSource();
 
             var t = flat[index];
-            var clip = Resources.Load<AudioClip>(t.Folder + "/" + t.Id);
+
+            // **第4案・夜卓の灯火の曲は、本体と別のファイルにある**（KillingMahjong.Managers.BgmBank）。
+            // まだ届いていなければ取りに行かせて、届いたら鳴らす
+            AudioClip clip;
+            string bankPrefix = KillingMahjong.Managers.BgmBank.PrefixOf(t.Id);
+            if (bankPrefix != null)
+            {
+                if (!KillingMahjong.Managers.BgmBank.IsReady(bankPrefix))
+                {
+                    KillingMahjong.Managers.BgmBank.Request(bankPrefix);
+                    selected = index;
+                    HighlightSelected();
+                    if (preview.isPlaying) preview.Stop();
+                    if (nowPlayingText != null) nowPlayingText.text = t.Label + "（読み込み中）";
+                    pendingBankIndex = index;
+                    StartCoroutine(PlayWhenBankReady(index, bankPrefix));
+                    return;
+                }
+                clip = KillingMahjong.Managers.BgmBank.Load(t.Id);
+            }
+            else
+            {
+                clip = Resources.Load<AudioClip>(t.Folder + "/" + t.Id);
+            }
+            pendingBankIndex = -1;
+
             if (clip == null)
             {
-                Debug.LogWarning("[CollectionUI] 見つかりません: Resources/" + t.Folder + "/" + t.Id);
+                Debug.LogWarning("[CollectionUI] 見つかりません: " + t.Folder + "/" + t.Id);
                 if (nowPlayingText != null) nowPlayingText.text = t.Label + "（ファイルがありません）";
                 return;
             }
@@ -783,6 +808,30 @@ namespace KillingMahjong.UI
             if (nowPlayingText != null) nowPlayingText.text = t.Label;
             // **一時停止は `∥`(U+2225)。** `‖`(U+2016) は PixelMplus に無く □ になっていた（2026-09-19）
             if (playLabel != null) playLabel.text = "∥";
+        }
+
+        /// <summary>届くのを待っている曲の番号。別の曲を選び直されたら、古い待ちは鳴らさない。</summary>
+        private int pendingBankIndex = -1;
+
+        private System.Collections.IEnumerator PlayWhenBankReady(int index, string bankPrefix)
+        {
+            while (!KillingMahjong.Managers.BgmBank.IsReady(bankPrefix)
+                   && !KillingMahjong.Managers.BgmBank.HasFailed(bankPrefix))
+            {
+                if (pendingBankIndex != index) yield break;
+                yield return null;
+            }
+            if (pendingBankIndex != index) yield break;
+            pendingBankIndex = -1;
+
+            if (KillingMahjong.Managers.BgmBank.IsReady(bankPrefix))
+            {
+                PlayIndex(index);
+            }
+            else if (nowPlayingText != null && index >= 0 && index < flat.Count)
+            {
+                nowPlayingText.text = flat[index].Label + "（読み込めませんでした）";
+            }
         }
 
         private float PreviewVolume()
