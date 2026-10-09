@@ -101,6 +101,11 @@ namespace KillingMahjong.Core
             /// **「第4案」も作品案の名前。** 既存の 0〜3 は動かさず、末尾に足した。
             /// </summary>
             Proposal4 = 4,
+            /// <summary>
+            /// 夜卓の灯火（2026-10-09、18本）。第4案と同じ仕組みで、フェイズと濃度で切り替える。
+            /// 既存の 0〜4 は動かさず、末尾に足した。
+            /// </summary>
+            ReturningTheme = 5,
         }
 
         /// <summary>
@@ -113,6 +118,7 @@ namespace KillingMahjong.Core
         public static readonly int[] MatchBgmChoiceKinds =
         {
             (int)MatchBgmSetKind.Proposal4,
+            (int)MatchBgmSetKind.ReturningTheme,
             (int)MatchBgmSetKind.PerPhase,
             (int)MatchBgmSetKind.PerPhaseNoLayers,
         };
@@ -126,6 +132,7 @@ namespace KillingMahjong.Core
         public static readonly string[] MatchBgmChoiceLabels =
         {
             "第4案",
+            "夜卓の灯火",
             "従来（層あり）",
             "従来（層なし）",
         };

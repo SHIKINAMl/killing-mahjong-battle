@@ -154,6 +154,27 @@ namespace KillingMahjong.Managers
             { "p4_bgm_result",       new Tempo(136f, 4) },
             { "p4_bgm_win",          new Tempo(136f, 4) },
             { "p4_bgm_lose",         new Tempo(136f, 4) },
+
+            // **夜卓の灯火（2026-10-09）。** `rt_` 名で引く。**全曲 136BPM・4拍子・82小節・同じ長さ。**
+            // 第4案（64小節）とは長さが違う。位置を保つのは濃度1〜4どうしだけ（AudioManager.Proposal4.cs）。
+            { "rt_bgm_field_1",      new Tempo(136f, 4) },
+            { "rt_bgm_field_2",      new Tempo(136f, 4) },
+            { "rt_bgm_field_3",      new Tempo(136f, 4) },
+            { "rt_bgm_field_4",      new Tempo(136f, 4) },
+            { "rt_bgm_phase_normal", new Tempo(136f, 4) },
+            { "rt_bgm_phase_turn",   new Tempo(136f, 4) },
+            { "rt_bgm_prepare",      new Tempo(136f, 4) },
+            { "rt_bgm_betting",      new Tempo(136f, 4) },
+            { "rt_bgm_tension",      new Tempo(136f, 4) },
+            { "rt_bgm_discard",      new Tempo(136f, 4) },
+            { "rt_bgm_discard_hot",  new Tempo(136f, 4) },
+            { "rt_bgm_ron",          new Tempo(136f, 4) },
+            { "rt_bgm_draw",         new Tempo(136f, 4) },
+            { "rt_bgm_draw_base",    new Tempo(136f, 4) },
+            { "rt_bgm_draw_motif",   new Tempo(136f, 4) },
+            { "rt_bgm_result",       new Tempo(136f, 4) },
+            { "rt_bgm_win",          new Tempo(136f, 4) },
+            { "rt_bgm_lose",         new Tempo(136f, 4) },
         };
 
         /// <summary>拍の情報が無い曲のときの既定。すぐ切り替える方に倒す。</summary>
@@ -511,6 +532,10 @@ namespace KillingMahjong.Managers
         private void ApplyLegacyResultBgm()
         {
             if (_resultBgmOverride == null) return;
+
+            // **従来の「負け」の曲（bgm_lose）は 2026-10-09 に消した**（WebGL のビルドを100MB未満にするため。
+            // ユーザーの判断）。従来を選んでいて負けたときは、結果の曲のまま鳴らし続ける
+            if (_resultBgmOverride == "bgm_lose") return;
 
             var clip = GetPhaseBgmClip(_resultBgmOverride);
             if (clip == null) return;

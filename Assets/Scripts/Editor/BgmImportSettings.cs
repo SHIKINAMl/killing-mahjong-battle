@@ -27,6 +27,12 @@ namespace KillingMahjong.EditorTools
             var s = importer.defaultSampleSettings;
             if (s.loadType == AudioClipLoadType.CompressedInMemory) return;
             s.loadType = AudioClipLoadType.CompressedInMemory;
+
+            // **圧縮の音質は 50%（2026-10-09）。** 既定の 100% のままだと WebGL のビルドが100MBを超えた。
+            // WebGL では 50% で1曲あたり約33%小さくなり、それより下げても変わらない（測った）。
+            // 50% でも約250kbpsある。ここを通るのは初めて取り込む曲だけ
+            // （もう取り込んである曲の設定は .meta が正で、ここでは上書きしない）
+            s.quality = 0.5f;
             importer.defaultSampleSettings = s;
         }
     }

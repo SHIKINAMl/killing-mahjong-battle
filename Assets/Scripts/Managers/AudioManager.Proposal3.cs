@@ -138,7 +138,8 @@ namespace KillingMahjong.Managers
             string baseName = (currentBgmPhase == RoundStatus.Result && _resultBgmOverride != null)
                 ? _resultBgmOverride
                 : ResolveBgmName(currentBgmPhase);
-            return UseProposal4Bgm ? P4NameFor(baseName) : P3Prefix + baseName;
+            string prefix = WantedSetPrefix;   // 第4案 / 夜卓の灯火
+            return prefix != null ? P4NameFor(prefix, baseName) : P3Prefix + baseName;
         }
 
         private AudioClip GetProposal3Clip(string name)
@@ -146,7 +147,8 @@ namespace KillingMahjong.Managers
             AudioClip clip;
             if (!_p3Clips.TryGetValue(name, out clip))
             {
-                string folder = name.StartsWith(P4Prefix) ? P4Folder : P3Folder;
+                string folder = name.StartsWith(RtPrefix) ? RtFolder
+                              : name.StartsWith(P4Prefix) ? P4Folder : P3Folder;
                 clip = Resources.Load<AudioClip>(folder + name);
                 _p3Clips[name] = clip;
                 if (clip == null)
@@ -241,9 +243,9 @@ namespace KillingMahjong.Managers
                     {
                         yield return P3ChangeClip();
                     }
-                    else if (_p3ClipName == P4DrawBaseName && !_p4MotifAlive)
+                    else if (IsDrawBase(_p3ClipName) && !_p4MotifAlive)
                     {
-                        // 流局の土台は鳴っているのに、モチーフが止まっている（第4案）
+                        // 流局の土台は鳴っているのに、モチーフが止まっている（第4案・夜卓の灯火）
                         yield return P4ResumeMotif();
                     }
                     else break;   // もう行き先の曲が鳴っている
@@ -322,9 +324,9 @@ namespace KillingMahjong.Managers
                 clip = GetProposal3Clip(want);
                 if (clip == null) { _p3Stuck = true; yield break; }
                 bool loading = clip.loadState == AudioDataLoadState.Loading;
-                if (want == P4DrawBaseName)
+                if (IsDrawBase(want))
                 {
-                    var motif = GetProposal3Clip(P4DrawMotifName);
+                    var motif = GetProposal3Clip(DrawMotifOf(want));
                     if (motif != null && motif.loadState == AudioDataLoadState.Loading) loading = true;
                 }
 
@@ -334,7 +336,7 @@ namespace KillingMahjong.Managers
             }
 
             // 流局のモチーフは、行き先が流局でなければここまでに止まっている。念のためもう一度見る
-            if (want != P4DrawBaseName) P4KillMotif();
+            if (!IsDrawBase(want)) P4KillMotif();
 
             var cur = _p3Decks[_p3Active];
             var next = _p3Decks[1 - _p3Active];
@@ -343,6 +345,13 @@ namespace KillingMahjong.Managers
             bool sameFamily = cur.clip != null
                               && cur.clip.samples == clip.samples
                               && SameTempo(cur.clip.name, clip.name);
+            // **夜卓の灯火は、濃度どうしのときだけ位置を保つ。** ほかの曲は同じ長さ・同じテンポでも
+            // 中身の並びが違うので、新しい曲の1拍目から入れる（AudioManager.Proposal4.cs の頭の説明）
+            if (sameFamily && SetPrefixOf(want) == RtPrefix && !(P4IsField(from) && P4IsField(want)))
+            {
+                sameFamily = false;
+            }
+
             int startSample = 0;
             if (sameFamily)
             {

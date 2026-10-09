@@ -88,6 +88,7 @@ namespace KillingMahjong.Managers
 
             bool wantP3 = kind == (int)Core.SettingsManager.MatchBgmSetKind.Proposal3;
             bool wantP4 = kind == (int)Core.SettingsManager.MatchBgmSetKind.Proposal4;
+            bool wantRt = kind == (int)Core.SettingsManager.MatchBgmSetKind.ReturningTheme;
             bool wantPair = kind == (int)Core.SettingsManager.MatchBgmSetKind.Pair;
             // **層を使うのは「新2曲」と「従来（層あり）」だけ。** 層を鳴らしたままだと
             // bgm_field_1〜4 は一度も鳴らない（層のステムが先に使われるため）。
@@ -102,6 +103,7 @@ namespace KillingMahjong.Managers
             // **案の番号も見て判定する（2026-10-08）。** 鳴らし方の旗だけで比べると、
             // 旗の組み合わせが同じ別の案へ替えたときに「変わっていない」と読んでしまう。
             if (kind == _matchBgmSet && wantP3 == UseProposal3Bgm && wantP4 == UseProposal4Bgm
+                && wantRt == UseReturningThemeBgm
                 && wantPair == UsePairBgm && wantLayers == UseBgmLayers) return;
 
             // **いま鳴っていないなら、鳴らし始めてはいけない。**
@@ -114,18 +116,19 @@ namespace KillingMahjong.Managers
                               || (bgmSource != null && bgmSource.isPlaying);
 
             // 行きか帰りのどちらかが第3案・第4案か。途中で取り消された切り替えが残っている場合も含む
-            bool proposal3Involved = wantP3 || wantP4 || Proposal3Owns;
+            bool proposal3Involved = wantP3 || wantP4 || wantRt || Proposal3Owns;
 
             _matchBgmSet = kind;
             UseProposal3Bgm = wantP3;
             UseProposal4Bgm = wantP4;
+            UseReturningThemeBgm = wantRt;
             UsePairBgm = wantPair;
             UseBgmLayers = wantLayers;
 
             if (!wasPlaying)
             {
                 // 旗だけ差し替える。音は次に誰かがフェイズを指定したときに任せる
-                if (!wantP3 && !wantP4) _legacySoundingKind = kind;
+                if (!wantP3 && !wantP4 && !wantRt) _legacySoundingKind = kind;
                 return;
             }
 

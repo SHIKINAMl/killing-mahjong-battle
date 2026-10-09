@@ -70,7 +70,7 @@ namespace KillingMahjong.UI
 
         /// <summary>
         /// 対局の場面と曲名の対応。**並びは対局の流れ順。**
-        /// 従来・第4案は同じ場面割り（AudioManager.PhaseBgmNames）なので、表を1つにして使い回す。
+        /// 従来・第4案・夜卓の灯火は同じ場面割り（AudioManager.PhaseBgmNames）なので、表を1つにして使い回す。
         /// </summary>
         private static readonly string[,] MatchScenes =
         {
@@ -89,7 +89,7 @@ namespace KillingMahjong.UI
         };
 
         /// <summary>
-        /// 第4案に入っているが、**対局では自動で鳴らない曲**（場面の割当に出番が無い）。
+        /// 第4案・夜卓の灯火に入っているが、**対局では自動で鳴らない曲**（場面の割当に出番が無い）。
         /// 聴けるように並べるだけ。
         /// </summary>
         private static readonly string[,] MatchExtras =
@@ -118,12 +118,26 @@ namespace KillingMahjong.UI
         /// <summary>
         /// 対局BGM「従来」。層あり・層なしで曲は同じ。違うのは打牌中の鳴らし方だけで、
         /// 層ありは場 I〜IV の代わりに下の4本の層（土台＋旋律＋打楽器＋きらめき）を重ねる。
+        ///
+        /// **「負け」の曲（bgm_lose）は 2026-10-09 に消した**ので、ここからも外す（ユーザーの判断）。
+        /// 従来で負けたときは、結果の曲がそのまま続く。
         /// </summary>
-        private static readonly Track[] BgmsLegacy = MatchTracks("Bgm", "", false,
+        private static readonly Track[] BgmsLegacy = Without("bgm_lose", MatchTracks("Bgm", "", false,
             new Track("Bgm", "field_base",    "場の層　土台（層あり）"),
             new Track("Bgm", "field_melody",  "場の層　旋律（層あり）"),
             new Track("Bgm", "field_drums",   "場の層　打楽器（層あり）"),
-            new Track("Bgm", "field_sparkle", "場の層　きらめき（層あり）"));
+            new Track("Bgm", "field_sparkle", "場の層　きらめき（層あり）")));
+
+        /// <summary>曲の並びから、名前の合う1曲を除く。</summary>
+        private static Track[] Without(string id, Track[] tracks)
+        {
+            var list = new List<Track>();
+            foreach (Track t in tracks)
+            {
+                if (t.Id != id) list.Add(t);
+            }
+            return list.ToArray();
+        }
 
         /// <summary>
         /// 対局BGM「第4案」。AudioManager.Proposal4。
@@ -132,6 +146,14 @@ namespace KillingMahjong.UI
         private static readonly Track[] BgmsProposal4 = MatchTracks("Bgm/Proposal4", "p4_", true,
             new Track("Bgm/Proposal4", "p4_bgm_draw_base",  "流局　土台だけ"),
             new Track("Bgm/Proposal4", "p4_bgm_draw_motif", "流局　モチーフだけ"));
+
+        /// <summary>
+        /// 対局BGM「夜卓の灯火」。AudioManager.Proposal4 の仕組みで鳴る（頭の印 `rt_`）。
+        /// 掛け金は「合図の余白 v2（メインなし）」。流局は第4案と同じく「土台＋モチーフ」の2本で鳴る。
+        /// </summary>
+        private static readonly Track[] BgmsReturningTheme = MatchTracks("Bgm/ReturningTheme", "rt_", true,
+            new Track("Bgm/ReturningTheme", "rt_bgm_draw_base",  "流局　土台だけ"),
+            new Track("Bgm/ReturningTheme", "rt_bgm_draw_motif", "流局　モチーフだけ"));
 
         /// <summary>
         /// 「音楽」タブの左に並べる、まとまりの1行。
@@ -159,6 +181,7 @@ namespace KillingMahjong.UI
             new MusicGroup { Label = "場面の曲", Path = "場面の曲", Tracks = BgmsScenes },
             new MusicGroup { Label = "対局BGM" },
             new MusicGroup { Label = "第4案", Path = "対局BGM ＞ 第4案", Indent = 1, Tracks = BgmsProposal4 },
+            new MusicGroup { Label = "夜卓の灯火", Path = "対局BGM ＞ 夜卓の灯火", Indent = 1, Tracks = BgmsReturningTheme },
             new MusicGroup { Label = "従来", Path = "対局BGM ＞ 従来", Indent = 1, Tracks = BgmsLegacy },
             new MusicGroup { Label = "未使用", Path = "未使用", Tracks = BgmsUnused },
             };
@@ -169,11 +192,8 @@ namespace KillingMahjong.UI
         /// 消さずに残してあるので、ここから試聴できる。
         ///
         ///   bgm_title      タイトルは追加曲の bgm_ex_midnight に差し替えた
-        ///   bgm_tutorial   チュートリアルは tut_lesson に差し替えた
-        ///   tut_* の7曲    チュートリアルは tut_lesson 1曲を最後まで流す形になった
-        ///                  （2026-09-27 のユーザー指示）。台詞ごとの曲の切り替えと
-        ///                  無音をやめたので、この7曲は鳴らなくなった。
-        ///                  合図の表は TutorialAudioDirector にあり、戻すならそちら。
+        ///   （bgm_tutorial と tut_* の7曲は、2026-10-09 に消した。チュートリアルは tut_lesson 1曲を
+        ///     最後まで流す形になっていて鳴っておらず、WebGL のビルドを100MB未満にするために外した。ユーザーの判断）
         ///   bgm_discard    打牌フェイズは場のBGMが受け持つようになり、出番が無くなった
         ///   bgm_discard_hot  同上
         ///   bgm_battle     どこからも参照されていない
@@ -196,7 +216,6 @@ namespace KillingMahjong.UI
         private static readonly Track[] BgmsUnused =
         {
             new Track("Bgm", "bgm_title",        "タイトル（旧）"),
-            new Track("Bgm", "bgm_tutorial",     "チュートリアル（旧）"),
             new Track("Bgm", "bgm_discard",      "打牌"),
             new Track("Bgm", "bgm_discard_hot",  "打牌　激"),
             new Track("Bgm", "bgm_battle",       "対局（旧）"),
@@ -211,13 +230,6 @@ namespace KillingMahjong.UI
             new Track("Bgm", "bgm_ex_incident",  "ひび割れた事件"),
             new Track("Bgm", "bgm_ex_surreal",   "奇妙な回廊"),
             new Track("Bgm", "bgm_ex_think",     "長考"),
-            new Track("Bgm", "tut_slack",        "チュートリアル　弛緩"),
-            new Track("Bgm", "tut_lie",          "チュートリアル　嘘"),
-            new Track("Bgm", "tut_cruel",        "チュートリアル　残酷"),
-            new Track("Bgm", "tut_ability",      "チュートリアル　能力"),
-            new Track("Bgm", "tut_reversal",     "チュートリアル　反転"),
-            new Track("Bgm", "tut_final",        "チュートリアル　決着"),
-            new Track("Bgm", "tut_farewell",     "チュートリアル　別れ"),
         };
 
         /// <summary>
