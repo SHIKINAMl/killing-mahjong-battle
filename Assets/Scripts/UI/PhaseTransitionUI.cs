@@ -339,6 +339,12 @@ namespace KillingMahjong.UI
         private const float CutinSpriteHeightRatio = 0.78f;
 
         [SerializeField] private Sprite playerCutinSprite;
+
+        /// <summary>
+        /// 自分のスキルのカットインに出す絵（板を持った悪魔ベルル。目が光っている）。
+        /// 役強化の演出が「ベルルの目が光る」所で同じ絵を使う（<see cref="Effects.BoostHandSkillEffect"/>）。
+        /// </summary>
+        public Sprite PlayerCutinSprite { get { return playerCutinSprite; } }
         [SerializeField] private Sprite playerTroubledSprite;
 
         public void PlayScoreSettlementAnimation(

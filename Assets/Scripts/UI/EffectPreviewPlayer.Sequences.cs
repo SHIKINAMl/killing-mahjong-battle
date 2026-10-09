@@ -44,7 +44,7 @@ namespace KillingMahjong.UI
                     yield return rig.phase.PlaySkillCutinAnimationRoutine("役強化", true, rig.player.CurrentCharacterData, subText: "清一色");
                     var boost = BoostHandSkillEffect.Create();
                     scope.AddCleanup(() => { if (boost != null) boost.Dispose(); });
-                    yield return boost.Play("清一色", boostBoard);
+                    yield return boost.Play("清一色", boostBoard, rig.phase.PlayerCutinSprite);
                     yield return new WaitForSeconds(0.8f); break;
                 case "skill.assault":
                     yield return rig.phase.PlaySkillCutinAnimationRoutine("強襲", true, rig.player.CurrentCharacterData);

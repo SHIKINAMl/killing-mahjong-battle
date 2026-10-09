@@ -33,7 +33,7 @@ namespace KillingMahjong.UI
         private static readonly Entry[] entries = {
             new Entry("skill.perspective", "スキル", "透視：集中 → 3枚公開 → 解除", "ExposedTileEffectPlayer.PlayReveal"),
             new Entry("skill.mulligan", "スキル", "牌交換：OUT / IN", "MulliganSwapAnimator.PlayRoutine"),
-            new Entry("skill.boost_hand", "スキル", "役強化：暗転 → 役名 → 翻数が上がる → 右上の一覧へ積む", "BoostHandSkillEffect.Play"),
+            new Entry("skill.boost_hand", "スキル", "役強化：暗転 → ベルルを呼ぶ → 力を借りて翻数が上がる → 右上の一覧へ積む", "BoostHandSkillEffect.Play"),
             new Entry("skill.assault", "スキル", "強襲：暗転 → 自分の血を抜く → 相手へ撃ち込む → 印が残る", "AssaultSkillEffect.Play"),
             new Entry("skill.cutin.enemy", "スキル", "相手の能力カットイン", "PhaseTransitionUI.PlaySkillCutinAnimationRoutine"),
             new Entry("phase.dealing", "フェイズ", "配牌：暗転 → 牌の山 → 明転", "PhaseTransitionUI.PlayRoundStartDarken / PlayRoundStartFadeOut"),
