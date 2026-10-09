@@ -25023,6 +25023,103 @@ MonoBehaviour:
   decideButton: {fileID: 519346419}
   autoManganButton: {fileID: 874971844}
   showAutoDiscardButton: 0
+--- !u!1001 &1951419611
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 1046393618424930031, guid: 6a50fb250870fa6479e67a270d1e0a7b, type: 3}
+      propertyPath: m_Pivot.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1046393618424930031, guid: 6a50fb250870fa6479e67a270d1e0a7b, type: 3}
+      propertyPath: m_Pivot.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1046393618424930031, guid: 6a50fb250870fa6479e67a270d1e0a7b, type: 3}
+      propertyPath: m_AnchorMax.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1046393618424930031, guid: 6a50fb250870fa6479e67a270d1e0a7b, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1046393618424930031, guid: 6a50fb250870fa6479e67a270d1e0a7b, type: 3}
+      propertyPath: m_AnchorMin.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1046393618424930031, guid: 6a50fb250870fa6479e67a270d1e0a7b, type: 3}
+      propertyPath: m_AnchorMin.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1046393618424930031, guid: 6a50fb250870fa6479e67a270d1e0a7b, type: 3}
+      propertyPath: m_SizeDelta.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1046393618424930031, guid: 6a50fb250870fa6479e67a270d1e0a7b, type: 3}
+      propertyPath: m_SizeDelta.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1046393618424930031, guid: 6a50fb250870fa6479e67a270d1e0a7b, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1046393618424930031, guid: 6a50fb250870fa6479e67a270d1e0a7b, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1046393618424930031, guid: 6a50fb250870fa6479e67a270d1e0a7b, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1046393618424930031, guid: 6a50fb250870fa6479e67a270d1e0a7b, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1046393618424930031, guid: 6a50fb250870fa6479e67a270d1e0a7b, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1046393618424930031, guid: 6a50fb250870fa6479e67a270d1e0a7b, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1046393618424930031, guid: 6a50fb250870fa6479e67a270d1e0a7b, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1046393618424930031, guid: 6a50fb250870fa6479e67a270d1e0a7b, type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1046393618424930031, guid: 6a50fb250870fa6479e67a270d1e0a7b, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1046393618424930031, guid: 6a50fb250870fa6479e67a270d1e0a7b, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1046393618424930031, guid: 6a50fb250870fa6479e67a270d1e0a7b, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1046393618424930031, guid: 6a50fb250870fa6479e67a270d1e0a7b, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6156445515931155940, guid: 6a50fb250870fa6479e67a270d1e0a7b, type: 3}
+      propertyPath: m_Name
+      value: YakuSelection
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 6a50fb250870fa6479e67a270d1e0a7b, type: 3}
 --- !u!1 &1954987631
 GameObject:
   m_ObjectHideFlags: 0
@@ -25606,32 +25703,36 @@ MonoBehaviour:
   dialogueText: {fileID: 711026256}
   titleButton: {fileID: 229336175}
   canvasGroup: {fileID: 1987867889}
-  summaryText: {fileID: 0}
-  rematchButton: {fileID: 0}
-  autoRematchButtonOffset: {x: 0, y: 110}
   configs:
   - victoryType: 0
     image: {fileID: 0}
     text: "\u52DD\u5229\uFF01"
+    dialoguePages: []
+    resultTitle: 
+    endingName: 
   - victoryType: 1
     image: {fileID: 21300000, guid: 0350fe3715e052f478dba4b5b13869f6, type: 3}
-    text: "対局が終了しました。"
+    text: "\u5BFE\u5C40\u304C\u7D42\u4E86\u3057\u307E\u3057\u305F\u3002"
     dialoguePages:
-    - "対局が終了しました。"
-    - "これは共通エンディングの仮内容です。"
+    - "\u5BFE\u5C40\u304C\u7D42\u4E86\u3057\u307E\u3057\u305F\u3002"
+    - "\u3053\u308C\u306F\u5171\u901A\u30A8\u30F3\u30C7\u30A3\u30F3\u30B0\u306E\u4EEE\u5185\u5BB9\u3067\u3059\u3002"
     resultTitle: DEAD END
-    endingName: "共通ED（仮）"
+    endingName: "\u5171\u901AED\uFF08\u4EEE\uFF09"
   - victoryType: 2
     image: {fileID: 0}
     text: "\u7279\u6B8A\u52DD\u5229\uFF01"
+    dialoguePages: []
+    resultTitle: 
+    endingName: 
   - victoryType: 3
     image: {fileID: 21300000, guid: 0350fe3715e052f478dba4b5b13869f6, type: 3}
-    text: "対局が終了しました。"
+    text: "\u5BFE\u5C40\u304C\u7D42\u4E86\u3057\u307E\u3057\u305F\u3002"
     dialoguePages:
-    - "対局が終了しました。"
-    - "これは共通エンディングの仮内容です。"
+    - "\u5BFE\u5C40\u304C\u7D42\u4E86\u3057\u307E\u3057\u305F\u3002"
+    - "\u3053\u308C\u306F\u5171\u901A\u30A8\u30F3\u30C7\u30A3\u30F3\u30B0\u306E\u4EEE\u5185\u5BB9\u3067\u3059\u3002"
     resultTitle: DEAD END
-    endingName: "共通ED（仮）"
+    endingName: "\u5171\u901AED\uFF08\u4EEE\uFF09"
+  victoryEndingConfigs: []
 --- !u!225 &1987867889
 CanvasGroup:
   m_ObjectHideFlags: 0
@@ -27098,3 +27199,4 @@ SceneRoots:
   - {fileID: 312065929}
   - {fileID: 326032734}
   - {fileID: 291622811}
+  - {fileID: 1951419611}

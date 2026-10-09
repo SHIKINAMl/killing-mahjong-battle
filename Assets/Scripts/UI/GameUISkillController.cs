@@ -170,22 +170,20 @@ namespace KillingMahjong.UI
 
         public void StartBoostHandSelection()
         {
-            if (yakuSelectionUI == null)
-            {
-                yakuSelectionUI = gameObject.AddComponent<YakuSelectionUI>();
-                if (yakuSelectionFont != null)
-                {
-                    yakuSelectionUI.customFont = yakuSelectionFont;
-                }
-            }
+            // 画面はシーンに置いてある（YakuSelection）。前はここで部品として付け、中身も再生時に組んでいた。
+            // yakuSelectionFont は前の画面（旧 Text）用で、いまは使っていない（シーンの参照を壊さないよう残してある）
+            if (yakuSelectionUI == null) yakuSelectionUI = YakuSelectionUI.FindOrCreate();
 
+            var board = Managers.BoardStateManager.Instance;
             yakuSelectionUI.Show(
                 onSelected: (yakuName) => {
                     uiManager.SendActionToServer("skill", new Network.ActionPayload { skill_type = "boost_hand", yaku_name = yakuName });
                 },
                 onCanceled: () => {
                     Debug.Log("Boost hand cancelled");
-                }
+                },
+                tiles: uiManager.TileResourceManager,
+                boosts: board != null ? board.LocalBoostHandBonus : null
             );
         }
 

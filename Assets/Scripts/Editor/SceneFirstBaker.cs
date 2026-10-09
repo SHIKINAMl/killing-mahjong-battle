@@ -22,12 +22,23 @@ namespace KillingMahjong.EditorTools
     ///   再生したときに「シーンに無かったので、再生時に作りました」の警告が出たとき。
     ///
     /// 対局メニューはタイトルと部屋の両方で使うので、Prefab にして両方のシーンへ置く。
+    ///
+    /// 対局のシーン（本編とチュートリアル）は別の口（<see cref="BakeMatch"/>）。
+    /// 役強化の「強める役を選ぶ画面」を、Prefab にして両方へ置く。
     /// </summary>
     public static class SceneFirstBaker
     {
         private const string TitleScenePath = "Assets/Scenes/タイトルシーン.unity";
         private const string RoomScenePath = "Assets/Scenes/部屋シーン.unity";
         private const string MenuPrefabPath = "Assets/Prefabs/UI/MultiMenu.prefab";
+
+        // 対局のシーンは2つある（本編とチュートリアル）。同じ物を両方に置くので Prefab にする
+        private static readonly string[] MatchScenePaths =
+        {
+            "Assets/Scenes/OpeningScene.unity",
+            "Assets/Scenes/UIテストシーン.unity",
+        };
+        private const string YakuSelectionPrefabPath = "Assets/Prefabs/UI/YakuSelection.prefab";
 
         [MenuItem("Tools/UI/実行時UIをシーンへ置く（タイトル・部屋・対局メニュー）")]
         private static void BakeFromMenu()
@@ -55,6 +66,77 @@ namespace KillingMahjong.EditorTools
                 EditorSceneManager.OpenScene(original, OpenSceneMode.Single);
             }
             return report.ToString();
+        }
+
+        [MenuItem("Tools/UI/実行時UIをシーンへ置く（対局）")]
+        private static void BakeMatchFromMenu()
+        {
+            Debug.Log("[SceneFirstBaker]\n" + BakeMatch());
+        }
+
+        /// <summary>
+        /// 対局のシーン2つに、足りない部品を置いて保存する。いまは役強化の「強める役を選ぶ画面」
+        /// （<see cref="YakuSelectionUI"/>）だけ。
+        /// </summary>
+        /// <returns>何を置いたかの報告</returns>
+        public static string BakeMatch()
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode) return "再生中は実行できません。";
+
+            Scene active = SceneManager.GetActiveScene();
+            if (active.isDirty) return "開いているシーンに保存していない変更があります。保存してから実行してください。";
+            string original = active.path;
+
+            var report = new StringBuilder();
+            foreach (string path in MatchScenePaths)
+            {
+                Scene scene = EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
+                report.Append(path).Append(": 役を選ぶ画面=").Append(BakeYakuSelection(scene));
+                EditorSceneManager.MarkSceneDirty(scene);
+                bool saved = EditorSceneManager.SaveScene(scene);
+                report.AppendLine(saved ? " / 保存しました" : " / **保存に失敗しました**");
+            }
+
+            // 始める前に開いていたシーンへ戻す
+            if (!string.IsNullOrEmpty(original) && SceneManager.GetActiveScene().path != original)
+            {
+                EditorSceneManager.OpenScene(original, OpenSceneMode.Single);
+            }
+            return report.ToString();
+        }
+
+        /// <summary>役を選ぶ画面を置く。Prefab が無ければここで作り、あればその実体をシーンに置く。</summary>
+        private static string BakeYakuSelection(Scene scene)
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(YakuSelectionPrefabPath);
+            GameObject root = SceneFirst.Find(YakuSelectionUI.RootName);
+
+            string placed = "";
+            if (root == null && prefab != null)
+            {
+                root = (GameObject)PrefabUtility.InstantiatePrefab(prefab, scene);
+                root.name = YakuSelectionUI.RootName;
+                placed = "Prefab をシーンに置いた。";
+            }
+
+            string made = YakuSelectionUI.BakeForEditor();
+
+            root = SceneFirst.Find(YakuSelectionUI.RootName);
+            if (root == null) return placed + "作れませんでした。";
+
+            if (prefab == null)
+            {
+                PrefabUtility.SaveAsPrefabAssetAndConnect(root, YakuSelectionPrefabPath, InteractionMode.AutomatedAction);
+                placed += "Prefab を作った（" + YakuSelectionPrefabPath + "）。";
+            }
+            else if (made.Length > 0 && PrefabUtility.IsPartOfPrefabInstance(root))
+            {
+                // このシーンで足した部品を Prefab へ戻す。戻さないと、もう片方のシーンには出ない
+                PrefabUtility.ApplyPrefabInstance(root, InteractionMode.AutomatedAction);
+                placed += "足した部品を Prefab に反映した。";
+            }
+
+            return placed + Describe(made);
         }
 
         private static string BakeScene(string path)

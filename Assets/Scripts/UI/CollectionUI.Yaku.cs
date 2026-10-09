@@ -12,84 +12,14 @@ namespace KillingMahjong.UI
     ///
     /// 左に役の一覧（翻数ごとに区切る）、右に選んだ役の説明と、牌で組んだ例を出す。
     ///
-    /// **役の名前と翻数は、ここでは持たない。**
-    ///   翻数 … <see cref="GameRules.GetBaseHan"/>（サーバーの `mahjong_engine/engine/yaku.py` と同じ27役）
-    ///   説明 … <see cref="YakuInfo.GetDescription"/>（対局中の役一覧と同じ文）
-    /// ここにあるのは「並べる順番」と「例の牌」だけ。役が増えたら <see cref="YakuEntries"/> に1行足す。
-    ///
-    /// **例の牌は、このゲームの牌だけで組む。** 字牌は東と西の2種しか無い（發・中・白などは無い）。
-    /// 手牌13枚＋ロンする1枚。鳴きは無いので、どの例も門前の形。
+    /// **役の並び順・例の牌・翻数・説明は、ここでは持たない。**
+    ///   並び順と例の牌 … <see cref="YakuExamples"/>（役強化で強める役を選ぶ画面と共用）
+    ///   翻数 … <see cref="GameRules.GetBaseHan"/>
+    ///   説明 … <see cref="YakuInfo.GetDescription"/>
     /// </summary>
     public sealed partial class CollectionUI
     {
-        /// <summary>一覧に並べる1役。</summary>
-        private readonly struct YakuEntry
-        {
-            public readonly string Name;
-
-            /// <summary>
-            /// 例の牌。「m123 p456 s789 E3 m5 + m5」のように書く
-            /// （m=萬子 p=筒子 s=索子、後ろの数字が1枚ずつ。E=東 W=西 は後ろの数字が枚数。
-            /// r を頭に付けると赤ドラ。「+」より後ろがロンする牌）。空なら例を出さない。
-            /// </summary>
-            public readonly string Example;
-
-            /// <summary>例の下に出すひとこと。空なら既定の文。</summary>
-            public readonly string Note;
-
-            public YakuEntry(string name, string example, string note = "")
-            {
-                Name = name;
-                Example = example;
-                Note = note;
-            }
-        }
-
-        /// <summary>
-        /// 並べる順番と、例の牌。翻数の小さい順（サーバーの yaku.py と同じ並び）。
-        /// 区切りの見出しは、翻数が変わる所に自動で入る。
-        /// </summary>
-        private static readonly YakuEntry[] YakuEntries =
-        {
-            // ---- 1翻 ----
-            new YakuEntry("立直",     "", "形は問わない"),
-            new YakuEntry("断么九",   "m234 m567 p345 s456 s8 + s8"),
-            new YakuEntry("平和",     "m123 p567 s234 s67 p88 + s8", "順子4組。待ちは両側（5索か8索）"),
-            new YakuEntry("一盃口",   "m223344 p567 s789 E1 + E1"),
-            new YakuEntry("東",       "E3 m234 p567 s345 s9 + s9"),
-            new YakuEntry("西",       "W3 m345 p234 s678 p9 + p9"),
-            new YakuEntry("ドラ",     "", "形は問わない"),
-            new YakuEntry("赤ドラ",   "rm5 rp5 rs5", "赤い5はこの3種類"),
-            new YakuEntry("一発",     "", "形は問わない"),
-            new YakuEntry("河底撈魚", "", "形は問わない"),
-
-            // ---- 2翻 ----
-            new YakuEntry("三色同順", "m345 m789 p345 s345 p1 + p1"),
-            new YakuEntry("三色同刻", "m222 p222 s222 m678 W1 + W1"),
-            new YakuEntry("三暗刻",   "m111 p444 s777 m456 p8 + p8"),
-            new YakuEntry("対々和",   "m222 p555 s888 E2 W2 + E1"),
-            new YakuEntry("混老頭",   "m111 m999 p111 s999 E1 + E1"),
-            new YakuEntry("混全帯么九", "m123 m789 p123 E3 s9 + s9"),
-            new YakuEntry("七対子",   "m11 m44 p22 p77 s33 s66 W1 + W1"),
-            new YakuEntry("一気通貫", "m123 m456 m789 p234 s5 + s5"),
-
-            // ---- 3翻 ----
-            new YakuEntry("二盃口",   "m223344 p556677 s9 + s9"),
-            new YakuEntry("混一色",   "m111 m345 m678 E3 m9 + m9"),
-            new YakuEntry("純全帯么九", "m123 m789 p123 s789 s1 + s1"),
-
-            // ---- 6翻 ----
-            new YakuEntry("清一色",   "m123 m345 m567 m789 m9 + m9"),
-
-            // ---- 役満 ----
-            new YakuEntry("九蓮宝燈", "m1112245678999 + m3"),
-            new YakuEntry("緑一色",   "s234 s234 s666 s888 s4 + s4", "2・3・4・6・8索だけ。このゲームに發は無い"),
-            new YakuEntry("清老頭",   "m111 m999 p111 s11 s99 + s9"),
-            new YakuEntry("四暗刻",   "m222 p444 p777 s333 E1 + E1"),
-
-            // ---- ダブル役満 ----
-            new YakuEntry("純正九蓮宝燈", "m1112345678999 + m5", "1から9のどれが来てもアガれる形"),
-        };
+        private static YakuExamples.Entry[] YakuEntries { get { return YakuExamples.Entries; } }
 
         // 割り付け。プレイヤーバー（試聴の棒）が出ないタブなので、一覧は下まで使う
         private const float YakuListCenterX = -252f;
@@ -232,29 +162,11 @@ namespace KillingMahjong.UI
             rt.anchoredPosition = new Vector2(0f, y);
         }
 
-        /// <summary>
-        /// 画面に出す役名。**サーバーの表記のまま出してはいけない。**
-        /// 「断么九」などの「么」はフォントに無く、□ になる（最初に作ったとき実際に □ が出た）。
-        /// 対局中の画面と同じ関数を通して、収録済みの「幺」に置き換える。
-        /// </summary>
-        private static string YakuDisplayName(string name)
-        {
-            return YakuNameUtil.ToDisplayText(new YakuNameUtil.Entry { BaseName = name, Boost = 0, Count = 1 });
-        }
+        private static string YakuDisplayName(string name) { return YakuExamples.DisplayName(name); }
 
-        private static string YakuSectionName(int han)
-        {
-            if (han >= 26) return "ダブル役満";
-            if (han >= 13) return "役満";
-            return han + "翻";
-        }
+        private static string YakuSectionName(int han) { return YakuExamples.SectionName(han); }
 
-        private static string YakuHanText(int han)
-        {
-            if (han >= 26) return "ダブル役満（26翻）";
-            if (han >= 13) return "役満（13翻）";
-            return han + "翻";
-        }
+        private static string YakuHanText(int han) { return YakuExamples.HanText(han); }
 
         // ------------------------------------------------------------
         //  右: 選んだ役の説明と例
@@ -329,7 +241,7 @@ namespace KillingMahjong.UI
                 yakuRowBgs[i].color = (yakuRowEntry[i] == index) ? RowSelected : new Color(0f, 0f, 0f, 0f);
             }
 
-            YakuEntry entry = YakuEntries[index];
+            YakuExamples.Entry entry = YakuEntries[index];
             int han = GameRules.GetBaseHan(entry.Name);
 
             if (yakuNameText != null) yakuNameText.text = YakuDisplayName(entry.Name);
@@ -340,11 +252,7 @@ namespace KillingMahjong.UI
             if (yakuExampleHead != null) yakuExampleHead.gameObject.SetActive(hasExample);
             if (yakuNoteText != null)
             {
-                bool wins = entry.Example.Contains("+");
-                string note = entry.Note;
-                if (string.IsNullOrEmpty(note) && wins) note = "右に離した1枚でロン";
-                else if (!string.IsNullOrEmpty(note) && wins) note = "右に離した1枚でロン。" + note;
-                yakuNoteText.text = note;
+                yakuNoteText.text = YakuExamples.NoteOf(entry);
 
                 // 例が無い役は、ひとことを例の位置まで上げる
                 yakuNoteText.rectTransform.anchoredPosition =
@@ -352,7 +260,7 @@ namespace KillingMahjong.UI
             }
         }
 
-        /// <summary>例の牌を並べる。並べたら true。書式は <see cref="YakuEntry.Example"/>。</summary>
+        /// <summary>例の牌を並べる。並べたら true。書式は <see cref="YakuExamples.Entry.Example"/>。</summary>
         private bool ShowYakuExample(string example)
         {
             if (yakuTileRow == null) return false;
@@ -362,15 +270,8 @@ namespace KillingMahjong.UI
             TileResourceManager tiles = GetYakuTiles();
             if (tiles == null) return false;
 
-            // 「+」の前が手牌、後ろがロンする牌
-            var ids = new List<int>();
-            int winFrom = -1;
-            foreach (string token in example.Split(' '))
-            {
-                if (token.Length == 0) continue;
-                if (token == "+") { winFrom = ids.Count; continue; }
-                AddExampleTiles(token, ids);
-            }
+            int winFrom;
+            List<int> ids = YakuExamples.Parse(example, out winFrom);
             if (ids.Count == 0) return false;
 
             const float gap = 2f;
@@ -388,35 +289,6 @@ namespace KillingMahjong.UI
                 x += YakuTileWidth + gap;
             }
             return true;
-        }
-
-        /// <summary>「m123」「E3」「rp5」のような1かたまりを牌の番号にして足す。</summary>
-        private static void AddExampleTiles(string token, List<int> ids)
-        {
-            bool red = token[0] == 'r';
-            if (red) token = token.Substring(1);
-            if (token.Length < 2) return;
-
-            char kind = token[0];
-            string digits = token.Substring(1);
-
-            if (kind == 'E' || kind == 'W')
-            {
-                int count = digits[0] - '0';
-                int honor = kind == 'E' ? TutorialTiles.Ton : TutorialTiles.Sha;
-                for (int i = 0; i < count; i++) ids.Add(TutorialTiles.Encode(honor));
-                return;
-            }
-
-            foreach (char d in digits)
-            {
-                int number = d - '0';
-                if (number < 1 || number > 9) continue;
-                int baseId = kind == 'm' ? TutorialTiles.Man(number)
-                           : kind == 'p' ? TutorialTiles.Pin(number)
-                           : TutorialTiles.Sou(number);
-                ids.Add(TutorialTiles.Encode(baseId, false, red));
-            }
         }
 
         /// <summary>
