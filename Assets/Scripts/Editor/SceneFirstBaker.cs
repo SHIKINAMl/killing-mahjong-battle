@@ -32,7 +32,8 @@ namespace KillingMahjong.EditorTools
         private const string RoomScenePath = "Assets/Scenes/部屋シーン.unity";
         private const string MenuPrefabPath = "Assets/Prefabs/UI/MultiMenu.prefab";
 
-        // 対局のシーンは2つある（本編とチュートリアル）。同じ物を両方に置くので Prefab にする
+        // 対局のシーンは2つある（OpeningScene＝チュートリアル、UIテストシーン＝本編のオンライン対局）。
+        // 同じ物を両方に置くので Prefab にする
         private static readonly string[] MatchScenePaths =
         {
             "Assets/Scenes/OpeningScene.unity",
