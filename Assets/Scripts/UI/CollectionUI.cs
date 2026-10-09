@@ -65,19 +65,12 @@ namespace KillingMahjong.UI
             new Track("Bgm", "tut_lesson",       "チュートリアル"),
         };
 
-        /// <summary>
-        /// 対局BGM「新2曲（切替）」。AudioManager.PairBgm が、通常と高揚を重ねて入れ替える。
-        /// 流局・結果・勝ち負けは受け持たないので、その場面では「従来」の曲が鳴る。
-        /// </summary>
-        private static readonly Track[] BgmsPair =
-        {
-            new Track("Bgm", "bgm_phase_normal", "通常"),
-            new Track("Bgm", "bgm_phase_turn",   "高揚"),
-        };
+        // 対局BGM「新2曲（切替）」と「第3案」は、2026-10-09 に曲ごと消した
+        // （WebGL のビルドが100MBを超えたため。ユーザーの判断）。ここにも並べない。
 
         /// <summary>
         /// 対局の場面と曲名の対応。**並びは対局の流れ順。**
-        /// 従来・第3案・第4案は同じ場面割り（AudioManager.PhaseBgmNames）なので、表を1つにして使い回す。
+        /// 従来・第4案は同じ場面割り（AudioManager.PhaseBgmNames）なので、表を1つにして使い回す。
         /// </summary>
         private static readonly string[,] MatchScenes =
         {
@@ -96,7 +89,7 @@ namespace KillingMahjong.UI
         };
 
         /// <summary>
-        /// 第3案・第4案に入っているが、**対局では自動で鳴らない曲**（場面の割当に出番が無い）。
+        /// 第4案に入っているが、**対局では自動で鳴らない曲**（場面の割当に出番が無い）。
         /// 聴けるように並べるだけ。
         /// </summary>
         private static readonly string[,] MatchExtras =
@@ -132,9 +125,6 @@ namespace KillingMahjong.UI
             new Track("Bgm", "field_drums",   "場の層　打楽器（層あり）"),
             new Track("Bgm", "field_sparkle", "場の層　きらめき（層あり）"));
 
-        /// <summary>対局BGM「第3案」。AudioManager.Proposal3。</summary>
-        private static readonly Track[] BgmsProposal3 = MatchTracks("Bgm/Proposal3", "p3_", true);
-
         /// <summary>
         /// 対局BGM「第4案」。AudioManager.Proposal4。
         /// 流局は対局では「土台＋モチーフ」の2本で鳴る（足すと「流局」の完成版と同じ音）。
@@ -168,11 +158,8 @@ namespace KillingMahjong.UI
             {
             new MusicGroup { Label = "場面の曲", Path = "場面の曲", Tracks = BgmsScenes },
             new MusicGroup { Label = "対局BGM" },
-            new MusicGroup { Label = "新2曲", Path = "対局BGM ＞ 新2曲", Indent = 1, Tracks = BgmsPair,
-                             Note = "流局・結果・勝ち負けは「従来」の曲" },
-            new MusicGroup { Label = "従来", Path = "対局BGM ＞ 従来", Indent = 1, Tracks = BgmsLegacy },
-            new MusicGroup { Label = "第3案", Path = "対局BGM ＞ 第3案", Indent = 1, Tracks = BgmsProposal3 },
             new MusicGroup { Label = "第4案", Path = "対局BGM ＞ 第4案", Indent = 1, Tracks = BgmsProposal4 },
+            new MusicGroup { Label = "従来", Path = "対局BGM ＞ 従来", Indent = 1, Tracks = BgmsLegacy },
             new MusicGroup { Label = "未使用", Path = "未使用", Tracks = BgmsUnused },
             };
         }

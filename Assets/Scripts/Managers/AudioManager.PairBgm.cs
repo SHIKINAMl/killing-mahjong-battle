@@ -29,7 +29,9 @@ namespace KillingMahjong.Managers
         /// <summary>2曲方式を使うか。切ると従来のフェイズ差し替え（曲ごと入れ替え）に戻る。</summary>
         [Header("Pair BGM")]
         [Tooltip("採用した2曲をフェイズでクロスフェードする。切ると従来のフェイズ差し替えに戻る")]
-        public bool UsePairBgm = true;
+        // **2曲（bgm_phase_normal / bgm_phase_turn）は 2026-10-09 に消した**（WebGL のビルドが100MBを
+        // 超えたため。ユーザーの判断）。設定からも選べない。仕組みだけ残してあるので、既定は切っておく
+        public bool UsePairBgm = false;
 
         private const string PairNormalClip = "bgm_phase_normal";
         private const string PairTurnClip = "bgm_phase_turn";
@@ -81,6 +83,9 @@ namespace KillingMahjong.Managers
         /// </summary>
         public void ApplyMatchBgmSet(int kind)
         {
+            // 消した案（新2曲・第3案）の番号が来たら、第4案へ読み替える
+            kind = Core.SettingsManager.NormalizeMatchBgmSet(kind);
+
             bool wantP3 = kind == (int)Core.SettingsManager.MatchBgmSetKind.Proposal3;
             bool wantP4 = kind == (int)Core.SettingsManager.MatchBgmSetKind.Proposal4;
             bool wantPair = kind == (int)Core.SettingsManager.MatchBgmSetKind.Pair;

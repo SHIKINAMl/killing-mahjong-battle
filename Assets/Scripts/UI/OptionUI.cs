@@ -258,7 +258,7 @@ namespace KillingMahjong.UI
 
                 // **通知を止めてから入れる。** そのまま代入すると onValueChanged が走り、
                 // 画面を開いただけで曲が鳴り直したり、画面サイズが切り替わったりする
-                SetDropdown(matchBgmDropdown, settings.MatchBgmSet);
+                SetDropdown(matchBgmDropdown, Core.SettingsManager.MatchBgmChoiceIndexOf(settings.MatchBgmSet));
                 SetDropdown(textSpeedDropdown, settings.TextSpeed);
                 SetDropdown(screenModeDropdown, settings.ScreenMode);
                 SetDropdown(dialogueBubbleDropdown, settings.DialogueBubble);
@@ -372,8 +372,8 @@ namespace KillingMahjong.UI
             // （実機で「文字送り」が既定の「ふつう」ではなく「ゆっくり」と表示された）。
             var current = Core.SettingsManager.Instance;
             matchBgmDropdown = CreateDropdownRow("MatchBgm", "対局BGM",
-                Core.SettingsManager.MatchBgmSetLabels, RowMatchBgm,
-                current != null ? current.MatchBgmSet : 0, OnMatchBgmChanged);
+                Core.SettingsManager.MatchBgmChoiceLabels, RowMatchBgm,
+                current != null ? Core.SettingsManager.MatchBgmChoiceIndexOf(current.MatchBgmSet) : 0, OnMatchBgmChanged);
             textSpeedDropdown = CreateDropdownRow("TextSpeed", "文字送り",
                 Core.SettingsManager.TextSpeedLabels, RowTextSpeed,
                 current != null ? current.TextSpeed : 1, OnTextSpeedChanged);
@@ -495,7 +495,9 @@ namespace KillingMahjong.UI
         private void OnMatchBgmChanged(int index)
         {
             var settings = RequireSettings("対局BGM");
-            if (settings != null) settings.SetMatchBgmSet(index);
+            // 選択欄の何番目かを、種類の番号へ直す（番号は飛び飛び。SettingsManager.MatchBgmChoiceKinds）
+            var kinds = Core.SettingsManager.MatchBgmChoiceKinds;
+            if (settings != null && index >= 0 && index < kinds.Length) settings.SetMatchBgmSet(kinds[index]);
         }
 
         private void OnTextSpeedChanged(int index)

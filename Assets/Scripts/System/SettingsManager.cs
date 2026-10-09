@@ -70,13 +70,17 @@ namespace KillingMahjong.Core
         // 従来のフェイズ別BGM（bgm_prepare / bgm_betting / 場の4層 / bgm_ron）が
         // 一切鳴らなくなっていた。リマスター版を入れても聞こえない、という状態だった。
         [Header("Match BGM")]
-        [SerializeField] private int matchBgmSet = (int)MatchBgmSetKind.Pair;
+        [SerializeField] private int matchBgmSet = (int)MatchBgmSetKind.Proposal4;
         public int MatchBgmSet => matchBgmSet;
 
         /// <summary>対局中に鳴らすBGMの種類。</summary>
         public enum MatchBgmSetKind
         {
-            /// <summary>採用した2曲を、通常と盛り上がりでクロスフェードする</summary>
+            /// <summary>
+            /// 採用した2曲を、通常と盛り上がりでクロスフェードする。
+            /// **曲は 2026-10-09 に消した**（WebGL のビルドが100MBを超えたため。ユーザーの判断）。
+            /// 番号は保存データに残っているので欠番にしてある。選ばれていたら第4案へ読み替える。
+            /// </summary>
             Pair = 0,
             /// <summary>従来のフェイズ別BGM。打牌中の場のBGMは4層のステムで鳴る</summary>
             PerPhase = 1,
@@ -89,6 +93,7 @@ namespace KillingMahjong.Core
             /// 第3案（2026-10-08）。フルミックス16曲をフェイズと濃度で切り替える。
             /// **「第3案」は作品案の名前で、上の3番目を置き換えたものではない。**
             /// 既存の番号は保存データに残っているので動かさず、新しい番号を足した。
+            /// **曲は 2026-10-09 に消した**（同上）。欠番。選ばれていたら第4案へ読み替える。
             /// </summary>
             Proposal3 = 3,
             /// <summary>
@@ -99,19 +104,47 @@ namespace KillingMahjong.Core
         }
 
         /// <summary>
-        /// 選べる種類の表示名。並び順は MatchBgmSetKind と合わせること。
+        /// 選べる種類。設定の選択欄には、この並びで出る。
+        ///
+        /// **番号（MatchBgmSetKind）は飛び飛び。** 「新2曲（切替）」(0) と「第3案」(3) は
+        /// 2026-10-09 に曲ごと消したので、ここに無い。選択欄の何番目かと番号は別物なので、
+        /// <see cref="MatchBgmChoiceIndexOf"/> と <see cref="MatchBgmChoiceKinds"/> で行き来すること。
+        /// </summary>
+        public static readonly int[] MatchBgmChoiceKinds =
+        {
+            (int)MatchBgmSetKind.Proposal4,
+            (int)MatchBgmSetKind.PerPhase,
+            (int)MatchBgmSetKind.PerPhaseNoLayers,
+        };
+
+        /// <summary>
+        /// 選べる種類の表示名。並び順は <see cref="MatchBgmChoiceKinds"/> と合わせること。
         ///
         /// **全角7文字まで。** 選択欄の幅は解像度の欄と同じで、8文字を超えると
         /// 折り返して下が切れる（実機で「フェイズ別（層なし）」が切れた）。
         /// </summary>
-        public static readonly string[] MatchBgmSetLabels =
+        public static readonly string[] MatchBgmChoiceLabels =
         {
-            "新2曲（切替）",
+            "第4案",
             "従来（層あり）",
             "従来（層なし）",
-            "第3案",
-            "第4案",
         };
+
+        /// <summary>種類の番号が、選択欄の何番目か。選べない番号なら 0（第4案）。</summary>
+        public static int MatchBgmChoiceIndexOf(int kind)
+        {
+            int index = System.Array.IndexOf(MatchBgmChoiceKinds, kind);
+            return index < 0 ? 0 : index;
+        }
+
+        /// <summary>
+        /// 選べない番号（消した「新2曲」「第3案」や、範囲の外）を第4案へ読み替える。
+        /// 前の版で保存された選択が残っていても、無い曲を鳴らしにいかないようにする。
+        /// </summary>
+        public static int NormalizeMatchBgmSet(int kind)
+        {
+            return System.Array.IndexOf(MatchBgmChoiceKinds, kind) >= 0 ? kind : (int)MatchBgmSetKind.Proposal4;
+        }
 
         // --- 文字送りの速さ ---
         //
@@ -249,7 +282,7 @@ namespace KillingMahjong.Core
             isHighSpeedMode = PlayerPrefs.GetInt("IsHighSpeedMode", isHighSpeedMode ? 1 : 0) == 1;
             isEffectEnabled = PlayerPrefs.GetInt("IsEffectEnabled", isEffectEnabled ? 1 : 0) == 1;
 
-            matchBgmSet = PlayerPrefs.GetInt("MatchBgmSet", matchBgmSet);
+            matchBgmSet = NormalizeMatchBgmSet(PlayerPrefs.GetInt("MatchBgmSet", matchBgmSet));
             textSpeed = PlayerPrefs.GetInt("TextSpeed", textSpeed);
             screenMode = PlayerPrefs.GetInt("ScreenMode", screenMode);
             dialogueBubble = PlayerPrefs.GetInt("DialogueBubble", dialogueBubble);
@@ -303,7 +336,7 @@ namespace KillingMahjong.Core
         /// </summary>
         public void SetMatchBgmSet(int kind)
         {
-            matchBgmSet = Mathf.Clamp(kind, 0, MatchBgmSetLabels.Length - 1);
+            matchBgmSet = NormalizeMatchBgmSet(kind);
             var am = KillingMahjong.Managers.AudioManager.Instance;
             if (am != null) am.ApplyMatchBgmSet(matchBgmSet);
         }
