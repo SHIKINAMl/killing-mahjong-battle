@@ -67,6 +67,50 @@ namespace KillingMahjong.UI.Effects
             return g;
         }
 
+        /// <summary>画面ぜんたいを覆う1色の幕を足す（牌交換の暗転と同じ物）。</summary>
+        public Image AddDim(string name, Color color)
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            Stretch(go);
+            var image = go.GetComponent<Image>();
+            image.raycastTarget = false;
+            image.color = color;
+            return image;
+        }
+
+        /// <summary>
+        /// 対象の絵（血の表示など）と同じ絵を、同じ場所に、この舞台の上へ出す。
+        /// 幕で暗く落とした画面の上に、見せたい物だけを浮かせるために使う
+        /// （牌交換が、入れ替える牌だけを暗転の上に出しているのと同じ）。
+        /// 対象に絵が無ければ null。
+        /// </summary>
+        public Image AddCopyOf(string name, RectTransform target)
+        {
+            var source = target != null ? target.GetComponent<Image>() : null;
+            if (source == null || source.sprite == null) return null;
+
+            var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            go.transform.SetParent(Rect, false);
+            Rect at = LocalRectOf(target);
+            var rt = (RectTransform)go.transform;
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = at.center;
+            rt.sizeDelta = at.size;
+
+            var image = go.GetComponent<Image>();
+            image.sprite = source.sprite;
+            image.type = source.type;
+            image.preserveAspect = source.preserveAspect;
+            image.fillMethod = source.fillMethod;
+            image.fillOrigin = source.fillOrigin;
+            image.fillClockwise = source.fillClockwise;
+            image.fillAmount = source.fillAmount;
+            image.color = source.color;
+            image.raycastTarget = false;
+            return image;
+        }
+
         public TextMeshProUGUI AddText(string name, string text, float fontSize, Color color)
         {
             var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));

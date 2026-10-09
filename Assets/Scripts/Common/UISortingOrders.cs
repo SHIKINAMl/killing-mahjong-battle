@@ -305,8 +305,8 @@ namespace KillingMahjong.Common
         public const int ClickFeedback = 94;
 
         /// <summary>
-        /// 役強化・強襲の演出の中身（役名・翻数・血の粒）（2026-10-09）。
-        /// 舞台（<see cref="PerspectiveOverlay"/>、青や赤の重ねと集中線）より手前で、
+        /// 役強化・強襲の演出（暗転と、その上の役名・翻数・血の粒）（2026-10-09）。
+        /// 対局の画面ぜんたいを暗く落とすので、ほかの対局の部品より手前。
         /// カットイン（95）と白フラッシュ（98）より奥。ClickFeedback と同じ段でよい
         /// （演出中のクリックの波紋と重なっても困らない）。
         /// </summary>

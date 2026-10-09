@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using UnityEngine;
+using UnityEngine.UI;
 using KillingMahjong.Common;
 using KillingMahjong.Managers;
 
@@ -10,27 +11,35 @@ namespace KillingMahjong.UI.Effects
     /// 強襲を使ったあとの演出（2026-10-09 に作り直した）。
     ///
     /// **自分の血を抜いて、覚悟を決める**（ユーザーの指示）。
-    /// 絵の作りは透視・牌交換に合わせてある。最初の版は、刻む動きと照準の線
-    /// （四方から赤い線が絞り込む）で、「雰囲気が合っていない」と言われた。
+    /// 絵の作りは牌交換に合わせてある。画面を暗く落とし、その上に見せたい物だけを出す。
     ///
-    ///   舞台 … 透視のものを、赤い調子で借りる（<see cref="PerspectiveSkillEffect"/>）。
-    ///           その瞬間の画面を暗い赤にして周りに重ね、暗く落とし、集中線を**血が集まる所**へ集める。
-    ///           BGM が水の中のように沈み、終わりに白く光って、心音とともに戻る
+    ///   1つ目の版 … 刻む動きと照準の線（四方から赤い線が絞り込む）。「雰囲気が合っていない」と言われた
+    ///   2つ目の版 … 透視の舞台（赤い画面の重ね・集中線）を借りた。
+    ///                「透視では周りのやつがいい感じだったが、役強化と強襲には合わない」と言われた
+    ///   いまの版   … 周りの重ねと集中線をやめ、牌交換と同じ暗転だけにした
+    ///
+    ///   幕   … 牌交換と同じ暗転（黒に少しだけ赤み）。その上に、自分と相手の血の表示だけを浮かせる
+    ///           （牌交換が、入れ替える牌だけを暗転の上に出しているのと同じ）
     ///   中身 … 血の粒。自分の血の表示から1つずつ抜けて、画面の真ん中に集まる
     ///           （透視で牌を1枚ずつ返すのと同じ間合い。1つごとに心音）。
     ///           集まった血がぎゅっと縮み、相手の血の表示へ撃ち込まれて、印になって残る
+    ///   音   … 透視と同じ段取り（<see cref="SkillTranceAudio"/>）
     ///
-    /// 流れ（約3.6秒。うち白く光るまでが約3.0秒）
-    ///   ① 集中     … 赤い舞台が出る
+    /// 流れ（約3.4秒。うち白く光るまでが約2.8秒）
+    ///   ① 暗転     … 画面が落ち、血の表示だけが残る
     ///   ② 血を抜く … 血の粒が3つ、自分の血の表示から真ん中へ。1つごとに心音
     ///   ③ 覚悟     … 集まった血が脈を打ち、外から輪が締まってきて、縮む
     ///   ④ 撃ち込む … 筋を引いて相手の血の表示へ飛び、弾けて相手が跳ねる。印が残る（<see cref="AssaultMarkUI"/>）
-    ///   ⑤ 解除     … 白く光って舞台が消える
+    ///   ⑤ 解除     … 白く光って暗転が消える
     ///
-    /// シーンには置かない。出しているのは実機の画面の複製と、図形（丸）だけ。
+    /// シーンには置かない。出しているのは血の表示の写しと、図形（丸）だけ。
     /// </summary>
     public class AssaultSkillEffect : MonoBehaviour
     {
+        // 牌交換（MulliganSwapAnimator）と同じ濃さ。色は黒に少しだけ赤みを入れた
+        private static readonly Color DimColor = new Color(0.07f, 0f, 0.015f, 0.85f);
+        private const float DimSeconds = 0.30f;
+
         // 透視（ExposedTileEffectPlayer）と同じ間合い
         private const float DropGap = 0.28f;
         private const float HoldBeforeFlash = 0.45f;
@@ -46,10 +55,9 @@ namespace KillingMahjong.UI.Effects
         private const float ShootSeconds = 0.20f;     // 相手へ飛ぶ
         private const float ResolvedScale = 0.6f;     // 縮みきった大きさ（集まった血に対して）
 
-        /// <summary>血の粒の後ろ（集中線の集まる先）を暗くする量。</summary>
-        private const float FocusDim = 0.6f;
+        private const int SplashCount = 8;
 
-        private PerspectiveSkillEffect _backdrop;
+        private SkillTranceAudio _trance;
         private SkillEffectStage _stage;
 
         public static AssaultSkillEffect Create()
@@ -67,9 +75,9 @@ namespace KillingMahjong.UI.Effects
 
         private void OnDestroy()
         {
-            // 舞台は別の入れ物なので、一緒に消す（残すと画面が赤いまま・音が沈んだままになる）
-            if (_backdrop != null) _backdrop.Dispose();
-            _backdrop = null;
+            // 途中で打ち切られたら、沈めた音はここで戻す（残すと音が沈んだままになる）
+            if (_trance != null && !_trance.IsReleased) _trance.Dispose();
+            _trance = null;
         }
 
         /// <param name="targetHpAnchor">狙われる側の血の表示。血はここへ撃ち込まれ、印が残る</param>
@@ -77,8 +85,17 @@ namespace KillingMahjong.UI.Effects
         /// <param name="onHit">血が当たった瞬間に呼ぶ（相手の立ち絵を跳ねさせる、など）</param>
         public IEnumerator Play(RectTransform targetHpAnchor, RectTransform casterHpAnchor, Action onHit)
         {
-            // 位置を測るための入れ物。まだ何も描かないので、舞台が撮る画面には写らない
-            _stage = new SkillEffectStage("Content", UISortingOrders.SkillEffectContent, transform);
+            _trance = SkillTranceAudio.Begin(DimSeconds);
+
+            _stage = new SkillEffectStage("Stage", UISortingOrders.SkillEffectContent, transform);
+            Image dim = _stage.AddDim("Dim", Color.clear);
+
+            // 暗転の上に、血の表示だけを浮かせる。どこから抜いて、どこへ撃つのかが見えるように
+            Image casterCopy = _stage.AddCopyOf("CasterHp", casterHpAnchor);
+            Image targetCopy = _stage.AddCopyOf("TargetHp", targetHpAnchor);
+            Color casterColor = casterCopy != null ? casterCopy.color : Color.white;
+            Color targetColor = targetCopy != null ? targetCopy.color : Color.white;
+
             var shapes = _stage.AddShapes("Blood");
 
             Rect caster = _stage.LocalVisibleRectOf(casterHpAnchor);
@@ -87,21 +104,16 @@ namespace KillingMahjong.UI.Effects
             Vector2 pool = new Vector2(40f, -30f);
             Vector2 to = AssaultMarkUI.MarkPosition(_stage, targetHpAnchor);
 
-            // ---- ① 集中。舞台は透視と同じで、色だけ赤。集中線は血が集まる所へ集める ----
-            // 最初は自分の血の表示へ集めていたが、画面の右端に寄って、主役の血の粒が暗がりに沈んだ
-            float unit = Screen.width / Mathf.Max(1f, _stage.Rect.rect.width);
-            const float focusHalfW = 130f, focusHalfH = 50f;
-            var focus = new Rect(Screen.width * 0.5f + (pool.x - focusHalfW) * unit,
-                                 Screen.height * 0.5f + (pool.y - focusHalfH) * unit,
-                                 focusHalfW * 2f * unit, focusHalfH * 2f * unit);
-            _backdrop = PerspectiveSkillEffect.Create(PerspectiveSkillEffect.Tone.Red);
-            if (_backdrop != null)
-            {
-                _backdrop.FocusDim = FocusDim;
-                yield return _backdrop.Enter(focus);
-            }
-
             var audio = AudioManager.Instance;
+
+            // ---- ① 暗転 ----
+            for (float t = 0f; t < DimSeconds; t += Time.deltaTime)
+            {
+                float p = Mathf.Sin(Mathf.Clamp01(t / DimSeconds) * Mathf.PI * 0.5f);
+                SetStage(dim, casterCopy, casterColor, targetCopy, targetColor, p);
+                yield return null;
+            }
+            SetStage(dim, casterCopy, casterColor, targetCopy, targetColor, 1f);
 
             // ---- ② 血を抜く。1つずつ、心音と一緒に ----
             // 粒は山なりに飛ぶ。飛び出す時刻は等間隔（透視で牌を返す間合いと同じ）
@@ -180,7 +192,7 @@ namespace KillingMahjong.UI.Effects
             AssaultMarkUI.Show(targetHpAnchor);
 
             // 着弾。白く弾けて、輪が2つ広がり、しぶきが散る。
-            // 印（AssaultMarkUI）は舞台より奥に居て、白く光るまで見えない。そのあいだはここで同じ粒を描く
+            // 印（AssaultMarkUI）は暗転より奥に居て、白く光るまで見えない。そのあいだはここで同じ粒を描く
             for (float t = 0f; t < HoldBeforeFlash; t += Time.deltaTime)
             {
                 float p = Mathf.Clamp01(t / 0.35f);
@@ -220,25 +232,43 @@ namespace KillingMahjong.UI.Effects
                 shapes.End();
                 yield return null;
             }
-            shapes.Begin();
-            shapes.End();
 
-            // ---- ⑤ 白く光って舞台が消える。心音と BGM の戻りは待たない ----
-            if (_backdrop != null)
+            // ---- ⑤ 白く光って暗転が消える。心音と BGM の戻りは待たない ----
+            Action clear = () =>
             {
-                var backdrop = _backdrop;
-                _backdrop = null;          // ここから先は舞台が自分で片付く
-                yield return backdrop.ReleaseQuick();
+                if (this == null) return;
+                SetStage(dim, casterCopy, casterColor, targetCopy, targetColor, 0f);
+                shapes.Begin();
+                shapes.End();
+            };
+            if (_trance != null)
+            {
+                var trance = _trance;
+                _trance = null;            // ここから先は音の部品が自分で鳴らしきる
+                trance.ReleaseDetached(clear);
             }
             else
             {
                 ScreenFlash.Play();
             }
+            yield return new WaitForSeconds(0.12f);
+            clear();
 
             Dispose();
         }
 
-        private const int SplashCount = 8;
+        /// <summary>暗転と、その上に浮かせた血の表示の濃さをまとめて決める。</summary>
+        private static void SetStage(Image dim, Image casterCopy, Color casterColor, Image targetCopy, Color targetColor, float strength)
+        {
+            if (dim != null)
+            {
+                Color c = DimColor;
+                c.a *= strength;
+                dim.color = c;
+            }
+            if (casterCopy != null) { casterColor.a *= strength; casterCopy.color = casterColor; }
+            if (targetCopy != null) { targetColor.a *= strength; targetCopy.color = targetColor; }
+        }
 
         /// <summary>
         /// 撃ち込む血。頭の粒と、その後ろに伸びる筋。<paramref name="head"/> は 0（集まった所）〜 1（相手）。

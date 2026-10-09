@@ -24,25 +24,9 @@ namespace KillingMahjong.UI.Effects
     ///
     /// **AI画像生成は使っていない。** 出しているのは実機の画面そのものの複製と、
     /// 頂点色で描いた図形だけ。
-    ///
-    /// **役強化・強襲の演出も、この舞台を借りている（2026-10-09）。**
-    /// 最初に作った役強化・強襲は絵の作りが違い（刻む動き・黒い帯・金の柱・照準の線）、
-    /// 「透視や牌交換と雰囲気が合っていない」と言われた。重ね・暗落とし・集中線・フラッシュを
-    /// 同じ物にすれば、雰囲気は揃う。色の調子（<see cref="Tone"/>）だけを変えられる。
     /// </summary>
     public class PerspectiveSkillEffect : MonoBehaviour
     {
-        /// <summary>重ねる画面の色の調子。</summary>
-        public enum Tone
-        {
-            /// <summary>濃い青。透視・役強化。</summary>
-            Blue,
-            /// <summary>濃い赤。強襲（自分の血を抜く）。</summary>
-            Red,
-        }
-
-        private Tone _tone = Tone.Blue;
-
         // ------------------------------------------------------------
         //  重ねる位置。画面の幅・高さに対する割合で持つ
         //
@@ -91,25 +75,15 @@ namespace KillingMahjong.UI.Effects
         private PerspectiveGhostLayer[] _ghosts;
         private PerspectiveDarkenLayer _darken;
         private PerspectiveFocusLines _lines;
-        private Image _focusDim;
         private bool _released;
 
-        /// <summary>
-        /// 穴の中（集中線の集まる先）も暗くする量。0 で暗くしない（透視。穴の中の山牌を見せたい）。
-        /// **役強化・強襲は穴の中に文字や血の粒を出す。** 明るい画面のままだと埋もれて読めないので、
-        /// 画面ぜんたいを一段落としてから、いつもの暗落としを重ねる。<see cref="Enter"/> の前に決めること。
-        /// </summary>
-        public float FocusDim;
-
         /// <summary>演出の入れ物を作る。まだ何も出さない。</summary>
-        public static PerspectiveSkillEffect Create(Tone tone = Tone.Blue)
+        public static PerspectiveSkillEffect Create()
         {
             if (!Application.isPlaying) return null;
 
             var go = new GameObject("PerspectiveSkillEffect");
-            var effect = go.AddComponent<PerspectiveSkillEffect>();
-            effect._tone = tone;
-            return effect;
+            return go.AddComponent<PerspectiveSkillEffect>();
         }
 
         /// <summary>
@@ -128,7 +102,7 @@ namespace KillingMahjong.UI.Effects
             Texture2D captured = ScreenCapture.CaptureScreenshotAsTexture();
             if (captured != null)
             {
-                _shot = TintBlue(captured, _tone);
+                _shot = TintBlue(captured);
                 Destroy(captured);
             }
 
@@ -174,32 +148,6 @@ namespace KillingMahjong.UI.Effects
                 ApplyStrength(0f);
             }
 
-            Dispose();
-        }
-
-        /// <summary>
-        /// ③フラッシュだけを待って、すぐ返る。**心音と BGM の戻りは音の部品が鳴らしきる。**
-        /// 透視以外のスキルが使う（演出のあとにゲームを待たせないため）。終わったら自分を片付ける。
-        /// </summary>
-        public IEnumerator ReleaseQuick()
-        {
-            if (_released) yield break;
-            _released = true;
-
-            if (_trance != null)
-            {
-                _trance.ReleaseDetached(() => { if (this != null) ApplyStrength(0f); });
-                // 手放す。持ったまま片付けると、こちらの片付けが心音の途中で音を切ってしまう
-                _trance = null;
-            }
-            else
-            {
-                ScreenFlash.Play();
-            }
-
-            // 光が乗りきってから重ねを消す（上の合図）。それを待ってから片付ける
-            yield return new WaitForSeconds(0.12f);
-            ApplyStrength(0f);
             Dispose();
         }
 
@@ -265,19 +213,8 @@ namespace KillingMahjong.UI.Effects
         /// ここで止まっても対局の操作には掛からないが、**毎フレームやらないこと。**
         /// </summary>
         /// <returns>青くした絵。読めなかったときは null（重ねを出さずに演出は続ける）。</returns>
-        private static Texture2D TintBlue(Texture2D tex, Tone tone = Tone.Blue)
+        private static Texture2D TintBlue(Texture2D tex)
         {
-            // 赤の調子。**青より暗く作る。** 対局の画面はもともと赤い（幕も血も赤）ので、
-            // 青と同じ明るさで赤へ寄せると画面じゅうが同じ赤になり、上に出す血の粒が見えなくなった
-            // （2026-10-09 に録画で確認）。暗い血の色（黒に近い赤）へ寄せて、粒の赤を浮かせる
-            float mulR = TintMulR, addR = TintAddR, mulG = TintMulG, addG = TintAddG, mulB = TintMulB, addB = TintAddB;
-            if (tone == Tone.Red)
-            {
-                mulR = 0.30f; addR = 30f;
-                mulG = 0.05f; addG = 3f;
-                mulB = 0.07f; addB = 9f;
-            }
-
             Color32[] pixels;
             try
             {
@@ -292,9 +229,9 @@ namespace KillingMahjong.UI.Effects
             for (int i = 0; i < pixels.Length; i++)
             {
                 Color32 c = pixels[i];
-                c.r = (byte)(c.r * mulR + addR);
-                c.g = (byte)(c.g * mulG + addG);
-                c.b = (byte)(c.b * mulB + addB);
+                c.r = (byte)(c.r * TintMulR + TintAddR);
+                c.g = (byte)(c.g * TintMulG + TintAddG);
+                c.b = (byte)(c.b * TintMulB + TintAddB);
                 pixels[i] = c;
             }
 
@@ -356,15 +293,8 @@ namespace KillingMahjong.UI.Effects
             // **青くない所もはっきり暗くする（2026-10-03 のユーザー指摘
             // 「普段の画面全体ももう少し暗く」）。** 楕円を小さめにして
             // 暗さが山牌の近くから立ち上がるようにし、いちばん暗い所も濃くした
-            if (FocusDim > 0f)
-            {
-                // いちばん下に敷く。上に乗る暗落としと青（赤）の重ねは、今までどおりに見える
-                _focusDim = NewGraphic<Image>("FocusDim");
-                _focusDim.color = new Color(0f, 0f, 0f, 0f);
-            }
-
             _darken = NewGraphic<PerspectiveDarkenLayer>("Darken");
-            _darken.color = _tone == Tone.Red ? new Color(0.02f, 0f, 0f, 1f) : new Color(0f, 0f, 0.02f, 1f);
+            _darken.color = new Color(0f, 0f, 0.02f, 1f);
             _darken.CenterLocal = wallCenter;
             _darken.RadiusX = wallExtent.x + w * 0.06f;
             _darken.RadiusY = wallExtent.y + h * 0.10f;
@@ -448,7 +378,6 @@ namespace KillingMahjong.UI.Effects
             }
             if (_darken != null) _darken.Strength = strength;
             if (_lines != null) _lines.Progress = strength;
-            if (_focusDim != null) _focusDim.color = new Color(0f, 0f, 0f, FocusDim * strength);
         }
 
         // ------------------------------------------------------------

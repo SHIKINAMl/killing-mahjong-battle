@@ -1,6 +1,7 @@
 using System.Collections;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 using KillingMahjong.Common;
 using KillingMahjong.Managers;
 
@@ -9,29 +10,33 @@ namespace KillingMahjong.UI.Effects
     /// <summary>
     /// 役強化を使ったあとの演出（2026-10-09 に作り直した）。
     ///
-    /// **透視・牌交換と同じ絵の作りにしてある。**
-    /// 最初の版は、刻む動き・黒い帯・金色の光の柱・「+1翻」の刻印という別の作りで、
-    /// 「雰囲気が合っていない。透視や牌交換と合わせて」と言われた（ユーザーの指摘）。
+    /// **牌交換と同じ絵の作りにしてある。** 画面を暗く落とし、その上に文字だけを出す。
     ///
-    ///   舞台 … 透視のものをそのまま借りる（<see cref="PerspectiveSkillEffect"/>）。
-    ///           その瞬間の画面を青くして周りに重ね、暗く落とし、集中線を真ん中へ集める。
-    ///           BGM が水の中のように沈み、終わりに白く光って、心音とともに戻る
+    ///   1つ目の版 … 刻む動き・黒い帯・金色の光の柱・「+1翻」の刻印。
+    ///                「雰囲気が合っていない。透視や牌交換と合わせて」と言われた
+    ///   2つ目の版 … 透視の舞台（青い画面の重ね・集中線）を借りた。
+    ///                「透視では周りのやつがいい感じだったが、役強化と強襲には合わない」と言われた
+    ///   いまの版   … 周りの重ねと集中線をやめ、牌交換と同じ暗転だけにした
+    ///
+    ///   幕   … 牌交換と同じ黒い暗転
     ///   中身 … 牌交換の文字の出し方に合わせる。役名が横から滑り込み、
     ///           新しい翻数が上から降りてくる（牌交換の IN と同じ動き・同じ水色）。
-    ///           降りきったら透視の牌と同じように一度ふくらみ、白く光ったあと黄色く明滅する
+    ///           降りきったら一度ふくらみ、白く光ったあと黄色く明滅する
+    ///   音   … 透視と同じ段取り（<see cref="SkillTranceAudio"/>）。BGM が水の中のように沈み、
+    ///           白く光って、心音とともに戻る
     ///
-    /// 流れ（約3.5秒。うち白く光るまでが約2.3秒）
-    ///   ① 集中   … 舞台が出る
-    ///   ② 役名   … 強める役の名前と、いまの翻数が出る
-    ///   ③ 上がる … 新しい翻数が上から降りてきて、ふくらむ
-    ///   ④ 解除   … 白く光って舞台が消える。役名と新しい翻数は残って黄色く明滅し、消える
+    /// 流れ（約3秒。うち白く光るまでが約1.8秒）
+    ///   ① 役名   … 暗転し、強める役の名前と、いまの翻数が出る
+    ///   ② 上がる … 新しい翻数が上から降りてきて、ふくらむ
+    ///   ③ 解除   … 白く光って暗転が消える。役名と新しい翻数は残って黄色く明滅し、消える
     ///
     /// シーンには置かない。呼ばれるたびに自前の入れ物を作り、終わったら自分を消す。
-    /// 出しているのは実機の画面の複製と、文字だけ。**AIで作った絵は使っていない。**
+    /// 出しているのは文字だけ。**AIで作った絵は使っていない。**
     /// </summary>
     public class BoostHandSkillEffect : MonoBehaviour
     {
         // 牌交換（MulliganSwapAnimator）と同じ秒数・同じ色にしてある
+        private const float DimAlpha = 0.85f;
         private const float SlideSeconds = 0.30f;
         private const float DropSeconds = 0.30f;
         private static readonly Color InColor = new Color(0.2f, 0.8f, 1f, 1f);
@@ -44,12 +49,10 @@ namespace KillingMahjong.UI.Effects
 
         private static readonly Color OldHanColor = new Color(0.85f, 0.85f, 0.90f, 1f);
 
-        /// <summary>文字の後ろ（集中線の集まる先）を暗くする量。</summary>
-        private const float FocusDim = 0.55f;
         /// <summary>新しい翻数が出たあとの、古い翻数の濃さ。</summary>
         private const float OldHanFaded = 0.6f;
 
-        private PerspectiveSkillEffect _backdrop;
+        private SkillTranceAudio _trance;
         private SkillEffectStage _stage;
 
         public static BoostHandSkillEffect Create()
@@ -59,7 +62,7 @@ namespace KillingMahjong.UI.Effects
             return go.AddComponent<BoostHandSkillEffect>();
         }
 
-        /// <summary>途中で止めたいときに。舞台も音も片付ける。</summary>
+        /// <summary>途中で止めたいときに。幕も音も片付ける。</summary>
         public void Dispose()
         {
             if (this == null || gameObject == null) return;
@@ -68,9 +71,9 @@ namespace KillingMahjong.UI.Effects
 
         private void OnDestroy()
         {
-            // 舞台は別の入れ物なので、一緒に消す（残すと画面が青いまま・音が沈んだままになる）
-            if (_backdrop != null) _backdrop.Dispose();
-            _backdrop = null;
+            // 途中で打ち切られたら、沈めた音はここで戻す（残すと音が沈んだままになる）
+            if (_trance != null && !_trance.IsReleased) _trance.Dispose();
+            _trance = null;
         }
 
         /// <param name="yakuName">強めた役の名前（サーバーの表記）。分からなければ空でよい</param>
@@ -94,20 +97,10 @@ namespace KillingMahjong.UI.Effects
                 ? "役強化"
                 : YakuNameUtil.ToDisplayText(new YakuNameUtil.Entry { BaseName = yakuName, Boost = 0, Count = 1 });
 
-            // ---- ① 集中。舞台は透視と同じ ----
-            // 集める先は画面の真ん中（役名と翻数を出す所）
-            var focus = new Rect(Screen.width * 0.20f, Screen.height * 0.40f,
-                                 Screen.width * 0.60f, Screen.height * 0.22f);
-            _backdrop = PerspectiveSkillEffect.Create(PerspectiveSkillEffect.Tone.Blue);
-            if (_backdrop != null)
-            {
-                // 文字は穴の中（相手の立ち絵と血袋の上）に出る。明るいままだと「清」が血袋に埋もれた
-                _backdrop.FocusDim = FocusDim;
-                yield return _backdrop.Enter(focus);
-            }
+            _trance = SkillTranceAudio.Begin(SlideSeconds);
 
-            // 中身は舞台を撮ったあとに作る（先に作ると、重ねる画面に文字が写り込む）
-            _stage = new SkillEffectStage("Content", UISortingOrders.SkillEffectContent, transform);
+            _stage = new SkillEffectStage("Stage", UISortingOrders.SkillEffectContent, transform);
+            Image dim = _stage.AddDim("Dim", new Color(0f, 0f, 0f, 0f));
 
             float nameSize = Mathf.Clamp(560f / Mathf.Max(shown.Length, 1), 52f, 96f);
             var nameText = _stage.AddText("YakuName", shown, nameSize, Color.white);
@@ -132,22 +125,24 @@ namespace KillingMahjong.UI.Effects
 
             var audio = AudioManager.Instance;
 
-            // ---- ② 役名が横から滑り込む（牌交換の OUT の文字と同じ動き）----
+            // ---- ① 暗転しながら、役名が横から滑り込む（牌交換の OUT の文字と同じ動き）----
             for (float t = 0f; t < SlideSeconds; t += Time.deltaTime)
             {
                 float p = Mathf.Sin(Mathf.Clamp01(t / SlideSeconds) * Mathf.PI * 0.5f);
+                dim.color = new Color(0f, 0f, 0f, DimAlpha * p);
                 nameText.rectTransform.anchoredPosition = Vector2.Lerp(namePos + new Vector2(-50f, 0f), namePos, p);
                 nameText.alpha = p;
                 oldText.alpha = p;
                 yield return null;
             }
+            dim.color = new Color(0f, 0f, 0f, DimAlpha);
             nameText.rectTransform.anchoredPosition = namePos;
             nameText.alpha = 1f;
             oldText.alpha = 1f;
 
             yield return new WaitForSeconds(0.25f);
 
-            // ---- ③ 新しい翻数が上から降りてくる（牌交換の IN と同じ動き）----
+            // ---- ② 新しい翻数が上から降りてくる（牌交換の IN と同じ動き）----
             if (audio != null) audio.PlaySynthSound(SynthWaveType.Sine, 520f, 780f, 0.28f, 0.45f);
             for (float t = 0f; t < DropSeconds; t += Time.deltaTime)
             {
@@ -173,17 +168,19 @@ namespace KillingMahjong.UI.Effects
 
             yield return new WaitForSeconds(HoldBeforeFlash);
 
-            // ---- ④ 白く光って舞台が消える。心音と BGM の戻りは待たない ----
-            if (_backdrop != null)
+            // ---- ③ 白く光って暗転が消える。心音と BGM の戻りは待たない ----
+            if (_trance != null)
             {
-                var backdrop = _backdrop;
-                _backdrop = null;          // ここから先は舞台が自分で片付く
-                yield return backdrop.ReleaseQuick();
+                var trance = _trance;
+                _trance = null;            // ここから先は音の部品が自分で鳴らしきる
+                trance.ReleaseDetached(() => { if (dim != null) dim.color = Color.clear; });
             }
             else
             {
                 ScreenFlash.Play();
             }
+            yield return new WaitForSeconds(0.12f);
+            dim.color = Color.clear;
 
             // 何が強まったかを、戻った画面の上でもう一度見せる（透視の「見えた牌の明滅」と同じ）
             for (float t = 0f; t < GlowSeconds; t += Time.deltaTime)
