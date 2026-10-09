@@ -21,14 +21,22 @@ namespace KillingMahjong.UI.Effects
     ///   幕   … 牌交換と同じ黒い暗転
     ///   中身 … 牌交換の文字の出し方に合わせる。役名が横から滑り込み、
     ///           新しい翻数が上から降りてくる（牌交換の IN と同じ動き・同じ水色）。
-    ///           降りきったら一度ふくらみ、白く光ったあと黄色く明滅する
+    ///           降りきったら一度ふくらむ
+    ///   ボード … 対局中、画面の右上に役強化の一覧（<see cref="YakuListUI"/> の強化の枠）がある。
+    ///           役名と新しい翻数が小さくなりながらその枠へ飛んでいき、収まった瞬間に白く光って、
+    ///           枠が一度ふくらみ、黄色く明滅する（「ここに積まれた」を見せる。ユーザーの指示）。
+    ///           枠は演出が届くまで伏せておく（<see cref="YakuListUI.HoldLocalBoostChip"/>）
     ///   音   … 透視と同じ段取り（<see cref="SkillTranceAudio"/>）。BGM が水の中のように沈み、
     ///           白く光って、心音とともに戻る
     ///
-    /// 流れ（約3秒。うち白く光るまでが約1.8秒）
+    /// 流れ（約3.2秒。うち白く光るまでが約2.1秒）
     ///   ① 役名   … 暗転し、強める役の名前と、いまの翻数が出る
     ///   ② 上がる … 新しい翻数が上から降りてきて、ふくらむ
-    ///   ③ 解除   … 白く光って暗転が消える。役名と新しい翻数は残って黄色く明滅し、消える
+    ///   ③ 積む   … 役名と新しい翻数が、右上のボードの枠へ飛んでいく
+    ///   ④ 解除   … 収まった瞬間に白く光って暗転が消える。ボードの枠がふくらみ、黄色く明滅する
+    ///
+    /// ボードが無い・枠が見つからないとき（試写の古い舞台など）は、③を飛ばし、
+    /// その場で白く光って、役名と新しい翻数が黄色く明滅して消える。
     ///
     /// シーンには置かない。呼ばれるたびに自前の入れ物を作り、終わったら自分を消す。
     /// 出しているのは文字だけ。**AIで作った絵は使っていない。**
@@ -52,8 +60,19 @@ namespace KillingMahjong.UI.Effects
         /// <summary>新しい翻数が出たあとの、古い翻数の濃さ。</summary>
         private const float OldHanFaded = 0.6f;
 
+        /// <summary>ボードの枠へ飛んでいく秒数。</summary>
+        private const float FlySeconds = 0.35f;
+        /// <summary>収まってから、枠がふくらみ始めるまで（白い光が引くのを待つ）と、ふくらむ秒数。</summary>
+        private const float ChipPopDelay = 0.2f;
+        private const float ChipPopSeconds = 0.2f;
+
         private SkillTranceAudio _trance;
         private SkillEffectStage _stage;
+
+        // 途中で打ち切られたときに戻す物
+        private YakuListUI _heldBoard;
+        private RectTransform _poppedChip;
+        private Vector3 _chipScale;
 
         public static BoostHandSkillEffect Create()
         {
@@ -74,19 +93,33 @@ namespace KillingMahjong.UI.Effects
             // 途中で打ち切られたら、沈めた音はここで戻す（残すと音が沈んだままになる）
             if (_trance != null && !_trance.IsReleased) _trance.Dispose();
             _trance = null;
+
+            // ボードの枠を伏せたまま・ふくらんだままにしない
+            if (_heldBoard != null) _heldBoard.ReleaseLocalBoostChip();
+            _heldBoard = null;
+            if (_poppedChip != null) _poppedChip.localScale = _chipScale;
+            _poppedChip = null;
         }
 
         /// <param name="yakuName">強めた役の名前（サーバーの表記）。分からなければ空でよい</param>
-        public IEnumerator Play(string yakuName)
+        /// <param name="board">右上の役強化の一覧。演出の最後に、役名と翻数がここの枠へ飛んでいく。無ければ null</param>
+        public IEnumerator Play(string yakuName, YakuListUI board = null)
         {
+            // 枠は、演出が届くまで伏せておく（呼ぶ側がもう伏せていても、同じことをするだけ）
+            if (board != null && !string.IsNullOrEmpty(yakuName))
+            {
+                board.HoldLocalBoostChip(yakuName);
+                _heldBoard = board;
+            }
+
             // いくつからいくつへ上がったか。翻数の表と、いま積んである強化の数から出す
             int baseHan = string.IsNullOrEmpty(yakuName) ? -1 : GameRules.GetBaseHan(yakuName);
             int bonus = 1;
-            var board = BoardStateManager.Instance;
-            if (board != null && board.LocalBoostHandBonus != null && !string.IsNullOrEmpty(yakuName))
+            var state = BoardStateManager.Instance;
+            if (state != null && state.LocalBoostHandBonus != null && !string.IsNullOrEmpty(yakuName))
             {
                 int stored;
-                if (board.LocalBoostHandBonus.TryGetValue(yakuName, out stored) && stored > 0) bonus = stored;
+                if (state.LocalBoostHandBonus.TryGetValue(yakuName, out stored) && stored > 0) bonus = stored;
             }
             bool hasNumbers = baseHan > 0;
             int after = baseHan + bonus;
@@ -168,17 +201,79 @@ namespace KillingMahjong.UI.Effects
 
             yield return new WaitForSeconds(HoldBeforeFlash);
 
-            // ---- ③ 白く光って暗転が消える。心音と BGM の戻りは待たない ----
-            if (_trance != null)
+            // ---- ③ 役名と新しい翻数が、右上のボードの枠へ飛んでいく ----
+            RectTransform chip = board != null ? board.LocalBoostChipOf(yakuName) : null;
+            if (chip != null)
             {
-                var trance = _trance;
-                _trance = null;            // ここから先は音の部品が自分で鳴らしきる
-                trance.ReleaseDetached(() => { if (dim != null) dim.color = Color.clear; });
+                Rect chipAt = _stage.LocalRectOf(chip);
+                Vector2 nameTo = chipAt.center + new Vector2(0f, chipAt.height * 0.18f);
+                Vector2 newTo = chipAt.center - new Vector2(0f, chipAt.height * 0.25f);
+                // 枠に収まる大きさまで縮める
+                float nameShrink = Mathf.Clamp(chipAt.width * 0.9f / Mathf.Max(1f, nameText.preferredWidth), 0.08f, 0.6f);
+                float newShrink = Mathf.Clamp(chipAt.height * 0.5f / Mathf.Max(1f, newText.fontSize), 0.08f, 0.6f);
+
+                for (float t = 0f; t < FlySeconds; t += Time.deltaTime)
+                {
+                    float p = Mathf.Clamp01(t / FlySeconds);
+                    float eased = p * p;                       // 出だしはゆっくり、吸い込まれるように速く
+                    nameText.rectTransform.anchoredPosition = Vector2.Lerp(namePos, nameTo, eased);
+                    nameText.rectTransform.localScale = Vector3.one * Mathf.Lerp(1f, nameShrink, eased);
+                    newText.rectTransform.anchoredPosition = Vector2.Lerp(newPos, newTo, eased);
+                    newText.rectTransform.localScale = Vector3.one * Mathf.Lerp(1f, newShrink, eased);
+                    float fade = 1f - Mathf.Clamp01(p * 3f);   // 古い翻数と矢印は、その場で先に消える
+                    oldText.alpha = OldHanFaded * fade;
+                    arrowText.alpha = fade;
+                    yield return null;
+                }
+                nameText.alpha = 0f;
+                newText.alpha = 0f;
+                oldText.alpha = 0f;
+                arrowText.alpha = 0f;
+
+                // ---- ④ 収まった。枠を出して、白く光る ----
+                board.ReleaseLocalBoostChip();
+                _heldBoard = null;
+                if (audio != null) audio.PlaySynthSound(SynthWaveType.Sine, 780f, 1170f, 0.14f, 0.5f);
+                ReleaseTrance(dim);
+
+                _poppedChip = chip;
+                _chipScale = chip.localScale;
+                var glow = _stage.AddShapes("ChipGlow");
+                for (float t = 0f; t < GlowSeconds; t += Time.deltaTime)
+                {
+                    if (t >= 0.12f) dim.color = Color.clear;
+
+                    // 枠が一度ふくらむ（透視で牌を返した瞬間と同じ）。
+                    // 白い光が引いてからでないと見えないので、少し遅らせる
+                    float popAt = t - ChipPopDelay;
+                    float pop = popAt >= 0f && popAt < ChipPopSeconds ? Mathf.PingPong(popAt * (1f / (ChipPopSeconds / 2f)), 1f) : 0f;
+                    chip.localScale = _chipScale * Mathf.Lerp(1f, 1.4f, pop);
+
+                    // 黄色く明滅する（透視の「見えた牌の明滅」と同じ色・同じ速さ）
+                    Rect at = SkillEffectStage.Expand(_stage.LocalRectOf(chip), 2f);
+                    float blink = Mathf.PingPong(t * 3f, 1f);
+                    Color edge = GlowColor;
+                    Color face = GlowColor;
+                    face.a = 0.45f * blink;
+                    glow.Begin();
+                    glow.Box(at, face);
+                    glow.Box(at.xMin - 2f, at.yMin - 2f, at.xMax + 2f, at.yMin, edge);
+                    glow.Box(at.xMin - 2f, at.yMax, at.xMax + 2f, at.yMax + 2f, edge);
+                    glow.Box(at.xMin - 2f, at.yMin, at.xMin, at.yMax, edge);
+                    glow.Box(at.xMax, at.yMin, at.xMax + 2f, at.yMax, edge);
+                    glow.End();
+                    yield return null;
+                }
+                chip.localScale = _chipScale;
+                _poppedChip = null;
+                dim.color = Color.clear;
+
+                Dispose();
+                yield break;
             }
-            else
-            {
-                ScreenFlash.Play();
-            }
+
+            // ---- ボードが無いとき。その場で白く光って暗転が消える ----
+            ReleaseTrance(dim);
             yield return new WaitForSeconds(0.12f);
             dim.color = Color.clear;
 
@@ -202,6 +297,21 @@ namespace KillingMahjong.UI.Effects
             }
 
             Dispose();
+        }
+
+        /// <summary>白く光って、沈んでいた音を抜く。心音と BGM の戻りは待たない。光が乗りきったら暗転を消す。</summary>
+        private void ReleaseTrance(Image dim)
+        {
+            if (_trance != null)
+            {
+                var trance = _trance;
+                _trance = null;            // ここから先は音の部品が自分で鳴らしきる
+                trance.ReleaseDetached(() => { if (dim != null) dim.color = Color.clear; });
+            }
+            else
+            {
+                ScreenFlash.Play();
+            }
         }
     }
 }

@@ -23,6 +23,8 @@ namespace KillingMahjong.UI
         public Sprite arrowArt;
         public DialogueUI dialogue;
         public KillingMahjong.UI.Effects.MatchMomentumUI momentum;
+        /// <summary>右上の役一覧と強化の枠。役強化の演出が、最後にここへ飛んでいく。</summary>
+        public YakuListUI yakuList;
         public VictoryConfig[] endings;
         public VictoryConfig[] victoryEndings;
         public RectTransform surface;
@@ -38,6 +40,7 @@ namespace KillingMahjong.UI
             player.SetMaxHP(20000); player.SetHP(20000); player.ShowReadyBox(false);
             enemy.SetMaxHP(20000); enemy.SetHP(20000); enemy.ShowReadyBox(false);
             player.SetVitalsVisible(true); enemy.SetPanelVisible(true);
+            if (yakuList != null) yakuList.gameObject.SetActive(true);
             if (dialogue != null) { dialogue.HideText(); dialogue.gameObject.SetActive(false); }
             if (character != null) character.gameObject.SetActive(true);
             if (betting != null) betting.HideBettingPhase(true);

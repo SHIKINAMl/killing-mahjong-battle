@@ -40,6 +40,7 @@ namespace KillingMahjong.UI
             _mulliganSwapAnimator?.CancelPresentation();
             // 役強化・強襲の演出は自前の入れ物で動いている。コルーチンを止めるだけだと画面に残る
             if (_boostEffect != null) _boostEffect.Dispose();
+            if (uiManager != null && uiManager.YakuListUI != null) uiManager.YakuListUI.ReleaseLocalBoostChip();
             if (_assaultEffect != null) _assaultEffect.Dispose();
             _boostEffect = null;
             _assaultEffect = null;
@@ -160,6 +161,13 @@ namespace KillingMahjong.UI
                 if (!string.IsNullOrEmpty(boostedYakuName))
                 {
                     subText = $"<color=yellow>{boostedYakuName}</color>";
+
+                    // 右上の一覧は返事が届いた時点でもう新しい値になっている。演出の最後に役名が
+                    // そこへ飛んでいくので、届くまでその枠だけ伏せておく（戻すのは演出。上限つき）
+                    if (isLocalPlayer && uiManager.YakuListUI != null)
+                    {
+                        uiManager.YakuListUI.HoldLocalBoostChip(boostedYakuName);
+                    }
                 }
             }
 
@@ -320,7 +328,7 @@ namespace KillingMahjong.UI
                     _boostEffect = Effects.BoostHandSkillEffect.Create();
                     if (_boostEffect != null)
                     {
-                        yield return _boostEffect.Play(boostedYakuName);
+                        yield return _boostEffect.Play(boostedYakuName, uiManager.YakuListUI);
                         _boostEffect = null;
                         if (!ownedLock.IsActive) yield break;
                     }

@@ -206,6 +206,83 @@ namespace KillingMahjong.UI
             // `fontSharedMaterial` が null のためマテリアルの差し替えだけ空振りする
             // （自動縮小など他の設定は効くので、直ったように見えて輪郭だけ残る）。
             ApplyActiveBoostReadability();
+
+            // 演出が伏せている枠は、並べ直したあとも伏せたままにする
+            ApplyLocalChipHold();
+        }
+
+        // ==================== 役強化の演出とのつなぎ（2026-10-09） ====================
+        //
+        // 役強化を使うと、演出の最後に役名と翻数がこのボードの枠へ飛んできて収まる
+        // （<see cref="Effects.BoostHandSkillEffect"/>）。
+        // **サーバーの返事が届いた時点で枠はもう新しい値になっている**ので、そのままだと
+        // 「飛んでくる前から答えが出ている」ことになる。演出が届くまで、その枠だけ伏せておく。
+
+        /// <summary>伏せたまま戻らなくなるのを防ぐ上限。演出は長くても5秒ほど。</summary>
+        private const float ChipHoldLimitSeconds = 10f;
+
+        private string _heldLocalYaku;
+        private float _heldUntil;
+
+        /// <summary>自分の強化の枠のうち、この役の枠を伏せる。演出が届いたら <see cref="ReleaseLocalBoostChip"/> で戻す。</summary>
+        public void HoldLocalBoostChip(string yakuName)
+        {
+            _heldLocalYaku = string.IsNullOrEmpty(yakuName) ? null : yakuName;
+            _heldUntil = Time.unscaledTime + ChipHoldLimitSeconds;
+            ApplyLocalChipHold();
+        }
+
+        /// <summary>伏せていた枠を戻す。伏せていなければ何もしない。</summary>
+        public void ReleaseLocalBoostChip()
+        {
+            if (_heldLocalYaku == null) return;
+            _heldLocalYaku = null;
+            ApplyLocalChipHold();
+        }
+
+        /// <summary>
+        /// 自分の強化の枠のうち、この役が入っている枠。演出が飛んでいく先に使う。
+        /// 枠に入りきらず「+3」にまとめられているときは、まとめの枠を返す。見つからなければ null。
+        /// </summary>
+        public RectTransform LocalBoostChipOf(string yakuName)
+        {
+            if (localActiveBoostTexts == null || string.IsNullOrEmpty(yakuName)) return null;
+
+            TextMeshProUGUI last = null;
+            foreach (var text in localActiveBoostTexts)
+            {
+                if (text == null || !text.gameObject.activeInHierarchy) continue;
+                if (text.text == yakuName) return text.transform.parent as RectTransform;
+                last = text;
+            }
+            return last != null && last.text.StartsWith("+") ? last.transform.parent as RectTransform : null;
+        }
+
+        private void Update()
+        {
+            // 演出が途中で打ち切られても、枠が伏せたままにならないようにする
+            if (_heldLocalYaku != null && Time.unscaledTime > _heldUntil) ReleaseLocalBoostChip();
+        }
+
+        private void ApplyLocalChipHold()
+        {
+            if (localActiveBoostTexts == null) return;
+
+            foreach (var text in localActiveBoostTexts)
+            {
+                if (text == null) continue;
+                var chip = text.transform.parent;
+                if (chip == null || chip.gameObject == yakuListPanel) continue;
+
+                bool hide = _heldLocalYaku != null && text.text == _heldLocalYaku;
+                var group = chip.GetComponent<CanvasGroup>();
+                if (group == null)
+                {
+                    if (!hide) continue;
+                    group = chip.gameObject.AddComponent<CanvasGroup>();
+                }
+                group.alpha = hide ? 0f : 1f;
+            }
         }
 
         /// <summary>常時表示の強化役（自3枠・敵3枠）の文字を読めるようにする。</summary>

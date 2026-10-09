@@ -27,10 +27,25 @@ namespace KillingMahjong.UI
                     yield return swap.PlayRoutine(Tile(1), Tile(8), rig.handTiles[1]);
                     rig.handTiles[1].GetComponent<Image>().sprite = rig.tiles.GetTileSprite(Tile(8)); break;
                 case "skill.boost_hand":
+                    // 右上の一覧に「清一色+1」を入れて、届くまで伏せておく（本編と同じ段取り）
+                    var boostBoard = rig.yakuList;
+                    if (boostBoard != null)
+                    {
+                        yield return null;   // 一覧の Start が空のデータで上書きするので、1コマ待ってから入れる
+                        boostBoard.UpdateBoostData(new Dictionary<string, int> { { "清一色", 1 } }, null);
+                        boostBoard.HoldLocalBoostChip("清一色");
+                        scope.AddCleanup(() =>
+                        {
+                            if (boostBoard == null) return;
+                            boostBoard.ReleaseLocalBoostChip();
+                            boostBoard.UpdateBoostData(null, null);
+                        });
+                    }
                     yield return rig.phase.PlaySkillCutinAnimationRoutine("役強化", true, rig.player.CurrentCharacterData, subText: "清一色");
                     var boost = BoostHandSkillEffect.Create();
                     scope.AddCleanup(() => { if (boost != null) boost.Dispose(); });
-                    yield return boost.Play("清一色"); break;
+                    yield return boost.Play("清一色", boostBoard);
+                    yield return new WaitForSeconds(0.8f); break;
                 case "skill.assault":
                     yield return rig.phase.PlaySkillCutinAnimationRoutine("強襲", true, rig.player.CurrentCharacterData);
                     var assault = AssaultSkillEffect.Create();

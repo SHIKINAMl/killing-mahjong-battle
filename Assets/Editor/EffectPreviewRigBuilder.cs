@@ -32,6 +32,8 @@ namespace KillingMahjong.EditorTools
                 rig.tiles = ui.TileResourceManager;
                 rig.dialogue = ui.DialogueUI;
                 rig.momentum = root.GetComponentInChildren<KillingMahjong.UI.Effects.MatchMomentumUI>(true);
+                // 右上の役一覧と強化の枠。役強化の演出が最後にここへ飛んでいくので、試写にも置く
+                rig.yakuList = ui.YakuListUI;
                 var enemyData = new SerializedObject(rig.enemy);
                 rig.character = enemyData.FindProperty("characterRenderer").objectReferenceValue as SpriteRenderer;
                 rig.face = enemyData.FindProperty("faceRenderer").objectReferenceValue as SpriteRenderer;
@@ -43,7 +45,7 @@ namespace KillingMahjong.EditorTools
                 rig.endings = ReadConfigs(data.FindProperty("configs"));
                 rig.victoryEndings = ReadConfigs(data.FindProperty("victoryEndingConfigs"));
                 // シーンの編集時はメニュー類が開いていてもよいが、試写には持ち込まない。
-                var visibleRoots = new Component[] { rig.phase, rig.ron, rig.player, rig.enemy, rig.betting, rig.blink, rig.dialogue, rig.momentum }
+                var visibleRoots = new Component[] { rig.phase, rig.ron, rig.player, rig.enemy, rig.betting, rig.blink, rig.dialogue, rig.momentum, rig.yakuList }
                     .Where(c => c != null).Select(c => c.transform).ToArray();
                 foreach (var canvas in root.GetComponentsInChildren<Canvas>(true))
                 {
@@ -69,7 +71,7 @@ namespace KillingMahjong.EditorTools
                 var keep = new[] { typeof(EffectPreviewRig), typeof(PhaseTransitionUI), typeof(RonAnimationUI),
                     typeof(PlayerInfoUI), typeof(EnemyInfoUI), typeof(BettingUI), typeof(BlinkEffectUI),
                     typeof(DialogueUI), typeof(KillingMahjong.UI.Effects.MatchMomentumUI),
-                    typeof(KillingMahjong.UI.Effects.HeartbeatEffect) };
+                    typeof(KillingMahjong.UI.Effects.HeartbeatEffect), typeof(YakuListUI), typeof(YakuItemUI) };
                 // InputModule が EventSystem を要求するため、コンポーネント単位で順に消すと残る。
                 foreach (var input in root.GetComponentsInChildren<UnityEngine.EventSystems.EventSystem>(true))
                     UnityEngine.Object.DestroyImmediate(input.gameObject);
