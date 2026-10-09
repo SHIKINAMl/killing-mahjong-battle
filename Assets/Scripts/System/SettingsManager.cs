@@ -437,15 +437,18 @@ namespace KillingMahjong.Core
         /// （`Assets/Plugins/WebGL/KmCanvas.jslib`）。
         ///   800×600 等倍       … canvas を 800×600 で出す
         ///   画面に合わせて大きく … 4:3 を保ったまま窓いっぱい（`index.html` の CSS のまま）
-        ///   全画面             … 窓いっぱいにしたうえで、ブラウザの全画面にする
+        ///   全画面             … Web 版では「画面に合わせて大きく」と同じ（全画面への切り替えはしない）
         /// 2026-10-09 までは Web 版では何もしておらず、「800×600 にしても最大ぐらい大きくなる」と言われた。
         /// </summary>
         private void ApplyResolution()
         {
 #if UNITY_WEBGL && !UNITY_EDITOR
-            KmSetCanvasMode(screenMode == (int)ScreenModeKind.X1 ? 0 : 1);
-            bool wantFull = screenMode == (int)ScreenModeKind.FullScreen;
-            if (Screen.fullScreen != wantFull) Screen.fullScreen = wantFull;
+            // **`Screen.fullScreen` には触らない。** WebGL でこれを立てると、全画面に入った瞬間に
+            // 描く解像度が 80x60 ほどに落ちて、マウスの指の絵だけが画面いっぱいに映った
+            // （2026-10-09、公開したページでユーザーが踏んだ）。
+            // Web 版の「全画面」は「窓いっぱい」と同じに扱う（本当の全画面はブラウザの F11）
+            KmSetCanvasMode(screenMode == (int)ScreenModeKind.X1 ? 0
+                          : screenMode == (int)ScreenModeKind.FullScreen ? 2 : 1);
 #endif
 #if !UNITY_WEBGL
             switch ((ScreenModeKind)screenMode)
