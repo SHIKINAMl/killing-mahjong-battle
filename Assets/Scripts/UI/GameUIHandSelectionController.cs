@@ -276,7 +276,28 @@ namespace KillingMahjong.UI
             else if (best >= 1.5f) rank = "跳満";
             else rank = "満貫";
 
-            GetRankCallUI().ShowRank(rank);
+            // **役名表示は、カットしてよい演出として順番待ちへ入れる**（2026-10-11）。
+            // ほかの演出（スキルなど）が流れていれば終わるのを待ち、出ている最中にほかの演出が来たら消える。
+            // 順番が来たときに手牌が変わっていたら、もう出さない
+            var shownFor = _rankResultIndexes != null ? new List<int>(_rankResultIndexes) : null;
+            var queue = Effects.EffectQueue.Instance;
+            if (queue == null)
+            {
+                GetRankCallUI().ShowRank(rank);
+                return;
+            }
+            queue.Enqueue("rank-call", () => ShowRankCallRoutine(rank), cuttable: true,
+                onCut: () => { if (_rankCallUI != null) _rankCallUI.HideImmediate(); },
+                stillValid: () => this != null && CanShowInstantRankCall()
+                    && TryCaptureCurrentHandSelection(out List<int> now, out _)
+                    && (shownFor == null || SameHandIndexes(now, shownFor)));
+        }
+
+        private System.Collections.IEnumerator ShowRankCallRoutine(string rank)
+        {
+            var ui = GetRankCallUI();
+            ui.ShowRank(rank);
+            while (ui != null && ui.IsShowing) yield return null;
         }
 
         private void StopInstantRankCallForSubmission()

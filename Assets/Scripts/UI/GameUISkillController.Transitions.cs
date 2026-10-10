@@ -45,6 +45,9 @@ namespace KillingMahjong.UI
             _boostEffect = null;
             _assaultEffect = null;
             StopAllCoroutines();
+            // 順番待ちが待っているスキルの演出（RunQueuedSkill）を、ここで終わらせる。
+            // コルーチンを止めると「終わった」が届かないので、世代で知らせる
+            _skillRunGeneration++;
             foreach (var lease in skillTransitions) lease.Dispose();
             skillTransitions.Clear();
             if (NetworkMessageHandler.Instance != null)
@@ -56,9 +59,60 @@ namespace KillingMahjong.UI
 
         private void OnDisable() { CancelActiveTransitions(); }
 
+        /// <summary><see cref="CancelActiveTransitions"/> のたびに進む。進んだら、流していたスキルの演出は打ち切り。</summary>
+        private int _skillRunGeneration;
+
+        /// <summary>
+        /// スキルが使われた（自分のも相手のも）。**演出は順番待ちへ入れる**（2026-10-11）。
+        ///
+        /// それまでは届いた瞬間に始めていたので、前のスキルの演出や、配牌・対局開始などの演出が
+        /// 流れている最中だと重なっていた。順番待ち（<see cref="Effects.EffectQueue"/>）が、
+        /// 前の演出が終わるのを待ってから流す。スキルの演出は途中で切らない。
+        ///
+        /// チュートリアルは台本が1つずつ順に進めるので、今までどおりその場で始める
+        /// （台本側がロックを持ったまま呼ぶことがあり、待たせると進行が止まる）。
+        /// </summary>
         public void HandleSkillCasted(SkillCastedData data)
         {
-            StartCoroutine(HandleSkillCastedRoutine(data));
+            if (data == null) return;
+            if (uiManager != null && uiManager.IsTutorialMode)
+            {
+                StartCoroutine(HandleSkillCastedRoutine(data));
+                return;
+            }
+
+            var queue = Effects.EffectQueue.Instance;
+            if (queue == null)
+            {
+                StartCoroutine(HandleSkillCastedRoutine(data));
+                return;
+            }
+            queue.Enqueue("skill:" + data.skillType, () => RunQueuedSkill(data));
+        }
+
+        /// <summary>
+        /// 順番が来たスキルの演出を流して、終わるまで待つ。
+        /// **演出そのものは、このコントローラのコルーチンで動かす。** 中止（CancelActiveTransitions の
+        /// StopAllCoroutines）が今までどおり効くようにするため。止められると「終わった」が届かないので、
+        /// 世代が進んだら打ち切られたと見て返る。
+        /// </summary>
+        private System.Collections.IEnumerator RunQueuedSkill(SkillCastedData data)
+        {
+            if (this == null || !isActiveAndEnabled) yield break;
+
+            int generation = _skillRunGeneration;
+            bool done = false;
+            StartCoroutine(RunThenFlag(HandleSkillCastedRoutine(data), () => done = true));
+            while (!done && this != null && isActiveAndEnabled && generation == _skillRunGeneration)
+            {
+                yield return null;
+            }
+        }
+
+        private static System.Collections.IEnumerator RunThenFlag(System.Collections.IEnumerator inner, System.Action onDone)
+        {
+            try { yield return inner; }
+            finally { onDone(); }
         }
 
         private System.Collections.IEnumerator HandleSkillCastedRoutine(SkillCastedData data)

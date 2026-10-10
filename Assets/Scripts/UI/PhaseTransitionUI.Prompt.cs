@@ -48,6 +48,8 @@ namespace KillingMahjong.UI
             }
 
             promptText.gameObject.SetActive(false);
+            _promptRoutine = null;
+            ReleasePromptShowing();
         }
     }
 }

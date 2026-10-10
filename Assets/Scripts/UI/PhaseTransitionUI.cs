@@ -373,9 +373,38 @@ namespace KillingMahjong.UI
         }
 
 
+        private Coroutine _promptRoutine;
+        private Effects.EffectQueue.Showing _promptShowing;
+
+        /// <summary>
+        /// 画面中央に案内の文字を出す（「手牌を選んでください」）。
+        /// **カットしてよい演出。** ほかの演出（スキル・配牌など）が来たら、その場で消える（2026-10-11）。
+        /// 出す時刻は変えたくないので順番待ちには入れず、「いま出ている」とだけ届け出る。
+        /// </summary>
         public void PlayPromptText(string text, float duration = 2.0f)
         {
-            StartCoroutine(PlayPromptTextRoutine(text, duration));
+            CutPromptText();
+            _promptRoutine = StartCoroutine(PlayPromptTextRoutine(text, duration));
+            var queue = Effects.EffectQueue.Instance;
+            if (queue != null) _promptShowing = queue.RegisterShowing("prompt", CutPromptText);
+        }
+
+        /// <summary>案内の文字をその場で消す。出ていなければ何もしない。</summary>
+        internal void CutPromptText()
+        {
+            if (_promptRoutine != null) StopCoroutine(_promptRoutine);
+            _promptRoutine = null;
+            ReleasePromptShowing();
+            if (promptText != null) promptText.gameObject.SetActive(false);
+        }
+
+        private void ReleasePromptShowing()
+        {
+            if (_promptShowing == null) return;
+            var showing = _promptShowing;
+            _promptShowing = null;
+            var queue = Effects.EffectQueue.Instance;
+            if (queue != null) queue.Unregister(showing);
         }
 
 

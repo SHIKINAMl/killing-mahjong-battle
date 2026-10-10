@@ -214,6 +214,9 @@ namespace KillingMahjong.UI
             _routine = StartCoroutine(ShowRoutine(rankName));
         }
 
+        /// <summary>役名を出している最中か（消えきるまで true）。演出の順番待ちが、終わりを知るのに使う。</summary>
+        public bool IsShowing { get { return _routine != null; } }
+
         /// <summary>出ているものを即座に片付ける（フェイズが変わったときなど）。</summary>
         public void HideImmediate()
         {

@@ -21,6 +21,19 @@ namespace KillingMahjong.UI
         private readonly Action changed;
         private int generation;
         public bool IsLocked => active.Count > 0;
+
+        /// <summary>
+        /// <paramref name="ignoreOwner"/> が true を返す持ち主を除いて、ロックが残っているか。
+        /// 演出の順番待ち（Effects.EffectQueue）が、次を流してよいかを見るのに使う。
+        /// </summary>
+        public bool IsLockedByOthers(Predicate<string> ignoreOwner)
+        {
+            foreach (var lease in active)
+            {
+                if (ignoreOwner == null || !ignoreOwner(lease.Owner)) return true;
+            }
+            return false;
+        }
         public TransitionLockSet(Action changed = null) { this.changed = changed; }
         public Lease Acquire(string owner)
         {
