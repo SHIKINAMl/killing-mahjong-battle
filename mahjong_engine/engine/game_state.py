@@ -84,6 +84,22 @@ def get_skill_cost(skill_type: SkillType, special_victory_count: int) -> int:
     return HP_COST_TABLE[index]["skill_costs"][skill_type]
 
 
+def apply_skill_cost_rate(cost: int, rate: float) -> int:
+    """
+    スキルコストに倍率を掛け、整数に丸める（例: 1200 × 0.6 = 720）。
+
+    Args:
+        cost: 倍率を掛ける前のコスト
+        rate: 倍率（1.0 なら変えない）
+
+    Returns:
+        倍率を掛けたあとのコスト
+    """
+    if rate == 1.0:
+        return cost
+    return int(round(cost * rate))
+
+
 def get_bet_rule(special_victory_count: int) -> tuple[int, int]:
     """
     掛け金ルール（上限, 単位）を取得
@@ -119,6 +135,11 @@ class PlayerState:
     voltage_points: int = 0 # 現在のボルテージ値
     voltage_broken: bool = False # ボルテージが継続中か
     voltage_resume_points: int = 0 # ボルテージを再開するとき、どこから再開するのか
+    # CPU（とくしゅ）の特典。人間は既定値のまま（対局を通じて持続）
+    skill_cost_rate: float = 1.0  # スキルコストの倍率
+    boost_hand_targets: int = 1  # BOOST_HAND 1回で強化できる役の数
+    opening_boost_count: int = 1  # 開始時恒常強化の数
+    initial_perspective_count: int = 0  # 配牌時に無料で公開する相手の牌の枚数
 
 
 @dataclass

@@ -8,12 +8,15 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from typing import Callable, Optional
 import random
 
-from .game_state import GameState, RoundStatus, SkillType, PlayerState, get_skill_cost, get_bet_rule
+from .game_state import GameState, RoundStatus, SkillType, PlayerState, get_skill_cost, get_bet_rule, apply_skill_cost_rate
 from .tile_wall import RoundDeal, generate_round_deal
 from .hand_analyzer import HandAnalyzer
 from .yaku import Yaku
 
 logger = logging.getLogger(__name__)
+
+# 1 局で各プレイヤーが捨てる枚数。両者がこの枚数を捨て終えたら流局
+DISCARDS_PER_PLAYER = 17
 
 # 配牌生成（満貫聴牌形の探索）を行うスレッド。全マッチで共有する。
 _DEAL_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="deal")
@@ -40,6 +43,10 @@ class GameEngine:
         self._voltage_seen_base_ids: set[int] = set() #　両者の河に出た牌を保存する集合
         # 次局の配牌（バックグラウンドで生成中 or 生成済み）
         self._next_deal: Optional[Future] = None
+        # この局の配牌時に特典で公開した牌（initial_perspective_count を持つプレイヤーの分）
+        self._initial_perspective_reveals: list[dict] = []
+        # 対局が終わった理由（game_end の victory_method になる）
+        self.game_end_reason: Optional[str] = None
 
         # 各種コールバック
         # 準備フェーズ
@@ -147,6 +154,7 @@ class GameEngine:
 
         self.state.round_state.dora_id = deal.dora_id
         self._pending_agari = None
+        self._apply_initial_perspectives()
 
         # 局中に次局の配牌を用意しておき、局開始時にすぐ配れるようにする
         self.prepare_next_deal()
@@ -154,6 +162,26 @@ class GameEngine:
         self._invoke_callback(self.on_dealt)
 
         self._set_phase(RoundStatus.HAND_SELECTION)
+
+    def _apply_initial_perspectives(self) -> None:
+        """配牌時に、特典を持つプレイヤーへ相手の牌を無料で公開する。"""
+        self._initial_perspective_reveals = []
+        for player in self.state.players:
+            if player.initial_perspective_count <= 0:
+                continue
+            target = next((p for p in self.state.players if p.player_id != player.player_id), None)
+            if target is None:
+                continue
+            exposed = self._expose_random_tiles(target, player.initial_perspective_count)
+            self._initial_perspective_reveals.append({
+                "player_id": player.player_id,
+                "target_id": target.player_id,
+                "exposed_indexes": exposed,
+            })
+
+    def get_initial_perspective_reveals(self) -> list[dict]:
+        """この局の配牌時に特典で公開した牌を返す。"""
+        return [dict(reveal) for reveal in self._initial_perspective_reveals]
 
     def selected_hand(self) -> None:
         """手牌の選択フェーズを完了"""
@@ -163,7 +191,7 @@ class GameEngine:
             # 流局後は同じ掛け金を維持し、ベットフェーズをスキップ
             if not self._can_all_players_cover_carry_over_bet():
                 logger.warning("持ち越し掛け金を支払えないプレイヤーがいるためゲーム終了")
-                self._on_game_end()
+                self._on_game_end("bet_unpayable")
                 return
             self.bet()
             return
@@ -171,7 +199,7 @@ class GameEngine:
         # 通常局は最低掛け金を支払えるかチェック
         if not self._can_all_players_cover_min_bet():
             logger.warning("最低掛け金を支払えないプレイヤーがいるためゲーム終了")
-            self._on_game_end()
+            self._on_game_end("bet_unpayable")
             return
 
         self._set_phase(RoundStatus.BETTING)
@@ -181,7 +209,7 @@ class GameEngine:
         dead_players = [player.player_id for player in self.state.players if player.health < 0]
         if dead_players:
             logger.info("ベット確定時のHPマイナスによるゲーム終了: players=%s", dead_players)
-            self._on_game_end()
+            self._on_game_end("hp_zero")
             return
 
         self._invoke_callback(self.on_bet)
@@ -200,7 +228,12 @@ class GameEngine:
         return unit
 
     def place_bet(self, player: PlayerState, bet_amount: int) -> bool:
-        """掛け金を検証して設定する。"""
+        """
+        掛け金を検証して設定する。
+
+        掛け金は先払いしない（HP はここでは減らない）。和了の精算でだけ「掛け金 × 倍率」が動く。
+        賭けられるのは HP 以下の額だけ。
+        """
         if not isinstance(bet_amount, int):
             return False
 
@@ -215,9 +248,6 @@ class GameEngine:
         if player.health < bet_amount:
             return False
 
-        player.health -= bet_amount
-        if player.health < 0:
-            player.health = 0
         player.bet = bet_amount
         player.base_bet = bet_amount
         return True
@@ -363,7 +393,7 @@ class GameEngine:
         """
         # HP コスト計算
         try:
-            cost = get_skill_cost(skill_type, user.special_victory_count)
+            cost = self.get_skill_cost(user, skill_type)
         except KeyError:
             logger.error("スキルコスト取得失敗: skill_type=%s", skill_type)
             return None
@@ -393,6 +423,11 @@ class GameEngine:
 
         return cost
 
+    def get_skill_cost(self, player: PlayerState, skill_type: SkillType) -> int:
+        """プレイヤーの特典（スキルコストの倍率）を反映したスキルコストを返す。"""
+        base_cost = get_skill_cost(skill_type, player.special_victory_count)
+        return apply_skill_cost_rate(base_cost, player.skill_cost_rate)
+
     def _validate_skill_cast(self, user: PlayerState, skill_type: SkillType, target: PlayerState | None, options: dict) -> bool:
         """
         スキル発動の前提条件をチェック
@@ -401,12 +436,16 @@ class GameEngine:
             エラーがあれば True、正常ならば False
         """
         if skill_type == SkillType.BOOST_HAND:
-            if "yaku_name" not in options or not options["yaku_name"]:
+            # 1回で強化できる役の数は boost_hand_targets まで（同じ役を重ねて指定してもよい）
+            yaku_names = options.get("yaku_names")
+            if yaku_names is None:
+                yaku_names = [options.get("yaku_name")]
+            if not isinstance(yaku_names, list) or not 1 <= len(yaku_names) <= user.boost_hand_targets:
                 return True
-            normalized_yaku_name = self.normalize_boost_target_yaku_name(options["yaku_name"])
-            if normalized_yaku_name is None:
+            normalized_names = [self.normalize_boost_target_yaku_name(name) for name in yaku_names]
+            if any(name is None for name in normalized_names):
                 return True
-            options["yaku_name"] = normalized_yaku_name
+            options["yaku_names"] = normalized_names
 
         elif skill_type == SkillType.MULLIGAN:
             target_index = options.get("target_hand_index")
@@ -446,20 +485,13 @@ class GameEngine:
                 self._invoke_callback(self.on_special_victory_won, user.player_id)
 
         elif skill_type == SkillType.BOOST_HAND:
-            yaku_name = options["yaku_name"]
-            user.boost_hand_bonus[yaku_name] = user.boost_hand_bonus.get(yaku_name, 0) + 1
+            for yaku_name in options["yaku_names"]:
+                user.boost_hand_bonus[yaku_name] = user.boost_hand_bonus.get(yaku_name, 0) + 1
 
         elif skill_type == SkillType.PERSPECTIVE:
             # 使用者の牌は公開しない。相手（target）の山牌全体から未公開の index を公開する
             if target is not None and target.player_id != user.player_id and target.wall:
-                unrevealed_indexes = [
-                    idx for idx in range(len(target.wall))
-                    if idx not in target.exposed_hand_indexes
-                ]
-                if unrevealed_indexes:
-                    exposed = random.sample(unrevealed_indexes, min(3, len(unrevealed_indexes)))
-                    target.exposed_hand_indexes.update(exposed)
-                exposed_tiles[target.player_id] = set(target.exposed_hand_indexes)
+                exposed_tiles[target.player_id] = set(self._expose_random_tiles(target, 3))
 
         elif skill_type == SkillType.MULLIGAN:
             target_index = options["target_hand_index"]
@@ -483,19 +515,42 @@ class GameEngine:
 
         return exposed_tiles
 
-    def use_skill(self, player: PlayerState, skill_type: SkillType, yaku_name: str | None = None) -> Optional[int]:
+    def _expose_random_tiles(self, target: PlayerState, count: int) -> list[int]:
+        """
+        相手の山から未公開の牌を count 枚ランダムに公開する。
+
+        Returns:
+            公開済みを含む、相手の全公開 index（昇順）
+        """
+        unrevealed_indexes = [
+            idx for idx in range(len(target.wall))
+            if idx not in target.exposed_hand_indexes
+        ]
+        if unrevealed_indexes:
+            exposed = random.sample(unrevealed_indexes, min(count, len(unrevealed_indexes)))
+            target.exposed_hand_indexes.update(exposed)
+        return sorted(target.exposed_hand_indexes)
+
+    def use_skill(
+        self,
+        player: PlayerState,
+        skill_type: SkillType,
+        yaku_name: str | None = None,
+        yaku_names: list[str] | None = None,
+    ) -> Optional[int]:
         """
         プレイヤーがスキルを使用する（自分を対象とするスキル）
 
         Args:
             player: 使用プレイヤー
             skill_type: スキル種別（BOOST_HAND, SPECIAL_VICTORY など）
-            yaku_name: BOOST_HAND 使用時に必須。翻を上げる対象役名
+            yaku_name: BOOST_HAND 使用時に、翻を上げる対象役名
+            yaku_names: BOOST_HAND で複数の役を同時に上げるときの対象役名（boost_hand_targets 件まで）
 
         Returns:
             実際に支払ったHP コスト。失敗時は None
         """
-        return self.cast_skill(player, skill_type, yaku_name=yaku_name)
+        return self.cast_skill(player, skill_type, yaku_name=yaku_name, yaku_names=yaku_names)
 
     def use_skill_on_opponent(self, user: PlayerState, opponent: PlayerState, skill_type: SkillType) -> Optional[int]:
         """
@@ -524,7 +579,6 @@ class GameEngine:
         """
         return self.cast_skill(player, SkillType.MULLIGAN, target_hand_index=target_hand_index)
 
-    
     def _apply_voltage_discard(self, player: PlayerState, tile_id: int) -> None:
         """打牌に応じて、そのプレイヤーのボルテージを更新する。"""
         base_id = tile_id & 0b11111
@@ -583,9 +637,8 @@ class GameEngine:
         discarded_tile = discarding_player.wall[wall_index]
         discarding_player.discards.append(discarded_tile)
         discarding_player.discarded_wall_indexes.add(wall_index)
-        
-        self._apply_voltage_discard(discarding_player, discarded_tile) # ボルテージを適用する
 
+        self._apply_voltage_discard(discarding_player, discarded_tile) # ボルテージを適用する
 
         self._invoke_callback(self.on_discarded, player_id, discarded_tile)
 
@@ -601,6 +654,7 @@ class GameEngine:
             winning_player is not None
             and discarded_tile_base in winning_waits
             and discarded_tile_base not in winning_discard_bases
+            and self.can_agari(winning_player, discarding_player, discarded_tile)
         ):
             logger.info(
                 "和了入力待ち: discarder=%s winner=%s tile=%d tile_base=%d",
@@ -631,9 +685,10 @@ class GameEngine:
                 discarded_tile_base,
             )
 
-        if all(len(player.discards) >= 16 for player in self.state.players):
+        if all(len(player.discards) >= DISCARDS_PER_PLAYER for player in self.state.players):
             logger.info(
-                "流局: all players reached 16 discards (%s)",
+                "流局: all players reached %d discards (%s)",
+                DISCARDS_PER_PLAYER,
                 {player.player_id: len(player.discards) for player in self.state.players},
             )
             self.end_round(is_draw=True)
@@ -668,9 +723,10 @@ class GameEngine:
                 winner_discard_bases = {tile & 0b11111 for tile in winner.discards}
                 if winning_tile_base in winner_discard_bases:
                     logger.info("フリテンのため和了不可: winner=%s tile_base=%d", winner.player_id, winning_tile_base)
-                    if all(len(player.discards) >= 16 for player in self.state.players):
+                    if all(len(player.discards) >= DISCARDS_PER_PLAYER for player in self.state.players):
                         logger.info(
-                            "和了拒否（フリテン）後に流局: all players reached 16 discards (%s)",
+                            "和了拒否（フリテン）後に流局: all players reached %d discards (%s)",
+                            DISCARDS_PER_PLAYER,
                             {player.player_id: len(player.discards) for player in self.state.players},
                         )
                         self.end_round(is_draw=True)
@@ -693,9 +749,10 @@ class GameEngine:
 
             return self.liquidation(player_id, winning_hand_tiles + [winning_tile], winning_tile=winning_tile)
 
-        if all(len(player.discards) >= 16 for player in self.state.players):
+        if all(len(player.discards) >= DISCARDS_PER_PLAYER for player in self.state.players):
             logger.info(
-                "和了見送り後に流局: all players reached 16 discards (%s)",
+                "和了見送り後に流局: all players reached %d discards (%s)",
+                DISCARDS_PER_PLAYER,
                 {player.player_id: len(player.discards) for player in self.state.players},
             )
             self.end_round(is_draw=True)
@@ -746,7 +803,7 @@ class GameEngine:
         if points >= 2:
             return 1.1
         return 1.0
-    
+
     def _get_voltage_level(self, points: int) -> int:
         """ボルテージポイントから段階番号を返す。0〜4。"""
         if points >= 14:
@@ -758,7 +815,7 @@ class GameEngine:
         if points >= 2:
             return 1
         return 0
-    
+
     def _get_voltage_resume_points(self, points: int) -> int:
         """ブレイク後、次の初出牌で再開するポイントを返す。"""
         if points >= 14:
@@ -797,8 +854,8 @@ class GameEngine:
         return len(winner.discards) <= 1 and len(loser.discards) == 1
 
     def _is_houtei_raoyui(self, loser: PlayerState, winning_tile: Optional[int]) -> bool:
-        """河底撈魚成立かどうかを返す。後手側の16打目を最後の捨て牌とみなす。"""
-        if winning_tile is None or len(loser.discards) != 16:
+        """河底撈魚成立かどうかを返す。後手側の最後の打牌（DISCARDS_PER_PLAYER 打目）を最後の捨て牌とみなす。"""
+        if winning_tile is None or len(loser.discards) != DISCARDS_PER_PLAYER:
             return False
 
         first_player = self.state.players[self.state.round_state.first_player_index]
@@ -825,6 +882,44 @@ class GameEngine:
 
         return context_yaku
 
+    def _calc_agari_han(
+        self,
+        winner: PlayerState,
+        loser: PlayerState,
+        hand: list[int],
+        winning_tile: Optional[int],
+    ) -> tuple[list[str], int, int, dict[str, int]]:
+        """
+        和了したときの役と翻数を数える（状況役・役強化を含む）。
+
+        Returns:
+            (役のリスト, 素の翻数, 役強化による翻数, 役強化の辞書)
+        """
+        base_yaku_list = HandAnalyzer.enum_yaku(hand, winning_tile=winning_tile)
+        base_yaku_list += self._get_win_context_yaku(winner, loser, winning_tile, base_yaku_list)
+
+        # 満貫判定にはスキルによる翻上昇分も含める
+        boost_bonus_map = self._effective_boost_bonus_map(winner)
+        base_han = sum(Yaku.get_han_by_name(name) for name in base_yaku_list)
+        bonus_han = sum(boost_bonus_map.get(name, 0) for name in base_yaku_list)
+        return base_yaku_list, base_han, bonus_han, boost_bonus_map
+
+    def can_agari(self, winner: PlayerState, loser: PlayerState, winning_tile: int) -> bool:
+        """
+        その牌でロンしたら満貫以上で精算されるか。
+
+        満貫未満の手は和了れない。打牌の時点でこれを確かめ、和了れない牌ではロン確認を出さない。
+        数え方は liquidation と同じ（状況役の一発・河底撈魚、役強化を含む）。
+        """
+        try:
+            hand = [winner.wall[idx] for idx in winner.hand] + [winning_tile]
+        except (IndexError, TypeError):
+            return False
+        if not HandAnalyzer.is_win(hand):
+            return False
+        _, base_han, bonus_han, _ = self._calc_agari_han(winner, loser, hand, winning_tile)
+        return base_han + bonus_han >= 4
+
     def liquidation(self, player_id: str, hand: list[int], winning_tile: Optional[int] = None) -> bool:
         """
         清算処理
@@ -844,13 +939,7 @@ class GameEngine:
             return False
 
         is_win = HandAnalyzer.is_win(hand)
-        base_yaku_list = HandAnalyzer.enum_yaku(hand, winning_tile=winning_tile)
-        base_yaku_list += self._get_win_context_yaku(winner, loser, winning_tile, base_yaku_list)
-
-        # 満貫判定にはスキルによる翻上昇分も含める
-        boost_bonus_map = self._effective_boost_bonus_map(winner)
-        base_han = sum(Yaku.get_han_by_name(name) for name in base_yaku_list)
-        bonus_han = sum(boost_bonus_map.get(name, 0) for name in base_yaku_list)
+        base_yaku_list, base_han, bonus_han, boost_bonus_map = self._calc_agari_han(winner, loser, hand, winning_tile)
         han = base_han + bonus_han
         is_mangan = han >= 4
         if not is_win or not is_mangan:
@@ -864,7 +953,7 @@ class GameEngine:
         multiplier = self._get_liquidation_multiplier(han)
         logger.info("精算: winner=%s  yaku=%s  base_han=%d  bonus_han=%d  multiplier=%.1f",
                     winner.player_id, display_yaku_list, base_han, bonus_han, multiplier)
-        
+
         # ボルテージの倍率
         voltage_multiplier = self._get_voltage_multiplier(
             winner.voltage_points
@@ -886,7 +975,9 @@ class GameEngine:
         # 敗者: 単騎待ち和了時のみ支払いを倍化（勝者獲得量は据え置き）
         loser_loss_multiplier = 2 if is_tanki_wait else 1
         loser_loss = int(loser_effective_bet * multiplier * loser_loss_multiplier) + assault_bonus_damage
-        loser.health = max(0, loser.health - loser_loss)
+        # 残りの HP を超える損失は、マイナスのまま記録する（どれだけ超えたかを見せるため）。
+        # 0 以下になれば end_round でその場でゲーム終了になる
+        loser.health = loser.health - loser_loss
 
         self._last_liquidation_result = {
             "winner_id": winner.player_id,
@@ -938,6 +1029,10 @@ class GameEngine:
                 special_victory_count=p.special_victory_count,
                 boost_hand_bonus=p.boost_hand_bonus.copy(),
                 exposed_hand_indexes=set(),  # 局が変わるたびにリセット（手牌が変わるため古い indexes は無効）
+                skill_cost_rate=p.skill_cost_rate,
+                boost_hand_targets=p.boost_hand_targets,
+                opening_boost_count=p.opening_boost_count,
+                initial_perspective_count=p.initial_perspective_count,
             )
             for p in self.state.players
         ]
@@ -977,15 +1072,16 @@ class GameEngine:
         if self.state.round_state.round_number >= self.max_rounds:
             logger.info("最大ラウンド到達によるゲーム終了: round=%d", self.state.round_state.round_number)
             self._invoke_callback(self.on_round_end, is_draw)
-            self._on_game_end()
+            self._on_game_end("max_rounds")
             return
 
-        # 清算は HP を 0 で止めるため、0 到達もこの局で終了させる。
-        if any(p.health <= 0 for p in self.state.players):
+        # 精算後に HP が 0 以下のプレイヤーがいれば、その場でゲーム終了。
+        # 流局では HP は減らない（全額を賭けて 0 になった場合は、下の「次局の掛け金を払えない」で終わる）
+        if not is_draw and any(p.health <= 0 for p in self.state.players):
             dead = [p.player_id for p in self.state.players if p.health <= 0]
-            logger.info("HP枯渇によるゲーム終了: players=%s", dead)
+            logger.info("HP 0 によるゲーム終了: players=%s", dead)
             self._invoke_callback(self.on_round_end, is_draw)
-            self._on_game_end()
+            self._on_game_end("hp_zero")
             return
 
         # 勝利時の獲得累計点数が 30000 に到達したらゲーム終了
@@ -997,7 +1093,19 @@ class GameEngine:
                 point_winner.cumulative_earned_points,
             )
             self._invoke_callback(self.on_round_end, is_draw)
-            self._on_game_end()
+            self._on_game_end("cumulative_earned_points")
+            return
+
+        # 次の局の掛け金（流局後は持ち越しの掛け金、それ以外は最低掛け金）を払えなければ、その場でゲーム終了。
+        # 次の局を始めてから手牌選択の後に気づくのでは遅い
+        unpayable = [
+            p.player_id for p in self.state.players
+            if p.health < (p.bet if is_draw else self.get_minimum_bet(p))
+        ]
+        if unpayable:
+            logger.info("次局の掛け金を払えないためゲーム終了: players=%s is_draw=%s", unpayable, is_draw)
+            self._invoke_callback(self.on_round_end, is_draw)
+            self._on_game_end("bet_unpayable")
             return
 
         if is_draw:
@@ -1010,8 +1118,15 @@ class GameEngine:
         self._set_phase(RoundStatus.ROUND_END_WAITING)
         self._invoke_callback(self.on_round_end, is_draw)
 
-    def _on_game_end(self) -> None:
-        """ゲーム終了時の処理"""
+    def _on_game_end(self, reason: str = "unknown") -> None:
+        """
+        ゲーム終了時の処理
+
+        Args:
+            reason: 終わった理由（"hp_zero" / "cumulative_earned_points" / "bet_unpayable" / "max_rounds"）
+        """
+        if self.game_end_reason is None:
+            self.game_end_reason = reason
         self._invoke_callback(self.on_game_end)
 
     def _set_phase(self, new_status: RoundStatus) -> None:

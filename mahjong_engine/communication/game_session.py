@@ -9,6 +9,7 @@ from typing import Any, Awaitable, Callable, Dict, List, Optional, Set
 from ..engine.game_engine import GameEngine
 from ..engine.game_state import RoundStatus, SkillType, PlayerState
 from ..engine.hand_analyzer import HandAnalyzer
+from ..ai.cpu_controller import CpuController
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,8 @@ class GameSession:
 		self._tasks_by_match: Dict[str, Set[asyncio.Task]] = {}
 		# マッチごとの最終操作時刻（放置マッチの検出に使う）
 		self._last_activity_by_match: Dict[str, float] = {}
+		# CPU の席（client_id → CpuController）。CPU 宛ての通知は WebSocket ではなくここへ渡す
+		self._cpu_controllers: Dict[str, CpuController] = {}
 
 	async def _send_error(self, client_id: str, message: str) -> None:
 		"""クライアントへのエラー通知"""
@@ -167,6 +170,19 @@ class GameSession:
 		task.add_done_callback(_on_done)
 		return task
 
+	def spawn(self, match_id: str, coro: Awaitable[None]) -> asyncio.Task:
+		"""マッチに紐づくタスクを起動する（CPU から使う）。マッチの破棄時にまとめてキャンセルされる。"""
+		return self._spawn(match_id, coro)
+
+	def get_engine(self, match_id: str) -> Optional[GameEngine]:
+		return self._game_engines.get(match_id)
+
+	def get_cpu_controller(self, client_id: str) -> Optional[CpuController]:
+		return self._cpu_controllers.get(client_id)
+
+	def is_hand_selection_confirmed(self, match_id: str, client_id: str) -> bool:
+		return client_id in self._confirmed_hand_players_by_match.get(match_id, set())
+
 	def _create_task_callback(
 		self,
 		handler: Callable[..., Awaitable[None]],
@@ -202,6 +218,8 @@ class GameSession:
 			engine.dispose()
 		self._confirmed_hand_players_by_match.pop(match_id, None)
 		self._last_activity_by_match.pop(match_id, None)
+		for cpu_id in [cid for cid, cpu in self._cpu_controllers.items() if cpu.match_id == match_id]:
+			self._cpu_controllers.pop(cpu_id).stop()
 
 		# 自分自身（on_game_end など）はキャンセルしない
 		current = asyncio.current_task()
@@ -227,6 +245,7 @@ class GameSession:
 			"match_tasks": sum(len(t) for t in self._tasks_by_match.values()),
 			"pending_low_hand_confirmations": len(self._pending_low_hand_confirmations),
 			"confirmed_hand_matches": len(self._confirmed_hand_players_by_match),
+			"cpu_controllers": len(self._cpu_controllers),
 		}
 
 	def _clear_pending_confirmations_for_engine(self, engine: GameEngine) -> None:
@@ -252,23 +271,23 @@ class GameSession:
 		return len(confirmed) >= engine.num_players
 
 	def _apply_opening_boosts(self, engine: GameEngine) -> List[Dict[str, Any]]:
-		"""ゲーム開始時に各プレイヤーへ恒常強化を1つずつ付与する。"""
+		"""ゲーム開始時に各プレイヤーへ恒常強化を付与する（通常は1つ。特典を持つ CPU は重複なしで複数）。"""
 		candidates = GameEngine.get_opening_boost_candidates()
 		if not candidates:
 			return []
 
 		assigned: List[Dict[str, Any]] = []
 		for player in engine.state.players:
-			yaku_name = random.choice(candidates)
-			if not engine.assign_opening_boost(player, yaku_name, bonus_han=1):
-				continue
-			assigned.append(
-				{
-					"client_id": player.player_id,
-					"yaku_name": yaku_name,
-					"bonus_han": 1,
-				}
-			)
+			for yaku_name in random.sample(candidates, min(player.opening_boost_count, len(candidates))):
+				if not engine.assign_opening_boost(player, yaku_name, bonus_han=1):
+					continue
+				assigned.append(
+					{
+						"client_id": player.player_id,
+						"yaku_name": yaku_name,
+						"bonus_han": 1,
+					}
+				)
 
 		return assigned
 
@@ -282,6 +301,18 @@ class GameSession:
 	async def _start_match_inner(self, match: Any) -> None:
 		engine = GameEngine(max_rounds=4)
 		engine.initialize_players(match.players)
+		cpu_profiles = getattr(match, "cpu_profiles", {}) or {}
+		for player in engine.state.players:
+			profile = cpu_profiles.get(player.player_id)
+			if profile is None:
+				continue
+			perks = profile.perks
+			player.skill_cost_rate = perks["skill_cost_rate"]
+			player.boost_hand_targets = perks["boost_hand_targets"]
+			player.opening_boost_count = perks["opening_boost_count"]
+			player.initial_perspective_count = perks["initial_perspective_count"]
+			# game_started より前に登録しておく。開始前に人間が切断しても cleanup_match_locked で片付く
+			self._cpu_controllers[player.player_id] = CpuController(self, match.match_id, player.player_id, profile)
 		original_deal_tiles = engine._deal_tiles
 		round_start_done = asyncio.Event()
 		dealing_phase_done = asyncio.Event()
@@ -343,10 +374,13 @@ class GameSession:
 			"type": "game_started",
 			"data": {
 				"match_id": match.match_id,
+				"mode": getattr(match, "mode", "public"),
 				"players": [
 					{
 						"client_id": cid,
 						"health": engine.state.players[idx].health,
+						"is_cpu": cid in cpu_profiles,
+						**({"cpu": cpu_profiles[cid].to_public_dict()} if cid in cpu_profiles else {}),
 					}
 					for idx, cid in enumerate(match.players)
 				],
@@ -432,6 +466,12 @@ class GameSession:
 			logger.error("アクション処理中に例外: client=%s  action=%s\n%s",
 				client_id, action_type, tb)
 			await self._send_error(client_id, f"Internal error while processing '{action_type}'")
+
+		# CPU 宛ての通知がないまま状態が変わることがある（例: 人間のロンが不成立で、手番が CPU に残る）。
+		# 人間が何かしたら、同じマッチの CPU にやるべきことがないか確かめさせる
+		for cpu in list(self._cpu_controllers.values()):
+			if cpu.match_id == match_id and cpu.client_id != client_id:
+				cpu.wake()
 
 	def _serialize_round_state(self, engine: GameEngine) -> Dict[str, Any]:
 		round_state = engine.state.round_state
@@ -554,8 +594,7 @@ class GameSession:
 
 		if cost is None:
 			try:
-				from ..engine.game_state import get_skill_cost
-				skill_cost = get_skill_cost(skill_type, player.special_victory_count)
+				skill_cost = engine.get_skill_cost(player, skill_type)
 				detail = f" (cost={skill_cost}, health={player.health})"
 			except Exception:
 				detail = ""
@@ -580,6 +619,13 @@ class GameSession:
 			HP コスト。失敗時は None
 		"""
 		if skill_type == SkillType.BOOST_HAND:
+			# 複数の役を同時に強化する（件数と役名の検証はエンジンで行う）
+			yaku_names = action_data.get("yaku_names")
+			if yaku_names is not None:
+				if not isinstance(yaku_names, list):
+					return None
+				return engine.use_skill(user, skill_type, yaku_names=yaku_names)
+
 			# 対象役名を検証
 			yaku_name = action_data.get("yaku_name")
 			normalized_yaku_name = GameEngine.normalize_boost_target_yaku_name(yaku_name)
@@ -997,6 +1043,17 @@ class GameSession:
 			},
 		)
 
+		# 特典の初期透視（CPU のとくしゅ）は、配牌の直後に通常の透視と同じ形で知らせる
+		for reveal in self._game_engines[match_id].get_initial_perspective_reveals():
+			await self._broadcast_skill_casted(
+				match_id,
+				reveal["player_id"],
+				SkillType.PERSPECTIVE,
+				0,
+				{reveal["target_id"]: reveal["exposed_indexes"]},
+				source="cpu_perk",
+			)
+
 	async def on_selected(self, match_id: str) -> None:
 		"""手牌選択完了の処理"""
 		payload = [
@@ -1084,6 +1141,23 @@ class GameSession:
 
 	async def on_skill_casted(self, match_id: str, player_id: str, skill_type: SkillType, cost: int, exposed_indexes: Any) -> None:
 		"""スキル使用時の処理"""
+		await self._broadcast_skill_casted(match_id, player_id, skill_type, cost, exposed_indexes, source="skill")
+
+	async def _broadcast_skill_casted(
+		self,
+		match_id: str,
+		player_id: str,
+		skill_type: SkillType,
+		cost: int,
+		exposed_indexes: Any,
+		source: str,
+	) -> None:
+		"""
+		skill_casted を両者へ送る。
+
+		Args:
+			source: "skill"（スキルを使った）/ "cpu_perk"（CPU の特典による無料の発動）
+		"""
 		player = self._game_engines[match_id].get_player_by_id(player_id)
 
 		exposed_by_player: Dict[str, List[int]] = {}
@@ -1129,6 +1203,7 @@ class GameSession:
 					"exposedHandIndexes": exposed_flat,
 					"exposedHandIndexesByPlayer": exposed_by_player,
 					"mulliganResult": mulligan_result,
+					"source": source,
 				},
 			},
 		)
@@ -1200,7 +1275,9 @@ class GameSession:
 		self._clear_hand_selection_confirmations(match_id)
 		if engine:
 			self._clear_pending_confirmations_for_engine(engine)
-			if any(p.health <= 0 for p in engine.state.players):
+			if engine.game_end_reason is not None:
+				victory_method = engine.game_end_reason
+			elif any(p.health <= 0 for p in engine.state.players):
 				victory_method = "hp_zero"
 			elif any(p.cumulative_earned_points >= 30000 for p in engine.state.players):
 				victory_method = "cumulative_earned_points"

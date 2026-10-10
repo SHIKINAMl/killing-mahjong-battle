@@ -1,0 +1,131 @@
+{
+  "easy": {
+    "brain": "easy",
+    "think_time": {
+      "hand_selection": [2.0, 4.0],
+      "skill": [0.8, 1.5],
+      "bet": [1.0, 2.0],
+      "discard": [0.8, 2.0],
+      "agari": [0.3, 0.6],
+      "next_round": [0.5, 1.0]
+    },
+    "perks": {
+      "initial_perspective_count": 0,
+      "opening_boost_count": 1,
+      "boost_hand_targets": 1,
+      "skill_cost_rate": 1.0
+    },
+    "hand_selection": {
+      "candidate_limit": 30,
+      "search_time_limit": 1.0,
+      "weight_han_multiplier": 1.0,
+      "weight_wait_count": 1.0,
+      "penalty_wait_in_own_wall": 0.5,
+      "bonus_wait_seen_in_opponent_wall": 0.0,
+      "strong_hand_score": 8.0
+    },
+    "skill": {
+      "min_health_after_use": 8000,
+      "mulligan": {"enabled": true, "max_strength": 0.4, "max_uses_per_round": 1, "value_per_wait_tile": 0},
+      "perspective": {"enabled": true, "min_health": 25000, "max_uses_per_round": 1, "value": 0},
+      "assault": {"enabled": true, "min_han": 8, "kill_ratio": 0},
+      "boost_hand": {"enabled": true, "min_health": 30000, "min_gain_ratio": 0}
+    },
+    "bet": {
+      "min_multiplier_to_raise": 1.0,
+      "steps": [
+        {"min_strength": 0.0, "bet_ratio": 0.0},
+        {"min_strength": 0.6, "bet_ratio": 0.2},
+        {"min_strength": 0.85, "bet_ratio": 0.4}
+      ],
+      "health_lead_factor": 0.0
+    },
+    "discard": {
+      "weight_genbutsu": 100,
+      "weight_own_wait": -50,
+      "weight_danger": -10,
+      "danger_honor": 0.3,
+      "danger_terminal": 0.6,
+      "danger_2_8": 0.8,
+      "danger_middle": 1.0,
+      "suji_factor": 0.5,
+      "weight_exposed_neighbor": 0.0
+    }
+  },
+  "normal": {
+    "brain": "normal",
+    "think_time": {
+      "hand_selection": [1.5, 3.0],
+      "skill": [0.6, 1.2],
+      "bet": [0.8, 1.5],
+      "discard": [0.6, 1.5],
+      "agari": [0.3, 0.6],
+      "next_round": [0.5, 1.0]
+    },
+    "perks": {
+      "initial_perspective_count": 0,
+      "opening_boost_count": 1,
+      "boost_hand_targets": 1,
+      "skill_cost_rate": 1.0
+    },
+    "hand_selection": {
+      "candidate_limit": 40,
+      "search_time_limit": 1.0,
+      "weight_han_multiplier": 1.0,
+      "weight_wait_count": 1.0,
+      "penalty_wait_in_own_wall": 0.5,
+      "bonus_wait_seen_in_opponent_wall": 0.3,
+      "strong_hand_score": 8.0
+    },
+    "skill": {
+      "min_health_after_use": 6000,
+      "mulligan": {"enabled": true, "max_strength": 0.5, "max_uses_per_round": 2, "value_per_wait_tile": 800},
+      "perspective": {"enabled": true, "min_health": 0, "max_uses_per_round": 1, "value": 1000},
+      "assault": {"enabled": true, "min_han": 99, "kill_ratio": 1.0},
+      "boost_hand": {"enabled": true, "min_health": 30000, "min_gain_ratio": 0.5}
+    },
+    "bet": {
+      "min_multiplier_to_raise": 1.0,
+      "steps": [
+        {"min_strength": 0.0, "bet_ratio": 0.0},
+        {"min_strength": 0.5, "bet_ratio": 0.15},
+        {"min_strength": 0.8, "bet_ratio": 0.4},
+        {"min_strength": 0.95, "bet_ratio": 0.7}
+      ],
+      "health_lead_factor": 0.1
+    },
+    "discard": {
+      "weight_genbutsu": 100,
+      "weight_own_wait": -50,
+      "weight_danger": -10,
+      "danger_honor": 0.3,
+      "danger_terminal": 0.6,
+      "danger_2_8": 0.8,
+      "danger_middle": 1.0,
+      "suji_factor": 0.5,
+      "weight_exposed_neighbor": 1.5
+    }
+  },
+  "hard": {
+    "extends": "normal",
+    "brain": "model",
+    "model_path": "",
+    "think_time": {
+      "hand_selection": [1.0, 2.0],
+      "skill": [0.4, 0.8],
+      "bet": [0.5, 1.0],
+      "discard": [0.5, 1.0],
+      "agari": [0.3, 0.6],
+      "next_round": [0.5, 1.0]
+    }
+  },
+  "special": {
+    "extends": "normal",
+    "perks": {
+      "initial_perspective_count": 7,
+      "opening_boost_count": 3,
+      "boost_hand_targets": 2,
+      "skill_cost_rate": 0.6
+    }
+  }
+}
