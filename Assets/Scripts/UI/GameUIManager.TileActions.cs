@@ -72,15 +72,32 @@ namespace KillingMahjong.UI
             {
                 StartCoroutine(VisualController.PlayTransitionAnimationRoutine(() =>
                 {
-                    BoardStateManager.Instance.MoveTileToHand(tileId);
+                    MoveTileToHandByPlayer(tileId);
                     ClearSelection();
                 }));
             }
             else
             {
-                BoardStateManager.Instance.MoveTileToHand(tileId);
+                MoveTileToHandByPlayer(tileId);
                 ClearSelection();
             }
+        }
+
+        /// <summary>
+        /// プレイヤーがクリックした牌を手牌へ入れる。
+        /// **これが13枚目なら、役名表示（満貫など）を出してよい印を立てる**（2026-10-11）。
+        /// 役名表示は「自分の手で13枚目を入れたとき」だけ出す。おまかせ・選びなおし・スキルは
+        /// ここを通らないので出ない（<see cref="GameUIHandSelectionController.ArmInstantRankCall"/>）。
+        /// 印は盤面を動かす前に立てる。動かした瞬間に手牌の並べ直しが走り、そこで印を見るため。
+        /// </summary>
+        private void MoveTileToHandByPlayer(int tileId)
+        {
+            var board = BoardStateManager.Instance;
+            bool completesHand = board.CurrentHandTiles != null && board.CurrentHandTiles.Count == 12;
+            if (completesHand && HandSelectionController != null) HandSelectionController.ArmInstantRankCall();
+
+            bool moved = board.MoveTileToHand(tileId);
+            if (!moved && completesHand && HandSelectionController != null) HandSelectionController.DisarmInstantRankCall();
         }
 
         public void MoveTileToWall(int tileId)

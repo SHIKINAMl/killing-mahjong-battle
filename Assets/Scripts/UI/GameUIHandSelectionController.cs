@@ -27,6 +27,33 @@ namespace KillingMahjong.UI
         private HandRankCallUI _rankCallUI;
 
         /// <summary>
+        /// 役名表示を出してよいか。**自分の手で13枚目を入れたときだけ立つ**（2026-10-11 のユーザー指示）。
+        ///
+        /// それまでは「手牌が13枚で、まだ問い合わせていない並び」なら毎回出していた。
+        /// 手牌の並べ直し（HandUI.UpdateLayout）は牌を入れたとき以外にも通るので、
+        /// 選びなおしで手牌が戻ってきたときや、スキルを使ったあとにも役名が出ていた。
+        ///
+        /// 立てるのは <see cref="ArmInstantRankCall"/>（牌をクリックして手牌へ入れる経路だけが呼ぶ）。
+        /// 「おまかせ」・選びなおし・スキル・サーバーからの組み直しは呼ばないので、出ない。
+        /// 問い合わせを送ったら降ろす。13枚でなくなったとき・確定したときも降ろす。
+        /// </summary>
+        private bool _rankCallArmed;
+
+        /// <summary>
+        /// 自分の手で13枚目を入れる直前に呼ぶ。次の並べ直しで、役名の問い合わせを1回だけ通す。
+        /// </summary>
+        public void ArmInstantRankCall()
+        {
+            _rankCallArmed = true;
+        }
+
+        /// <summary>入れようとした牌が入らなかったときに呼ぶ。</summary>
+        public void DisarmInstantRankCall()
+        {
+            _rankCallArmed = false;
+        }
+
+        /// <summary>
         /// もう取り下げられないか。**相手を待っている間は取り下げてよい**（`select_cancel` は
         /// そのためにある）。手遅れになるのは相手も確定して掛け金フェイズへ移る直前だけ。
         /// 判定は `phase_completed_notice` で両者の確定を知る PhaseController に持たせている。
@@ -110,6 +137,7 @@ namespace KillingMahjong.UI
             if (!CanShowInstantRankCall())
             {
                 _hasRankResult = false;
+                _rankCallArmed = false;
                 // **手牌選択を抜けたら片付ける。** 13枚を割っただけなら消さない（自分の2秒で消える）が、
                 // フェイズが変わったら役名は用済み。残すと決着画面まで出続ける（2026-09-20）
                 if (uiManager != null && uiManager.CurrentPhaseStatus != RoundStatus.HandSelection
@@ -130,6 +158,11 @@ namespace KillingMahjong.UI
             }
 
             if (_hasRankResult && SameHandIndexes(currentIndexes, _rankResultIndexes)) return;
+
+            // **自分の手で13枚目を入れたときだけ問い合わせる。**
+            // 選びなおしで戻ってきた13枚や、スキルのあとの13枚では出さない
+            if (!_rankCallArmed) return;
+            _rankCallArmed = false;
 
             _rankRequestIndexes = new List<int>(currentIndexes);
             _rankRequestInFlight = true;
@@ -256,6 +289,7 @@ namespace KillingMahjong.UI
                 _rankRequestInFlight = false;
             }
             _hasRankResult = false;
+            _rankCallArmed = false;
             if (_rankCallUI != null) _rankCallUI.HideImmediate();
         }
 
