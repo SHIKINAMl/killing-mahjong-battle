@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Optional
 
 from ..engine.game_engine import GameEngine
-from ..engine.game_state import RoundStatus, SkillType
+from ..engine.game_state import SkillType
 
 # CPU が使うスキル（特殊勝利は使わない）
 CPU_SKILLS = (SkillType.MULLIGAN, SkillType.PERSPECTIVE, SkillType.BOOST_HAND, SkillType.ASSAULT)
@@ -41,7 +41,6 @@ class MyView:
     client_id: str
     wall: tuple[int, ...]
     hand: tuple[int, ...]  # 手牌確定前はサーバーの聴牌例（wall index）
-    hand_confirmed: bool
     waits: tuple[int, ...]  # 牌種（下位5ビット）
     discarded_wall_indexes: frozenset[int]
     health: int
@@ -78,9 +77,6 @@ class CpuObservation:
     dora_id: Optional[int]
     me: MyView
     opponent: OpponentView
-    my_turn: bool
-    pending_agari_for_me: bool
-    pending_agari_tile: Optional[int]  # 自分がロンできる牌（相手の捨て牌）
     i_am_first_player: bool  # 打牌フェーズの先手か（discard_phase_started で公開される）
     my_discard_count: int
     my_skills_this_round: dict[str, int]
@@ -96,18 +92,11 @@ def build_observation(engine: GameEngine, client_id: str, public: PublicInfo) ->
     status = round_state.status
 
     max_bet, bet_unit = engine.get_bet_rule(me)
-    pending = engine.get_pending_agari()
-    my_turn = (
-        status == RoundStatus.DISCARD
-        and pending is None
-        and engine.get_current_player().player_id == client_id
-    )
 
     my_view = MyView(
         client_id=client_id,
         wall=tuple(me.wall),
         hand=tuple(me.hand),
-        hand_confirmed=bool(me.waits) or status not in (RoundStatus.DEALING, RoundStatus.HAND_SELECTION),
         waits=tuple(w & 0b11111 for w in me.waits),
         discarded_wall_indexes=frozenset(me.discarded_wall_indexes),
         health=me.health,
@@ -142,9 +131,6 @@ def build_observation(engine: GameEngine, client_id: str, public: PublicInfo) ->
         dora_id=round_state.dora_id,
         me=my_view,
         opponent=opponent_view,
-        my_turn=my_turn,
-        pending_agari_for_me=bool(pending and pending.get("winner_id") == client_id),
-        pending_agari_tile=pending.get("winning_tile") if pending and pending.get("winner_id") == client_id else None,
         i_am_first_player=engine.state.players[round_state.first_player_index].player_id == client_id,
         my_discard_count=len(me.discards),
         my_skills_this_round=dict(public.my_skills_this_round),

@@ -8,14 +8,9 @@
 
 実行: python -m pytest tests -q
 """
-import sys
-from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
-
-from mahjong_engine.engine.game_engine import GameEngine  # noqa: E402
-from mahjong_engine.engine.game_state import RoundStatus  # noqa: E402
+from mahjong_engine.engine.game_engine import GameEngine
+from mahjong_engine.engine.game_state import RoundStatus
 
 DORA_NONE = 28  # 西。手牌に西を入れなければドラは乗らない
 

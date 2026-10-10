@@ -463,6 +463,9 @@ class WebSocketGameServer:
 			await self._send_to_client(client_id, {"type": "error", "message": f"Unsupported difficulty: {difficulty}"})
 			return
 
+		# 設定ファイルはここで読み直す（書き換えは次のマッチから反映される）。全員が待つロックの外で読む
+		profile = create_cpu_profile(difficulty)
+
 		match: Optional[MatchSession] = None
 		async with self._lock:
 			if client_id in self._active_match_by_client:
@@ -478,8 +481,6 @@ class WebSocketGameServer:
 				await self._send_to_client(client_id, {"type": "error", "message": "Client not connected"})
 				return
 
-			# 設定ファイルはここで読み直す（書き換えは次のマッチから反映される）
-			profile = create_cpu_profile(difficulty)
 			match = self._create_match_locked([client_id])
 			# CPU の client_id はマッチ番号から作る。マッチ番号は同時に重ならないので CPU も重ならない
 			cpu_id = f"CPU{match.match_id[1:]}"

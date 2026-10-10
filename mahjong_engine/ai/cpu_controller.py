@@ -14,6 +14,7 @@ import asyncio
 import logging
 import random
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, Awaitable, Callable, Optional
 
 from ..engine.game_state import RoundStatus
@@ -25,6 +26,10 @@ if TYPE_CHECKING:
     from ..communication.game_session import GameSession
 
 logger = logging.getLogger(__name__)
+
+# 手牌の候補探索（重い）を動かすスレッド。全マッチで共有し、同時に走る探索の数を抑える
+# （512 MB のサーバーで、CPU 戦が重なってもスレッドとメモリが増えすぎないように）
+_SEARCH_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="cpu-search")
 
 
 class CpuController:
@@ -230,8 +235,8 @@ class CpuController:
             index = fallback_discard(obs) if use_fallback else self._brain.choose_discard(obs)
             await self._send_action("discard", {"wall_index": index})
         elif category == "agari":
-            # 満貫未満のロンを受けると対局が止まるので、打ち直しでも同じ判定を使う
-            await self._send_action("agari", {"accept": self._brain.should_accept_agari(obs)})
+            # エンジンは満貫以上で和了れるときだけロン確認を出すので、必ず受ける
+            await self._send_action("agari", {"accept": True})
         elif category == "next_round":
             await self._send_action("next_round", {})
 
@@ -241,13 +246,13 @@ class CpuController:
             return
 
         # 聴牌形の探索は重いので、イベントループを止めないよう別スレッドで行う
-        plan = await asyncio.to_thread(self._brain.plan_hand, obs)
+        loop = asyncio.get_running_loop()
+        plan = await loop.run_in_executor(_SEARCH_EXECUTOR, self._brain.plan_hand, obs)
 
         for _ in range(self.MAX_SKILL_STEPS):
-            action = self._brain.next_skill(obs, plan)
-            if action is None:
+            data = self._brain.next_skill(obs, plan)
+            if data is None:
                 break
-            data = action["data"]
             skill = data["skill_type"]
             # 弾かれても同じスキルを繰り返さないよう、送る前に数える
             self._public.my_skills_this_round[skill] = self._public.my_skills_this_round.get(skill, 0) + 1
@@ -259,9 +264,9 @@ class CpuController:
 
             accepted = await self._send_action("skill", data)
             obs = self._observe()
-            if accepted and skill != "assault":
+            if accepted:
                 # 交換で山が、透視で見える牌が、役強化で翻数が変わるので、手牌を選び直す
-                plan = await asyncio.to_thread(self._brain.plan_hand, obs)
+                plan = await loop.run_in_executor(_SEARCH_EXECUTOR, self._brain.replan, obs, plan, skill)
 
         self._plan = plan
         hand_indexes = list(plan.hand_indexes) if plan is not None else fallback_hand_indexes(obs)

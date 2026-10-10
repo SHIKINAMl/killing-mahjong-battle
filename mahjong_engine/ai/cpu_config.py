@@ -325,9 +325,9 @@ def config_path() -> Path:
     return Path(override) if override else DEFAULT_CONFIG_PATH
 
 
-def load_cpu_config() -> dict[str, dict]:
+def _load_resolved() -> dict[str, dict]:
     """
-    設定ファイルを読み直して、難易度ごとの設定を返す。
+    設定ファイルを読み直して、難易度ごとの設定を返す（呼び出し側で書き換えないこと）。
 
     読み込みに失敗したときは直前に正しく読めた設定を返す（まだ一度も読めていなければ同梱の既定値）。
     """
@@ -338,14 +338,16 @@ def load_cpu_config() -> dict[str, dict]:
             raw = json.loads(path.read_text(encoding="utf-8"))
             if not isinstance(raw, dict):
                 raise ValueError("最上位は辞書が必要です")
-            resolved = _with_model_path(_resolve(raw, _BUILTIN_RESOLVED))
+            _last_good = _with_model_path(_resolve(raw, _BUILTIN_RESOLVED))
         except (OSError, ValueError) as exc:
             # json.JSONDecodeError は ValueError の一種
-            fallback = _last_good if _last_good is not None else _BUILTIN_RESOLVED
             logger.warning("CPU 設定を読めなかったため、直前の設定を使います: path=%s error=%s", path, exc)
-            return copy.deepcopy(fallback)
-        _last_good = resolved
-        return copy.deepcopy(resolved)
+        return _last_good if _last_good is not None else _BUILTIN_RESOLVED
+
+
+def load_cpu_config() -> dict[str, dict]:
+    """設定ファイルを読み直して、難易度ごとの設定を返す（書き換えてよいコピー）。"""
+    return copy.deepcopy(_load_resolved())
 
 
 @dataclass(frozen=True)
@@ -371,4 +373,4 @@ def create_cpu_profile(difficulty: str) -> CpuProfile:
     """難易度から CPU 席の設定を作る。設定ファイルはここで読み直す。"""
     if difficulty not in DIFFICULTIES:
         raise ValueError(f"Unsupported difficulty: {difficulty}")
-    return CpuProfile(difficulty=difficulty, config=load_cpu_config()[difficulty])
+    return CpuProfile(difficulty=difficulty, config=copy.deepcopy(_load_resolved()[difficulty]))

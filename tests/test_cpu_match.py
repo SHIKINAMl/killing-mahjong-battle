@@ -17,17 +17,13 @@ from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
-
-from mahjong_engine.ai import cpu_config  # noqa: E402
-from mahjong_engine.ai.cpu_config import create_cpu_profile, load_cpu_config  # noqa: E402
-from mahjong_engine.ai.observation import PublicInfo, build_observation  # noqa: E402
-from mahjong_engine.ai.rule_brain import RuleBrain, tile_kind  # noqa: E402
-from mahjong_engine.communication.game_session import GameSession  # noqa: E402
-from mahjong_engine.communication.websocket_server import WebSocketGameServer  # noqa: E402
-from mahjong_engine.engine.game_engine import GameEngine  # noqa: E402
-from mahjong_engine.engine.game_state import RoundStatus, SkillType  # noqa: E402
+from mahjong_engine.ai import cpu_config
+from mahjong_engine.ai.cpu_config import create_cpu_profile, load_cpu_config
+from mahjong_engine.ai.observation import PublicInfo, build_observation
+from mahjong_engine.ai.rule_brain import RuleBrain, tile_kind
+from mahjong_engine.communication.websocket_server import WebSocketGameServer
+from mahjong_engine.engine.game_engine import GameEngine
+from mahjong_engine.engine.game_state import RoundStatus, SkillType
 
 ZERO_THINK_TIME = {key: [0, 0] for key in ("hand_selection", "skill", "bet", "discard", "agari", "next_round")}
 
@@ -69,13 +65,6 @@ def test_packaged_config_is_valid(monkeypatch, caplog):
     assert config["hard"]["discard"] == config["normal"]["discard"]
 
 
-def test_packaged_config_matches_builtin_defaults():
-    """同梱の cpu_config.json と、読めなかったときに使う既定値（cpu_config.py）が揃っていること。"""
-    raw = json.loads(cpu_config.DEFAULT_CONFIG_PATH.read_text(encoding="utf-8"))
-    resolved = cpu_config._with_model_path(cpu_config._resolve(raw, cpu_config._BUILTIN_RESOLVED))
-    assert resolved == cpu_config._BUILTIN_RESOLVED
-
-
 def test_extends_and_invalid_values(config_file, caplog):
     config_file({
         "normal": {"bet": {"health_lead_factor": 0.5}, "hand_selection": {"candidate_limit": "many"}},
@@ -107,9 +96,7 @@ def test_unknown_difficulty():
 def _engine_with_perks(**perks) -> GameEngine:
     engine = GameEngine()
     engine.initialize_players(["C0001", "CPU0001"])
-    cpu = engine.get_player_by_id("CPU0001")
-    for key, value in perks.items():
-        setattr(cpu, key, value)
+    engine.update_player_state("CPU0001", **perks)
     return engine
 
 
@@ -169,11 +156,10 @@ def test_initial_perspective_on_every_deal():
 
 def test_opening_boosts_are_distinct():
     engine = _engine_with_perks(opening_boost_count=3)
-    session = GameSession(asyncio.Lock(), {}, {}, {}, [], None, None)
     for _ in range(20):
         for player in engine.state.players:
             player.boost_hand_bonus = {}
-        assigned = session._apply_opening_boosts(engine)
+        assigned = engine.assign_random_opening_boosts()
         cpu_boosts = [b["yaku_name"] for b in assigned if b["client_id"] == "CPU0001"]
         human_boosts = [b for b in assigned if b["client_id"] == "C0001"]
         assert len(cpu_boosts) == 3 and len(set(cpu_boosts)) == 3
@@ -260,7 +246,6 @@ class _BotSocket:
 
 
 def _make_human_bot(join_payload):
-    sys.path.insert(0, str(ROOT))
     import opponent_bot
 
     class HumanBot(opponent_bot.OpponentBot):

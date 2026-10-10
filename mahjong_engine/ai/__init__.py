@@ -1,6 +1,3 @@
 """
-AI・学習モジュール
+CPU 対戦の考え方（cpu_controller / observation / rule_brain / cpu_config）
 """
-from .ai_player import AIPlayer
-
-__all__ = ['AIPlayer']

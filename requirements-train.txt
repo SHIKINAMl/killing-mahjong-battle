@@ -1,0 +1,3 @@
+# つよい（強化学習）の学習用の依存。本番のサーバー（requirements.txt）には入れない
+-r requirements.txt
+numpy>=1.26

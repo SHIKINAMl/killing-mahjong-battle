@@ -130,3 +130,6 @@ test.py
 /intro_page/
 /bot*.txt
 /bot_supervisor.pid
+
+# つよい の学習用に生成した配牌・学習の出力（大きいのでコミットしない）
+/training/data/

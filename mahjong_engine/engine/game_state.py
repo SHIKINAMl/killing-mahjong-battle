@@ -95,8 +95,6 @@ def apply_skill_cost_rate(cost: int, rate: float) -> int:
     Returns:
         倍率を掛けたあとのコスト
     """
-    if rate == 1.0:
-        return cost
     return int(round(cost * rate))
 
 

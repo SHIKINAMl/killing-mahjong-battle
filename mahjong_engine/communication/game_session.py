@@ -1,7 +1,6 @@
 import asyncio
 import heapq
 import logging
-import random
 import time
 import traceback
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Set
@@ -270,27 +269,6 @@ class GameSession:
 		confirmed = self._confirmed_hand_players_by_match.get(match_id, set())
 		return len(confirmed) >= engine.num_players
 
-	def _apply_opening_boosts(self, engine: GameEngine) -> List[Dict[str, Any]]:
-		"""ゲーム開始時に各プレイヤーへ恒常強化を付与する（通常は1つ。特典を持つ CPU は重複なしで複数）。"""
-		candidates = GameEngine.get_opening_boost_candidates()
-		if not candidates:
-			return []
-
-		assigned: List[Dict[str, Any]] = []
-		for player in engine.state.players:
-			for yaku_name in random.sample(candidates, min(player.opening_boost_count, len(candidates))):
-				if not engine.assign_opening_boost(player, yaku_name, bonus_han=1):
-					continue
-				assigned.append(
-					{
-						"client_id": player.player_id,
-						"yaku_name": yaku_name,
-						"bonus_han": 1,
-					}
-				)
-
-		return assigned
-
 	async def start_match(self, match: Any) -> None:
 		try:
 			await self._start_match_inner(match)
@@ -301,18 +279,12 @@ class GameSession:
 	async def _start_match_inner(self, match: Any) -> None:
 		engine = GameEngine(max_rounds=4)
 		engine.initialize_players(match.players)
-		cpu_profiles = getattr(match, "cpu_profiles", {}) or {}
-		for player in engine.state.players:
-			profile = cpu_profiles.get(player.player_id)
-			if profile is None:
-				continue
-			perks = profile.perks
-			player.skill_cost_rate = perks["skill_cost_rate"]
-			player.boost_hand_targets = perks["boost_hand_targets"]
-			player.opening_boost_count = perks["opening_boost_count"]
-			player.initial_perspective_count = perks["initial_perspective_count"]
+		cpu_profiles = match.cpu_profiles
+		for cpu_id, profile in cpu_profiles.items():
+			# 特典の項目名は PlayerState のフィールド名と同じ
+			engine.update_player_state(cpu_id, **profile.perks)
 			# game_started より前に登録しておく。開始前に人間が切断しても cleanup_match_locked で片付く
-			self._cpu_controllers[player.player_id] = CpuController(self, match.match_id, player.player_id, profile)
+			self._cpu_controllers[cpu_id] = CpuController(self, match.match_id, cpu_id, profile)
 		original_deal_tiles = engine._deal_tiles
 		round_start_done = asyncio.Event()
 		dealing_phase_done = asyncio.Event()
@@ -374,7 +346,7 @@ class GameSession:
 			"type": "game_started",
 			"data": {
 				"match_id": match.match_id,
-				"mode": getattr(match, "mode", "public"),
+				"mode": match.mode,
 				"players": [
 					{
 						"client_id": cid,
@@ -402,7 +374,7 @@ class GameSession:
 			self._last_activity_by_match[match.match_id] = time.monotonic()
 		logger.info("マッチ開始: match_id=%s  players=%s", match.match_id, match.players)
 
-		opening_boosts = self._apply_opening_boosts(engine)
+		opening_boosts = engine.assign_random_opening_boosts()
 		if opening_boosts:
 			await self._broadcast_match_members(
 				match.match_id,
@@ -467,7 +439,7 @@ class GameSession:
 				client_id, action_type, tb)
 			await self._send_error(client_id, f"Internal error while processing '{action_type}'")
 
-		# CPU 宛ての通知がないまま状態が変わることがある（例: 人間のロンが不成立で、手番が CPU に残る）。
+		# CPU は通知を受け取ったときに動く。CPU 宛ての通知がないまま状態が変わっても止まらないよう、
 		# 人間が何かしたら、同じマッチの CPU にやるべきことがないか確かめさせる
 		for cpu in list(self._cpu_controllers.values()):
 			if cpu.match_id == match_id and cpu.client_id != client_id:
@@ -590,7 +562,7 @@ class GameSession:
 			await self._send_error(client_id, "Player not found")
 			return
 
-		cost = await self._execute_skill(engine, player, skill_type, action_data)
+		cost = engine.execute_skill(player, skill_type, action_data)
 
 		if cost is None:
 			try:
@@ -610,50 +582,6 @@ class GameSession:
 				"currentHealth": player.health,
 			},
 		})
-
-	async def _execute_skill(self, engine: GameEngine, user: PlayerState, skill_type: SkillType, action_data: Dict[str, Any]) -> Optional[int]:
-		"""
-		スキルを実行（種別ごとの入力検証 + engine 呼び出し）
-
-		Returns:
-			HP コスト。失敗時は None
-		"""
-		if skill_type == SkillType.BOOST_HAND:
-			# 複数の役を同時に強化する（件数と役名の検証はエンジンで行う）
-			yaku_names = action_data.get("yaku_names")
-			if yaku_names is not None:
-				if not isinstance(yaku_names, list):
-					return None
-				return engine.use_skill(user, skill_type, yaku_names=yaku_names)
-
-			# 対象役名を検証
-			yaku_name = action_data.get("yaku_name")
-			normalized_yaku_name = GameEngine.normalize_boost_target_yaku_name(yaku_name)
-			if normalized_yaku_name is None:
-				return None
-			return engine.use_skill(user, skill_type, normalized_yaku_name)
-
-		elif skill_type == SkillType.SPECIAL_VICTORY:
-			return engine.use_skill(user, skill_type)
-
-		elif skill_type == SkillType.ASSAULT:
-			return engine.use_skill(user, skill_type)
-
-		elif skill_type == SkillType.PERSPECTIVE:
-			# 相手を取得
-			target = next((p for p in engine.state.players if p.player_id != user.player_id), None)
-			if target is None:
-				return None
-			return engine.use_skill_on_opponent(user, target, skill_type)
-
-		elif skill_type == SkillType.MULLIGAN:
-			# 交換対象インデックスを検証
-			target_index = action_data.get("target_hand_index")
-			if not isinstance(target_index, int) or target_index < 0 or target_index >= len(user.wall):
-				return None
-			return engine.use_mulligan(user, target_index)
-
-		return None
 
 	async def _select(self, engine: GameEngine, client_id: str, action_data: Dict[str, Any]) -> None:
 		"""手牌選択アクションの処理"""

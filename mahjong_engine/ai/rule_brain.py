@@ -3,23 +3,25 @@
 
 規則ごとに点数を付け、点数の高い行動を選ぶ。重み・しきい値はすべて cpu_config.json から受け取る。
 入力は CpuObservation（視界）だけで、エンジンの状態は読まない。
-出力は人間のクライアントと同じ action JSON。
+出力は人間のクライアントと同じ action の data。
 """
 import itertools
 import random
 import time
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from ..engine.game_engine import GameEngine
+from ..engine.game_engine import GameEngine, tiles_to_wall_indexes
 from ..engine.hand_analyzer import HandAnalyzer
-from ..engine.yaku import Yaku
+from ..engine.game_state import SkillType
 from .observation import CpuObservation
 
 HONOR_START = 27  # 牌種 27 以降は字牌（東・西）
 HAND_SIZE = 13
 OPPONENT_HAND_SIZE = 13
+# 相手が手牌に持つ牌と、待ちの牌種との近さ（同じ牌種 / 1 つ隣 / 2 つ隣）
+CLOSENESS_BY_DISTANCE = (1.0, 0.6, 0.3)
 
 
 def tile_kind(tile: int) -> int:
@@ -35,7 +37,7 @@ def _clamp(value: float, low: float, high: float) -> float:
 class WaitInfo:
     kind: int
     han: int
-    multiplier: float  # 満貫未満なら 0（ロンしても精算されない）
+    multiplier: float  # 満貫未満なら 0（和了れない）
     yaku: tuple[str, ...]
     available: float  # 和了れそうな枚数の見積もり
 
@@ -46,6 +48,8 @@ class HandPlan:
     waits: tuple[WaitInfo, ...]
     score: float
     strength: float  # 0〜1。掛け金やスキルの判断に使う
+    # この案を選んだときに比べた候補。山が変わらない限り、選び直しは探し直さずに採点し直すだけで済む
+    candidates: tuple[tuple[int, ...], ...] = field(default=(), compare=False)
 
     @property
     def best_han(self) -> int:
@@ -63,21 +67,6 @@ class HandPlan:
         if total <= 0:
             return max((w.multiplier for w in winning), default=0.0)
         return sum(w.multiplier * w.available for w in winning) / total
-
-
-def tiles_to_wall_indexes(wall: list[int], tiles: list[int]) -> Optional[tuple[int, ...]]:
-    """牌ID の並びを wall index へ変換する。ドラ・赤ドラを取り違えないよう、同一の牌を優先する。"""
-    used = [False] * len(wall)
-    indexes: list[int] = []
-    for tile in tiles:
-        found = next((i for i, t in enumerate(wall) if not used[i] and t == tile), None)
-        if found is None:
-            found = next((i for i, t in enumerate(wall) if not used[i] and tile_kind(t) == tile_kind(tile)), None)
-        if found is None:
-            return None
-        used[found] = True
-        indexes.append(found)
-    return tuple(sorted(indexes))
 
 
 def possibly_held_exposed_kinds(obs: CpuObservation) -> Counter:
@@ -104,6 +93,26 @@ def rest_indexes(obs: CpuObservation, hand_indexes: tuple[int, ...]) -> list[int
     ]
 
 
+def mulligan_targets(obs: CpuObservation, plan: "HandPlan") -> list[int]:
+    """マリガンで交換する候補: 手牌以外にある自分の待ち牌（山から出ない上に、捨てればフリテンになる）。"""
+    return [i for i in rest_indexes(obs, plan.hand_indexes) if tile_kind(obs.me.wall[i]) in plan.wait_kinds]
+
+
+def boostable_yaku(plan: "HandPlan") -> list[str]:
+    """役強化で強化できる、この手牌で和了れる待ちの役。"""
+    return sorted({
+        name
+        for wait in plan.waits if wait.multiplier > 0
+        for name in wait.yaku
+        if GameEngine.normalize_boost_target_yaku_name(name) is not None
+    })
+
+
+def replan_needs_search(skill: str) -> bool:
+    """スキルの後、手牌の候補を探し直す必要があるか（山が変わるのはマリガンだけ）。"""
+    return skill == SkillType.MULLIGAN.value
+
+
 # ========== 安全な手（考え方が失敗したときに必ず通る行動） ==========
 
 def fallback_hand_indexes(obs: CpuObservation) -> list[int]:
@@ -123,6 +132,15 @@ def fallback_discard(obs: CpuObservation) -> int:
     return candidates[0]
 
 
+@dataclass(frozen=True)
+class _HandContext:
+    """手牌の候補によらない、視界から決まる値（候補ごとに数え直さないため）。"""
+    wall: list[int]
+    own_counts: Counter
+    opponent_discards: Counter
+    held_exposed: Counter
+
+
 class RuleBrain:
     """よわい（level="easy"）／ふつう（level="normal"）の考え方。"""
 
@@ -134,6 +152,16 @@ class RuleBrain:
         self.rng = rng or random.Random()
 
     # ========== 手牌選択 ==========
+
+    @staticmethod
+    def _context(obs: CpuObservation) -> _HandContext:
+        wall = list(obs.me.wall)
+        return _HandContext(
+            wall=wall,
+            own_counts=Counter(tile_kind(t) for t in wall),
+            opponent_discards=Counter(tile_kind(t) for t in obs.opponent.discards),
+            held_exposed=possibly_held_exposed_kinds(obs),
+        )
 
     def plan_hand(self, obs: CpuObservation) -> Optional[HandPlan]:
         """
@@ -153,74 +181,109 @@ class RuleBrain:
         )
         for tiles in found:
             indexes = tiles_to_wall_indexes(wall, tiles)
-            if indexes is not None and indexes not in candidates:
-                candidates.append(indexes)
+            if indexes is not None and tuple(sorted(indexes)) not in candidates:
+                candidates.append(tuple(sorted(indexes)))
+        return self._best_of(obs, tuple(candidates))
 
+    def replan(self, obs: CpuObservation, plan: Optional[HandPlan], skill: str) -> Optional[HandPlan]:
+        """
+        スキルを使った後に手牌を選び直す。
+
+        山が変わるマリガンの後だけ探し直す。透視（見える牌）・役強化（翻数）の後は、
+        前の候補を採点し直すだけで足りる。強襲は手牌の評価に関係しない。
+        """
+        if plan is None or replan_needs_search(skill):
+            return self.plan_hand(obs)
+        if skill == SkillType.ASSAULT.value:
+            return plan
+        return self._best_of(obs, plan.candidates)
+
+    def _best_of(self, obs: CpuObservation, candidates: tuple[tuple[int, ...], ...]) -> Optional[HandPlan]:
+        ctx = self._context(obs)
         best: Optional[HandPlan] = None
         for indexes in candidates:
-            plan = self.evaluate_hand(obs, indexes)
+            plan = self.evaluate_hand(obs, indexes, ctx=ctx)
             if plan is not None and (best is None or plan.score > best.score):
                 best = plan
-        return best
+        if best is None:
+            return None
+        return HandPlan(best.hand_indexes, best.waits, best.score, best.strength, candidates)
 
     def evaluate_hand(
         self,
         obs: CpuObservation,
         hand_indexes: tuple[int, ...],
-        extra_boosts: Optional[dict[str, int]] = None,
+        ctx: Optional[_HandContext] = None,
     ) -> Optional[HandPlan]:
         """手牌に点数を付ける。聴牌でない・満貫の待ちがない場合は None。"""
         cfg = self.config["hand_selection"]
-        wall = list(obs.me.wall)
-        hand_tiles = [wall[i] for i in hand_indexes]
-        if not HandAnalyzer.is_tenpai(hand_tiles, wall):
+        ctx = ctx or self._context(obs)
+        hand_tiles = [ctx.wall[i] for i in hand_indexes]
+        scored = GameEngine.evaluate_waits(hand_tiles, ctx.wall, obs.dora_id, obs.me.boost_hand_bonus)
+        if scored is None:
             return None
 
-        boosts = Counter(obs.me.boost_hand_bonus)
-        if extra_boosts:
-            boosts.update(extra_boosts)
-
-        own_counts = Counter(tile_kind(t) for t in wall)
-        opponent_discards = Counter(tile_kind(t) for t in obs.opponent.discards)
-        held_exposed = possibly_held_exposed_kinds(obs)
-        rest_counts = Counter(tile_kind(wall[i]) for i in rest_indexes(obs, hand_indexes))
-
+        rest_counts = Counter(tile_kind(ctx.wall[i]) for i in rest_indexes(obs, hand_indexes))
         waits: list[WaitInfo] = []
-        score = 0.0
-        for kind in HandAnalyzer.get_tenpai_waiting_tiles(hand_tiles, wall):
-            # GameEngine.get_waits と同じく、ドラの待ちはドラの牌IDで役を数える
-            winning_tile = kind + 32 if kind == obs.dora_id else kind
-            yaku = HandAnalyzer.enum_yaku(hand_tiles + [winning_tile], winning_tile=winning_tile)
-            han = sum(Yaku.get_han_by_name(name) for name in yaku) + sum(boosts.get(name, 0) for name in yaku)
-            multiplier = obs.multiplier_for_han(han) if han >= 4 else 0.0
-
-            live = max(0, 4 - own_counts[kind] - opponent_discards[kind])
+        for winning_tile, yaku, han in scored:
+            kind = tile_kind(winning_tile)
+            live = max(0, 4 - ctx.own_counts[kind] - ctx.opponent_discards[kind])
             available = max(
                 0.0,
                 live
-                + cfg["bonus_wait_seen_in_opponent_wall"] * held_exposed[kind]
+                + cfg["bonus_wait_seen_in_opponent_wall"] * ctx.held_exposed[kind]
                 - cfg["penalty_wait_in_own_wall"] * rest_counts[kind],
             )
-            if multiplier > 0:
-                score += (multiplier ** cfg["weight_han_multiplier"]) * (available ** cfg["weight_wait_count"])
+            multiplier = obs.multiplier_for_han(han) if han >= 4 else 0.0
             waits.append(WaitInfo(kind, han, multiplier, tuple(yaku), available))
 
-        if not any(w.multiplier > 0 for w in waits):
+        score = self._score_waits(waits)
+        if score is None:
             return None
-
         strength = _clamp(score / cfg["strong_hand_score"], 0.0, 1.0)
         return HandPlan(tuple(sorted(hand_indexes)), tuple(waits), score, strength)
+
+    def _score_waits(self, waits) -> Optional[float]:
+        """待ちの点数。和了れる（満貫以上の）待ちがなければ None。"""
+        cfg = self.config["hand_selection"]
+        winning = [w for w in waits if w.multiplier > 0]
+        if not winning:
+            return None
+        return sum(
+            (w.multiplier ** cfg["weight_han_multiplier"]) * (w.available ** cfg["weight_wait_count"])
+            for w in winning
+        )
+
+    def best_boost_combo(
+        self, obs: CpuObservation, plan: HandPlan
+    ) -> tuple[Optional[tuple[str, ...]], float]:
+        """
+        役強化で強化する役の組合せのうち、点数がいちばん上がるもの（と、そのときの点数）。
+        上がる組合せがなければ (None, plan.score)。手牌の評価はやり直さず、待ちの翻数に足し直して採点する。
+        """
+        best_combo: Optional[tuple[str, ...]] = None
+        best_score = plan.score
+        for combo in itertools.combinations_with_replacement(boostable_yaku(plan), obs.me.boost_hand_targets):
+            extra = Counter(combo)
+            boosted = []
+            for w in plan.waits:
+                han = w.han + sum(extra[name] for name in w.yaku)
+                boosted.append(WaitInfo(w.kind, han, obs.multiplier_for_han(han) if han >= 4 else 0.0, w.yaku, w.available))
+            score = self._score_waits(boosted) or 0.0
+            if score > best_score:
+                best_combo, best_score = combo, score
+        return best_combo, best_score
 
     # ========== スキル ==========
 
     def next_skill(self, obs: CpuObservation, plan: Optional[HandPlan]) -> Optional[dict[str, Any]]:
-        """次に使うスキルの action を返す。使わないなら None。手牌選択フェーズで繰り返し呼ぶ。"""
+        """次に使うスキルの action の data を返す。使わないなら None。手牌選択フェーズで繰り返し呼ぶ。"""
         if plan is None:
             return None
         for decide in (self._decide_perspective, self._decide_mulligan, self._decide_boost_hand, self._decide_assault):
-            action = decide(obs, plan)
-            if action is not None:
-                return action
+            data = decide(obs, plan)
+            if data is not None:
+                return data
         return None
 
     def _can_afford(self, obs: CpuObservation, skill: str) -> bool:
@@ -245,7 +308,7 @@ class RuleBrain:
             value = cfg["value"] * unrevealed / max(1, obs.opponent.wall_size)
             if value < obs.me.skill_costs[skill]:
                 return None
-        return {"action": "skill", "data": {"skill_type": skill}}
+        return {"skill_type": skill}
 
     def _decide_mulligan(self, obs: CpuObservation, plan: HandPlan) -> Optional[dict[str, Any]]:
         cfg = self.config["skill"]["mulligan"]
@@ -256,13 +319,12 @@ class RuleBrain:
             return None
         if plan.strength >= cfg["max_strength"]:
             return None
-        # 手牌以外にある自分の待ち牌は、山から出ない上に、捨てればフリテンになる。交換して減らす
-        targets = [i for i in rest_indexes(obs, plan.hand_indexes) if tile_kind(obs.me.wall[i]) in plan.wait_kinds]
+        targets = mulligan_targets(obs, plan)
         if not targets:
             return None
         if self.level == "normal" and cfg["value_per_wait_tile"] * len(targets) < obs.me.skill_costs[skill]:
             return None
-        return {"action": "skill", "data": {"skill_type": skill, "target_hand_index": self.rng.choice(targets)}}
+        return {"skill_type": skill, "target_hand_index": self.rng.choice(targets)}
 
     def _decide_boost_hand(self, obs: CpuObservation, plan: HandPlan) -> Optional[dict[str, Any]]:
         cfg = self.config["skill"]["boost_hand"]
@@ -272,33 +334,13 @@ class RuleBrain:
         if not self._can_afford(obs, skill) or obs.me.health < cfg["min_health"]:
             return None
 
-        boostable = sorted({
-            name
-            for wait in plan.waits if wait.multiplier > 0
-            for name in wait.yaku
-            if GameEngine.normalize_boost_target_yaku_name(name) is not None
-        })
-        if not boostable:
+        combo, score = self.best_boost_combo(obs, plan)
+        if combo is None:
             return None
-
-        best_combo: Optional[tuple[str, ...]] = None
-        best_score = plan.score
-        for combo in itertools.combinations_with_replacement(boostable, obs.me.boost_hand_targets):
-            boosted = self.evaluate_hand(obs, plan.hand_indexes, extra_boosts=Counter(combo))
-            if boosted is not None and boosted.score > best_score:
-                best_combo, best_score = combo, boosted.score
-        if best_combo is None:
-            return None
-
-        gain_ratio = (best_score - plan.score) / max(plan.score, 1e-9)
+        gain_ratio = (score - plan.score) / max(plan.score, 1e-9)
         if self.level == "normal" and gain_ratio < cfg["min_gain_ratio"]:
             return None
-        data: dict[str, Any] = {"skill_type": skill}
-        if len(best_combo) == 1:
-            data["yaku_name"] = best_combo[0]
-        else:
-            data["yaku_names"] = list(best_combo)
-        return {"action": "skill", "data": data}
+        return {"skill_type": skill, "yaku_names": list(combo)}
 
     def _decide_assault(self, obs: CpuObservation, plan: HandPlan) -> Optional[dict[str, Any]]:
         cfg = self.config["skill"]["assault"]
@@ -316,29 +358,7 @@ class RuleBrain:
             use = gain > 0 and gain < obs.opponent.health <= 2 * gain * cfg["kill_ratio"]
         if not use:
             return None
-        return {"action": "skill", "data": {"skill_type": skill}}
-
-    # ========== ロン ==========
-
-    def should_accept_agari(self, obs: CpuObservation) -> bool:
-        """
-        ロンを受けるか。満貫以上で精算されるなら必ず受ける。
-
-        満貫未満の手は和了れないので、エンジンは満貫に届く牌でしかロン確認を出さない（GameEngine.can_agari）。
-        ここでの判定は念のための二重確認。数え方は GameEngine.liquidation と同じ（状況役の一発・河底撈魚を含む）。
-        """
-        tile = obs.pending_agari_tile
-        if tile is None or len(obs.me.hand) != HAND_SIZE:
-            return True
-        hand_tiles = [obs.me.wall[i] for i in obs.me.hand]
-        yaku = HandAnalyzer.enum_yaku(hand_tiles + [tile], winning_tile=tile)
-        han = sum(Yaku.get_han_by_name(name) for name in yaku)
-        han += sum(obs.me.boost_hand_bonus.get(name, 0) for name in yaku)
-        if Yaku.RICHI.japanese_name in yaku and obs.my_discard_count <= 1 and len(obs.opponent.discards) == 1:
-            han += Yaku.IPPATSU.han + obs.me.boost_hand_bonus.get(Yaku.IPPATSU.japanese_name, 0)
-        if len(obs.opponent.discards) == 16 and obs.i_am_first_player:
-            han += Yaku.KAWA_ZO.han + obs.me.boost_hand_bonus.get(Yaku.KAWA_ZO.japanese_name, 0)
-        return han >= 4
+        return {"skill_type": skill}
 
     # ========== 掛け金 ==========
 
@@ -378,20 +398,17 @@ class RuleBrain:
         undiscarded = max(OPPONENT_HAND_SIZE, obs.opponent.wall_size - len(obs.opponent.discards))
         in_hand_probability = OPPONENT_HAND_SIZE / undiscarded
 
-        best_index = candidates[0]
-        best_score = float("-inf")
-        for index in candidates:
-            kind = tile_kind(obs.me.wall[index])
+        # 点数は牌種で決まるので、牌種ごとに 1 回だけ数える（同点の選び方だけは牌ごとに散らす）
+        kind_scores: dict[int, float] = {}
+        for kind in {tile_kind(obs.me.wall[i]) for i in candidates}:
             score = 0.0
             if kind in opponent_discard_kinds:
                 score += cfg["weight_genbutsu"]  # 相手が捨てた種類はフリテンで必ず安全
             if kind in my_waits:
                 score += cfg["weight_own_wait"]  # 自分の待ちを捨てると自分がフリテンになる
             score += cfg["weight_danger"] * self._danger(kind, opponent_discard_kinds, held_exposed, in_hand_probability)
-            score += self.rng.random() * 1e-3  # 同点のときの選び方を散らす
-            if score > best_score:
-                best_index, best_score = index, score
-        return best_index
+            kind_scores[kind] = score
+        return max(candidates, key=lambda i: kind_scores[tile_kind(obs.me.wall[i])] + self.rng.random() * 1e-3)
 
     def _danger(
         self,
@@ -431,11 +448,11 @@ class RuleBrain:
     def _closeness(kind: int, other: int) -> float:
         """other を手牌に持つ相手が kind を待っている見込みの近さ。"""
         if kind == other:
-            return 1.0
+            return CLOSENESS_BY_DISTANCE[0]
         if kind >= HONOR_START or other >= HONOR_START or kind // 9 != other // 9:
             return 0.0
         distance = abs(kind - other)
-        return {1: 0.6, 2: 0.3}.get(distance, 0.0)
+        return CLOSENESS_BY_DISTANCE[distance] if distance < len(CLOSENESS_BY_DISTANCE) else 0.0
 
 
 def create_brain(config: dict, rng: Optional[random.Random] = None) -> RuleBrain:

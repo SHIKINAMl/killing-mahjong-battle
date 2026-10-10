@@ -22,15 +22,37 @@ DISCARDS_PER_PLAYER = 17
 _DEAL_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="deal")
 
 
+def tiles_to_wall_indexes(wall: list[int], tiles: list[int]) -> Optional[list[int]]:
+    """
+    牌IDの並びを、山（wall）の index の並びへ変換する。変換できなければ None。
+
+    ドラ/赤ドラを取り違えると翻数が変わり満貫を割るため、同一の牌を優先し、なければ同じ牌種を使う。
+    """
+    used = [False] * len(wall)
+    indexes: list[int] = []
+    for tile in tiles:
+        found = next((i for i, t in enumerate(wall) if not used[i] and t == tile), None)
+        if found is None:
+            kind = tile & 0b11111
+            found = next((i for i, t in enumerate(wall) if not used[i] and (t & 0b11111) == kind), None)
+        if found is None:
+            return None
+        used[found] = True
+        indexes.append(found)
+    return indexes
+
+
 class GameEngine:
     """麻雀ゲームエンジン"""
 
-    def __init__(self, max_rounds: int = 25):
+    def __init__(self, max_rounds: int = 25, deal_factory: Optional[Callable[[int], RoundDeal]] = None):
         """
         ゲームエンジンを初期化
 
         Args:
             max_rounds: 最大ラウンド数（デフォルト25）
+            deal_factory: 配牌を作る関数（引数は人数）。None なら本番の generate_round_deal を
+                別スレッドで動かす。学習用のシミュレーターは、事前に作った配牌を返す関数を渡す
         """
         self.state = GameState()
         self.num_players = 2
@@ -42,6 +64,7 @@ class GameEngine:
         self._pending_agari: Optional[dict] = None
         # 次局の配牌（バックグラウンドで生成中 or 生成済み）
         self._next_deal: Optional[Future] = None
+        self._deal_factory = deal_factory
         # この局の配牌時に特典で公開した牌（initial_perspective_count を持つプレイヤーの分）
         self._initial_perspective_reveals: list[dict] = []
         # 対局が終わった理由（game_end の victory_method になる）
@@ -86,12 +109,19 @@ class GameEngine:
         次局の配牌をバックグラウンドで生成し始める。既に生成中・生成済みならそれを返す。
         返り値の Future が完了していれば、_deal_tiles は待たずに配牌できる。
         """
+        if self._deal_factory is not None:
+            # 差し込まれた配牌は配るときに作る（先読みしない）。待つものはないので完了済みの Future を返す
+            ready: Future = Future()
+            ready.set_result(None)
+            return ready
         if self._next_deal is None:
             self._next_deal = _DEAL_EXECUTOR.submit(generate_round_deal, self.num_players)
         return self._next_deal
 
     def _take_next_deal(self) -> RoundDeal:
         """用意しておいた配牌を取り出す。未用意・生成失敗時はその場で生成する。"""
+        if self._deal_factory is not None:
+            return self._deal_factory(self.num_players)
         future, self._next_deal = self._next_deal, None
         if future is not None:
             try:
@@ -127,28 +157,14 @@ class GameEngine:
         self.state.round_state.reserved_tiles = list(deal.reserved_tiles)
 
         def _to_wall_indexes(wall_tiles: list[int], hand_tiles: list[int]) -> list[int]:
-            used = [False] * len(wall_tiles)
-            indexes: list[int] = []
-            for tile in hand_tiles:
-                tile_base = tile & 0b11111
-                # ドラ/赤ドラを取り違えると翻数が変わり満貫を割るため、同一の牌を優先する
-                found_idx = next(
-                    (idx for idx, wall_tile in enumerate(wall_tiles) if not used[idx] and wall_tile == tile),
-                    None,
-                )
-                if found_idx is None:
-                    found_idx = next(
-                        (idx for idx, wall_tile in enumerate(wall_tiles) if not used[idx] and (wall_tile & 0b11111) == tile_base),
-                        None,
-                    )
-                if found_idx is None:
-                    raise ValueError("deal が返した聴牌例を wall index へ変換できませんでした")
-                used[found_idx] = True
-                indexes.append(found_idx)
+            indexes = tiles_to_wall_indexes(wall_tiles, hand_tiles)
+            if indexes is None:
+                raise ValueError("deal が返した聴牌例を wall index へ変換できませんでした")
             return indexes
 
         for player, (wall, hand_tiles) in zip(self.state.players, hands):
-            player.wall = wall  # 配られた牌
+            # 配られた牌。マリガンで書き換えるので、配牌そのもの（deal）とは別のリストにする
+            player.wall = list(wall)
             player.hand = _to_wall_indexes(wall, hand_tiles)  # 手牌例を wall index で保持
 
         self.state.round_state.dora_id = deal.dora_id
@@ -367,6 +383,22 @@ class GameEngine:
         player.boost_hand_bonus[normalized_name] = player.boost_hand_bonus.get(normalized_name, 0) + bonus_han
         return True
 
+    def assign_random_opening_boosts(self, rng: random.Random | None = None) -> list[dict]:
+        """
+        開始時の恒常強化を、各プレイヤーに opening_boost_count 個ずつ付与する（役は重複なし、各 +1 翻）。
+
+        Returns:
+            付与した強化（{"client_id", "yaku_name", "bonus_han"} のリスト。opening_boost_assigned で送る形）
+        """
+        rng = rng or random
+        candidates = self.get_opening_boost_candidates()
+        assigned: list[dict] = []
+        for player in self.state.players:
+            for yaku_name in rng.sample(candidates, min(player.opening_boost_count, len(candidates))):
+                if self.assign_opening_boost(player, yaku_name, bonus_han=1):
+                    assigned.append({"client_id": player.player_id, "yaku_name": yaku_name, "bonus_han": 1})
+        return assigned
+
     def _build_display_yaku_list(self, yaku_list: list[str], bonus_map: dict[str, int]) -> list[str]:
         """表示用役名を `役名+回数` 形式で組み立てる。"""
         display: list[str] = []
@@ -564,6 +596,41 @@ class GameEngine:
             実際に支払ったHP コスト。失敗時は None
         """
         return self.cast_skill(user, skill_type, target=opponent)
+
+    def execute_skill(self, user: PlayerState, skill_type: SkillType, data: dict) -> Optional[int]:
+        """
+        クライアントの skill action の data を受け取ってスキルを使う。
+
+        Returns:
+            実際に支払ったHP コスト。入力が不正・前提条件を満たさないときは None
+        """
+        if skill_type == SkillType.BOOST_HAND:
+            # 複数の役を同時に強化する（件数と役名の検証は _validate_skill_cast で行う）
+            yaku_names = data.get("yaku_names")
+            if yaku_names is not None:
+                if not isinstance(yaku_names, list):
+                    return None
+                return self.use_skill(user, skill_type, yaku_names=yaku_names)
+            yaku_name = self.normalize_boost_target_yaku_name(data.get("yaku_name"))
+            if yaku_name is None:
+                return None
+            return self.use_skill(user, skill_type, yaku_name)
+
+        if skill_type == SkillType.PERSPECTIVE:
+            target = next((p for p in self.state.players if p.player_id != user.player_id), None)
+            if target is None:
+                return None
+            return self.use_skill_on_opponent(user, target, skill_type)
+
+        if skill_type == SkillType.MULLIGAN:
+            target_index = data.get("target_hand_index")
+            if not isinstance(target_index, int) or target_index < 0 or target_index >= len(user.wall):
+                return None
+            return self.use_mulligan(user, target_index)
+
+        if skill_type in (SkillType.SPECIAL_VICTORY, SkillType.ASSAULT):
+            return self.use_skill(user, skill_type)
+        return None
 
     def use_mulligan(self, player: PlayerState, target_hand_index: int) -> Optional[int]:
         """
@@ -1052,7 +1119,7 @@ class GameEngine:
         self._set_phase(RoundStatus.ROUND_END_WAITING)
         self._invoke_callback(self.on_round_end, is_draw)
 
-    def _on_game_end(self, reason: str = "unknown") -> None:
+    def _on_game_end(self, reason: str) -> None:
         """
         ゲーム終了時の処理
 
@@ -1120,24 +1187,39 @@ class GameEngine:
         """
         # index から牌 ID に変換
         hand_tiles = [player.wall[idx] for idx in hand_indexes]
-        
-        if not HandAnalyzer.is_tenpai(hand_tiles, player.wall):
+        boost_bonus_map = self._effective_boost_bonus_map(player)
+        waits = self.evaluate_waits(hand_tiles, player.wall, self.state.round_state.dora_id, boost_bonus_map)
+        if waits is None:
             return None
 
-        waits = HandAnalyzer.get_tenpai_waiting_tiles(hand_tiles, player.wall)
-        waits = [w+32 if w == self.state.round_state.dora_id else w for w in waits]
-
         result = []
-        boost_bonus_map = self._effective_boost_bonus_map(player)
-        for w in waits:
-            base_yaku_list = HandAnalyzer.enum_yaku(hand_tiles + [w], winning_tile=w)
-            base_han = sum(Yaku.get_han_by_name(y) for y in base_yaku_list)
-            bonus = sum(boost_bonus_map.get(y, 0) for y in base_yaku_list)
-            total_han = base_han + bonus
+        for w, base_yaku_list, total_han in waits:
             display_yaku_list = self._build_display_yaku_list(base_yaku_list, boost_bonus_map)
             multiplier = self._get_liquidation_multiplier(total_han) if total_han >= 4 else 0.0
             multiplier_label = self._get_multiplier_label(total_han)
             result.append((w, total_han >= 4, display_yaku_list, base_yaku_list, total_han, multiplier, multiplier_label))
+        return result
+
+    @staticmethod
+    def evaluate_waits(
+        hand_tiles: list[int],
+        wall: list[int],
+        dora_id: Optional[int],
+        boost_bonus_map: dict[str, int],
+    ) -> Optional[list[tuple[int, list[str], int]]]:
+        """
+        聴牌なら、待ちごとに (和了牌の牌ID, 役のリスト, 翻数（役強化込み）) を返す。聴牌でなければ None。
+        ドラの待ちはドラの牌IDで役を数える。
+        """
+        waits = HandAnalyzer.get_tenpai_waiting_tiles(hand_tiles, wall)
+        if not waits:
+            return None
+        result = []
+        for kind in waits:
+            tile = kind + 32 if kind == dora_id else kind
+            yaku = HandAnalyzer.enum_yaku(hand_tiles + [tile], winning_tile=tile)
+            han = sum(Yaku.get_han_by_name(y) for y in yaku) + sum(boost_bonus_map.get(y, 0) for y in yaku)
+            result.append((tile, yaku, han))
         return result
 
 
