@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using KillingMahjong.Common;
@@ -8,31 +9,32 @@ using KillingMahjong.Managers;
 namespace KillingMahjong.UI.Effects
 {
     /// <summary>
-    /// 強襲を使ったあとの演出（2026-10-09 に作り直した）。
+    /// 強襲を使ったあとの演出（2026-10-10 に、背景を決めて作り直した）。
     ///
-    /// **自分の血を抜いて、覚悟を決める**（ユーザーの指示）。
-    /// 絵の作りは牌交換に合わせてある。画面を暗く落とし、その上に見せたい物だけを出す。
+    /// **強襲の背景（ユーザーと決めた）:**
+    ///   強襲は、アガったときに自分がもらえるはずだった血が0になり、同じ額が相手の損失に上乗せされる能力
+    ///   （撃った時点では何も起きない。血3000を払う。1局1回）。
+    ///   これは**ベルル（ギャンブルの悪魔）との追加の契約**。
+    ///   「この局、私は配当を受け取らない。その分をあいつから余計に取り立てろ」。
+    ///   血3000はその手数料で、自分の血で契約に判を押す。相手に残るのは、ベルルの差し押さえの札。
+    ///   アガれなければ手数料だけ取られる。
     ///
-    ///   1つ目の版 … 刻む動きと照準の線（四方から赤い線が絞り込む）。「雰囲気が合っていない」と言われた
-    ///   2つ目の版 … 透視の舞台（赤い画面の重ね・集中線）を借りた。
-    ///                「透視では周りのやつがいい感じだったが、役強化と強襲には合わない」と言われた
-    ///   いまの版   … 周りの重ねと集中線をやめ、牌交換と同じ暗転だけにした
+    /// 流れ（約4秒。うち白く光るまでが約3.4秒）
+    ///   ① 暗転     … 画面が落ち、自分と相手の血の表示だけが残る（牌交換と同じ暗転）
+    ///   ② 血を抜く … 血の粒が3つ、自分の血の表示から真ん中へ。1つごとに心音。
+    ///                 そのあいだに、上に黄色い輪が描かれてベルルが出てくる
+    ///   ③ 契約     … ベルルの板に「取り立て」の字。集まった血が脈を打ち、輪が締まって縮む（覚悟）
+    ///   ④ 血判     … 血が板へ飛んで、判になる。ベルルの目が光る
+    ///   ⑤ 差し押さえ … 板から札が飛んで、相手の血の表示に貼り付く。相手が跳ねる。印が残る（<see cref="AssaultMarkUI"/>）
+    ///   ⑥ 解除     … ベルルは輪へ帰り、白く光って暗転が消える
     ///
-    ///   幕   … 牌交換と同じ暗転（黒に少しだけ赤み）。その上に、自分と相手の血の表示だけを浮かせる
-    ///           （牌交換が、入れ替える牌だけを暗転の上に出しているのと同じ）
-    ///   中身 … 血の粒。自分の血の表示から1つずつ抜けて、画面の真ん中に集まる
-    ///           （透視で牌を1枚ずつ返すのと同じ間合い。1つごとに心音）。
-    ///           集まった血がぎゅっと縮み、相手の血の表示へ撃ち込まれて、印になって残る
-    ///   音   … 透視と同じ段取り（<see cref="SkillTranceAudio"/>）
+    /// これまでの版:
+    ///   1つ目 … 刻む動きと照準の線。「雰囲気が合っていない」
+    ///   2つ目 … 透視の舞台（赤い画面の重ね・集中線）。「透視には合うが、役強化と強襲には合わない」
+    ///   3つ目 … 牌交換と同じ暗転の上で、自分の血を抜いて相手へ撃ち込む。背景が無かった
     ///
-    /// 流れ（約3.4秒。うち白く光るまでが約2.8秒）
-    ///   ① 暗転     … 画面が落ち、血の表示だけが残る
-    ///   ② 血を抜く … 血の粒が3つ、自分の血の表示から真ん中へ。1つごとに心音
-    ///   ③ 覚悟     … 集まった血が脈を打ち、外から輪が締まってきて、縮む
-    ///   ④ 撃ち込む … 筋を引いて相手の血の表示へ飛び、弾けて相手が跳ねる。印が残る（<see cref="AssaultMarkUI"/>）
-    ///   ⑤ 解除     … 白く光って暗転が消える
-    ///
-    /// シーンには置かない。出しているのは血の表示の写しと、図形（丸）だけ。
+    /// ベルルの絵が読めないときは③の字と④を飛ばし、血は集まった所から札になって相手へ飛ぶ。
+    /// シーンには置かない。出しているのは血の表示の写し、ベルルの絵（もとからある物）、図形、文字だけ。
     /// </summary>
     public class AssaultSkillEffect : MonoBehaviour
     {
@@ -43,6 +45,7 @@ namespace KillingMahjong.UI.Effects
         // 透視（ExposedTileEffectPlayer）と同じ間合い
         private const float DropGap = 0.28f;
         private const float HoldBeforeFlash = 0.45f;
+        private const float PopSeconds = 0.15f;
 
         private const int DropCount = 3;
         private const float DropFlySeconds = 0.40f;
@@ -52,10 +55,22 @@ namespace KillingMahjong.UI.Effects
         private static readonly float[] PoolRadius = { 0f, 16f, 23f, 30f };
 
         private const float ResolveSeconds = 0.60f;   // 脈を打って縮む
-        private const float ShootSeconds = 0.20f;     // 相手へ飛ぶ
         private const float ResolvedScale = 0.6f;     // 縮みきった大きさ（集まった血に対して）
+        private const float StampFlySeconds = 0.22f;  // 血が板へ飛ぶ
+        private const float StampSettleSeconds = 0.30f;
+        private const float TagFlySeconds = 0.22f;    // 札が相手へ飛ぶ
+        private const float BelleLeaveSeconds = 0.35f;
+
+        /// <summary>板に押した血判の大きさ。</summary>
+        private const float SealRadius = 14f;
 
         private const int SplashCount = 8;
+
+        // ベルル。置き場所と大きさは役強化（BoostHandSkillEffect）と同じ
+        private static readonly Vector2 BelleCenter = new Vector2(0f, 150f);
+        private const float BelleScale = 0.55f;
+
+        private static readonly Color ClauseColor = new Color32(0xF2, 0xE6, 0xC8, 0xFF);
 
         private SkillTranceAudio _trance;
         private SkillEffectStage _stage;
@@ -80,29 +95,48 @@ namespace KillingMahjong.UI.Effects
             _trance = null;
         }
 
-        /// <param name="targetHpAnchor">狙われる側の血の表示。血はここへ撃ち込まれ、印が残る</param>
+        /// <param name="targetHpAnchor">狙われる側の血の表示。札はここへ貼り付き、印が残る</param>
         /// <param name="casterHpAnchor">撃った側の血の表示。血の粒はここから抜ける</param>
-        /// <param name="onHit">血が当たった瞬間に呼ぶ（相手の立ち絵を跳ねさせる、など）</param>
-        public IEnumerator Play(RectTransform targetHpAnchor, RectTransform casterHpAnchor, Action onHit)
+        /// <param name="onHit">札が貼り付いた瞬間に呼ぶ（相手の立ち絵を跳ねさせる、など）</param>
+        /// <param name="demonPowered">
+        /// 目が光っているベルルの絵（自分のスキルのカットインの絵。<c>PhaseTransitionUI.PlayerCutinSprite</c>）。
+        /// 無ければ目は光らず、構えた絵のままで進む
+        /// </param>
+        public IEnumerator Play(RectTransform targetHpAnchor, RectTransform casterHpAnchor, Action onHit,
+            Sprite demonPowered = null)
         {
             _trance = SkillTranceAudio.Begin(DimSeconds);
 
             _stage = new SkillEffectStage("Stage", UISortingOrders.SkillEffectContent, transform);
             Image dim = _stage.AddDim("Dim", Color.clear);
 
-            // 暗転の上に、血の表示だけを浮かせる。どこから抜いて、どこへ撃つのかが見えるように
+            // 暗転の上に、血の表示だけを浮かせる。どこから抜いて、どこへ貼るのかが見えるように
             Image casterCopy = _stage.AddCopyOf("CasterHp", casterHpAnchor);
             Image targetCopy = _stage.AddCopyOf("TargetHp", targetHpAnchor);
             Color casterColor = casterCopy != null ? casterCopy.color : Color.white;
             Color targetColor = targetCopy != null ? targetCopy.color : Color.white;
 
+            BelleFigure belle = BelleFigure.Create(_stage, BelleCenter, BelleScale, demonPowered);
+
+            // ベルルの板に出す、契約の中身
+            TextMeshProUGUI clause = null;
+            if (belle != null)
+            {
+                clause = _stage.AddText("Clause", "取り立て", 30f, ClauseColor);
+                clause.fontStyle = FontStyles.Bold;
+                clause.alpha = 0f;
+                clause.rectTransform.anchoredPosition = belle.SignPosition + new Vector2(-16f, 0f);
+            }
+
             var shapes = _stage.AddShapes("Blood");
 
             Rect caster = _stage.LocalVisibleRectOf(casterHpAnchor);
             Vector2 from = caster.width > 1f ? caster.center : new Vector2(300f, -120f);
-            // 血が集まる所。画面の真ん中から少し自分寄り（相手へ撃ち込む距離を取るため）
-            Vector2 pool = new Vector2(40f, -30f);
+            // 血が集まる所。画面の真ん中から少し自分寄り
+            Vector2 pool = new Vector2(40f, -40f);
             Vector2 to = AssaultMarkUI.MarkPosition(_stage, targetHpAnchor);
+            // 血判を押す所（板の字の右下。書類に判を押すのと同じ位置）。ベルルが居なければ、集まった所
+            Vector2 sealAt = belle != null ? belle.SignPosition + new Vector2(56f, -6f) : pool;
 
             var audio = AudioManager.Instance;
 
@@ -115,12 +149,12 @@ namespace KillingMahjong.UI.Effects
             }
             SetStage(dim, casterCopy, casterColor, targetCopy, targetColor, 1f);
 
-            // ---- ② 血を抜く。1つずつ、心音と一緒に ----
-            // 粒は山なりに飛ぶ。飛び出す時刻は等間隔（透視で牌を返す間合いと同じ）
+            // ---- ② 血を抜く。1つずつ、心音と一緒に。途中からベルルが出てくる ----
             float drawSeconds = DropGap * (DropCount - 1) + DropFlySeconds;
             int beats = 0;
             float poolPop = 0f;      // 粒が届いた瞬間のふくらみ（1 → 0 へ戻る）
             int arrived = 0;
+            bool belleCalled = false;
             for (float t = 0f; t < drawSeconds; t += Time.deltaTime)
             {
                 // 心音は粒が出る瞬間に。3つ目だけ強く
@@ -132,6 +166,14 @@ namespace KillingMahjong.UI.Effects
                                             HeartbeatSpacing.Compact);
                     }
                     beats++;
+                }
+
+                // 2つ目の粒が出るころに呼ぶ。血が集まりきるころに、板を持って構えている
+                if (belle != null && !belleCalled && t >= DropGap)
+                {
+                    belleCalled = true;
+                    if (audio != null) audio.PlaySynthSound(SynthWaveType.Sine, 880f, 1320f, 0.25f, 0.35f);
+                    StartCoroutine(belle.Arrive());
                 }
 
                 int nowArrived = 0;
@@ -153,12 +195,27 @@ namespace KillingMahjong.UI.Effects
                 yield return null;
             }
 
-            // ---- ③ 覚悟。脈を1つ打って、ぎゅっと縮む ----
-            if (audio != null) audio.PlayHeartbeat(HeartbeatStrength.Strong, HeartbeatSpacing.Compact);
             float full = PoolRadius[DropCount];
+            if (belle != null)
+            {
+                // ベルルが構えきるのを待つ（ふつうはもう構えている）
+                float giveUp = Time.time + 1f;
+                while (!belle.Arrived && Time.time < giveUp)
+                {
+                    shapes.Begin();
+                    AssaultMarkUI.DrawDrop(shapes, pool, full, 1f);
+                    shapes.End();
+                    yield return null;
+                }
+            }
+
+            // ---- ③ 契約。板に字が出る。血が脈を1つ打って、ぎゅっと縮む（覚悟）----
+            if (audio != null) audio.PlayHeartbeat(HeartbeatStrength.Strong, HeartbeatSpacing.Compact);
             for (float t = 0f; t < ResolveSeconds; t += Time.deltaTime)
             {
                 float p = Mathf.Clamp01(t / ResolveSeconds);
+                if (clause != null) clause.alpha = Mathf.Clamp01(t / 0.2f);
+
                 // 前半でいったん大きく脈打ち、後半で小さく固まる
                 float r = p < 0.35f
                     ? Mathf.Lerp(full, full * 1.25f, Mathf.Sin(p / 0.35f * Mathf.PI))
@@ -172,35 +229,88 @@ namespace KillingMahjong.UI.Effects
                 shapes.End();
                 yield return null;
             }
+            if (clause != null) clause.alpha = 1f;
 
-            // ---- ④ 撃ち込む ----
             float small = full * ResolvedScale;
-            if (audio != null) audio.PlaySynthSoundDual(SynthWaveType.Sine, SynthWaveType.Noise, 240f, 70f, 0.22f, 0.9f);
-            for (float t = 0f; t < ShootSeconds; t += Time.deltaTime)
+            if (belle != null)
             {
-                float p = Mathf.Clamp01(t / ShootSeconds);
-                float eased = p * Mathf.Sqrt(p);             // 出だしは溜めて、一気に届く
+                // ---- ④ 血判。血が板へ飛んで、判になる。ベルルの目が光る ----
+                for (float t = 0f; t < StampFlySeconds; t += Time.deltaTime)
+                {
+                    float p = Mathf.Clamp01(t / StampFlySeconds);
+                    float eased = p * Mathf.Sqrt(p);             // 出だしは溜めて、一気に届く
+                    shapes.Begin();
+                    DrawStreak(shapes, pool, sealAt, eased, small, SealRadius, 1f);
+                    shapes.End();
+                    yield return null;
+                }
+
+                belle.PowerOn();
+                ScreenQuake.Play(8f, 0.18f);
+                if (audio != null) audio.PlaySynthSoundDual(SynthWaveType.Sine, SynthWaveType.Noise, 240f, 70f, 0.22f, 0.9f);
+                for (float t = 0f; t < StampSettleSeconds; t += Time.deltaTime)
+                {
+                    // 押した瞬間は大きく、すぐ落ち着く。ベルルも一度ふくらみ、目の光が輪になって広がる
+                    float pop = t < PopSeconds ? Mathf.PingPong(t * (1f / (PopSeconds / 2f)), 1f) : 0f;
+                    belle.SetScale(Mathf.Lerp(1f, 1.12f, pop));
+
+                    float q = Mathf.Clamp01(t / StampSettleSeconds);
+                    Color ring = BelleFigure.Yellow;
+                    ring.a = (1f - q) * 0.9f;
+                    shapes.Begin();
+                    shapes.Ring(belle.Center, 70f + q * 150f, 4f, ring);
+                    AssaultMarkUI.DrawSeal(shapes, sealAt, SealRadius * Mathf.Lerp(1.6f, 1f, Mathf.Clamp01(t / 0.1f)), 1f);
+                    shapes.End();
+                    yield return null;
+                }
+                belle.SetScale(1f);
                 shapes.Begin();
-                DrawStreak(shapes, pool, to, eased, small, 1f);
+                AssaultMarkUI.DrawSeal(shapes, sealAt, SealRadius, 1f);
+                shapes.End();
+
+                yield return new WaitForSeconds(0.2f);
+            }
+
+            // ---- ⑤ 差し押さえ。札が相手の血の表示へ飛んで、貼り付く ----
+            if (audio != null) audio.PlaySynthSound(SynthWaveType.Sine, 520f, 260f, 0.2f, 0.5f);
+            for (float t = 0f; t < TagFlySeconds; t += Time.deltaTime)
+            {
+                float p = Mathf.Clamp01(t / TagFlySeconds);
+                float eased = p * Mathf.Sqrt(p);
+                Vector2 at = Vector2.Lerp(sealAt, to, eased);
+                shapes.Begin();
+                if (belle != null) AssaultMarkUI.DrawSeal(shapes, sealAt, SealRadius, 1f);
+                else AssaultMarkUI.DrawDrop(shapes, pool, small * (1f - p), 1f - p);
+                // 後ろに血の粒を引く
+                for (int k = 3; k >= 1; k--)
+                {
+                    float back = eased - k * 0.08f;
+                    if (back <= 0f) continue;
+                    AssaultMarkUI.DrawDrop(shapes, Vector2.Lerp(sealAt, to, back), 5f - k, 0.7f - k * 0.15f);
+                }
+                AssaultMarkUI.DrawTag(shapes, at, Mathf.Lerp(1.8f, 1f, eased), 1f);
                 shapes.End();
                 yield return null;
             }
 
-            // 当たった。相手が跳ね、印が残る
+            // 貼り付いた。相手が跳ね、印が残る
             if (onHit != null) onHit();
             ScreenQuake.Play(10f, 0.2f);
             AssaultMarkUI.Show(targetHpAnchor);
 
-            // 着弾。白く弾けて、輪が2つ広がり、しぶきが散る。
-            // 印（AssaultMarkUI）は暗転より奥に居て、白く光るまで見えない。そのあいだはここで同じ粒を描く
+            // ベルルは輪へ帰る。板の字と判は、板が畳まれる前に消す
+            if (belle != null) StartCoroutine(belle.Leave(BelleLeaveSeconds));
+
+            // 貼り付いた所から輪が2つ広がり、しぶきが散る。
+            // 印（AssaultMarkUI）は暗転より奥に居て、白く光るまで見えない。そのあいだはここで同じ札を描く
             for (float t = 0f; t < HoldBeforeFlash; t += Time.deltaTime)
             {
                 float p = Mathf.Clamp01(t / 0.35f);
-                shapes.Begin();
+                float boardFade = 1f - Mathf.Clamp01(t / 0.1f);
+                if (clause != null) clause.alpha = boardFade;
 
-                // 撃った跡の筋が、少しだけ残って消える
-                float trail = 1f - Mathf.Clamp01(t / 0.12f);
-                if (trail > 0f) DrawStreak(shapes, pool, to, 1f, small, trail);
+                shapes.Begin();
+                if (belle != null && boardFade > 0f) AssaultMarkUI.DrawSeal(shapes, sealAt, SealRadius, boardFade);
 
                 for (int k = 0; k < 2; k++)
                 {
@@ -220,24 +330,18 @@ namespace KillingMahjong.UI.Effects
                     AssaultMarkUI.DrawDrop(shapes, at, 4f * (1f - p), 1f - p);
                 }
 
-                float burst = 1f - Mathf.Clamp01(t / 0.14f);
-                if (burst > 0f)
-                {
-                    Color white = Color.white;
-                    white.a = burst;
-                    shapes.Disc(to, AssaultMarkUI.Radius + 20f * burst, white);
-                }
-
-                AssaultMarkUI.DrawDrop(shapes, to, AssaultMarkUI.Radius, 1f);
+                AssaultMarkUI.DrawTag(shapes, to, 1f, 1f);
                 shapes.End();
                 yield return null;
             }
 
-            // ---- ⑤ 白く光って暗転が消える。心音と BGM の戻りは待たない ----
+            // ---- ⑥ 白く光って暗転が消える。心音と BGM の戻りは待たない ----
             Action clear = () =>
             {
                 if (this == null) return;
                 SetStage(dim, casterCopy, casterColor, targetCopy, targetColor, 0f);
+                if (belle != null) belle.Hide();
+                if (clause != null) clause.alpha = 0f;
                 shapes.Begin();
                 shapes.End();
             };
@@ -271,14 +375,15 @@ namespace KillingMahjong.UI.Effects
         }
 
         /// <summary>
-        /// 撃ち込む血。頭の粒と、その後ろに伸びる筋。<paramref name="head"/> は 0（集まった所）〜 1（相手）。
+        /// 飛んでいく血。頭の粒と、その後ろに伸びる筋。<paramref name="head"/> は 0（出発）〜 1（到着）。
         /// 筋は粒を詰めて並べて作る。後ろほど細く薄い。
         /// </summary>
-        private static void DrawStreak(PixelShapeGraphic g, Vector2 from, Vector2 to, float head, float startRadius, float alpha)
+        private static void DrawStreak(PixelShapeGraphic g, Vector2 from, Vector2 to, float head,
+            float startRadius, float endRadius, float alpha)
         {
             const int steps = 12;
             const float length = 0.55f;                       // 筋の長さ（道のりに対して）
-            float headRadius = Mathf.Lerp(startRadius, AssaultMarkUI.Radius, head);
+            float headRadius = Mathf.Lerp(startRadius, endRadius, head);
             for (int k = steps; k >= 1; k--)
             {
                 float back = head - length * k / steps;

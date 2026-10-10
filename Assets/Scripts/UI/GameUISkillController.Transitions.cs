@@ -338,7 +338,7 @@ namespace KillingMahjong.UI
             }
             else if (data.skillType == SkillNames.Assault)
             {
-                // 同上。自分の血を抜いて相手の血の表示へ撃ち込み、局の終わりまで印を残す
+                // 同上。自分の血でベルルの契約に判を押し、差し押さえの札を相手の血の表示に貼る。札は局の終わりまで残す
                 // （印を消すのは局の頭。BoardStateManager.ClearAllBoardData）
                 if (isLocalPlayer && uiManager.PlayerInfoUI != null && uiManager.EnemyInfoUI != null)
                 {
@@ -346,8 +346,10 @@ namespace KillingMahjong.UI
                     if (_assaultEffect != null)
                     {
                         var enemyInfo = uiManager.EnemyInfoUI;
+                        var assaultCutin = uiManager.PhaseTransitionUI;
                         yield return _assaultEffect.Play(enemyInfo.HpGaugeAnchor, uiManager.PlayerInfoUI.HpGaugeAnchor,
-                            () => { if (enemyInfo != null) enemyInfo.PlayBounceAnimation(0.4f); });
+                            () => { if (enemyInfo != null) enemyInfo.PlayBounceAnimation(0.4f); },
+                            assaultCutin != null ? assaultCutin.PlayerCutinSprite : null);
                         _assaultEffect = null;
                         if (!ownedLock.IsActive) yield break;
                     }

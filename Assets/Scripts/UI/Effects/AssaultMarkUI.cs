@@ -9,9 +9,10 @@ namespace KillingMahjong.UI.Effects
     /// **強襲は、撃ってからアガるまで何巡も効果が出ない。** そのあいだ画面に何も残らないと、
     /// 撃ったこと自体を忘れる。局が終わるまで印を出しっぱなしにして、「いま狙っている」を見せ続ける。
     ///
-    /// 絵は、撃ち込んだ自分の血の粒。血の表示の右上に小さく置き、ゆっくり脈を打たせる。
-    /// 最初の版は血の表示を囲む照準（四隅のかぎ形）だったが、演出を透視・牌交換の雰囲気へ
-    /// 作り直したのに合わせて、線の照準はやめた（<see cref="AssaultSkillEffect"/>）。
+    /// 絵は、差し押さえの札（自分の血で判を押した小さな紙。<see cref="DrawTag"/>）。
+    /// 血の表示の右上に小さく置き、ゆっくり脈を打たせる。
+    /// 最初の版は血の表示を囲む照準（四隅のかぎ形）、次は血の粒だった。2026-10-10 に強襲の背景を
+    /// 「ベルルとの追加の契約（配当を受け取らず、その分を相手から取り立てさせる）」と決めたので、札にした。
     ///
     /// 出すのは <see cref="AssaultSkillEffect"/> が血を撃ち込んだ瞬間。消すのは局の頭
     /// （<see cref="Clear"/>。BoardStateManager.ClearAllBoardData が呼ぶ）。シーンをまたぐと自分で消える。
@@ -86,11 +87,53 @@ namespace KillingMahjong.UI.Effects
                 float beat = Mathf.Repeat(_clock, 1.2f) / 1.2f;
                 Color ring = Blood;
                 ring.a = (1f - beat) * 0.7f;
-                _shapes.Ring(at, Radius + 3f + beat * 9f, 2f, ring);
+                _shapes.Ring(at, Radius + 5f + beat * 9f, 2f, ring);
 
-                DrawDrop(_shapes, at, Radius, 1f);
+                DrawTag(_shapes, at, 1f, 1f);
             }
             _shapes.End();
+        }
+
+        private static readonly Color Paper = new Color32(0xF2, 0xE6, 0xC8, 0xFF);
+        private static readonly Color Ink = new Color32(0x4A, 0x3A, 0x30, 0xFF);
+
+        /// <summary>
+        /// 差し押さえの札を描く。縦長の紙に、字のつもりの横線2本と、赤い血判。
+        ///
+        /// 強襲は「配当を受け取らない代わりに、その分をベルルが相手から取り立てる」追加の契約
+        /// （2026-10-10 にユーザーと決めた背景）。相手の血の表示に残るのは、その札。
+        /// </summary>
+        /// <param name="scale">1 で幅14・高さ20（Canvas の単位）</param>
+        internal static void DrawTag(PixelShapeGraphic g, Vector2 center, float scale, float alpha)
+        {
+            if (scale <= 0.05f || alpha <= 0f) return;
+
+            float w = 14f * scale, h = 20f * scale;
+            float x0 = center.x - w * 0.5f, x1 = center.x + w * 0.5f;
+            float y0 = center.y - h * 0.5f, y1 = center.y + h * 0.5f;
+
+            Color outline = Outline; outline.a *= alpha;
+            Color paper = Paper; paper.a = alpha;
+            Color ink = Ink; ink.a = alpha;
+
+            g.Box(x0 - 2f, y0 - 2f, x1 + 2f, y1 + 2f, outline);
+            g.Box(x0, y0, x1, y1, paper);
+            g.Box(x0 + 3f * scale, y1 - 5f * scale, x1 - 3f * scale, y1 - 3f * scale, ink);
+            g.Box(x0 + 3f * scale, y1 - 9f * scale, x1 - 5f * scale, y1 - 7f * scale, ink);
+            DrawSeal(g, center + new Vector2(1.5f * scale, -4f * scale), 4.5f * scale, alpha);
+        }
+
+        /// <summary>血判（丸い判子の跡）を描く。暗い縁、赤い面、内側に暗い輪。</summary>
+        internal static void DrawSeal(PixelShapeGraphic g, Vector2 center, float radius, float alpha)
+        {
+            if (radius <= 0.5f || alpha <= 0f) return;
+
+            Color dark = BloodDark; dark.a = alpha;
+            Color red = Blood; red.a = alpha;
+
+            g.Disc(center, radius + 1.5f, dark);
+            g.Disc(center, radius, red);
+            if (radius >= 8f) g.Ring(center, radius - 4f, 2f, dark);
         }
 
         /// <summary>
