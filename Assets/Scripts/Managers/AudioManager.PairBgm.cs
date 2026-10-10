@@ -277,7 +277,7 @@ namespace KillingMahjong.Managers
 
             if (_pairFade != null) { StopCoroutine(_pairFade); _pairFade = null; }
 
-            float master = bgmVolume * masterVolume;
+            float master = BgmMaster;
             if (instant)
             {
                 _pairNormalSource.volume = hot ? 0f : master;
@@ -373,7 +373,7 @@ namespace KillingMahjong.Managers
         private void ApplyPairVolumes()
         {
             if (!_pairRunning || _pairFade != null) return;   // フェード中は触らない
-            float master = bgmVolume * masterVolume;
+            float master = BgmMaster;
             bool hot = _pairHot == 1;
             if (_pairNormalSource != null) _pairNormalSource.volume = hot ? 0f : master;
             if (_pairTurnSource != null) _pairTurnSource.volume = hot ? master : 0f;

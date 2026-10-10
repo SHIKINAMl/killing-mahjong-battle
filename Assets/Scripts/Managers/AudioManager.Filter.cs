@@ -31,8 +31,41 @@ namespace KillingMahjong.Managers
         /// 届かなかった理由は幅で、1000→600 は 0.74 オクターブしかない。
         /// 人の耳は対数で聞くので、**すでにこもっている所からさらに沈めるには
         /// オクターブで稼ぐ必要がある。** 260Hz なら 1000 から約1.9オクターブ下がる。
+        ///
+        /// 2026-10-10 に 200Hz へ下げた（ユーザー「水に沈んだ感じが少し弱い。もっと沈めてよい」）。
+        /// ただし弱く聞こえた主な理由はここではなく、音量だった（<see cref="DeepSinkGain"/>）。
         /// </summary>
-        private const float DeepMuffledCutoff = 260f;
+        private const float DeepMuffledCutoff = 200f;
+
+        /// <summary>
+        /// 沈んでいるあいだ、BGM の音量に掛ける倍率（2026-10-10）。
+        ///
+        /// **それまでの「沈み」は、沈むどころか BGM を大きくしていた。** 実機で測ると、高い音は消えるが
+        /// 残響が低い音を足すので、全体では 7〜14dB 上がっていた（第4案の手牌選択で -26.8 → -19.9dB、
+        /// 賭けの合図で -20.8 → -6.7dB）。低音が前に出てきて「沈んだ」に聞こえない。
+        /// 音源の音量そのものを下げ、残響も絞って（<see cref="DeepReverbLevel"/>）、沈むと小さくなるようにした。
+        ///
+        /// **Web版ではこの倍率だけが効く。** Unity の Web 版は音のフィルター（ローパス・残響）を
+        /// 使えないので、上のカットオフも残響も何も起きない。音量だけは下げられる。
+        /// </summary>
+        private const float DeepSinkGain = 0.4f;
+
+        /// <summary>沈んでいるあいだの残響の量（ミリベル）。もとは 800 で、これが低音を大きくしていた。</summary>
+        private const float DeepReverbLevel = -400f;
+
+        /// <summary>いまの沈みの倍率。1 で等倍。</summary>
+        private float _bgmSink = 1f;
+        private Coroutine _bgmSinkFade;
+
+        /// <summary>曲を小さくして止めている最中か（<see cref="FadeOutBgm"/>）。そのあいだは音量を当て直さない。</summary>
+        private bool _bgmFadingOut;
+
+        /// <summary>
+        /// BGM の音源に入れる音量。設定の音量に、沈みの倍率を掛けたもの。
+        /// **BGM の音量を決める所は、必ずこれを使う。** `bgmVolume * masterVolume` を直に書くと、
+        /// 沈んでいるあいだに鳴り始めた曲だけが大きいままになる。
+        /// </summary>
+        private float BgmMaster { get { return bgmVolume * masterVolume * _bgmSink; } }
 
         /// <summary>沈むまでの秒数。長いと「いつの間にか変わっていた」になるので短めに。</summary>
         private const float DeepMuffleDuration = 0.6f;
@@ -79,6 +112,45 @@ namespace KillingMahjong.Managers
             ApplyFilterTarget(fadeDuration);
             FadeReverb(on, fadeDuration);
             FadeDeepExtras(on, fadeDuration);
+            FadeBgmSink(on ? DeepSinkGain : 1f, fadeDuration);
+        }
+
+        /// <summary>沈みの倍率を動かす。動いているあいだは、鳴っている BGM の音量を毎コマ当て直す。</summary>
+        private void FadeBgmSink(float target, float duration)
+        {
+            if (_bgmSinkFade != null) StopCoroutine(_bgmSinkFade);
+            _bgmSinkFade = StartCoroutine(BgmSinkFadeRoutine(target, duration));
+        }
+
+        private System.Collections.IEnumerator BgmSinkFadeRoutine(float target, float duration)
+        {
+            // 音量も耳には対数で聞こえるので、倍率は log で補間する
+            float logStart = Mathf.Log(Mathf.Max(_bgmSink, 0.01f));
+            float logTarget = Mathf.Log(Mathf.Max(target, 0.01f));
+
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / Mathf.Max(0.0001f, duration));
+                t = t * t * (3f - 2f * t);
+                _bgmSink = Mathf.Exp(Mathf.Lerp(logStart, logTarget, t));
+                ApplyBgmVolumes();
+                yield return null;
+            }
+            _bgmSink = target;
+            ApplyBgmVolumes();
+
+            // 層や2曲のフェードは、始めたときの音量を行き先に持っている（フェード中は当て直しが触らない）。
+            // 倍率が動いているあいだに始まったフェードが古い音量で終わるので、少しのあいだ当て直し続ける
+            float tail = 2.5f;
+            while (tail > 0f)
+            {
+                tail -= Time.deltaTime;
+                ApplyBgmVolumes();
+                yield return null;
+            }
+            _bgmSinkFade = null;
         }
 
         /// <summary>いま出ているべきカットオフへ向かわせる。</summary>
@@ -156,7 +228,7 @@ namespace KillingMahjong.Managers
                 bgmReverbFilter.room = ReverbRoomOff;
                 bgmReverbFilter.roomHF = -3500f;    // 高い所ほど残響に乗せない。水の中らしくなる
                 bgmReverbFilter.decayTime = 3.5f;
-                bgmReverbFilter.reverbLevel = 800f;
+                bgmReverbFilter.reverbLevel = DeepReverbLevel;
                 bgmReverbFilter.reverbDelay = 0.02f;
                 bgmReverbFilter.diffusion = 100f;
                 bgmReverbFilter.density = 100f;
@@ -257,7 +329,7 @@ namespace KillingMahjong.Managers
                 reverb.room = ReverbRoomOff;
                 reverb.roomHF = -3500f;
                 reverb.decayTime = 3.5f;
-                reverb.reverbLevel = 800f;
+                reverb.reverbLevel = DeepReverbLevel;
                 reverb.reverbDelay = 0.02f;
                 reverb.diffusion = 100f;
                 reverb.density = 100f;

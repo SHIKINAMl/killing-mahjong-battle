@@ -170,16 +170,25 @@ namespace KillingMahjong.Managers
             // 落としたはずの音量が戻ってプツッと鳴る。差し替えが終われば向こうが戻す。
             //
             // 第3案へ移るために既存案の音を下げている最中（0.25 秒）も同じ理由で触らない。
+            ApplyBgmVolumes();
+            if (seSource != null) seSource.volume = seVolume * masterVolume;
+            if (voiceSource != null) voiceSource.volume = voiceVolume * masterVolume;
+            if (discardSeSource != null) discardSeSource.volume = seVolume * masterVolume;
+        }
+
+        /// <summary>
+        /// 鳴っている BGM の音源すべてに、いまの音量（<see cref="BgmMaster"/>）を当て直す。
+        /// 設定の音量が変わったときと、スキルの「沈み」で倍率が動いているあいだに呼ぶ。
+        /// </summary>
+        private void ApplyBgmVolumes()
+        {
             if (!_p3FadingLegacy)
             {
-                if (bgmSource != null && !IsSwappingPhaseBgm) bgmSource.volume = bgmVolume * masterVolume;
+                if (bgmSource != null && !IsSwappingPhaseBgm && !_bgmFadingOut) bgmSource.volume = BgmMaster;
                 ApplyLayerVolumes();
                 ApplyPairVolumes();
             }
             ApplyProposal3Volumes();
-            if (seSource != null) seSource.volume = seVolume * masterVolume;
-            if (voiceSource != null) voiceSource.volume = voiceVolume * masterVolume;
-            if (discardSeSource != null) discardSeSource.volume = seVolume * masterVolume;
             ApplyDrumVolume();
         }
 

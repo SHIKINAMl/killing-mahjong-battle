@@ -121,7 +121,7 @@ namespace KillingMahjong.Managers
             get { return ProposalWanted || _p3Running || _p3Director != null; }
         }
 
-        private float P3Master { get { return bgmVolume * masterVolume; } }
+        private float P3Master { get { return BgmMaster; } }
 
         private bool LegacyBgmAudible
         {
@@ -738,7 +738,7 @@ namespace KillingMahjong.Managers
             if (bgmSource != null)
             {
                 bgmSource.Stop();
-                bgmSource.volume = bgmVolume * masterVolume;   // 次に鳴らすときのために戻す
+                bgmSource.volume = BgmMaster;   // 次に鳴らすときのために戻す
             }
             currentPhaseBgmName = null;
 

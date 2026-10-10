@@ -64,16 +64,19 @@ namespace KillingMahjong.Managers
         private IEnumerator FadeOutBgmRoutine(float seconds)
         {
             float from = bgmSource.volume;
+            // 小さくしているあいだは、音量の当て直し（ApplyBgmVolumes）に触らせない
+            _bgmFadingOut = true;
             for (float t = 0f; t < seconds; t += Time.deltaTime)
             {
-                if (bgmSource == null) yield break;
+                if (bgmSource == null) { _bgmFadingOut = false; yield break; }
                 bgmSource.volume = Mathf.Lerp(from, 0f, t / seconds);
                 yield return null;
             }
+            _bgmFadingOut = false;
 
             StopBGM();
             // 次に鳴らすときのために音量を戻しておく
-            if (bgmSource != null) bgmSource.volume = bgmVolume * masterVolume;
+            if (bgmSource != null) bgmSource.volume = BgmMaster;
         }
 
         public void StopBGM()

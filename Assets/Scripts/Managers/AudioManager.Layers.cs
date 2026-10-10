@@ -153,7 +153,7 @@ namespace KillingMahjong.Managers
             if (intensity == _layerIntensity) return;
             _layerIntensity = intensity;
 
-            float master = bgmVolume * masterVolume;
+            float master = BgmMaster;
             for (int i = 0; i < _layerSources.Length; i++)
             {
                 float target = LayerMix[intensity, i] * master;
@@ -186,7 +186,7 @@ namespace KillingMahjong.Managers
         {
             if (!_layersRunning || _layerSources == null || _layerIntensity < 0) return;
 
-            float master = bgmVolume * masterVolume;
+            float master = BgmMaster;
             for (int i = 0; i < _layerSources.Length; i++)
             {
                 if (_layerFades[i] != null) continue;   // フェード中は触らない

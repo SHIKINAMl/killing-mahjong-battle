@@ -65,7 +65,7 @@ namespace KillingMahjong.Managers
             drumSource = gameObject.AddComponent<AudioSource>();
             drumSource.playOnAwake = false;
             drumSource.loop = true;
-            drumSource.volume = drumVolume * bgmVolume * masterVolume;
+            drumSource.volume = drumVolume * BgmMaster;
         }
 
         private AudioClip GetDrumClip(string name)
@@ -123,7 +123,7 @@ namespace KillingMahjong.Managers
             if (wait > 0f) yield return new WaitForSeconds(wait);
 
             drumSource.clip = clip;
-            drumSource.volume = drumVolume * bgmVolume * masterVolume;
+            drumSource.volume = drumVolume * BgmMaster;
             drumSource.loop = true;
             drumSource.Play();
             drumSwapCoroutine = null;
@@ -150,7 +150,7 @@ namespace KillingMahjong.Managers
         /// <summary>音量設定が変わったときにドラムにも反映する。</summary>
         private void ApplyDrumVolume()
         {
-            if (drumSource != null) drumSource.volume = drumVolume * bgmVolume * masterVolume;
+            if (drumSource != null) drumSource.volume = drumVolume * BgmMaster;
         }
     }
 }

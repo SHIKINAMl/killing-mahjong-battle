@@ -342,7 +342,7 @@ namespace KillingMahjong.Managers
             float wait = SecondsToNextPhaseBgmBar();
             if (wait > SwapDipSeconds) yield return new WaitForSeconds(wait - SwapDipSeconds);
 
-            float full = bgmVolume * masterVolume;
+            float full = BgmMaster;
 
             // 落とす
             float t = 0f;
@@ -375,10 +375,11 @@ namespace KillingMahjong.Managers
             while (t < SwapDipSeconds)
             {
                 t += Time.deltaTime;
-                bgmSource.volume = Mathf.Lerp(0f, full, t / SwapDipSeconds);
+                // 戻り先は毎回読み直す。落としているあいだに、スキルの「沈み」で音量の倍率が動くことがある
+                bgmSource.volume = Mathf.Lerp(0f, BgmMaster, t / SwapDipSeconds);
                 yield return null;
             }
-            bgmSource.volume = full;
+            bgmSource.volume = BgmMaster;
 
             bgmSwapCoroutine = null;
         }
@@ -486,7 +487,7 @@ namespace KillingMahjong.Managers
             bgmSource.clip = clip;
             bgmSource.loop = true;
             bgmSource.timeSamples = 0;
-            bgmSource.volume = bgmVolume * masterVolume;
+            bgmSource.volume = BgmMaster;
             bgmSource.Play();
         }
 
@@ -592,7 +593,7 @@ namespace KillingMahjong.Managers
             bgmSource.clip = clip;
             bgmSource.loop = true;
             bgmSource.timeSamples = 0;
-            bgmSource.volume = bgmVolume * masterVolume;
+            bgmSource.volume = BgmMaster;
             bgmSource.Play();
         }
 
