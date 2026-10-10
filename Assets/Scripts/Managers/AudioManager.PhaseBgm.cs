@@ -99,12 +99,82 @@ namespace KillingMahjong.Managers
             // **135.00 ちょうど・1拍目がサンプル0**。実測ではなく設計値。
             { "tut_lesson",       new Tempo(135f, 4) },
 
+            // プランナー採用の2曲（2026-09-26）。**AudioManager.PairBgm.cs がここから拍を引く。**
+            // 2本は同じ素材から書き出した同尺・同テンポ・同調で、それが重ねられる条件。
+            // 実測 136.000 BPM / 4拍子 / 80小節ちょうど / 141.1765 秒。
+            { "bgm_phase_normal", new Tempo(136f, 4) },
+            { "bgm_phase_turn",   new Tempo(136f, 4) },
+
             // 層のステム。**ここに無いと拍が引けず、音ハメが効かない。**
             // 4本とも同じ編曲を分けたものなので当然おなじテンポ。
             { "field_base",       new Tempo(118f, 4) },
             { "field_melody",     new Tempo(118f, 4) },
             { "field_drums",      new Tempo(118f, 4) },
             { "field_sparkle",    new Tempo(118f, 4) },
+
+            // **第3案（2026-10-08）。** 既存の曲とは別の `p3_` 名で引く。全曲4拍子。
+            // 値は受け取った音源一式の一覧表（manifest）のもの。
+            // 濃度1〜4 と betting / draw / win などは同テンポ・同尺で、
+            // それが「再生位置を保ったまま入れ替えられる」条件（AudioManager.Proposal3.cs）。
+            { "p3_bgm_field_1",      new Tempo(124f, 4) },
+            { "p3_bgm_field_2",      new Tempo(124f, 4) },
+            { "p3_bgm_field_3",      new Tempo(124f, 4) },
+            { "p3_bgm_field_4",      new Tempo(124f, 4) },
+            { "p3_bgm_phase_normal", new Tempo(124f, 4) },
+            { "p3_bgm_phase_turn",   new Tempo(124f, 4) },
+            { "p3_bgm_betting",      new Tempo(124f, 4) },
+            { "p3_bgm_discard",      new Tempo(124f, 4) },
+            { "p3_bgm_ron",          new Tempo(124f, 4) },
+            { "p3_bgm_draw",         new Tempo(124f, 4) },
+            { "p3_bgm_win",          new Tempo(124f, 4) },
+            { "p3_bgm_prepare",      new Tempo(105f, 4) },
+            { "p3_bgm_result",       new Tempo(105f, 4) },
+            { "p3_bgm_tension",      new Tempo(132f, 4) },
+            { "p3_bgm_discard_hot",  new Tempo(132f, 4) },
+            { "p3_bgm_lose",         new Tempo(92f,  4) },
+
+            // **第4案（2026-10-08）。** `p4_` 名で引く。**全曲 136BPM・4拍子・64小節・同じ長さ。**
+            // だから第4案の中では、どの曲へ移るときも再生位置を保てる（AudioManager.Proposal4.cs）。
+            // 流局は土台とモチーフの2本に分けて鳴らすので、その2本も載せる。
+            { "p4_bgm_field_1",      new Tempo(136f, 4) },
+            { "p4_bgm_field_2",      new Tempo(136f, 4) },
+            { "p4_bgm_field_3",      new Tempo(136f, 4) },
+            { "p4_bgm_field_4",      new Tempo(136f, 4) },
+            { "p4_bgm_phase_normal", new Tempo(136f, 4) },
+            { "p4_bgm_phase_turn",   new Tempo(136f, 4) },
+            { "p4_bgm_prepare",      new Tempo(136f, 4) },
+            { "p4_bgm_betting",      new Tempo(136f, 4) },
+            { "p4_bgm_tension",      new Tempo(136f, 4) },
+            { "p4_bgm_discard",      new Tempo(136f, 4) },
+            { "p4_bgm_discard_hot",  new Tempo(136f, 4) },
+            { "p4_bgm_ron",          new Tempo(136f, 4) },
+            { "p4_bgm_draw",         new Tempo(136f, 4) },
+            { "p4_bgm_draw_base",    new Tempo(136f, 4) },
+            { "p4_bgm_draw_motif",   new Tempo(136f, 4) },
+            { "p4_bgm_result",       new Tempo(136f, 4) },
+            { "p4_bgm_win",          new Tempo(136f, 4) },
+            { "p4_bgm_lose",         new Tempo(136f, 4) },
+
+            // **夜卓の灯火（2026-10-09）。** `rt_` 名で引く。**全曲 136BPM・4拍子・82小節・同じ長さ。**
+            // 第4案（64小節）とは長さが違う。位置を保つのは濃度1〜4どうしだけ（AudioManager.Proposal4.cs）。
+            { "rt_bgm_field_1",      new Tempo(136f, 4) },
+            { "rt_bgm_field_2",      new Tempo(136f, 4) },
+            { "rt_bgm_field_3",      new Tempo(136f, 4) },
+            { "rt_bgm_field_4",      new Tempo(136f, 4) },
+            { "rt_bgm_phase_normal", new Tempo(136f, 4) },
+            { "rt_bgm_phase_turn",   new Tempo(136f, 4) },
+            { "rt_bgm_prepare",      new Tempo(136f, 4) },
+            { "rt_bgm_betting",      new Tempo(136f, 4) },
+            { "rt_bgm_tension",      new Tempo(136f, 4) },
+            { "rt_bgm_discard",      new Tempo(136f, 4) },
+            { "rt_bgm_discard_hot",  new Tempo(136f, 4) },
+            { "rt_bgm_ron",          new Tempo(136f, 4) },
+            { "rt_bgm_draw",         new Tempo(136f, 4) },
+            { "rt_bgm_draw_base",    new Tempo(136f, 4) },
+            { "rt_bgm_draw_motif",   new Tempo(136f, 4) },
+            { "rt_bgm_result",       new Tempo(136f, 4) },
+            { "rt_bgm_win",          new Tempo(136f, 4) },
+            { "rt_bgm_lose",         new Tempo(136f, 4) },
         };
 
         /// <summary>拍の情報が無い曲のときの既定。すぐ切り替える方に倒す。</summary>
@@ -133,6 +203,16 @@ namespace KillingMahjong.Managers
             return clip;
         }
 
+        /// <summary>
+        /// 対局のあいだ通して流す1曲の名前（「賭けの合図 I / II」を選んでいるとき）。そうでなければ null。
+        /// 設定から <see cref="ApplyMatchBgmSet"/> が入れる。層も2曲方式も使わず、1本の音源で鳴らす。
+        /// **この曲の拍は拍の表（Tempos）に入れていない。** 測った値はある（AudioManager.Drums.cs の
+        /// BeatGrids。135.10 / 134.25 BPM）が、1拍目が曲の頭から 0.283 / 0.152 秒ずれていて、
+        /// 「1拍目はサンプル0」を前提にした拍の計算（TryGetBeatPosition）に乗らない。
+        /// 選んでいるあいだ、曲の拍に合わせる動きは拍を取れないときの動きになる。
+        /// </summary>
+        private string _fixedMatchBgm;
+
         /// <summary>いまのフェイズと濃度から、鳴らすべき曲名を決める。</summary>
         private string ResolveBgmName(RoundStatus status)
         {
@@ -154,6 +234,7 @@ namespace KillingMahjong.Managers
             if (!CanPlay) return;
             if (!UsePhaseBgm) return;
 
+            if (status != RoundStatus.Result) _resultBgmOverride = null;
             currentBgmPhase = status;
             ApplyPhaseBgm();
         }
@@ -185,7 +266,38 @@ namespace KillingMahjong.Managers
         /// </summary>
         private void ApplyPhaseBgm()
         {
-            string want = ResolveBgmName(currentBgmPhase);
+            // **第3案が絡むあいだは、監督（AudioManager.Proposal3.cs）に任せる（2026-10-08）。**
+            // 第3案を選んでいるときだけでなく、第3案から既存案へ戻る途中もここで止める。
+            // 下へ流すと、第3案が鳴っている上に既存案が重なって二重に鳴る。
+            if (Proposal3Owns)
+            {
+                NotifyProposal3();
+                return;
+            }
+            ApplyLegacyPhaseBgm();
+        }
+
+        /// <summary>
+        /// 既存案（2曲方式・層・1本もの）でいまのフェイズの曲を当てる。
+        /// 第3案の監督が既存案へ戻すときにも、ここを直接呼ぶ。
+        /// </summary>
+        private void ApplyLegacyPhaseBgm()
+        {
+            // **採用した2曲が担当するフェイズは、こちらより先に2曲方式へ渡す（2026-09-26）。**
+            // 2曲は最初から同時に鳴っていて、フェイズが変わっても止めない。
+            // 曲を差し替えるこの下の処理へ落とすと、せっかく重ねた2本が止まってしまう。
+            if (UsePairBgm && PairHandles(currentBgmPhase))
+            {
+                bool hot = PairIsTurnPhase[currentBgmPhase];
+                if (!IsPairBgmRunning) StartPairBgm(hot);
+                else ApplyPairMix(hot, instant: false);
+                return;
+            }
+            // 2曲の担当外のフェイズ（流局・結果など）へ出たら畳む
+            if (IsPairBgmRunning) StopPairBgm();
+
+            // 「賭けの合図」を選んでいるあいだは、どのフェイズでもその1曲（_fixedMatchBgm）
+            string want = _fixedMatchBgm ?? ResolveBgmName(currentBgmPhase);
 
             // **場のBGMは層で鳴らす。** 濃さが変わっても曲は変わらないので、
             // ここでは「場に入ったか / 場から出たか」だけを見る。
@@ -318,15 +430,18 @@ namespace KillingMahjong.Managers
 
             currentBgmPhase = status;
             currentPhaseBgmName = null;   // 同じ曲でも鳴らし直せるようにする
+            _resultBgmOverride = null;
             ApplyPhaseBgm();
         }
 
         /// <summary>
-        /// タイトル画面の曲。**追加曲の「真夜中のアーケード」**（2026-09-19 のユーザー指示）。
-        /// 元の `bgm_title` はコレクションで聴ける。
+        /// タイトル画面の曲。**追加曲の「夏の空」**（2026-10-04 のユーザー指示）。
+        ///
+        /// 2026-09-19 からは「真夜中のアーケード」(`bgm_ex_midnight`) だった。
+        /// それも元の `bgm_title` も、コレクションで聴ける。
         /// ループ用の曲ではないので、終わりの約2秒でフェードしてから頭に戻る。
         /// </summary>
-        public const string TitleBgmName = "bgm_ex_midnight";
+        public const string TitleBgmName = "bgm_ex_summer";
 
         /// <summary>タイトル・メニュー用。対局のBGMとは別系統。</summary>
         public void PlayTitleBgm()
@@ -358,6 +473,10 @@ namespace KillingMahjong.Managers
 
             var clip = GetPhaseBgmClip(name);
             if (clip == null) { PlayBGM(defaultBgm); return; }
+
+            // 対局の外の曲を鳴らすので、第3案が鳴っていたら畳む（待っている切り替えも消す）
+            StopProposal3();
+
             if (bgmSource.isPlaying && bgmSource.clip == clip) return;
 
             currentPhaseBgmName = name;
@@ -409,10 +528,33 @@ namespace KillingMahjong.Managers
             if (!CanPlay) return;
             if (!UsePhaseBgm) return;
 
-            var clip = GetPhaseBgmClip(isLocalWin ? "bgm_win" : "bgm_lose");
+            // 第3案へ切り替えたときも同じ場面の曲を選べるよう、勝敗を覚えておく
+            _resultBgmOverride = isLocalWin ? "bgm_win" : "bgm_lose";
+
+            if (Proposal3Owns)
+            {
+                NotifyProposal3();
+                return;
+            }
+            ApplyLegacyResultBgm();
+        }
+
+        /// <summary>既存案で、結果画面の曲を勝敗の曲へ替える。</summary>
+        private void ApplyLegacyResultBgm()
+        {
+            if (_resultBgmOverride == null) return;
+
+            // 「賭けの合図」は、結果・勝ち負けの画面でも同じ曲のまま
+            if (_fixedMatchBgm != null) return;
+
+            // **従来の「負け」の曲（bgm_lose）は 2026-10-09 に消した**（WebGL のビルドを100MB未満にするため。
+            // ユーザーの判断）。従来を選んでいて負けたときは、結果の曲のまま鳴らし続ける
+            if (_resultBgmOverride == "bgm_lose") return;
+
+            var clip = GetPhaseBgmClip(_resultBgmOverride);
             if (clip == null) return;
 
-            currentPhaseBgmName = isLocalWin ? "bgm_win" : "bgm_lose";
+            currentPhaseBgmName = _resultBgmOverride;
             if (bgmSwapCoroutine != null) StopCoroutine(bgmSwapCoroutine);
             bgmSwapCoroutine = StartCoroutine(SwapBgmAtNextBar(clip));
         }
@@ -445,6 +587,8 @@ namespace KillingMahjong.Managers
             if (bgmSwapCoroutine != null) { StopCoroutine(bgmSwapCoroutine); bgmSwapCoroutine = null; }
             currentPhaseBgmName = name;
 
+            StopProposal3();   // チュートリアルは第3案を使わない。鳴っていたら畳む
+
             bgmSource.clip = clip;
             bgmSource.loop = true;
             bgmSource.timeSamples = 0;
@@ -464,6 +608,8 @@ namespace KillingMahjong.Managers
             if (bgmSwapCoroutine != null) { StopCoroutine(bgmSwapCoroutine); bgmSwapCoroutine = null; }
             if (bgmSource != null) bgmSource.Stop();
             StopLayeredBgm();             // 層で鳴っていたらそれも断つ
+            StopPairBgm();                // 採用した2曲で鳴っていたらそれも断つ
+            StopProposal3();              // 第3案で鳴っていたらそれも断つ
             currentPhaseBgmName = null;   // 同じ曲を鳴らし直せるようにしておく
         }
 
@@ -471,6 +617,7 @@ namespace KillingMahjong.Managers
         private void ResetPhaseBgmState()
         {
             currentPhaseBgmName = null;
+            _resultBgmOverride = null;
             if (bgmSwapCoroutine != null) { StopCoroutine(bgmSwapCoroutine); bgmSwapCoroutine = null; }
         }
     }

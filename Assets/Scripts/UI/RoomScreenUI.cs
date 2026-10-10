@@ -7,8 +7,21 @@ using KillingMahjong.Common;
 namespace KillingMahjong.UI
 {
     /// <summary>
-    /// タイトルから入る、女の子が部屋で待っているホーム画面。
-    /// シーンには保存せず、タイトルシーン上に専用 Canvas として実行時に組み立てる。
+    /// 女の子が部屋で待っているホーム画面（部屋シーン）。
+    ///
+    /// **部屋の部品はシーンに置いてある（`RoomScreen`）。ここはそれを探して使う（2026-10-09）。**
+    /// 以前は再生のたびにコードで組み立て、シーンには「見本の写し」だけを置いていた。
+    /// 写しはコードを変えても付いてこないので、置いてある物と再生時の物が食い違った
+    /// （看板を1体足したのに、シーンには2体のままだった）。
+    ///
+    /// **位置・大きさ・色・文字はシーンが正。** 見た目を変えるときはシーンを直す。
+    /// ここに残っている数字は、シーンに無かったときに作るための控え（<see cref="SceneFirst"/>）。
+    /// 部品を足したら `Tools > UI > 実行時UIをシーンへ置く` でシーンにも置くこと。
+    ///
+    /// 再生時にだけ付けるもの（シーンには保存できない・しない）:
+    ///   女の子の歩きと瞬き（<see cref="RoomGirlWalker"/>）、
+    ///   空気の層（周辺減光と粒子。絵をその場で作る）、光の明滅・影・つぶやき。
+    ///   シーンに残っているこれらの写しは、再生時に捨てて付け直す。
     /// </summary>
     public sealed class RoomScreenUI : MonoBehaviour
     {
@@ -19,6 +32,7 @@ namespace KillingMahjong.UI
         private static readonly Color RoomFloor = new Color32(35, 20, 27, 255);
         private static readonly Color WoodDark = new Color32(48, 28, 28, 255);
         private static readonly Color WoodLight = new Color32(91, 53, 45, 255);
+        private const float GirlBaseY = -54f;
 
         private GameObject root;
         private GameObject content;
@@ -84,12 +98,15 @@ namespace KillingMahjong.UI
 
         private void BuildBackdropDim()
         {
-            backdropDim = new GameObject("RoomBackdropDim", typeof(RectTransform), typeof(Image));
-            backdropDim.transform.SetParent(root.transform, false);
-            Stretch(backdropDim.GetComponent<RectTransform>());
-            var image = backdropDim.GetComponent<Image>();
-            image.color = new Color(0f, 0f, 0f, 0.55f);
-            image.raycastTarget = true;
+            backdropDim = SceneFirst.Child(root.transform, "RoomBackdropDim", out bool created,
+                typeof(RectTransform), typeof(Image));
+            if (created)
+            {
+                Stretch(backdropDim.GetComponent<RectTransform>());
+                var image = backdropDim.GetComponent<Image>();
+                image.color = new Color(0f, 0f, 0f, 0.55f);
+                image.raycastTarget = true;
+            }
             backdropDim.SetActive(false);
         }
 
@@ -142,48 +159,124 @@ namespace KillingMahjong.UI
             }
         }
 
+        private const string RootName = "RoomScreen";
+
+        /// <summary>2026-10-09 より前のシーンでの名前。当時は再生時に捨てる「見本の写し」だった。</summary>
+        private const string LegacyRootName = "SavedRoomPreview";
+
         private void Build()
+        {
+            BuildStatic();
+            AttachRuntime();
+            SceneFirst.Report("RoomScreenUI");
+        }
+
+        /// <summary>
+        /// **エディタ用。** 部屋の部品のうち、シーンに無い物だけを作って置く
+        /// （`SceneFirstBaker` が再生していないときに呼ぶ）。再生時にだけ付けるものは付けない。
+        /// </summary>
+        /// <returns>シーンに無くて作った物の名前。全部置いてあったら空文字</returns>
+        public string BakeForEditor()
+        {
+            BuildStatic();
+            return SceneFirst.Report("RoomScreenUI");
+        }
+
+        /// <summary>シーンに置いてある部品を探して覚える。無い物は作る。再生していなくても呼べる。</summary>
+        private void BuildStatic()
         {
             font = BorrowJapaneseFont();
 
-            root = new GameObject("RoomScreen", typeof(RectTransform), typeof(Canvas),
-                typeof(CanvasScaler), typeof(GraphicRaycaster));
-            var canvas = root.GetComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = UISortingOrders.TitleRoomScreen;
+            root = SceneFirst.Find(RootName);
+            if (root == null)
+            {
+                root = SceneFirst.Find(LegacyRootName);
+                if (root != null) root.name = RootName;
+            }
+            if (root == null)
+            {
+                SceneFirst.NoteCreated(RootName);
+                root = new GameObject(RootName, typeof(RectTransform), typeof(Canvas),
+                    typeof(CanvasScaler), typeof(GraphicRaycaster));
+                var canvas = root.GetComponent<Canvas>();
+                canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+                canvas.sortingOrder = UISortingOrders.TitleRoomScreen;
 
-            var scaler = root.GetComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(800f, 600f);
-            scaler.matchWidthOrHeight = 0.5f;
-            Stretch(root.GetComponent<RectTransform>());
+                var scaler = root.GetComponent<CanvasScaler>();
+                scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+                scaler.referenceResolution = new Vector2(800f, 600f);
+                scaler.matchWidthOrHeight = 0.5f;
+                Stretch(root.GetComponent<RectTransform>());
+            }
 
-            content = new GameObject("RoomContent", typeof(RectTransform));
-            content.transform.SetParent(root.transform, false);
-            Stretch(content.GetComponent<RectTransform>());
+            content = SceneFirst.Child(root.transform, "RoomContent", out bool madeContent, typeof(RectTransform));
+            if (madeContent) Stretch(content.GetComponent<RectTransform>());
 
             BuildRoomBackground();
             BuildGirl();
+            BuildMenuBar();
+            BuildTutorialModal();
+            BuildBackdropDim();
+        }
+
+        /// <summary>
+        /// 再生時にだけ付けるもの。**絵をその場で作る**（周辺減光・粒子）か、
+        /// **動きの途中の状態を持つ**（歩き・明滅・つぶやき）ので、シーンには保存できない。
+        /// </summary>
+        private void AttachRuntime()
+        {
+            if (girlRectForAmbience != null)
+            {
+                var girl = girlRectForAmbience.gameObject;
+                var walker = girl.GetComponent<RoomGirlWalker>();
+                if (walker == null) walker = girl.AddComponent<RoomGirlWalker>();
+                walker.Initialize(girlFace, girlOpenFace, girlClosedFace,
+                    new Vector2(-200f, GirlBaseY), new Vector2(40f, GirlBaseY));
+            }
+
+            // シーンに残っている写しを先に捨てる。残したまま付けると二重になる
+            RemoveSavedCopies("SceneAtmosphere", "RoomAmbience", "RoomGirlShadow", "RoomMurmur");
 
             // **ここで空気をかぶせる（2026-09-17 のユーザー指示）。**
-            // 部屋と女の子の上、メニューの下。順番が重なり順になるので、
-            // これより後に作るもの（メニュー・確認パネル）は曇らない。
+            // 部屋と女の子の上、メニューの下。
             Effects.SceneAtmosphere.Attach(content.transform,
                                            Effects.SceneAtmosphere.RoomVignette,
                                            Effects.SceneAtmosphere.RoomGrain,
                                            Effects.SceneAtmosphere.RoomGrainMean);
 
             // **光・影・奥行き・つぶやき（2026-09-17）。**
-            // 空気の層より後に作る。つぶやきの吹き出しは、
+            // 空気の層より後に付ける。つぶやきの吹き出しは、
             // 周辺減光や粒子で曇らせたくないため。
             Effects.RoomAmbience.Attach(content.transform, girlRectForAmbience,
                                         windowGlow, lampGlow,
                                         farLayer, midLayer, nearLayer, font);
 
-            BuildMenuBar();
-            BuildTutorialModal();
-            BuildBackdropDim();
+            // **並び順が重なり順。** 上の2つは末尾に足されるので、メニューと確認パネルを
+            // その後ろ（手前）へ送り直す。送らないとメニューまで曇る
+            if (menuBar != null) menuBar.transform.SetAsLastSibling();
+            if (tutorialModal != null) tutorialModal.transform.SetAsLastSibling();
         }
+
+        private void RemoveSavedCopies(params string[] names)
+        {
+            var doomed = new System.Collections.Generic.List<Transform>();
+            foreach (var t in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (t != null && t != root.transform && Array.IndexOf(names, t.name) >= 0) doomed.Add(t);
+            }
+            foreach (var t in doomed)
+            {
+                if (t == null) continue;
+                // 消えるのはコマの終わり。先に外しておかないと、このコマのあいだ並び順に残る
+                t.gameObject.SetActive(false);
+                t.SetParent(null, false);
+                Destroy(t.gameObject);
+            }
+        }
+
+        private Image girlFace;
+        private Sprite girlOpenFace;
+        private Sprite girlClosedFace;
 
         /// <summary>奥行きを出すための層。遠・中・近。歩きに合わせて別々の速さで流す。</summary>
         private RectTransform farLayer;
@@ -198,12 +291,27 @@ namespace KillingMahjong.UI
         private RectTransform girlRectForAmbience;
 
         /// <summary>視差用の層を1枚作る。中身は全画面に広げておく。</summary>
+        /// <summary>
+        /// 視差で流す層の、画面からはみ出させる幅（左右それぞれ）。
+        ///
+        /// **層は画面より広く作らないと、端が画面の中に入ってくる。**
+        /// 女の子は x -200〜+40 の 240px を歩き、層はその動きの逆へ
+        /// far 0.05 / mid 0.11 / near 0.19 倍ずれる。いちばん動く near で 45.6px。
+        /// 余裕を見て 80px。ここを削ると、女の子が端へ行ったとき
+        /// 壁や床の向こうの「何も無い背景」が覗く（2026-09-27 の指摘）。
+        /// </summary>
+        private const float ParallaxOverscan = 80f;
+
         private RectTransform CreateParallaxLayer(string name)
         {
-            var go = new GameObject(name, typeof(RectTransform));
-            go.transform.SetParent(content.transform, false);
+            var go = SceneFirst.Child(content.transform, name, out bool created, typeof(RectTransform));
             var rt = go.GetComponent<RectTransform>();
+            if (!created) return rt;
+
             Stretch(rt);
+            // 左右へ広げる。Stretch のままだと画面と同じ幅で、ずらすと端が出る
+            rt.offsetMin = new Vector2(-ParallaxOverscan, rt.offsetMin.y);
+            rt.offsetMax = new Vector2(ParallaxOverscan, rt.offsetMax.y);
             return rt;
         }
 
@@ -218,10 +326,14 @@ namespace KillingMahjong.UI
 
             // 素材待ちでタイトル絵が透けないよう、まずはコードだけで室内を組む。
             // 壁・床・窓明かり・本棚・机を重ね、あとで背景画へ差し替えても他のUIに影響しない構造にする。
+            // **横幅は画面(800)ではなく、はみ出しぶんを足した幅にする。**
+            // 800 のままだと、層をずらしたときに絵の端が画面の中へ入ってくる。
+            const float wideW = 800f + ParallaxOverscan * 2f;
+
             CreateStretchImage(farLayer, "RoomBackdrop", RoomDark);
-            CreateCenteredImage(farLayer, "RoomWall", new Vector2(0f, 100f), new Vector2(800f, 400f), RoomWall);
-            CreateCenteredImage(nearLayer, "RoomFloor", new Vector2(0f, -200f), new Vector2(800f, 200f), RoomFloor);
-            CreateCenteredImage(farLayer, "RoomCeilingTrim", new Vector2(0f, 286f), new Vector2(800f, 18f),
+            CreateCenteredImage(farLayer, "RoomWall", new Vector2(0f, 100f), new Vector2(wideW, 400f), RoomWall);
+            CreateCenteredImage(nearLayer, "RoomFloor", new Vector2(0f, -200f), new Vector2(wideW, 200f), RoomFloor);
+            CreateCenteredImage(farLayer, "RoomCeilingTrim", new Vector2(0f, 286f), new Vector2(wideW, 18f),
                 new Color32(75, 45, 55, 255));
 
             CreateCenteredImage(nearLayer, "RoomRug", new Vector2(-58f, -144f), new Vector2(435f, 118f),
@@ -274,27 +386,26 @@ namespace KillingMahjong.UI
             if (openFace == null) openFace = fallback;
             if (closedFace == null) closedFace = openFace;
 
-            var outline = new GameObject("RoomGirlOutline", typeof(RectTransform));
-            outline.transform.SetParent(content.transform, false);
-            var outlineRect = outline.GetComponent<RectTransform>();
-            ConfigureGirlRect(outlineRect);
-            outlineRect.localScale = Vector3.one * 1.035f;
-            CreateGirlLayer(outline.transform, "RoomGirlOutlineBody", body, new Color(1f, 1f, 1f, 0.90f));
-            Image outlineFace = CreateGirlLayer(outline.transform, "RoomGirlOutlineFace", openFace,
-                new Color(1f, 1f, 1f, 0.90f));
-
-            var girl = new GameObject("RoomGirl", typeof(RectTransform));
-            girl.transform.SetParent(content.transform, false);
+            // 足元は下のメニュー境界で隠す。画像自体の切れ目を部屋の中に見せない。
+            var viewport = SceneFirst.Child(content.transform, "RoomGirlViewport", out bool madeViewport,
+                typeof(RectTransform), typeof(RectMask2D));
+            if (madeViewport)
+            {
+                Stretch(viewport.GetComponent<RectTransform>());
+                viewport.GetComponent<RectMask2D>().padding = new Vector4(0, 92, 0, 0);
+            }
+            var girl = SceneFirst.Child(viewport.transform, "RoomGirl", out bool madeGirl, typeof(RectTransform));
             var girlRect = girl.GetComponent<RectTransform>();
-            ConfigureGirlRect(girlRect);
+            if (madeGirl) ConfigureGirlRect(girlRect);
             CreateGirlLayer(girl.transform, "RoomGirlBody", body, Color.white);
-            Image face = CreateGirlLayer(girl.transform, "RoomGirlFace", openFace, Color.white);
+            girlFace = CreateGirlLayer(girl.transform, "RoomGirlFace", openFace, Color.white);
 
+            // 瞬きは「開いた顔」と「閉じた顔」を入れ替える。開いた顔はシーンに置いてある絵を使う
+            girlOpenFace = girlFace.sprite != null ? girlFace.sprite : openFace;
+            girlClosedFace = closedFace;
             girlRectForAmbience = girlRect;
 
-            var walker = girl.AddComponent<RoomGirlWalker>();
-            walker.Initialize(outlineRect, outlineFace, face, openFace, closedFace,
-                new Vector2(-200f, -30f), new Vector2(40f, -30f));
+            // 歩きと瞬き（RoomGirlWalker）は再生時に付ける（AttachRuntime）
         }
 
         private static void ConfigureGirlRect(RectTransform rect)
@@ -302,16 +413,17 @@ namespace KillingMahjong.UI
             rect.anchorMin = new Vector2(0.5f, 0.5f);
             rect.anchorMax = new Vector2(0.5f, 0.5f);
             rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = new Vector2(-100f, -30f);
+            rect.anchoredPosition = new Vector2(-100f, GirlBaseY);
             rect.sizeDelta = new Vector2(340f, 340f);
         }
 
         private static Image CreateGirlLayer(Transform parent, string name, Sprite sprite, Color color)
         {
-            var layer = new GameObject(name, typeof(RectTransform), typeof(Image));
-            layer.transform.SetParent(parent, false);
-            Stretch(layer.GetComponent<RectTransform>());
+            var layer = SceneFirst.Child(parent, name, out bool created, typeof(RectTransform), typeof(Image));
             var image = layer.GetComponent<Image>();
+            if (!created) return image;
+
+            Stretch(layer.GetComponent<RectTransform>());
             image.sprite = sprite;
             image.color = color;
             image.preserveAspect = true;
@@ -321,27 +433,32 @@ namespace KillingMahjong.UI
 
         private void BuildMenuBar()
         {
-            var bar = new GameObject("RoomMenuBar", typeof(RectTransform));
-            bar.transform.SetParent(content.transform, false);
+            var bar = SceneFirst.Child(content.transform, "RoomMenuBar", out bool madeBar, typeof(RectTransform));
             menuBar = bar;
-            var barRect = bar.GetComponent<RectTransform>();
-            barRect.anchorMin = new Vector2(0.5f, 0f);
-            barRect.anchorMax = new Vector2(0.5f, 0f);
-            barRect.pivot = new Vector2(0.5f, 0f);
-            barRect.anchoredPosition = new Vector2(0f, 28f);
-            barRect.sizeDelta = new Vector2(740f, 64f);
+            if (madeBar)
+            {
+                var barRect = bar.GetComponent<RectTransform>();
+                barRect.anchorMin = new Vector2(0.5f, 0f);
+                barRect.anchorMax = new Vector2(0.5f, 0f);
+                barRect.pivot = new Vector2(0.5f, 0f);
+                barRect.anchoredPosition = new Vector2(0f, 28f);
+                barRect.sizeDelta = new Vector2(740f, 64f);
+            }
 
-            var rule = new GameObject("RoomMenuRule", typeof(RectTransform), typeof(Image));
-            rule.transform.SetParent(bar.transform, false);
-            var ruleRect = rule.GetComponent<RectTransform>();
-            ruleRect.anchorMin = new Vector2(0.5f, 1f);
-            ruleRect.anchorMax = new Vector2(0.5f, 1f);
-            ruleRect.pivot = new Vector2(0.5f, 1f);
-            ruleRect.anchoredPosition = Vector2.zero;
-            ruleRect.sizeDelta = new Vector2(700f, 1f);
-            var ruleImage = rule.GetComponent<Image>();
-            ruleImage.color = new Color(240f / 255f, 232f / 255f, 236f / 255f, 0.38f);
-            ruleImage.raycastTarget = false;
+            var rule = SceneFirst.Child(bar.transform, "RoomMenuRule", out bool madeRule,
+                typeof(RectTransform), typeof(Image));
+            if (madeRule)
+            {
+                var ruleRect = rule.GetComponent<RectTransform>();
+                ruleRect.anchorMin = new Vector2(0.5f, 1f);
+                ruleRect.anchorMax = new Vector2(0.5f, 1f);
+                ruleRect.pivot = new Vector2(0.5f, 1f);
+                ruleRect.anchoredPosition = Vector2.zero;
+                ruleRect.sizeDelta = new Vector2(700f, 1f);
+                var ruleImage = rule.GetComponent<Image>();
+                ruleImage.color = new Color(240f / 255f, 232f / 255f, 236f / 255f, 0.38f);
+                ruleImage.raycastTarget = false;
+            }
 
             // **バーは 740 幅で、5項目 x 148 でちょうど埋まっていた（-370〜+370）。**
             // コレクションを足して6項目になったので、バーを広げるのではなく1項目を詰める。
@@ -365,27 +482,78 @@ namespace KillingMahjong.UI
             {
                 var it = items[i];
                 float x = -370f + slot * (i + 0.5f);
-                CreateMenuItem(bar.transform, it.Name, it.Label, new Vector2(x, -8f), new Vector2(122f, 44f), it.Size,
-                    () => it.Act()?.Invoke());
+                var item = CreateMenuItem(bar.transform, it.Name, it.Label, new Vector2(x, -8f), new Vector2(122f, 44f),
+                    it.Size, () => it.Act()?.Invoke(), out bool madeItem);
+                if (it.Name == "RoomMenu_Exit")
+                {
+                    // 「やめる」は押せない。灰色にするのは作ったときだけ（置いてある物の色はシーンが正）
+                    item.GetComponent<Button>().onClick.RemoveAllListeners();
+                    if (madeItem)
+                    {
+                        item.GetComponent<Button>().interactable = false;
+                        item.transform.Find("Label").GetComponent<TextMeshProUGUI>().color = new Color32(125, 120, 123, 255);
+                        item.transform.Find("Marker").GetComponent<Image>().color = new Color32(125, 120, 123, 255);
+                    }
+                }
+                // 看板は左の3項目に立てる。コレクションのぶんは 2026-10-09 に足した（ユーザーの指示）
+                if (i < MenuSignLabels.Length)
+                    CreateMenuSign(bar.transform, x, MenuSignLabels[i]);
             }
+        }
+
+        /// <summary>
+        /// メニューの上に立てる看板の文字。左の項目から順（対局へ・チュートリアル・コレクション）。
+        /// **看板に入るのは1行6文字まで。** それより長いものは `\n` で2行に割って書く。
+        /// </summary>
+        private static readonly string[] MenuSignLabels =
+        {
+            "対戦したい方",
+            "ルールを\n知りたい方",
+            "資料を\n見たい方",
+        };
+
+        private void CreateMenuSign(Transform parent, float x, string label)
+        {
+            string name = "RoomMenuSign_" + label.Replace("\n", "");
+            if (SceneFirst.FindChild(parent, name) != null) return;   // シーンに置いてある
+
+            Sprite sprite = Resources.Load<Sprite>("Room/MenuSignGirl");
+            if (sprite == null) return;
+
+            // 矢印の先をメニューの上に合わせ、看板の傾きに沿って文字を載せる。
+            var sign = CreateCenteredImage(parent, name,
+                new Vector2(x + 2f, 114f), new Vector2(192f, 144f), Color.white);
+            sign.sprite = sprite;
+            sign.preserveAspect = true;
+            CreateText(sign.transform, "SignLabel", label, new Vector2(-21.6f, 36f),
+                new Vector2(68f, 30f), 9f, TextAlignmentOptions.Center, new Color32(69, 37, 26, 255));
+            var text = sign.transform.Find("SignLabel").GetComponent<TextMeshProUGUI>();
+            text.rectTransform.localRotation = Quaternion.Euler(0f, 0f, 22f);
+            text.textWrappingMode = TextWrappingModes.NoWrap;
         }
 
         private void BuildTutorialModal()
         {
-            tutorialModal = new GameObject("RoomTutorialChoice", typeof(RectTransform), typeof(Image));
-            tutorialModal.transform.SetParent(content.transform, false);
-            Stretch(tutorialModal.GetComponent<RectTransform>());
-            var scrim = tutorialModal.GetComponent<Image>();
-            scrim.color = new Color(0f, 0f, 0f, 0.72f);
-            scrim.raycastTarget = true;
+            tutorialModal = SceneFirst.Child(content.transform, "RoomTutorialChoice", out bool madeModal,
+                typeof(RectTransform), typeof(Image));
+            if (madeModal)
+            {
+                Stretch(tutorialModal.GetComponent<RectTransform>());
+                var scrim = tutorialModal.GetComponent<Image>();
+                scrim.color = new Color(0f, 0f, 0f, 0.72f);
+                scrim.raycastTarget = true;
+            }
 
-            var panel = new GameObject("Panel", typeof(RectTransform), typeof(Image));
-            panel.transform.SetParent(tutorialModal.transform, false);
-            var panelRect = panel.GetComponent<RectTransform>();
-            Center(panelRect, new Vector2(330f, 252f));
-            var panelImage = panel.GetComponent<Image>();
-            panelImage.color = new Color32(46, 28, 39, 250);
-            panelImage.raycastTarget = true;
+            var panel = SceneFirst.Child(tutorialModal.transform, "Panel", out bool madePanel,
+                typeof(RectTransform), typeof(Image));
+            if (madePanel)
+            {
+                var panelRect = panel.GetComponent<RectTransform>();
+                Center(panelRect, new Vector2(330f, 252f));
+                var panelImage = panel.GetComponent<Image>();
+                panelImage.color = new Color32(46, 28, 39, 250);
+                panelImage.raycastTarget = true;
+            }
 
             CreateText(panel.transform, "Heading", "チュートリアル", new Vector2(0f, 88f), new Vector2(290f, 38f), 25f,
                 TextAlignmentOptions.Center, MenuText);
@@ -398,11 +566,28 @@ namespace KillingMahjong.UI
             tutorialModal.SetActive(false);
         }
 
-        private void CreateMenuItem(Transform parent, string name, string label, Vector2 position, Vector2 size,
+        private GameObject CreateMenuItem(Transform parent, string name, string label, Vector2 position, Vector2 size,
             float fontSize, Action onClick)
         {
-            var item = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
-            item.transform.SetParent(parent, false);
+            return CreateMenuItem(parent, name, label, position, size, fontSize, onClick, out _);
+        }
+
+        /// <summary>
+        /// メニューの1項目。シーンに置いてあればそれを使い、**押したときの動きだけをつなぎ直す。**
+        /// </summary>
+        private GameObject CreateMenuItem(Transform parent, string name, string label, Vector2 position, Vector2 size,
+            float fontSize, Action onClick, out bool created)
+        {
+            var item = SceneFirst.Child(parent, name, out created, typeof(RectTransform), typeof(Image), typeof(Button));
+            if (!created)
+            {
+                // 置いてあるボタンは使い回すので、前につないだ物を外してからつなぐ
+                var placed = item.GetComponent<Button>();
+                placed.onClick.RemoveAllListeners();
+                placed.onClick.AddListener(() => onClick?.Invoke());
+                return item;
+            }
+
             var rect = item.GetComponent<RectTransform>();
             rect.anchorMin = new Vector2(0.5f, 0.5f);
             rect.anchorMax = new Vector2(0.5f, 0.5f);
@@ -446,13 +631,16 @@ namespace KillingMahjong.UI
             tmp.raycastTarget = false;
 
             item.GetComponent<Button>().onClick.AddListener(() => onClick?.Invoke());
+            return item;
         }
 
         private void CreateText(Transform parent, string name, string text, Vector2 position, Vector2 size,
             float fontSize, TextAlignmentOptions alignment, Color color)
         {
-            var textObject = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
-            textObject.transform.SetParent(parent, false);
+            var textObject = SceneFirst.Child(parent, name, out bool created,
+                typeof(RectTransform), typeof(TextMeshProUGUI));
+            if (!created) return;
+
             var rect = textObject.GetComponent<RectTransform>();
             rect.anchorMin = new Vector2(0.5f, 0.5f);
             rect.anchorMax = new Vector2(0.5f, 0.5f);
@@ -472,10 +660,11 @@ namespace KillingMahjong.UI
 
         private static Image CreateStretchImage(Transform parent, string name, Color color)
         {
-            var item = new GameObject(name, typeof(RectTransform), typeof(Image));
-            item.transform.SetParent(parent, false);
-            Stretch(item.GetComponent<RectTransform>());
+            var item = SceneFirst.Child(parent, name, out bool created, typeof(RectTransform), typeof(Image));
             var image = item.GetComponent<Image>();
+            if (!created) return image;
+
+            Stretch(item.GetComponent<RectTransform>());
             image.color = color;
             image.raycastTarget = false;
             return image;
@@ -483,8 +672,9 @@ namespace KillingMahjong.UI
 
         private static Image CreateCenteredImage(Transform parent, string name, Vector2 position, Vector2 size, Color color)
         {
-            var item = new GameObject(name, typeof(RectTransform), typeof(Image));
-            item.transform.SetParent(parent, false);
+            var item = SceneFirst.Child(parent, name, out bool created, typeof(RectTransform), typeof(Image));
+            if (!created) return item.GetComponent<Image>();
+
             var rect = item.GetComponent<RectTransform>();
             rect.anchorMin = new Vector2(0.5f, 0.5f);
             rect.anchorMax = new Vector2(0.5f, 0.5f);
@@ -525,123 +715,6 @@ namespace KillingMahjong.UI
             rect.pivot = new Vector2(0.5f, 0.5f);
             rect.anchoredPosition = Vector2.zero;
             rect.sizeDelta = Vector2.zero;
-        }
-    }
-
-    /// <summary>部屋での待機・移動・瞬きを担当する、UI立ち絵用の小さな状態機械。</summary>
-    public sealed class RoomGirlWalker : MonoBehaviour
-    {
-        public enum WalkerState
-        {
-            Idle,
-            Walk
-        }
-
-        public WalkerState State { get; private set; } = WalkerState.Idle;
-        public bool IsBlinking { get; private set; }
-
-        private RectTransform girl;
-        private RectTransform outline;
-        private Image outlineFace;
-        private Image face;
-        private Sprite openFace;
-        private Sprite closedFace;
-        private Vector2 minPosition;
-        private Vector2 maxPosition;
-        private Vector2 basePosition;
-        private Vector2 targetPosition;
-        private float idleRemaining;
-        private float walkSpeed;
-        private float blinkEndsAt;
-        private float nextBlinkAt;
-        private bool initialized;
-
-        public void Initialize(RectTransform outlineRect, Image outlineFaceImage, Image faceImage, Sprite openFaceSprite,
-            Sprite closedFaceSprite, Vector2 min, Vector2 max)
-        {
-            girl = GetComponent<RectTransform>();
-            outline = outlineRect;
-            outlineFace = outlineFaceImage;
-            face = faceImage;
-            openFace = openFaceSprite;
-            closedFace = closedFaceSprite;
-            minPosition = min;
-            maxPosition = max;
-            basePosition = girl != null ? girl.anchoredPosition : Vector2.zero;
-            targetPosition = basePosition;
-            idleRemaining = UnityEngine.Random.Range(2.5f, 4.5f);
-            nextBlinkAt = Time.unscaledTime + UnityEngine.Random.Range(3.5f, 5.5f);
-            initialized = girl != null && outline != null;
-            ApplyVisuals();
-        }
-
-        private void Update()
-        {
-            if (!initialized) return;
-
-            float delta = Time.unscaledDeltaTime;
-            if (State == WalkerState.Idle)
-            {
-                idleRemaining -= delta;
-                if (idleRemaining <= 0f) BeginWalk();
-            }
-            else
-            {
-                basePosition = Vector2.MoveTowards(basePosition, targetPosition, walkSpeed * delta);
-                if ((basePosition - targetPosition).sqrMagnitude < 0.01f)
-                {
-                    State = WalkerState.Idle;
-                    idleRemaining = UnityEngine.Random.Range(3f, 6f);
-                }
-            }
-
-            UpdateBlink();
-            ApplyVisuals();
-        }
-
-        private void BeginWalk()
-        {
-            State = WalkerState.Walk;
-            float midpoint = (minPosition.x + maxPosition.x) * 0.5f;
-            float targetX = basePosition.x <= midpoint ? maxPosition.x : minPosition.x;
-            targetPosition = new Vector2(targetX, basePosition.y);
-
-            walkSpeed = UnityEngine.Random.Range(44f, 66f);
-        }
-
-        private void UpdateBlink()
-        {
-            float now = Time.unscaledTime;
-            if (!IsBlinking && now >= nextBlinkAt)
-            {
-                IsBlinking = true;
-                blinkEndsAt = now + 0.12f;
-                if (outlineFace != null) outlineFace.sprite = closedFace;
-                if (face != null) face.sprite = closedFace;
-            }
-            else if (IsBlinking && now >= blinkEndsAt)
-            {
-                IsBlinking = false;
-                nextBlinkAt = now + UnityEngine.Random.Range(4f, 7f);
-                if (outlineFace != null) outlineFace.sprite = openFace;
-                if (face != null) face.sprite = openFace;
-            }
-        }
-
-        private void ApplyVisuals()
-        {
-            float time = Time.unscaledTime;
-            float bobAmplitude = State == WalkerState.Walk ? 4f : 1.8f;
-            float bobSpeed = State == WalkerState.Walk ? 8f : 2.5f;
-            Vector2 visualPosition = basePosition + Vector2.up * Mathf.Sin(time * bobSpeed) * bobAmplitude;
-            float direction = State == WalkerState.Walk
-                ? Mathf.Sign(targetPosition.x - basePosition.x) : 0f;
-            float tilt = State == WalkerState.Walk ? -direction * 2.5f : 0f;
-
-            girl.anchoredPosition = visualPosition;
-            girl.localRotation = Quaternion.Euler(0f, 0f, tilt);
-            outline.anchoredPosition = visualPosition;
-            outline.localRotation = Quaternion.Euler(0f, 0f, tilt);
         }
     }
 }

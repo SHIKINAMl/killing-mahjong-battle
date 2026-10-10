@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes">
+    <title>{{{ PRODUCT_NAME }}}</title>
+    <style>
+      /*
+        画面いっぱいに広げる（2026-09-30）。
+
+        **これまでは canvas が 800x600 の直書きだった。** 内蔵の Minimal
+        テンプレートをそのまま使っていたため、どんな大きさの画面でも
+        800x600 のまま左上寄りに小さく出ていて、プランナーから
+        「比率はいいがサイズが小さい」と言われた。
+
+        **4:3 は CSS だけで保つ。** 縦か横の狭いほうに合わせるので、
+        JS で大きさを計算し直す必要がない。
+      */
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        background: #0b0b0b;
+        overflow: hidden;
+      }
+
+      #unity-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      #unity-canvas {
+        /*
+          **ドット絵なので、拡大は必ず nearest-neighbour にする。**
+          既定の滑らかな拡大だと、1ドットの輪郭がぼけて別のゲームの絵になる。
+          `pixelated` を解さない古いブラウザのために `crisp-edges` も並べる。
+        */
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+        image-rendering: -moz-crisp-edges;
+
+        /* 4:3 を保ったまま、入るほうの辺に合わせて最大化する */
+        width: min(100vw, calc(100vh * 4 / 3));
+        height: min(100vh, calc(100vw * 3 / 4));
+
+        background: {{{ BACKGROUND_COLOR }}};
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="unity-container">
+      <canvas id="unity-canvas" width="{{{ WIDTH }}}" height="{{{ HEIGHT }}}" tabindex="-1"></canvas>
+    </div>
+
+    <script src="Build/{{{ LOADER_FILENAME }}}"></script>
+    <script>
+      createUnityInstance(document.querySelector("#unity-canvas"), {
+        arguments: [],
+        dataUrl: "Build/{{{ DATA_FILENAME }}}",
+        frameworkUrl: "Build/{{{ FRAMEWORK_FILENAME }}}",
+        codeUrl: "Build/{{{ CODE_FILENAME }}}",
+#if MEMORY_FILENAME
+        memoryUrl: "Build/{{{ MEMORY_FILENAME }}}",
+#endif
+#if SYMBOLS_FILENAME
+        symbolsUrl: "Build/{{{ SYMBOLS_FILENAME }}}",
+#endif
+        streamingAssetsUrl: "StreamingAssets",
+        companyName: {{{ JSON.stringify(COMPANY_NAME) }}},
+        productName: {{{ JSON.stringify(PRODUCT_NAME) }}},
+        productVersion: {{{ JSON.stringify(PRODUCT_VERSION) }}},
+
+        /*
+          **中身は 800x600 のまま描かせる。** ここを既定（true）のままにすると、
+          Unity が CSS の大きさに合わせて描画解像度そのものを上げてしまう。
+          そうすると1枚1枚のドット絵が半端な倍率で個別に拡大され、
+          位置によってドットの太さが変わって、動くたびにちらつく。
+
+          画面全体を1枚の絵として引き伸ばすほうが、ドットの拡がり方が
+          画面のどこでも揃うので、ドット絵には向いている。
+        */
+        matchWebGLToCanvasSize: false,
+
+        /*
+          **高DPIの画面でも 800x600 で描く。** これを入れないと Retina 等で
+          2倍の解像度に描かれ、上の matchWebGLToCanvasSize=false と噛み合わない。
+        */
+        devicePixelRatio: 1,
+      }).then((unityInstance) => {
+      }).catch((message) => {
+        alert(message);
+      });
+    </script>
+  </body>
+</html>

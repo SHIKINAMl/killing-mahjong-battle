@@ -191,6 +191,8 @@ namespace KillingMahjong.Managers
         public bool Trigger(ReactionTrigger trigger, ReactionPriority priority, string formatArg = "")
         {
             if (SuppressedInTutorial) return false;
+            // 打牌タイマーが未設定の間は、残り秒数・時間切れのセリフを出さない。
+            if (trigger == ReactionTrigger.Tile_ThinkTimeout) return false;
             return TriggerCore(trigger, priority, formatArg);
         }
 

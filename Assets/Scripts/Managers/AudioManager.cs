@@ -118,8 +118,35 @@ namespace KillingMahjong.Managers
             }
         }
 
+        /// <summary>
+        /// 起動時にタイトル曲を流さない（2026-09-23）。
+        ///
+        /// **チュートリアルの冒頭を無音にするために要る。** `OpeningSequenceManager` は
+        /// Awake で `StopBGM()` を呼ぶが、こちらの `Start` はそのあとに走るので、
+        /// 止めた直後にタイトル曲が鳴り出していた。Awake でこの旗を立ててもらう。
+        ///
+        /// **旗は static で持つ（2026-10-10）。** 前は部品ごとの旗で、立てる側は
+        /// `AudioManager.Instance` が居るときだけ立てていた。Awake の順番は決まっておらず、
+        /// エディタではこちらが先に Awake していたが、**ビルドでは向こうが先になり、旗が立たなかった。**
+        /// 契約書を取る前からタイトル曲が鳴っていた（公開したページでユーザーが見つけた）。
+        /// static なら、こちらがまだ居なくても立てられる。
+        /// </summary>
+        public static bool StartupBgmSuppressed;
+
+        /// <summary><see cref="StartupBgmSuppressed"/> と同じ物。前からの呼び方を残してある。</summary>
+        public bool SuppressStartupBgm
+        {
+            get { return StartupBgmSuppressed; }
+            set { StartupBgmSuppressed = value; }
+        }
+
         private void Start()
         {
+            if (StartupBgmSuppressed)
+            {
+                Debug.Log("[AudioManager] 起動時のBGMは流さない（チュートリアルの冒頭を無音にするため）");
+                return;
+            }
             if (IsBgmPlaying) return;
 
             // 起動時は自作のタイトルBGM（2026-09-11）。
@@ -141,8 +168,15 @@ namespace KillingMahjong.Managers
             // 曲の差し替え中は音量を一瞬 0 まで落としている最中なので触らない。
             // ここで上書きすると、その 50ms のあいだに設定を変えられたとき
             // 落としたはずの音量が戻ってプツッと鳴る。差し替えが終われば向こうが戻す。
-            if (bgmSource != null && !IsSwappingPhaseBgm) bgmSource.volume = bgmVolume * masterVolume;
-            ApplyLayerVolumes();
+            //
+            // 第3案へ移るために既存案の音を下げている最中（0.25 秒）も同じ理由で触らない。
+            if (!_p3FadingLegacy)
+            {
+                if (bgmSource != null && !IsSwappingPhaseBgm) bgmSource.volume = bgmVolume * masterVolume;
+                ApplyLayerVolumes();
+                ApplyPairVolumes();
+            }
+            ApplyProposal3Volumes();
             if (seSource != null) seSource.volume = seVolume * masterVolume;
             if (voiceSource != null) voiceSource.volume = voiceVolume * masterVolume;
             if (discardSeSource != null) discardSeSource.volume = seVolume * masterVolume;

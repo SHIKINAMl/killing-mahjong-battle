@@ -61,6 +61,9 @@ namespace KillingMahjong.Common
 
         // ---- 10 - 19 常設UI ----
 
+        /// <summary>展示用タイトルの全画面クリック受付。ローディングやメニューより奥。</summary>
+        public const int TitleStartInput = 10;
+
         /// <summary>DoraDisplayUI: ドラ表示牌 (WorldSpace Canvas)</summary>
         public const int DoraTile = 10;
 
@@ -116,6 +119,12 @@ namespace KillingMahjong.Common
         /// <summary>GameUISkillController: マリガン中に選択対象の手牌/山UIをディマーより手前に出すレイヤー</summary>
         public const int MulliganFocusTiles = 21;
 
+        /// <summary>AssaultMarkUI: 強襲で狙った側の血の表示に、局の終わりまで残る照準（2026-10-08）。
+        ///
+        /// 盤面と情報パネル（20以下）より手前。局のあいだ出しっぱなしなので、
+        /// ツールチップ（25）や各種パネル・演出（30以上）が出たら、その下に隠れてよい。</summary>
+        public const int AssaultMark = 22;
+
         /// <summary>AbilityUI: ツールチップ (InfoPanelHighlight より手前)</summary>
         public const int AbilityTooltip = 25;
 
@@ -124,7 +133,26 @@ namespace KillingMahjong.Common
         /// <summary>LoadingManager: ローディング画面</summary>
         public const int LoadingScreen = 30;
 
-        // ---- 50 - 59 ロン待機・結果パネル・軽い演出 ----
+        /// <summary>接続失敗・離席予告。チュートリアルやEDの入力より手前。</summary>
+        public const int SessionPrompt = 31000;
+
+        // ---- 40 - 49 ロンの猶予演出（暗幕） ----
+
+        /// <summary>
+        /// RonChanceEffect: ロンできる牌が出たときに盤面を落とす暗幕（2026-10-04）。
+        ///
+        /// **盤面(〜21)より手前・ロン待ちパネル(50)より奥。** 暗くしている間も
+        /// ロンボタンは押せていなければならないので、必ずパネルより奥に置く。
+        /// </summary>
+        public const int RonChanceDimmer = 40;
+
+        /// <summary>
+        /// RonChanceEffect: ロン待機パネルより前に出す、ロンできる牌。
+        /// 牌そのものに Canvas を足して一時的に上げ、演出が終わったら外す。
+        /// </summary>
+        public const int RonChanceTile = 51;
+
+        // ---- 50 - 59 ロン待機・結果パネル・牌の前面表示 ----
 
         /// <summary>GameUIManager: ロン待機パネル (DialogueUI / BloodMeter より手前)</summary>
         public const int RonWaitPanel = 50;
@@ -141,8 +169,20 @@ namespace KillingMahjong.Common
         /// <summary>TutorialMaskUI: 誘導先だけを切り抜く集中マスク</summary>
         public const int TutorialMask = 60;
 
+        /// <summary>
+        /// TutorialHighlightUI: 説明している範囲を塗る／囲む強調（2026-09-24）。
+        /// 点数計算表（ResultPanel 55）の上に重ね、矢印(65)よりは奥。
+        /// </summary>
+        public const int TutorialHighlight = 63;
+
         /// <summary>TutorialArrowUI: 誘導矢印。穴の外にはみ出すので必ずマスクより手前に置く</summary>
         public const int TutorialArrow = 65;
+
+        /// <summary>
+        /// TutorialButtonIntroUI: ボタンを紹介するとき、中央に大きく出す**絵だけの複製**（2026-09-29）。
+        /// 矢印(65)より手前。紹介が終わると本来の位置へ飛んでいって消える。
+        /// </summary>
+        public const int TutorialButtonIntro = 66;
 
         // ---- 70 - 79 牌アニメーション・実況 ----
 
@@ -155,6 +195,12 @@ namespace KillingMahjong.Common
 
         /// <summary>GameUISkillController: マリガン中のプロンプトテキスト (独立Canvas)</summary>
         public const int MulliganPromptText = 78;
+
+        /// <summary>
+        /// HandRankCallUI: 手牌が13枚そろった瞬間に出る役名（満貫／跳満／倍満／役満）。
+        /// 牌より手前・ダイアログより奥。2秒で自分から消える一瞬の表示。
+        /// </summary>
+        public const int HandRankCall = 79;
 
         // ---- 80 - 89 ダイアログ・最前面パネル ----
 
@@ -179,7 +225,8 @@ namespace KillingMahjong.Common
         /// 原因が見えにくい。
         ///
         /// タイトルシーンには 80 番台の住人が他に居ないのでここを使う。
-        /// カーソル(99)より奥なのは意図どおりで、カーソルはメニューの上に出てよい。
+        /// カーソル（<see cref="MouseCursor"/>）より奥なのは意図どおりで、
+        /// カーソルはメニューの上に出てよい。
         /// </summary>
         public const int TitleMenuOverlay = 81;
 
@@ -190,6 +237,19 @@ namespace KillingMahjong.Common
         /// 閉じるまで奥の部屋を触らせないため。カーソル(99)より奥なのは意図どおり。
         /// </summary>
         public const int CollectionScreen = 82;
+
+        /// <summary>
+        /// TutorialArchiveUI: オプションから開くチュートリアル資料。
+        /// オプション画面より前で操作を受け、タイトルのコレクション画面とは重ならない。
+        /// </summary>
+        public const int TutorialArchive = 83;
+
+        /// <summary>
+        /// 資料の中で範囲を示す強調（2026-09-29）。**資料より手前に置く。**
+        /// 通常の `TutorialHighlight`(63) のままだと資料(83)の下に潜って見えない。
+        /// 実機で band を出しても画面に出ず、これで気づいた。
+        /// </summary>
+        public const int TutorialArchiveHighlight = 84;
 
         /// <summary>WaitUI: 待ち牌表示を最前面に出す際のレイヤー</summary>
         public const int WaitDisplayFront = 84;
@@ -228,8 +288,29 @@ namespace KillingMahjong.Common
         /// <summary>GameUISkillController: マリガン中の全画面ディマー（現在はシーン側で設定。参照用）</summary>
         public const int SkillDimmer = 93;
 
+        /// <summary>
+        /// PerspectiveSkillEffect: 透視スキルの全画面演出（2026-10-03）。
+        /// 青い重ね・暗落とし・集中線をまとめて乗せる。
+        ///
+        /// **<see cref="SkillDimmer"/>(93) と同値なのは意図的。** どちらも
+        /// 「スキル中だけ出る全画面の覆い」で、**同時に出ることがない**
+        /// （マリガンと透視は別のスキルなので、同じ瞬間には撃てない）。
+        ///
+        /// <see cref="ScreenFlash"/>(98) より必ず奥に置くこと。手前に出すと、
+        /// 白で切るはずの③フラッシュがこの青の下に潜って見えなくなる。
+        /// </summary>
+        public const int PerspectiveOverlay = 93;
+
         /// <summary>ClickFeedbackManager: クリックエフェクト</summary>
         public const int ClickFeedback = 94;
+
+        /// <summary>
+        /// 役強化・強襲の演出（暗転と、その上の役名・翻数・血の粒）（2026-10-09）。
+        /// 対局の画面ぜんたいを暗く落とすので、ほかの対局の部品より手前。
+        /// カットイン（95）と白フラッシュ（98）より奥。ClickFeedback と同じ段でよい
+        /// （演出中のクリックの波紋と重なっても困らない）。
+        /// </summary>
+        public const int SkillEffectContent = 94;
 
         /// <summary>CutinAnimationUI: カットイン演出</summary>
         public const int CutinAnimation = 95;
@@ -269,12 +350,37 @@ namespace KillingMahjong.Common
         /// <summary>TutorialIntro: チュートリアル開始前の問いかけと案内板。
         ///
         /// 対局が始まる前に全画面を覆う。答えるまで先へ進ませないので、
-        /// 盤面やダイアログ(97)より手前に置く。カーソル(99)より奥なのは
-        /// 押している間もカーソルが見えていてよいため。</summary>
+        /// 盤面やダイアログ(97)より手前に置く。カーソル（<see cref="MouseCursor"/>）より
+        /// 奥なのは、押している間もカーソルが見えていてよいため。</summary>
         public const int TutorialIntro = 98;
 
-        /// <summary>CustomCusor: 自前マウスカーソル。常に全UIより手前</summary>
-        public const int MouseCursor = 99;
+        /// <summary>
+        /// CustomCusor: 自前マウスカーソル。常に全UIより手前。
+        ///
+        /// **99 では足りない（2026-09-29 に実機で判明）。**
+        /// Unity の `TMP_Dropdown` は、開いた一覧の Canvas を
+        /// `overrideSorting = true` / `sortingOrder = 30000` で作る（遮蔽板は 29999）。
+        /// これは Unity 側に焼かれている値で、こちらからは動かせない。
+        /// そのため 99 のままだと**設定のドロップダウンを開くとカーソルが下に潜り**、
+        /// 何を指しているか見えないまま選ばされることになる（ユーザー報告）。
+        ///
+        /// この Canvas は GraphicRaycaster を**意図的に切って**あるので
+        /// （カーソルの絵がクリックを食わないように）、手前へ出しても
+        /// 下の UI の当たり判定は奪わない。
+        ///
+        /// **他の番号と比べるときは 99 のつもりで読むこと。** ここだけ桁が違うのは
+        /// Unity の固定値を越えるためで、UIの重なりの設計が変わったわけではない。
+        /// </summary>
+        public const int MouseCursor = 30100;
+
+        /// <summary>
+        /// コレクションの演出の試写の操作欄（上の題名、下の「もう一度」「繰り返し」「一覧へ戻る」）。
+        ///
+        /// 試写する演出（エンディングは 30000）より手前で、**マウスの指（<see cref="MouseCursor"/>）より奥。**
+        /// 前は 32760 で指より手前にあり、指が下のボタンの後ろへ隠れた（2026-10-10 のユーザー報告）。
+        /// それまで気づかなかったのは、試写のあいだ指そのものを隠してしまっていたため。
+        /// </summary>
+        public const int EffectPreviewControls = 30090;
 
         // ---- SpriteRenderer 用 (Canvas とは別系統) ----
         // ScreenSpace-Overlay の Canvas とは描画パスが違うため、上の値とは比較できない。

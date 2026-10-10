@@ -9,13 +9,16 @@ namespace KillingMahjong.UI
     public class TitleUIManager : MonoBehaviour
     {
         private const string TutorialSceneName = "OpeningScene";
-        private const string TutorialReturnToRoomKey = "Title_ReturnToRoom";
+        private const string RoomSceneName = "部屋シーン";
+        private const string TutorialReturnToRoomKey = TutorialNavigation.ReturnKey;
 
         [Header("遷移先のシーン名")]
         [SerializeField] private string nextSceneName = "UIテストシーン"; // 実際のメインゲームのシーン名に合わせてください
 
         [Header("設定画面パネル")]
         [SerializeField] private GameObject optionUIPanel;
+
+        [SerializeField] private bool startInPreservedRoom;
 
         /// <summary>タイトルの表示差し替えが完了したことを、撮影や自動確認から読めるようにする。</summary>
         public bool PresentationApplied { get; private set; }
@@ -26,13 +29,28 @@ namespace KillingMahjong.UI
             HideTitleLogo();
             PresentationApplied = true;
 
-            // チュートリアルの完走／スキップ後だけは、入口へ戻すのではなく
-            // 直前にいた部屋へ帰す。起動時に一度だけ消費する印にする。
-            if (PlayerPrefs.GetInt(TutorialReturnToRoomKey, 0) != 0)
+            if (startInPreservedRoom)
+            {
+                // **シーンに置いてある部屋をそのまま使う（2026-10-09）。**
+                // 以前はここで「見本の写し」（SavedRoomPreview）を捨て、RoomScreenUI が作り直していた。
+                // 写しはコードを変えても付いてこないので、置いてある物と再生時の物が食い違っていた。
+                OpenPreservedRoom();
+                return;
+            }
+
+            BuildTitleClickTarget();
+            ExhibitionIdleReturn.EnableSession();
+
+            // 既存の帰還キーを一度だけ消費し、チュートリアル後は対局メニューへ進む。
+            int tutorialReturn = PlayerPrefs.GetInt(TutorialReturnToRoomKey, 0);
+            if (tutorialReturn != 0)
             {
                 PlayerPrefs.DeleteKey(TutorialReturnToRoomKey);
                 PlayerPrefs.Save();
-                OnClickStartButton();
+                if (tutorialReturn == 2)
+                    SceneManager.LoadScene(RoomSceneName);
+                else
+                    OpenMatchMenu();
             }
         }
 
@@ -44,9 +62,135 @@ namespace KillingMahjong.UI
         ///
         /// **シーンの `onClick` はこのメソッド名で配線済みなので、名前は変えないこと。**
         /// 作り直すと配線が外れて「押しても何も起きない」状態になる。
-        /// 中身だけを差し替えて、まず部屋の待機画面を開く。
+        /// 展示用タイトルからはチュートリアルを最初から開始する。
         /// </summary>
         public void OnClickStartButton()
+        {
+            if (startInPreservedRoom)
+            {
+                OpenPreservedRoom();
+                return;
+            }
+            if (isStartingTutorial) return;
+            isStartingTutorial = true;
+            if (titleClickTarget != null) titleClickTarget.SetActive(false);
+            StartTutorialScene(0);
+        }
+
+        private bool isStartingTutorial;
+        private GameObject titleClickTarget;
+
+        private const string TitleClickTargetName = "TitleClickToTutorial";
+        private const string MatchShortcutName = "ルールを知っている方：対局へ";
+        private const string DebugRoomButtonName = "デバッグ部屋";
+
+        /// <summary>
+        /// タイトルの「どこでも押せば開始」と、その上の2つのボタンを用意する。
+        ///
+        /// **シーンに置いてある物を使う（2026-10-09、<see cref="SceneFirst"/>）。**
+        /// 位置・大きさ・色はシーンのほうが正で、ここでは押したときの動きをつなぐだけ。
+        /// 下の数字は、シーンに無かったときに作るための控え。
+        /// </summary>
+        private void BuildTitleClickTarget()
+        {
+            titleClickTarget = SceneFirst.Root(TitleClickTargetName, out bool madeTarget, typeof(RectTransform),
+                typeof(Canvas), typeof(GraphicRaycaster), typeof(Image), typeof(Button));
+            var button = titleClickTarget.GetComponent<Button>();
+            if (madeTarget)
+            {
+                var canvas = titleClickTarget.GetComponent<Canvas>();
+                canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+                canvas.sortingOrder = KillingMahjong.Common.UISortingOrders.TitleStartInput;
+                var image = titleClickTarget.GetComponent<Image>();
+                image.color = Color.clear;
+                button.targetGraphic = image;
+                button.transition = Selectable.Transition.None;
+            }
+            Bind(button, OnClickStartButton);
+
+            // 繰り返し遊ぶ来場者は、練習を通さず対局メニューを開ける。
+            var shortcut = SceneFirst.FindChild(titleClickTarget.transform, MatchShortcutName);
+            if (shortcut == null)
+            {
+                SceneFirst.NoteCreated(MatchShortcutName);
+                var made = SessionPrompt.CreateButton(titleClickTarget.transform,
+                    MatchShortcutName, new Vector2(0f, 40f), () => { });
+                var rect = made.GetComponent<RectTransform>();
+                rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0f);
+                rect.sizeDelta = new Vector2(400f, 48f);
+                made.GetComponentInChildren<TMP_Text>().fontSize = 20f;
+                shortcut = made.gameObject;
+            }
+            Bind(shortcut.GetComponent<Button>(), OpenMatchMenu);
+
+            // 開発用の入口（2026-10-07 のユーザー指示）。部屋シーンへ直接行く。
+            // 展示用タイトルはチュートリアルか対局メニューにしか進めず、部屋
+            // （コレクションや演出の試写がある）へ行く道が無かった。
+            // 来場者向けの導線ではないので、右下の隅に小さく、目立たない色で置く。
+            var debug = SceneFirst.FindChild(titleClickTarget.transform, DebugRoomButtonName);
+            if (debug == null)
+            {
+                SceneFirst.NoteCreated(DebugRoomButtonName);
+                var made = SessionPrompt.CreateButton(titleClickTarget.transform,
+                    DebugRoomButtonName, new Vector2(-70f, 22f), () => { });
+                var debugRect = made.GetComponent<RectTransform>();
+                debugRect.anchorMin = debugRect.anchorMax = new Vector2(1f, 0f);
+                debugRect.sizeDelta = new Vector2(124f, 28f);
+                made.GetComponent<Image>().color = new Color32(30, 18, 26, 170);
+                var debugLabel = made.GetComponentInChildren<TMP_Text>();
+                debugLabel.rectTransform.sizeDelta = debugRect.sizeDelta;
+                debugLabel.fontSize = 14f;
+                debugLabel.color = new Color32(200, 188, 196, 255);
+                debug = made.gameObject;
+            }
+            Bind(debug.GetComponent<Button>(), OpenDebugRoom);
+
+            lastBakeReport = SceneFirst.Report("TitleUIManager");
+        }
+
+        /// <summary>直前の組み立てで、シーンに無くて作った物の名前。焼き込みの報告用。</summary>
+        private string lastBakeReport = "";
+
+        /// <summary>
+        /// ボタンに、押したときの動きをつなぐ。**前につないだ物は外してからつなぐ**
+        /// （シーンに置いてあるボタンは使い回すので、足すだけだと二重に走る）。
+        /// </summary>
+        private static void Bind(Button button, UnityEngine.Events.UnityAction action)
+        {
+            if (button == null) return;
+            button.onClick.RemoveAllListeners();
+            button.onClick.AddListener(action);
+        }
+
+        /// <summary>
+        /// **エディタ用。** タイトルのボタンをシーンに置く（`SceneFirstBaker` が再生していないときに呼ぶ）。
+        /// 再生中の動き（チュートリアルからの戻りなど）は走らせない。
+        /// </summary>
+        /// <returns>シーンに無くて作った物の名前。全部置いてあったら空文字</returns>
+        public string BakeTitleButtonsForEditor()
+        {
+            BuildTitleClickTarget();
+            titleClickTarget = null;
+            return lastBakeReport;
+        }
+
+        /// <summary>このシーンが部屋（再生すると部屋の画面から始まる）か。焼き込みが見る。</summary>
+        public bool StartsInRoom { get { return startInPreservedRoom; } }
+
+        /// <summary>
+        /// タイトルから「デバッグ部屋」＝部屋シーンへ移る。
+        ///
+        /// **押したらタイトルの「どこでも押せば開始」を止める。**
+        /// 止めないと、暗転している間のクリックでチュートリアルも始まってしまう。
+        /// </summary>
+        private void OpenDebugRoom()
+        {
+            if (isStartingTutorial) return;
+            if (titleClickTarget != null) titleClickTarget.SetActive(false);
+            StartScene(RoomSceneName);
+        }
+
+        private void OpenPreservedRoom()
         {
             if (roomScreen == null)
             {
@@ -121,6 +265,9 @@ namespace KillingMahjong.UI
 
         private void OpenMatchMenu()
         {
+            if (titleClickTarget != null) titleClickTarget.SetActive(false);
+            var titleMenu = FindSceneObjectIncludingInactive("ボタン達");
+            if (titleMenu != null) titleMenu.SetActive(false);
             if (multiMenu == null)
             {
                 multiMenu = gameObject.AddComponent<TitleMultiMenuUI>();
@@ -129,8 +276,13 @@ namespace KillingMahjong.UI
             multiMenu.Open(mode =>
             {
                 Debug.Log($"対局開始（{mode}）。{nextSceneName} に遷移します。");
+                if (titleClickTarget != null) titleClickTarget.SetActive(false);
                 if (roomScreen != null) roomScreen.SetContentVisible(false);
                 StartMultiplayScene();
+            }, () =>
+            {
+                if (titleClickTarget != null) titleClickTarget.SetActive(true);
+                if (titleMenu != null && !startInPreservedRoom) titleMenu.SetActive(true);
             });
         }
 
@@ -163,9 +315,8 @@ namespace KillingMahjong.UI
         {
             // OpeningScene は冒頭演出の後に StartTutorial() を呼ぶ。
             // シーンをまたいで「最初から／続きから」の選択を渡すための一回限りの要求。
+            TutorialNavigation.Begin(startInPreservedRoom ? 2 : 1);
             TutorialManager.RequestStartFrom(roundIndex);
-            PlayerPrefs.SetInt(TutorialReturnToRoomKey, 1);
-            PlayerPrefs.Save();
 
             if (roomScreen != null) roomScreen.SetContentVisible(false);
             StartScene(TutorialSceneName);
@@ -176,6 +327,7 @@ namespace KillingMahjong.UI
             if (multiMenu != null) multiMenu.Close();
             if (roomScreen != null) roomScreen.Close();
             SetTitlePresentationVisible(true);
+            if (titleClickTarget != null) titleClickTarget.SetActive(true);
 
             var audio = KillingMahjong.Managers.AudioManager.Instance;
             if (audio != null) audio.PlayTitleBgm();
@@ -189,7 +341,7 @@ namespace KillingMahjong.UI
         /// <summary>
         /// タイトルを「ソロ／マルチ」の区分ではなく、対局の入口として見せる。
         /// 既存 Button の onClick 配線はシーンに保存されているため、Button を作り直さず
-        /// 実行時に表示だけを置き換える。
+        /// 表示状態はタイトルシーンにも保存している。旧状態のシーンでも同じ表示に揃える。
         /// </summary>
         private static void ApplyTitlePresentation()
         {
@@ -256,9 +408,8 @@ namespace KillingMahjong.UI
         /// <summary>
         /// タイトルのロゴ「じゃんぱいあ」と、その周りのキラキラを消す。ユーザーの指示（2026-09-05）。
         ///
-        /// シーンを書き換えず実行時に隠している。シーンを直接触ると、
-        /// Play の出入りで差分が出たり、外部から書き換えたときに MCP ごと止まることがある
-        /// （AGENTS.md §15）。戻すときはこのメソッドの呼び出しを外すだけでよい。
+        /// 停止中にも現在のタイトルが見えるよう、非表示状態をシーンに保存している。
+        /// 起動時にも揃えることで、旧状態のシーンを読み込んでもロゴが復活しない。
         /// </summary>
         private static void HideTitleLogo()
         {
@@ -305,6 +456,8 @@ namespace KillingMahjong.UI
 
         private void StartScene(string sceneName)
         {
+            if (isLoadingScene) return;
+            isLoadingScene = true;
             if (KillingMahjong.UI.LoadingManager.Instance != null)
             {
                 KillingMahjong.UI.LoadingManager.Instance.FadeOutScreen(() => 
@@ -317,6 +470,8 @@ namespace KillingMahjong.UI
                 StartCoroutine(LoadSceneAsyncCoroutine(sceneName));
             }
         }
+
+        private bool isLoadingScene;
 
         private System.Collections.IEnumerator LoadSceneAsyncCoroutine(string sceneName)
         {

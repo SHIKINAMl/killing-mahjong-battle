@@ -1,0 +1,230 @@
+using UnityEngine;
+using System.Collections;
+using System.Collections.Generic;
+using TMPro;
+
+namespace KillingMahjong.Managers
+{
+    public partial class TutorialManager
+    {
+        // 対局フェイズ①が終わったあとの締め（2026-09-24）。
+        //
+        // 出どころはフロー図（km-docs/tutorial/flow_20260927.drawio）の3枚目
+        // 「流局＆能力について」。**2026-09-28 に能力の中身まで描かれた。**
+        // ここが受け持つのは前半で、
+        //
+        //   対局フェイズ①終了 → 手牌選択フェイズ②へ → 初期非表示UI：能力ベル
+        //   → 「とまぁこれがゲームの流れね」 → 「わかった？」 → 分岐
+        //        はい　 → 「おっ後輩ちゃんできるねぇ」 → 「うーん…じゃあいらないと思うけど……ハイコレ」
+        //        いいえ → 「そうだねぇ……気持ちわかるわー」 → 「ならとりあえず……ハイコレ！」
+        //   → オプションハイライト → プレイヤーオプションクリック
+        //   → オプション内：チュートリアル資料ハイライト → プレイヤーチュートリアル資料クリック
+        //   → チュートリアル資料表示 → プレイヤーオプション画面を閉じる
+        //   → 「ここに今までのチュートリアルがまとめてあるから困ったら見て」
+        //
+        // まで。**この続き（能力の紹介）は `TutorialManager.AbilityIntro.cs`。**
+
+        private static readonly List<TutorialLine> WrapUpLines = new List<TutorialLine>
+        {
+            new TutorialLine("とまぁこれがゲームの流れね"),
+        };
+
+        /// <summary>分岐の問いかけ。選ばせている間もこの吹き出しを出したままにする。</summary>
+        private const string WrapUpQuestion = "「わかった？」";
+
+        private static readonly List<TutorialLine> WrapUpUnderstoodLines = new List<TutorialLine>
+        {
+            new TutorialLine("おっ後輩ちゃんできるねぇ"),
+            new TutorialLine("うーん…じゃあいらないと思うけど……ハイコレ"),
+        };
+
+        private static readonly List<TutorialLine> WrapUpConfusedLines = new List<TutorialLine>
+        {
+            new TutorialLine("そうだねぇ……気持ちわかるわー"),
+            new TutorialLine("ならとりあえず……ハイコレ！"),
+        };
+
+        private static readonly List<TutorialLine> ArchiveClosingLines = new List<TutorialLine>
+        {
+            new TutorialLine("ここに今までのチュートリアルがまとめてあるから困ったら見て"),
+        };
+
+        /// <summary>能力ベルを一度でも出したか。出したら以降は出したままにする。</summary>
+        private bool _abilityBellRevealed;
+
+        /// <summary>第2局か。締めのくだりはここの頭で一度だけ流す。</summary>
+        private bool IsSecondTutorialRound(TutorialRoundData data)
+        {
+            return _scenario != null && _scenario.rounds != null
+                   && _scenario.rounds.Count > 1 && _scenario.rounds[1] == data;
+        }
+
+        /// <summary>
+        /// 能力ベルの出し入れ。フロー図の「初期非表示UI：能力ベル」。
+        /// まだ説明していないものを置いておくと、押してよいのか分からない。
+        /// </summary>
+        private void SetAbilityBellVisible(bool visible)
+        {
+            if (gameUIManager == null || gameUIManager.AbilityUI == null) return;
+
+            // **入れ物ごと起こす。** `AbilityUI` の GameObject 自体を伏せている場所が
+            // 6箇所あり（賭け・マッチング・ロン・局送りなど）、子のベルだけ
+            // SetActive(true) にしても `activeInHierarchy` は false のまま。
+            // 2026-09-28 に実機で詰まった。ベルが出ないのに枠だけ出て、
+            // 押しようがないまま止まる。
+            if (visible) gameUIManager.AbilityUI.gameObject.SetActive(true);
+
+            gameUIManager.AbilityUI.SetBellVisible(visible);
+        }
+
+        private IEnumerator RunAfterFirstRoundWrapUp()
+        {
+            yield return StartCoroutine(PlayLines(WrapUpLines));
+
+            // 「わかった？」。**見た目は冒頭の「麻雀とか知ってたっけ？」と同じにする。**
+            // 問いかけを吹き出しに出したまま選ばせないと、答えずに読み飛ばせてしまう。
+            int answer = -1;                       // 0=はい / 1=いいえ
+            TMP_FontAsset font = BorrowJapaneseFont();
+            Transform parent = BuildIntroCanvas(dim: false);
+            if (parent != null)
+            {
+                if (dialogueUI != null)
+                {
+                    dialogueUI.gameObject.SetActive(true);
+                    dialogueUI.ShowText(WrapUpQuestion);
+                }
+
+                BuildQuestionPanel(parent, font, onYes: () => answer = 0, onNo: () => answer = 1);
+                yield return new WaitUntil(() => answer >= 0);
+                CloseIntro();
+            }
+
+            yield return StartCoroutine(PlayLines(
+                answer == 1 ? WrapUpConfusedLines : WrapUpUnderstoodLines));
+
+            yield return StartCoroutine(RunTutorialArchiveGuide());
+
+            // フロー図では「ここに今までの…」から「それじゃあ第二局目だね」へ
+            // そのまま矢印が伸びている。**続けて能力の紹介に入る。**
+            yield return StartCoroutine(RunAbilityIntroduction());
+        }
+
+        /// <summary>
+        /// 「ハイコレ」の中身。資料の開き方を、実際に開かせて覚えさせる。
+        ///
+        /// **押させる所は枠で囲み、押されるまで待つ。**
+        /// ここだけ帯ではなく枠なのは、相手がボタンだから。実機で見比べると、
+        /// 帯を敷いたボタンは色が濁って**押せないボタンに見える**（2026-09-24 に確認）。
+        /// 読ませたい表や数字は帯、押させるボタンは枠、と使い分ける。
+        ///
+        /// マスクは使わない。オプション画面は自前で入力を受けるので、
+        /// 上から穴あきマスクをかぶせるとスライダーもボタンも触れなくなる。
+        /// </summary>
+        private IEnumerator RunTutorialArchiveGuide()
+        {
+            var option = gameUIManager != null ? gameUIManager.OptionUI : null;
+            RectTransform optionButton = gameUIManager != null ? gameUIManager.OptionButtonRect : null;
+
+            // 盤面にオプションが無い状態（局を指定して始めた等）では、言うだけにして進む。
+            // ここで待つと、開きようがないまま止まってしまう。
+            if (option == null || optionButton == null)
+            {
+                yield return StartCoroutine(PlayLines(ArchiveClosingLines));
+                yield break;
+            }
+
+            // オプションハイライト → プレイヤーオプションクリック
+            GuideTo(optionButton, false, null, UI.TutorialHighlightUI.Style.Frame);
+            yield return new WaitUntil(() => option.IsOpen);
+            ClearGuide();
+
+            // オプション内：チュートリアル資料ハイライト → プレイヤーチュートリアル資料クリック
+            // 資料ボタンは OptionUI が実行時に作るので、開いてから取りに行く。
+            yield return null;
+            GuideTo(option.TutorialArchiveButtonRect, false, null, UI.TutorialHighlightUI.Style.Frame);
+
+            // 資料を開かずに閉じられたら、そこで誘導は終わりにする。付き合わせ続けない。
+            yield return new WaitUntil(() => option.IsTutorialArchiveOpen || !option.IsOpen);
+            ClearGuide();
+
+            // チュートリアル資料表示。**中でも目線を運ぶ（2026-09-29 の指示）。**
+            // 開いただけだと、どこから読めばいいのか分からないまま閉じられる。
+            yield return StartCoroutine(RunArchiveReadingGuide(option));
+
+            // プレイヤーオプション画面を閉じる
+            // 資料を閉じるとオプションへ戻るので、**オプションが閉じるまで**待つ。
+            yield return new WaitUntil(() => !option.IsOpen);
+
+            yield return StartCoroutine(PlayLines(ArchiveClosingLines));
+        }
+
+        /// <summary>
+        /// 資料の中を指す。**資料より手前の描画順で出す。**
+        /// 既定（63）のままだと資料（83）の下に潜って、実機で一切見えなかった。
+        /// </summary>
+        private void ShowArchiveHighlight(RectTransform target, UI.TutorialHighlightUI.Style style)
+        {
+            UI.TutorialHighlightUI.Show(target, style, Common.UISortingOrders.TutorialArchiveHighlight);
+        }
+
+        /// <summary>見出しを指している時間。読むものではないので短く。</summary>
+        private const float ArchiveTitleDwell = 0.7f;
+
+        /// <summary>本文に帯を敷いている時間。**ここだけは読ませる。**</summary>
+        private const float ArchiveBodyDwell = 1.6f;
+
+        /// <summary>
+        /// 資料の中で目線を運ぶ（2026-09-29 の指示）。
+        ///
+        /// ページごとに **見出し → 本文 → 次のボタン** の順で指す。
+        /// 帯と枠の使い分けは既存の決まりに従う。読ませたい本文は帯、
+        /// 押させるボタンは枠（帯を敷いたボタンは押せないものに見える）。
+        ///
+        /// **ボタンでだけ待つ。** 見出しと本文はクリックできないので、
+        /// そこで待つと進めなくなる。短く置いて次へ送る。
+        ///
+        /// 途中で閉じられたら、そこで誘導をやめる。**付き合わせ続けない。**
+        /// </summary>
+        private IEnumerator RunArchiveReadingGuide(UI.OptionUI option)
+        {
+            var archive = option != null ? option.TutorialArchive : null;
+            if (archive == null)
+            {
+                // 資料そのものが取れないときは、開いている間だけ待って抜ける
+                yield return new WaitUntil(() => !option.IsTutorialArchiveOpen || !option.IsOpen);
+                ClearGuide();
+                yield break;
+            }
+
+            // **何周もしないよう、ページ数ぶんで打ち切る。** 前へ戻られても回り続けない
+            for (int step = 0; step < archive.PageCount; step++)
+            {
+                if (!option.IsTutorialArchiveOpen) break;
+
+                ShowArchiveHighlight(archive.PageTitleRect, UI.TutorialHighlightUI.Style.Band);
+                yield return new WaitForSeconds(ArchiveTitleDwell);
+                if (!option.IsTutorialArchiveOpen) break;
+
+                ShowArchiveHighlight(archive.PageBodyRect, UI.TutorialHighlightUI.Style.Band);
+                yield return new WaitForSeconds(ArchiveBodyDwell);
+                if (!option.IsTutorialArchiveOpen) break;
+
+                if (archive.IsLastPage)
+                {
+                    // 最後のページ。閉じるところまで案内して終わり
+                    ShowArchiveHighlight(archive.CloseButtonRect, UI.TutorialHighlightUI.Style.Frame);
+                    break;
+                }
+
+                int shown = archive.PageIndex;
+                ShowArchiveHighlight(archive.NextButtonRect, UI.TutorialHighlightUI.Style.Frame);
+                yield return new WaitUntil(
+                    () => !option.IsTutorialArchiveOpen || archive.PageIndex != shown);
+            }
+
+            // 閉じられるまでは枠を出したままにしておく
+            yield return new WaitUntil(() => !option.IsTutorialArchiveOpen || !option.IsOpen);
+            ClearGuide();
+        }
+    }
+}

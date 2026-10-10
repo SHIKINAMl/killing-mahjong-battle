@@ -10,6 +10,9 @@ namespace KillingMahjong.UI
         [SerializeField] private RectTransform waitContainer;
         [SerializeField] private GameObject tilePrefab;
         [SerializeField] private TileResourceManager tileResourceManager;
+
+        /// <summary>チュートリアルで待ち牌の表示枠を指し示すための実表示領域。</summary>
+        public RectTransform GuideTargetRect => waitContainer;
         
         [Header("Dialog Position Settings")]
         [SerializeField] private Vector2 dialogCenterPosition = new Vector2(0, 50);

@@ -49,6 +49,14 @@ namespace KillingMahjong.UI
         /// こうしないと localScale.y を下げたときにパネル自身の中心へ縮んでしまい、
         /// 「画面中央に黒帯が2本残る」見た目になってまぶたに見えない。
         /// </summary>
+        /// <summary>
+        /// まぶたを画面の外まではみ出させる量。
+        ///
+        /// **ぴったり半分ずつだと、四辺と中央の継ぎ目に線が出る。**
+        /// 丸め誤差で 1px 足りない行ができるため。上下左右へ少し余らせて隠す。
+        /// </summary>
+        private const float LidOverscan = 4f;
+
         private void SetupLid(RectTransform lid, bool isTop)
         {
             if (lid == null) return;
@@ -57,9 +65,27 @@ namespace KillingMahjong.UI
             lid.anchorMin = new Vector2(0f, isTop ? 0.5f : 0f);
             lid.anchorMax = new Vector2(1f, isTop ? 1f : 0.5f);
 
-            // アンカー一杯に広げる（画面比が変わっても上下ぴったり半分を覆う）
-            lid.offsetMin = Vector2.zero;
-            lid.offsetMax = Vector2.zero;
+            // アンカー一杯に広げたうえで、四方へ少しはみ出させる。
+            // 中央側（上まぶたなら下辺）も余らせて、2枚の境目を重ねる
+            lid.offsetMin = new Vector2(-LidOverscan, isTop ? -LidOverscan : -LidOverscan);
+            lid.offsetMax = new Vector2(LidOverscan, isTop ? LidOverscan : LidOverscan);
+
+            // **スプライトを外して単色で塗る。**
+            // 既定の `Background` は9スライスで、外周1pxが不透明にならない。
+            // そのせいで画面の四辺と中央に、後ろの卓が透けた線が出ていた
+            // （2026-09-27 に実機で確認）。sprite を null にすると
+            // Image はただの塗りつぶしになり、端まできっちり黒くなる。
+            var image = lid.GetComponent<Image>();
+            if (image != null)
+            {
+                image.sprite = null;
+                image.type = Image.Type.Simple;
+                var c = image.color;
+                image.color = new Color(0f, 0f, 0f, 1f);
+                // 元が真っ黒でなかった場合に備えて、明るさだけは元を尊重する
+                if (c.r > 0.05f || c.g > 0.05f || c.b > 0.05f)
+                    image.color = new Color(c.r, c.g, c.b, 1f);
+            }
         }
 
         /// <summary>

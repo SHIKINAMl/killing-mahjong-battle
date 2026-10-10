@@ -8,6 +8,13 @@ namespace KillingMahjong.UI
 {
     public class CutinAnimationUI : MonoBehaviour
     {
+        private readonly PresentationScopeSet presentations = new PresentationScopeSet(Debug.LogException);
+        public void CancelPresentation()
+        {
+            presentations.CancelAll();
+            StopAllCoroutines();
+        }
+        private void OnDisable() { CancelPresentation(); }
         /// <summary>
         /// カットインを出す。
         /// </summary>
@@ -26,8 +33,15 @@ namespace KillingMahjong.UI
         private IEnumerator CutinRoutine(Sprite characterSprite, Sprite faceSprite, TMP_FontAsset font,
                                          string cutinText, System.Action onComplete, float intensity)
         {
+            using (var scope = presentations.Begin())
+                yield return scope.Run(CutinVisualsRoutine(scope, characterSprite, faceSprite, font, cutinText, onComplete, intensity));
+        }
+
+        private IEnumerator CutinVisualsRoutine(PresentationScope scope, Sprite characterSprite, Sprite faceSprite, TMP_FontAsset font,
+                                         string cutinText, System.Action onComplete, float intensity)
+        {
             // 1. ルートコンテナの作成
-            GameObject root = new GameObject("CutinRoot");
+            GameObject root = scope.Own(new GameObject("CutinRoot"));
             root.transform.SetParent(transform, false);
             RectTransform rootRt = root.AddComponent<RectTransform>();
             rootRt.anchorMin = Vector2.zero;

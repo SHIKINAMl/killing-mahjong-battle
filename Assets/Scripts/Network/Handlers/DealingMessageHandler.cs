@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using KillingMahjong.EngineData;
+using KillingMahjong.UI;
 using UnityEngine;
 
 namespace KillingMahjong.Network.Handlers
@@ -14,11 +15,20 @@ namespace KillingMahjong.Network.Handlers
 
         public void Handle(string messageType, string jsonString, NetworkMessageHandler network)
         {
-            // 既存実装と同じく、盤面反映より先に完了イベントを通知する
-            network.RaiseDealingCompleted();
+            // 局頭の進行管理が反映可能になるまで、通知全体を保留する。
+            var uiManager = Object.FindFirstObjectByType<GameUIManager>();
+            if (uiManager != null && uiManager.DeferRoundStartBoardUpdate(
+                RoundStartCoordinator.BoardUpdateKind.DealingCompleted,
+                () => Handle(messageType, jsonString, network))) return;
+
+            ApplyDealingCompleted(jsonString, network);
+        }
+
+        private static void ApplyDealingCompleted(string jsonString, NetworkMessageHandler network)
+        {
 
             DealingCompletedMessage msg = JsonUtility.FromJson<DealingCompletedMessage>(jsonString);
-            if (msg.hands == null) return;
+            if (msg == null || msg.hands == null) return;
 
             var board = Managers.BoardStateManager.Instance;
             string localPlayerId = network.LocalPlayerId;
@@ -64,6 +74,11 @@ namespace KillingMahjong.Network.Handlers
                 }
             }
             board.FireRebuildEvent();
+
+            // PhaseTransitionUI はこのイベントで局頭の暗転を解除する。
+            // 盤面反映より先に発火すると、表示がないまま暗転だけが明けるため、
+            // FireRebuildEvent の後に通知する。
+            network.RaiseDealingCompleted();
         }
     }
 }

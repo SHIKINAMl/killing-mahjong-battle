@@ -74,6 +74,11 @@ namespace KillingMahjong.UI
             RonWaitPanel.SetActive(true);
             RonWaitPanel.transform.SetAsLastSibling();
 
+            // **画面を落として、ロンできる牌だけを光らせる**（2026-10-04、`ロン演出.pdf`）。
+            // 光らせるのは敵がいま捨てた牌＝敵の河のいちばん最後。
+            // 暗幕はクリックを吸わないので、ロンボタンはこれまでどおり押せる。
+            Effects.RonChanceEffect.Show(EnemyRiverUI != null ? EnemyRiverUI.LastTile : null);
+
             // 最前面に表示するためにCanvasを追加してソート順を強制する
             Canvas canvas = RonWaitPanel.GetComponent<Canvas>();
             if (canvas == null)
@@ -115,23 +120,11 @@ namespace KillingMahjong.UI
 
         private void HandleTurnChanged(bool isLocalTurn)
         {
+            PhaseController?.HandleDiscardTurnChanged(); // 演出中の手番変更も記録する。
             if (IsTransitioning) return; // アニメーション演出中は矢印を消さない
             if (wallUI != null)
             {
                 wallUI.UpdateDiscardTurnIndicator(isLocalTurn, currentPhaseStatus == RoundStatus.Discard);
-            }
-
-            // 打牌フェイズ中にターンが変わった場合、タイマーをリセット・開始/停止する
-            if (currentPhaseStatus == RoundStatus.Discard && playerInfoUI != null)
-            {
-                if (isLocalTurn)
-                {
-                    playerInfoUI.StartTurnTimer(10f); // 10秒でリセットして開始
-                }
-                else
-                {
-                    playerInfoUI.StopTurnTimer();
-                }
             }
 
             // 手番の側の体力表示を光らせ直す。
@@ -145,10 +138,9 @@ namespace KillingMahjong.UI
         {
             Debug.Log($"[GameUIManager] ExecuteRonAction called. _isAgariPending={_isAgariPending}");
 
-            if (KillingMahjong.Managers.AudioManager.Instance != null)
-            {
-                KillingMahjong.Managers.AudioManager.Instance.PlayVoice(KillingMahjong.Managers.AudioManager.Instance.ronVoice);
-            }
+            // 暗幕と牌の点滅をここで畳む。押したのに光ったままだと、
+            // 「まだ押せていない」のか分からない
+            Effects.RonChanceEffect.HideCurrent();
 
             // チュートリアルはサーバーに繋がっていないので、進行役へ返すだけ
             if (_tutorialRonCallback != null)
@@ -156,7 +148,7 @@ namespace KillingMahjong.UI
                 var cb = _tutorialRonCallback;
                 _tutorialRonCallback = null;
                 if (RonWaitPanel != null) RonWaitPanel.SetActive(false);
-                cb();
+                StartCoroutine(RonImpactThen(cb));
                 return;
             }
 
@@ -164,12 +156,37 @@ namespace KillingMahjong.UI
             {
                 _isAgariPending = false;
                 if (RonWaitPanel != null) RonWaitPanel.SetActive(false);
-                SendActionToServer("agari", new KillingMahjong.Network.ActionPayload { accept = true });
-                Debug.Log("[GameUIManager] Sent 'agari' action to server. Waiting for server response to play animation.");
+                StartCoroutine(RonImpactThen(() =>
+                {
+                    SendActionToServer("agari", new KillingMahjong.Network.ActionPayload { accept = true });
+                    Debug.Log("[GameUIManager] Sent 'agari' action to server. Waiting for server response to play animation.");
+                }));
                 return; // サーバーからの確定（役のデータ等）を待ってからアニメーションを再生するため、ここでは抜ける
             }
 
             PhaseController?.ExecuteRonAction();
+        }
+
+        /// <summary>
+        /// 手の三段階を見せ、指差しのあとに吹き出しと体力表示だけを揺らして次へ渡す。
+        ///
+        /// サーバーへはこの短い入力演出の後に送る。返答で始まる既存の決着カットインと
+        /// 重ならず、入力が受理されたことも盤面上で読み取れる。
+        /// </summary>
+        private System.Collections.IEnumerator RonImpactThen(System.Action next)
+        {
+            var hpPanels = new System.Collections.Generic.List<RectTransform>();
+            if (PlayerInfoUI != null && PlayerInfoUI.HpAnchor != null) hpPanels.Add(PlayerInfoUI.HpAnchor);
+            if (EnemyInfoUI != null && EnemyInfoUI.HpAnchor != null) hpPanels.Add(EnemyInfoUI.HpAnchor);
+
+            yield return Effects.RonImpactEffect.Play(this, hpPanels);
+
+            if (KillingMahjong.Managers.AudioManager.Instance != null)
+            {
+                KillingMahjong.Managers.AudioManager.Instance.PlayVoice(KillingMahjong.Managers.AudioManager.Instance.ronVoice);
+            }
+
+            next?.Invoke();
         }
     }
 }

@@ -43,6 +43,11 @@ namespace KillingMahjong.Managers
         {
             get
             {
+                // 第3案で鳴っているときは、いま前に出ている側の音源を見る（2026-10-08）
+                if (_p3Running && _p3Decks != null && _p3Decks[_p3Active] != null
+                    && _p3Decks[_p3Active].isPlaying && _p3Decks[_p3Active].clip != null)
+                    return _p3Decks[_p3Active];
+
                 if (_layersRunning && _layerSources != null && _layerSources.Length > 0
                     && _layerSources[0] != null && _layerSources[0].isPlaying)
                     return _layerSources[0];

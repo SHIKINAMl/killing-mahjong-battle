@@ -87,6 +87,11 @@ namespace KillingMahjong.UI
             // 体力表示の重なり直し（血を袋の奥へ／黒い横線3本を出さない）。
             // 中身は PlayerInfoUI.MeterLayering.cs。戻すときはこの1行を外す。
             FixHpMeterLayering();
+
+            // **血を光らせる（2026-09-29 のユーザー指示）。重なり直しの後に呼ぶこと。**
+            // 先に呼ぶと、FixHpMeterLayering が袋を血より後ろの兄弟として作り直すときに
+            // 並びが変わって、光が袋の下へ潜る。
+            Effects.BloodGlowUI.Attach(hpFillImage);
         }
 
         private void ApplyCharacterData(CharacterData data)

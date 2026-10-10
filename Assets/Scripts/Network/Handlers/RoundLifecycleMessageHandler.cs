@@ -50,38 +50,8 @@ namespace KillingMahjong.Network.Handlers
                         }
                         else if (!network.AgariProcessed)
                         {
-                            network.AgariProcessed = true;
-                            // ロン判定 - JsonUtility がネストした liquidation をパースできない場合に手動パースする
-                            LiquidationData liq = reMsg.data.liquidation;
-                            if (liq == null || string.IsNullOrEmpty(liq.winner_id))
-                            {
-                                liq = ServerJsonParser.ParseLiquidationFromJson(jsonString);
-                            }
-
-                            if (liq != null && !string.IsNullOrEmpty(liq.winner_id))
-                            {
-                                Debug.Log($"[Network] ロン成立: winner={liq.winner_id}, loser={liq.loser_id}, winner_health={liq.winner_health}, loser_health={liq.loser_health}");
-                                bool isLocalWin = (liq.winner_id == network.LocalPlayerId);
-                                board.LastIsLocalWin = isLocalWin;
-                                board.LastLiquidationData = liq;
-
-                                // 演出は「減る前 → 減った後」を見せる。後はサーバーの確定値だが、
-                                // 前は上書きしてしまうと分からなくなるので、ここで控えておく。
-                                // 逆算（後 − 獲得）に頼ると、強襲のように獲得と損失が
-                                // 非対称になる仕様が入ったときに静かにずれる
-                                board.RememberHpBeforeLiquidation();
-
-                                int newLocalHp = isLocalWin ? liq.winner_health : liq.loser_health;
-                                int newEnemyHp = isLocalWin ? liq.loser_health : liq.winner_health;
-                                board.UpdateHp(newLocalHp, newEnemyHp);
-
-                                network.RaisePhaseStatusChanged(RoundStatus.Agari);
-                                network.RaiseAgari(isLocalWin);
-                            }
-                            else
-                            {
-                                Debug.LogWarning("[Network] round_end: is_draw=false だが liquidation データが取得できませんでした");
-                            }
+                            if (!LiquidationMessageApplier.TryApply(reMsg.data.liquidation, jsonString, network))
+                                Debug.LogWarning("[Network] round_end: 有効な清算データを取得できませんでした");
                         }
                     }
                     break;

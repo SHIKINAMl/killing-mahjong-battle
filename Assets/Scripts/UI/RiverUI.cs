@@ -35,6 +35,88 @@ namespace KillingMahjong.UI
 
         private List<Transform> discardedTiles = new List<Transform>();
 
+        /// <summary>
+        /// いちばん最後に置いた牌。**ロン演出で「その牌だけ光らせる」ために使う**（2026-10-04）。
+        /// まだ1枚も置いていなければ null。
+        /// </summary>
+        public RectTransform LastTile
+        {
+            get
+            {
+                for (int i = discardedTiles.Count - 1; i >= 0; i--)
+                {
+                    var rt = discardedTiles[i] as RectTransform;
+                    if (rt != null) return rt;
+                }
+                return null;
+            }
+        }
+
+        private RectTransform _tilesBoundsProxy;
+
+        /// <summary>
+        /// いま置いてある牌ぜんぶを囲む矩形（2026-10-07）。
+        /// **チュートリアルで「河をハイライト」するときの的に使う。**
+        ///
+        /// 河の入れ物（riverContainer）そのものは的にできない。牌は自前の座標で
+        /// 並べていて、入れ物の矩形は牌の並びと大きさが合っていないので、
+        /// そこを囲むと何も無い所に枠が出る。実際に置いてある牌の四隅から測る。
+        ///
+        /// 返すのは**この河の直下に置いた、見えない目印**。牌の親（riverContainer）の
+        /// 下には置かない。あちらは並び順や枚数を子の並びで見ているので、
+        /// 牌でないものを混ぜると数え違いの元になる。
+        ///
+        /// 1枚も置いていなければ null。
+        /// </summary>
+        public RectTransform GetTilesBoundsRect()
+        {
+            var self = transform as RectTransform;
+            if (self == null) return null;
+
+            bool any = false;
+            Vector2 min = new Vector2(float.MaxValue, float.MaxValue);
+            Vector2 max = new Vector2(float.MinValue, float.MinValue);
+            var corners = new Vector3[4];
+
+            foreach (var t in discardedTiles)
+            {
+                var rt = t as RectTransform;
+                if (rt == null || !rt.gameObject.activeInHierarchy) continue;
+
+                // 敵の河は180度回してあるので、ローカルの大きさではなく世界座標の四隅で測る
+                rt.GetWorldCorners(corners);
+                for (int i = 0; i < 4; i++)
+                {
+                    Vector2 p = self.InverseTransformPoint(corners[i]);
+                    min = Vector2.Min(min, p);
+                    max = Vector2.Max(max, p);
+                    any = true;
+                }
+            }
+
+            if (!any) return null;
+
+            if (_tilesBoundsProxy == null)
+            {
+                var go = new GameObject("TilesBounds", typeof(RectTransform));
+                _tilesBoundsProxy = (RectTransform)go.transform;
+                _tilesBoundsProxy.SetParent(self, false);
+            }
+
+            // 親の矩形の大きさに引きずられないよう、アンカーは親のピボットの位置に寄せる。
+            // こうすると anchoredPosition が、そのまま親のローカル座標になる
+            Vector2 pivot = self.pivot;
+            _tilesBoundsProxy.anchorMin = pivot;
+            _tilesBoundsProxy.anchorMax = pivot;
+            _tilesBoundsProxy.pivot = new Vector2(0.5f, 0.5f);
+            _tilesBoundsProxy.localRotation = Quaternion.identity;
+            _tilesBoundsProxy.localScale = Vector3.one;
+            _tilesBoundsProxy.sizeDelta = max - min;
+            _tilesBoundsProxy.anchoredPosition = (min + max) * 0.5f;
+
+            return _tilesBoundsProxy;
+        }
+
         // ボルテージのゲージはここでは作らない。**GameUIManager.Start が作る。**
         // 河から作ると河のキャンバスの下にぶら下がり、手牌を選んでいる間は
         // 河ごと消えてゲージまで見えなくなる（実際そうなった）。
@@ -153,6 +235,7 @@ namespace KillingMahjong.UI
             UpdateTurnText();
             UpdateSiblingOrder();
 
+            PlayPlacedHeartbeat();
             if (willFly) FinishVoltage(rt);
         }
 
@@ -188,7 +271,28 @@ namespace KillingMahjong.UI
             UpdateTurnText();
             UpdateSiblingOrder();
 
+            PlayPlacedHeartbeat();
             if (willFly) FinishVoltage(rt);
+        }
+
+        /// <summary>
+        /// 牌が河に置かれた直後の心音（弱・詰まった1拍）。
+        ///
+        /// **ここ1か所だけで鳴らす。** <see cref="AddTile"/> と
+        /// <see cref="AddExistingTile"/> は自分・相手・チュートリアルの
+        /// すべての打牌が通る場所なので、`GameUIManager.HandleDiscardEvent` や
+        /// `TutorialManager` 側にも足すと二重に鳴る。
+        ///
+        /// **鳴らすのは自分の打牌だけ**（2026-10-01 の指示）。
+        /// 相手の打牌でも鳴らしていたが、自分が切る緊張を表す音なので、
+        /// 両方で鳴ると打牌のたびに鳴り続けて意味が薄れる。
+        /// </summary>
+        private void PlayPlacedHeartbeat()
+        {
+            if (isEnemyRiver) return;
+
+            var audio = KillingMahjong.Managers.AudioManager.Instance;
+            if (audio != null) audio.PlayDiscardHeartbeat();
         }
 
         /// <summary>
@@ -219,12 +323,39 @@ namespace KillingMahjong.UI
         private void FinishVoltage(RectTransform rt)
         {
             bool enemy = isEnemyRiver;
-            if (!VoltageTileFlightEffect.TryPlay(
-                    rt, enemy,
-                    () => KillingMahjong.Managers.VoltageSystem.ApplyDiscardResult(enemy, true)))
+            // **光が出せない場面でも同じ包みを通す。** 直に
+            // `ApplyDiscardResult` を呼ぶと、そちらの経路だけ心音が鳴らなくなる。
+            if (!VoltageTileFlightEffect.TryPlay(rt, enemy, () => ApplyVoltageWithHeartbeat(enemy)))
             {
-                KillingMahjong.Managers.VoltageSystem.ApplyDiscardResult(enemy, true);
+                ApplyVoltageWithHeartbeat(enemy);
             }
+        }
+
+        /// <summary>
+        /// ゲージへ反映し、**実際にポイントが増えたときだけ**心音を鳴らす。
+        ///
+        /// 増えたかどうかを前後で比べているのは、鳴らしてはいけない場合が
+        /// 3つあるから。既出牌で途切れたとき（ここは `NotifyDiscard` 側を通るので
+        /// そもそも来ない）、最大値（14点）に張り付いていて増えないとき、
+        /// そして将来 `ApplyDiscardResult` の条件が増えたとき。
+        /// **「呼んだから鳴らす」ではなく「増えたから鳴らす」にしておく。**
+        ///
+        /// 段が上がった回（2/5/9/14 に届いた回）だけ強い方にする。
+        /// </summary>
+        private static void ApplyVoltageWithHeartbeat(bool enemy)
+        {
+            int beforePoints = KillingMahjong.Managers.VoltageSystem.GetPoints(enemy);
+            int beforeLevel = KillingMahjong.Managers.VoltageSystem.GetLevel(enemy);
+
+            KillingMahjong.Managers.VoltageSystem.ApplyDiscardResult(enemy, true);
+
+            int afterPoints = KillingMahjong.Managers.VoltageSystem.GetPoints(enemy);
+            int afterLevel = KillingMahjong.Managers.VoltageSystem.GetLevel(enemy);
+
+            if (afterPoints <= beforePoints) return;
+
+            var audio = KillingMahjong.Managers.AudioManager.Instance;
+            if (audio != null) audio.PlayVoltageHeartbeat(afterLevel > beforeLevel);
         }
 
         private void ApplyRiverLayout(RectTransform rt)
@@ -302,6 +433,15 @@ namespace KillingMahjong.UI
                     foreach (var t in rows[i]) t.SetSiblingIndex(sibIdx++);
                 }
             }
+        }
+
+        /// <summary>
+        /// 打牌数（「後：五打目」）の置き場所。チュートリアルで囲んで見せるのに使う（2026-10-08）。
+        /// この河が打牌数を持っていなければ null。
+        /// </summary>
+        public RectTransform TurnTextRect
+        {
+            get { return turnText != null ? turnText.rectTransform : null; }
         }
 
         public void UpdateTurnText()

@@ -74,12 +74,20 @@ namespace KillingMahjong.Managers
 
         // ここから下はフロー図の続き（2026-09-19 に追加）。
         // 「わかった？…」のあと、手牌を選ばせる直前までの案内。
+        //
+        // **強調のタグは、ここでは付けない（2026-10-08）。** 以前は青太字の語句を
+        // 1行ずつ手で囲んでいた（黄色 + 1pt）が、フロー図の青太字は70行あり、
+        // 手で追うと必ず漏れる。いまは図から起こした表（Tutorial.TutorialEmphasis）が
+        // セリフを出すときにまとめて掛ける。この2つは空にしてあり、文は素のまま通る。
+        // 既存の行で使っているので定数は残してある。**新しい行では使わないこと。**
+        private const string HighlightOpen = "";
+        private const string HighlightClose = "";
 
         /// <summary>山牌を見せてから、何をさせるかを言う。**どちらの経路でも共通。**</summary>
         private static readonly List<TutorialLine> ShowWallLines = new List<TutorialLine>
         {
-            new TutorialLine("「じゃーん！\nこれが君の山牌ね」"),
-            new TutorialLine("「君はこの中から13枚選んでテンパイな手牌を作ってもらうよ」"),
+            new TutorialLine("「じゃーん！\nこれが君の" + HighlightOpen + "山牌" + HighlightClose + "ね」"),
+            new TutorialLine("「君はこの中から" + HighlightOpen + "13枚選んでテンパイな手牌" + HighlightClose + "を作ってもらうよ」"),
         };
 
         /// <summary>
@@ -89,7 +97,7 @@ namespace KillingMahjong.Managers
         private static readonly List<TutorialLine> TenpaiExplainLines = new List<TutorialLine>
         {
             new TutorialLine("「えっテンパイって何かって？」"),
-            new TutorialLine("「テンパイってのはあと1牌でアガりって状態のこと」"),
+            new TutorialLine("「テンパイってのは" + HighlightOpen + "あと1牌でアガりって状態" + HighlightClose + "のこと」"),
             new TutorialLine("「ま普通にアガる手を作って１牌抜くのがラクだよ」"),
         };
 
@@ -97,13 +105,24 @@ namespace KillingMahjong.Managers
         private static readonly List<TutorialLine> ManganRequestLines = new List<TutorialLine>
         {
             new TutorialLine("「で今回作ってもらうのはただのテンパイじゃないよ」"),
-            new TutorialLine("「君には満貫な手を作ってもらうねー」"),
+            new TutorialLine("「君には" + HighlightOpen + "満貫" + HighlightClose + "なテンパイを作ってもらうねー」"),
+        };
+
+        /// <summary>
+        /// 満貫説明UIを閉じたあとの念押し（2026-09-23 に足した。フロー図にあったが抜けていた）。
+        /// </summary>
+        private static readonly List<TutorialLine> ManganRuleLines = new List<TutorialLine>
+        {
+            new TutorialLine("「このゲームはまず" + HighlightOpen + "満貫以上の形" + HighlightClose + "を作るのがルールでね」"),
+            new TutorialLine("「満貫以上を作れないと" + HighlightOpen + "賭けにならない" + HighlightClose + "から注意して」"),
+            new TutorialLine("「んじゃあ満貫を作る練習ねー」"),
         };
 
         /// <summary>最後のひと押し。この直後に手牌選択へ入る。</summary>
         private static readonly List<TutorialLine> StartBuildingLines = new List<TutorialLine>
         {
-            new TutorialLine("「とりあえず適当に作ってみようかー？」"),
+            new TutorialLine("「とりあえず適当に13牌触ってみてよ」"),
+            new TutorialLine("「アタシが見てやるからさー」"),
         };
 
         /// <summary>
@@ -143,11 +162,17 @@ namespace KillingMahjong.Managers
         private bool _askExperienceAfterIntro;
 
         /// <summary>
-        /// 立ち絵を出してほしいときに呼ぶ。**1行目のセリフの後に1度だけ。**
+        /// 立ち絵を出してほしいときに呼ぶ。**契約書を閉じた直後に1度だけ。**
         /// 立ち絵を持っているのは `OpeningSequenceManager`（シーン側）なので、
         /// こちらは「出して」と言うだけにしてある。
         /// </summary>
         public System.Action CharacterRevealRequested;
+
+        /// <summary>
+        /// 立ち絵が出きったかどうか。**台詞はこれが立つまで待つ（2026-09-27 の指示）。**
+        /// 出すのはシーン側、待つのはこちらなので、旗で受け渡す。
+        /// </summary>
+        public bool CharacterRevealFinished;
 
         /// <summary>
         /// 導入セリフのあとに「麻雀を知っているか」を聞き、答えに応じて説明を見せる
@@ -230,6 +255,7 @@ namespace KillingMahjong.Managers
             // 手を組ませる直前のここが正しい位置（以前は合流点に出していた）
             yield return ShowRulePanelRoutine(font, null, null, GuideBoardPath);
 
+            yield return PlayLines(ManganRuleLines);
             yield return PlayLines(StartBuildingLines);
         }
 

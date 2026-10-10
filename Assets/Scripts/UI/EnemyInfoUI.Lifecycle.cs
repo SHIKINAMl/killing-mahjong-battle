@@ -103,6 +103,10 @@ namespace KillingMahjong.UI
                 normalSprite = characterRenderer.sprite;
                 if (faceRenderer != null) normalFaceSprite = faceRenderer.sprite;
             }
+
+            // **血を光らせる（2026-09-29 のユーザー指示）。**
+            // 自分側（PlayerInfoUI）と同じ部品で、同じ見え方にする。
+            Effects.BloodGlowUI.Attach(hpFillImage);
         }
 
         /// <summary>

@@ -218,9 +218,11 @@ namespace KillingMahjong.Managers
             s.rounds.Add(BuildRound5(dora, d1, d2, d3, d4, finalHand, finalWaits, finalWinningTile, FinalWall));
 
 
-            // 第1〜3局は同じ清一色の手牌を使うので、聴牌チェックの応答も共通にしておく
-            foreach (var r in s.rounds)
+            // 第2〜3局は同じ清一色の手牌を使うので、聴牌チェックの応答も共通にしておく。
+            // 第1局は混一色＋一気通貫の満貫なので、BuildRound1 の設定を上書きしない。
+            for (int i = 1; i < s.rounds.Count; i++)
             {
+                var r = s.rounds[i];
                 r.manganHandYaku = new List<string> { "清一色" };
                 r.manganHandHan = 6;
 

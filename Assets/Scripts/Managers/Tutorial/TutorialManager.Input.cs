@@ -29,6 +29,8 @@ namespace KillingMahjong.Managers
                 ShowInterruptMessage("今は『自動』ボタンを押してね。");
                 return false;
             }
+
+            if (toHand) _hasMovedTileThisRound = true;
             return true;
         }
 
@@ -156,6 +158,12 @@ namespace KillingMahjong.Managers
             // 次は決定ボタンへ誘導する（自由に組ませる局では誘導しない）
             if (_isWaitingForHandSelectionComplete && !_round.freeHandBuilding)
             {
+                // フロー図にある一言（2026-09-23 に足した）。矢印だけでは何を押すのか伝わらない
+                StartCoroutine(PlayLines(new List<TutorialLine>
+                {
+                    new TutorialLine(DecidePromptLine),
+                }));
+
                 GuideTo(gameUIManager != null && gameUIManager.HandUI != null
                     ? gameUIManager.HandUI.DecideButtonRect : null);
             }

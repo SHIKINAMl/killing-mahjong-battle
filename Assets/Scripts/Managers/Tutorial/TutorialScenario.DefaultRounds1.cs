@@ -18,6 +18,8 @@ namespace KillingMahjong.Managers
                 wallBaseIds = Wall(),
                 manganHandBaseIds = new List<int>(hand),
                 waitBaseIds = new List<int>(waits),
+                manganHandYaku = new List<string> { "混一色", "一気通貫" },
+                manganHandHan = 5,
                 doraBaseId = dora,
 
                 allowManualHandSelection = true,   // ① 適当に13枚選ばせる
@@ -38,7 +40,7 @@ namespace KillingMahjong.Managers
                 // **そのまま事実になる。** 以前は清一色6飜＝跳満で +3000 入っていて、
                 // セリフと食い違っていた。
 
-                betPromptText = "{0}円。それがあなたの言い値ね。",
+                betPromptText = "",
 
                 introLines = new List<TutorialLine>
                 {
@@ -60,32 +62,27 @@ namespace KillingMahjong.Managers
                 },
                 onHandFilledLines = new List<TutorialLine>
                 {
-                    new TutorialLine("13枚ね。……その手、満貫にも届いていないわ。"),
-                    new TutorialLine("安い手で座るのは許さない。死ぬ値打ちがないもの。"),
-                    new TutorialLine("今回は組んであげる。『自動』を押しなさい。"),
+                    new TutorialLine("あーそれは違うね"),
+                    new TutorialLine("まぁ難しいし、しゃあないか"),
+                    new TutorialLine("じゃあ、コレ使ってよ"),
+                    new TutorialLine("これは おまかせボタン"),
+                    new TutorialLine("自動で山牌の中から満貫以上の形を作ってくれるよ"),
+                    // フロー図にあったが抜けていた1行（2026-09-23 に足した）
+                    new TutorialLine("君はまだできないみたいだからこれを押して"),
                 },
                 onSelfManganLines = new List<TutorialLine>
                 {
-                    new TutorialLine("……あら。ちゃんと満貫に届いてる。"),
-                    new TutorialLine("麻雀を知っている手ね。少し楽しくなってきたわ。"),
-                    new TutorialLine("文句はないわ。『決定』を押しなさい。"),
+                    new TutorialLine("おっきっちりできたね"),
+                    new TutorialLine("さすがは後輩ちゃん 飲み込み早いねー"),
+                    new TutorialLine("じゃあまぁいらないと思うけど"),
                 },
                 beforeBetLines = new List<TutorialLine>
                 {
-                    new TutorialLine("次は賭け金よ。"),
-                    new TutorialLine("言っておくけど、決めた分の血はその場で抜かれるわ。"),
-                    new TutorialLine("勝ってから払うんじゃない。賭けた瞬間に、もう減っているの。"),
-                    new TutorialLine("体力ゲージ、決めた瞬間に減るのを見ていなさい。"),
-                    new TutorialLine("戻ってくるかどうかは、まだ何も決まっていないけれど。"),
-                    new TutorialLine("勝てば役の倍率をかけて返る。負ければ、払った上にもっと持っていかれる。"),
-                    new TutorialLine("いくら出す？ 自分で決めていいのよ。"),
+                    new TutorialLine("あっ！その前に賭け金の設定をしなきゃね"),
+                    new TutorialLine("あとで説明するから今回は2000賭けてくれるかな"),
                 },
-                onBattleStartLines = new List<TutorialLine>
-                {
-                    new TutorialLine("対局開始よ。"),
-                    new TutorialLine("あなたの番。好きな牌を捨ててごらんなさい。"),
-                    new TutorialLine("一枚捨てるたびに、どちらかが近づくの。"),
-                },
+                // 第1局の対局導入は TutorialManager.Progression の専用フローで表示する。
+                onBattleStartLines = new List<TutorialLine>(),
                 outroLines = new List<TutorialLine>
                 {
                     new TutorialLine("ロン。あなたの上がりね。"),
@@ -110,14 +107,27 @@ namespace KillingMahjong.Managers
                 waitBaseIds = new List<int>(waits),
                 doraBaseId = dora,
 
-                allowManualHandSelection = false,
+                // **この局は「もう一回 手牌選択の練習」**（2026-09-30 のフロー図改訂）。
+                // 以前は『自動』を押させるだけだったが、改訂版では自分で13枚組ませる。
+                // 詰まった人には時間で声をかけ、最後は『おまかせ』へ逃がす
+                // （TutorialManager.RunSecondRoundHandTimerHints）。
+                allowManualHandSelection = true,
+                freeHandBuilding = true,
                 rejectFirstConfirm = false,
-                requireAutoManganToConfirm = true,
+                requireAutoManganToConfirm = false,
 
                 // 流局ぶんは次局へ積み増されるので少額にしておく。
                 // 第3局は単騎の2倍が効くため、ここを大きくすると自分が死ぬ。
+                // **この額は賭け金フェイズが使えなかったときの保険。**
+                // 改訂版ではプレイヤーが自分で決めるので、実際に積まれるのは
+                // 確定した額（賭けすぎは 3000 で止める）。
                 betAmount = 600,
-                // 17手ぶん。うち最初の15手は自動で流し、残り2手をプレイヤーに打たせる。
+                // 17手ぶん。**最初の4手は自分で打たせる**（2026-10-06 のフロー図改訂）。
+                // 敵の5打目の手前でボルテージの説明が入り、そこから15手目までを自動で流して、
+                // 残り2手をまたプレイヤーに打たせる。運びは TutorialManager.RunSecondRoundBattle。
+                //
+                // この並びは**優先順位**として使われる。敵は「まだ川に出ていない牌」を
+                // 打つ仕様なので、プレイヤーが先に捨てた牌種は飛ばして次を打つ。
                 enemyDiscardBaseIds = new List<int>(drawDiscards),
                 autoDiscardTurns = 15,
                 outcome = TutorialOutcome.Draw,
@@ -127,12 +137,28 @@ namespace KillingMahjong.Managers
 
                 introLines = new List<TutorialLine>
                 {
-                    new TutorialLine("次は、誰も死なない局を見せてあげる。"),
-                    new TutorialLine("『自動』を押しなさい。"),
+                    new TutorialLine("まずはもう一回 手牌選択の練習 をしよっか"),
+                    new TutorialLine("13枚の牌を選んで手牌を作ってねー"),
                 },
+                // 13枚そろったとき。自力でも『おまかせ』でも同じ言葉をかける
+                onHandFilledLines = new List<TutorialLine>
+                {
+                    new TutorialLine("よーしできたね"),
+                    new TutorialLine("ほいじゃ決定ボタンを押して"),
+                },
+                onSelfManganLines = new List<TutorialLine>
+                {
+                    new TutorialLine("よーしできたね"),
+                    new TutorialLine("ほいじゃ決定ボタンを押して"),
+                },
+                // 対局フェイズ②の頭（2026-10-06 のフロー図改訂・4枚目）。
+                // 「プレイヤー後攻から」なので、この2行のあと敵が先に打つ。
+                // 旧「しばらく黙って見ていなさい。勝手に進めるわ。」は、ボルテージの説明の
+                // あと自動で流し始める所へ移した（TutorialManager.SecondBattleResumeLines）。
                 onBattleStartLines = new List<TutorialLine>
                 {
-                    new TutorialLine("しばらく黙って見ていなさい。勝手に進めるわ。"),
+                    new TutorialLine("じゃあ早速対局開始！"),
+                    new TutorialLine("今度はアタシから"),
                 },
                 beforeManualDiscardLines = new List<TutorialLine>
                 {

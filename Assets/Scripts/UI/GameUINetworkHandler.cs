@@ -9,6 +9,9 @@ namespace KillingMahjong.UI
     {
         private GameUIManager uiManager;
         private bool isEventsRegistered = false;
+        private bool receivedInitialResponse;
+        private bool connectionFailed;
+        private const float InitialResponseTimeout = 30f;
 
         public void Setup(GameUIManager manager)
         {
@@ -26,6 +29,8 @@ namespace KillingMahjong.UI
                 NetworkMessageHandler.Instance.OnMatchCancelled += HandleMatchCancelled;
                 
                 NetworkMessageHandler.Instance.OnPhaseStatusChanged += HandlePhaseStatusChanged;
+                NetworkMessageHandler.Instance.OnDealingStarted += HandleDealingStarted;
+                NetworkMessageHandler.Instance.OnDealingCompleted += HandleDealingCompleted;
                 NetworkMessageHandler.Instance.OnIsTenpaiReceived += HandleIsTenpaiReceived;
                 NetworkMessageHandler.Instance.OnNotTenpaiReceived += HandleNotTenpaiReceived;
                 NetworkMessageHandler.Instance.OnNextRoundWaitingReceived += HandleNextRoundWaitingReceived;
@@ -48,6 +53,24 @@ namespace KillingMahjong.UI
         {
             // Setup()が呼ばれなかった場合のフェイルセーフとしてここでも呼ぶ
             RegisterEvents();
+            if (uiManager != null && !uiManager.IsTutorialMode &&
+                (NetworkMessageHandler.Instance == null || !NetworkMessageHandler.Instance.UseDebugClient))
+                StartCoroutine(WatchInitialConnection());
+        }
+
+        private System.Collections.IEnumerator WatchInitialConnection()
+        {
+            float deadline = Time.realtimeSinceStartup + InitialResponseTimeout;
+            while (!receivedInitialResponse && Time.realtimeSinceStartup < deadline) yield return null;
+            if (receivedInitialResponse) yield break;
+            connectionFailed = true;
+            LoadingManager.Instance?.ForceHide();
+            SessionPrompt prompt = null;
+            prompt = SessionPrompt.Show("サーバーから応答がありません。\n通信環境を確認し、タイトルからやり直してください。",
+                "タイトルへ戻る", () => prompt.ReturnToTitle());
+            // 遅れて成立した対局を、このエラー画面の裏で開始させない。
+            var client = WebSocketGameClientSample.Instance;
+            if (client != null) _ = client.ResetConnectionAsync();
         }
 
         private void OnDestroy()
@@ -59,6 +82,8 @@ namespace KillingMahjong.UI
                 NetworkMessageHandler.Instance.OnMatchCancelled -= HandleMatchCancelled;
                 
                 NetworkMessageHandler.Instance.OnPhaseStatusChanged -= HandlePhaseStatusChanged;
+                NetworkMessageHandler.Instance.OnDealingStarted -= HandleDealingStarted;
+                NetworkMessageHandler.Instance.OnDealingCompleted -= HandleDealingCompleted;
                 NetworkMessageHandler.Instance.OnIsTenpaiReceived -= HandleIsTenpaiReceived;
                 NetworkMessageHandler.Instance.OnNotTenpaiReceived -= HandleNotTenpaiReceived;
                 NetworkMessageHandler.Instance.OnNextRoundWaitingReceived -= HandleNextRoundWaitingReceived;
@@ -78,6 +103,8 @@ namespace KillingMahjong.UI
 
         private void HandleGameStarted()
         {
+            if (connectionFailed) return;
+            receivedInitialResponse = true;
             Debug.Log("[GameUINetworkHandler] HandleGameStarted called.");
             KillingMahjong.UI.LoadingManager.Instance.ForceHide();
             uiManager.PhaseController?.OnGameStarted();
@@ -85,6 +112,8 @@ namespace KillingMahjong.UI
 
         private void HandleMatchmakingWaiting(KillingMahjong.EngineData.MatchingWaitingData data)
         {
+            if (connectionFailed) return;
+            receivedInitialResponse = true;
             Debug.Log("[GameUINetworkHandler] HandleMatchmakingWaiting called.");
 
             // 暗転を明けさせつつ、マッチング待機画面を出す
@@ -109,6 +138,16 @@ namespace KillingMahjong.UI
         private void HandlePhaseStatusChanged(RoundStatus newStatus)
         {
             uiManager.PhaseController?.UpdatePhaseStatus(newStatus);
+        }
+
+        private void HandleDealingStarted()
+        {
+            uiManager.PhaseController?.HandleDealingStarted();
+        }
+
+        private void HandleDealingCompleted()
+        {
+            uiManager.PhaseController?.HandleDealingCompleted();
         }
 
         private void HandleIsTenpaiReceived(IsTenpaiData data)
@@ -175,16 +214,8 @@ namespace KillingMahjong.UI
                 KillingMahjong.UI.LoadingManager.Instance.ForceHide();
             }
 
-            // **エラーで戻ってきたときは必ず操作ロックを解除する（2026-08-23）。**
-            //
-            // スキルは送信の直前に IsTransitioning を立てるが、倒すのは skill_casted だけだった。
-            // サーバーに弾かれると error しか返らないため、フラグが立ちっぱなしになり
-            // TileInteraction が全経路で早期 return して**盤面が二度と押せなくなる**
-            // （強襲の「1局1回」はサーバー側だけの制限で、クライアントに同じ制限が無いので
-            // 2発目を押すと確実に踏む）。
-            // 手牌選択・打牌側も送信前にロックを立てるので、同じ事故はスキル以外でも起きうる。
-            // 演出の途中で倒すことになっても、押せないまま固まるより軽い。
-            uiManager.SetIsTransitioning(false);
+            // 操作識別子のないerrorでは、応答待ちの要求だけを解除する。進行中の演出は触らない。
+            uiManager.SkillController?.CancelPendingSkillRequest();
 
             if (uiManager.DialogueUI != null)
             {

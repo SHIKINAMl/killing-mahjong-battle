@@ -185,6 +185,8 @@ namespace KillingMahjong.UI
 
             if (localBoost == null) localBoost = new Dictionary<string, int>();
             if (enemyBoost == null) enemyBoost = new Dictionary<string, int>();
+            _lastLocalBoost = localBoost;
+            _lastEnemyBoost = enemyBoost;
 
             for (int i = 0; i < allYakus.Length; i++)
             {
@@ -206,6 +208,113 @@ namespace KillingMahjong.UI
             // `fontSharedMaterial` が null のためマテリアルの差し替えだけ空振りする
             // （自動縮小など他の設定は効くので、直ったように見えて輪郭だけ残る）。
             ApplyActiveBoostReadability();
+
+            // 演出が伏せている枠は、並べ直したあとも伏せたままにする
+            ApplyLocalChipHold();
+        }
+
+        // ==================== 役強化の演出とのつなぎ（2026-10-09） ====================
+        //
+        // 役強化を使うと、演出の最後に役名と翻数がこのボードの枠へ飛んできて収まる
+        // （<see cref="Effects.BoostHandSkillEffect"/>）。
+        // **サーバーの返事が届いた時点で枠はもう新しい値になっている**ので、そのままだと
+        // 「飛んでくる前から答えが出ている」ことになる。演出が届くまで、その枠だけ伏せておく。
+
+        /// <summary>伏せたまま戻らなくなるのを防ぐ上限。演出は長くても5秒ほど。</summary>
+        private const float ChipHoldLimitSeconds = 10f;
+
+        private string _heldLocalYaku;
+        private float _heldUntil;
+
+        /// <summary>自分の強化の枠のうち、この役の枠を伏せる。演出が届いたら <see cref="ReleaseLocalBoostChip"/> で戻す。</summary>
+        public void HoldLocalBoostChip(string yakuName)
+        {
+            _heldLocalYaku = string.IsNullOrEmpty(yakuName) ? null : yakuName;
+            _heldUntil = Time.unscaledTime + ChipHoldLimitSeconds;
+            ApplyLocalChipHold();
+        }
+
+        /// <summary>伏せていた枠を戻す。伏せていなければ何もしない。</summary>
+        public void ReleaseLocalBoostChip()
+        {
+            if (_heldLocalYaku == null) return;
+            _heldLocalYaku = null;
+            ApplyLocalChipHold();
+        }
+
+        /// <summary>
+        /// 自分の強化の枠のうち、この役が入っている枠。演出が飛んでいく先に使う。
+        /// 枠に入りきらず「+3」にまとめられているときは、まとめの枠を返す。見つからなければ null。
+        /// </summary>
+        public RectTransform LocalBoostChipOf(string yakuName)
+        {
+            if (localActiveBoostTexts == null || string.IsNullOrEmpty(yakuName)) return null;
+
+            TextMeshProUGUI last = null;
+            foreach (var text in localActiveBoostTexts)
+            {
+                if (text == null || !text.gameObject.activeInHierarchy) continue;
+                if (text.text == yakuName) return text.transform.parent as RectTransform;
+                last = text;
+            }
+            return last != null && last.text.StartsWith("+") ? last.transform.parent as RectTransform : null;
+        }
+
+        // **強化が枠（3つ）より多いとき。** 上位2つだけ名前で出て、3つ目の枠は「+2」（あと2件）になる。
+        // 強めたばかりの役がその「あと何件」に入ると、演出の役名は「+2」へ飛んでいくのに、
+        // ボードには何を強めたかが出ない（2026-10-09 に録画で確認）。
+        // 収まってからしばらくだけ、3つ目の枠にその役を名前で出す。時間が来たら「+2」へ戻る。
+
+        private Dictionary<string, int> _lastLocalBoost;
+        private Dictionary<string, int> _lastEnemyBoost;
+        private string _spotlightYaku;
+        private float _spotlightUntil;
+
+        /// <summary>
+        /// 強めたばかりの役を、しばらくだけ名前で出す。その役がもう名前で出ているなら、何も変わらない。
+        /// 戻すのはこの部品が自分でやる（演出は待たなくてよい）。
+        /// </summary>
+        /// <param name="seconds">名前で出しておく秒数</param>
+        public void SpotlightLocalBoost(string yakuName, float seconds)
+        {
+            if (string.IsNullOrEmpty(yakuName)) return;
+            _spotlightYaku = yakuName;
+            // 演出と同じ時計（Time.time）で数える。演出の明滅と足並みをそろえるため
+            _spotlightUntil = Time.time + seconds;
+            UpdateBoostData(_lastLocalBoost, _lastEnemyBoost);
+        }
+
+        private void Update()
+        {
+            // 演出が途中で打ち切られても、枠が伏せたままにならないようにする
+            if (_heldLocalYaku != null && Time.unscaledTime > _heldUntil) ReleaseLocalBoostChip();
+
+            if (_spotlightYaku != null && Time.time > _spotlightUntil)
+            {
+                _spotlightYaku = null;
+                UpdateBoostData(_lastLocalBoost, _lastEnemyBoost);
+            }
+        }
+
+        private void ApplyLocalChipHold()
+        {
+            if (localActiveBoostTexts == null) return;
+
+            foreach (var text in localActiveBoostTexts)
+            {
+                if (text == null) continue;
+                var chip = text.transform.parent;
+                if (chip == null || chip.gameObject == yakuListPanel) continue;
+
+                bool hide = _heldLocalYaku != null && text.text == _heldLocalYaku;
+                var group = chip.GetComponent<CanvasGroup>();
+                if (group == null)
+                {
+                    if (!hide) continue;
+                    group = chip.gameObject.AddComponent<CanvasGroup>();
+                }
+                group.alpha = hide ? 0f : 1f;
+            }
         }
 
         /// <summary>常時表示の強化役（自3枠・敵3枠）の文字を読めるようにする。</summary>
@@ -478,9 +587,21 @@ namespace KillingMahjong.UI
                 {
                     // 役名と翻数を分けて、翻数だけ下の帯に入れる。
                     // 枠が足りないときの「+3」は役名が無いので、帯を隠して1行で出る
+                    string overflowText = $"+{hiddenCount}";
+                    if (isOverflowSlot && isLocal && _spotlightYaku != null)
+                    {
+                        // 強めたばかりの役が「あと何件」に埋もれているあいだだけ、その役を名前で出す
+                        for (int k = shownCount; k < activeBoosts.Count; k++)
+                        {
+                            if (activeBoosts[k].Key != _spotlightYaku) continue;
+                            overflowText = $"{activeBoosts[k].Key}+{activeBoosts[k].Value}";
+                            break;
+                        }
+                    }
+
                     BuildTile(textArray[i], isLocal);
                     ApplyTileText(textArray[i], isOverflowSlot
-                        ? $"+{hiddenCount}"
+                        ? overflowText
                         : $"{activeBoosts[i].Key}+{activeBoosts[i].Value}");
                     textArray[i].gameObject.SetActive(true);
                     

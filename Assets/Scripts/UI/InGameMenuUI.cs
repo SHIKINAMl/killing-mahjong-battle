@@ -39,6 +39,10 @@ namespace KillingMahjong.UI
 
         private async void ReturnToTitle()
         {
+            var tutorial = FindFirstObjectByType<KillingMahjong.Managers.TutorialManager>();
+            if (tutorial != null) { tutorial.SkipTutorial(); return; }
+            TutorialNavigation.Cancel();
+            KillingMahjong.Managers.Tutorial.TutorialAudioDirector.ResetVisuals();
             // ボタンを無効化して連打防止
             if (returnToTitleButton != null) returnToTitleButton.interactable = false;
 
@@ -61,7 +65,7 @@ namespace KillingMahjong.UI
                 */
                 
                 // WebSocketを閉じる
-                await wsClient.DisconnectAsync();
+                await Task.WhenAny(wsClient.ResetConnectionAsync(), Task.Delay(2000));
             }
             else
             {

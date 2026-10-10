@@ -2,7 +2,6 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using UnityEngine.SceneManagement;
-using System.Collections;
 using KillingMahjong.Core;
 
 namespace KillingMahjong.UI
@@ -21,49 +20,39 @@ namespace KillingMahjong.UI
         public VictoryType victoryType;
         public Sprite image;
         [TextArea] public string text;
+        [Tooltip("クリックで進める本文。未設定の場合は従来の text を1ページとして使う。")]
+        [TextArea] public string[] dialoguePages;
+        [Tooltip("本文終了後に表示する結果見出し（例：DEAD END）。")]
+        public string resultTitle;
+        [Tooltip("エンディング番号と名前（例：No.4：激烈借金地獄）。")]
+        public string endingName;
     }
 
     public class VictoryUI : MonoBehaviour
     {
-        /// <summary>スコアが渡されなかったことを表す番兵。特殊勝利のように最終スコアが無い経路で使う。</summary>
         public const int UnknownScore = int.MinValue;
 
-        [Header("UI References")]
+        // 既存シーンの参照を維持。表示は共通の EndingSequenceUI が担当する。
         [SerializeField] private Image backgroundImage;
         [SerializeField] private TextMeshProUGUI dialogueText;
         [SerializeField] private Button titleButton;
         [SerializeField] private CanvasGroup canvasGroup;
-
-        [Header("Optional")]
-        [Tooltip("最終スコアと通算成績を出す専用テキスト。未設定ならセリフ欄の下に追記する。")]
-        [SerializeField] private TextMeshProUGUI summaryText;
-
-        [Tooltip("再戦ボタン。未設定ならタイトルボタンを複製して実行時に生成する。")]
-        [SerializeField] private Button rematchButton;
-
-        [Tooltip("再戦ボタンをタイトルボタンから自動生成するときの位置ずらし量")]
-        [SerializeField] private Vector2 autoRematchButtonOffset = new Vector2(0f, 110f);
-
-        [Header("Configurations")]
         [SerializeField] private VictoryConfig[] configs;
+        [Tooltip("勝利用の演出案。未設定の間は、対応する敗北演出の内容を仮に使用する。")]
+        [SerializeField] private VictoryConfig[] victoryEndingConfigs;
 
-        private bool resultRecorded = false;
+        private bool resultRecorded;
+        private EndingSequenceUI victorySequence;
+        private EndingSequenceUI defeatSequence;
 
         private void Awake()
         {
-            if (titleButton != null)
-            {
-                titleButton.onClick.AddListener(OnTitleButtonClicked);
-            }
-            if (canvasGroup != null)
-            {
-                canvasGroup.alpha = 0;
-                canvasGroup.interactable = false;
-                canvasGroup.blocksRaycasts = false;
-            }
+            if (canvasGroup == null) return;
+            canvasGroup.alpha = 0;
+            canvasGroup.interactable = false;
+            canvasGroup.blocksRaycasts = false;
         }
 
-        /// <summary>旧シグネチャ。スコア不明のまま結果を出す。</summary>
         public void PlayAnimation(VictoryType type)
         {
             PlayAnimation(type, UnknownScore, UnknownScore);
@@ -71,173 +60,72 @@ namespace KillingMahjong.UI
 
         public void PlayAnimation(VictoryType type, int localScore, int enemyScore)
         {
+            // special_victory_won に続いて game_end が届いてもEDを再開しない。
+            if (resultRecorded) return;
             gameObject.SetActive(true);
-
-            bool isWin = (type == VictoryType.NormalVictory || type == VictoryType.SpecialVictory);
-            bool isSpecial = (type == VictoryType.SpecialVictory);
-
-            // 対局の結果がこれまで一切保存されていなかったため、ここで通算戦績に記録する。
-            // 呼び出し経路が複数あるので、1試合につき1回だけになるようガードする。
             if (!resultRecorded)
             {
                 resultRecorded = true;
-                PlayerStatsManager.RecordMatchResult(isWin, isSpecial);
+                PlayerStatsManager.RecordMatchResult(
+                    type == VictoryType.NormalVictory || type == VictoryType.SpecialVictory,
+                    type == VictoryType.SpecialVictory);
             }
 
-            // Apply config based on type
-            if (configs != null)
-            {
-                foreach (var config in configs)
-                {
-                    if (config.victoryType == type)
-                    {
-                        if (backgroundImage != null && config.image != null)
-                            backgroundImage.sprite = config.image;
-                        if (dialogueText != null && !string.IsNullOrEmpty(config.text))
-                            dialogueText.text = config.text;
-                        break;
-                    }
-                }
-            }
-
-            ApplySummary(type, localScore, enemyScore);
-            EnsureRematchButton();
-
-            StartCoroutine(FadeInRoutine());
+            if (type == VictoryType.NormalVictory || type == VictoryType.SpecialVictory)
+                PlayVictoryEnding(type);
+            else
+                PlayDefeatEnding(type);
         }
 
-        /// <summary>
-        /// 「敗北...」の一言だけでは何が起きたのか分からないため、
-        /// 最終スコアと通算成績を添える。
-        /// </summary>
-        private void ApplySummary(VictoryType type, int localScore, int enemyScore)
+        private void PlayVictoryEnding(VictoryType type)
         {
-            var sb = new System.Text.StringBuilder();
-
-            if (localScore != UnknownScore && enemyScore != UnknownScore)
+            var selected = FindConfig(victoryEndingConfigs, type);
+            if (selected == null)
             {
-                sb.Append($"最終HP  あなた {localScore}  /  相手 {enemyScore}");
+                // 勝利案ができるまでは演出内容だけ借用し、勝利の記録・経路は維持する。
+                var placeholderType = type == VictoryType.NormalVictory
+                    ? VictoryType.NormalDefeat : VictoryType.SpecialDefeat;
+                selected = FindConfig(configs, placeholderType) ?? FindConfig(configs, type);
             }
-            else if (type == VictoryType.SpecialVictory)
-            {
-                sb.Append("特殊勝利による決着");
-            }
-            else if (type == VictoryType.SpecialDefeat)
-            {
-                sb.Append("相手の特殊勝利による決着");
-            }
-
-            if (sb.Length > 0) sb.Append('\n');
-            sb.Append(PlayerStatsManager.BuildSummaryLine());
-
-            string summary = sb.ToString();
-
-            if (summaryText != null)
-            {
-                summaryText.text = summary;
-            }
-            else if (dialogueText != null)
-            {
-                // 専用テキストがInspectorで用意されていない場合でも見えるように追記する
-                dialogueText.text = $"{dialogueText.text}\n<size=60%>{summary}</size>";
-            }
+            if (defeatSequence != null) defeatSequence.gameObject.SetActive(false);
+            ShowSequence(ref victorySequence, "VictoryEndingSequence", selected);
         }
 
-        /// <summary>
-        /// 再戦ボタンがInspectorで割り当てられていない場合、タイトルボタンを複製して用意する。
-        /// Prefab/シーンを触らなくても「もう一戦」の導線が出るようにするための措置。
-        /// </summary>
-        private void EnsureRematchButton()
+        private void PlayDefeatEnding(VictoryType type)
         {
-            if (rematchButton != null)
-            {
-                rematchButton.onClick.RemoveListener(OnRematchButtonClicked);
-                rematchButton.onClick.AddListener(OnRematchButtonClicked);
-                return;
-            }
-
-            if (titleButton == null) return;
-
-            var clone = Instantiate(titleButton, titleButton.transform.parent);
-            clone.name = "RematchButton";
-
-            // 複製元のリスナー（タイトルへ戻る）を引き継がせない。
-            // RemoveAllListeners は Inspector で設定された永続リスナーを消さないので個別に無効化する。
-            clone.onClick.RemoveAllListeners();
-            for (int i = 0; i < clone.onClick.GetPersistentEventCount(); i++)
-            {
-                clone.onClick.SetPersistentListenerState(i, UnityEngine.Events.UnityEventCallState.Off);
-            }
-            clone.onClick.AddListener(OnRematchButtonClicked);
-
-            var cloneRt = clone.GetComponent<RectTransform>();
-            var srcRt = titleButton.GetComponent<RectTransform>();
-            if (cloneRt != null && srcRt != null)
-            {
-                cloneRt.anchoredPosition = srcRt.anchoredPosition + autoRematchButtonOffset;
-            }
-
-            SetButtonLabel(clone, "もう一戦");
-
-            rematchButton = clone;
+            if (victorySequence != null) victorySequence.gameObject.SetActive(false);
+            ShowSequence(ref defeatSequence, "DefeatEndingSequence", FindConfig(configs, type));
         }
 
-        private static void SetButtonLabel(Button button, string label)
+        private static VictoryConfig FindConfig(VictoryConfig[] source, VictoryType type)
         {
-            var tmp = button.GetComponentInChildren<TextMeshProUGUI>(true);
-            if (tmp != null)
-            {
-                tmp.text = label;
-                return;
-            }
-
-            var legacy = button.GetComponentInChildren<Text>(true);
-            if (legacy != null) legacy.text = label;
+            if (source != null)
+                foreach (var config in source)
+                    if (config != null && config.victoryType == type) return config;
+            return null;
         }
 
-        private IEnumerator FadeInRoutine()
+        private void ShowSequence(ref EndingSequenceUI sequence, string name, VictoryConfig selected)
         {
-            if (canvasGroup == null) yield break;
-
-            canvasGroup.blocksRaycasts = true;
-
-            float elapsed = 0f;
-            float duration = 0.5f; // Fast fade in for impact
-
-            // Screen Shake effect parameters
-            Vector3 originalPos = transform.localPosition;
-
-            while (elapsed < duration)
+            if (sequence == null)
             {
-                elapsed += Time.deltaTime;
-                canvasGroup.alpha = Mathf.Lerp(0f, 1f, elapsed / duration);
-
-                // Shake
-                transform.localPosition = originalPos + (Vector3)(Random.insideUnitCircle * 20f);
-
-                yield return null;
+                var root = new GameObject(name, typeof(RectTransform));
+                // 独立した全画面 Canvas。旧結果パネルの矩形や透明度を引き継がない。
+                sequence = root.AddComponent<EndingSequenceUI>();
             }
+            sequence.Show(selected, dialogueText != null ? dialogueText.font : null, OnTitleButtonClicked);
+        }
 
-            transform.localPosition = originalPos;
-            canvasGroup.alpha = 1f;
-            canvasGroup.interactable = true;
+        private void OnDestroy()
+        {
+            if (victorySequence != null) Destroy(victorySequence.gameObject);
+            if (defeatSequence != null) Destroy(defeatSequence.gameObject);
         }
 
         private void OnTitleButtonClicked()
         {
-            // Reset timescale just in case
             Time.timeScale = 1f;
             SceneManager.LoadScene("タイトルシーン");
-        }
-
-        /// <summary>
-        /// 同じ対戦シーンを読み込み直して即座に再戦する。
-        /// 従来はタイトル経由の2回のシーン遷移が必要だった。
-        /// </summary>
-        private void OnRematchButtonClicked()
-        {
-            Time.timeScale = 1f;
-            SceneManager.LoadScene(SceneManager.GetActiveScene().name);
         }
     }
 }

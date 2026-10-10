@@ -59,7 +59,18 @@ namespace KillingMahjong.UI
 
         private IEnumerator SequenceRoutine(List<int> handTiles, int ronTile, List<string> yakuList, string formula, string rankName, int score, bool isLocalPlayerWin,
             PlayerInfoUI playerInfo, EnemyInfoUI enemyInfo, int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp, System.Action onComplete,
-            string scoreFormula, RonSettlementInfo settlement = null)
+            string scoreFormula, RonSettlementInfo settlement = null,
+            bool suppressSettlementPanel = false, bool deferHpUpdate = false)
+        {
+            using (var scope = presentations.Begin())
+                yield return scope.Run(SequenceVisualsRoutine(scope, handTiles, ronTile, yakuList, formula, rankName, score, isLocalPlayerWin,
+                    playerInfo, enemyInfo, prevLocalHp, newLocalHp, prevEnemyHp, newEnemyHp, onComplete, scoreFormula, settlement,
+                    suppressSettlementPanel, deferHpUpdate));
+        }
+
+        private IEnumerator SequenceVisualsRoutine(PresentationScope scope, List<int> handTiles, int ronTile, List<string> yakuList, string formula, string rankName, int score, bool isLocalPlayerWin,
+            PlayerInfoUI playerInfo, EnemyInfoUI enemyInfo, int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp, System.Action onComplete,
+            string scoreFormula, RonSettlementInfo settlement, bool suppressSettlementPanel, bool deferHpUpdate)
         {
             // 0. カットイン演出（勝者の顔と「ロン！」を表示）
             bool cutinFinished = false;
@@ -88,7 +99,9 @@ namespace KillingMahjong.UI
                 }
             }
 
-            if (winnerSprite != null)
+            // 自分ロンは、入力直後に RonImpactEffect の手と「ロン!!!」を見せ終えている。
+            // ここで同じ内容のカットインを重ねず、役表示へ直行する。
+            if (!isLocalPlayerWin && winnerSprite != null)
             {
                 // カットインと同時に「ロン！」ボイスを再生
                 if (KillingMahjong.Managers.AudioManager.Instance != null)
@@ -101,6 +114,11 @@ namespace KillingMahjong.UI
                 // 絵が揃った瞬間に当てたいので、カットイン側へ強さだけ渡す。
 
                 CutinAnimationUI cutinUI = gameObject.AddComponent<CutinAnimationUI>();
+                activeCutin = cutinUI;
+                scope.AddCleanup(() => {
+                    if (cutinUI != null) { cutinUI.CancelPresentation(); Destroy(cutinUI); }
+                    if (activeCutin == cutinUI) activeCutin = null;
+                });
                 cutinUI.PlayCutin(winnerSprite, faceSprite, customFont, cutinText, () => {
                     cutinFinished = true;
                     Destroy(cutinUI);
@@ -109,7 +127,7 @@ namespace KillingMahjong.UI
                 // カットインが終わるまで待機
                 while (!cutinFinished) yield return null;
             }
-            else
+            else if (!isLocalPlayerWin)
             {
                 // **立ち絵が無いときはカットインが出ない。** そのときは
                 // 揺れる相手が居なくなるので、ここで直接鳴らす。
@@ -117,7 +135,7 @@ namespace KillingMahjong.UI
             }
 
             // 1. 大枠コンテナの生成（すべてを包括する最前面キャンバス）
-            GameObject container = new GameObject("RonCinematicContainer");
+            GameObject container = scope.Own(new GameObject("RonCinematicContainer"));
             container.transform.SetParent(transform, false);
             container.transform.SetAsLastSibling();
             RectTransform containerRt = container.AddComponent<RectTransform>();
@@ -250,11 +268,16 @@ namespace KillingMahjong.UI
             if (settlement == null)
             {
                 // **HPだけは必ず最終値に合わせる。** ここで抜けて放置すると
-                // サーバーの結果と画面がずれたまま次の局へ進む
-                Debug.LogWarning("[RonAnimationUI] 内訳の無いロン。パネルを出さずHPだけ最終値に合わせる");
+                // サーバーの結果と画面がずれたまま次の局へ進む。
+                // ただしチュートリアル第1局だけは、台本どおり表を読ませてから既存の血移動で反映する。
+                if (!suppressSettlementPanel)
+                    Debug.LogWarning("[RonAnimationUI] 内訳の無いロン。パネルを出さずHPだけ最終値に合わせる");
                 Destroy(container);
-                if (playerInfo != null) playerInfo.SetHP(newLocalHp);
-                if (enemyInfo != null) enemyInfo.SetHP(newEnemyHp);
+                if (!deferHpUpdate)
+                {
+                    if (playerInfo != null) playerInfo.SetHP(newLocalHp);
+                    if (enemyInfo != null) enemyInfo.SetHP(newEnemyHp);
+                }
                 yield return new WaitForSeconds(0.2f);
                 onComplete?.Invoke();
                 yield break;

@@ -44,7 +44,7 @@ namespace KillingMahjong.UI
                                   newStatus == RoundStatus.Result || 
                                   newStatus == RoundStatus.Draw;
 
-            if (!isGameEndPhase && !uiManager.IsTransitioning)
+            if (!isGameEndPhase && uiManager.CanRebuildBoard)
             {
                 // コンテナ切り替えはBetting時にHandBaseUI.UpdateLayout内部でガードされる。
                 // ここでは呼び出しをスキップしない（ボタン表示の更新のために必要）。
@@ -57,66 +57,42 @@ namespace KillingMahjong.UI
                 }
             }
             
-            // ここは :177 の同値ガードを抜けた先＝本当に段が進んだときだけ通る。
-            // フラッシュの可否をここで決め、実際に光らせるのは表示が切り替わる瞬間に任せる。
-            _flashOnNextPhaseVisibility = true;
-
-            HandlePhaseVisibility(newStatus);
+            EnterPhase(newStatus);
         }
 
-        /// <summary>
-        /// 次の HandlePhaseVisibility でフラッシュを出すか。UpdatePhaseStatus だけが立てる。
-        /// 表示の作り直し目的の呼び出しでは立たないので、透視の公開後などには光らない。
-        /// </summary>
-        private bool _flashOnNextPhaseVisibility = false;
+        // 既存の呼び出し口は保持する。再描画では入場処理を再実行しない。
+        public void HandlePhaseVisibility(RoundStatus status) => RefreshPhaseView(status);
 
-        public void HandlePhaseVisibility(RoundStatus status)
+        public void RefreshPhaseView(RoundStatus status)
         {
-            // UpdatePhaseStatus は :176 で先に status を確定させてからここへ来るため、
-            // ここで捨てると「status だけ進んで演出が出ない」状態になる。
-            // しかも同じ status の再通知は :164 の同値ガードで弾かれるので二度と復帰しない。
-            // 保留して演出明けに実行する。
-            //
-            // キーに status を含めて畳まないこと。フェイズごとに本体の処理が違い、しかも
-            // 冪等ではない（Dealing は _hasShownHandSelectionPrompt / _hasExecutedRonAnimation の
-            // リセットと次局の暗転開始を担っている）。1つのキーで畳むと Dealing が
-            // HandSelection に上書きされて消え、次局が始まらなくなる。
-            // 到着順に積んでおけば、演出が無かった場合と同じ順序で再生される。
-            if (uiManager.IsBusyWithTransition)
+            if (status != uiManager.CurrentPhaseStatus) return;
+            if (uiManager.IsBusyWithTransition && !uiManager.IsUpdatingCoveredBoard)
             {
-                uiManager.DeferUntilIdle($"phaseVisibility:{status}", () => HandlePhaseVisibility(status));
+                uiManager.DeferUntilIdle($"phaseVisibility:{status}", () => RefreshPhaseView(status));
                 return;
-            }
-
-            // フェイズが切り替わる合図として一瞬だけ光らせる。
-            //
-            // **このメソッドは「フェイズが変わった」ときだけでなく「今のフェイズの表示を
-            // 作り直す」ときにも呼ばれる**（透視演出の後の ExposedTileEffectPlayer:91、
-            // 手牌決定後の GameUIHandSelectionController:345 など）。
-            // 無条件に光らせると、透視で3枚公開したあとにも光ってしまう。
-            // 実際に段が進んだときだけ立つ印を見て、その場合に限って光らせる。
-            //
-            // 印はフラグで持ち、引数では渡さない。保留は同じ key で後勝ちに上書きされるので、
-            // ラムダに焼き込むと「進行」の保留が後から来た「作り直し」の保留に潰される。
-            //
-            // **保留から復帰した場合も、捨てずにここで光らせる。** 上の分岐より前に置くと
-            // 別の演出で画面が覆われている最中に光ることになり、何の合図か分からなくなる。
-            if (_flashOnNextPhaseVisibility)
-            {
-                _flashOnNextPhaseVisibility = false;
-
-                // 決着系（Agari / Ron / Result / Draw）は除く。それぞれロン演出・流局演出という
-                // 専用の入りを持っていて、そちらでも光らせるため、ここで光らせると二度光る。
-                bool isSettlementPhase = status == RoundStatus.Agari ||
-                                         status == RoundStatus.Ron ||
-                                         status == RoundStatus.Result ||
-                                         status == RoundStatus.Draw;
-                if (!isSettlementPhase) Effects.ScreenFlash.Play();
             }
 
             if (status != RoundStatus.Betting && uiManager.BettingUI != null)
             {
                 uiManager.BettingUI.HideBettingPhase(true);
+            }
+
+            // **待ち用の裏牌の山は、局が動き出したら必ず片付ける（2026-10-01）。**
+            //
+            // あれは「配牌が届くまで手持ち無沙汰にしない」ための山なので、
+            // 局が進んだ時点で用は無い。以前は `RoundStartFadeOutRoutine` の
+            // `Hide` だけに任せていたが、**置く側と片付ける側が同じ瞬間に動く**ため、
+            //
+            //     片付け(Hide) → 待機UIの準備が Attach
+            //
+            // の順に入れ替わると山が残り続けた。サーバーの配牌が 4.8秒から
+            // 十数ms になって順序が揺れるようになり、実際に手牌選択フェイズまで
+            // 残った（2026-10-01 のユーザー報告）。
+            //
+            // **順序に頼らず、フェイズを見て消す。** 何度呼ばれても害は無い。
+            if (status != RoundStatus.Dealing)
+            {
+                HideWaitingTileClatter();
             }
 
             bool showBoardElements = status == RoundStatus.Discard || 
@@ -164,7 +140,7 @@ namespace KillingMahjong.UI
             switch (status)
             {
                 case RoundStatus.Betting:      ApplyBettingVisibility();       break;
-                case RoundStatus.Dealing:      ApplyDealingVisibility();       break;
+                case RoundStatus.Dealing:      break; // 局頭準備は EnterPhase のみ。
                 case RoundStatus.HandSelection: ApplyHandSelectionVisibility(); break;
                 case RoundStatus.TurnDecision: ApplyTurnDecisionVisibility();  break;
                 case RoundStatus.Discard:      ApplyDiscardVisibility();       break;
@@ -185,7 +161,13 @@ namespace KillingMahjong.UI
             // 挟まる**ので、外すと1手ごとにゲージが点いたり消えたりする。
             bool duringDiscard = status == RoundStatus.Discard
                               || status == RoundStatus.TurnDecision;
-            VoltageUI.SetCanvasVisible(duringDiscard && !uiManager.IsTutorialMode);
+            //
+            // チュートリアルでは、**先輩がボルテージを紹介するまで伏せておく**
+            // （フロー図「初期非表示UI：ボルテージUI」→ 第2局「ボルテージUI表示」）。
+            bool tutorialAllows = !uiManager.IsTutorialMode
+                                  || (uiManager.TutorialManager != null
+                                      && uiManager.TutorialManager.IsVoltageUiRevealed);
+            VoltageUI.SetCanvasVisible(duringDiscard && tutorialAllows);
 
             ReHideTutorialChrome();
         }
@@ -265,6 +247,26 @@ namespace KillingMahjong.UI
             // **出したあとに必ず伏せ直す**ほうが取りこぼしが無い。
             // 伏せているあいだ以外は何もしない（FirstRoundChromeHidden を見る）。
             ReHideTutorialChrome();
+        }
+
+        /// <summary>
+        /// 配牌待ちの裏牌の山を、置かれている全部の場所から片付ける。
+        ///
+        /// **置き場所が3つある**（マッチング待ち・局頭の暗転・待機UIの準備）ので、
+        /// 1か所ずつ消すと取りこぼす。シーン内の実体を全部たどって落とす。
+        /// マッチング待ち用のものは親ごと伏せられるが、伏せ忘れても害が無いよう
+        /// ここでも一緒に落としておく。
+        /// </summary>
+        private void HideWaitingTileClatter()
+        {
+            foreach (var clatter in Object.FindObjectsByType<Effects.TileClatterEffect>(
+                         FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                if (clatter != null && clatter.gameObject.activeSelf)
+                {
+                    clatter.gameObject.SetActive(false);
+                }
+            }
         }
     }
 }

@@ -412,6 +412,58 @@ namespace KillingMahjong.UI
             UpdateUI();
         }
 
+        /// <summary>
+        /// 賭け金を**自分で決めさせる**賭けフェイズ（チュートリアル用。2026-09-30）。
+        ///
+        /// 増減ボタンは押せるままにし、煽りの自動セリフだけ止める。
+        /// あちらはチュートリアルの台本と同じ吹き出しを奪い合うため
+        /// （`ShowFixedBettingPhase` が止めているのと同じ理由）。
+        /// </summary>
+        public void ShowFreeBettingPhase(int initialHp, int currentHp, Action<int> onConfirm)
+        {
+            ShowBettingPhase(initialHp, currentHp, 0, onConfirm);
+
+            if (autoDialogueCoroutine != null)
+            {
+                StopCoroutine(autoDialogueCoroutine);
+                autoDialogueCoroutine = null;
+            }
+        }
+
+        /// <summary>矢印UIの誘導先として使う「賭け金アップ」ボタンの RectTransform。</summary>
+        public RectTransform IncreaseButtonRect =>
+            increaseBetButton != null ? increaseBetButton.GetComponent<RectTransform>() : null;
+
+        /// <summary>いまパネルに出ている賭け金。</summary>
+        public int CurrentBet => currentBet;
+
+        /// <summary>
+        /// 賭け金を外から書き換える（チュートリアルの「3000まで減少する演出」用）。
+        /// **上限・単位の丸めはしない。** 台本が決め打った額をそのまま見せるため。
+        /// </summary>
+        public void ForceSetBet(int amount)
+        {
+            currentBet = Mathf.Max(0, amount);
+            UpdateUI();
+
+            // **`UpdateUI` は増減ボタンの interactable を額から作り直す。**
+            // 決定後（パネルの入力を切ったあと）に呼ぶと、もう押せないボタンが
+            // 押せる見た目に戻ってしまうので、入力が切れているなら灰色へ戻す。
+            if (panelCanvasGroup != null && !panelCanvasGroup.blocksRaycasts) LockBetButtons();
+        }
+
+        /// <summary>
+        /// 決定ボタンを代わりに押す（チュートリアルの「自動で押される演出」用）。
+        ///
+        /// **`onClick` 経由では押せない。** `ConfirmBet` が決定ボタンの interactable を
+        /// 落としてパネルの入力ごと切るため、プレイヤーが一度押したあとの押し直しは
+        /// ボタン経由だと無反応になる。決定の処理を直に呼ぶ。
+        /// </summary>
+        public void PressConfirm()
+        {
+            ConfirmBet();
+        }
+
         public void HideBettingPhase(bool immediate = false)
         {
             if (autoDialogueCoroutine != null)
@@ -575,16 +627,22 @@ namespace KillingMahjong.UI
         private void ConfirmBet()
         {
             // Lock UI
-            if (increaseBetButton != null) increaseBetButton.interactable = false;
-            if (decreaseBetButton != null) decreaseBetButton.interactable = false;
-            if (fullBetButton != null) fullBetButton.interactable = false;
-            if (confirmButton != null) confirmButton.interactable = false;
+            LockBetButtons();
             SetPanelInputEnabled(false);
 
             var audio = Managers.AudioManager.Instance;
             if (audio != null) audio.PlayBetConfirmSE();
 
             onConfirmAction?.Invoke(currentBet);
+        }
+
+        /// <summary>賭け金パネルのボタンをすべて押せない見た目にする。</summary>
+        private void LockBetButtons()
+        {
+            if (increaseBetButton != null) increaseBetButton.interactable = false;
+            if (decreaseBetButton != null) decreaseBetButton.interactable = false;
+            if (fullBetButton != null) fullBetButton.interactable = false;
+            if (confirmButton != null) confirmButton.interactable = false;
         }
 
         private IEnumerator AutoDialogueRoutine()

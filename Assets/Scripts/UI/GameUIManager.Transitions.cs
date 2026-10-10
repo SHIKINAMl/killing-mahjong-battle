@@ -21,7 +21,7 @@ namespace KillingMahjong.UI
             //
             // **開くのは演出が明けてから（2026-08-26）。**
             //
-            // `UpdatePhaseStatus` はここを呼んだ直後に `HandlePhaseVisibility` を呼ぶが、
+            // `UpdatePhaseStatus` はここを呼んだ直後に `EnterPhase` を呼ぶが、
             // あちらは演出中なら `DeferUntilIdle` で演出明けまで保留される。
             // ここで即座にフェードを始めると、**2秒のフェードが暗転に覆われている
             // あいだに走り切ってしまい**、プレイヤーが盤面を見たときには既に開き切っている。
@@ -33,7 +33,13 @@ namespace KillingMahjong.UI
             if (!IsTutorialMode && KillingMahjong.Managers.AudioManager.Instance != null)
             {
                 bool willOpen = (status == RoundStatus.Discard);
-                if (willOpen && IsBusyWithTransition)
+                if (willOpen && holdDiscardBgmOpeningForBattleStart)
+                {
+                    // 賭け確定の暗転中だけは、盤面が見え始める瞬間まで開かない。
+                    // onMidpoint は進行を先に Discard へ進めるため、ここで止めないと
+                    // 暗転の裏で 2 秒のローパス解除が終わってしまう。
+                }
+                else if (willOpen && IsBusyWithTransition)
                 {
                     DeferUntilIdle(BgmFilterDeferKey, ApplyBgmFilterForCurrentPhase);
                 }
@@ -46,6 +52,37 @@ namespace KillingMahjong.UI
 
         /// <summary>保留キューでの識別名。後勝ちで畳みたいので固定の1本にする。</summary>
         private const string BgmFilterDeferKey = "bgmFilter";
+
+        // 賭け確定の既存シーケンスだけが、暗転解除の瞬間まで Discard の開放を持つ。
+        // BGMの開放待ちは入力ロックと別の責任なので、ロックの取得数には含めない。
+        private bool holdDiscardBgmOpeningForBattleStart;
+
+        /// <summary>
+        /// 賭け確定後の BGM 開放を、盤面が見え始める瞬間まで待たせる。
+        ///
+        /// onMidpoint の進行順や DeferUntilIdle の保留順を変えずに、音だけを演出の起点へ揃える。
+        /// </summary>
+        public void HoldDiscardBgmOpeningForBattleStart()
+        {
+            if (IsTutorialMode) return;
+            holdDiscardBgmOpeningForBattleStart = true;
+        }
+
+        /// <summary>
+        /// 賭け確定後の BGM 開放を実行する。
+        ///
+        /// 保留時点のフェイズを焼き込まず、既存どおり実行時点の状態を読むことで、
+        /// 演出中に別フェイズへ進んだ場合も古い Discard 用 BGM を開かない。
+        /// </summary>
+        public void ReleaseDiscardBgmOpeningForBattleStart()
+        {
+            if (!holdDiscardBgmOpeningForBattleStart) return;
+
+            holdDiscardBgmOpeningForBattleStart = false;
+            if (IsTutorialMode) return;
+
+            ApplyBgmFilterForCurrentPhase();
+        }
 
         /// <summary>
         /// 今のフェイズに合わせてBGMのこもりを当てる。
@@ -71,14 +108,18 @@ namespace KillingMahjong.UI
             audio.SetPhaseDrum(currentPhaseStatus);
         }
 
-        public void SetIsTransitioning(bool value)
-        {
-            isTransitioning = value;
-            UpdateTurnIndicatorVisibility();
 
-            // 能力パネルと説明ツールチップは通常 20/25 で、フェーズ演出の帯(19)より手前に出る。
-            // 演出のあいだだけ帯より下へ退避させる（2026-08-19 のプランナー要望 R-2）。
-            if (abilityUI != null) abilityUI.SetSuppressedForTransition(value);
+
+        private int coveredBoardUpdateDepth;
+        internal bool IsUpdatingCoveredBoard => coveredBoardUpdateDepth > 0;
+        internal bool CanRebuildBoard => !IsTransitioning || IsUpdatingCoveredBoard;
+
+        /// <summary>黒幕内の同期更新だけを許可する。操作ロックは演出完了まで保持する。</summary>
+        internal void RunCoveredBoardUpdate(Action update)
+        {
+            coveredBoardUpdateDepth++;
+            try { update(); }
+            finally { coveredBoardUpdateDepth--; }
         }
 
         // --- 演出中に届いたサーバーイベントの保留 ---
@@ -88,26 +129,29 @@ namespace KillingMahjong.UI
         // 捨てる代わりにここへ積み、演出が明けてから実行する。
 
         private readonly List<KeyValuePair<string, Action>> deferredActions = new List<KeyValuePair<string, Action>>();
-        private bool ignoreBusyForForcedFlush = false;
-
-        /// <summary>
-        /// 保留を流す見張り。**bool ではなく Coroutine のハンドルで持つ。**
-        ///
-        /// 以前は `isFlushWatcherRunning` という bool で二重起動を防いでいたが、
-        /// コルーチンが外から止められると true のまま取り残され、
-        /// `if (!isFlushWatcherRunning)` が二度と通らなくなる。
-        /// そうなると保留は永久に実行されず、8秒の強制実行という安全網ごと死ぬ
-        /// （実際にロン猶予が保留されたまま対局が停止した）。
-        /// ハンドルなら StopCoroutine されても null 判定と併せて張り直せる。
-        /// </summary>
-        private Coroutine flushWatcher;
+        private int deferredFirstFrame;
+        private float deferredWaitedSeconds;
+        private bool deferredTimeoutReported;
+        private bool processingDeferredActions;
 
         /// <summary>
         /// 何らかの演出が進行中で、UI を触ると壊れる状態かどうか。
         /// </summary>
         public bool IsBusyWithTransition =>
-            !ignoreBusyForForcedFlush
-            && (isTransitioning || (phaseTransitionUI != null && phaseTransitionUI.IsDarkenTransitioning));
+            isTransitioning || (phaseTransitionUI != null && phaseTransitionUI.IsDarkenTransitioning);
+
+        /// <summary>配牌・状態同期の共通入口。再実行時にも局頭の進行管理へ確認する。</summary>
+        public bool DeferRoundStartBoardUpdate(RoundStartCoordinator.BoardUpdateKind kind, Action retry)
+        {
+            bool shouldDefer = PhaseController != null
+                ? PhaseController.ShouldDeferRoundStartBoardUpdate(kind, IsBusyWithTransition)
+                : IsBusyWithTransition;
+            if (!shouldDefer) return false;
+            string key = kind == RoundStartCoordinator.BoardUpdateKind.DealingCompleted
+                ? "dealingCompleted" : "roundStartStatus";
+            DeferUntilIdle(key, retry);
+            return true;
+        }
 
         /// <summary>
         /// 演出が明けるまで処理を保留する。
@@ -118,65 +162,65 @@ namespace KillingMahjong.UI
         {
             if (action == null) return;
 
+            if (deferredActions.Count == 0)
+            {
+                deferredFirstFrame = Time.frameCount;
+                ResetDeferredWait();
+            }
+
             var entry = new KeyValuePair<string, Action>(key, action);
             int existing = deferredActions.FindIndex(p => p.Key == key);
             if (existing >= 0) deferredActions[existing] = entry;
             else deferredActions.Add(entry);
             Debug.Log($"[GameUIManager] 演出中のため '{key}' を保留しました。演出完了後に実行します。");
 
-            EnsureFlushWatcher();
         }
 
-        /// <summary>
-        /// 見張りが動いていなければ張り直す。保留がある限り、何度呼んでも安全。
-        /// </summary>
-        private void EnsureFlushWatcher()
+        private void ResetDeferredWait()
         {
-            if (flushWatcher != null) return;
-            if (!isActiveAndEnabled) return;
-            flushWatcher = StartCoroutine(FlushDeferredActionsRoutine());
+            deferredWaitedSeconds = 0f;
+            deferredTimeoutReported = false;
+        }
+
+        internal void ResetDeferredActions()
+        {
+            deferredActions.Clear();
+            deferredFirstFrame = Time.frameCount;
+            ResetDeferredWait();
         }
 
         private void Update()
         {
-            // コルーチンが外から止められても、保留が残っていれば必ず拾い直す。
-            // これが最後の砦で、ここが無いと「進行が止まったまま何も起きない」に戻る。
-            if (deferredActions.Count > 0) EnsureFlushWatcher();
+            TryStartGameResult();
+            // 待機用コルーチンを持たない。再有効化後のUpdateが保留を引き継ぐ。
+            ProcessDeferredActions(Time.unscaledDeltaTime);
         }
 
-        private IEnumerator FlushDeferredActionsRoutine()
+        private void ProcessDeferredActions(float deltaTime)
         {
-
-            // 演出の途中で一瞬だけ isTransitioning が false に戻る箇所があるため
-            // （TriggerBettingAnimationPhase の onMidpoint）、必ず1フレーム待ってから判定する。
-            float waited = 0f;
-            do
+            if (!isActiveAndEnabled || processingDeferredActions || deferredActions.Count == 0
+                || deferredFirstFrame == Time.frameCount) return;
+            if (IsBusyWithTransition)
             {
-                yield return null;
-                waited += Time.deltaTime;
+                deferredWaitedSeconds += Mathf.Max(0f, deltaTime);
+                if (!deferredTimeoutReported && deferredWaitedSeconds >= DeferredActionTimeoutSeconds)
+                {
+                    deferredTimeoutReported = true;
+                    Debug.LogWarning($"[GameUIManager] 保留が {DeferredActionTimeoutSeconds} 秒続いています。演出・通信待ちの完了または中止によるロック解除を待ちます（{deferredActions.Count}件）。");
+                }
+                return;
             }
-            while (IsBusyWithTransition && waited < DeferredActionTimeoutSeconds);
-
-            // 演出フラグが立ちっぱなしになると保留が永久に実行されず、
-            // 取りこぼしと同じ「進行停止」になる。見た目の乱れより進行を優先する。
-            bool forced = IsBusyWithTransition;
-            if (forced)
-            {
-                Debug.LogWarning($"[GameUIManager] 演出が {DeferredActionTimeoutSeconds} 秒明けませんでした。保留していた処理を強制実行します。");
-            }
-
-            var toRun = new List<KeyValuePair<string, Action>>(deferredActions);
-            deferredActions.Clear();
-            flushWatcher = null;
-
-            // 強制実行のときはガードを一時的に無効化する。
-            // そうしないと各処理が冒頭で再び「演出中」と判定して保留し直し、
-            // 永久に実行されないまま警告だけ出し続ける。
-            ignoreBusyForForcedFlush = forced;
+            ResetDeferredWait();
+            // 再入・同じフレームの自己再登録でループしない。実行の直前に一件ずつ取り出す。
+            int remaining = deferredActions.Count;
+            processingDeferredActions = true;
             try
             {
-                foreach (var entry in toRun)
+                while (remaining-- > 0 && deferredActions.Count > 0 && isActiveAndEnabled
+                    && !IsBusyWithTransition && deferredFirstFrame != Time.frameCount)
                 {
+                    var entry = deferredActions[0];
+                    deferredActions.RemoveAt(0);
                     try
                     {
                         entry.Value?.Invoke();
@@ -189,7 +233,7 @@ namespace KillingMahjong.UI
             }
             finally
             {
-                ignoreBusyForForcedFlush = false;
+                processingDeferredActions = false;
             }
         }
 

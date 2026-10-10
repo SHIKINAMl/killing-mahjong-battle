@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using System.Collections;
 using System.Collections.Generic;
 using KillingMahjong.Common;
 using KillingMahjong.EngineData;
@@ -14,6 +15,15 @@ namespace KillingMahjong.UI
         // --- Dragging the Hand Panel ---
         private RectTransform panelRect;
         private Vector2 dragOffset;
+        private Coroutine battleStartRiseRoutine;
+        private RectTransform battleStartRiseTarget;
+        private Vector2 battleStartRiseRestPosition;
+
+        // 800x600 の画面で手牌が画面外へ沈まず、それでも着弾と分かる最小限の移動量。
+        private const float BattleStartRiseDistance = 36f;
+
+        // 暗転解除と同時に始め、既存の市松模様フェードアウト中に収める長さ。
+        private const float BattleStartRiseDuration = 0.24f;
 
         [Header("Cursor")]
         [SerializeField] private Transform cursor; // Changed from RectTransform to Transform
@@ -132,6 +142,116 @@ namespace KillingMahjong.UI
                 autoDiscardButton.gameObject.SetActive(false);
 
                 CreatePeekButton();
+            }
+        }
+
+        // --- 相手の番のあいだ、自分の手牌だけを静める（2026-09-20 のユーザー指示）---
+        //
+        // **暗幕は敷かない。** 画面全体を落とすと牌まで読みづらくなる。
+        // 自分の手牌の帯だけを少し落として「いまは打てない」を伝える。
+        // 牌の文字が読める濃さに留めること（0.72 で実機確認）。
+
+        /// <summary>相手の番のときの濃さ。これ以上落とすと牌が読みにくくなる。</summary>
+        private const float OpponentTurnQuietAlpha = 0.72f;
+
+        /// <summary>濃さを移す時間。切り替わりが分かる程度に、目で追える速さ。</summary>
+        private const float QuietFadeSeconds = 0.25f;
+
+        private CanvasGroup quietGroup;
+        private Coroutine quietRoutine;
+
+        /// <summary>
+        /// 自分の手牌を静めるか。相手の番に true、自分の番に false。
+        /// **操作の可否そのものは変えない**（打てるかどうかは既存の判定が持っている）。
+        /// </summary>
+        public void SetQuietForOpponentTurn(bool quiet)
+        {
+            var target = discardPhaseContainer as RectTransform;
+            if (target == null) return;
+
+            if (quietGroup == null)
+            {
+                quietGroup = target.GetComponent<CanvasGroup>();
+                if (quietGroup == null) quietGroup = target.gameObject.AddComponent<CanvasGroup>();
+            }
+
+            float to = quiet ? OpponentTurnQuietAlpha : 1f;
+            if (Mathf.Approximately(quietGroup.alpha, to)) return;
+
+            if (quietRoutine != null) StopCoroutine(quietRoutine);
+            quietRoutine = StartCoroutine(QuietFadeRoutine(to));
+        }
+
+        private IEnumerator QuietFadeRoutine(float to)
+        {
+            float from = quietGroup.alpha;
+            for (float t = 0f; t < QuietFadeSeconds; t += Time.unscaledDeltaTime)
+            {
+                if (quietGroup == null) yield break;
+                quietGroup.alpha = Mathf.Lerp(from, to, t / QuietFadeSeconds);
+                yield return null;
+            }
+            if (quietGroup != null) quietGroup.alpha = to;
+            quietRoutine = null;
+        }
+
+        /// <summary>
+        /// 賭け確定後、打牌用の自分の手牌だけを下から元の位置へ戻す。
+        ///
+        /// シーンごとの座標を持たず、現在の anchoredPosition を終点にする。
+        /// そのため UIテストシーンと OpeningScene で既存配置が違っても、配置そのものは変えない。
+        /// </summary>
+        public void PlayBattleStartRise()
+        {
+            var target = discardPhaseContainer as RectTransform;
+            if (target == null || !target.gameObject.activeInHierarchy) return;
+
+            StopBattleStartRise();
+
+            battleStartRiseTarget = target;
+            battleStartRiseRestPosition = target.anchoredPosition;
+            battleStartRiseRoutine = StartCoroutine(PlayBattleStartRiseRoutine(target, battleStartRiseRestPosition));
+        }
+
+        private void StopBattleStartRise()
+        {
+            if (battleStartRiseRoutine == null) return;
+
+            StopCoroutine(battleStartRiseRoutine);
+            if (battleStartRiseTarget != null)
+            {
+                battleStartRiseTarget.anchoredPosition = battleStartRiseRestPosition;
+            }
+
+            battleStartRiseRoutine = null;
+            battleStartRiseTarget = null;
+        }
+
+        private IEnumerator PlayBattleStartRiseRoutine(RectTransform target, Vector2 restPosition)
+        {
+            Vector2 startPosition = restPosition + Vector2.down * BattleStartRiseDistance;
+            float elapsed = 0f;
+
+            if (target != null) target.anchoredPosition = startPosition;
+
+            while (elapsed < BattleStartRiseDuration)
+            {
+                elapsed += Time.deltaTime;
+                float progress = Mathf.Clamp01(elapsed / BattleStartRiseDuration);
+                // 終点で減速させ、着弾の揺れのあとに手牌だけが跳ねないようにする。
+                progress = 1f - (1f - progress) * (1f - progress);
+                if (target != null)
+                {
+                    target.anchoredPosition = Vector2.LerpUnclamped(startPosition, restPosition, progress);
+                }
+                yield return null;
+            }
+
+            if (target != null) target.anchoredPosition = restPosition;
+            if (battleStartRiseTarget == target)
+            {
+                battleStartRiseRoutine = null;
+                battleStartRiseTarget = null;
             }
         }
 
@@ -339,6 +459,13 @@ namespace KillingMahjong.UI
             if (autoManganButton != null)
             {
                 autoManganButton.gameObject.SetActive(showAuto);
+
+                // チュートリアルの紹介中は、出してはいるが押させない（2026-09-23）。
+                // 押されると台本の手牌に置き換わり、自分で組んだ満貫手が消えてしまう。
+                bool lockAuto = showAuto && gameUIManager != null && gameUIManager.IsTutorialMode
+                                && gameUIManager.TutorialManager != null
+                                && gameUIManager.TutorialManager.IsAutoButtonLocked;
+                autoManganButton.interactable = !lockAuto;
             }
             if (reselectButton != null)
             {
@@ -356,6 +483,14 @@ namespace KillingMahjong.UI
                 reselectButton.gameObject.SetActive(canReselect);
             }
             UpdatePhaseGuide(phaseStatus);
+
+            // 13枚そろった瞬間の即席満貫以上判定もここで起こす（2026-09-20 の仕様書）。
+            // 手牌の増減ごとに UpdateLayout が通るため、決定ボタンを押す前の状態だけを
+            // GameUIHandSelectionController へ通知できる。
+            if (gameUIManager != null && gameUIManager.HandSelectionController != null)
+            {
+                gameUIManager.HandSelectionController.UpdateInstantRankCallForCurrentHand();
+            }
 
             if (autoDiscardButton != null)
             {

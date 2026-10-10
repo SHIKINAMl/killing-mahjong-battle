@@ -130,6 +130,9 @@ class PlayerState:
     exposed_hand_indexes: set = field(default_factory=set)  # PERSPECTIVE で公開された手牌インデックス（局ごとにリセット）
     assault_active_this_round: bool = False  # ASSAULT 発動済みなら、この局の和了時効果を有効化
     assault_used_this_round: bool = False  # ASSAULT の局内使用回数制限（1局1回）
+    voltage_points: int = 0 # 現在のボルテージ値
+    voltage_broken: bool = False # ボルテージが継続中か
+    voltage_resume_points: int = 0 # ボルテージを再開するとき、どこから再開するのか
     # CPU（とくしゅ）の特典。人間は既定値のまま（対局を通じて持続）
     skill_cost_rate: float = 1.0  # スキルコストの倍率
     boost_hand_targets: int = 1  # BOOST_HAND 1回で強化できる役の数

@@ -13,7 +13,16 @@ namespace KillingMahjong.UI
 
         public void OnGameStarted()
         {
+            uiManager.ResetDeferredActions();
+            uiManager.ResetGameResultState();
+            CancelPhasePresentations();
+            uiManager.HandSelectionController?.CancelPendingConfirmation();
+            uiManager.SkillController?.CancelActiveTransitions();
+            uiManager.ResetTransitionLocks();
             _currentRoundIndex = 1;
+            _pendingDrawTransition = false;
+            roundStart.Reset();
+            BeginRoundStart();
             ResetPhaseReadyMarks();
 
             // 前の対局で覚えたスキルコストは持ち越さない（特殊勝利の回数が 0 に戻るため）
@@ -49,10 +58,7 @@ namespace KillingMahjong.UI
                     uiManager.EnemyInfoUI.ShowReadyBox(false);
                 }
                 
-                if (uiManager.PhaseTransitionUI != null)
-                {
-                    uiManager.PhaseTransitionUI.PlayRoundStartDarken("対局開始");
-                }
+                StartRoundStartTransition("対局開始", afterDraw: false);
 
                 if (ReactionController.Instance != null)
                 {
@@ -101,56 +107,21 @@ namespace KillingMahjong.UI
         }
 
 
-        private bool _isStartingNextRound = false;
-
         public void HandleNextRoundWaitingReceived(NextRoundWaitingData data = null)
         {
-            Debug.Log("[GameUIPhaseController] HandleNextRoundWaitingReceived: 相手が次ラウンド準備完了（またはロンボタン押下）しました。");
-            
-            if (data != null && data.ready_players != null)
+            if (data == null || data.ready_players == null) return;
+            var phase = uiManager.CurrentPhaseStatus;
+            if (phase != RoundStatus.Agari && phase != RoundStatus.Ron && phase != RoundStatus.Result
+                && phase != RoundStatus.Draw) return;
+            string localId = NetworkMessageHandler.Instance.LocalPlayerId;
+            bool localReady = false, enemyReady = false;
+            foreach (var id in data.ready_players)
             {
-                // 自分以外のIDが ready_players に含まれているか確認
-                string localId = NetworkMessageHandler.Instance.LocalPlayerId;
-                bool enemyIsReady = false;
-                bool localIsReady = false;
-                foreach (var playerId in data.ready_players)
-                {
-                    if (playerId != localId) enemyIsReady = true;
-                    if (playerId == localId) localIsReady = true;
-                }
-                
-                if (uiManager.EnemyInfoUI != null)
-                {
-                    uiManager.EnemyInfoUI.SetReadyCheck(enemyIsReady);
-                }
-                
-                if (uiManager.PlayerInfoUI != null)
-                {
-                    uiManager.PlayerInfoUI.SetReadyCheck(localIsReady);
-                }
+                if (id == localId) localReady = true;
+                else enemyReady = true;
             }
-        }
-
-
-        private void StartNextRoundTransitionForDealing()
-        {
-            if (_isStartingNextRound) return;
-            _isStartingNextRound = true;
-
-            if (uiManager.PhaseTransitionUI != null)
-            {
-                uiManager.PhaseTransitionUI.PlayRoundStartDarken($"第{_currentRoundIndex}局...", () => {
-                    BoardStateManager.Instance.ClearAllBoardData();
-                    uiManager.ClearAllTiles();
-                    StartCoroutine(DealingRoutine());
-                });
-            }
-            else
-            {
-                BoardStateManager.Instance.ClearAllBoardData();
-                uiManager.ClearAllTiles();
-                StartCoroutine(DealingRoutine());
-            }
+            roundEnd.SetReady(localReady, enemyReady);
+            ApplyNextRoundReadyMarks();
         }
 
 
@@ -192,35 +163,16 @@ namespace KillingMahjong.UI
             }
         }
 
-        // 第1局の配牌待ちで、局名を隠さずに牌の山を置く高さ。
-        // 4:3 の画面下端から測るため、待ち画面と同じ卓の手前側に収まる。
-        private const float FirstRoundClatterOffsetY = 112f;
-
-        private IEnumerator DealingRoutine()
+        private void ShowDealingWaitUI()
         {
-            _isStartingNextRound = false;
-
             if (uiManager.PhaseTransitionUI != null)
             {
-                while (uiManager.PhaseTransitionUI.IsDarkenTransitioning)
-                {
-                    yield return null;
-                }
                 uiManager.PhaseTransitionUI.ChangeDarkenText($"第{_currentRoundIndex}局進行中...");
 
-                // 第1局の配牌待ちだけは、手で混ぜる裏牌の山を重ねる。
-                // 2局目以降とチュートリアルには出さない（初局の導入を賑やかにする演出）。
-                if (!uiManager.IsTutorialMode && _currentRoundIndex == 1)
-                {
-                    var transitionRect = uiManager.PhaseTransitionUI.transform as RectTransform;
-                    if (transitionRect != null)
-                    {
-                        Effects.TileClatterEffect.Attach(transitionRect, FirstRoundClatterOffsetY);
-                    }
-                }
+                uiManager.PhaseTransitionUI.ShowRoundStartWaitTiles();
             }
             
-            uiManager.ClearAllTiles();
+            // 進行管理が反映待ちを解除する前に、待機UIの準備を同期的に済ませる。
             SetMatchUIVisibility(false);
             if (uiManager.EnemyInfoUI != null) uiManager.EnemyInfoUI.SetPanelVisible(true);
             if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.gameObject.SetActive(true);

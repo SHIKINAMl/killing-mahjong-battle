@@ -55,8 +55,40 @@ namespace KillingMahjong.UI
         [SerializeField] private float checkerFadeDuration = 1.0f;
         [SerializeField] private float hpDeductionDuration = 1.5f;
 
-        private bool isWaitingForDeal = false;
-        private float dealWaitTimer = 0f;
+        /// <summary>
+        /// 実行時に作ったマテリアルの複製。**後始末のために持っておく。**
+        /// </summary>
+        private Material checkerMaterialInstance;
+
+        private void Awake()
+        {
+            EnsureCheckerMaterialInstance();
+        }
+
+        /// <summary>
+        /// 市松模様のマテリアルを、実行時だけの複製に差し替える。
+        ///
+        /// **共有アセットを直接触ってはいけない。** `checkerMaterial` はシーンから
+        /// `Assets/Resources/市松模様.mat` を直に指していて、そこへ `SetFloat("_Progress", ...)`
+        /// を書くと**アセットそのものが書き換わる**。エディタでは再生するたびに
+        /// `_Progress: 0` が `1` になってファイルが汚れ、毎回 git に差分が出ていた
+        /// （2026-09-27 に原因を特定）。
+        ///
+        /// 複製に差し替えれば、演出は同じまま、アセットには何も書かれない。
+        /// **`Start` ではなく `Awake` でやる。** 演出は `Start` より前に走ることがある。
+        /// </summary>
+        private void EnsureCheckerMaterialInstance()
+        {
+            if (checkerMaterialInstance != null) return;
+            if (checkerMaterial == null) return;
+
+            checkerMaterialInstance = new Material(checkerMaterial);
+            checkerMaterialInstance.name = checkerMaterial.name + " (実行時の複製)";
+            checkerMaterial = checkerMaterialInstance;
+
+            // 画像側も複製を使うようにする。ここを忘れると、見た目は元のまま動かない
+            if (fullScreenCheckerImage != null) fullScreenCheckerImage.material = checkerMaterialInstance;
+        }
 
         private void Start()
         {
@@ -83,33 +115,21 @@ namespace KillingMahjong.UI
                 loadingText.gameObject.SetActive(false);
             }
 
-            if (NetworkMessageHandler.Instance != null)
-            {
-                NetworkMessageHandler.Instance.OnDealingStarted += HandleDealingStarted;
-                NetworkMessageHandler.Instance.OnDealingCompleted += HandleDealingCompleted;
-            }
         }
 
         private void OnDestroy()
         {
-            if (NetworkMessageHandler.Instance != null)
+            // **立てたまま消さない。** 残ると次の場面でセリフ送りが効かなくなる
+            IsScreenDarkened = false;
+
+
+            // 複製は自分で捨てる。放っておくと再生のたびに積もる
+            if (checkerMaterialInstance != null)
             {
-                NetworkMessageHandler.Instance.OnDealingStarted -= HandleDealingStarted;
-                NetworkMessageHandler.Instance.OnDealingCompleted -= HandleDealingCompleted;
+                if (Application.isPlaying) Destroy(checkerMaterialInstance);
+                else DestroyImmediate(checkerMaterialInstance);
+                checkerMaterialInstance = null;
             }
-        }
-
-        private void HandleDealingStarted()
-        {
-            isWaitingForDeal = true;
-            // Removed: loadingText
-        }
-
-        private void HandleDealingCompleted()
-        {
-            isWaitingForDeal = false;
-            // 山牌構築完了後、画面が暗転していれば晴らす
-            PlayRoundStartFadeOut();
         }
 
         // 空の Update() があると Unity から毎フレーム呼ばれるだけ無駄なので削除した。
@@ -157,10 +177,10 @@ namespace KillingMahjong.UI
 
         private PlayerInfoUI targetPlayerInfoUI;
 
-        public void PlayTransition(string roundName, PlayerInfoUI playerInfoUI, KillingMahjong.EngineData.BettingCompletedInfo bet, Action onMidpoint, Action onComplete)
+        public void PlayTransition(string roundName, PlayerInfoUI playerInfoUI, KillingMahjong.EngineData.BettingCompletedInfo bet, Action onMidpoint, Action onComplete, bool? displayIsLocalTurn = null)
         {
             this.targetPlayerInfoUI = playerInfoUI;
-            StartCoroutine(SequenceRoutine(roundName, bet, onMidpoint, onComplete));
+            StartCoroutine(SequenceRoutine(roundName, bet, onMidpoint, onComplete, displayIsLocalTurn));
         }
 
         public void PlayCenterTextAnim(string text, float duration = 1.5f, Action onComplete = null)
@@ -177,30 +197,108 @@ namespace KillingMahjong.UI
 
 
         private bool isDarkened = false;
+        private readonly PresentationScopeSet skillPresentations = new PresentationScopeSet(Debug.LogException);
+
+        private void OnDisable() { CancelTransitions(); }
+        internal void CancelSkillPresentations() { skillPresentations.CancelAll(); }
+
+        internal void CancelTransitions()
+        {
+            skillPresentations.CancelAll();
+            StopAllCoroutines();
+            isDarkened = false;
+            IsDarkenTransitioning = false;
+            IsScreenDarkened = false;
+            _additionalRoundStartDarkenedCallbacks = null;
+            _additionalRoundStartReadyCallbacks = null;
+            _roundStartCleanupDone = false;
+            if (fullScreenCheckerImage != null) fullScreenCheckerImage.gameObject.SetActive(false);
+            if (horizontalLineRt != null) horizontalLineRt.gameObject.SetActive(false);
+            if (centerText != null) centerText.gameObject.SetActive(false);
+            if (promptText != null) promptText.gameObject.SetActive(false);
+            if (hpBetContainer != null) hpBetContainer.SetActive(false);
+            Effects.TileClatterEffect.Hide(transform as RectTransform);
+        }
 
         public bool IsDarkenTransitioning { get; private set; }
 
-        public void PlayRoundStartDarken(string text, Action onDarkened = null)
+        /// <summary>
+        /// 局頭の黒幕が降りているあいだ true（2026-09-27）。
+        ///
+        /// **黒幕の裏でセリフ送りが走ると、見えないのに音だけ「ポポポポ」と鳴る。**
+        /// それを止めるために <see cref="DialogueUI"/> から見に来る。
+        /// 場面をまたいで見る必要があるので static にしてある。
+        ///
+        /// **必ず降ろすこと。** 立てたまま消えると、そこから先ずっと
+        /// セリフ送りが無くなる（同じ作りの `SuppressStartupBgm` で実際にやった）。
+        /// `OnDestroy` でも降ろしている。
+        /// </summary>
+        public static bool IsScreenDarkened { get; private set; }
+
+        public void PlayRoundStartDarken(string text, Action onDarkened = null, Action onReady = null)
         {
             if (isDarkened)
             {
-                onDarkened?.Invoke();
+                // isDarkened は暗転の開始時点で立つ。進行中の暗転へ合流した
+                // 局頭リセットも、画面を覆いきるまで実行しない。
+                if (IsDarkenTransitioning)
+                {
+                    _additionalRoundStartDarkenedCallbacks += onDarkened;
+                    _additionalRoundStartReadyCallbacks += onReady;
+                }
+                else
+                {
+                    onDarkened?.Invoke();
+                    onReady?.Invoke();
+                }
                 return;
             }
             isDarkened = true;
+            IsScreenDarkened = true;
             IsDarkenTransitioning = true;
-            StartCoroutine(RoundStartDarkenRoutine(text, onDarkened));
+            StartCoroutine(RoundStartDarkenRoutine(text, onDarkened, onReady));
         }
 
 
         public void PlayRoundStartFadeOut(Action onComplete = null)
         {
+            // **暗転していなくても、裏牌の山だけは必ず片付ける（2026-10-01）。**
+            //
+            // 配牌完了の進行管理はここを1回しか叩かない。
+            // 暗転していないと下の `return` で抜けていたため、
+            // そのあとに置かれた山を片付ける人が誰もいなくなり、
+            // **手牌選択フェイズの盤面に散らばったまま残った**（実機で確認）。
+            //
+            // 旗も先に立てる。これ以降は「置く側」が置かずに済む
+            // （PhaseTransitionUI.Darken / GameUIPhaseController.RoundFlow）。
+            MarkRoundStartCleanupDone();
+
+            // **降りている最中なら、上がりきるまで晴らさない（2026-10-04）。**
+            //
+            // サーバーの配牌が十数msになり、暗転が降りきる前に配牌完了が届くように
+            // なった。そのまま晴らしに入ると、暗転が画面を覆いきらないうちに
+            // 折り返すので、**そろった盤面が暗転にかぶる前に見えてしまう**
+            // （ユーザー報告「暗転する前に全部そろっている画面が映っています」）。
+            //
+            // ここで待つのは「降りきるまで」だけ。**待ちを増やしているのではなく、
+            // 順番を戻しているだけ**で、降りきったあとはすぐ晴らしに入る。
+            if (IsDarkenTransitioning)
+            {
+                if (!_fadeOutPendingUntilDarkened)
+                {
+                    _fadeOutPendingUntilDarkened = true;
+                    StartCoroutine(FadeOutAfterDarkenRoutine(onComplete));
+                }
+                return;
+            }
+
             if (!isDarkened)
             {
                 onComplete?.Invoke();
                 return;
             }
             isDarkened = false;
+            IsScreenDarkened = false;
             StartCoroutine(RoundStartFadeOutRoutine(onComplete));
         }
 
@@ -229,7 +327,24 @@ namespace KillingMahjong.UI
         [Header("Effects Settings")]
         [SerializeField] private Sprite bloodSplatterSprite;
         [SerializeField] private Color dimmerColor = new Color(0, 0, 0, 0.7f);
+        /// <summary>
+        /// 自分のスキルで出す専用の絵。画面の何割まで使ってよいか。
+        ///
+        /// **迫力を出すため 0.72/0.62 から上げた（2026-10-02）。**
+        /// 絵が横長なので、横長の画面ほど高さ側が先に効く。16:9 で画面幅の
+        /// 45%→57%、4:3 で 60%→76% になる。21:9 や縦でもはみ出さないことは
+        /// 計算で確かめてある。
+        /// </summary>
+        private const float CutinSpriteWidthRatio = 0.85f;
+        private const float CutinSpriteHeightRatio = 0.78f;
+
         [SerializeField] private Sprite playerCutinSprite;
+
+        /// <summary>
+        /// 自分のスキルのカットインに出す絵（板を持った悪魔ベルル。目が光っている）。
+        /// 役強化の演出が「ベルルの目が光る」所で同じ絵を使う（<see cref="Effects.BoostHandSkillEffect"/>）。
+        /// </summary>
+        public Sprite PlayerCutinSprite { get { return playerCutinSprite; } }
         [SerializeField] private Sprite playerTroubledSprite;
 
         public void PlayScoreSettlementAnimation(
@@ -271,10 +386,56 @@ namespace KillingMahjong.UI
 
         public IEnumerator PlaySkillCutinAnimationRoutine(string skillName, bool isLocalPlayer, CharacterData characterData = null, float duration = 2.0f, Action onComplete = null, string subText = null)
         {
+            using (var scope = skillPresentations.Begin())
+                yield return scope.Run(SkillCutinVisualsRoutine(scope, skillName, isLocalPlayer, characterData, duration, onComplete, subText));
+        }
+
+        /// <summary>
+        /// 相手のカットインの立ち絵の高さ（Canvas の単位、4:3 のとき）。絵の全体でこの高さ。
+        ///
+        /// **頭から裾までが映り、絵の下端だけが少し隠れる大きさ**（2026-10-09 のユーザー指示）。
+        /// 立ち絵は膝の上で切れている絵なので、下端まで映すと「脚が途中で切れている」のが見えてしまう。
+        /// 下端の 6% ほどを、帯と画面の下へ隠す（<see cref="EnemyCutinPortraitPosition"/>）。
+        ///
+        /// 同じ日の経緯: 1406（膨らんでいた）→ 400（小さいと言われた）→ 1000（ロンと同じ。顔と胸元だけ）
+        /// → 480（全身を帯の中に。脚の切れ目が見えると言われた）→ 560。
+        /// </summary>
+        private const float EnemyCutinPortraitHeight = 560f;
+
+        /// <summary>
+        /// 相手のカットインの立ち絵を置く位置（絵の下端の中央。**画面の中心から**、4:3 のとき）。
+        ///
+        /// **縦は、絵の下端を画面の下（-300）より 34 だけ下へ出す。** 高さ 560 の 6%。
+        /// 脚の切れ目がちょうど隠れ、裾のフリルは残る。横は左寄りで、左の翼の先が画面の端に来る。
+        /// 高さを変えたら、縦は「-300 − 高さ × 0.06」で出し直すこと。
+        /// </summary>
+        private static readonly Vector2 EnemyCutinPortraitPosition = new Vector2(-130f, -334f);
+
+        /// <summary>カットインの帯の傾き（度）。立ち絵を帯の中に置くときの座標の向きに使う。</summary>
+        private const float CutinStripeTilt = 15f;
+
+        /// <summary>カットインの寸法を決めたときの Canvas の高さ（800x600 の 600）。</summary>
+        private const float CutinReferenceHeight = 600f;
+
+        /// <summary>
+        /// `Image.SetNativeSize()` が決める大きさ（Canvas の単位）を、スプライトから計算する。
+        /// **`sprite.rect`（画素数）をそのまま大きさとして使ってはいけない。**
+        /// pixelsPerUnit が 100 でない絵や、取り込みで縮めた絵では、画素数と大きさが一致しない。
+        /// </summary>
+        private static Vector2 NativeSizeOf(Sprite sprite, Canvas canvas)
+        {
+            if (sprite == null) return Vector2.zero;
+            float reference = canvas != null ? canvas.referencePixelsPerUnit : 100f;
+            float ppu = sprite.pixelsPerUnit > 0f ? sprite.pixelsPerUnit : 100f;
+            return sprite.rect.size / ppu * reference;
+        }
+
+        private IEnumerator SkillCutinVisualsRoutine(PresentationScope scope, string skillName, bool isLocalPlayer, CharacterData characterData, float duration, Action onComplete, string subText)
+        {
             ResetVisuals();
 
             // 1. コンテナ作成
-            GameObject container = new GameObject("DeathGameCutinContainer");
+            GameObject container = scope.Own(new GameObject("DeathGameCutinContainer"));
             container.transform.SetParent(transform, false);
             container.transform.SetAsLastSibling();
             RectTransform containerRt = container.AddComponent<RectTransform>();
@@ -319,7 +480,7 @@ namespace KillingMahjong.UI
             RectTransform stripeRt = bgStripeObj.GetComponent<RectTransform>();
             // 画面を覆い尽くす長方形から、帯状（バナー）に変更
             stripeRt.sizeDelta = new Vector2(6000f, 600f);
-            stripeRt.localRotation = Quaternion.Euler(0, 0, 15f); // 傾きを少し緩やかに
+            stripeRt.localRotation = Quaternion.Euler(0, 0, CutinStripeTilt); // 傾きを少し緩やかに
             
             // 下から斜めに突き抜けるように配置
             Vector2 stripeTarget = new Vector2(0, 0);
@@ -370,7 +531,18 @@ namespace KillingMahjong.UI
             Sprite bodySprite = null;
             Sprite faceSprite = null;
 
-            if (characterData != null)
+            // **自分のスキルは専用の絵を出す（2026-10-02 の指示）。**
+            // 以前は characterData（＝自分のキャラの立ち絵）が優先され、
+            // `playerCutinSprite` は characterData が無いときの控えでしかなかった。
+            // 自分が撃つときだけは、立ち絵ではなく専用の絵にする。
+            // 顔は重ねない（立ち絵用の差分なので、この絵には合わない）。
+            bool usingCutinSprite = false;
+            if (isLocalPlayer && playerCutinSprite != null)
+            {
+                bodySprite = playerCutinSprite;
+                usingCutinSprite = true;
+            }
+            else if (characterData != null)
             {
                 var bodyMatch = characterData.bodySprites?.Find(x => x.id == characterData.defaultBodyId);
                 bodySprite = bodyMatch != null ? bodyMatch.sprite : characterData.normalSprite;
@@ -397,21 +569,90 @@ namespace KillingMahjong.UI
                 portraitImg.SetNativeSize();
 
                 portraitRt = portraitObj.GetComponent<RectTransform>();
-                portraitRt.pivot = new Vector2(0.5f, 0f); // 下端中央
-                
-                // SetNativeSizeの直後だとrect.heightが未確定な場合があるため、spriteの実際のサイズからスケールを計算する
-                float targetHeight = 800f; // さらに少し小さめにして確実に頭が収まるようにする
-                float actualHeight = bodySprite.rect.height;
-                float scale = actualHeight > 0 ? targetHeight / actualHeight : 1f;
-                portraitRt.localScale = new Vector3(scale, scale, 1f);
-                
-                // 常に左下に配置（自分の顔のみ出るため）
-                portraitRt.anchorMin = new Vector2(0f, 0f);
-                portraitRt.anchorMax = new Vector2(0f, 0f);
-                portraitTargetPos = new Vector2(250, -150); // 少し下に移動して頭頂部が見切れないようにする
-                portraitStartPos = portraitTargetPos + new Vector2(0, -800); // 下から上がってくる
-                
-                portraitRt.anchoredPosition = portraitStartPos; 
+
+                if (usingCutinSprite)
+                {
+                    // **専用の絵は画面に収める（2026-10-02）。**
+                    // 立ち絵と違って見切れてよい絵ではないし、
+                    // CanvasScaler が幅基準（match=0・基準 800x600）なので、
+                    // 16:9 では**キャンバスの高さが 450 単位まで縮む**。
+                    // 高さ 800 の決め打ちだと、その時点ではみ出す。
+                    float areaW = containerRt.rect.width;
+                    float areaH = containerRt.rect.height;
+                    // 画素数ではなく、SetNativeSize が決めた大きさ（Canvas の単位）で測る。理由は下の相手側と同じ
+                    Vector2 native = NativeSizeOf(bodySprite, containerCanvas);
+                    float spriteW = Mathf.Max(native.x, 1f);
+                    float spriteH = Mathf.Max(native.y, 1f);
+
+                    // 幅・高さの両方で頭打ちにして、狭いほうに合わせる
+                    float fit = Mathf.Min(areaW * CutinSpriteWidthRatio / spriteW,
+                                          areaH * CutinSpriteHeightRatio / spriteH);
+                    portraitRt.localScale = new Vector3(fit, fit, 1f);
+
+                    // 画面中央。看板を掲げる絵なので、寄せずに真ん中で見せる
+                    portraitRt.pivot = new Vector2(0.5f, 0.5f);
+                    portraitRt.anchorMin = new Vector2(0.5f, 0.5f);
+                    portraitRt.anchorMax = new Vector2(0.5f, 0.5f);
+                    portraitTargetPos = Vector2.zero;
+                    portraitStartPos = portraitTargetPos + new Vector2(0f, -areaH);
+                }
+                else
+                {
+                    portraitRt.pivot = new Vector2(0.5f, 0f); // 下端中央
+
+                    // **大きさは Canvas の単位で決める（2026-10-09 に直した）。**
+                    //
+                    // 以前は「絵の画素数」から倍率を出していた（800 ÷ 画素の高さ）。
+                    // ところが SetNativeSize が決める大きさは 画素数 ÷ pixelsPerUnit × 100 で、
+                    // 取り込みの上限（maxTextureSize）を下げると**画素数だけが減る**。
+                    // 2026-09-27 に上限を 4096 → 1024 にしたとき、倍率が 800/3600 → 800/1024 に変わり、
+                    // 立ち絵が 400 → 1406 単位（約3.5倍）に膨らんで、胴体しか映らなくなっていた
+                    // （コレクションの試写でユーザーが気づいた）。
+                    // SetNativeSize の直後は rect が未確定なことがあるので、スプライトから計算する。
+                    float nativeHeight = NativeSizeOf(bodySprite, containerCanvas).y;
+
+                    // **画面の高さに比例させる。** Canvas は幅基準（800 固定）なので、横長の画面では
+                    // 高さが 600 より小さくなる（16:9 で 450）。決め打ちだと、そのぶん大きく見える。
+                    // 4:3 のとき k=1
+                    float k = containerRt.rect.height > 1f ? containerRt.rect.height / CutinReferenceHeight : 1f;
+                    float scale = nativeHeight > 0f ? EnemyCutinPortraitHeight * k / nativeHeight : 1f;
+                    portraitRt.localScale = new Vector3(scale, scale, 1f);
+
+                    // **立ち絵は帯の中だけに映す（2026-10-09 のユーザー指示）。**
+                    // 帯と同じ形の「切り抜き枠」を重ね、立ち絵をその子にする。帯そのものの子にしないのは、
+                    // 帯のすぐ上に血飛沫が描かれるため（子にすると、立ち絵の上に血飛沫が乗る）。
+                    // 枠は帯と同じ動きをさせるので、立ち絵は帯に乗ったまま下から突き上がってくる
+                    var maskObj = new GameObject("PortraitMask", typeof(RectTransform), typeof(Image), typeof(Mask));
+                    maskObj.transform.SetParent(containerRt, false);
+                    var maskRt = (RectTransform)maskObj.transform;
+                    maskRt.sizeDelta = stripeRt.sizeDelta;
+                    maskRt.localRotation = stripeRt.localRotation;
+                    maskRt.anchoredPosition = stripeStart;
+                    maskObj.GetComponent<Image>().raycastTarget = false;
+                    maskObj.GetComponent<Mask>().showMaskGraphic = false;   // 枠そのものは描かない
+                    bgElements.Add(maskRt);
+                    bgStartPos.Add(stripeStart);
+                    bgTargetPos.Add(stripeTarget);
+
+                    portraitObj.transform.SetParent(maskRt, false);
+                    portraitRt.anchorMin = new Vector2(0.5f, 0.5f);
+                    portraitRt.anchorMax = new Vector2(0.5f, 0.5f);
+
+                    // 枠は傾いているので、立ち絵は逆へ同じだけ回してまっすぐ立たせる。
+                    // 置く位置も、画面の向きで決めた値を枠の向きへ直す
+                    portraitRt.localRotation = Quaternion.Euler(0f, 0f, -CutinStripeTilt);
+                    Vector2 onScreen = EnemyCutinPortraitPosition * k;
+                    float rad = CutinStripeTilt * Mathf.Deg2Rad;
+                    Vector2 inBand = new Vector2(
+                        onScreen.x * Mathf.Cos(rad) + onScreen.y * Mathf.Sin(rad),
+                        -onScreen.x * Mathf.Sin(rad) + onScreen.y * Mathf.Cos(rad));
+
+                    // 帯の中では動かさない（帯ごと出入りする）
+                    portraitTargetPos = inBand;
+                    portraitStartPos = inBand;
+                }
+
+                portraitRt.anchoredPosition = portraitStartPos;
                 
                 // 立ち絵にテーマカラーのドロップシャドウ。
                 // Shadow は立ち絵の四角を丸ごと複製するので、半透明で塗る面積が1枚ぶん増える

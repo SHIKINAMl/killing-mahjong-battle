@@ -26,8 +26,12 @@ namespace KillingMahjong.UI
         }
 
         /// <summary>
-        /// HPの隣に出すこの局の増減。**「隣」は画面の内側**（自分＝右のスマホなのでその左、相手＝左の血袋なのでその右）。
-        /// 上に出すと、いま止めた <c>HpPopupPresenter</c> の浮き数字と同じ場所になってしまう。
+        /// この局の増減を、**HPの表示の真上**に出す（2026-10-08 のユーザー指示）。
+        ///
+        /// HPが増減したときの浮き数字（<c>HpPopupPresenter</c>。演出の試写の hp.damage / hp.heal）と
+        /// 同じ場所にそろえた。以前は「HPの隣（画面の内側）」に出していて、相手側はキャラの胸の上、
+        /// 自分側は山牌の上に数字がかかっていた。ロンのあいだ浮き数字は止めてあるので、
+        /// 同じ場所に出しても二重にはならない。
         /// </summary>
         /// <summary>基準が潰れているとみなす大きさ[px]。</summary>
         private const float MinAnchorSize = 20f;
@@ -36,7 +40,17 @@ namespace KillingMahjong.UI
         private const float FallbackCenterX = 0.42f;
         private const float FallbackCenterY = 0.58f;
 
-        private TextMeshProUGUI SpawnHpDeltaLabel(RectTransform parent, RectTransform anchor, int delta, Color tint, bool placeLeft)
+        /// <summary>
+        /// HPの表示の上端から、数字の下端までのすき間（800x600 での画素数）。
+        /// 相手側は上端のすぐ内側に「相手 18002」の文字があるので、上端より上に出せば重ならない。
+        /// 自分側は上端の上にスマホの飾りがあり、その上へ出る。
+        /// </summary>
+        private const float HpDeltaGapAbove = 12f;
+
+        /// <summary>数字の箱の高さ（Canvas の単位）。位置の計算にも使う。</summary>
+        private const float HpDeltaBoxHeight = 44f;
+
+        private TextMeshProUGUI SpawnHpDeltaLabel(RectTransform parent, RectTransform anchor, int delta, Color tint)
         {
             if (anchor == null) return null;
 
@@ -48,55 +62,57 @@ namespace KillingMahjong.UI
             text.fontSize = 30f;
             text.fontStyle = FontStyles.Bold;
             text.textWrappingMode = TextWrappingModes.NoWrap;
-            text.alignment = placeLeft ? TextAlignmentOptions.Right : TextAlignmentOptions.Left;
+            text.alignment = TextAlignmentOptions.Center;
             text.outlineWidth = 0.2f;
             text.outlineColor = new Color32(0, 0, 0, 255);
 
             RectTransform rt = go.GetComponent<RectTransform>();
-            rt.sizeDelta = new Vector2(280f, 44f);
+            rt.sizeDelta = new Vector2(280f, HpDeltaBoxHeight);
 
-            // 基準が潰れているとみなす大きさ[px]。これ以下は「画面に映っていない」
-            // 扱いにする。まともなHP表示なら軽く超える。
-            // **ピボットを文字が寄る側の端に置く。** 既定の中心(0.5)のままだと `rt.position` が箱の中心になり、
-            // 右寄せの文字は箱の半分ぶん外側へずれてスマホや血袋に重なる。
-            // **しかも sizeDelta はキャンバス単位・position は画面ピクセルなので、
-            // 解像度によってずれ方が変わる。机上では気付けない類のずれ。**
-            rt.pivot = new Vector2(placeLeft ? 1f : 0f, 0.5f);
+            // 箱の中心を、HPの表示の中心の真上に置く
+            rt.pivot = new Vector2(0.5f, 0.5f);
 
-            Vector3[] corners = new Vector3[4];
-            anchor.GetWorldCorners(corners);
-            Vector3 center = (corners[0] + corners[2]) * 0.5f;
-            float halfWidth = (corners[2].x - corners[0].x) * 0.5f;
+            // **基準の場所は、画面の座標へ直してから使う（2026-10-08）。**
+            //
+            // 以前は `GetWorldCorners` の値をそのまま画面ピクセルとして使っていた。
+            // 自分側（スマホ）の Canvas は Overlay なのでそれで合うが、**相手側（EnemyInfoUI）の
+            // Canvas は「Screen Space - Camera」**で、ワールド座標はピクセルではない。
+            // 2026-09-17 に「相手の基準は 3x3px・座標(-5,3) に潰れている」と読んだのは
+            // この取り違えで、潰れていたのではなく単位が違っていた。
+            // そのせいで相手側は下の「決め打ちの場所」へ逃がされ、HPの表示から離れた所に
+            // 数字が出ていた（ユーザー報告「体力の増減の数値が出る場所がおかしい」。
+            // HpPopupPresenter の浮き数字は Canvas の中の座標で置くので、ずれていなかった）。
+            Rect screenRect = ScreenRectOf(anchor);
+            Vector3 center = new Vector3(screenRect.center.x, screenRect.center.y, 0f);
 
-            // **基準が潰れていたら、画面の位置で置き直す（2026-09-17）。**
-            //
-            // 相手側の基準（`EnemyInfoUI.HpAnchor` → `EnemyPanel`）は、画面上では
-            // **3x3px・座標(-5,3)** しかない。`EnemyInfoUI` の localScale が 0.02 で、
-            // パネル側に打ち消しが無いため。しかも**見えている点滴はUIではなく
-            // スプライト**で、`EnemyInfoUI` の階層の外にあるので、
-            // RectTransform を返すこの仕組みからは届かない。
-            //
-            // そのままだと増減ラベルが画面左下の隅へ飛び、下端で切れる
-            // （「ロン後の点数の出る位置がおかしい」の正体。2026-09-17 に実測）。
-            //
-            // **根本はシーンの作りのほう。** ここは、壊れた基準を見つけたら
-            // 画面上の妥当な場所へ逃がすだけに留める。
-            float anchorWidth = corners[2].x - corners[0].x;
-            float anchorHeight = corners[2].y - corners[0].y;
+            // 画面の大きさが変わっても同じ見た目の間隔になるよう、800x600 に対する倍率で持つ
+            float pixelScale = Screen.height / 600f;
+            bool anchorUsable = true;
+
+            // 基準が本当に取れなかったとき（画面の外、大きさ 0 など）の逃げ道は残してある
+            float anchorWidth = screenRect.width;
+            float anchorHeight = screenRect.height;
             if (anchorWidth < MinAnchorSize || anchorHeight < MinAnchorSize)
             {
                 // 点滴は画面のやや左・中ほどにある（800x600 で x225〜270 / y270〜430 を実測）。
                 // その右隣へ置く。画面の割合で持つので、解像度が変わっても付いてくる。
                 center = new Vector3(Screen.width * FallbackCenterX,
                                      Screen.height * FallbackCenterY, 0f);
-                halfWidth = 0f;
+                anchorUsable = false;
             }
-            // HPの絵に食い込まないぶんだけ内側へ逃がす（画面ピクセル）。
-            // **24 では足りなかった（2026-08-29 の実機確認）。** ここで基準にしている HpAnchor は
-            // スマホの中の `HPPanel`（x 669..759）で、**スマホの外枠はそこから 24px ほど外へ出ている。**
-            // 逃がした量と枠までの距離がちょうど同じで、実質の隙間が 0 になっていた。
-            const float gap = 48f;
-            center.x += placeLeft ? -(halfWidth + gap) : (halfWidth + gap);
+
+            if (anchorUsable)
+            {
+                // HPの表示の上端のすぐ上へ。箱の高さの半分だけ持ち上げて、数字の下端を上端に合わせる
+                center.y = screenRect.yMax + (HpDeltaGapAbove + HpDeltaBoxHeight * 0.5f) * pixelScale;
+
+                // 画面の端にかからないよう、左右と上を収める（額が大きいと数字が長くなる）
+                float halfTextWidth = Mathf.Min(text.preferredWidth, rt.sizeDelta.x) * 0.5f * pixelScale;
+                float margin = 6f * pixelScale;
+                center.x = Mathf.Clamp(center.x, halfTextWidth + margin, Screen.width - halfTextWidth - margin);
+                float maxY = Screen.height - (HpDeltaBoxHeight * 0.5f) * pixelScale - margin;
+                if (center.y > maxY) center.y = maxY;
+            }
             rt.position = center;
 
             StartCoroutine(HpDeltaLabelRoutine(rt, text));
@@ -140,12 +156,40 @@ namespace KillingMahjong.UI
             else audio.PlayHitSE(ratio);
         }
 
-        /// <summary>RectTransform の中心をワールド座標で返す。**サイズが 0 の空オブジェクトでも中心が取れる。**</summary>
+        /// <summary>
+        /// RectTransform の中心を**画面の座標**で返す。**サイズが 0 の空オブジェクトでも中心が取れる。**
+        /// 血の数字を飛ばす先に使う。飛ばす側の Canvas は Overlay なので、画面の座標がそのまま位置になる。
+        /// </summary>
         private static Vector3 AnchorCenter(RectTransform rt)
+        {
+            Rect r = ScreenRectOf(rt);
+            return new Vector3(r.center.x, r.center.y, 0f);
+        }
+
+        /// <summary>
+        /// RectTransform が画面のどこに映っているか（ピクセル）。
+        ///
+        /// Canvas が Overlay ならワールド座標がそのままピクセルだが、
+        /// 「Screen Space - Camera」や World の Canvas では、そのカメラを通して変換しないと合わない。
+        /// カメラが割り当てられていない Camera 方式の Canvas は、Unity が Overlay として扱う。
+        /// </summary>
+        private static Rect ScreenRectOf(RectTransform rt)
         {
             Vector3[] corners = new Vector3[4];
             rt.GetWorldCorners(corners);
-            return (corners[0] + corners[2]) * 0.5f;
+
+            Camera cam = null;
+            Canvas canvas = rt.GetComponentInParent<Canvas>();
+            if (canvas != null)
+            {
+                Canvas root = canvas.rootCanvas;
+                if (root.renderMode != RenderMode.ScreenSpaceOverlay) cam = root.worldCamera;
+            }
+
+            Vector2 a = RectTransformUtility.WorldToScreenPoint(cam, corners[0]);
+            Vector2 b = RectTransformUtility.WorldToScreenPoint(cam, corners[2]);
+            return Rect.MinMaxRect(Mathf.Min(a.x, b.x), Mathf.Min(a.y, b.y),
+                                   Mathf.Max(a.x, b.x), Mathf.Max(a.y, b.y));
         }
     }
 }

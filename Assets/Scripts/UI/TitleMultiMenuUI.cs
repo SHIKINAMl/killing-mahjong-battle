@@ -9,10 +9,15 @@ namespace KillingMahjong.UI
     /// <summary>
     /// タイトルの「対局する」を押したときに出す、対戦相手の探し方を選ぶ小さなメニュー。
     ///
-    /// **シーンには置かず、実行時に組み立てる。**
-    /// タイトルのボタンは `onClick` が `TitleUIManager` へシリアライズ済みで、
-    /// シーンをいじると配線が消えて「押しても何も起きない」状態になりやすい
-    /// （`HANDOFF_20260802.md` で一度踏んでいる）。触らないのがいちばん安全。
+    /// **メニューの部品はシーンに置いてある（`MultiMenu`。普段は非表示）。ここはそれを探して使う
+    /// （2026-10-09）。** タイトルシーンと部屋シーンの両方で使うので、Prefab
+    /// （`Assets/Prefabs/UI/MultiMenu.prefab`）にして両方のシーンへ置いている。
+    /// 位置・大きさ・色・文字は Prefab が正で、ここに残っている数字は、
+    /// シーンに無かったときに作るための控え（<see cref="SceneFirst"/>）。
+    ///
+    /// **押したときの動きは、再生時にコードでつなぐ。** シーンには保存しない。
+    /// シーンに保存した配線は、シーンをいじると外れて「押しても何も起きない」になりやすい
+    /// （`HANDOFF_20260802.md` で一度踏んでいる）。
     ///
     /// 見た目は `TitleScreenBuilder.RestyleMenu` に合わせてある
     /// （黒い長方形は使わず文字だけ、左に深紅の菱形）。
@@ -28,6 +33,9 @@ namespace KillingMahjong.UI
         private const float ItemHeight = 46f;
         private const float ItemWidth = 300f;
         private const float LabelFontSize = 24f;
+        private const string FriendIllustrationResourcePath = "UI/FriendMatchIllustration";
+        private const float FriendIllustrationScale = 0.18f;
+        private const float FriendIllustrationGap = 20f;
 
         /// <summary>合言葉の確認を待つ上限。返事が無いまま固まらないようにする。</summary>
         private const float JoinTimeoutSeconds = 15f;
@@ -44,19 +52,25 @@ namespace KillingMahjong.UI
         private TMP_Text _passwordError;
         private TMP_Text _passwordStatus;
         private TMP_FontAsset _font;
+        private RectTransform _friendIllustration;
+        private TMP_Text _friendMatchLabel;
 
         /// <summary>確認中に二重で送らないための印。</summary>
         private bool _isCheckingRoom;
+        private bool _hasDecided;
 
         private Action<MatchJoinMode> _onDecided;
+        private Action _onClosed;
 
         /// <summary>
         /// メニューを出す。<paramref name="onDecided"/> は入り方が決まったときに呼ばれる
         /// （`MatchJoinRequest` はその前に設定済み）。
         /// </summary>
-        public void Open(Action<MatchJoinMode> onDecided)
+        public void Open(Action<MatchJoinMode> onDecided, Action onClosed = null)
         {
             _onDecided = onDecided;
+            _hasDecided = false;
+            _onClosed = onClosed;
 
             if (_root == null) Build();
             if (_root == null) return;
@@ -70,6 +84,7 @@ namespace KillingMahjong.UI
         {
             if (_root != null) _root.SetActive(false);
             SetTruthNameHookVisible(true);
+            _onClosed?.Invoke();
         }
 
         // ------------------------------------------------------------------
@@ -82,11 +97,11 @@ namespace KillingMahjong.UI
             if (_modePanel != null) _modePanel.SetActive(true);
             if (_friendPanel != null) _friendPanel.SetActive(false);
             if (_passwordPanel != null) _passwordPanel.SetActive(false);
+            PositionFriendIllustration();
         }
 
         /// <summary>
-        /// フレンドと遊ぶための入口。ここを専用パネルにしておくと、将来の部屋設定を
-        /// サーバーの契約が決まった時点で安全に追加できる。
+        /// フレンドと遊ぶための、部屋作成／合言葉入力の入口。
         /// </summary>
         private void ShowFriendPanel()
         {
@@ -121,21 +136,21 @@ namespace KillingMahjong.UI
 
         private void OnPublicSelected()
         {
-            if (_isCheckingRoom) return;
+            if (_isCheckingRoom || _hasDecided) return;
             MatchJoinRequest.RequestPublic();
             Decide(MatchJoinMode.Public);
         }
 
         private void OnPrivateCreateSelected()
         {
-            if (_isCheckingRoom) return;
+            if (_isCheckingRoom || _hasDecided) return;
             MatchJoinRequest.RequestPrivateCreate();
             Decide(MatchJoinMode.PrivateCreate);
         }
 
         private void OnPasswordSubmit()
         {
-            if (_isCheckingRoom) return;
+            if (_isCheckingRoom || _hasDecided) return;
 
             string input = _passwordInput != null ? _passwordInput.text : "";
 
@@ -293,6 +308,8 @@ namespace KillingMahjong.UI
 
         private void Decide(MatchJoinMode mode)
         {
+            if (_hasDecided) return;
+            _hasDecided = true;
             Close();
             _onDecided?.Invoke(mode);
         }
@@ -308,56 +325,130 @@ namespace KillingMahjong.UI
             // **専用の Canvas を立てる。**
             // タイトルの既存 Canvas にぶら下げると、全画面の TitleScrim（右ほど濃くする幕）が
             // メニューの上に乗り、見えているのにクリックが幕に吸われて押せなくなる。
-            _root = new GameObject("MultiMenu",
+            _root = SceneFirst.Root(RootName, out bool madeRoot,
                 typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+            if (madeRoot)
+            {
+                var canvas = _root.GetComponent<Canvas>();
+                canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+                canvas.sortingOrder = Common.UISortingOrders.TitleMenuOverlay;
 
-            var canvas = _root.GetComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = Common.UISortingOrders.TitleMenuOverlay;
+                // このプロジェクトの UI は 800x600 基準（CanvasFixer と揃える）
+                var scaler = _root.GetComponent<CanvasScaler>();
+                scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+                scaler.referenceResolution = new Vector2(800f, 600f);
 
-            // このプロジェクトの UI は 800x600 基準（CanvasFixer と揃える）
-            var scaler = _root.GetComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(800f, 600f);
-
-            Stretch(_root.GetComponent<RectTransform>());
+                Stretch(_root.GetComponent<RectTransform>());
+            }
 
             // 背後の暗幕。タイトルのボタンを押せないようにする役目も兼ねる
-            var scrim = new GameObject("Scrim", typeof(RectTransform), typeof(Image));
-            scrim.transform.SetParent(_root.transform, false);
-            Stretch(scrim.GetComponent<RectTransform>());
-            var scrimImg = scrim.GetComponent<Image>();
-            scrimImg.color = ScrimColor;
-            scrimImg.raycastTarget = true;
+            var scrim = SceneFirst.Child(_root.transform, "Scrim", out bool madeScrim,
+                typeof(RectTransform), typeof(Image));
+            if (madeScrim)
+            {
+                Stretch(scrim.GetComponent<RectTransform>());
+                var scrimImg = scrim.GetComponent<Image>();
+                scrimImg.color = ScrimColor;
+                scrimImg.raycastTarget = true;
+            }
 
             BuildModePanel();
             BuildFriendPanel();
             BuildPasswordPanel();
+
+            _lastBakeReport = SceneFirst.Report("TitleMultiMenuUI");
+        }
+
+        /// <summary>シーンに置くときの、メニューの根の名前。</summary>
+        public const string RootName = "MultiMenu";
+
+        private string _lastBakeReport = "";
+
+        /// <summary>
+        /// **エディタ用。** メニューの部品のうち、シーンに無い物だけを作って置く
+        /// （`SceneFirstBaker` が再生していないときに呼ぶ）。
+        /// 置いたあとは非表示にしておく（全画面の暗幕を持つので、出したままだと下の画面が見えない）。
+        /// </summary>
+        /// <returns>シーンに無くて作った物の名前。全部置いてあったら空文字</returns>
+        public string BakeForEditor()
+        {
+            Build();
+            if (_root != null)
+            {
+                // 絵の位置は文字の幅から決めるので、見えている状態で一度だけ計算する
+                _root.SetActive(true);
+                _modePanel.SetActive(true);
+                PositionFriendIllustration();
+                _root.SetActive(false);
+            }
+            return _lastBakeReport;
         }
 
         private void BuildModePanel()
         {
-            _modePanel = new GameObject("ModePanel", typeof(RectTransform));
-            _modePanel.transform.SetParent(_root.transform, false);
-            Center(_modePanel.GetComponent<RectTransform>(), new Vector2(ItemWidth, ItemHeight * 5f));
+            _modePanel = SceneFirst.Child(_root.transform, "ModePanel", out bool madePanel, typeof(RectTransform));
+            if (madePanel) Center(_modePanel.GetComponent<RectTransform>(), new Vector2(ItemWidth, ItemHeight * 5f));
 
             CreateHeading(_modePanel.transform, "対局する", ItemHeight * 2f);
 
             CreateMenuItem(_modePanel.transform, "野良マッチ", ItemHeight * 0.9f, OnPublicSelected);
-            CreateMenuItem(_modePanel.transform, "フレンドマッチ", -ItemHeight * 0.2f, ShowFriendPanel);
+            var friendItem = CreateMenuItem(_modePanel.transform, "フレンドマッチ", -ItemHeight * 0.2f, ShowFriendPanel);
+            CreateFriendIllustration(friendItem);
             CreateMenuItem(_modePanel.transform, "もどる", -ItemHeight * 1.5f, Close);
+        }
+
+        private void CreateFriendIllustration(GameObject friendItem)
+        {
+            var texture = Resources.Load<Texture2D>(FriendIllustrationResourcePath);
+            if (texture == null) return;
+
+            _friendMatchLabel = friendItem.GetComponentInChildren<TMP_Text>();
+            var obj = SceneFirst.Child(friendItem.transform, "MatchIllustration", out bool created,
+                typeof(RectTransform), typeof(RawImage));
+            _friendIllustration = obj.GetComponent<RectTransform>();
+
+            // **置いてある絵は動かさない。** 位置はシーン（Prefab）で決める。
+            // 文字の幅から位置を計算するのは、ここで作ったときだけ
+            _positionIllustrationFromText = created;
+            if (!created) return;
+
+            Center(_friendIllustration, new Vector2(texture.width, texture.height) * FriendIllustrationScale);
+
+            var image = obj.GetComponent<RawImage>();
+            image.texture = texture;
+            image.raycastTarget = false;
+        }
+
+        /// <summary>絵の位置を、文字の幅から計算して決めるか。シーンに置いてあった絵なら false。</summary>
+        private bool _positionIllustrationFromText;
+
+        private void PositionFriendIllustration()
+        {
+            if (!_positionIllustrationFromText) return;
+            if (_friendIllustration == null || _friendMatchLabel == null) return;
+
+            Canvas.ForceUpdateCanvases();
+            _friendMatchLabel.ForceMeshUpdate();
+            var bounds = _friendMatchLabel.textBounds;
+            var friendRect = (RectTransform)_friendIllustration.parent;
+            float textRight = friendRect.InverseTransformPoint(_friendMatchLabel.transform.TransformPoint(
+                new Vector3(bounds.max.x, bounds.center.y, 0f))).x;
+
+            // 元の800x600画像の透明な余白は残し、見える絵の左端・中央で位置を合わせる。
+            // 承認済み配置: 文字の右端から20px、絵の高さ47.52px。クリック領域は増やさない。
+            _friendIllustration.anchoredPosition = new Vector2(
+                textRight + FriendIllustrationGap + _friendIllustration.sizeDelta.x * 0.5f - 121f * FriendIllustrationScale,
+                _friendIllustration.sizeDelta.y * 0.5f - 255f * FriendIllustrationScale);
         }
 
         private void BuildFriendPanel()
         {
-            _friendPanel = new GameObject("FriendPanel", typeof(RectTransform));
-            _friendPanel.transform.SetParent(_root.transform, false);
-            Center(_friendPanel.GetComponent<RectTransform>(), new Vector2(ItemWidth, ItemHeight * 5f));
+            _friendPanel = SceneFirst.Child(_root.transform, "FriendPanel", out bool madePanel, typeof(RectTransform));
+            if (madePanel) Center(_friendPanel.GetComponent<RectTransform>(), new Vector2(ItemWidth, ItemHeight * 5f));
 
             CreateHeading(_friendPanel.transform, "フレンドマッチ", ItemHeight * 2f);
             CreateMenuItem(_friendPanel.transform, "部屋を作る", ItemHeight * 0.9f, OnPrivateCreateSelected);
             CreateMenuItem(_friendPanel.transform, "あいことばで入る", -ItemHeight * 0.2f, ShowPasswordPanel);
-            CreateCaption(_friendPanel.transform, "部屋設定は今後追加予定", -ItemHeight * 1.15f);
             CreateMenuItem(_friendPanel.transform, "もどる", -ItemHeight * 2.1f, ShowModePanel);
 
             _friendPanel.SetActive(false);
@@ -365,63 +456,72 @@ namespace KillingMahjong.UI
 
         private void BuildPasswordPanel()
         {
-            _passwordPanel = new GameObject("PasswordPanel", typeof(RectTransform));
-            _passwordPanel.transform.SetParent(_root.transform, false);
-            Center(_passwordPanel.GetComponent<RectTransform>(), new Vector2(ItemWidth, ItemHeight * 5f));
+            _passwordPanel = SceneFirst.Child(_root.transform, "PasswordPanel", out bool madePanel, typeof(RectTransform));
+            if (madePanel) Center(_passwordPanel.GetComponent<RectTransform>(), new Vector2(ItemWidth, ItemHeight * 5f));
 
             CreateHeading(_passwordPanel.transform, "あいことばを入力", ItemHeight * 2f);
 
-            var fieldObj = new GameObject("PasswordInput",
+            var fieldObj = SceneFirst.Child(_passwordPanel.transform, "PasswordInput", out bool madeField,
                 typeof(RectTransform), typeof(Image), typeof(TMP_InputField));
-            fieldObj.transform.SetParent(_passwordPanel.transform, false);
-            var frt = fieldObj.GetComponent<RectTransform>();
-            Center(frt, new Vector2(ItemWidth * 0.7f, ItemHeight));
-            frt.anchoredPosition = new Vector2(0f, ItemHeight * 0.7f);
-
-            var fieldBg = fieldObj.GetComponent<Image>();
-            fieldBg.color = new Color(1f, 1f, 1f, 0.10f);
-
-            var textArea = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
-            textArea.transform.SetParent(fieldObj.transform, false);
-            Stretch(textArea.GetComponent<RectTransform>());
-            var textComp = textArea.GetComponent<TextMeshProUGUI>();
-            ApplyFont(textComp);
-            textComp.fontSize = LabelFontSize;
-            textComp.color = MenuText;
-            textComp.alignment = TextAlignmentOptions.Center;
-
             _passwordInput = fieldObj.GetComponent<TMP_InputField>();
-            _passwordInput.textViewport = textArea.GetComponent<RectTransform>();
-            _passwordInput.textComponent = textComp;
-            _passwordInput.characterLimit = MatchJoinRequest.PasswordLength;
-            // 合言葉は英大文字と数字だけ。小文字で打たれても MatchJoinRequest 側で直す
-            _passwordInput.characterValidation = TMP_InputField.CharacterValidation.Alphanumeric;
+            if (madeField)
+            {
+                var frt = fieldObj.GetComponent<RectTransform>();
+                Center(frt, new Vector2(ItemWidth * 0.7f, ItemHeight));
+                frt.anchoredPosition = new Vector2(0f, ItemHeight * 0.7f);
+
+                var fieldBg = fieldObj.GetComponent<Image>();
+                fieldBg.color = new Color(1f, 1f, 1f, 0.10f);
+
+                var textArea = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
+                textArea.transform.SetParent(fieldObj.transform, false);
+                Stretch(textArea.GetComponent<RectTransform>());
+                var textComp = textArea.GetComponent<TextMeshProUGUI>();
+                ApplyFont(textComp);
+                textComp.fontSize = LabelFontSize;
+                textComp.color = MenuText;
+                textComp.alignment = TextAlignmentOptions.Center;
+
+                _passwordInput.textViewport = textArea.GetComponent<RectTransform>();
+                _passwordInput.textComponent = textComp;
+                _passwordInput.characterLimit = MatchJoinRequest.PasswordLength;
+                // 合言葉は英大文字と数字だけ。小文字で打たれても MatchJoinRequest 側で直す
+                _passwordInput.characterValidation = TMP_InputField.CharacterValidation.Alphanumeric;
+            }
+            // 置いてある入力欄は使い回すので、前につないだ物を外してからつなぐ
+            _passwordInput.onSubmit.RemoveAllListeners();
             _passwordInput.onSubmit.AddListener(_ => OnPasswordSubmit());
 
-            var errorObj = new GameObject("Error", typeof(RectTransform), typeof(TextMeshProUGUI));
-            errorObj.transform.SetParent(_passwordPanel.transform, false);
-            var ert = errorObj.GetComponent<RectTransform>();
-            Center(ert, new Vector2(ItemWidth, ItemHeight * 0.7f));
-            ert.anchoredPosition = new Vector2(0f, ItemHeight * 0.05f);
+            var errorObj = SceneFirst.Child(_passwordPanel.transform, "Error", out bool madeError,
+                typeof(RectTransform), typeof(TextMeshProUGUI));
             _passwordError = errorObj.GetComponent<TextMeshProUGUI>();
-            ApplyFont(_passwordError);
-            _passwordError.fontSize = LabelFontSize * 0.7f;
-            _passwordError.color = ErrorText;
-            _passwordError.alignment = TextAlignmentOptions.Center;
+            if (madeError)
+            {
+                var ert = errorObj.GetComponent<RectTransform>();
+                Center(ert, new Vector2(ItemWidth, ItemHeight * 0.7f));
+                ert.anchoredPosition = new Vector2(0f, ItemHeight * 0.05f);
+                ApplyFont(_passwordError);
+                _passwordError.fontSize = LabelFontSize * 0.7f;
+                _passwordError.color = ErrorText;
+                _passwordError.alignment = TextAlignmentOptions.Center;
+            }
             _passwordError.text = "";
 
-            var statusObj = new GameObject("Status", typeof(RectTransform), typeof(TextMeshProUGUI));
-            statusObj.transform.SetParent(_passwordPanel.transform, false);
-            var srt = statusObj.GetComponent<RectTransform>();
-            Center(srt, new Vector2(ItemWidth, ItemHeight * 0.7f));
-            srt.anchoredPosition = new Vector2(0f, ItemHeight * 1.35f);
+            var statusObj = SceneFirst.Child(_passwordPanel.transform, "Status", out bool madeStatus,
+                typeof(RectTransform), typeof(TextMeshProUGUI));
             _passwordStatus = statusObj.GetComponent<TextMeshProUGUI>();
-            ApplyFont(_passwordStatus);
-            _passwordStatus.fontSize = LabelFontSize * 0.7f;
-            _passwordStatus.color = MenuText;
-            _passwordStatus.alignment = TextAlignmentOptions.Center;
+            if (madeStatus)
+            {
+                var srt = statusObj.GetComponent<RectTransform>();
+                Center(srt, new Vector2(ItemWidth, ItemHeight * 0.7f));
+                srt.anchoredPosition = new Vector2(0f, ItemHeight * 1.35f);
+                ApplyFont(_passwordStatus);
+                _passwordStatus.fontSize = LabelFontSize * 0.7f;
+                _passwordStatus.color = MenuText;
+                _passwordStatus.alignment = TextAlignmentOptions.Center;
+                _passwordStatus.raycastTarget = false;
+            }
             _passwordStatus.text = "";
-            _passwordStatus.raycastTarget = false;
 
             CreateMenuItem(_passwordPanel.transform, "決定", -ItemHeight * 0.8f, OnPasswordSubmit);
             CreateMenuItem(_passwordPanel.transform, "もどる", -ItemHeight * 1.9f, ShowFriendPanel);
@@ -433,8 +533,10 @@ namespace KillingMahjong.UI
 
         private void CreateHeading(Transform parent, string text, float y)
         {
-            var obj = new GameObject("Heading", typeof(RectTransform), typeof(TextMeshProUGUI));
-            obj.transform.SetParent(parent, false);
+            var obj = SceneFirst.Child(parent, "Heading", out bool created,
+                typeof(RectTransform), typeof(TextMeshProUGUI));
+            if (!created) return;
+
             var rt = obj.GetComponent<RectTransform>();
             Center(rt, new Vector2(ItemWidth, ItemHeight));
             rt.anchoredPosition = new Vector2(0f, y);
@@ -465,10 +567,19 @@ namespace KillingMahjong.UI
             tmp.raycastTarget = false;
         }
 
-        private void CreateMenuItem(Transform parent, string label, float y, Action onClick)
+        private GameObject CreateMenuItem(Transform parent, string label, float y, Action onClick)
         {
-            var obj = new GameObject(label, typeof(RectTransform), typeof(Image), typeof(Button));
-            obj.transform.SetParent(parent, false);
+            var obj = SceneFirst.Child(parent, label, out bool created,
+                typeof(RectTransform), typeof(Image), typeof(Button));
+            if (!created)
+            {
+                // 置いてあるボタンは使い回すので、前につないだ物を外してからつなぐ
+                var placed = obj.GetComponent<Button>();
+                placed.onClick.RemoveAllListeners();
+                placed.onClick.AddListener(() => onClick?.Invoke());
+                return obj;
+            }
+
             var rt = obj.GetComponent<RectTransform>();
             Center(rt, new Vector2(ItemWidth, ItemHeight));
             rt.anchoredPosition = new Vector2(0f, y);
@@ -506,6 +617,7 @@ namespace KillingMahjong.UI
             mimg.raycastTarget = false;
 
             obj.GetComponent<Button>().onClick.AddListener(() => onClick?.Invoke());
+            return obj;
         }
 
         private void ApplyFont(TMP_Text tmp)

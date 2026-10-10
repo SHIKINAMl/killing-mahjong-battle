@@ -74,11 +74,29 @@ namespace KillingMahjong.UI
 
         public bool IsMulliganSelection => SkillController != null && SkillController.IsMulliganSelection;
 
+        /// <summary>
+        /// サーバーからのメッセージを渡してよい状態か（2026-09-30）。
+        ///
+        /// **`GameUIManager` が居る＝受け取れる、ではない。**
+        /// 山牌などを描く購読は `Start` の `SetupControllers` で張られるので、
+        /// `Awake` と `Start` の隙間にメッセージを流すと、盤面の状態は更新されるのに
+        /// **誰も描き直さないまま終わる。**
+        ///
+        /// 配牌が 4.8 秒かかっていた頃はこの隙間に入りようがなかったが、
+        /// 2026-09-30 のサーバー側の高速化（約14ms）で実際に踏むようになり、
+        /// 「手牌選択フェイズで山牌が出ない」という形で出た。
+        /// </summary>
+        public bool IsReadyForServerMessages { get; private set; }
+
         private void Start()
         {
             SetupManagers();
             SetupControllers();
             SetupUI();
+
+            // **ここから先は受け取ってよい。** 貯めていたぶんは
+            // WebSocketGameClientSample が次のフレームで流す
+            IsReadyForServerMessages = true;
 
             // ボルテージのゲージを画面左に出す。**河からではなくここで作る。**
             // 河は手牌を選んでいる間は消えているので、河側の OnEnable に任せると
@@ -107,6 +125,8 @@ namespace KillingMahjong.UI
             // 出っぱなしになる。
             //
             // **チュートリアルでは一度も出さない**（2026-09-15 の指示）。
+            // → 2026-10-08 のフロー図で、第2局の説明の途中から出すことになった。
+            //   出すのは TutorialManager（RevealVoltageUi）。ここは作った直後なので伏せたまま。
             bool showVoltageNow = !IsTutorialMode
                                   && (CurrentPhaseStatus == RoundStatus.Discard
                                       || CurrentPhaseStatus == RoundStatus.TurnDecision);
@@ -255,6 +275,38 @@ namespace KillingMahjong.UI
         [SerializeField] private KillingMahjong.UI.Effects.MatchMomentumUI matchMomentumUI;
 
         // HP履歴・勝敗判定・結果画面 → GameUIManager.GameResult.cs
+
+        private RectTransform _optionButtonRect;
+
+        /// <summary>
+        /// オプション（設定）を開くボタン。チュートリアルの誘導先に使う。
+        ///
+        /// **シーンを触らずに済ませるため、参照は持たずに探す。**
+        /// 名前ではなく「押すと <see cref="OpenOptionUI"/> が呼ばれること」で見つけるので、
+        /// ボタンの名前や置き場所が変わっても追従する。
+        /// </summary>
+        public RectTransform OptionButtonRect
+        {
+            get
+            {
+                if (_optionButtonRect != null) return _optionButtonRect;
+
+                var buttons = FindObjectsByType<UnityEngine.UI.Button>(
+                    FindObjectsInactive.Include, FindObjectsSortMode.None);
+                foreach (var b in buttons)
+                {
+                    if (b == null) continue;
+                    int count = b.onClick.GetPersistentEventCount();
+                    for (int i = 0; i < count; i++)
+                    {
+                        if (b.onClick.GetPersistentMethodName(i) != nameof(OpenOptionUI)) continue;
+                        _optionButtonRect = b.transform as RectTransform;
+                        return _optionButtonRect;
+                    }
+                }
+                return null;
+            }
+        }
 
         public void OpenOptionUI()
         {
