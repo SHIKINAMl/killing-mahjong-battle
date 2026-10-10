@@ -203,6 +203,16 @@ namespace KillingMahjong.Managers
             return clip;
         }
 
+        /// <summary>
+        /// 対局のあいだ通して流す1曲の名前（「賭けの合図 I / II」を選んでいるとき）。そうでなければ null。
+        /// 設定から <see cref="ApplyMatchBgmSet"/> が入れる。層も2曲方式も使わず、1本の音源で鳴らす。
+        /// **この曲の拍は拍の表（Tempos）に入れていない。** 測った値はある（AudioManager.Drums.cs の
+        /// BeatGrids。135.10 / 134.25 BPM）が、1拍目が曲の頭から 0.283 / 0.152 秒ずれていて、
+        /// 「1拍目はサンプル0」を前提にした拍の計算（TryGetBeatPosition）に乗らない。
+        /// 選んでいるあいだ、曲の拍に合わせる動きは拍を取れないときの動きになる。
+        /// </summary>
+        private string _fixedMatchBgm;
+
         /// <summary>いまのフェイズと濃度から、鳴らすべき曲名を決める。</summary>
         private string ResolveBgmName(RoundStatus status)
         {
@@ -286,7 +296,8 @@ namespace KillingMahjong.Managers
             // 2曲の担当外のフェイズ（流局・結果など）へ出たら畳む
             if (IsPairBgmRunning) StopPairBgm();
 
-            string want = ResolveBgmName(currentBgmPhase);
+            // 「賭けの合図」を選んでいるあいだは、どのフェイズでもその1曲（_fixedMatchBgm）
+            string want = _fixedMatchBgm ?? ResolveBgmName(currentBgmPhase);
 
             // **場のBGMは層で鳴らす。** 濃さが変わっても曲は変わらないので、
             // ここでは「場に入ったか / 場から出たか」だけを見る。
@@ -532,6 +543,9 @@ namespace KillingMahjong.Managers
         private void ApplyLegacyResultBgm()
         {
             if (_resultBgmOverride == null) return;
+
+            // 「賭けの合図」は、結果・勝ち負けの画面でも同じ曲のまま
+            if (_fixedMatchBgm != null) return;
 
             // **従来の「負け」の曲（bgm_lose）は 2026-10-09 に消した**（WebGL のビルドを100MB未満にするため。
             // ユーザーの判断）。従来を選んでいて負けたときは、結果の曲のまま鳴らし続ける

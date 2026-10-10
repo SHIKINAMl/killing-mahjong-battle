@@ -106,6 +106,13 @@ namespace KillingMahjong.Core
             /// 既存の 0〜4 は動かさず、末尾に足した。
             /// </summary>
             ReturningTheme = 5,
+            /// <summary>
+            /// 賭けの合図 I（2026-10-10）。ユーザーが作った1曲（bgm_kake_1）を、対局のあいだ通して流す。
+            /// フェイズでも濃度でも曲は替わらない。結果・勝ち負けの画面でも同じ曲のまま。
+            /// </summary>
+            KakeNoAizu1 = 6,
+            /// <summary>賭けの合図 II（bgm_kake_2）。鳴らし方は I と同じ。</summary>
+            KakeNoAizu2 = 7,
         }
 
         /// <summary>
@@ -119,6 +126,8 @@ namespace KillingMahjong.Core
         {
             (int)MatchBgmSetKind.Proposal4,
             (int)MatchBgmSetKind.ReturningTheme,
+            (int)MatchBgmSetKind.KakeNoAizu1,
+            (int)MatchBgmSetKind.KakeNoAizu2,
             (int)MatchBgmSetKind.PerPhase,
             (int)MatchBgmSetKind.PerPhaseNoLayers,
         };
@@ -133,6 +142,8 @@ namespace KillingMahjong.Core
         {
             "第4案",
             "夜卓の灯火",
+            "賭けの合図 I",
+            "賭けの合図 II",
             "従来（層あり）",
             "従来（層なし）",
         };

@@ -96,6 +96,11 @@ namespace KillingMahjong.Managers
             bool wantLayers = kind == (int)Core.SettingsManager.MatchBgmSetKind.Pair
                               || kind == (int)Core.SettingsManager.MatchBgmSetKind.PerPhase;
 
+            // 「賭けの合図」は、対局のあいだ1曲を通して流す案（フェイズで曲を替えない）
+            _fixedMatchBgm = kind == (int)Core.SettingsManager.MatchBgmSetKind.KakeNoAizu1 ? "bgm_kake_1"
+                           : kind == (int)Core.SettingsManager.MatchBgmSetKind.KakeNoAizu2 ? "bgm_kake_2"
+                           : null;
+
             // 初めて呼ばれたときは、いまの旗から案の番号を起こす
             if (_matchBgmSet < 0) _matchBgmSet = MatchBgmKindFromLegacyFlags();
             if (_legacySoundingKind < 0) _legacySoundingKind = _matchBgmSet;
