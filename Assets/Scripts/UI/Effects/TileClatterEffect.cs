@@ -8,14 +8,21 @@ namespace KillingMahjong.UI.Effects
     /// 待っているあいだ、牌をじゃらじゃらと鳴らす（2026-09-15 のユーザー指示）。
     ///
     /// **対戦相手を待っている画面が、文字だけで止まっていた。**
-    /// 裏向きの牌を並べて、卓の上で牌をかき混ぜているように動かす。
+    /// 卓の上に牌を散らして置き、マウスで混ぜられるようにする。
     ///
-    /// **音は鳴らさない。** いまゲームは無音にしてある（AGENTS.md 第6項）ので、
-    /// 見た目だけで「じゃらじゃら」を出している。音を戻すときは、
-    /// <see cref="Hop"/> が起きた瞬間に牌がぶつかる音を当てるとよい。
+    /// **音は鳴らさない。** 見た目だけで「じゃらじゃら」を出している。音を足すときは、
+    /// マウスが牌を押した所（<see cref="ApplyHand"/>）か、牌どうしが押し合った所
+    /// （<see cref="ResolveTileSeparation"/>）で鳴らすとよい。
     ///
     /// **シーンには置かない。** 対局シーンが2つあるので、置くと片方に入れ忘れる
     /// （`ScreenFlash` などと同じ理由）。待ち画面から呼んで作る。
+    ///
+    /// **動き方（2026-10-11 にユーザーの指示で作り直した）。**
+    ///   ・牌は、自分が動かしたときだけ動く。ひとりでに揺れたり跳ねたりしない
+    ///   ・動かしたあと、元の場所へ戻らない。止まった所に居る
+    ///   ・牌はマウスを避ける。マウスの先の近くには居られず、外へ押し出される
+    ///   ・卓の中だけを動く。卓の縁（と画面の端）から外へは出ない
+    /// それまでは、常に小さく揺れ、ときどき1枚が跳ね、払っても元の山へばねで戻っていた。
     /// </summary>
     public class TileClatterEffect : MonoBehaviour
     {
@@ -38,44 +45,75 @@ namespace KillingMahjong.UI.Effects
         private const float PileHalfWidth = 250f;
         private const float PileHalfHeight = 72f;
 
-        /// <summary>常に揺れている量。**小さく。** 大きいと壊れて見える。</summary>
-        private const float IdleSwayDegrees = 2.5f;
-        private const float IdleBobPixels = 2.0f;
+        // --- マウスで押す ---
 
-        /// <summary>跳ねる高さ[px]と、跳ねている長さ[秒]。</summary>
-        private const float HopHeight = 16f;
-        private const float HopSeconds = 0.32f;
+        /// <summary>
+        /// マウスの先からこの距離より内側に、牌の中心は居られない（画面基準の単位）。
+        /// 牌の半分（21）より大きくして、マウスが牌に触れる前に牌のほうがよけるようにする。
+        /// </summary>
+        private const float HandReach = 54f;
 
-        /// <summary>次に誰かが跳ねるまでの間隔[秒]。ばらけさせる。</summary>
-        private const float HopIntervalMin = 0.18f;
-        private const float HopIntervalMax = 0.55f;
+        /// <summary>入り込んだ牌を外へ押し出す速さの上限[単位/秒]。上限が無いと、一瞬で飛んで見える。</summary>
+        private const float HandShoveSpeed = 1100f;
 
-        // --- 手混ぜの物理量（4:3 のゲーム画面基準） ---
-        private const float HandRadius = 120f;
-        private const float HandPush = 1700f;
-        private const float HandCarry = 0.55f;
+        /// <summary>静かに近づいたときでも、よけた牌が少し滑る速さ[単位/秒]。</summary>
+        private const float HandNudgeSpeed = 60f;
+
+        /// <summary>手の速さのうち、牌がもらう割合。払うと、そのぶん遠くへ滑る。</summary>
+        private const float HandCarry = 0.6f;
+
         private const float HandSpeedCap = 1400f;
-        private const float HandSpin = 520f;
-        // 動画のように、払った直後は少し散らばったまま残る。
-        // 収束を急ぎすぎると、牌を触った感触が出ない。
-        private const float HomeSpring = 18f;
-        private const float Damping = 4f;
-        private const float SpinSpring = 14f;
-        private const float PairRadius = 29f;
+
+        /// <summary>横をかすめたときに牌が回る強さ[度/秒²]。</summary>
+        private const float HandSpin = 1800f;
+
+        /// <summary>滑りが止まる早さ。大きいほどすぐ止まる。</summary>
+        private const float Damping = 4.5f;
+
+        /// <summary>牌どうしがこれより近いと押し合う。牌の幅（42）より小さいので、少し重なって山に見える。</summary>
+        private const float PairRadius = 30f;
         private const float PairSeparation = 780f;
-        // **押して広げられる距離（2026-09-17 に 70 -> 190 へ）。**
-        // 「もっと卓上に広げたい」という指示。狭いと、手で払っても
-        // すぐ引き戻されて散らばらなかった。
-        private const float MaxStray = 190f;
+
+        /// <summary>牌の傾きの上限[度]。ドット絵は大きく回すと崩れて見える。</summary>
         private const float MaxSpin = 24f;
+
+        // --- 卓の形（2026-10-11 に待ち画面のスクリーンショットから測った） ---
+        //
+        // 座標は 800x600 の画面基準で、**画面の下端の真ん中が原点**、上が正。
+        // 卓は台形で、上の辺は下から 208、そこから下へ行くほど左右に広がる（1 下がるごとに 1.414）。
+        // 下から 58 より下では、卓の縁は画面の外へ出る。
+        //
+        //   実測（画面上端から y / 左端 / 右端）: 395 / 207 / 592、450 / 130 / 669、540 / 2 / 797
+        //
+        // 背景の絵を描き直して卓の形が変わったら、ここを測り直すこと。
+
+        /// <summary>卓の上の辺の高さ。</summary>
+        private const float TableTopY = 208f;
+
+        /// <summary>卓の上の辺の、真ん中から端までの幅。</summary>
+        private const float TableTopHalfWidth = 188f;
+
+        /// <summary>1 下がるごとに、卓が片側へ広がる量。</summary>
+        private const float TableSideSlope = 1.414f;
+
+        /// <summary>画面の幅の半分。卓の縁が画面の外へ出たあとは、ここが端になる。</summary>
+        private const float ScreenHalfWidth = 400f;
+
+        /// <summary>牌の中心を、卓の上の辺からどれだけ内側に留めるか。牌の半分＋縁の線の太さ。</summary>
+        private const float InsetTop = 30f;
+
+        /// <summary>牌の中心を、卓の斜めの辺からどれだけ内側（横方向）に留めるか。</summary>
+        private const float InsetSide = 46f;
+
+        /// <summary>牌の中心を、画面の端からどれだけ内側に留めるか。</summary>
+        private const float InsetScreen = 24f;
 
         private class Tile
         {
             public RectTransform Rect;
+            /// <summary>最初に置いた場所。戻る先ではない（戻らない）。いまの場所は Home + Offset。</summary>
             public Vector2 Home;
             public float Phase;
-            public float HopStart;      // 負なら跳ねていない
-            public float Tilt;
             public Vector2 Offset;
             public Vector2 Velocity;
             public float Spin;
@@ -83,8 +121,6 @@ namespace KillingMahjong.UI.Effects
         }
 
         private readonly List<Tile> _tiles = new List<Tile>();
-        private float _nextHopAt;
-        private float _elapsed;
         private RectTransform _rect;
         private Canvas _canvas;
         private Vector2 _lastHandPosition;
@@ -172,10 +208,9 @@ namespace KillingMahjong.UI.Effects
                 rt.SetParent(transform, false);
                 rt.sizeDelta = new Vector2(TileWidth, TileHeight);
 
-                // 毎回同じ列に戻すのではなく、最初から少し重なった「牌の山」にする。
-                // y を浅くして、画面下端でも局名や待ち文字にかぶらないようにする。
-                Vector2 scatter = Random.insideUnitCircle;
-                var home = new Vector2(scatter.x * PileHalfWidth, scatter.y * PileHalfHeight);
+                // 卓の中に散らして置く。**牌どうしが押し合わない間隔を空ける。**
+                // 重ねて置くと、押し合いで牌がひとりでに動いてしまう（触るまで動かさない）
+                Vector2 home = PickHome();
                 rt.anchoredPosition = home;
 
                 var img = go.GetComponent<Image>();
@@ -203,17 +238,63 @@ namespace KillingMahjong.UI.Effects
                     Home = home,
                     // **等間隔にずらす。** 乱数だと固まって、列が波に見えないことがある
                     Phase = i * 0.8f,
-                    HopStart = -1f,
-                    Tilt = 0f,
                     Offset = Vector2.zero,
                     Velocity = Vector2.zero,
                     Spin = Random.Range(-8f, 8f),
                     SpinVelocity = 0f,
                 });
+                rt.localRotation = Quaternion.Euler(0f, 0f, _tiles[_tiles.Count - 1].Spin);
             }
 
-            _nextHopAt = Random.Range(HopIntervalMin, HopIntervalMax);
             _builtArtGeneration = _artGeneration;
+        }
+
+        /// <summary>
+        /// 牌を置く場所を1つ決める。卓の中で、すでに置いた牌から離れた所。
+        /// 何度か引いても空きが無ければ、いちばんましだった所にする。
+        /// </summary>
+        private Vector2 PickHome()
+        {
+            Vector2 origin = TableOrigin;
+            Vector2 best = Vector2.zero;
+            float bestGap = -1f;
+            for (int attempt = 0; attempt < 40; attempt++)
+            {
+                // 山の広がり（PileHalfWidth x PileHalfHeight）の中から引いて、卓の中へ収める
+                Vector2 scatter = Random.insideUnitCircle;
+                Vector2 candidate = ClampToTable(
+                    new Vector2(scatter.x * PileHalfWidth, scatter.y * PileHalfHeight) + origin) - origin;
+
+                float gap = float.MaxValue;
+                for (int i = 0; i < _tiles.Count; i++)
+                {
+                    gap = Mathf.Min(gap, Vector2.Distance(candidate, _tiles[i].Home));
+                }
+                if (gap > bestGap) { bestGap = gap; best = candidate; }
+                if (gap >= PairRadius + 2f) break;
+            }
+            return best;
+        }
+
+        /// <summary>
+        /// 画面の下端の真ん中から見た、この山の原点の位置。
+        /// 山は親の下端の真ん中に留めてあるので（<see cref="Attach"/>）、留めた位置がそのまま答えになる。
+        /// </summary>
+        private Vector2 TableOrigin
+        {
+            get { return _rect != null ? _rect.anchoredPosition : Vector2.zero; }
+        }
+
+        /// <summary>
+        /// 点を卓の中へ収める。座標は画面基準（下端の真ん中が原点）。
+        /// </summary>
+        private static Vector2 ClampToTable(Vector2 p)
+        {
+            p.y = Mathf.Clamp(p.y, InsetScreen, TableTopY - InsetTop);
+            float half = Mathf.Min(ScreenHalfWidth - InsetScreen,
+                TableTopHalfWidth + (TableTopY - p.y) * TableSideSlope - InsetSide);
+            p.x = Mathf.Clamp(p.x, -half, half);
+            return p;
         }
 
         /// <summary>
@@ -237,8 +318,6 @@ namespace KillingMahjong.UI.Effects
                     Rect = rect,
                     Home = rect.anchoredPosition,
                     Phase = _tiles.Count * 0.8f,
-                    HopStart = -1f,
-                    Tilt = 0f,
                     Offset = Vector2.zero,
                     Velocity = Vector2.zero,
                     Spin = rect.localEulerAngles.z > 180f ? rect.localEulerAngles.z - 360f : rect.localEulerAngles.z,
@@ -247,7 +326,6 @@ namespace KillingMahjong.UI.Effects
             }
 
             if (_tiles.Count == 0) Build();
-            else _nextHopAt = _elapsed + Random.Range(HopIntervalMin, HopIntervalMax);
         }
 
         /// <summary>
@@ -403,65 +481,38 @@ namespace KillingMahjong.UI.Effects
             // **待ち画面は時間が止まっていることがある**ので、実時間で動かす
             float deltaTime = Time.unscaledDeltaTime;
             if (deltaTime <= 0f) return;
+            // 画面が引っかかった直後に、牌が一気に飛ばないようにする
+            deltaTime = Mathf.Min(deltaTime, 0.05f);
 
-            _elapsed += deltaTime;
             UpdateHand(deltaTime);
 
-            if (_elapsed >= _nextHopAt)
-            {
-                Hop();
-                _nextHopAt = _elapsed + Random.Range(HopIntervalMin, HopIntervalMax);
-            }
-
-            // 手で押す力・元の山へ戻るばねを先に加え、牌どうしの反発を足す。
-            // 元の「列」には戻らず、最初に作った散ったホーム位置へ収まる。
+            // マウスが押す。**牌を動かすのはこれだけ。** ひとりでに揺れたり跳ねたりはしない
             for (int i = 0; i < _tiles.Count; i++)
             {
                 var tile = _tiles[i];
                 if (tile.Rect == null) continue;
-
-                ApplyHandForce(tile, deltaTime);
-                tile.Velocity += -tile.Offset * HomeSpring * deltaTime;
-                tile.SpinVelocity += -tile.Spin * SpinSpring * deltaTime;
+                ApplyHand(tile, deltaTime);
             }
 
+            // 押された牌が、隣の牌を押す
             ResolveTileSeparation(deltaTime);
 
+            Vector2 origin = TableOrigin;
+            float damping = Mathf.Exp(-Damping * deltaTime);
             for (int i = 0; i < _tiles.Count; i++)
             {
                 var tile = _tiles[i];
                 if (tile.Rect == null) continue;
 
-                float damping = Mathf.Exp(-Damping * deltaTime);
+                // 滑って、止まる。**元の場所へは戻さない**
                 tile.Velocity *= damping;
                 tile.SpinVelocity *= damping;
                 tile.Offset += tile.Velocity * deltaTime;
-                tile.Spin += tile.SpinVelocity * deltaTime;
-                ConstrainMotion(tile);
+                tile.Spin = Mathf.Clamp(tile.Spin + tile.SpinVelocity * deltaTime, -MaxSpin, MaxSpin);
+                KeepOnTable(tile, origin);
 
-                // いつもの小さな揺れ
-                float sway = Mathf.Sin(_elapsed * 3.1f + tile.Phase) * IdleSwayDegrees;
-                float bob = Mathf.Sin(_elapsed * 4.3f + tile.Phase * 1.7f) * IdleBobPixels;
-
-                // 跳ねている最中はそこへ足す
-                float lift = 0f;
-                if (tile.HopStart >= 0f)
-                {
-                    float k = (_elapsed - tile.HopStart) / HopSeconds;
-                    if (k >= 1f)
-                    {
-                        tile.HopStart = -1f;
-                        tile.Tilt = 0f;
-                    }
-                    else
-                    {
-                        // 上がって落ちる。**落ち際を速くする**と牌らしくなる
-                        lift = Mathf.Sin(k * Mathf.PI) * HopHeight * (1f - k * 0.3f);
-                    }
-                }
-
-                tile.Rect.anchoredPosition = tile.Home + tile.Offset + new Vector2(0f, bob + lift);
-                tile.Rect.localRotation = Quaternion.Euler(0f, 0f, sway + tile.Tilt + tile.Spin);
+                tile.Rect.anchoredPosition = tile.Home + tile.Offset;
+                tile.Rect.localRotation = Quaternion.Euler(0f, 0f, tile.Spin);
             }
         }
 
@@ -503,27 +554,35 @@ namespace KillingMahjong.UI.Effects
             _lastHandPosition = handPosition;
         }
 
-        private void ApplyHandForce(Tile tile, float deltaTime)
+        /// <summary>
+        /// マウスが牌を押す。**牌は、マウスの先の近く（<see cref="HandReach"/>）には居られない。**
+        /// 入り込んだ分だけ外へ押し出し、よける向きの速さを足す。マウスが止まっていても押し出す
+        /// （止まっているマウスの下に牌が残ると、「よける」に見えない）。
+        /// </summary>
+        private void ApplyHand(Tile tile, float deltaTime)
         {
-            // 停止している手に吸い付かず、払った瞬間だけ流れるようにする。
-            if (_handSpeed01 <= 0.01f) return;
+            if (!_hasHandPosition) return;
 
-            Vector2 tilePosition = tile.Home + tile.Offset;
-            Vector2 delta = tilePosition - _lastHandPosition;
+            Vector2 delta = tile.Home + tile.Offset - _lastHandPosition;
             float distance = delta.magnitude;
-            if (distance >= HandRadius) return;
+            if (distance >= HandReach) return;
 
             Vector2 away = distance > 0.001f
                 ? delta / distance
                 : new Vector2(Mathf.Cos(tile.Phase), Mathf.Sin(tile.Phase));
-            float influence = 1f - distance / HandRadius;
-            influence *= influence;
+            float depth = HandReach - distance;
 
-            // 手の進行方向へ流す力と、指先から逃がす力を混ぜる。
-            tile.Velocity += (away * HandPush + _handVelocity * HandCarry) * influence * deltaTime;
+            tile.Offset += away * Mathf.Min(depth, HandShoveSpeed * deltaTime);
 
+            // 手が速いほど遠くへ滑る。もう十分その向きへ動いていれば足さない
+            float along = Mathf.Max(0f, Vector2.Dot(_handVelocity, away));
+            float want = HandNudgeSpeed + along * HandCarry;
+            float have = Vector2.Dot(tile.Velocity, away);
+            if (have < want) tile.Velocity += away * (want - have);
+
+            // 横をかすめると回る
             float cross = _handVelocity.x * away.y - _handVelocity.y * away.x;
-            tile.SpinVelocity += Mathf.Sign(cross) * HandSpin * influence * deltaTime;
+            tile.SpinVelocity += Mathf.Clamp(cross / HandSpeedCap, -1f, 1f) * HandSpin * deltaTime;
         }
 
         private void ResolveTileSeparation(float deltaTime)
@@ -552,29 +611,18 @@ namespace KillingMahjong.UI.Effects
             }
         }
 
-        private static void ConstrainMotion(Tile tile)
+        /// <summary>
+        /// 牌を卓の中に留める。縁に当たったら、外へ向かう速さだけを消す（縁に沿っては滑れる）。
+        /// </summary>
+        private static void KeepOnTable(Tile tile, Vector2 origin)
         {
-            if (tile.Offset.sqrMagnitude > MaxStray * MaxStray)
-            {
-                Vector2 outward = tile.Offset.normalized;
-                tile.Offset = outward * MaxStray;
-                float outwardSpeed = Vector2.Dot(tile.Velocity, outward);
-                if (outwardSpeed > 0f) tile.Velocity -= outward * outwardSpeed;
-            }
+            Vector2 position = tile.Home + tile.Offset + origin;
+            Vector2 kept = ClampToTable(position);
+            if (kept == position) return;
 
-            tile.Spin = Mathf.Clamp(tile.Spin, -MaxSpin, MaxSpin);
-        }
-
-        /// <summary>牌を1枚はじく。**音を戻すときは、ここで鳴らすこと。**</summary>
-        private void Hop()
-        {
-            if (_tiles.Count == 0) return;
-
-            var tile = _tiles[Random.Range(0, _tiles.Count)];
-            if (tile.HopStart >= 0f) return;     // もう跳ねている
-
-            tile.HopStart = _elapsed;
-            tile.Tilt = Random.Range(-14f, 14f);
+            if (kept.x != position.x && Mathf.Sign(tile.Velocity.x) == Mathf.Sign(position.x - kept.x)) tile.Velocity.x = 0f;
+            if (kept.y != position.y && Mathf.Sign(tile.Velocity.y) == Mathf.Sign(position.y - kept.y)) tile.Velocity.y = 0f;
+            tile.Offset = kept - origin - tile.Home;
         }
     }
 }
