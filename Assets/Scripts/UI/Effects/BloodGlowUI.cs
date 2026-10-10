@@ -80,7 +80,15 @@ namespace KillingMahjong.UI.Effects
             _blood = blood;
             _neon = GetComponent<Image>();
             _neon.raycastTarget = false;
-            _neon.material = NeonMaterials.CreateAll(NeonColor);
+            Material material = NeonMaterials.CreateAll(NeonColor);
+            if (material == null)
+            {
+                // シェーダが無い。既定の材質で重ねると、光らずに血の色が濁るだけなので、出さない
+                _neon.enabled = false;
+                enabled = false;
+                return;
+            }
+            _neon.material = material;
             _phase = Random.Range(0f, Mathf.PI * 2f);
             ApplyPower((PowerMin + PowerMax) * 0.5f);
             SyncShape();

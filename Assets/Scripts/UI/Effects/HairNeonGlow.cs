@@ -77,7 +77,15 @@ namespace KillingMahjong.UI.Effects
         {
             _source = source;
             _neon = GetComponent<SpriteRenderer>();
-            _neon.sharedMaterial = NeonMaterials.Create(NeonColor, HairKeyColor, HairTolerance);
+            Material material = NeonMaterials.Create(NeonColor, HairKeyColor, HairTolerance);
+            if (material == null)
+            {
+                // シェーダが無い。**材質なしのまま描かせない**（ピンク色で描かれる）。光らせないだけにする
+                _neon.enabled = false;
+                enabled = false;
+                return;
+            }
+            _neon.sharedMaterial = material;
             _phase = Random.Range(0f, Mathf.PI * 2f);
             ApplyPower((PowerMin + PowerMax) * 0.5f);
             SyncShape();

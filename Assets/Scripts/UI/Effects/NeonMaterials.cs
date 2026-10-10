@@ -5,8 +5,13 @@ namespace KillingMahjong.UI.Effects
     /// <summary>
     /// 蛍光色に光らせる用のマテリアルを作る（2026-09-30）。
     ///
-    /// シェーダは <c>KillingMahjong/NeonKeyAdd</c>（<c>Assets/Shaders/NeonKeyAdd.shader</c>）。
+    /// シェーダは <c>KillingMahjong/NeonKeyAdd</c>（<c>Assets/Resources/Shaders/NeonKeyAdd.shader</c>）。
     /// 加算合成なので、下の絵へ光を足して明るくできる。
+    ///
+    /// **シェーダは Resources に置いて、`Resources.Load` で読む（2026-10-10）。**
+    /// 最初は `Assets/Shaders/` に置いて `Shader.Find` で探していた。エディタでは見つかるが、
+    /// どのマテリアルからも参照されていないシェーダは**ビルドに入らない**。ビルドでは見つからず、
+    /// 材質なしで描かれて、髪のまわりと目元がピンク色になった（公開したページでユーザーが見つけた）。
     ///
     /// **マテリアルは使う側ごとに作る。** 使い回すと、1か所で強さを変えたつもりが
     /// 別の所まで一緒に動く。作られる数は自分と相手のHP・立ち絵の数だけなので数個で済む。
@@ -15,12 +20,16 @@ namespace KillingMahjong.UI.Effects
     {
         public const string ShaderName = "KillingMahjong/NeonKeyAdd";
 
+        /// <summary>Resources からの道（拡張子なし）。</summary>
+        private const string ShaderResourcePath = "Shaders/NeonKeyAdd";
+
         private static Shader _shader;
 
         private static Shader NeonShader
         {
             get
             {
+                if (_shader == null) _shader = Resources.Load<Shader>(ShaderResourcePath);
                 if (_shader == null) _shader = Shader.Find(ShaderName);
                 if (_shader == null)
                 {
