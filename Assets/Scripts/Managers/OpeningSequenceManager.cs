@@ -84,12 +84,19 @@ namespace KillingMahjong.Managers
             // **目を開けてから紙を取るまでは無音にする（2026-09-23 のユーザー指示）。**
             // 一度は「時計じかけの謎」を流したが、要らないと言われて戻した。
             // 曲は契約書のあと、台本の1行目で TutorialAudioDirector が流し始める。
+            //
+            // **旗は、AudioManager が居なくても立てる（2026-10-10）。**
+            // 前は「居るときだけ」立てていた。ビルドではこちらの Awake が先に走って、まだ居ないことがあり、
+            // 旗が立たずにタイトル曲が鳴っていた（Awake の順番は、エディタとビルドで同じとは限らない）。
+            // AudioManager.Start はこのあとに走り、旗を見て、タイトル曲を流すのをやめる
+            KillingMahjong.Managers.AudioManager.StartupBgmSuppressed = true;
             if (KillingMahjong.Managers.AudioManager.Instance != null)
             {
-                // **旗を先に立てる。** AudioManager.Start はこのあとに走り、
-                // 何も鳴っていなければタイトル曲を流し始めてしまう（2026-09-23 に実機で確認）
-                KillingMahjong.Managers.AudioManager.Instance.SuppressStartupBgm = true;
                 KillingMahjong.Managers.AudioManager.Instance.StopBGM();
+            }
+            else
+            {
+                Debug.Log("[OpeningSequence] AudioManager がまだ居なかった（旗だけ先に立てた）");
             }
 
             // 少し待ってから目を覚ます演出

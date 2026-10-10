@@ -124,12 +124,29 @@ namespace KillingMahjong.Managers
         /// **チュートリアルの冒頭を無音にするために要る。** `OpeningSequenceManager` は
         /// Awake で `StopBGM()` を呼ぶが、こちらの `Start` はそのあとに走るので、
         /// 止めた直後にタイトル曲が鳴り出していた。Awake でこの旗を立ててもらう。
+        ///
+        /// **旗は static で持つ（2026-10-10）。** 前は部品ごとの旗で、立てる側は
+        /// `AudioManager.Instance` が居るときだけ立てていた。Awake の順番は決まっておらず、
+        /// エディタではこちらが先に Awake していたが、**ビルドでは向こうが先になり、旗が立たなかった。**
+        /// 契約書を取る前からタイトル曲が鳴っていた（公開したページでユーザーが見つけた）。
+        /// static なら、こちらがまだ居なくても立てられる。
         /// </summary>
-        public bool SuppressStartupBgm { get; set; }
+        public static bool StartupBgmSuppressed;
+
+        /// <summary><see cref="StartupBgmSuppressed"/> と同じ物。前からの呼び方を残してある。</summary>
+        public bool SuppressStartupBgm
+        {
+            get { return StartupBgmSuppressed; }
+            set { StartupBgmSuppressed = value; }
+        }
 
         private void Start()
         {
-            if (SuppressStartupBgm) return;
+            if (StartupBgmSuppressed)
+            {
+                Debug.Log("[AudioManager] 起動時のBGMは流さない（チュートリアルの冒頭を無音にするため）");
+                return;
+            }
             if (IsBgmPlaying) return;
 
             // 起動時は自作のタイトルBGM（2026-09-11）。
