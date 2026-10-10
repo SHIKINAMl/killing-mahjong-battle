@@ -349,8 +349,8 @@ class RuleBrain:
         if max_bet <= unit:
             return unit
 
-        # 掛け金は賭けた時点で HP から引かれ、和了ると「掛け金 × 倍率」が戻る。満貫（倍率1）では収支 0 なので、
-        # 倍率が十分高い見込みのときだけ上げる
+        # 和了ると「掛け金 × 倍率」を得て、放銃すると「掛け金 × 倍率」を失う（先払いはない）。
+        # 和了れる見込みの倍率が設定値に届くときだけ、手の強さに応じて上げる
         if plan is None or plan.expected_multiplier < cfg["min_multiplier_to_raise"]:
             return unit
 

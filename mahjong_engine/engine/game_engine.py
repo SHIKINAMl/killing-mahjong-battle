@@ -15,6 +15,9 @@ from .yaku import Yaku
 
 logger = logging.getLogger(__name__)
 
+# 1 局で各プレイヤーが捨てる枚数。両者がこの枚数を捨て終えたら流局
+DISCARDS_PER_PLAYER = 17
+
 # 配牌生成（満貫聴牌形の探索）を行うスレッド。全マッチで共有する。
 _DEAL_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="deal")
 
@@ -224,7 +227,12 @@ class GameEngine:
         return unit
 
     def place_bet(self, player: PlayerState, bet_amount: int) -> bool:
-        """掛け金を検証して設定する。"""
+        """
+        掛け金を検証して設定する。
+
+        掛け金は先払いしない（HP はここでは減らない）。和了の精算でだけ「掛け金 × 倍率」が動く。
+        賭けられるのは HP 以下の額だけ。
+        """
         if not isinstance(bet_amount, int):
             return False
 
@@ -239,9 +247,6 @@ class GameEngine:
         if player.health < bet_amount:
             return False
 
-        player.health -= bet_amount
-        if player.health < 0:
-            player.health = 0
         player.bet = bet_amount
         player.base_bet = bet_amount
         return True
@@ -657,9 +662,10 @@ class GameEngine:
                 discarded_tile_base,
             )
 
-        if all(len(player.discards) >= 16 for player in self.state.players):
+        if all(len(player.discards) >= DISCARDS_PER_PLAYER for player in self.state.players):
             logger.info(
-                "流局: all players reached 16 discards (%s)",
+                "流局: all players reached %d discards (%s)",
+                DISCARDS_PER_PLAYER,
                 {player.player_id: len(player.discards) for player in self.state.players},
             )
             self.end_round(is_draw=True)
@@ -694,9 +700,10 @@ class GameEngine:
                 winner_discard_bases = {tile & 0b11111 for tile in winner.discards}
                 if winning_tile_base in winner_discard_bases:
                     logger.info("フリテンのため和了不可: winner=%s tile_base=%d", winner.player_id, winning_tile_base)
-                    if all(len(player.discards) >= 16 for player in self.state.players):
+                    if all(len(player.discards) >= DISCARDS_PER_PLAYER for player in self.state.players):
                         logger.info(
-                            "和了拒否（フリテン）後に流局: all players reached 16 discards (%s)",
+                            "和了拒否（フリテン）後に流局: all players reached %d discards (%s)",
+                            DISCARDS_PER_PLAYER,
                             {player.player_id: len(player.discards) for player in self.state.players},
                         )
                         self.end_round(is_draw=True)
@@ -719,9 +726,10 @@ class GameEngine:
 
             return self.liquidation(player_id, winning_hand_tiles + [winning_tile], winning_tile=winning_tile)
 
-        if all(len(player.discards) >= 16 for player in self.state.players):
+        if all(len(player.discards) >= DISCARDS_PER_PLAYER for player in self.state.players):
             logger.info(
-                "和了見送り後に流局: all players reached 16 discards (%s)",
+                "和了見送り後に流局: all players reached %d discards (%s)",
+                DISCARDS_PER_PLAYER,
                 {player.player_id: len(player.discards) for player in self.state.players},
             )
             self.end_round(is_draw=True)
@@ -789,8 +797,8 @@ class GameEngine:
         return len(winner.discards) <= 1 and len(loser.discards) == 1
 
     def _is_houtei_raoyui(self, loser: PlayerState, winning_tile: Optional[int]) -> bool:
-        """河底撈魚成立かどうかを返す。後手側の16打目を最後の捨て牌とみなす。"""
-        if winning_tile is None or len(loser.discards) != 16:
+        """河底撈魚成立かどうかを返す。後手側の最後の打牌（DISCARDS_PER_PLAYER 打目）を最後の捨て牌とみなす。"""
+        if winning_tile is None or len(loser.discards) != DISCARDS_PER_PLAYER:
             return False
 
         first_player = self.state.players[self.state.round_state.first_player_index]

@@ -160,3 +160,61 @@ def test_round_continues_when_everyone_can_pay():
     engine.end_round(is_draw=True)
     assert engine.game_end_reason is None
     assert engine.state.round_state.status == RoundStatus.ROUND_END_WAITING
+
+
+# ========== 掛け金の精算（案 B: 先払いなし。流局は同額のまま積み上げ） ==========
+
+def test_bet_does_not_reduce_health():
+    engine = GameEngine()
+    engine.initialize_players(["A", "B"])
+    a = engine.get_player_by_id("A")
+    assert engine.place_bet(a, 1000)
+    assert a.health == 20000 and a.bet == 1000
+    assert not engine.place_bet(a, 5000 + 200)  # 上限を超える額は賭けられない
+    a.health = 800
+    assert not engine.place_bet(a, 1000)  # HP を超える額は賭けられない
+
+
+def test_draw_moves_no_health():
+    engine = GameEngine()
+    engine.initialize_players(["A", "B"])
+    for player in engine.state.players:
+        assert engine.place_bet(player, 1000)
+    engine.end_round(is_draw=True)
+    assert [p.health for p in engine.state.players] == [20000, 20000]
+    assert engine.state.round_state.status == RoundStatus.ROUND_END_WAITING
+
+
+def test_settlement_after_draws_accumulates_same_bet():
+    """流局 2 回のあとに和了ると、同じ掛け金が 3 局分積み上がって精算される。"""
+    engine, _ = _discard_engine(CHINITSU_HAND, loser_wall=[4, 20])
+    engine._carry_over_draw_count = 2
+    winner, loser = engine.get_player_by_id("W"), engine.get_player_by_id("L")
+    engine.discard("L", 0)
+    assert engine.resolve_pending_agari("W", True) is True
+
+    result = engine.get_last_liquidation_result()
+    multiplier = result["multiplier"]
+    assert result["winner_bet"] == result["loser_bet"] == 200 * 3
+    assert winner.health == 20000 + int(200 * 3 * multiplier)
+    expected_loss = int(200 * 3 * multiplier * result["loser_loss_multiplier"])
+    assert loser.health == 20000 - expected_loss
+
+
+# ========== 流局（両者が 17 枚ずつ捨てたら） ==========
+
+def test_draw_after_each_player_discards_17():
+    from mahjong_engine.engine.game_engine import DISCARDS_PER_PLAYER
+    assert DISCARDS_PER_PLAYER == 17
+
+    engine, events = _discard_engine(LOW_HAND, loser_wall=list(range(18)), loser_previous_discards=0)
+    winner, loser = engine.get_player_by_id("W"), engine.get_player_by_id("L")
+    winner.discards = [24] * 17  # W は捨て終えている
+    for index in range(16):
+        engine.state.round_state.current_player_index = 1
+        engine.discard("L", index)
+        assert engine.state.round_state.status == RoundStatus.DISCARD  # 16 枚目ではまだ終わらない
+    engine.state.round_state.current_player_index = 1
+    engine.discard("L", 16)
+    assert len(loser.discards) == 17
+    assert engine.state.round_state.status == RoundStatus.ROUND_END_WAITING  # 17 枚目で流局

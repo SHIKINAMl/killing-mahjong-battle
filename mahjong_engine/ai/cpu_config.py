@@ -73,7 +73,7 @@ _BUILTIN_CONFIG: dict[str, Any] = {
             "boost_hand": {"enabled": True, "min_health": 30000, "min_gain_ratio": 0.0},
         },
         "bet": {
-            "min_multiplier_to_raise": 1.5,
+            "min_multiplier_to_raise": 1.0,
             "steps": [
                 {"min_strength": 0.0, "bet_ratio": 0.0},
                 {"min_strength": 0.6, "bet_ratio": 0.2},
@@ -114,7 +114,7 @@ _BUILTIN_CONFIG: dict[str, Any] = {
             "boost_hand": {"enabled": True, "min_health": 30000, "min_gain_ratio": 0.5},
         },
         "bet": {
-            "min_multiplier_to_raise": 1.5,
+            "min_multiplier_to_raise": 1.0,
             "steps": [
                 {"min_strength": 0.0, "bet_ratio": 0.0},
                 {"min_strength": 0.5, "bet_ratio": 0.15},
