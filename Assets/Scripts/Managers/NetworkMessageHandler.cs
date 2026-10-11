@@ -147,14 +147,18 @@ namespace KillingMahjong.Network
         public List<int> wall_indexes;
         public int wall_index;
         public string skill_type;
+        /// <summary>
+        /// 透視の任意の種別。JsonUtilityには渡さず、指定されたときだけSerializeActionで追加する。
+        /// ランダム時のnullが空文字で送られるとサーバーに拒否されるため、未指定は項目ごと省く。
+        /// </summary>
+        [NonSerialized] public string suit;
         public int target_hand_index;
         public string yaku_name;
 
         /// <summary>
         /// 牌交換で出す、自分の山の位置3つ（2026-10-11 のスキル変更。1枚だけの target_hand_index は受け付けなくなった）。
         /// **この型は全部の項目が毎回送られる**（JsonUtility）。使わないアクションでは空の配列 [] が付く。
-        /// 文字列の項目は空文字 "" で送られるので、透視の suit はここに足していない
-        /// （"" は「4つ以外の値」としてエラーになる。足すなら送り方を変えること）。
+        /// 透視の任意項目suitだけはSerializeActionで指定時に追加する。
         /// </summary>
         public List<int> target_hand_indexes;
 
@@ -321,6 +325,13 @@ namespace KillingMahjong.Network
                 return;
             }
 
+            string json = SerializeAction(actionType, dataPayload);
+            await client.SendAsync(json);
+        }
+
+        /// <summary>既存アクションのJSONを保ち、種別指定の透視にだけsuitを付ける。</summary>
+        public static string SerializeAction(string actionType, ActionPayload dataPayload)
+        {
             var msg = new ActionMessage
             {
                 type = "action",
@@ -332,7 +343,14 @@ namespace KillingMahjong.Network
             };
 
             string json = JsonUtility.ToJson(msg);
-            await client.SendAsync(json);
+            if (actionType == "skill" && dataPayload != null && dataPayload.skill_type == "perspective"
+                && !string.IsNullOrEmpty(dataPayload.suit))
+            {
+                var packet = Newtonsoft.Json.Linq.JObject.Parse(json);
+                packet["data"]["data"]["suit"] = dataPayload.suit;
+                return packet.ToString(Newtonsoft.Json.Formatting.None);
+            }
+            return json;
         }
 
         public void ProcessServerMessage(string jsonString)

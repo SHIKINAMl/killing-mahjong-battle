@@ -247,6 +247,7 @@ namespace KillingMahjong.UI
             get
             {
                 if (currentSelection == null || realAbilities == null || instantiatedItems == null) return null;
+                if (_perspectiveMenu != PerspectiveMenu.None) return SkillNames.Perspective;
                 for (int i = 0; i < realAbilities.Count && i < instantiatedItems.Count; i++)
                 {
                     if (instantiatedItems[i] == null) continue;
@@ -259,6 +260,9 @@ namespace KillingMahjong.UI
         public RectTransform GetAbilityItemRect(string skillType)
         {
             if (realAbilities == null) return null;
+            if (_perspectiveMenu != PerspectiveMenu.None)
+                return skillType == SkillNames.Perspective && instantiatedItems.Count > 0
+                    ? instantiatedItems[0].transform as RectTransform : null;
 
             for (int i = 0; i < realAbilities.Count && i < instantiatedItems.Count; i++)
             {
@@ -282,6 +286,7 @@ namespace KillingMahjong.UI
             else
             {
                 DeselectAll(); // Deselect on close
+                _perspectiveMenu = PerspectiveMenu.None;
                 var uiMgr = FindFirstObjectByType<GameUIManager>();
                 if (uiMgr != null && cancelSkill) uiMgr.CancelSkillSelection();
 
@@ -308,7 +313,7 @@ namespace KillingMahjong.UI
 
         public void OnAbilitySelected(AbilityItemUI item)
         {
-            if (IsDisplayOnly) return;
+            if (IsDisplayOnly || !isWindowVisible || item == null || !instantiatedItems.Contains(item)) return;
 
             if (currentSelection == item)
             {

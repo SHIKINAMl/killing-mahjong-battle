@@ -7,11 +7,13 @@ namespace KillingMahjong.UI
     {
         private void OnActivateClicked()
         {
-            if (IsDisplayOnly) return;
+            if (IsDisplayOnly || !isWindowVisible) return;
 
             if (currentSelection != null)
             {
-                int index = currentSelection.AbilityIndex;
+                int index = _perspectiveMenu == PerspectiveMenu.None
+                    ? currentSelection.AbilityIndex
+                    : realAbilities.FindIndex(ability => ability.skillType == SkillNames.Perspective);
                 if (index >= 0 && index < realAbilities.Count)
                 {
                     var data = realAbilities[index];
@@ -53,7 +55,8 @@ namespace KillingMahjong.UI
                         }
 
                         // HP不足のスキルは押せてしまうと無反応で終わるため、理由を示して弾く
-                        if (!currentSelection.IsAffordable)
+                        if (!currentSelection.IsAffordable || CurrentLocalHp <
+                            GameRules.GetSkillCost(data.skillType, CurrentSpecialVictoryCount))
                         {
                             int requiredCost = GameRules.GetSkillCost(data.skillType, CurrentSpecialVictoryCount);
                             if (uiMgr.DialogueUI != null)
@@ -66,7 +69,12 @@ namespace KillingMahjong.UI
                             return;
                         }
 
-                        if (data.skillType == "mulligan")
+                        if (data.skillType == SkillNames.Perspective)
+                        {
+                            ActivatePerspectiveChoice(uiMgr, currentSelection.AbilityIndex);
+                            return; // 選択中は巻物を閉じず、最終決定のときだけ送信する。
+                        }
+                        else if (data.skillType == "mulligan")
                         {
                             uiMgr.StartMulliganSelection();
                         }

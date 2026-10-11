@@ -17,7 +17,7 @@ namespace KillingMahjong.UI
                 new AbilityData(SkillNames.Mulligan, SkillNames.GetDisplayName(SkillNames.Mulligan),
                     "牌を3枚出し、出した3枚と山札の3枚の6枚から、残す3枚を選ぶ。"),
                 new AbilityData(SkillNames.Perspective, SkillNames.GetDisplayName(SkillNames.Perspective),
-                    "相手の手牌をランダムに3枚公開する。"),
+                    "種別を選ぶか、ランダムで、相手の山の未公開牌を最大3枚公開する。"),
                 new AbilityData(SkillNames.BoostHand, SkillNames.GetDisplayName(SkillNames.BoostHand),
                     "指定した役を含むアガリの倍率を1段上げる。1つの役につき1回。"),
                 new AbilityData(SkillNames.Assault, SkillNames.GetDisplayName(SkillNames.Assault),
@@ -66,10 +66,21 @@ namespace KillingMahjong.UI
         private void PopulateList()
         {
             EnsureAbilities();
+            _perspectiveMenu = PerspectiveMenu.None;
+            PopulateEntries(realAbilities);
+        }
+
+        // 通常一覧と透視の選択肢は、同じ行プレハブと配置を使う。
+        private void PopulateEntries(System.Collections.Generic.IList<AbilityData> entries)
+        {
             if (itemPrefab == null || contentContainer == null) return;
 
             // clear existing
-            foreach(Transform child in contentContainer) Destroy(child.gameObject);
+            foreach(Transform child in contentContainer)
+            {
+                child.gameObject.SetActive(false); // Destroy待ちの旧行を連続クリックさせない。
+                Destroy(child.gameObject);
+            }
             instantiatedItems.Clear();
 
             // **選択は行と一緒に消える。** 行を作り直しているので、
@@ -82,9 +93,9 @@ namespace KillingMahjong.UI
             int currentHp = CurrentLocalHp;
 
             float currentY = 0f;
-            for (int i = 0; i < realAbilities.Count; i++)
+            for (int i = 0; i < entries.Count; i++)
             {
-                var data = realAbilities[i];
+                var data = entries[i];
                 int currentCost = GameRules.GetSkillCost(data.skillType, svCount);
                 bool affordable = currentHp >= currentCost;
                 string unusableReason = GetUnusableReason(data.skillType);
