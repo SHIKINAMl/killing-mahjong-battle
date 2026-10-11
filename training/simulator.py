@@ -38,6 +38,7 @@ class Agent(Protocol):
     def plan_hand(self, obs: CpuObservation) -> Optional[HandPlan]: ...
     def replan(self, obs: CpuObservation, plan: Optional[HandPlan], skill: str) -> Optional[HandPlan]: ...
     def choose_skill(self, obs: CpuObservation, plan: Optional[HandPlan]) -> Optional[dict]: ...
+    def choose_mulligan(self, obs: CpuObservation, pending: dict): ...
     def choose_hand(self, obs: CpuObservation, plan: Optional[HandPlan]) -> list[int]: ...
     def choose_bet(self, obs: CpuObservation, plan: Optional[HandPlan]) -> int: ...
     def choose_discard(self, obs: CpuObservation) -> int: ...
@@ -59,6 +60,9 @@ class RuleAgent:
 
     def choose_skill(self, obs, plan):
         return self.brain.next_skill(obs, plan) if self.use_skills else None
+
+    def choose_mulligan(self, obs, pending):
+        return self.brain.choose_mulligan(obs, pending)
 
     def choose_hand(self, obs, plan):
         return list(plan.hand_indexes) if plan is not None else fallback_hand_indexes(obs)
@@ -271,8 +275,21 @@ class MatchSimulator:
             # 弾かれても同じスキルを繰り返さないよう、使う前に数える（CpuController と同じ）
             mine = self.public[pid].my_skills_this_round
             mine[skill] = mine.get(skill, 0) + 1
+            opponent = engine.get_player_by_id(self._other(pid))
+            exposed_before = len(opponent.exposed_hand_indexes)
             if engine.execute_skill(player, SkillType(skill), data) is None:
                 continue
+            if skill == SkillType.PERSPECTIVE.value:
+                # CpuController が skill_casted の perspectiveResult から覚えるのと同じ情報
+                self.public[pid].record_my_perspective(
+                    data.get("suit"), len(opponent.exposed_hand_indexes) - exposed_before
+                )
+            if skill == SkillType.MULLIGAN.value:
+                # 候補を見て、手に入れる牌を選ぶ（GameSession の mulligan_select と同じ）
+                pending = dict(player.pending_mulligan)
+                result = engine.resolve_mulligan(player, agent.choose_mulligan(self._obs(pid), pending))
+                if result is not None:
+                    self.public[pid].record_mulligan(pending, result["changes"])
             self._skills[pid].append(skill)
             other = self.public[self._other(pid)]
             other.opponent_skills_this_round.append(skill)

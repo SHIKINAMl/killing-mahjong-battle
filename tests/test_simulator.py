@@ -10,7 +10,7 @@
 """
 import random
 
-from mahjong_engine.engine.game_state import RoundStatus
+from mahjong_engine.engine.game_state import RoundStatus, SkillType
 from mahjong_engine.engine.tile_wall import generate_round_deal
 from training.simulator import MatchSimulator, RuleAgent, make_rule_agent
 
@@ -56,5 +56,6 @@ def test_reused_deal_is_not_mutated_by_mulligan():
     sim = MatchSimulator([_agent("normal", 1), _agent("normal", 2)], deal_factory=lambda _n: deal,
                          opening_boosts=False)
     player = sim.engine.get_player_by_id("P0")
-    assert sim.engine.use_mulligan(player, 0) is not None
+    assert sim.engine.execute_skill(player, SkillType.MULLIGAN, {"target_hand_indexes": [0, 1, 2]}) is not None
+    sim.engine.resolve_mulligan(player, [3, 4, 5])
     assert deal.hands[0][0] == original_wall  # エンジンの山だけが変わる

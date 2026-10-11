@@ -18,6 +18,72 @@ logger = logging.getLogger(__name__)
 # 1 局で各プレイヤーが捨てる枚数。両者がこの枚数を捨て終えたら流局
 DISCARDS_PER_PLAYER = 17
 
+# 透視で指定できる色と、その色に入る牌種（下位5ビット）
+PERSPECTIVE_SUITS: dict[str, range] = {
+    "manzu": range(0, 9),    # 萬子
+    "pinzu": range(9, 18),   # 筒子
+    "souzu": range(18, 27),  # 索子
+    "jihai": range(27, 29),  # 字牌（東・西）
+}
+# 透視 1 回で公開する枚数
+PERSPECTIVE_REVEAL_COUNT = 3
+# マリガンで交換に出す枚数・牌山から出す候補の枚数。
+# 自分の山から 3 枚を出し、出した 3 枚 + 候補 3 枚の 6 枚から 3 枚を選ぶ
+MULLIGAN_CANDIDATE_COUNT = 3
+
+# 精算倍率の段階（満貫・跳満・倍満・三倍満・役満・ダブル役満）
+MULTIPLIER_TIERS = (1.0, 1.5, 2.0, 3.0, 4.0, 8.0)
+MULTIPLIER_TIER_LABELS = ("満貫", "跳満", "倍満", "三倍満", "役満", "ダブル役満")
+# 段階に届く最低の翻数
+_TIER_MIN_HAN = (4, 6, 8, 11, 13, 26)
+
+
+def han_to_tier(han: int) -> Optional[int]:
+    """翻数から精算倍率の段階（MULTIPLIER_TIERS の番号）を返す。満貫未満は None（和了れない）。"""
+    tier = None
+    for i, min_han in enumerate(_TIER_MIN_HAN):
+        if han >= min_han:
+            tier = i
+    return tier
+
+
+def boost_tier_cap(yaku_name: str) -> int:
+    """
+    役強化でその役が昇格させられる上限の段階。和了りやすい（翻数の低い）役ほど上限が低い。
+    1・2 翻 → 跳満、3・4 翻 → 倍満、清一色（6 翻）→ 役満、役満 → ダブル役満。
+    """
+    han = Yaku.get_han_by_name(yaku_name)
+    if han <= 2:
+        return 1
+    if han <= 5:
+        return 2
+    if han < 13:
+        return 4
+    return 5
+
+
+def promoted_tier(han: int, yaku: list[str], boost_map: dict[str, int]) -> Optional[int]:
+    """
+    役強化を含めた精算倍率の段階。満貫未満は None（役強化があっても和了れない）。
+
+    手に含まれる強化済みの役 1 つにつき 1 段昇格する。上限は、含まれる強化済みの役の上限のうち高い方。
+    元の段階が上限以上なら昇格しない（下がることはない）。
+    """
+    base = han_to_tier(han)
+    if base is None:
+        return None
+    boosted = {name for name in yaku if boost_map.get(name, 0) > 0}
+    if not boosted:
+        return base
+    cap = max(boost_tier_cap(name) for name in boosted)
+    return max(base, min(base + len(boosted), cap))
+
+
+def promoted_multiplier(han: int, yaku: list[str], boost_map: dict[str, int]) -> float:
+    """役強化を含めた精算倍率。満貫未満は 0。"""
+    tier = promoted_tier(han, yaku, boost_map)
+    return 0.0 if tier is None else MULTIPLIER_TIERS[tier]
+
 # 配牌生成（満貫聴牌形の探索）を行うスレッド。全マッチで共有する。
 _DEAL_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="deal")
 
@@ -45,7 +111,11 @@ def tiles_to_wall_indexes(wall: list[int], tiles: list[int]) -> Optional[list[in
 class GameEngine:
     """麻雀ゲームエンジン"""
 
-    def __init__(self, max_rounds: int = 25, deal_factory: Optional[Callable[[int], RoundDeal]] = None):
+    def __init__(
+        self,
+        max_rounds: int = 25,
+        deal_factory: Optional[Callable[[int], RoundDeal]] = None,
+    ):
         """
         ゲームエンジンを初期化
 
@@ -378,15 +448,16 @@ class GameEngine:
             return False
 
         normalized_name = self.normalize_boost_target_yaku_name(yaku_name)
-        if normalized_name is None:
+        if normalized_name is None or normalized_name in self._effective_boost_bonus_map(player):
             return False
 
-        player.boost_hand_bonus[normalized_name] = player.boost_hand_bonus.get(normalized_name, 0) + bonus_han
+        # 強化は役ごとに 1 段の昇格（bonus_han は互換のため受け取るが、段数は増えない）
+        player.boost_hand_bonus[normalized_name] = 1
         return True
 
     def assign_random_opening_boosts(self, rng: random.Random | None = None) -> list[dict]:
         """
-        開始時の恒常強化を、各プレイヤーに opening_boost_count 個ずつ付与する（役は重複なし、各 +1 翻）。
+        開始時の恒常強化を、各プレイヤーに opening_boost_count 個ずつ付与する（役は重複なし。スキルと同じ 1 段の昇格）。
 
         Returns:
             付与した強化（{"client_id", "yaku_name", "bonus_han"} のリスト。opening_boost_assigned で送る形）
@@ -418,7 +489,7 @@ class GameEngine:
             target: 相手を対象とするスキルの場合は相手プレイヤー
             **options: スキル固有のオプション
                 - yaku_name: BOOST_HAND の対象役名
-                - target_hand_index: MULLIGAN の交換対象インデックス
+                - target_hand_indexes: MULLIGAN で交換に出す wall 内インデックス 3 つ
 
         Returns:
             実際に支払ったHP コスト。失敗時は None
@@ -468,7 +539,8 @@ class GameEngine:
             エラーがあれば True、正常ならば False
         """
         if skill_type == SkillType.BOOST_HAND:
-            # 1回で強化できる役の数は boost_hand_targets まで（同じ役を重ねて指定してもよい）
+            # 1回で強化できる役の数は boost_hand_targets まで。
+            # 強化は役ごとに 1 回だけ（同じ役を重ねて指定する・強化済みの役をもう一度強化することはできない）
             yaku_names = options.get("yaku_names")
             if yaku_names is None:
                 yaku_names = [options.get("yaku_name")]
@@ -477,24 +549,45 @@ class GameEngine:
             normalized_names = [self.normalize_boost_target_yaku_name(name) for name in yaku_names]
             if any(name is None for name in normalized_names):
                 return True
+            if len(set(normalized_names)) != len(normalized_names):
+                return True
+            boosted = self._effective_boost_bonus_map(user)
+            if any(name in boosted for name in normalized_names):
+                return True
             options["yaku_names"] = normalized_names
 
         elif skill_type == SkillType.MULLIGAN:
-            target_index = options.get("target_hand_index")
-            if not isinstance(target_index, int) or target_index < 0 or target_index >= len(user.wall):
-                return True
-            if target_index in user.discarded_wall_indexes:
+            def valid_index(idx) -> bool:
+                return (
+                    isinstance(idx, int) and not isinstance(idx, bool)
+                    and 0 <= idx < len(user.wall) and idx not in user.discarded_wall_indexes
+                )
+
+            indexes = options.get("target_hand_indexes")
+            if (
+                not isinstance(indexes, list) or len(indexes) != MULLIGAN_CANDIDATE_COUNT
+                or len(set(indexes)) != len(indexes) or not all(valid_index(i) for i in indexes)
+            ):
                 return True
             # 予備牌チェック
             if not self.state.round_state.reserved_tiles:
+                return True
+            # 前のマリガンの牌を選び終えるまでは、次を使えない
+            if user.pending_mulligan is not None:
                 return True
 
         elif skill_type == SkillType.PERSPECTIVE:
             if target is None:
                 return True
-            unrevealed_indexes = [idx for idx in range(len(target.wall)) if idx not in target.exposed_hand_indexes]
-            if not unrevealed_indexes:
-                return True
+            suit = options.get("suit")
+            if suit is not None:
+                # 色を指定したときは、その色が相手の山に残っていなくても使える（全額払い、0 枚公開）
+                if suit not in PERSPECTIVE_SUITS:
+                    return True
+            else:
+                unrevealed_indexes = [idx for idx in range(len(target.wall)) if idx not in target.exposed_hand_indexes]
+                if not unrevealed_indexes:
+                    return True
 
         elif skill_type == SkillType.ASSAULT:
             if user.assault_used_this_round:
@@ -518,28 +611,31 @@ class GameEngine:
 
         elif skill_type == SkillType.BOOST_HAND:
             for yaku_name in options["yaku_names"]:
-                user.boost_hand_bonus[yaku_name] = user.boost_hand_bonus.get(yaku_name, 0) + 1
+                user.boost_hand_bonus[yaku_name] = 1
 
         elif skill_type == SkillType.PERSPECTIVE:
-            # 使用者の牌は公開しない。相手（target）の山牌全体から未公開の index を公開する
+            # 使用者の牌は公開しない。相手（target）の山のうち、指定した色の未公開の牌から公開する
+            # （色の指定がなければ山全体から。色を送らない古いクライアントのため）
             if target is not None and target.player_id != user.player_id and target.wall:
-                exposed_tiles[target.player_id] = set(self._expose_random_tiles(target, 3))
+                suit = options.get("suit")
+                before = set(target.exposed_hand_indexes)
+                kinds = PERSPECTIVE_SUITS[suit] if suit is not None else None
+                exposed_tiles[target.player_id] = set(self._expose_random_tiles(target, PERSPECTIVE_REVEAL_COUNT, kinds))
+                exposed_tiles["__perspective__"] = {
+                    "suit": suit,
+                    "new_indexes": sorted(target.exposed_hand_indexes - before),
+                }
 
         elif skill_type == SkillType.MULLIGAN:
-            target_index = options["target_hand_index"]
-            # target_hand_index は wall 内インデックス(0-33)として扱う
-            wall_idx = target_index
-            old_tile_id = user.wall[wall_idx]
-            new_tile_id = random.choice(self.state.round_state.reserved_tiles)
-            self.state.round_state.reserved_tiles.remove(new_tile_id)
-            self.state.round_state.reserved_tiles.append(old_tile_id)
-            # wall 内の指定位置の牌を差し替える
-            user.wall[wall_idx] = new_tile_id
-            exposed_tiles["__mulligan__"] = {
-                "target_hand_index": wall_idx,
-                "old_tile": old_tile_id,
-                "new_tile": new_tile_id,
-            }
+            # 牌山から候補を出し、選ばせる（選ぶのは resolve_mulligan）。
+            # 候補は選び終えるまで牌山から抜いておき、手に入れなかった牌は牌山へ戻す
+            reserved = self.state.round_state.reserved_tiles
+            drawn = random.sample(reserved, min(MULLIGAN_CANDIDATE_COUNT, len(reserved)))
+            for tile in drawn:
+                reserved.remove(tile)
+            indexes = list(options["target_hand_indexes"])
+            user.pending_mulligan = {"wall_indexes": indexes, "options": [user.wall[i] for i in indexes] + drawn}
+            exposed_tiles["__mulligan__"] = dict(user.pending_mulligan)
 
         elif skill_type == SkillType.ASSAULT:
             user.assault_used_this_round = True
@@ -547,9 +643,12 @@ class GameEngine:
 
         return exposed_tiles
 
-    def _expose_random_tiles(self, target: PlayerState, count: int) -> list[int]:
+    def _expose_random_tiles(self, target: PlayerState, count: int, kinds: Optional[range] = None) -> list[int]:
         """
-        相手の山から未公開の牌を count 枚ランダムに公開する。
+        相手の山から未公開の牌を count 枚ランダムに公開する。足りなければある分だけ公開する。
+
+        Args:
+            kinds: 指定したときは、この牌種（下位5ビット）の牌からだけ選ぶ
 
         Returns:
             公開済みを含む、相手の全公開 index（昇順）
@@ -557,6 +656,7 @@ class GameEngine:
         unrevealed_indexes = [
             idx for idx in range(len(target.wall))
             if idx not in target.exposed_hand_indexes
+            and (kinds is None or (target.wall[idx] & 0b11111) in kinds)
         ]
         if unrevealed_indexes:
             exposed = random.sample(unrevealed_indexes, min(count, len(unrevealed_indexes)))
@@ -621,30 +721,44 @@ class GameEngine:
             target = next((p for p in self.state.players if p.player_id != user.player_id), None)
             if target is None:
                 return None
-            return self.use_skill_on_opponent(user, target, skill_type)
+            suit = data.get("suit")
+            if suit is not None and suit not in PERSPECTIVE_SUITS:
+                return None
+            return self.cast_skill(user, skill_type, target=target, suit=suit)
 
         if skill_type == SkillType.MULLIGAN:
-            target_index = data.get("target_hand_index")
-            if not isinstance(target_index, int) or target_index < 0 or target_index >= len(user.wall):
-                return None
-            return self.use_mulligan(user, target_index)
+            return self.cast_skill(user, skill_type, target_hand_indexes=data.get("target_hand_indexes"))
 
         if skill_type in (SkillType.SPECIAL_VICTORY, SkillType.ASSAULT):
             return self.use_skill(user, skill_type)
         return None
 
-    def use_mulligan(self, player: PlayerState, target_hand_index: int) -> Optional[int]:
+    def resolve_mulligan(self, player: PlayerState, choice) -> Optional[dict]:
         """
-        プレイヤーがMULLIGAN スキルを使用する（手牌を交換）
-
-        Args:
-            player: プレイヤー
-            target_hand_index: 交換対象の wall 内インデックス（0-33）
+        マリガンで手に入れる牌を選ぶ。choice は options（出した 3 枚 + 候補 3 枚）の番号 3 つ。
+        選んだ順に、出した位置へ入る（[0, 1, 2] なら出した牌をそのまま残す）。手に入れなかった牌は牌山へ戻す。
 
         Returns:
-            実際に支払ったHP コスト。失敗時は None
+            {"changes": [{"wall_index", "old_tile", "new_tile"}, ...]}。選択待ちがない・choice が不正なら None
         """
-        return self.cast_skill(player, SkillType.MULLIGAN, target_hand_index=target_hand_index)
+        pending = player.pending_mulligan
+        if pending is None:
+            return None
+        options, indexes = pending["options"], pending["wall_indexes"]
+        if not isinstance(choice, list) or len(choice) != len(indexes) or len(set(choice)) != len(choice):
+            return None
+        if not all(isinstance(c, int) and not isinstance(c, bool) and 0 <= c < len(options) for c in choice):
+            return None
+
+        changes = [
+            {"wall_index": wall_idx, "old_tile": player.wall[wall_idx], "new_tile": options[option]}
+            for wall_idx, option in zip(indexes, choice)
+        ]
+        for change in changes:
+            player.wall[change["wall_index"]] = change["new_tile"]
+        self.state.round_state.reserved_tiles.extend(t for i, t in enumerate(options) if i not in choice)
+        player.pending_mulligan = None
+        return {"changes": changes}
 
     def _apply_voltage_discard(self, player: PlayerState, tile_id: int) -> None:
         """打牌に応じて、そのプレイヤーのボルテージを更新する。"""
@@ -828,36 +942,10 @@ class GameEngine:
         self._advance_player()
         return False
 
-    def _get_liquidation_multiplier(self, han: int) -> float:
-        """翻数から精算倍率を返す。"""
-        if han >= 26:
-            return 8.0
-        if han >= 13:
-            return 4.0
-        if han >= 11:
-            return 3.0
-        if han >= 8:
-            return 2.0
-        if han >= 6:
-            return 1.5
-        if han >= 4:
-            return 1.0
-
-    def _get_multiplier_label(self, han: int) -> str:
-        """翻数から点数倍率の呼称を返す。"""
-        if han >= 26:
-            return "ダブル役満"
-        if han >= 13:
-            return "役満"
-        if han >= 11:
-            return "三倍満"
-        if han >= 8:
-            return "倍満"
-        if han >= 6:
-            return "跳満"
-        if han >= 4:
-            return "満貫"
-        return "満貫未満"
+    @staticmethod
+    def _get_multiplier_label(tier: Optional[int]) -> str:
+        """精算倍率の段階から呼称を返す。"""
+        return "満貫未満" if tier is None else MULTIPLIER_TIER_LABELS[tier]
 
     def _get_voltage_multiplier(self, points: int) -> float:
         """ボルテージポイントから勝者獲得額の倍率を返す。"""
@@ -955,28 +1043,27 @@ class GameEngine:
         loser: PlayerState,
         hand: list[int],
         winning_tile: Optional[int],
-    ) -> tuple[list[str], int, int, dict[str, int]]:
+    ) -> tuple[list[str], int, Optional[int], dict[str, int]]:
         """
-        和了したときの役と翻数を数える（状況役・役強化を含む）。
+        和了したときの役・翻数・精算倍率の段階を数える（状況役を含む）。
 
         Returns:
-            (役のリスト, 素の翻数, 役強化による翻数, 役強化の辞書)
+            (役のリスト, 翻数, 役強化を含めた段階（満貫未満は None）, 役強化の辞書)
         """
         base_yaku_list = HandAnalyzer.enum_yaku(hand, winning_tile=winning_tile)
         base_yaku_list += self._get_win_context_yaku(winner, loser, winning_tile, base_yaku_list)
 
-        # 満貫判定にはスキルによる翻上昇分も含める
+        # 役強化は翻数ではなく段階を上げるので、満貫に届くかどうかは変わらない
         boost_bonus_map = self._effective_boost_bonus_map(winner)
-        base_han = sum(Yaku.get_han_by_name(name) for name in base_yaku_list)
-        bonus_han = sum(boost_bonus_map.get(name, 0) for name in base_yaku_list)
-        return base_yaku_list, base_han, bonus_han, boost_bonus_map
+        han = sum(Yaku.get_han_by_name(name) for name in base_yaku_list)
+        return base_yaku_list, han, promoted_tier(han, base_yaku_list, boost_bonus_map), boost_bonus_map
 
     def can_agari(self, winner: PlayerState, loser: PlayerState, winning_tile: int) -> bool:
         """
         その牌でロンしたら満貫以上で精算されるか。
 
         満貫未満の手は和了れない。打牌の時点でこれを確かめ、和了れない牌ではロン確認を出さない。
-        数え方は liquidation と同じ（状況役の一発・河底撈魚、役強化を含む）。
+        数え方は liquidation と同じ（状況役の一発・河底撈魚を含む。役強化では満貫に届かない）。
         """
         try:
             hand = [winner.wall[idx] for idx in winner.hand] + [winning_tile]
@@ -984,8 +1071,8 @@ class GameEngine:
             return False
         if not HandAnalyzer.is_win(hand):
             return False
-        _, base_han, bonus_han, _ = self._calc_agari_han(winner, loser, hand, winning_tile)
-        return base_han + bonus_han >= 4
+        _, _, tier, _ = self._calc_agari_han(winner, loser, hand, winning_tile)
+        return tier is not None
 
     def liquidation(self, player_id: str, hand: list[int], winning_tile: Optional[int] = None) -> bool:
         """
@@ -1006,20 +1093,21 @@ class GameEngine:
             return False
 
         is_win = HandAnalyzer.is_win(hand)
-        base_yaku_list, base_han, bonus_han, boost_bonus_map = self._calc_agari_han(winner, loser, hand, winning_tile)
-        han = base_han + bonus_han
-        is_mangan = han >= 4
+        base_yaku_list, han, tier, boost_bonus_map = self._calc_agari_han(winner, loser, hand, winning_tile)
+        is_mangan = tier is not None
         if not is_win or not is_mangan:
             logger.debug("上がり条件不成立: player=%s  is_win=%s  check_mangan=%s", player_id, is_win, is_mangan)
             return False
 
         is_tanki_wait = self._is_tanki_wait_agari(hand, winning_tile, winner.waits)
 
-        # 役倍率（跳満 1.5倍 / 倍満 2倍 / 三倍満 3倍 / 役満 4倍）
+        # 役倍率（跳満 1.5倍 / 倍満 2倍 / 三倍満 3倍 / 役満 4倍 / ダブル役満 8倍。役強化で昇格）
         display_yaku_list = self._build_display_yaku_list(base_yaku_list, boost_bonus_map)
-        multiplier = self._get_liquidation_multiplier(han)
-        logger.info("精算: winner=%s  yaku=%s  base_han=%d  bonus_han=%d  multiplier=%.1f",
-                    winner.player_id, display_yaku_list, base_han, bonus_han, multiplier)
+        base_tier = han_to_tier(han)
+        multiplier = MULTIPLIER_TIERS[tier]
+        logger.info("精算: winner=%s  yaku=%s  han=%d  tier=%s→%s  multiplier=%.1f",
+                    winner.player_id, display_yaku_list, han, MULTIPLIER_TIER_LABELS[base_tier],
+                    MULTIPLIER_TIER_LABELS[tier], multiplier)
 
         # ボルテージの倍率
         voltage_multiplier = self._get_voltage_multiplier(
@@ -1052,10 +1140,13 @@ class GameEngine:
             "yaku": display_yaku_list,
             "base_yaku": base_yaku_list,
             "display_yaku": display_yaku_list,
-            "base_han": base_han,
-            "bonus_han": bonus_han,
+            "base_han": han,
+            "bonus_han": 0,  # 役強化は翻を上げなくなった（互換のため残す）
             "han": han,
             "multiplier": multiplier,
+            "multiplier_label": MULTIPLIER_TIER_LABELS[tier],
+            "base_multiplier": MULTIPLIER_TIERS[base_tier],
+            "promoted_tiers": tier - base_tier,
             "voltage_multiplier": voltage_multiplier,
             "winner_voltage_points": winner.voltage_points,
             "winner_voltage_level": self._get_voltage_level(winner.voltage_points),
@@ -1247,8 +1338,8 @@ class GameEngine:
                 - 満貫以上の待ちかどうか
                 - 表示用役のリスト（役名+強化回数）
                 - 生の役のリスト
-                - 合計翻数
-                - 点数倍率
+                - 翻数（役強化は翻を上げない）
+                - 点数倍率（役強化の昇格込み）
                 - 点数倍率の呼称
         """
         # index から牌 ID に変換
@@ -1259,11 +1350,10 @@ class GameEngine:
             return None
 
         result = []
-        for w, base_yaku_list, total_han in waits:
+        for w, base_yaku_list, han, multiplier in waits:
             display_yaku_list = self._build_display_yaku_list(base_yaku_list, boost_bonus_map)
-            multiplier = self._get_liquidation_multiplier(total_han) if total_han >= 4 else 0.0
-            multiplier_label = self._get_multiplier_label(total_han)
-            result.append((w, total_han >= 4, display_yaku_list, base_yaku_list, total_han, multiplier, multiplier_label))
+            multiplier_label = self._get_multiplier_label(promoted_tier(han, base_yaku_list, boost_bonus_map))
+            result.append((w, multiplier > 0, display_yaku_list, base_yaku_list, han, multiplier, multiplier_label))
         return result
 
     @staticmethod
@@ -1272,9 +1362,10 @@ class GameEngine:
         wall: list[int],
         dora_id: Optional[int],
         boost_bonus_map: dict[str, int],
-    ) -> Optional[list[tuple[int, list[str], int]]]:
+    ) -> Optional[list[tuple[int, list[str], int, float]]]:
         """
-        聴牌なら、待ちごとに (和了牌の牌ID, 役のリスト, 翻数（役強化込み）) を返す。聴牌でなければ None。
+        聴牌なら、待ちごとに (和了牌の牌ID, 役のリスト, 翻数, 精算倍率（役強化の昇格込み。満貫未満は 0）) を返す。
+        聴牌でなければ None。
         ドラの待ちはドラの牌IDで役を数える。
         """
         waits = HandAnalyzer.get_tenpai_waiting_tiles(hand_tiles, wall)
@@ -1284,8 +1375,8 @@ class GameEngine:
         for kind in waits:
             tile = kind + 32 if kind == dora_id else kind
             yaku = HandAnalyzer.enum_yaku(hand_tiles + [tile], winning_tile=tile)
-            han = sum(Yaku.get_han_by_name(y) for y in yaku) + sum(boost_bonus_map.get(y, 0) for y in yaku)
-            result.append((tile, yaku, han))
+            han = sum(Yaku.get_han_by_name(y) for y in yaku)
+            result.append((tile, yaku, han, promoted_multiplier(han, yaku, boost_bonus_map)))
         return result
 
 

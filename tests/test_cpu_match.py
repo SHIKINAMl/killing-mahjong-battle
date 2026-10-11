@@ -73,7 +73,7 @@ def test_extends_and_invalid_values(config_file, caplog):
     with caplog.at_level(logging.WARNING):
         config = load_cpu_config()
     assert config["special"]["bet"]["health_lead_factor"] == 0.5  # normal から引き継ぐ
-    assert config["normal"]["hand_selection"]["candidate_limit"] == 40  # 型違いは既定値へ
+    assert config["normal"]["hand_selection"]["candidate_limit"] == 160  # 型違いは既定値へ
     assert config["special"]["perks"]["skill_cost_rate"] == 0.6  # 範囲外は、その難易度の既定値へ
     messages = " ".join(r.getMessage() for r in caplog.records)
     assert "candidate_limit" in messages and "skill_cost_rate" in messages
@@ -104,35 +104,38 @@ def test_skill_cost_rate():
     engine = _engine_with_perks(skill_cost_rate=0.6)
     cpu = engine.get_player_by_id("CPU0001")
     human = engine.get_player_by_id("C0001")
-    assert engine.get_skill_cost(cpu, SkillType.MULLIGAN) == 720
-    assert engine.get_skill_cost(cpu, SkillType.PERSPECTIVE) == 900
-    assert engine.get_skill_cost(cpu, SkillType.BOOST_HAND) == 6000
+    assert engine.get_skill_cost(cpu, SkillType.MULLIGAN) == 300
+    assert engine.get_skill_cost(cpu, SkillType.PERSPECTIVE) == 300
+    assert engine.get_skill_cost(cpu, SkillType.BOOST_HAND) == 3000
     assert engine.get_skill_cost(cpu, SkillType.ASSAULT) == 1800
-    assert engine.get_skill_cost(human, SkillType.MULLIGAN) == 1200
+    assert engine.get_skill_cost(human, SkillType.MULLIGAN) == 500
 
 
 def test_boost_hand_two_targets():
     engine = _engine_with_perks(boost_hand_targets=2, skill_cost_rate=0.6)
     cpu = engine.get_player_by_id("CPU0001")
     cpu.health = 30000
-    assert engine.use_skill(cpu, SkillType.BOOST_HAND, yaku_names=["平和", "平和"]) == 6000
-    assert cpu.boost_hand_bonus == {"平和": 2}
-    assert cpu.health == 24000  # 2つ強化してもコストは1回分
-    assert engine.use_skill(cpu, SkillType.BOOST_HAND, yaku_names=["断么九", "一盃口"]) == 6000
-    assert cpu.boost_hand_bonus == {"平和": 2, "断么九": 1, "一盃口": 1}
-    # 3つ・不正な役名・立直は失敗し、HP は減らない
-    assert engine.use_skill(cpu, SkillType.BOOST_HAND, yaku_names=["平和", "平和", "平和"]) is None
-    assert engine.use_skill(cpu, SkillType.BOOST_HAND, yaku_names=["平和", "存在しない役"]) is None
+    assert engine.use_skill(cpu, SkillType.BOOST_HAND, yaku_names=["平和", "断么九"]) == 3000
+    assert cpu.boost_hand_bonus == {"平和": 1, "断么九": 1}
+    assert cpu.health == 27000  # 2つ強化してもコストは1回分
+    # 同じ役を重ねる・強化済みの役・3つ・不正な役名・立直は失敗し、HP は減らない
+    assert engine.use_skill(cpu, SkillType.BOOST_HAND, yaku_names=["一盃口", "一盃口"]) is None
+    assert engine.use_skill(cpu, SkillType.BOOST_HAND, yaku_names=["一盃口", "平和"]) is None
+    assert engine.use_skill(cpu, SkillType.BOOST_HAND, yaku_names=["一盃口", "東", "西"]) is None
+    assert engine.use_skill(cpu, SkillType.BOOST_HAND, yaku_names=["一盃口", "存在しない役"]) is None
     assert engine.use_skill(cpu, SkillType.BOOST_HAND, yaku_names=["立直"]) is None
-    assert cpu.health == 18000
+    assert cpu.health == 27000
+    assert engine.use_skill(cpu, SkillType.BOOST_HAND, yaku_names=["一盃口"]) == 3000
+    assert cpu.boost_hand_bonus == {"平和": 1, "断么九": 1, "一盃口": 1}
 
 
 def test_human_cannot_boost_two():
     engine = _engine_with_perks()
     human = engine.get_player_by_id("C0001")
     assert engine.use_skill(human, SkillType.BOOST_HAND, yaku_names=["平和", "平和"]) is None
-    assert engine.use_skill(human, SkillType.BOOST_HAND, yaku_name="平和") == 10000
+    assert engine.use_skill(human, SkillType.BOOST_HAND, yaku_name="平和") == 5000
     assert human.boost_hand_bonus == {"平和": 1}
+    assert engine.use_skill(human, SkillType.BOOST_HAND, yaku_name="平和") is None  # 重ねがけ不可
 
 
 def test_initial_perspective_on_every_deal():
@@ -363,3 +366,140 @@ def test_cpu_join_errors(zero_think_time):
         "Unsupported difficulty: None",
         "Already in matchmaking queue",
     ]
+
+
+# ========== 透視（色を指定して、その中からランダムに 3 枚） ==========
+
+def _perspective_engine(opponent_wall):
+    engine = GameEngine()
+    engine.initialize_players(["C0001", "CPU0001"])
+    engine.get_player_by_id("CPU0001").wall = list(opponent_wall)
+    return engine, engine.get_player_by_id("C0001"), engine.get_player_by_id("CPU0001")
+
+
+def test_perspective_reveals_only_the_chosen_suit():
+    # 萬子 5 枚・筒子 2 枚・字牌 1 枚の山
+    engine, user, target = _perspective_engine([0, 1, 2, 3, 4, 9, 10, 27])
+    assert engine.execute_skill(user, SkillType.PERSPECTIVE, {"suit": "manzu"}) == 500
+    assert len(target.exposed_hand_indexes) == 3
+    assert all(target.wall[i] & 0b11111 < 9 for i in target.exposed_hand_indexes)
+
+
+def test_perspective_reveals_what_exists_and_charges_full_cost():
+    engine, user, target = _perspective_engine([0, 1, 2, 3, 4, 9, 10, 27])
+    assert engine.execute_skill(user, SkillType.PERSPECTIVE, {"suit": "pinzu"}) == 500
+    assert sorted(target.exposed_hand_indexes) == [5, 6]  # 筒子は 2 枚だけ
+    # 索子は 1 枚もない。0 枚公開でもコストは全額
+    assert engine.execute_skill(user, SkillType.PERSPECTIVE, {"suit": "souzu"}) == 500
+    assert sorted(target.exposed_hand_indexes) == [5, 6]
+    assert user.health == 20000 - 1000
+
+
+def test_perspective_rejects_unknown_suit():
+    engine, user, target = _perspective_engine([0, 1, 2, 3, 4, 9, 10, 27])
+    assert engine.execute_skill(user, SkillType.PERSPECTIVE, {"suit": "dragons"}) is None
+    assert user.health == 20000 and not target.exposed_hand_indexes
+
+
+def test_perspective_without_suit_reveals_from_whole_wall():
+    """色を送らない古いクライアントは、これまでどおり山全体から 3 枚。"""
+    engine, user, target = _perspective_engine([0, 1, 2, 3, 4, 9, 10, 27])
+    assert engine.execute_skill(user, SkillType.PERSPECTIVE, {}) == 500
+    assert len(target.exposed_hand_indexes) == 3
+
+
+# ========== マリガン（候補 3 枚 + 元の牌の 4 枚から選ぶ） ==========
+
+def _mulligan_engine():
+    engine = GameEngine()
+    engine.initialize_players(["C0001", "CPU0001"])
+    engine.start_game(5)  # 配牌まで進む（牌山の残りがマリガンの候補になる）
+    return engine, engine.get_player_by_id("C0001")
+
+
+def _all_tiles(engine):
+    return sorted([t for p in engine.state.players for t in p.wall] + engine.state.round_state.reserved_tiles)
+
+
+def test_mulligan_keeps_three_of_six():
+    """自分の 3 枚を出し、出した 3 枚 + 候補 3 枚の 6 枚から 3 枚を選ぶ。"""
+    engine, player = _mulligan_engine()
+    reserved = engine.state.round_state.reserved_tiles
+    reserved_before, tiles_before = len(reserved), _all_tiles(engine)
+    assert engine.execute_skill(player, SkillType.MULLIGAN, {"target_hand_indexes": [1, 2, 2]}) is None  # 重複
+    assert engine.execute_skill(player, SkillType.MULLIGAN, {"target_hand_indexes": [1, 2]}) is None  # 2 枚
+    assert engine.execute_skill(player, SkillType.MULLIGAN, {"target_hand_index": 1}) is None  # 1 枚交換の古い形
+    old = [player.wall[1], player.wall[2], player.wall[3]]
+    assert engine.execute_skill(player, SkillType.MULLIGAN, {"target_hand_indexes": [1, 2, 3]}) == 500
+    options = player.pending_mulligan["options"]
+    assert len(options) == 6 and options[:3] == old
+    assert len(reserved) == reserved_before - 3  # 候補は選び終えるまで牌山から抜く
+    assert [player.wall[1], player.wall[2], player.wall[3]] == old  # まだ入れ替わらない
+
+    # 選び終えるまでは次のマリガンを使えない
+    assert engine.execute_skill(player, SkillType.MULLIGAN, {"target_hand_indexes": [4, 5, 6]}) is None
+
+    assert engine.resolve_mulligan(player, [0, 4]) is None  # 3 つ選ぶ
+    assert engine.resolve_mulligan(player, [0, 4, 6]) is None  # 範囲外
+    result = engine.resolve_mulligan(player, [3, 0, 5])
+    assert [player.wall[1], player.wall[2], player.wall[3]] == [options[3], options[0], options[5]]
+    assert result["changes"][0] == {"wall_index": 1, "old_tile": old[0], "new_tile": options[3]}
+    assert player.pending_mulligan is None
+    assert len(reserved) == reserved_before  # 選ばれなかった 3 枚は牌山へ戻る
+    assert _all_tiles(engine) == tiles_before  # 牌は増えも減りもしない
+
+
+def test_mulligan_keeping_the_original_still_costs():
+    engine, player = _mulligan_engine()
+    wall_before = list(player.wall)
+    assert engine.execute_skill(player, SkillType.MULLIGAN, {"target_hand_indexes": [5, 6, 7]}) == 500
+    engine.resolve_mulligan(player, [0, 1, 2])
+    assert player.wall == wall_before and player.health == 20000 - 500
+
+
+def test_mulligan_protocol_over_session():
+    """候補は本人にだけ届き、選ぶまで手牌を確定できない。相手には使ったことだけが届く。"""
+    from mahjong_engine.communication.game_session import GameSession
+
+    async def run():
+        sent = []
+
+        async def send(cid, payload):
+            sent.append((cid, payload))
+
+        session = GameSession(asyncio.Lock(), {}, {}, {}, [], send, None)
+
+        async def broadcast(match_id, payload):
+            for cid in ("C0001", "C0002"):
+                await send(cid, payload)
+
+        session._broadcast_match_members = broadcast
+        engine = GameEngine()
+        engine.initialize_players(["C0001", "C0002"])
+        engine.on_skill_casted = session._create_task_callback(session.on_skill_casted, "M0001")
+        engine.start_game(5)
+        session._game_engines["M0001"] = engine
+        session._active_match_by_client.update({"C0001": "M0001", "C0002": "M0001"})
+        player = engine.get_player_by_id("C0001")
+
+        await session.handle_game_action("C0001", {"action": "skill", "data": {"skill_type": "mulligan", "target_hand_indexes": [5, 6, 7]}})
+        await asyncio.sleep(0)  # skill_casted の通知タスクを流す
+        accepted = next(p for c, p in sent if c == "C0001" and p.get("type") == "skill_accepted")["data"]
+        assert accepted["mulliganOptions"]["targetHandIndexes"] == [5, 6, 7]
+        assert len(accepted["mulliganOptions"]["options"]) == 6
+        casted = [p["data"] for c, p in sent if c == "C0002" and p.get("type") == "skill_casted"]
+        assert casted and casted[0]["mulliganResult"] is None  # 相手には牌を見せない
+
+        sent.clear()
+        await session.handle_game_action("C0001", {"action": "select", "data": {"hand_indexes": list(player.hand)}})
+        assert any(p.get("type") == "error" for c, p in sent)  # 選ぶまで手牌を確定できない
+
+        sent.clear()
+        await session.handle_game_action("C0001", {"action": "mulligan_select", "data": {"choices": [4, 1, 0]}})
+        selected = next(p for c, p in sent if p.get("type") == "mulligan_selected")["data"]
+        offered = accepted["mulliganOptions"]["options"]
+        assert [c["newTile"] for c in selected["changes"]] == [offered[4], offered[1], offered[0]]
+        assert [c["wallIndex"] for c in selected["changes"]] == [5, 6, 7]
+        assert player.wall[5] == offered[4] and player.pending_mulligan is None
+
+    asyncio.run(run())

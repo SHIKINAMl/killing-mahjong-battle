@@ -9,7 +9,7 @@
 実行: python -m pytest tests -q
 """
 
-from mahjong_engine.engine.game_engine import GameEngine
+from mahjong_engine.engine.game_engine import GameEngine, promoted_multiplier, promoted_tier
 from mahjong_engine.engine.game_state import RoundStatus
 
 DORA_NONE = 28  # 西。手牌に西を入れなければドラは乗らない
@@ -49,8 +49,8 @@ def _han_for(engine, player_id, tile):
     """満貫未満であることの前提確認用。"""
     winner = engine.get_player_by_id(player_id)
     hand = [winner.wall[i] for i in winner.hand] + [tile]
-    _, base, bonus, _ = engine._calc_agari_han(winner, engine.get_player_by_id("L"), hand, tile)
-    return base + bonus
+    _, han, _, _ = engine._calc_agari_han(winner, engine.get_player_by_id("L"), hand, tile)
+    return han
 
 
 # ========== 満貫未満は和了れない ==========
@@ -73,13 +73,47 @@ def test_mangan_wait_prompts_ron():
     assert engine.get_pending_agari()["winner_id"] == "W"
 
 
-def test_boost_counts_toward_mangan():
+def test_boost_does_not_reach_mangan():
+    """役強化は倍率の段階を上げるだけで、満貫未満の手を和了れるようにはしない。"""
     engine, events = _discard_engine(LOW_HAND, loser_wall=[27, 20])
     winner = engine.get_player_by_id("W")
-    base = _han_for(engine, "W", 27)
-    winner.boost_hand_bonus = {"三色同順": 4 - base}
+    winner.boost_hand_bonus = {"三色同順": 1}
     engine.discard("L", 0)
-    assert events == ["agari_pending"]
+    assert "agari_pending" not in events
+
+
+# ========== 役強化は倍率の段階を上げる ==========
+
+def test_boost_promotes_one_tier_per_yaku():
+    # 満貫（4 翻）の手。1・2 翻の役は跳満まで
+    assert promoted_tier(4, ["平和", "断么九"], {}) == 0
+    assert promoted_tier(4, ["平和", "断么九"], {"平和": 1}) == 1
+    # 2 つ強化しても、上限は跳満
+    assert promoted_tier(4, ["平和", "断么九"], {"平和": 1, "断么九": 1}) == 1
+    # 3 翻の役を含めば上限は倍満。段階は足し合わせる
+    assert promoted_tier(4, ["平和", "混一色"], {"平和": 1, "混一色": 1}) == 2
+    # 元が上限以上なら昇格しない（下がらない）
+    assert promoted_tier(8, ["平和", "三色同順"], {"平和": 1}) == 2
+    # 清一色は役満まで、役満はダブル役満まで
+    assert promoted_tier(11, ["清一色", "断么九"], {"清一色": 1}) == 4
+    assert promoted_tier(13, ["四暗刻"], {"四暗刻": 1}) == 5
+    # 手に含まれない役の強化は効かない。満貫未満は None
+    assert promoted_tier(4, ["平和"], {"清一色": 1}) == 0
+    assert promoted_tier(3, ["平和"], {"平和": 1}) is None
+    assert promoted_multiplier(4, ["平和"], {"平和": 1}) == 1.5
+    assert promoted_multiplier(3, ["平和"], {"平和": 1}) == 0.0
+
+
+def test_boost_does_not_exceed_double_yakuman():
+    """CHINITSU_HAND は純正九蓮宝燈（ダブル役満）。強化してもそれより上がらない。"""
+    engine, _ = _discard_engine(CHINITSU_HAND, loser_wall=[4, 20])
+    winner = engine.get_player_by_id("W")
+    winner.boost_hand_bonus = {"純正九蓮宝燈": 1}
+    engine.discard("L", 0)
+    assert engine.liquidation("W", [winner.wall[i] for i in winner.hand] + [4], 4)
+    result = engine._last_liquidation_result
+    assert result["multiplier"] == 8.0 and result["promoted_tiers"] == 0
+    assert result["multiplier_label"] == "ダブル役満"
 
 
 def test_context_yaku_counts_toward_mangan():
@@ -87,10 +121,10 @@ def test_context_yaku_counts_toward_mangan():
     # 前提: 三色同順＋立直の3翻。一発がつけば満貫に届く
     engine, _ = _discard_engine(LOW_HAND, loser_wall=[27, 20])
     winner = engine.get_player_by_id("W")
-    yaku, base, bonus, _ = engine._calc_agari_han(
+    yaku, han, tier, _ = engine._calc_agari_han(
         winner, engine.get_player_by_id("L"), [winner.wall[i] for i in winner.hand] + [27], 27,
     )
-    assert base + bonus == 3 and "立直" in yaku
+    assert han == 3 and tier is None and "立直" in yaku
 
     engine, events = _discard_engine(LOW_HAND, loser_wall=[27, 20], loser_previous_discards=0)
     engine.discard("L", 0)  # L の一打目

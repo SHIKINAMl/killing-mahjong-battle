@@ -421,6 +421,7 @@ class GameSession:
 			"select": self._select,
 			"select_cancel": self._select_cancel,
 			"select_confirm": self._select_confirm,
+			"mulligan_select": self._mulligan_select,
 			"bet": self._bet,
 			"discard": self._discard,
 			"agari": self._agari,
@@ -574,12 +575,42 @@ class GameSession:
 			return
 
 		# レスポンス（Python の snake_case を JSON のキャメルケースに変換）
+		data: Dict[str, Any] = {
+			"skillType": skill_type.value,
+			"cost": cost,
+			"currentHealth": player.health,
+		}
+		if skill_type == SkillType.MULLIGAN and player.pending_mulligan is not None:
+			# 候補は使った本人にだけ知らせる。mulligan_select で options の番号を 3 つ選んでもらう
+			data["mulliganOptions"] = {
+				"targetHandIndexes": list(player.pending_mulligan["wall_indexes"]),
+				"options": list(player.pending_mulligan["options"]),
+			}
+		await self._respond_to_client(client_id, {"type": "skill_accepted", "data": data})
+
+	async def _mulligan_select(self, engine: GameEngine, client_id: str, action_data: Dict[str, Any]) -> None:
+		"""
+		マリガンで手に入れる牌を選ぶ。choices は options の番号 3 つで、選んだ順に targetHandIndexes の位置へ入る
+		（[0, 1, 2] なら出した牌をそのまま残す）。
+		"""
+		if not await self._ensure_phase(engine, client_id, RoundStatus.HAND_SELECTION, "mulligan_select"):
+			return
+		player = engine.get_player_by_id(client_id)
+		if player is None:
+			await self._send_error(client_id, "Player not found")
+			return
+		result = engine.resolve_mulligan(player, action_data.get("choices"))
+		if result is None:
+			await self._send_error(client_id, "マリガンの選択待ちがないか、choices が不正です")
+			return
 		await self._respond_to_client(client_id, {
-			"type": "skill_accepted",
+			"type": "mulligan_selected",
 			"data": {
-				"skillType": skill_type.value,
-				"cost": cost,
-				"currentHealth": player.health,
+				"changes": [
+					{"wallIndex": c["wall_index"], "oldTile": c["old_tile"], "newTile": c["new_tile"]}
+					for c in result["changes"]
+				],
+				"wall": list(player.wall),
 			},
 		})
 
@@ -596,6 +627,10 @@ class GameSession:
 		player = engine.get_player_by_id(client_id)
 		if player is None:
 			await self._send_error(client_id, "Player not found")
+			return
+
+		if player.pending_mulligan is not None:
+			await self._send_error(client_id, "マリガンの牌を選んでから手牌を確定してください")
 			return
 
 		wall_indexes = action_data.get("hand_indexes", action_data.get("hand"))
@@ -695,6 +730,10 @@ class GameSession:
 		validation_error = self._validate_hand_indexes(player.wall, wall_indexes)
 		if validation_error is not None:
 			await self._send_error(client_id, validation_error)
+			return
+
+		if player.pending_mulligan is not None:
+			await self._send_error(client_id, "マリガンの牌を選んでから手牌を確定してください")
 			return
 
 		pending = self._pending_low_hand_confirmations.get(client_id)
@@ -1090,21 +1129,19 @@ class GameSession:
 
 		exposed_by_player: Dict[str, List[int]] = {}
 		exposed_flat: List[int] = []
+		# マリガンは相手に使ったことだけを知らせる（候補・選んだ牌は本人にだけ。mulliganResult は互換のため null）
 		mulligan_result: Optional[Dict[str, int]] = None
+		perspective_result: Optional[Dict[str, Any]] = None
 		if isinstance(exposed_indexes, dict):
-			raw_mulligan = exposed_indexes.get("__mulligan__")
-			if isinstance(raw_mulligan, dict):
-				try:
-					mulligan_result = {
-						"targetHandIndex": int(raw_mulligan["target_hand_index"]),
-						"oldTile": int(raw_mulligan["old_tile"]),
-						"newTile": int(raw_mulligan["new_tile"]),
-					}
-				except Exception:
-					mulligan_result = None
+			raw_perspective = exposed_indexes.get("__perspective__")
+			if isinstance(raw_perspective, dict):
+				perspective_result = {
+					"suit": raw_perspective.get("suit"),
+					"newlyExposedIndexes": list(raw_perspective.get("new_indexes", [])),
+				}
 
 			for cid, indexes in exposed_indexes.items():
-				if cid == "__mulligan__":
+				if cid in ("__mulligan__", "__perspective__"):
 					continue
 				try:
 					normalized = sorted(int(i) for i in indexes)
@@ -1131,6 +1168,7 @@ class GameSession:
 					"exposedHandIndexes": exposed_flat,
 					"exposedHandIndexesByPlayer": exposed_by_player,
 					"mulliganResult": mulligan_result,
+					"perspectiveResult": perspective_result,
 					"source": source,
 				},
 			},

@@ -17,6 +17,7 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, Awaitable, Callable, Optional
 
+from ..engine.game_engine import MULLIGAN_CANDIDATE_COUNT
 from ..engine.game_state import RoundStatus
 from .cpu_config import CpuProfile
 from .observation import CpuObservation, PublicInfo, build_observation
@@ -62,6 +63,8 @@ class CpuController:
         self._stopped = False
         self._last_error: Optional[str] = None
         self._pending_confirm: Optional[list[int]] = None
+        # マリガンの候補（skill_accepted の mulliganOptions。本人にだけ届く）
+        self._mulligan_options: Optional[dict] = None
         self._plan: Optional[HandPlan] = None
         self._attempts: Counter = Counter()
 
@@ -90,6 +93,11 @@ class CpuController:
                         self._public.opponent_opening_boosts.get(name, 0) + int(boost.get("bonus_han", 1))
                     )
         elif msg_type == "skill_casted":
+            perspective = data.get("perspectiveResult")
+            if data.get("player_id") == self.client_id and isinstance(perspective, dict):
+                self._public.record_my_perspective(
+                    perspective.get("suit"), len(perspective.get("newlyExposedIndexes") or [])
+                )
             if data.get("player_id") != self.client_id and data.get("source", "skill") == "skill":
                 skill = str(data.get("skillType"))
                 self._public.opponent_skills_this_round.append(skill)
@@ -102,6 +110,16 @@ class CpuController:
             self._pending_confirm = list(data.get("hand_indexes") or [])
         elif msg_type == "hand_selection_accepted":
             self._pending_confirm = None
+        elif msg_type == "skill_accepted" and isinstance(data.get("mulliganOptions"), dict):
+            self._mulligan_options = data["mulliganOptions"]
+        elif msg_type == "mulligan_selected":
+            if self._mulligan_options is not None:
+                changes = [
+                    {"wall_index": c.get("wallIndex"), "old_tile": c.get("oldTile"), "new_tile": c.get("newTile")}
+                    for c in data.get("changes") or []
+                ]
+                self._public.record_mulligan(self._pending_from_options(self._mulligan_options), changes)
+            self._mulligan_options = None
 
         self.wake()
 
@@ -145,6 +163,8 @@ class CpuController:
         round_number = round_state.round_number
 
         if status == RoundStatus.HAND_SELECTION:
+            if me.pending_mulligan is not None:
+                return "mulligan_select", (round_number, "mulligan_select", len(round_state.reserved_tiles))
             if self._pending_confirm is not None:
                 return "select_confirm", (round_number, "select_confirm")
             if not self._session.is_hand_selection_confirmed(self.match_id, self.client_id):
@@ -222,6 +242,8 @@ class CpuController:
 
         if category == "hand_selection":
             await self._act_hand_selection(obs, use_fallback)
+        elif category == "mulligan_select":
+            await self._select_mulligan(obs, use_fallback)
         elif category == "select_confirm":
             await self._send_action("select_confirm", {"hand_indexes": list(self._pending_confirm or [])})
         elif category == "bet":
@@ -239,6 +261,22 @@ class CpuController:
             await self._send_action("agari", {"accept": True})
         elif category == "next_round":
             await self._send_action("next_round", {})
+
+    @staticmethod
+    def _pending_from_options(options: dict) -> dict:
+        """skill_accepted の mulliganOptions を、engine の pending_mulligan と同じ形にする。"""
+        return {"wall_indexes": list(options["targetHandIndexes"]), "options": list(options["options"])}
+
+    async def _select_mulligan(self, obs: CpuObservation, use_fallback: bool) -> None:
+        """マリガンの候補から残す 3 枚を選ぶ。候補が分からないとき・打ち直しでは出した牌をそのまま残す。"""
+        options = self._mulligan_options
+        choices = list(range(MULLIGAN_CANDIDATE_COUNT))
+        if options is not None and not use_fallback:
+            loop = asyncio.get_running_loop()
+            choices = await loop.run_in_executor(
+                _SEARCH_EXECUTOR, self._brain.choose_mulligan, obs, self._pending_from_options(options),
+            )
+        await self._send_action("mulligan_select", {"choices": choices})
 
     async def _act_hand_selection(self, obs: CpuObservation, use_fallback: bool) -> None:
         if use_fallback:
@@ -263,6 +301,8 @@ class CpuController:
                 return
 
             accepted = await self._send_action("skill", data)
+            if accepted and skill == "mulligan":
+                await self._select_mulligan(self._observe(), use_fallback=False)
             obs = self._observe()
             if accepted:
                 # 交換で山が、透視で見える牌が、役強化で翻数が変わるので、手牌を選び直す

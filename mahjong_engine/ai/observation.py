@@ -12,10 +12,11 @@ CPU が判断に使ってよい情報だけを詰める。エンジンの状態�
 見てはいけない情報: 相手の山の未公開部分、相手の手牌、相手の待ち
 （サーバーは dealing_completed などで相手の山もクライアントへ送っているが、画面には出していない）
 """
+from collections import Counter
 from dataclasses import dataclass, field
-from typing import Callable, Optional
+from typing import Optional
 
-from ..engine.game_engine import GameEngine
+from ..engine.game_engine import PERSPECTIVE_REVEAL_COUNT, GameEngine
 from ..engine.game_state import SkillType
 
 # CPU が使うスキル（特殊勝利は使わない）
@@ -30,10 +31,27 @@ class PublicInfo:
     opponent_boost_use_count: int = 0
     opponent_skills_this_round: list[str] = field(default_factory=list)
     my_skills_this_round: dict[str, int] = field(default_factory=dict)
+    # 自分の透視で、相手の山のその色の牌を全部見た色（公開された枚数が規定より少なかった＝もう残っていない）
+    complete_suits: set[str] = field(default_factory=set)
+    # マリガンで見て牌山に戻った牌（牌ID）。牌山にあるので、相手の山にはない
+    known_reserved: list[int] = field(default_factory=list)
 
     def reset_round(self) -> None:
         self.opponent_skills_this_round = []
         self.my_skills_this_round = {}
+        self.complete_suits = set()
+        self.known_reserved = []
+
+    def record_mulligan(self, pending: dict, changes: list[dict]) -> None:
+        """マリガンの結果を覚える。見た牌のうち手に入れなかった牌は、牌山に戻っている。"""
+        returned = Counter(pending["options"])
+        returned.subtract(c["new_tile"] for c in changes)
+        self.known_reserved.extend(returned.elements())
+
+    def record_my_perspective(self, suit: Optional[str], newly_exposed_count: int) -> None:
+        """自分の透視の結果を覚える。規定の枚数より少なければ、その色はもう全部見えている。"""
+        if suit is not None and newly_exposed_count < PERSPECTIVE_REVEAL_COUNT:
+            self.complete_suits.add(suit)
 
 
 @dataclass(frozen=True)
@@ -44,6 +62,7 @@ class MyView:
     waits: tuple[int, ...]  # 牌種（下位5ビット）
     discarded_wall_indexes: frozenset[int]
     health: int
+    cumulative_earned_points: int  # 和了で得た累計点数（精算結果で両者に公開。30000 で勝ち）
     bet: int
     boost_hand_bonus: dict[str, int]
     special_victory_count: int
@@ -53,6 +72,7 @@ class MyView:
     bet_unit: int
     boost_hand_targets: int
     can_mulligan: bool  # 交換用の予備牌が残っているか
+    known_reserved: tuple[int, ...]  # マリガンで見て牌山に戻った牌（相手の山にはない）
 
 
 @dataclass(frozen=True)
@@ -62,11 +82,13 @@ class OpponentView:
     exposed: dict[int, int]  # 透視で公開された wall index → 牌ID
     discards: tuple[int, ...]  # 捨て牌（牌ID、捨てた順）
     health: int
+    cumulative_earned_points: int  # 和了で得た累計点数（精算結果で両者に公開。30000 で勝ち）
     bet: int
     opening_boosts: dict[str, int]
     boost_use_count: int
     special_victory_count: int
     skills_this_round: tuple[str, ...]
+    complete_suits: frozenset[str]  # 相手の山のその色の牌を全部見た色
 
 
 @dataclass(frozen=True)
@@ -81,7 +103,6 @@ class CpuObservation:
     my_discard_count: int
     my_skills_this_round: dict[str, int]
     # 翻数 → 精算倍率（ルールそのもので、状態を持たない）
-    multiplier_for_han: Callable[[int], float]
 
 
 def build_observation(engine: GameEngine, client_id: str, public: PublicInfo) -> CpuObservation:
@@ -100,6 +121,7 @@ def build_observation(engine: GameEngine, client_id: str, public: PublicInfo) ->
         waits=tuple(w & 0b11111 for w in me.waits),
         discarded_wall_indexes=frozenset(me.discarded_wall_indexes),
         health=me.health,
+        cumulative_earned_points=me.cumulative_earned_points,
         bet=me.bet,
         boost_hand_bonus=dict(engine._effective_boost_bonus_map(me)),
         special_victory_count=me.special_victory_count,
@@ -109,6 +131,7 @@ def build_observation(engine: GameEngine, client_id: str, public: PublicInfo) ->
         bet_unit=bet_unit,
         boost_hand_targets=me.boost_hand_targets,
         can_mulligan=bool(round_state.reserved_tiles),
+        known_reserved=tuple(public.known_reserved),
     )
 
     opponent_view = OpponentView(
@@ -117,11 +140,13 @@ def build_observation(engine: GameEngine, client_id: str, public: PublicInfo) ->
         exposed={idx: opponent.wall[idx] for idx in sorted(opponent.exposed_hand_indexes) if idx < len(opponent.wall)},
         discards=tuple(opponent.discards),
         health=opponent.health,
+        cumulative_earned_points=opponent.cumulative_earned_points,
         bet=opponent.bet,
         opening_boosts=dict(public.opponent_opening_boosts),
         boost_use_count=public.opponent_boost_use_count,
         special_victory_count=opponent.special_victory_count,
         skills_this_round=tuple(public.opponent_skills_this_round),
+        complete_suits=frozenset(public.complete_suits),
     )
 
     return CpuObservation(
@@ -134,5 +159,4 @@ def build_observation(engine: GameEngine, client_id: str, public: PublicInfo) ->
         i_am_first_player=engine.state.players[round_state.first_player_index].player_id == client_id,
         my_discard_count=len(me.discards),
         my_skills_this_round=dict(public.my_skills_this_round),
-        multiplier_for_han=engine._get_liquidation_multiplier,
     )
