@@ -39,6 +39,8 @@ namespace KillingMahjong.UI
         private static readonly string[] LabelWords =
         {
             "やめる", "戻る", "もどる", "キャンセル", "閉じる", "とじる", "いいえ",
+            // コレクションの演出の試写の「一覧へ戻る」（EffectPreviewPlayer）。再生中に右クリックで一覧へ戻れる
+            "一覧へ戻る",
             "×", "x", "X", "✕", "▼", "Close", "Cancel", "Back", "No",
         };
 
