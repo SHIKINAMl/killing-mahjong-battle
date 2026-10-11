@@ -228,8 +228,6 @@ namespace KillingMahjong.UI
 
             _countText = Txt(p, "Count", "あと 3 枚", new Vector2(0f, -72f), new Vector2(600f, 22f),
                 16f, TextAlignmentOptions.Center, TextMain);
-            Txt(p, "Note", "選ばなかった3枚は山札に戻ります。出した3枚を選べば、元のままです。", new Vector2(0f, -98f),
-                new Vector2(620f, 20f), 13f, TextAlignmentOptions.Center, TextSub);
 
             // 名前に Confirm を使う（右クリックで戻る機能は Cancel / Close などのボタンを探すので、これは拾われない）
             _confirm = Btn(p, "ConfirmButton", "決定", new Vector2(0f, -142f), new Vector2(220f, 40f), 18f, Marker);
