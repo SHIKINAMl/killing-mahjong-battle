@@ -235,6 +235,7 @@ namespace KillingMahjong.Managers
                 }
             }
             P4StopMotifNow();
+            ClearReturningThemePositions();
             _p3Running = false;
             _p3Fading = false;
             _p3ClipName = null;
@@ -312,17 +313,18 @@ namespace KillingMahjong.Managers
             _p3Decks[1 - _p3Active].Stop();
 
             double at = AudioSettings.dspTime + P3ScheduleLead;
+            int startSample = ReturningThemeStartSample(want, clip);
             var deck = _p3Decks[_p3Active];
             deck.Stop();
             deck.clip = clip;
             deck.loop = true;
-            deck.timeSamples = 0;
+            deck.timeSamples = startSample;
             deck.volume = P3Master;
             deck.PlayScheduled(at);
-            P4StartMotifWith(deck, want, at, 0);
+            P4StartMotifWith(deck, want, at, startSample);
 
             _p3AnchorDsp = at;
-            _p3AnchorSample = 0;
+            _p3AnchorSample = startSample;
             _p3ClipName = want;
             _p3Running = true;
         }
@@ -376,18 +378,19 @@ namespace KillingMahjong.Managers
             var cur = _p3Decks[_p3Active];
             var next = _p3Decks[1 - _p3Active];
             string from = _p3ClipName;
+            RememberReturningThemePosition(from, cur.clip, barPos);
 
             bool sameFamily = cur.clip != null
                               && cur.clip.samples == clip.samples
                               && SameTempo(cur.clip.name, clip.name);
             // **夜卓の灯火は、濃度どうしのときだけ位置を保つ。** ほかの曲は同じ長さ・同じテンポでも
-            // 中身の並びが違うので、新しい曲の1拍目から入れる（AudioManager.Proposal4.cs の頭の説明）
+            // 中身の並びが違うので、その曲自身の保存位置へ戻す。前の曲の秒数は渡さない。
             if (sameFamily && SetPrefixOf(want) == RtPrefix && !(P4IsField(from) && P4IsField(want)))
             {
                 sameFamily = false;
             }
 
-            int startSample = 0;
+            int startSample = ReturningThemeStartSample(want, clip);
             if (sameFamily)
             {
                 long s = (long)Math.Round(barPos * clip.frequency);
@@ -474,13 +477,14 @@ namespace KillingMahjong.Managers
             EnsureProposal3Decks();
             _p3Decks[1 - _p3Active].Stop();
             var deck = _p3Decks[_p3Active];
+            int startSample = ReturningThemeStartSample(want, clip);
             deck.Stop();
             deck.clip = clip;
             deck.loop = true;
-            deck.timeSamples = 0;
+            deck.timeSamples = startSample;
             deck.volume = P3Master;
             deck.PlayScheduled(dspAt);
-            P4StartMotifWith(deck, want, dspAt, 0);
+            P4StartMotifWith(deck, want, dspAt, startSample);
 
             while (AudioSettings.dspTime < dspAt)
             {
@@ -490,7 +494,7 @@ namespace KillingMahjong.Managers
             }
 
             _p3AnchorDsp = dspAt;
-            _p3AnchorSample = 0;
+            _p3AnchorSample = startSample;
             _p3ClipName = want;
             _p3Running = true;
 
@@ -540,6 +544,9 @@ namespace KillingMahjong.Managers
             }
 
             if (ProposalWanted) yield break;
+
+            // 別セットへ出ても栞は残す。タイトル等で StopBGM したときだけ対戦ごとに消す。
+            RememberReturningThemePosition(_p3ClipName, _p3Decks[_p3Active].clip, P3PositionAt(dspAt));
 
             currentPhaseBgmName = null;   // 「もうその曲を鳴らしている」と誤判定させない
             if (CanPlay && UsePhaseBgm)

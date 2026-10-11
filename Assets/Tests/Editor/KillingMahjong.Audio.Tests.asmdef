@@ -1,0 +1,7 @@
+{
+    "name": "KillingMahjong.Audio.Tests",
+    "references": [],
+    "includePlatforms": ["Editor"],
+    "optionalUnityReferences": ["TestAssemblies"],
+    "autoReferenced": false
+}

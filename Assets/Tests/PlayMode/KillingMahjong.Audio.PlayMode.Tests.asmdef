@@ -1,0 +1,6 @@
+{
+    "name": "KillingMahjong.Audio.PlayMode.Tests",
+    "references": [],
+    "optionalUnityReferences": ["TestAssemblies"],
+    "autoReferenced": false
+}
