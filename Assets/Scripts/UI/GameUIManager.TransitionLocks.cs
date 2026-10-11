@@ -29,6 +29,15 @@ namespace KillingMahjong.UI
         /// 順番待ちを通らない演出（配牌・対局開始・ロン・手牌決定の文字など）が流れているあいだは true。
         /// **順番待ちが見るのは、自分の演出を流していないときだけ**なので、スキルのロックは混ざらない。
         /// </summary>
+        /// <summary>
+        /// 画面を覆う演出（配牌・対局開始・ロン・手牌決定の文字など）が流れているか。
+        /// スキルの演出と、牌を動かす短いアニメは数えない。
+        /// 強襲の札（Effects.AssaultMarkUI）が、演出の上に出っぱなしにならないよう隠れるのに使う。
+        /// </summary>
+        internal bool IsCoveredByPhaseEffect =>
+            Locks.IsLockedByOthers(owner => IsQuietTransitionOwner(owner) || (owner != null && owner.StartsWith("skill:")))
+            || (phaseTransitionUI != null && (phaseTransitionUI.IsDarkenTransitioning || PhaseTransitionUI.IsScreenDarkened));
+
         internal bool IsBusyForQueuedEffect =>
             Locks.IsLockedByOthers(IsQuietTransitionOwner)
             || (phaseTransitionUI != null && phaseTransitionUI.IsDarkenTransitioning);

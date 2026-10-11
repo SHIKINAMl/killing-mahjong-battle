@@ -1,4 +1,7 @@
+using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
 using KillingMahjong.Common;
 
 namespace KillingMahjong.UI.Effects
@@ -18,6 +21,12 @@ namespace KillingMahjong.UI.Effects
     /// （<see cref="Clear"/>。BoardStateManager.ClearAllBoardData が呼ぶ）。シーンをまたぐと自分で消える。
     ///
     /// 印は対象を毎コマ追いかける。血の表示が隠れているあいだ（決着の演出など）は一緒に隠れる。
+    ///
+    /// **ほかの画面や演出の上には出ない（2026-10-11 のユーザー指摘）。**
+    /// 印は自前の Canvas に描いているので、設定画面やフェイズの演出が出ても、その上に残っていた。
+    /// 次のどちらかのあいだは描かない（<see cref="IsCovered"/>）:
+    ///   ・画面を覆う演出が流れている（配牌・対局開始・ロンなど。GameUIManager.IsCoveredByPhaseEffect）
+    ///   ・印の場所に、別の画面の見える部品が被さっている（設定・確認・役を選ぶ画面など）
     /// </summary>
     public class AssaultMarkUI : MonoBehaviour
     {
@@ -79,7 +88,7 @@ namespace KillingMahjong.UI.Effects
 
             _shapes.Begin();
             // 対象が消えた・隠れたあいだは描かない（印だけ宙に浮いて見えるのを防ぐ）
-            if (_target != null && _target.gameObject.activeInHierarchy)
+            if (_target != null && _target.gameObject.activeInHierarchy && !IsCovered())
             {
                 Vector2 at = MarkPosition(_stage, _target);
 
@@ -92,6 +101,61 @@ namespace KillingMahjong.UI.Effects
                 DrawTag(_shapes, at, 1f, 1f);
             }
             _shapes.End();
+        }
+
+        private GameUIManager _ui;
+        private bool _covered;
+        private int _coverCheckedFrame = -100;
+        private readonly List<RaycastResult> _hits = new List<RaycastResult>();
+
+        /// <summary>
+        /// 印が、ほかの画面や演出の下になっているはずか。
+        /// 被さりは、印の場所へクリックしたら何に当たるかで見る（数コマに1回）。
+        /// 当たった物が、血の表示とは別の Canvas にあって、はっきり見える色なら「被さっている」。
+        /// 透明な当たり判定だけの部品は数えない（画面全体に敷いてある物がある）。
+        /// </summary>
+        private bool IsCovered()
+        {
+            if (_ui == null) _ui = FindFirstObjectByType<GameUIManager>();
+            if (_ui != null && _ui.isActiveAndEnabled && _ui.IsCoveredByPhaseEffect) return true;
+
+            if (Time.frameCount - _coverCheckedFrame < 3) return _covered;
+            _coverCheckedFrame = Time.frameCount;
+            _covered = false;
+
+            var eventSystem = EventSystem.current;
+            var targetCanvas = _target != null ? _target.GetComponentInParent<Canvas>() : null;
+            if (eventSystem == null || targetCanvas == null) return false;
+
+            Canvas targetRoot = targetCanvas.rootCanvas;
+            Camera camera = targetRoot.renderMode == RenderMode.ScreenSpaceOverlay ? null : targetRoot.worldCamera;
+            Vector2 screen = RectTransformUtility.WorldToScreenPoint(camera, _target.TransformPoint(_target.rect.center));
+
+            var pointer = new PointerEventData(eventSystem) { position = screen };
+            _hits.Clear();
+            eventSystem.RaycastAll(pointer, _hits);
+            foreach (var hit in _hits)
+            {
+                if (hit.gameObject == null) continue;
+                var graphic = hit.gameObject.GetComponent<Graphic>();
+                if (graphic == null || graphic.color.a * graphic.canvasRenderer.GetInheritedAlpha() < 0.5f) continue;
+
+                var canvas = hit.gameObject.GetComponentInParent<Canvas>();
+                if (canvas == null) continue;
+                // 自分の札そのものに当たっただけ。被さりではない
+                if (_stage != null && canvas.rootCanvas == _stage.Canvas.rootCanvas) continue;
+                // **血の表示より手前に描かれる Canvas だけを「被さり」と数える。**
+                // 同じ段や奥の Canvas にも、この場所に当たる部品がある（盤面の枠など。試して分かった）
+                Canvas hitRoot = canvas.rootCanvas;
+                if (hitRoot == targetRoot) break;
+                bool inFront = targetRoot.renderMode == RenderMode.ScreenSpaceOverlay
+                    ? hitRoot.renderMode == RenderMode.ScreenSpaceOverlay && hitRoot.sortingOrder > targetRoot.sortingOrder
+                    : hitRoot.renderMode == RenderMode.ScreenSpaceOverlay || hitRoot.sortingOrder > targetRoot.sortingOrder;
+                if (!inFront) continue;
+                _covered = true;
+                break;
+            }
+            return _covered;
         }
 
         private static readonly Color Paper = new Color32(0xF2, 0xE6, 0xC8, 0xFF);
