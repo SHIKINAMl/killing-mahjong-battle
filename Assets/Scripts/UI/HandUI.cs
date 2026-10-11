@@ -118,6 +118,8 @@ namespace KillingMahjong.UI
             {
                 reselectButton = Instantiate(decideButton, decideButton.transform.parent);
                 reselectButton.name = "ReselectButton";
+                // 決定が13枚未満で無効でも、取り下げ操作にはその状態を引き継がない。
+                reselectButton.interactable = true;
                 reselectButton.onClick.RemoveAllListeners();
                 reselectButton.onClick.AddListener(OnReselectClicked);
                 
@@ -480,6 +482,7 @@ namespace KillingMahjong.UI
                     && !gameUIManager.IsMulliganSelection && !gameUIManager.IsTutorialMode
                     && (gameUIManager.HandSelectionController == null
                         || !gameUIManager.HandSelectionController.IsSelectionLockedIn);
+                reselectButton.interactable = canReselect;
                 reselectButton.gameObject.SetActive(canReselect);
             }
             UpdatePhaseGuide(phaseStatus);
@@ -515,6 +518,8 @@ namespace KillingMahjong.UI
 
             if (peekButton != null)
             {
+                // 決定ボタンの枚数制限とは独立。相手の手番でも自分の手牌は見られる。
+                peekButton.interactable = peekPhase;
                 peekButton.gameObject.SetActive(peekPhase);
                 if (peekPhase)
                 {

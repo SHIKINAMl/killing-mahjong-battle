@@ -11,6 +11,8 @@ namespace KillingMahjong.UI
         {
             peekButton = Instantiate(decideButton, decideButton.transform.parent);
             peekButton.name = "HandPeekButton";
+            // 複製元が無効なタイミングでも、覗き見を暗い無効表示のまま残さない。
+            peekButton.interactable = true;
             peekButton.onClick.RemoveAllListeners();   // 押しっぱなしで見るので click は使わない
 
             // **「決定」と同じ高さには置けない。** 打牌フェイズでは山牌が下へ降りてくるので
