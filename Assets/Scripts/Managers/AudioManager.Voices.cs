@@ -11,7 +11,11 @@ namespace KillingMahjong.Managers
             if (!CanPlay) return;
             if (clip != null && voiceSource != null)
             {
-                voiceSource.PlayOneShot(clip, voiceVolume * masterVolume);
+                // **音量の設定は voiceSource.volume に入っている**（ApplyVolumes）。
+                // ここでもう一度 voiceVolume を掛けると二重になり、設定が半分のとき声は 1/4 になっていた
+                // （2026-10-11 に直した。ユーザーの指摘「ロンや役名の声が小さい」）。
+                // 掛けるのは、素材ごとの音量をそろえる倍率だけ（VoiceGain。1 を超えてよい）
+                voiceSource.PlayOneShot(clip, VoiceGain.Of(clip));
             }
         }
 
