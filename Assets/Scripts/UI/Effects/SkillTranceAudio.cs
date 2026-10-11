@@ -12,8 +12,8 @@ namespace KillingMahjong.UI.Effects
     /// ユーザーの指示で、**自分が使うすべてのスキルの演出**に同じ段取りを掛けるため、ここへ切り出した。
     ///
     ///   始まる    … BGM が水の中に入ったように沈む。深く沈んだ音「ずーーーん」が流れ続ける
-    ///   終わる    … 白く光り、集中が抜ける音「さーーーっ」。沈んだ音は切れる
-    ///   そのあと  … 約1秒おいて心音「どくっ どくっ どく」。それに合わせて BGM が元の音へ戻る
+    ///   終わる    … 白く光り、集中が抜ける音「さーーーっ」。沈んだ音は切れ、BGM がすぐ元の音へ戻る（0.6秒）
+    ///   そのあと  … 約1秒おいて心音「どくっ どくっ どく」
     ///
     /// 使い方は2通り:
     ///
@@ -45,10 +45,17 @@ namespace KillingMahjong.UI.Effects
         private const float FlashToHeartbeat = 0.95f;
 
         /// <summary>
-        /// 心音と一緒に BGM を戻すのにかける秒数。
-        /// 心音の素材は 1.84 秒・3拍なので、だいたい最後の拍で戻りきる長さにする。
+        /// BGM を戻すのにかける秒数。**光ると同時に戻し始める**（2026-10-11 のユーザー指示
+        /// 「演出から BGM が戻るのが少し遅い。もっと早く元に戻していい」）。
+        ///
+        /// それまでは、光ってから 0.95 秒待ち、心音3拍に合わせて 1.7 秒かけて戻していた
+        /// （光ってから戻りきるまで約 2.65 秒）。いまは光った瞬間から 0.6 秒で戻りきる。
+        /// 心音は今までどおり、光ってから 0.95 秒後に鳴る（もう BGM は戻っている）。
         /// </summary>
-        private const float BgmReturnDuration = 1.7f;
+        private const float BgmReturnDuration = 0.6f;
+
+        /// <summary>心音の素材の長さ（秒）。鳴らしきるまで、この部品を残しておく。</summary>
+        private const float HeartbeatSeconds = 1.84f;
 
         /// <summary>心音3拍の間合い（秒）。SE素材が挿さっていないときの代替。</summary>
         private static readonly float[] HeartbeatGaps = { 0.00f, 0.42f, 0.36f };
@@ -100,6 +107,8 @@ namespace KillingMahjong.UI.Effects
             {
                 audio.StopClairvoyanceLoop();
                 if (hasSe) audio.PlayClairvoyanceFlashReturn();
+                // 光ると同時に BGM を戻し始める
+                if (hasSe) audio.SetBgmDeepMuffle(false, BgmReturnDuration);
             }
 
             yield return new WaitForSeconds(FlashSettle);
@@ -109,12 +118,8 @@ namespace KillingMahjong.UI.Effects
             {
                 // 抜ける音が鳴っているあいだは待つ
                 yield return new WaitForSeconds(FlashToHeartbeat - FlashSettle);
-                if (s_owner == this)
-                {
-                    audio.PlayClairvoyanceHeartbeat();
-                    audio.SetBgmDeepMuffle(false, BgmReturnDuration);
-                }
-                yield return new WaitForSeconds(BgmReturnDuration);
+                if (s_owner == this) audio.PlayClairvoyanceHeartbeat();
+                yield return new WaitForSeconds(HeartbeatSeconds);
             }
             else
             {
