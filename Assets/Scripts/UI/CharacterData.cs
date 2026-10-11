@@ -156,5 +156,53 @@ namespace KillingMahjong.UI
 
         [Header("Reactions")]
         public System.Collections.Generic.List<CharacterReaction> reactions = new System.Collections.Generic.List<CharacterReaction>();
+
+        /// <summary>
+        /// 絵を出さず、仮の四角で出す（2026-10-11 のユーザー指示）。
+        /// チュートリアルの女の子の絵を描き直すまでの間に合わせ。絵の指定（上の bodySprites など）は
+        /// 消さずに残してあるので、この印を外せば元の絵に戻る。
+        /// 四角は <see cref="CharacterPlaceholder"/> が作る。立ち絵（EnemyInfoUI）と相手のカットインに効く。
+        /// </summary>
+        [Header("Placeholder (仮の四角)")]
+        public bool showAsPlaceholder;
+        public Color placeholderColor = new Color(0.34f, 0.34f, 0.40f, 1f);
+    }
+
+    /// <summary>
+    /// キャラクターの絵の代わりに出す、仮の四角。絵の素材は使わず、1色の四角をその場で作る。
+    /// </summary>
+    public static class CharacterPlaceholder
+    {
+        private static readonly System.Collections.Generic.Dictionary<Sprite, Sprite> Cache =
+            new System.Collections.Generic.Dictionary<Sprite, Sprite>();
+        private static Texture2D _texture;
+
+        /// <summary>
+        /// <paramref name="reference"/>（元の立ち絵）と同じ場所に収まる四角を返す。
+        /// 一辺は、元の絵の幅と高さの小さいほうの半分。元の絵の真ん中に来るように軸を合わせる。
+        /// </summary>
+        public static Sprite SquareFor(Sprite reference)
+        {
+            if (reference == null) return null;
+            if (Cache.TryGetValue(reference, out Sprite cached) && cached != null) return cached;
+
+            if (_texture == null)
+            {
+                _texture = new Texture2D(4, 4, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, name = "CharacterPlaceholder" };
+                var pixels = new Color32[16];
+                for (int i = 0; i < pixels.Length; i++) pixels[i] = new Color32(255, 255, 255, 255);
+                _texture.SetPixels32(pixels);
+                _texture.Apply();
+            }
+
+            Bounds bounds = reference.bounds;
+            float side = Mathf.Max(0.01f, Mathf.Min(bounds.size.x, bounds.size.y) * 0.5f);
+            // 四角の真ん中を、元の絵の真ん中（軸からのずれ bounds.center）へ持っていく
+            var pivot = new Vector2(0.5f - bounds.center.x / side, 0.5f - bounds.center.y / side);
+            var square = Sprite.Create(_texture, new Rect(0, 0, 4, 4), pivot, 4f / side);
+            square.name = "CharacterPlaceholderSquare";
+            Cache[reference] = square;
+            return square;
+        }
     }
 }

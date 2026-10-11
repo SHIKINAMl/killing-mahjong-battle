@@ -578,6 +578,13 @@ namespace KillingMahjong.UI
 
                 var faceMatch = characterData.faceSprites?.Find(x => x.id == characterData.defaultFaceId);
                 if (faceMatch != null) faceSprite = faceMatch.sprite;
+
+                // 仮の四角で出すキャラクターは、カットインも四角にする（顔は重ねない）
+                if (characterData.showAsPlaceholder)
+                {
+                    bodySprite = CharacterPlaceholder.SquareFor(bodySprite);
+                    faceSprite = null;
+                }
             }
             else
             {

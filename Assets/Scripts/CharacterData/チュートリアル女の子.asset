@@ -981,3 +981,5 @@ MonoBehaviour:
     manfuType: 5
     duration: 0
     voiceClip: {fileID: 0}
+  showAsPlaceholder: 1
+  placeholderColor: {r: 0.34, g: 0.34, b: 0.4, a: 1}
