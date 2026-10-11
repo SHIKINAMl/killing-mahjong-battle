@@ -118,6 +118,8 @@ namespace KillingMahjong.UI
 
         private List<int> _lastWallIds = new List<int>();
         private List<int> _lastHandIds = new List<int>();
+        private List<int> _lastHandIndexes = new List<int>();
+        private List<int> _lastOriginalWallIds = new List<int>();
 
         /// <summary>
         /// 差分リビルドのキャッシュを捨てて、次回を必ずフルリビルドにする。
@@ -130,6 +132,8 @@ namespace KillingMahjong.UI
         {
             _lastWallIds.Clear();
             _lastHandIds.Clear();
+            _lastHandIndexes.Clear();
+            _lastOriginalWallIds.Clear();
         }
 
         public IEnumerator PlayHandSortAnimationRoutine()
@@ -138,9 +142,9 @@ namespace KillingMahjong.UI
         }
 
 
-        public IEnumerator PlayTransitionAnimationRoutine(System.Action onUpdateState)
+        public IEnumerator PlayTransitionAnimationRoutine(System.Action onUpdateState, TileInteraction clickedTile = null)
         {
-            return _moveAnimator.PlayTransitionAnimationRoutine(onUpdateState);
+            return _moveAnimator.PlayTransitionAnimationRoutine(onUpdateState, clickedTile);
         }
 
         /// <summary>Rebuildの差分検出用キャッシュを現在の盤面状態と同期する（TileMoveAnimatorから使用）</summary>
@@ -148,6 +152,8 @@ namespace KillingMahjong.UI
         {
             _lastWallIds = new List<int>(BoardStateManager.Instance.CurrentWallTiles);
             _lastHandIds = new List<int>(BoardStateManager.Instance.CurrentHandTiles);
+            _lastHandIndexes = new List<int>(BoardStateManager.Instance.LocalHandIndexes);
+            _lastOriginalWallIds = new List<int>(BoardStateManager.Instance.OriginalWallTiles);
         }
     }
 }

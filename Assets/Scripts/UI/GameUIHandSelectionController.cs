@@ -212,6 +212,14 @@ namespace KillingMahjong.UI
             handTiles = new List<int>(BoardStateManager.Instance.CurrentHandTiles);
             if (handTiles.Count != 13) return false;
 
+            var board = BoardStateManager.Instance;
+            if (BoardStateManager.HandIndexesMatch(board.OriginalWallTiles, handTiles, board.LocalHandIndexes))
+            {
+                handIndexes = new List<int>(board.LocalHandIndexes);
+                handIndexes.Sort();
+                return true;
+            }
+
             if (BoardStateManager.Instance.TargetHandIndexes != null
                 && BoardStateManager.Instance.TargetHandIndexes.Count == 13)
             {

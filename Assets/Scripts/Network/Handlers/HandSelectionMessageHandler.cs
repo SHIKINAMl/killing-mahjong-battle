@@ -119,7 +119,8 @@ namespace KillingMahjong.Network.Handlers
 
                 if (h.client_id == localPlayerId)
                 {
-                    board.SetLocalState(wallTiles, handTiles, waitTiles);
+                    // この通知のhandは牌の値。手動で選んだ実物の位置は、値が一致する限り保持する。
+                    board.SetLocalState(wallTiles, handTiles, waitTiles, new List<int>(board.LocalHandIndexes));
                 }
                 else
                 {

@@ -33,6 +33,7 @@ namespace KillingMahjong.Managers
         public HashSet<int> ExposedLocalHandWallIndexes { get; private set; } = new HashSet<int>();
         
         public List<int> SelectedTileIds { get; private set; } = new List<int>();
+        public int SelectedWallIndex { get; private set; } = -1;
         public List<int[]> CurrentTenpaiExamples { get; private set; } = new List<int[]>();
         
         // 追加: 強化された役の保持
@@ -215,6 +216,7 @@ namespace KillingMahjong.Managers
             EnemyHandIndexes.Clear();
             CurrentEnemyWallTiles.Clear();
             SelectedTileIds.Clear();
+            SelectedWallIndex = -1;
             CurrentWaitTiles.Clear();
             NonManganWaitTiles.Clear();
             DiscardedWallIndexes.Clear();
@@ -243,7 +245,7 @@ namespace KillingMahjong.Managers
         /// <summary>
         /// 全データを外部から受け取って一括セットする（サーバーからのwall_dealt/hand_selectedなど）
         /// </summary>
-        public void SetLocalState(List<int> wall, List<int> hand, List<int> wait = null)
+        public void SetLocalState(List<int> wall, List<int> hand, List<int> wait = null, List<int> handIndexes = null)
         {
             if (wall != null && wall.Count > 0)
             {
@@ -256,11 +258,17 @@ namespace KillingMahjong.Managers
                 // 値一致で壁スロットを1枚ずつ消費して手牌に割り当てる（重複牌対応）。
                 // 完全一致を優先し、無ければ baseId(0x1F) でドラフラグ差を許容して照合する。
                 List<int> remainingHand = hand != null ? new List<int>(hand) : null;
+                // サーバーや手動選択が持つ実物の位置を優先する。同種牌を先頭から探し直さない。
+                bool hasExactIndexes = HandIndexesMatch(wall, hand, handIndexes);
 
                 for (int i = 0; i < wall.Count; i++)
                 {
                     int matchIdx = -1;
-                    if (remainingHand != null)
+                    if (hasExactIndexes)
+                    {
+                        if (handIndexes.Contains(i)) matchIdx = remainingHand.IndexOf(wall[i]);
+                    }
+                    else if (remainingHand != null)
                     {
                         matchIdx = remainingHand.IndexOf(wall[i]);
                         if (matchIdx < 0)
@@ -278,7 +286,7 @@ namespace KillingMahjong.Managers
                     }
                     else
                     {
-                        displayWall.Add(wall[i]);
+                        if (!DiscardedWallIndexes.Contains(i)) displayWall.Add(wall[i]);
                     }
                 }
 
@@ -405,7 +413,7 @@ namespace KillingMahjong.Managers
         {
             for (int i = 0; i < OriginalWallTiles.Count; i++)
             {
-                if (OriginalWallTiles[i] == tileId && !DiscardedWallIndexes.Contains(i))
+                if (OriginalWallTiles[i] == tileId && !DiscardedWallIndexes.Contains(i) && !LocalHandIndexes.Contains(i))
                 {
                     return i;
                 }
@@ -453,8 +461,9 @@ namespace KillingMahjong.Managers
 
         // --- 牌の操作ロジック ---
 
-        public bool MoveTileToHand(int tileId)
+        public bool MoveTileToHand(int tileId, int wallIndex = -1)
         {
+            if (wallIndex >= 0 && !IsLocalTileAt(wallIndex, tileId, false)) return false;
             Debug.Log($"[BoardStateManager] MoveTileToHand called with tileId: {tileId}");
             int actualId = tileId;
             if (!CurrentWallTiles.Contains(tileId))
@@ -476,8 +485,10 @@ namespace KillingMahjong.Managers
             Debug.Log($"[BoardStateManager] CurrentHandTiles count: {CurrentHandTiles.Count}");
             if (CurrentHandTiles.Count < 13)
             {
+                if (wallIndex < 0) wallIndex = FindAvailableWallIndex(actualId);
                 CurrentWallTiles.Remove(actualId);
                 CurrentHandTiles.Add(actualId);
+                if (wallIndex >= 0) LocalHandIndexes.Add(wallIndex);
                 Debug.Log($"[BoardStateManager] Moved actualId {actualId} to hand. Invoking OnTileMovedToHand.");
                 OnTileMovedToHand?.Invoke(actualId);
                 return true;
@@ -486,12 +497,19 @@ namespace KillingMahjong.Managers
             return false;
         }
 
-        public bool MoveTileToWall(int tileId)
+        public bool MoveTileToWall(int tileId, int wallIndex = -1)
         {
+            if (wallIndex >= 0 && !IsLocalTileAt(wallIndex, tileId, true)) return false;
             if (CurrentHandTiles.Contains(tileId))
             {
+                if (wallIndex < 0)
+                {
+                    int handSlot = LocalHandIndexes.FindIndex(i => i >= 0 && i < OriginalWallTiles.Count && OriginalWallTiles[i] == tileId);
+                    if (handSlot >= 0) wallIndex = LocalHandIndexes[handSlot];
+                }
                 CurrentHandTiles.Remove(tileId);
                 CurrentWallTiles.Add(tileId);
+                LocalHandIndexes.Remove(wallIndex);
                 OnTileMovedToWall?.Invoke(tileId);
                 return true;
             }
@@ -511,18 +529,20 @@ namespace KillingMahjong.Managers
         }
 
 
-        public void SelectTile(int tileId, bool multiSelect)
+        public void SelectTile(int tileId, bool multiSelect, int wallIndex = -1)
         {
             if (!multiSelect) ClearSelection(false);
             if (!SelectedTileIds.Contains(tileId)) 
             {
                 SelectedTileIds.Add(tileId);
             }
+            SelectedWallIndex = wallIndex;
             OnSelectionChanged?.Invoke();
         }
 
         public void SelectTiles(List<int> ids)
         {
+            SelectedWallIndex = -1;
             SelectedTileIds = new List<int>(ids);
             OnSelectionChanged?.Invoke();
         }
@@ -530,12 +550,32 @@ namespace KillingMahjong.Managers
         public void ClearSelection(bool fireEvent = true)
         {
             SelectedTileIds.Clear();
+            SelectedWallIndex = -1;
             if (fireEvent) OnSelectionChanged?.Invoke();
         }
 
         public bool IsTileSelected(int tileId)
         {
             return SelectedTileIds.Contains(tileId);
+        }
+
+        public bool IsLocalTileAt(int wallIndex, int tileId, bool inHand)
+        {
+            return wallIndex >= 0 && wallIndex < OriginalWallTiles.Count
+                && OriginalWallTiles[wallIndex] == tileId && !DiscardedWallIndexes.Contains(wallIndex)
+                && LocalHandIndexes.Contains(wallIndex) == inHand;
+        }
+
+        public static bool HandIndexesMatch(List<int> wall, List<int> hand, List<int> indexes)
+        {
+            if (wall == null || hand == null || indexes == null || hand.Count != indexes.Count) return false;
+            var remaining = new List<int>(hand);
+            var used = new HashSet<int>();
+            foreach (int i in indexes)
+            {
+                if (i < 0 || i >= wall.Count || !used.Add(i) || !remaining.Remove(wall[i])) return false;
+            }
+            return remaining.Count == 0;
         }
         
         public void RemoveTileFromWall(int discardedTileId)

@@ -39,7 +39,9 @@ namespace KillingMahjong.UI
 
             bool needFullRebuild = true;
 
-            if (_lastWallIds.Count == currentWallIds.Count && _lastHandIds.Count == currentHandIds.Count)
+            if (new HashSet<int>(_lastHandIndexes).SetEquals(board.LocalHandIndexes)
+                && System.Linq.Enumerable.SequenceEqual(_lastOriginalWallIds, board.OriginalWallTiles)
+                && _lastWallIds.Count == currentWallIds.Count && _lastHandIds.Count == currentHandIds.Count)
             {
                 List<int> oldWallIds = new List<int>(_lastWallIds);
                 List<int> newWallIds = new List<int>(currentWallIds);
@@ -75,6 +77,8 @@ namespace KillingMahjong.UI
 
             _lastWallIds = currentWallIds;
             _lastHandIds = currentHandIds;
+            _lastHandIndexes = new List<int>(board.LocalHandIndexes);
+            _lastOriginalWallIds = new List<int>(board.OriginalWallTiles);
 
             _lastSuppressedIndices.Clear();
             if (uiManager.TilePrefab == null) return;
@@ -117,6 +121,18 @@ namespace KillingMahjong.UI
                 {
                     List<int> combinedIds = new List<int>(board.CurrentWallTiles);
                     combinedIds.AddRange(board.CurrentHandTiles);
+                    var remainingIds = new List<int>(combinedIds);
+                    var combinedIndexes = new List<int>();
+                    combinedIds.Clear();
+                    for (int i = 0; i < board.OriginalWallTiles.Count; i++)
+                    {
+                        int id = board.OriginalWallTiles[i];
+                        if (board.DiscardedWallIndexes.Contains(i) || !remainingIds.Remove(id)) continue;
+                        combinedIds.Add(id);
+                        combinedIndexes.Add(i);
+                    }
+                    // 山を持たない表示用データだけは従来の値による配置に戻す。
+                    foreach (int id in remainingIds) { combinedIds.Add(id); combinedIndexes.Add(-1); }
 
                     List<RectTransform> combinedGenerated = new List<RectTransform>();
                     foreach (var id in combinedIds)
@@ -130,7 +146,7 @@ namespace KillingMahjong.UI
                         }
                     }
 
-                    uiManager.WallUI.LayoutWallTiles(combinedGenerated, combinedIds, board.CurrentWaitTiles, uiManager.CurrentPhaseStatus == RoundStatus.Discard);
+                    uiManager.WallUI.LayoutWallTiles(combinedGenerated, combinedIds, board.CurrentWaitTiles, uiManager.CurrentPhaseStatus == RoundStatus.Discard, combinedIndexes);
 
                     if (uiManager.HandUI != null)
                     {
@@ -143,9 +159,13 @@ namespace KillingMahjong.UI
                             }
                         }
 
+                        bool exactHand = BoardStateManager.HandIndexesMatch(board.OriginalWallTiles, board.CurrentHandTiles, board.LocalHandIndexes);
+                        var handIndexes = new List<int>(board.LocalHandIndexes);
                         foreach (var id in board.CurrentHandTiles)
                         {
-                            RectTransform rt = uiManager.WallUI.GrabTileById(id);
+                            int handIndex = exactHand ? handIndexes.Find(i => board.OriginalWallTiles[i] == id) : -1;
+                            if (exactHand) handIndexes.Remove(handIndex);
+                            RectTransform rt = exactHand ? uiManager.WallUI.GrabTileByWallIndex(handIndex) : uiManager.WallUI.GrabTileById(id);
                             if (rt != null)
                             {
                                 InitializeTileComponent(rt, id, true);

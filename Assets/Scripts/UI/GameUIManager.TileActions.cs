@@ -10,6 +10,22 @@ namespace KillingMahjong.UI
     // クラス・namespace・[SerializeField] は変えていないのでシーン参照には影響しない。
     public partial class GameUIManager
     {
+        private int pendingDiscardWallIndex = -1;
+
+        private bool IsCurrentTileInArea(TileInteraction tile, bool inHand)
+        {
+            if (tile == null) return true; // 従来のID指定APIは自動選択用に残す。
+            if (!HasBoardState || tile.IsInHand != inHand) return false;
+            var rect = tile.GetComponent<RectTransform>();
+            bool inSlots = inHand ? handUI != null && handUI.GetHandSlots().Contains(rect)
+                : wallUI != null && wallUI.GetWallSlots().Contains(rect);
+            return inSlots && BoardStateManager.Instance.IsLocalTileAt(tile.WallIndex, tile.TileId, inHand);
+        }
+
+        public bool IsCurrentTile(TileInteraction tile)
+        {
+            return tile != null && IsCurrentTileInArea(tile, tile.IsInHand);
+        }
         // --- Entry points from external classes / old API ---
 
         /// <summary>
@@ -47,9 +63,10 @@ namespace KillingMahjong.UI
 
         // --- UI interaction wrappers bridging to BoardStateManager ---
 
-        public void MoveTileToHand(int tileId)
+        public void MoveTileToHand(int tileId, TileInteraction clickedTile = null)
         {
             if (!HasBoardState) return;
+            if (IsTransitioning || !IsCurrentTileInArea(clickedTile, false)) return;
             if (currentPhaseStatus != RoundStatus.HandSelection) return;
             if (handUI != null && handUI.IsSubmitted)
             {
@@ -72,13 +89,13 @@ namespace KillingMahjong.UI
             {
                 StartCoroutine(VisualController.PlayTransitionAnimationRoutine(() =>
                 {
-                    MoveTileToHandByPlayer(tileId);
+                    MoveTileToHandByPlayer(tileId, clickedTile != null ? clickedTile.WallIndex : -1);
                     ClearSelection();
-                }));
+                }, clickedTile));
             }
             else
             {
-                MoveTileToHandByPlayer(tileId);
+                MoveTileToHandByPlayer(tileId, clickedTile != null ? clickedTile.WallIndex : -1);
                 ClearSelection();
             }
         }
@@ -90,19 +107,20 @@ namespace KillingMahjong.UI
         /// ここを通らないので出ない（<see cref="GameUIHandSelectionController.ArmInstantRankCall"/>）。
         /// 印は盤面を動かす前に立てる。動かした瞬間に手牌の並べ直しが走り、そこで印を見るため。
         /// </summary>
-        private void MoveTileToHandByPlayer(int tileId)
+        private void MoveTileToHandByPlayer(int tileId, int wallIndex)
         {
             var board = BoardStateManager.Instance;
             bool completesHand = board.CurrentHandTiles != null && board.CurrentHandTiles.Count == 12;
             if (completesHand && HandSelectionController != null) HandSelectionController.ArmInstantRankCall();
 
-            bool moved = board.MoveTileToHand(tileId);
+            bool moved = board.MoveTileToHand(tileId, wallIndex);
             if (!moved && completesHand && HandSelectionController != null) HandSelectionController.DisarmInstantRankCall();
         }
 
-        public void MoveTileToWall(int tileId)
+        public void MoveTileToWall(int tileId, TileInteraction clickedTile = null)
         {
             if (!HasBoardState) return;
+            if (IsTransitioning || !IsCurrentTileInArea(clickedTile, true)) return;
             if (currentPhaseStatus != RoundStatus.HandSelection) return;
             if (handUI != null && handUI.IsSubmitted) return;
 
@@ -120,13 +138,13 @@ namespace KillingMahjong.UI
             {
                 StartCoroutine(VisualController.PlayTransitionAnimationRoutine(() =>
                 {
-                    BoardStateManager.Instance.MoveTileToWall(tileId);
+                    BoardStateManager.Instance.MoveTileToWall(tileId, clickedTile != null ? clickedTile.WallIndex : -1);
                     ClearSelection();
-                }));
+                }, clickedTile));
             }
             else
             {
-                BoardStateManager.Instance.MoveTileToWall(tileId);
+                BoardStateManager.Instance.MoveTileToWall(tileId, clickedTile != null ? clickedTile.WallIndex : -1);
                 ClearSelection();
             }
         }
@@ -184,12 +202,13 @@ namespace KillingMahjong.UI
             }
         }
 
-        public void SelectTile(int tileId, bool isInHand, bool multiSelect)
+        public void SelectTile(int tileId, bool isInHand, bool multiSelect, TileInteraction clickedTile = null)
         {
             if (!HasBoardState) return;
+            if (IsTransitioning || !IsCurrentTileInArea(clickedTile, isInHand)) return;
             if (currentPhaseStatus == RoundStatus.Discard && !BoardStateManager.Instance.IsLocalTurn) return;
 
-            BoardStateManager.Instance.SelectTile(tileId, multiSelect);
+            BoardStateManager.Instance.SelectTile(tileId, multiSelect, clickedTile != null ? clickedTile.WallIndex : -1);
             DeselectAbility();
         }
 
@@ -207,10 +226,11 @@ namespace KillingMahjong.UI
             BoardStateManager.Instance.ClearSelection();
         }
 
-        public bool IsTileSelected(int tileId)
+        public bool IsTileSelected(int tileId, TileInteraction clickedTile = null)
         {
             if (!HasBoardState) return false;
-            return BoardStateManager.Instance.IsTileSelected(tileId);
+            return BoardStateManager.Instance.IsTileSelected(tileId)
+                && (clickedTile == null || BoardStateManager.Instance.SelectedWallIndex == clickedTile.WallIndex);
         }
 
         public void DiscardSelectedTile()
@@ -222,6 +242,9 @@ namespace KillingMahjong.UI
             if (dialogueUI != null && dialogueUI.IsLogOpen) return;
 
             int tileToDiscard = BoardStateManager.Instance.SelectedTileIds[0];
+            var board = BoardStateManager.Instance;
+            int wallIndex = board.SelectedWallIndex >= 0 ? board.SelectedWallIndex : board.FindAvailableWallIndex(tileToDiscard);
+            if (!board.IsLocalTileAt(wallIndex, tileToDiscard, false)) { ClearSelection(); return; }
 
             if (IsTutorialMode && TutorialManager != null)
             {
@@ -239,7 +262,7 @@ namespace KillingMahjong.UI
                 // 疑似的に河へ移動
                 if (wallUI != null)
                 {
-                    RectTransform tileRt = wallUI.GrabTileById(tileToDiscard);
+                    RectTransform tileRt = wallUI.GrabTileByWallIndex(wallIndex);
                     if (tileRt != null)
                     {
                         if (riverUI != null) riverUI.AddExistingTile(tileRt, tileToDiscard);
@@ -261,9 +284,7 @@ namespace KillingMahjong.UI
 
             BoardStateManager.Instance.SetLocalTurn(false);
 
-            int wallIndex = BoardStateManager.Instance.FindAvailableWallIndex(tileToDiscard);
-            if (wallIndex < 0) wallIndex = tileToDiscard;
-
+            pendingDiscardWallIndex = wallIndex;
             BoardStateManager.Instance.MarkWallIndexAsDiscarded(wallIndex);
             SendActionToServer("discard", new ActionPayload { wall_index = wallIndex, tile = tileToDiscard });
             ClearSelection();
@@ -376,7 +397,9 @@ namespace KillingMahjong.UI
 
                 if (wallUI != null && riverUI != null)
                 {
-                    RectTransform tileRt = wallUI.GrabTile(discardedTileId);
+                    bool exactPending = pendingDiscardWallIndex >= 0 && pendingDiscardWallIndex < BoardStateManager.Instance.OriginalWallTiles.Count
+                        && BoardStateManager.Instance.OriginalWallTiles[pendingDiscardWallIndex] == discardedTileId;
+                    RectTransform tileRt = exactPending ? wallUI.GrabTileByWallIndex(pendingDiscardWallIndex) : wallUI.GrabTile(discardedTileId);
                     if (tileRt != null)
                     {
                         riverUI.AddExistingTile(tileRt, discardedTileId);
@@ -388,6 +411,7 @@ namespace KillingMahjong.UI
 
                     wallUI.UpdateWallHighlights(BoardStateManager.Instance.CurrentWaitTiles, currentPhaseStatus == RoundStatus.Discard);
                 }
+                pendingDiscardWallIndex = -1;
             }
             else
             {
@@ -420,6 +444,7 @@ namespace KillingMahjong.UI
 
         public void ClearAllTiles()
         {
+            pendingDiscardWallIndex = -1;
             if (handUI != null)
             {
                 foreach (RectTransform t in handUI.GetHandSlots().ToArray()) if (t != null) VisualController.ReturnTileToPool(t.gameObject);

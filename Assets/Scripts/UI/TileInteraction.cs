@@ -45,7 +45,8 @@ namespace KillingMahjong.UI
 
         public void OnPointerClick(PointerEventData eventData)
         {
-            if (_gameUIManager != null && _gameUIManager.IsTransitioning) return;
+            if (_gameUIManager == null || _gameUIManager.IsTransitioning) return;
+            if (!_gameUIManager.IsMulliganSelection && !_gameUIManager.IsCurrentTile(this)) return;
             
             // アニメーション中もホバーを受け付ける
             Debug.Log($"[TileInteraction] OnPointerClick called. TileId: {TileId}, IsInHand: {IsInHand}, Button: {eventData.button}, Phase: {(_gameUIManager != null ? _gameUIManager.CurrentPhaseStatus.ToString() : "null")}");
@@ -65,20 +66,20 @@ namespace KillingMahjong.UI
                 if (eventData.button == PointerEventData.InputButton.Left)
                 {
                     // 既に選択されていたら（浮いている状態なら）捨てる
-                    if (_gameUIManager.IsTileSelected(TileId))
+                    if (_gameUIManager.IsTileSelected(TileId, this))
                     {
                         _gameUIManager.DiscardSelectedTile();
                     }
                     else
                     {
                         // 左クリック：選択（または選択解除）
-                        _gameUIManager.SelectTile(TileId, IsInHand, false);
+                        _gameUIManager.SelectTile(TileId, IsInHand, false, this);
                     }
                 }
                 else if (eventData.button == PointerEventData.InputButton.Right)
                 {
                     // 右クリック：選択して即座に打牌
-                    _gameUIManager.SelectTile(TileId, IsInHand, false);
+                    _gameUIManager.SelectTile(TileId, IsInHand, false, this);
                     _gameUIManager.DiscardSelectedTile();
                 }
                 return;
@@ -109,7 +110,7 @@ namespace KillingMahjong.UI
                 }
                 else
                 {
-                    _gameUIManager.MoveTileToWall(TileId);
+                    _gameUIManager.MoveTileToWall(TileId, this);
                 }
             }
             else
@@ -121,7 +122,7 @@ namespace KillingMahjong.UI
                 else
                 {
                     Debug.Log($"[TileInteraction] Calling MoveTileToHand for TileId: {TileId}");
-                    _gameUIManager.MoveTileToHand(TileId);
+                    _gameUIManager.MoveTileToHand(TileId, this);
                 }
             }
         }

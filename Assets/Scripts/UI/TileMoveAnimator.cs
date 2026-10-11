@@ -45,7 +45,7 @@ namespace KillingMahjong.UI
 
             if (uiManager.WallUI != null && uiManager.HandUI != null)
             {
-                RectTransform movedTile = uiManager.WallUI.GrabTile(tileId);
+                RectTransform movedTile = GrabMovedWallTile(tileId, null);
                 if (movedTile != null)
                 {
                     Vector2 startScreenPos = GetScreenPosition(movedTile);
@@ -84,7 +84,7 @@ namespace KillingMahjong.UI
             foreach (RectTransform t in uiManager.HandUI.GetHandSlots())
             {
                 var interaction = t.GetComponent<TileInteraction>();
-                if (interaction != null && interaction.TileId == tileId)
+                if (interaction != null && interaction.TileId == tileId && IsMovedOutOfHand(interaction))
                 {
                     movedTile = t;
                     break;
@@ -116,6 +116,20 @@ namespace KillingMahjong.UI
                     movedTile.anchoredPosition = Vector2.zero;
                 }
             }
+        }
+
+        private static bool IsMovedOutOfHand(TileInteraction tile)
+        {
+            return tile.WallIndex < 0 || !BoardStateManager.Instance.LocalHandIndexes.Contains(tile.WallIndex);
+        }
+
+        private RectTransform GrabMovedWallTile(int tileId, TileInteraction clickedTile)
+        {
+            if (clickedTile != null) return uiManager.WallUI.GrabTileInstance(clickedTile.GetComponent<RectTransform>());
+            var slot = uiManager.WallUI.GetWallSlots().Find(t => t != null
+                && t.GetComponent<TileInteraction>() != null && t.GetComponent<TileInteraction>().TileId == tileId
+                && BoardStateManager.Instance.LocalHandIndexes.Contains(t.GetComponent<TileInteraction>().WallIndex));
+            return slot != null ? uiManager.WallUI.GrabTileInstance(slot) : uiManager.WallUI.GrabTileById(tileId);
         }
 
         /// <summary>手牌の並び順を現在の状態に合わせてアニメーション付きでソートする</summary>
@@ -229,7 +243,7 @@ namespace KillingMahjong.UI
         }
 
         /// <summary>状態更新（onUpdateState）の前後差分を検出し、移動した牌を視覚的に移動させる</summary>
-        public IEnumerator PlayTransitionAnimationRoutine(System.Action onUpdateState)
+        public IEnumerator PlayTransitionAnimationRoutine(System.Action onUpdateState, TileInteraction clickedTile = null)
         {
             if (uiManager.WallUI == null && uiManager.HandUI == null)
             {
@@ -275,7 +289,8 @@ namespace KillingMahjong.UI
                         foreach (var slot in uiManager.HandUI.GetHandSlots())
                         {
                             var inter = slot.GetComponent<TileInteraction>();
-                            if (inter != null && inter.TileId == id) { tileRt = slot; break; }
+                            if (inter != null && inter.TileId == id && IsMovedOutOfHand(inter)
+                                && (clickedTile == null || inter == clickedTile)) { tileRt = slot; break; }
                         }
                         if (tileRt != null)
                         {
@@ -308,7 +323,7 @@ namespace KillingMahjong.UI
                 {
                     if (uiManager.WallUI != null && uiManager.HandUI != null)
                     {
-                        RectTransform tileRt = uiManager.WallUI.GrabTileById(id);
+                        RectTransform tileRt = GrabMovedWallTile(id, clickedTile);
                         if (tileRt != null)
                         {
                             Vector2 startScreenPos = GetScreenPosition(tileRt);

@@ -127,6 +127,22 @@ namespace KillingMahjong.UI
             return null;
         }
 
+        public RectTransform GrabTileByWallIndex(int wallIndex)
+        {
+            if (wallIndex < 0) return null;
+            var slot = wallSlots.Find(t => t != null && t.GetComponent<TileInteraction>() != null
+                && t.GetComponent<TileInteraction>().WallIndex == wallIndex);
+            return GrabTileInstance(slot);
+        }
+
+        public RectTransform GrabTileInstance(RectTransform slot)
+        {
+            if (slot == null || !wallSlots.Contains(slot)) return null;
+            if (currentActiveInteraction == slot.GetComponent<TileInteraction>()) SetActiveDiscardTile(null);
+            wallSlots.Remove(slot);
+            return slot;
+        }
+
 
         public void UpdateContainerPosition(bool isDiscardPhase)
         {
@@ -154,7 +170,7 @@ namespace KillingMahjong.UI
         }
 
 
-        public void LayoutWallTiles(List<RectTransform> generatedTiles, List<int> tileIds, List<int> waitTiles, bool isDiscardPhase)
+        public void LayoutWallTiles(List<RectTransform> generatedTiles, List<int> tileIds, List<int> waitTiles, bool isDiscardPhase, List<int> wallIndexes = null)
         {
             // Clear existing tracking list (but DO NOT destroy, GameUIManager manages their lifecycle)
             wallSlots.Clear();
@@ -168,7 +184,7 @@ namespace KillingMahjong.UI
             List<WallEntry> allTiles = new List<WallEntry>();
             for (int idx = 0; idx < tileIds.Count; idx++)
             {
-                allTiles.Add(new WallEntry { Data = new TileData(tileIds[idx]), WallIndex = idx });
+                allTiles.Add(new WallEntry { Data = new TileData(tileIds[idx]), WallIndex = wallIndexes != null ? wallIndexes[idx] : idx });
             }
 
             // 2. Group by Category

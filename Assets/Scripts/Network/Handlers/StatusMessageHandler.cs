@@ -98,6 +98,7 @@ namespace KillingMahjong.Network.Handlers
                 {
                     var localWall = new List<int>(statusMsg.data.player_state.wall);
                     var localHand = new List<int>();
+                    List<int> exactHandIndexes = null;
 
                     if (statusMsg.data.game_state != null && statusMsg.data.game_state.status == "hand_selection")
                     {
@@ -105,12 +106,14 @@ namespace KillingMahjong.Network.Handlers
                         if (currentHand != null && currentHand.Count > 0)
                         {
                             localHand.AddRange(currentHand);
+                            exactHandIndexes = new List<int>(board.LocalHandIndexes);
                         }
                         else
                         {
                             var targetIndexes = board.TargetHandIndexes;
                             if (targetIndexes != null)
                             {
+                                exactHandIndexes = new List<int>(targetIndexes);
                                 foreach (var idx in targetIndexes)
                                 {
                                     if (idx >= 0 && idx < localWall.Count)
@@ -124,6 +127,7 @@ namespace KillingMahjong.Network.Handlers
                     else
                     {
                         var localHandIndices = statusMsg.data.player_state.hand;
+                        exactHandIndexes = localHandIndices != null ? new List<int>(localHandIndices) : null;
                         if (localHandIndices != null)
                         {
                             foreach (var idx in localHandIndices)
@@ -142,7 +146,8 @@ namespace KillingMahjong.Network.Handlers
                     board.SetLocalState(
                         localWall,
                         localHand,
-                        waitTiles != null ? new List<int>(waitTiles) : null
+                        waitTiles != null ? new List<int>(waitTiles) : null,
+                        exactHandIndexes
                     );
 
                     board.ExposedLocalHandWallIndexes.Clear();
