@@ -449,17 +449,20 @@ namespace KillingMahjong.UI
             int now = baseHan + bonus;
 
             if (_nameText != null) _nameText.text = YakuExamples.DisplayName(yaku);
+            // **役強化は「翻数 +1」ではなく「倍率を1段上げる」**（2026-10-11 のスキル変更）。
+            // 翻数は変わらないので「6翻 → 7翻」は出さない。どこまで上がれるかは役で決まる
             if (_hanText != null)
             {
-                _hanText.text = baseHan > 0
-                    ? now + "翻 → <color=" + BoostHex + ">" + (now + 1) + "翻</color>"
-                    : "<color=" + BoostHex + ">+1翻</color>";
+                string cap = "<color=" + BoostHex + ">倍率 1段昇格（" + GameRules.GetBoostTierCapLabel(yaku) + "まで）</color>";
+                _hanText.text = baseHan > 0 ? baseHan + "翻  " + cap : cap;
             }
             if (_descText != null) _descText.text = YakuInfo.GetDescription(yaku);
             if (_boostText != null)
             {
-                _boostText.text = bonus > 0 ? "すでに " + bonus + "翻ぶん強めている（もとは " + baseHan + "翻）" : "";
+                _boostText.text = bonus > 0 ? "強化済み。1つの役は1回だけ強化できる" : "";
             }
+            // 強化済みの役は選べない（送るとサーバーがエラーを返す）
+            if (_confirm != null) _confirm.interactable = bonus <= 0;
 
             bool hasExample = ShowExample(entry.Example);
             if (_exampleHead != null) _exampleHead.gameObject.SetActive(hasExample);

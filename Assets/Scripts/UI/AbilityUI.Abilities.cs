@@ -15,11 +15,11 @@ namespace KillingMahjong.UI
             realAbilities = new System.Collections.Generic.List<AbilityData>
             {
                 new AbilityData(SkillNames.Mulligan, SkillNames.GetDisplayName(SkillNames.Mulligan),
-                    "手牌か山牌から不要な牌を選び、山札と交換する。"),
+                    "牌を3枚出し、出した3枚と山札の3枚の6枚から、残す3枚を選ぶ。"),
                 new AbilityData(SkillNames.Perspective, SkillNames.GetDisplayName(SkillNames.Perspective),
                     "相手の手牌をランダムに3枚公開する。"),
                 new AbilityData(SkillNames.BoostHand, SkillNames.GetDisplayName(SkillNames.BoostHand),
-                    "指定した役の翻数を+1する。"),
+                    "指定した役を含むアガリの倍率を1段上げる。1つの役につき1回。"),
                 new AbilityData(SkillNames.Assault, SkillNames.GetDisplayName(SkillNames.Assault),
                     "この局は上がっても点を得ない。代わりに、得るはずだった額を相手への追加ダメージにする。1局1回。")
 

@@ -83,9 +83,11 @@ namespace KillingMahjong
                 BetUnit = 200,
                 SkillCosts = new Dictionary<string, int>
                 {
-                    { "mulligan", 1200 },
-                    { "perspective", 1500 },
-                    { "boost_hand", 10000 },
+                    // 2026-10-11 のスキル変更（サーバーの通信仕様）で、この段だけ額が変わった。
+                    // もとは マリガン1200・透視1500・役強化10000。Count 1・2 の段は変わっていない
+                    { "mulligan", 500 },
+                    { "perspective", 500 },
+                    { "boost_hand", 5000 },
                     { "assault", 3000 },
                     { "special_victory", 30000 }
                 }
@@ -156,6 +158,23 @@ namespace KillingMahjong
                 return cost;
             }
             return 99999; // Default fallback cost
+        }
+
+        /// <summary>
+        /// 役強化で昇格できる上限の呼び名（2026-10-11 のスキル変更）。
+        ///
+        /// 役強化は「翻数 +1」から「その役を含む和了の倍率を1段上げる」に変わった。
+        /// 段は 満貫 → 跳満 → 倍満 → 三倍満 → 役満 → ダブル役満。どこまで上がれるかは強化した役で決まる:
+        ///   1・2翻の役 … 跳満まで / 3翻の役 … 倍満まで / 清一色 … 役満まで / 役満の役 … ダブル役満まで
+        /// **決めているのはサーバー。** ここは説明に出す文字のための写し。
+        /// </summary>
+        public static string GetBoostTierCapLabel(string yakuName)
+        {
+            if (yakuName == "清一色") return "役満";
+            int han = GetBaseHan(yakuName);
+            if (han >= 13) return "ダブル役満";
+            if (han >= 3) return "倍満";
+            return "跳満";
         }
 
         public static int GetBaseHan(string yakuName)

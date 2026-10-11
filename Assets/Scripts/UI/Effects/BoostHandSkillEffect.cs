@@ -171,7 +171,11 @@ namespace KillingMahjong.UI.Effects
                 int stored;
                 if (state.LocalBoostHandBonus.TryGetValue(yakuName, out stored) && stored > 0) bonus = stored;
             }
-            bool hasNumbers = baseHan > 0;
+            // **役強化は「翻数 +1」ではなくなった（2026-10-11 のスキル変更）。**
+            // その役を含む和了の倍率が1段上がる（満貫 → 跳満 など）。翻数は変わらないので、
+            // 「N翻 → N+1翻」は出さない。板には「+1段」、降りてきた先には「倍率 1段昇格」と出す。
+            // 下の hasNumbers を false にしておくと、翻数を並べる所が丸ごと出なくなる
+            bool hasNumbers = false;
             int after = baseHan + bonus;
             int before = after - 1;
 
@@ -221,11 +225,11 @@ namespace KillingMahjong.UI.Effects
             oldText.alpha = 0f;
             var arrowText = _stage.AddText("Arrow", hasNumbers ? "→" : "", 44f, OldHanColor);
             arrowText.alpha = 0f;
-            var newText = _stage.AddText("NewHan", hasNumbers ? after + "翻" : "+1翻", 78f, InColor);
+            var newText = _stage.AddText("NewHan", hasNumbers ? after + "翻" : "倍率 1段昇格", hasNumbers ? 78f : 60f, InColor);
             newText.fontStyle = FontStyles.Bold;
             newText.alpha = 0f;
             // ベルルの板に出る「+1翻」。これが降りてきて、新しい翻数になる
-            var plusText = _stage.AddText("Plus", "+1翻", 38f, DemonYellow);
+            var plusText = _stage.AddText("Plus", "+1段", 38f, DemonYellow);
             plusText.fontStyle = FontStyles.Bold;
             plusText.alpha = 0f;
             plusText.rectTransform.anchoredPosition = signPos;
