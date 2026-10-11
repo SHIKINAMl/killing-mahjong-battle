@@ -22,7 +22,7 @@ namespace KillingMahjong.UI.Effects
         private TransitionLockSet.Lease inputTransition;
 
         // 既存の遷移に足す時間は 0.6 秒以内という制約のうち、静止に使う時間。
-        // 以降の揺れ・BGM解除・手牌せり上がりは同じフレームから並行して始める。
+        // 以降の手牌せり上がりは暗転が晴れ始めたところで出す。BGMは先攻・後攻の演出完了後。
         private const float BattleStartHoldSeconds = 0.30f;
 
 
@@ -286,7 +286,7 @@ namespace KillingMahjong.UI.Effects
         }
 
         /// <summary>
-        /// 盤面が見え始めたところで出す「着弾」。揺れ・BGMの開き・手牌のせり上がりをここでまとめて出す。
+        /// 盤面が見え始めたところで出す「着弾」。手牌のせり上がりをここで出す。
         /// **待たない。** 市松模様が晴れていく動きと重ねるため、呼んだ側は流したまま進む。
         /// </summary>
         public static void PlayBattleStartImpact()
@@ -307,7 +307,6 @@ namespace KillingMahjong.UI.Effects
             if (uiManager == null || uiManager.IsTutorialMode) return;
 
             battleStartReleasePrepared = true;
-            uiManager.HoldDiscardBgmOpeningForBattleStart();
         }
 
         private IEnumerator PlayBattleStartReleaseInternal()
@@ -334,18 +333,15 @@ namespace KillingMahjong.UI.Effects
             var uiManager = FindFirstObjectByType<GameUIManager>();
             if (uiManager == null || uiManager.IsTutorialMode) return;
 
-            // 進行が想定より先へ進んだときは、現在フェイズの音へ戻すだけにする。
-            // 古い Discard 用の揺れや手牌移動を後から出さない。
+            // 進行が想定より先へ進んだときは、古い Discard 用の手牌移動を出さない。
             if (uiManager.CurrentPhaseStatus != RoundStatus.Discard)
             {
-                uiManager.ReleaseDiscardBgmOpeningForBattleStart();
                 return;
             }
 
             // **揺らさない（2026-09-20 のユーザー指示）。**
             // 「盤面をハチャメチャにするより、盤面に集中させたい」。
-            // 開戦の合図は、音が開くことと手牌がせり上がることで出す。
-            uiManager.ReleaseDiscardBgmOpeningForBattleStart();
+            // 手牌のせり上がりは従来どおり。音は後続の先攻・後攻の演出完了まで維持する。
             if (uiManager.HandUI != null) uiManager.HandUI.PlayBattleStartRise();
         }
 

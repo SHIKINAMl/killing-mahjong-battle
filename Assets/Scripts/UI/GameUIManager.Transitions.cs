@@ -35,9 +35,8 @@ namespace KillingMahjong.UI
                 bool willOpen = (status == RoundStatus.Discard);
                 if (willOpen && holdDiscardBgmOpeningForBattleStart)
                 {
-                    // 賭け確定の暗転中だけは、盤面が見え始める瞬間まで開かない。
-                    // onMidpoint は進行を先に Discard へ進めるため、ここで止めないと
-                    // 暗転の裏で 2 秒のローパス解除が終わってしまう。
+                    // サーバー通知・暗転中の進行が先に Discard へ進んでも、
+                    // 先攻・後攻の文字と帯が消えるまでは前の曲を維持する。
                 }
                 else if (willOpen && IsBusyWithTransition)
                 {
@@ -53,14 +52,14 @@ namespace KillingMahjong.UI
         /// <summary>保留キューでの識別名。後勝ちで畳みたいので固定の1本にする。</summary>
         private const string BgmFilterDeferKey = "bgmFilter";
 
-        // 賭け確定の既存シーケンスだけが、暗転解除の瞬間まで Discard の開放を持つ。
+        // 賭け確定のシーケンスが、順番待ちから先攻・後攻の演出完了まで開放を持つ。
         // BGMの開放待ちは入力ロックと別の責任なので、ロックの取得数には含めない。
         private bool holdDiscardBgmOpeningForBattleStart;
 
         /// <summary>
-        /// 賭け確定後の BGM 開放を、盤面が見え始める瞬間まで待たせる。
+        /// 賭け確定後の BGM 開放を、先攻・後攻の演出完了まで待たせる。
         ///
-        /// onMidpoint の進行順や DeferUntilIdle の保留順を変えずに、音だけを演出の起点へ揃える。
+        /// 進行・見た目の順序を変えずに、音だけを演出完了へ揃える。
         /// </summary>
         public void HoldDiscardBgmOpeningForBattleStart()
         {
@@ -81,7 +80,18 @@ namespace KillingMahjong.UI
             holdDiscardBgmOpeningForBattleStart = false;
             if (IsTutorialMode) return;
 
+            if (currentPhaseStatus == RoundStatus.Discard && IsBusyWithTransition)
+            {
+                DeferUntilIdle(BgmFilterDeferKey, ApplyBgmFilterForCurrentPhase);
+                return;
+            }
             ApplyBgmFilterForCurrentPhase();
+        }
+
+        // シーン終了・演出中断では新しい曲を鳴らさず、次の局への保留だけ解除する。
+        internal void CancelDiscardBgmOpeningForBattleStart()
+        {
+            holdDiscardBgmOpeningForBattleStart = false;
         }
 
         /// <summary>
@@ -96,6 +106,8 @@ namespace KillingMahjong.UI
         {
             var audio = KillingMahjong.Managers.AudioManager.Instance;
             if (IsTutorialMode || audio == null) return;
+            // 以前の保留が順番待ち中に実行されても、演出の完了を追い越さない。
+            if (currentPhaseStatus == RoundStatus.Discard && holdDiscardBgmOpeningForBattleStart) return;
 
             audio.SetBgmFilter(currentPhaseStatus != RoundStatus.Discard);
 

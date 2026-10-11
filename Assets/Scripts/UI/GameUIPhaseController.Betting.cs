@@ -104,6 +104,7 @@ namespace KillingMahjong.UI
         private void ResetBettingTransition()
         {
             activeBettingTransition?.Lock?.Dispose();
+            if (uiManager != null) uiManager.CancelDiscardBgmOpeningForBattleStart();
             hasReceivedBettingResult = false;
             activeBettingTransition = null;
         }
@@ -124,6 +125,8 @@ namespace KillingMahjong.UI
                 }
             };
             activeBettingTransition = transition;
+            // 演出が順番待ちに入る前に音を保留する。解除は先攻・後攻の帯が消えた後。
+            uiManager.HoldDiscardBgmOpeningForBattleStart();
             PlayBettingTransition(transition);
         }
 
@@ -176,6 +179,7 @@ namespace KillingMahjong.UI
             if (!IsCurrentBettingTransition(transition) || transition.Stage != BettingStage.Covered) return;
             transition.Stage = BettingStage.Completed;
             transition.Lock?.Dispose();
+            uiManager.ReleaseDiscardBgmOpeningForBattleStart();
             RestoreBettingBoard(transition);
         }
 
