@@ -172,23 +172,10 @@ namespace KillingMahjong.UI
 
             if (centerText != null)
             {
-                t = 0;
-                float duration = 0.4f;
-                Vector3 initialScale = new Vector3(3f, 3f, 1f);
-                Vector3 targetScale = Vector3.one;
-                
-                while (t < duration)
-                {
-                    float progress = t / duration;
-                    float scaleProgress = 1f - Mathf.Pow(1f - progress, 4f); 
-                    centerText.transform.localScale = Vector3.LerpUnclamped(initialScale, targetScale, scaleProgress);
-                    t += Time.deltaTime;
-                    yield return null;
-                }
-                centerText.transform.localScale = targetScale;
-                
-                // 画面揺れ（着弾の衝撃）
-                StartCoroutine(ScreenShakeRoutine(0.2f, 20f));
+                // **局名は、中央にぱっと出すだけ（2026-10-11 のユーザー指示）。**
+                // それまでは3倍の大きさから 0.4 秒で縮めて着弾させ、画面を揺らしていた。
+                // 手前から中央へ文字が飛んでくるように見えるので、やめた。着弾が無いので揺れも外した
+                centerText.transform.localScale = Vector3.one;
             }
 
             // **局名が出たら、裏牌の山を置く（2026-09-20 のユーザー指示）。**
