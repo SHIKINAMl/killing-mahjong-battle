@@ -34,8 +34,7 @@ namespace KillingMahjong.UI
 
             if (centerText != null)
             {
-                // 流局は「決着」ではないので打撃音を当てない。垂れ下がるだけの音にする
-                PlayTransitionStinger("st_draw");
+                // 流局専用SEは鳴らさず、BGMと黒帯・暗転の短い音だけを残す。
                 centerText.text = "流局";
                 centerText.gameObject.SetActive(true);
             }
