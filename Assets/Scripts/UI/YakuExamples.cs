@@ -33,7 +33,7 @@ namespace KillingMahjong.UI
             /// </summary>
             public readonly string Example;
 
-            /// <summary>例の下に出すひとこと。空なら既定の文。</summary>
+            /// <summary>例の下に出すひとこと。空なら表示しない。</summary>
             public readonly string Note;
 
             public Entry(string name, string example, string note = "")
@@ -124,12 +124,10 @@ namespace KillingMahjong.UI
             return han + "翻";
         }
 
-        /// <summary>例の下に出すひとこと。ロンする牌がある例には「右に離した1枚でロン」を頭に付ける。</summary>
+        /// <summary>例の下に出す、役ごとのひとこと。</summary>
         public static string NoteOf(Entry entry)
         {
-            bool wins = entry.Example.Contains("+");
-            if (!wins) return entry.Note;
-            return string.IsNullOrEmpty(entry.Note) ? "右に離した1枚でロン" : "右に離した1枚でロン。" + entry.Note;
+            return entry.Note ?? "";
         }
 
         /// <summary>

@@ -400,9 +400,6 @@ namespace KillingMahjong.UI
                     new Vector2(x, -144f), new Vector2(cell, 18f), 12f, TextAlignmentOptions.Center, TextDim);
             }
 
-            Txt(parent, "TableNote", "合計が4翻（満貫）に届かない手では、ロンできない",
-                new Vector2(DetailCenterX, -164f), new Vector2(DetailWidth, 18f),
-                11.5f, TextAlignmentOptions.Left, TextDim);
         }
 
         // ---- 右下: 決める・やめる ----
@@ -466,8 +463,7 @@ namespace KillingMahjong.UI
 
             bool hasExample = ShowExample(entry.Example);
             if (_exampleHead != null) _exampleHead.gameObject.SetActive(hasExample);
-            // 牌を並べられなかったときは「右に離した1枚でロン」を出さない（指す牌が無い）
-            if (_noteText != null) _noteText.text = hasExample ? YakuExamples.NoteOf(entry) : entry.Note;
+            if (_noteText != null) _noteText.text = YakuExamples.NoteOf(entry);
         }
 
         /// <summary>例の牌を並べる。並べたら true。牌の絵はその場で作る（選ぶたびに入れ替わる）。</summary>

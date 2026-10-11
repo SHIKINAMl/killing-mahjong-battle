@@ -225,9 +225,6 @@ namespace KillingMahjong.UI
                     new Vector2(x, -226f), new Vector2(cell, 18f), 12f, TextAlignmentOptions.Center, TextDim);
             }
 
-            Label(parent, "YakuTableNote", "合計が4翻（満貫）に届かない手では、ロンできない",
-                new Vector2(YakuDetailCenterX, -248f), new Vector2(YakuDetailWidth, 18f),
-                11.5f, TextAlignmentOptions.Left, TextDim);
         }
 
         private void SelectYaku(int index)
