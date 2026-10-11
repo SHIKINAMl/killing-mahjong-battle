@@ -13,6 +13,13 @@ namespace KillingMahjong.UI
         {
             switch (EffectId)
             {
+                case "ui.ability_bell":
+                    var bellAudio = KillingMahjong.Managers.AudioManager.Instance;
+                    if (bellAudio == null) throw new InvalidOperationException("AudioManagerがありません。");
+                    scope.AddCleanup(() => { if (bellAudio != null) bellAudio.StopAbilityBellSE(); });
+                    bellAudio.PlayAbilityBellSE();
+                    yield return new WaitForSecondsRealtime(2.25f);
+                    yield break;
                 case "tile.sort":
                     var from = new System.Collections.Generic.Dictionary<RectTransform, Vector2>();
                     var to = new System.Collections.Generic.Dictionary<RectTransform, Vector2>();

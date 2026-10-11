@@ -8,6 +8,9 @@ namespace KillingMahjong.UI
         private void OnTriggerClicked()
         {
             ToggleAbilityWindow();
+            // 自動表示のOpenWindowでは鳴らさず、ベルを押して開いたときだけ鳴らす。
+            if (isWindowVisible && abilityWindow != null && KillingMahjong.Managers.AudioManager.Instance != null)
+                KillingMahjong.Managers.AudioManager.Instance.PlayAbilityBellSE();
             CancelOpponentReady();
             
             if (buttonPressCoroutine != null) StopCoroutine(buttonPressCoroutine);
