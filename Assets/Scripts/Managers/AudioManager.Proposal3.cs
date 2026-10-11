@@ -121,7 +121,7 @@ namespace KillingMahjong.Managers
             get { return ProposalWanted || _p3Running || _p3Director != null; }
         }
 
-        private float P3Master { get { return BgmMaster; } }
+        private float P3Master { get { return ProposalMasterFor(_p3ClipName); } }
 
         private bool LegacyBgmAudible
         {
@@ -319,7 +319,7 @@ namespace KillingMahjong.Managers
             deck.clip = clip;
             deck.loop = true;
             deck.timeSamples = startSample;
-            deck.volume = P3Master;
+            deck.volume = ProposalMasterFor(want);
             deck.PlayScheduled(at);
             P4StartMotifWith(deck, want, at, startSample);
 
@@ -401,14 +401,14 @@ namespace KillingMahjong.Managers
             next.clip = clip;
             next.loop = true;
             next.timeSamples = startSample;
-            next.volume = sameFamily ? 0f : P3Master;   // 予約の時刻までは鳴らないので、先に上げておいてよい
+            next.volume = sameFamily ? 0f : ProposalMasterFor(want);   // 予約の時刻までは鳴らないので、先に上げておいてよい
             next.PlayScheduled(dspAt);
             P4StartMotifWith(next, want, dspAt, startSample);
 
             _p3Fading = true;
             while (AudioSettings.dspTime < dspAt)
             {
-                if (!sameFamily) next.volume = P3Master;
+                if (!sameFamily) next.volume = ProposalMasterFor(want);
                 P4SyncMotifVolume();
                 yield return null;
             }
@@ -427,16 +427,16 @@ namespace KillingMahjong.Managers
                 if (u >= 1.0) break;
 
                 // 音量スライダーを動かされても付いていくよう、毎フレーム読み直す
-                float master = P3Master;
-                cur.volume = master * (float)(1.0 - u);
-                next.volume = sameFamily ? master * (float)u : master;
+                cur.volume = ProposalMasterFor(from) * (float)(1.0 - u);
+                float nextMaster = ProposalMasterFor(want);
+                next.volume = sameFamily ? nextMaster * (float)u : nextMaster;
                 P4SyncMotifVolume();
                 yield return null;
             }
 
             cur.Stop();
             cur.volume = 0f;
-            next.volume = P3Master;
+            next.volume = ProposalMasterFor(want);
             P4SyncMotifVolume();
             _p3Fading = false;
         }
@@ -482,13 +482,13 @@ namespace KillingMahjong.Managers
             deck.clip = clip;
             deck.loop = true;
             deck.timeSamples = startSample;
-            deck.volume = P3Master;
+            deck.volume = ProposalMasterFor(want);
             deck.PlayScheduled(dspAt);
             P4StartMotifWith(deck, want, dspAt, startSample);
 
             while (AudioSettings.dspTime < dspAt)
             {
-                deck.volume = P3Master;
+                deck.volume = ProposalMasterFor(want);
                 P4SyncMotifVolume();
                 yield return null;
             }

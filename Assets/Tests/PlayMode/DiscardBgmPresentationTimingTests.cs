@@ -241,5 +241,34 @@ namespace KillingMahjong.Tests
             Assert.That(Held, Is.False);
             Assert.That(AudioPhase, Is.EqualTo("TurnDecision"));
         }
+
+        [UnityTest]
+        public IEnumerator NightThemeVolumeBoostDoesNotCarryIntoAnotherSet()
+        {
+            SetPhase("Discard");
+            yield return WaitForClip("rt_bgm_field_2");
+            float baseline = (float)audio.GetType().GetField("bgmVolume").GetValue(audio)
+                * (float)audio.GetType().GetField("masterVolume").GetValue(audio)
+                * (float)Field(audio, "_bgmSink");
+            var decks = (AudioSource[])Field(audio, "_p3Decks");
+            int active = (int)Field(audio, "_p3Active");
+            Assert.That(decks[active].volume, Is.EqualTo(Mathf.Clamp01(baseline * 1.2f)).Within(0.00001f));
+            Assert.That(decks[active].pitch, Is.EqualTo(1f));
+            TestContext.Out.WriteLine("Night theme deck=" + decks[active].volume + "; unboosted baseline=" + baseline);
+
+            Call(audio, "ApplyMatchBgmSet", 4);
+            yield return WaitForClip("p4_bgm_field_2");
+            active = (int)Field(audio, "_p3Active");
+            Assert.That(decks[active].volume, Is.EqualTo(baseline).Within(0.00001f));
+
+            Call(audio, "ApplyMatchBgmSet", 5);
+            SetPhase("Draw");
+            yield return WaitForClip("rt_bgm_draw_base");
+            active = (int)Field(audio, "_p3Active");
+            var motif = (AudioSource)Field(audio, "_p4Motif");
+            Assert.That(decks[active].volume, Is.EqualTo(Mathf.Clamp01(baseline * 1.2f)).Within(0.00001f));
+            Assert.That(motif.volume, Is.EqualTo(decks[active].volume));
+            Assert.That(motif.isPlaying, Is.True);
+        }
     }
 }

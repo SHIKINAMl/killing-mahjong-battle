@@ -181,5 +181,68 @@ namespace KillingMahjong.Tests
             var routine = (IEnumerator)Invoke("P3ChangeClip");
             Assert.That(routine.MoveNext(), Is.False);
         }
+
+        private void SetTestVolumes(float bgm, float master = 1f, float sink = 1f)
+        {
+            _type.GetField("bgmVolume").SetValue(_audio, bgm);
+            _type.GetField("masterVolume").SetValue(_audio, master);
+            _type.GetField("_bgmSink", Private).SetValue(_audio, sink);
+        }
+
+        [TestCase("rt_bgm_prepare")]
+        [TestCase("rt_bgm_betting")]
+        [TestCase("rt_bgm_tension")]
+        [TestCase("rt_bgm_field_2")]
+        [TestCase("rt_bgm_draw_base")]
+        public void ReturningThemePlaybackVolumeIsTwentyPercentHigher(string clip)
+        {
+            SetTestVolumes(0.5f);
+            Assert.That((float)Invoke("ProposalMasterFor", clip), Is.EqualTo(0.6f).Within(0.00001f));
+            Assert.That((float)_type.GetField("bgmVolume").GetValue(_audio), Is.EqualTo(0.5f));
+        }
+
+        [TestCase("p4_bgm_field_2")]
+        [TestCase("p3_bgm_prepare")]
+        [TestCase(null)]
+        public void OtherSetsDoNotReceiveReturningThemeGain(string clip)
+        {
+            _type.GetField("UseReturningThemeBgm").SetValue(_audio, true);
+            SetTestVolumes(0.5f);
+            Assert.That((float)Invoke("ProposalMasterFor", new object[] { clip }), Is.EqualTo(0.5f));
+        }
+
+        [Test]
+        public void ReturningThemePlaybackVolumeRespectsAudioSourceCeiling()
+        {
+            SetTestVolumes(1f);
+            Assert.That((float)Invoke("ProposalMasterFor", "rt_bgm_field_4"), Is.EqualTo(1f));
+        }
+
+        [Test]
+        public void ReturningThemePlaybackStillRespectsMuteMasterAndDuck()
+        {
+            SetTestVolumes(0f);
+            Assert.That((float)Invoke("ProposalMasterFor", "rt_bgm_field_2"), Is.Zero);
+            SetTestVolumes(0.5f, 0.8f, 0.4f);
+            Assert.That((float)Invoke("ProposalMasterFor", "rt_bgm_field_2"), Is.EqualTo(0.192f).Within(0.00001f));
+        }
+
+        [Test]
+        public void ActiveDrawDeckAndMotifReceiveTheSameBoost()
+        {
+            var deck = _host.AddComponent<AudioSource>();
+            var motif = _host.AddComponent<AudioSource>();
+            _type.GetField("_p3Decks", Private).SetValue(_audio, new[] { deck, motif });
+            _type.GetField("_p3Active", Private).SetValue(_audio, 0);
+            _type.GetField("_p3ClipName", Private).SetValue(_audio, "rt_bgm_draw_base");
+            _type.GetField("_p3Running", Private).SetValue(_audio, true);
+            _type.GetField("_p4Motif", Private).SetValue(_audio, motif);
+            _type.GetField("_p4MotifDeck", Private).SetValue(_audio, deck);
+            _type.GetField("_p4MotifAlive", Private).SetValue(_audio, true);
+            SetTestVolumes(0.717f);
+            Invoke("ApplyProposal3Volumes");
+            Assert.That(deck.volume, Is.EqualTo(0.8604f).Within(0.00001f));
+            Assert.That(motif.volume, Is.EqualTo(deck.volume));
+        }
     }
 }

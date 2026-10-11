@@ -6,6 +6,17 @@ namespace KillingMahjong.Managers
 {
     public partial class AudioManager
     {
+        // 夜卓の灯火だけ少し大きくする。保存音量・音源・他セットのバランスは変えない。
+        private const float ReturningThemePlaybackGain = 1.2f;
+
+        private float ProposalMasterFor(string clipName)
+        {
+            // 選択中のセットではなく実際の曲で判別し、別セットへのフェードも正しく保つ。
+            return SetPrefixOf(clipName) == RtPrefix
+                ? Mathf.Clamp01(BgmMaster * ReturningThemePlaybackGain)
+                : BgmMaster;
+        }
+
         // 対戦中だけの曲ごとの栞。別のフェイズ中に時計を進めず、戻るときに続きを鳴らす。
         // 濃度1〜4は同じ時間軸なので、栞も共有する。他セットには適用しない。
         private struct ReturningThemePosition
