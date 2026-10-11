@@ -39,6 +39,7 @@ namespace KillingMahjong.UI
         public void CancelSkillSelection()
         {
             IsMulliganSelection = false;
+            ClearMulliganPicks();
             HideMulliganUI();
         }
 
@@ -49,6 +50,7 @@ namespace KillingMahjong.UI
         public void StartMulliganSelection()
         {
             IsMulliganSelection = true;
+            ClearMulliganPicks();
             ShowMulliganUI();
         }
 
@@ -81,6 +83,10 @@ namespace KillingMahjong.UI
 
         public void OnMulliganTileSelected(int tileId, RectTransform slotRt)
         {
+            // 本編は3枚選んでから送る（GameUISkillController.MulliganChoice.cs）。
+            // チュートリアルは通信の代役が1枚の形のままなので、下の今までの流れを通す
+            if (TryPickForMulligan(tileId, slotRt)) return;
+
             IsMulliganSelection = false;
             HideMulliganUI();
             

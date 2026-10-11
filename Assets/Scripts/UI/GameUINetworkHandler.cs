@@ -39,6 +39,8 @@ namespace KillingMahjong.UI
                 NetworkMessageHandler.Instance.OnHandSelectionConfirmation += HandleHandSelectionConfirmation;
                 NetworkMessageHandler.Instance.OnHandSelectionAccepted += HandleHandSelectionAccepted;
                 NetworkMessageHandler.Instance.OnSkillCasted += HandleSkillCasted;
+                NetworkMessageHandler.Instance.OnSkillAccepted += HandleSkillAccepted;
+                NetworkMessageHandler.Instance.OnMulliganSelected += HandleMulliganSelected;
 
                 NetworkMessageHandler.Instance.OnAgari += HandleAgari;
                 NetworkMessageHandler.Instance.OnDraw += HandleDraw;
@@ -92,6 +94,8 @@ namespace KillingMahjong.UI
                 NetworkMessageHandler.Instance.OnHandSelectionConfirmation -= HandleHandSelectionConfirmation;
                 NetworkMessageHandler.Instance.OnHandSelectionAccepted -= HandleHandSelectionAccepted;
                 NetworkMessageHandler.Instance.OnSkillCasted -= HandleSkillCasted;
+                NetworkMessageHandler.Instance.OnSkillAccepted -= HandleSkillAccepted;
+                NetworkMessageHandler.Instance.OnMulliganSelected -= HandleMulliganSelected;
 
                 NetworkMessageHandler.Instance.OnAgari -= HandleAgari;
                 NetworkMessageHandler.Instance.OnDraw -= HandleDraw;
@@ -190,6 +194,16 @@ namespace KillingMahjong.UI
         private void HandleSkillCasted(SkillCastedData data)
         {
             uiManager.SkillController?.HandleSkillCasted(data);
+        }
+
+        private void HandleSkillAccepted(SkillAcceptedData data)
+        {
+            uiManager.SkillController?.HandleSkillAccepted(data);
+        }
+
+        private void HandleMulliganSelected(MulliganSelectedData data)
+        {
+            uiManager.SkillController?.HandleMulliganSelected(data);
         }
 
         private void HandleAgari(bool isLocalWin)

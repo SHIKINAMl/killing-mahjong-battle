@@ -40,6 +40,7 @@ namespace KillingMahjong.EditorTools
             "Assets/Scenes/UIテストシーン.unity",
         };
         private const string YakuSelectionPrefabPath = "Assets/Prefabs/UI/YakuSelection.prefab";
+        private const string MulliganChoicePrefabPath = "Assets/Prefabs/UI/MulliganChoice.prefab";
 
         [MenuItem("Tools/UI/実行時UIをシーンへ置く（タイトル・部屋・対局メニュー）")]
         private static void BakeFromMenu()
@@ -93,6 +94,7 @@ namespace KillingMahjong.EditorTools
             {
                 Scene scene = EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
                 report.Append(path).Append(": 役を選ぶ画面=").Append(BakeYakuSelection(scene));
+                report.Append(" / 牌交換の残す牌を選ぶ画面=").Append(BakeMulliganChoice(scene));
                 EditorSceneManager.MarkSceneDirty(scene);
                 bool saved = EditorSceneManager.SaveScene(scene);
                 report.AppendLine(saved ? " / 保存しました" : " / **保存に失敗しました**");
@@ -104,6 +106,39 @@ namespace KillingMahjong.EditorTools
                 EditorSceneManager.OpenScene(original, OpenSceneMode.Single);
             }
             return report.ToString();
+        }
+
+        /// <summary>牌交換の、残す3枚を選ぶ画面を置く。やり方は役を選ぶ画面と同じ。</summary>
+        private static string BakeMulliganChoice(Scene scene)
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(MulliganChoicePrefabPath);
+            GameObject root = SceneFirst.Find(MulliganChoiceUI.RootName);
+
+            string placed = "";
+            if (root == null && prefab != null)
+            {
+                root = (GameObject)PrefabUtility.InstantiatePrefab(prefab, scene);
+                root.name = MulliganChoiceUI.RootName;
+                placed = "Prefab をシーンに置いた。";
+            }
+
+            string made = MulliganChoiceUI.BakeForEditor();
+
+            root = SceneFirst.Find(MulliganChoiceUI.RootName);
+            if (root == null) return placed + "作れませんでした。";
+
+            if (prefab == null)
+            {
+                PrefabUtility.SaveAsPrefabAssetAndConnect(root, MulliganChoicePrefabPath, InteractionMode.AutomatedAction);
+                placed += "Prefab を作った（" + MulliganChoicePrefabPath + "）。";
+            }
+            else if (made.Length > 0 && PrefabUtility.IsPartOfPrefabInstance(root))
+            {
+                PrefabUtility.ApplyPrefabInstance(root, InteractionMode.AutomatedAction);
+                placed += "足した部品を Prefab に反映した。";
+            }
+
+            return placed + Describe(made);
         }
 
         /// <summary>役を選ぶ画面を置く。Prefab が無ければここで作り、あればその実体をシーンに置く。</summary>

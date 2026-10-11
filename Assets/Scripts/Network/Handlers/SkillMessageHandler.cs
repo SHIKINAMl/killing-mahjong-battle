@@ -7,11 +7,23 @@ namespace KillingMahjong.Network.Handlers
     /// <summary>
     /// スキル/特殊勝利関連:
     /// "skill_casted"（スキル発動）, "special_victory_won"（特殊勝利）,
-    /// "opening_boost_assigned"（開局時の役ブースト付与）。
+    /// "opening_boost_assigned"（開局時の役ブースト付与）、
+    /// "skill_accepted"（本人への受付。牌交換の候補が入る）, "mulligan_selected"（牌交換の結果）。
     /// </summary>
     public class SkillMessageHandler : IServerMessageHandler
     {
-        private static readonly string[] Types = { "skill_casted", "special_victory_won", "opening_boost_assigned" };
+        private static readonly string[] Types =
+        {
+            "skill_casted", "special_victory_won", "opening_boost_assigned", "skill_accepted", "mulligan_selected",
+        };
+
+        /// <summary>
+        /// JSON の mulliganResult が null か。**JsonUtility は null を「中身が全部 0 の物」として作る**ので、
+        /// 型を見ても区別できない。新しい牌交換では skill_casted の mulliganResult は常に null で、
+        /// そのまま読むと「位置0の牌0を牌0に替える」という嘘の交換になる。
+        /// </summary>
+        private static readonly System.Text.RegularExpressions.Regex NullMulliganResult =
+            new System.Text.RegularExpressions.Regex("\"mulliganResult\"\\s*:\\s*null");
         public IReadOnlyList<string> MessageTypes => Types;
 
         public void Handle(string messageType, string jsonString, NetworkMessageHandler network)
@@ -25,6 +37,7 @@ namespace KillingMahjong.Network.Handlers
                     if (scMsg != null && scMsg.data != null)
                     {
                         scMsg.data.exposedHandIndexesByPlayer = ServerJsonParser.ParseExposedHandIndexesByPlayer(jsonString);
+                        if (NullMulliganResult.IsMatch(jsonString)) scMsg.data.mulliganResult = null;
 
                         // 実際に引かれた額をサーバーから教わる唯一の機会。控えておくと、
                         // 次から能力一覧が複製の表ではなく本物の額を出せる。
@@ -47,6 +60,30 @@ namespace KillingMahjong.Network.Handlers
                         // スキル使用直後に、役の強化状況や最新のHPを確実に取り寄せる
                         network.SendActionToServer("status", null);
                     }
+                    break;
+
+                case "skill_accepted":
+                    SkillAcceptedMessage saMsg = JsonUtility.FromJson<SkillAcceptedMessage>(jsonString);
+                    if (saMsg != null && saMsg.data != null)
+                    {
+                        // 候補が無いとき（牌交換以外）は null にそろえる。JsonUtility は空の物を作ってしまう
+                        var options = saMsg.data.mulliganOptions;
+                        if (options == null || options.options == null || options.options.Count == 0)
+                        {
+                            saMsg.data.mulliganOptions = null;
+                        }
+                        if (board != null && saMsg.data.cost > 0)
+                        {
+                            GameRules.SetServerSkillCost(
+                                saMsg.data.skillType, board.LocalPlayerSpecialVictoryCount, saMsg.data.cost);
+                        }
+                        network.RaiseSkillAccepted(saMsg.data);
+                    }
+                    break;
+
+                case "mulligan_selected":
+                    MulliganSelectedMessage msMsg = JsonUtility.FromJson<MulliganSelectedMessage>(jsonString);
+                    if (msMsg != null && msMsg.data != null) network.RaiseMulliganSelected(msMsg.data);
                     break;
 
                 case "special_victory_won":

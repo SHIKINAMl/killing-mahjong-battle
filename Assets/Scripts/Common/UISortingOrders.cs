@@ -264,6 +264,9 @@ namespace KillingMahjong.Common
         /// <summary>YakuSelectionUI: 役選択パネル（モーダルなので待ち牌表示より手前）</summary>
         public const int YakuSelection = 88;
 
+        /// <summary>牌交換の、残す3枚を選ぶ画面（MulliganChoiceUI）。役を選ぶ画面と同じ段。同時には出ない。</summary>
+        public const int MulliganChoice = 88;
+
         /// <summary>HpDamageGlitch: 体力が減った瞬間のノイズ。
         /// 元は手番の画面ふち（TurnVignette）が使っていた空き番。
         ///

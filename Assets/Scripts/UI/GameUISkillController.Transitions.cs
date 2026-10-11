@@ -127,6 +127,8 @@ namespace KillingMahjong.UI
                 pendingMulligan = null;
             }
             bool finished = false;
+            _ownMulliganCastSeenAt = data.skillType == "mulligan"
+                && data.player_id == NetworkMessageHandler.Instance.LocalPlayerId ? Time.unscaledTime : _ownMulliganCastSeenAt;
             try { yield return HandleSkillEffectsRoutine(data, ownedLock); finished = ownedLock.IsActive; }
             finally { skillTransitions.Remove(ownedLock); ownedLock.Dispose(); }
             if (finished) uiManager.RefreshBoardAfterTransition();
@@ -470,10 +472,8 @@ namespace KillingMahjong.UI
                             if (!ownedLock.IsActive) yield break;
                         }
                     }
-                    else
-                    {
-                        Debug.LogWarning("Mulligan animation failed: mulliganResult is null.");
-                    }
+                    // mulliganResult が無いのは、新しい牌交換（2026-10-11）では普通のこと。
+                    // 入れ替えと演出は、残す3枚を選んだあとの mulligan_selected で行う（MulliganChoice.cs）
 
                     _lastMulliganOutTileId = -1;
                     _lastMulliganTargetIndex = -1;

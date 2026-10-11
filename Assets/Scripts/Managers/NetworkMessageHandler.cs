@@ -58,6 +58,60 @@ namespace KillingMahjong.Network
         public int newTile;
     }
 
+    /// <summary>
+    /// 牌交換の候補（2026-10-11 のスキル変更）。skill_accepted の mulliganOptions。
+    /// options は牌IDが6つ。先頭3つが出した牌（targetHandIndexes の順）、後ろ3つが山札から引いた牌。
+    /// </summary>
+    [System.Serializable]
+    public class MulliganOptionsData
+    {
+        public List<int> targetHandIndexes;
+        public List<int> options;
+    }
+
+    /// <summary>skill_accepted。**使った本人にだけ届く。** 牌交換のときは候補が入っている。</summary>
+    [System.Serializable]
+    public class SkillAcceptedData
+    {
+        public string skillType;
+        public int cost;
+        public int currentHealth;
+        public MulliganOptionsData mulliganOptions;
+    }
+
+    [System.Serializable]
+    public class SkillAcceptedMessage
+    {
+        public string type;
+        public SkillAcceptedData data;
+    }
+
+    [System.Serializable]
+    public class MulliganChangeData
+    {
+        public int wallIndex;
+        public int oldTile;
+        public int newTile;
+    }
+
+    /// <summary>
+    /// mulligan_selected。残す3枚を選んだ結果。**使った本人にだけ届く。**
+    /// changes は出した3か所ぶん（元のままの所も入る）。wall は入れ替え後の山34枚。
+    /// </summary>
+    [System.Serializable]
+    public class MulliganSelectedData
+    {
+        public List<MulliganChangeData> changes;
+        public List<int> wall;
+    }
+
+    [System.Serializable]
+    public class MulliganSelectedMessage
+    {
+        public string type;
+        public MulliganSelectedData data;
+    }
+
     [System.Serializable]
     public class SpecialVictoryWonData
     {
@@ -95,6 +149,17 @@ namespace KillingMahjong.Network
         public string skill_type;
         public int target_hand_index;
         public string yaku_name;
+
+        /// <summary>
+        /// 牌交換で出す、自分の山の位置3つ（2026-10-11 のスキル変更。1枚だけの target_hand_index は受け付けなくなった）。
+        /// **この型は全部の項目が毎回送られる**（JsonUtility）。使わないアクションでは空の配列 [] が付く。
+        /// 文字列の項目は空文字 "" で送られるので、透視の suit はここに足していない
+        /// （"" は「4つ以外の値」としてエラーになる。足すなら送り方を変えること）。
+        /// </summary>
+        public List<int> target_hand_indexes;
+
+        /// <summary>mulligan_select で送る、残す候補の番号（0〜5）3つ。</summary>
+        public List<int> choices;
         
         // --- 互換性維持 ---
         public int amount;
@@ -169,6 +234,8 @@ namespace KillingMahjong.Network
         public event Action<SkillCastedData> OnSkillCasted;
         public event Action<string> OnSpecialVictoryWon;
         public event Action OnOpeningBoostAssigned;
+        public event Action<SkillAcceptedData> OnSkillAccepted;
+        public event Action<MulliganSelectedData> OnMulliganSelected;
 
         private string localPlayerId = ""; // GameManager等からセットされる想定
         public string LocalPlayerId => localPlayerId;
@@ -205,6 +272,8 @@ namespace KillingMahjong.Network
         internal void RaiseSkillCasted(SkillCastedData data) => OnSkillCasted?.Invoke(data);
         internal void RaiseSpecialVictoryWon(string playerId) => OnSpecialVictoryWon?.Invoke(playerId);
         internal void RaiseOpeningBoostAssigned() => OnOpeningBoostAssigned?.Invoke();
+        internal void RaiseSkillAccepted(SkillAcceptedData data) => OnSkillAccepted?.Invoke(data);
+        internal void RaiseMulliganSelected(MulliganSelectedData data) => OnMulliganSelected?.Invoke(data);
 
 
         private void Awake()
