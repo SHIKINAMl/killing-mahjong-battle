@@ -33,8 +33,9 @@ namespace KillingMahjong.UI
         /// 手牌の並べ直し（HandUI.UpdateLayout）は牌を入れたとき以外にも通るので、
         /// 選びなおしで手牌が戻ってきたときや、スキルを使ったあとにも役名が出ていた。
         ///
-        /// 立てるのは <see cref="ArmInstantRankCall"/>（牌をクリックして手牌へ入れる経路だけが呼ぶ）。
-        /// 「おまかせ」・選びなおし・スキル・サーバーからの組み直しは呼ばないので、出ない。
+        /// 立てるのは <see cref="ArmInstantRankCall"/>（牌をクリックして手牌へ入れる経路）と、
+        /// <see cref="RequestInstantRankCallNow"/>（「おまかせ」を押して13枚がそろったとき）。
+        /// 選びなおし・スキル・サーバーからの組み直しは呼ばないので、出ない。
         /// 問い合わせを送ったら降ろす。13枚でなくなったとき・確定したときも降ろす。
         /// </summary>
         private bool _rankCallArmed;
@@ -45,6 +46,19 @@ namespace KillingMahjong.UI
         public void ArmInstantRankCall()
         {
             _rankCallArmed = true;
+        }
+
+        /// <summary>
+        /// 「おまかせ」で13枚がそろった直後に呼ぶ。役名の問い合わせを、その場で1回通す
+        /// （2026-10-11 のユーザー指示「おまかせでも反応するようにして」）。
+        /// おまかせは牌を1枚ずつ動かすので、動かす前に印を立てても、13枚に届く前に降りてしまう。
+        /// だから、そろったあとに呼ぶ。同じ並びを前に問い合わせていても、押したのだからもう一度出す。
+        /// </summary>
+        public void RequestInstantRankCallNow()
+        {
+            _hasRankResult = false;
+            _rankCallArmed = true;
+            UpdateInstantRankCallForCurrentHand();
         }
 
         /// <summary>入れようとした牌が入らなかったときに呼ぶ。</summary>

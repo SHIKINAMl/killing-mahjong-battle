@@ -151,11 +151,14 @@ namespace KillingMahjong.UI
                 StartCoroutine(VisualController.PlayTransitionAnimationRoutine(() =>
                 {
                     BoardStateManager.Instance.SelectManganHand();
+                    // おまかせも自分で押した操作なので、役名（満貫など）を出す
+                    if (HandSelectionController != null) HandSelectionController.RequestInstantRankCallNow();
                 }));
             }
             else
             {
                 BoardStateManager.Instance.SelectManganHand();
+                if (HandSelectionController != null) HandSelectionController.RequestInstantRankCallNow();
             }
         }
 
