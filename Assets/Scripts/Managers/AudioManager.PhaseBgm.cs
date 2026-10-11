@@ -175,6 +175,12 @@ namespace KillingMahjong.Managers
             { "rt_bgm_result",       new Tempo(136f, 4) },
             { "rt_bgm_win",          new Tempo(136f, 4) },
             { "rt_bgm_lose",         new Tempo(136f, 4) },
+            // 対局濃度1〜4と同じ時間軸の、ドラム・ベースだけの版（2026-10-11 の場面別リメイクで届いた）。
+            // 掛け金の演出から打牌へつなぐための物。**まだ鳴らす所は作っていない**（音源だけ入れてある）
+            { "rt_bgm_field_1_drums_bass_sync", new Tempo(136f, 4) },
+            { "rt_bgm_field_2_drums_bass_sync", new Tempo(136f, 4) },
+            { "rt_bgm_field_3_drums_bass_sync", new Tempo(136f, 4) },
+            { "rt_bgm_field_4_drums_bass_sync", new Tempo(136f, 4) },
         };
 
         /// <summary>拍の情報が無い曲のときの既定。すぐ切り替える方に倒す。</summary>
