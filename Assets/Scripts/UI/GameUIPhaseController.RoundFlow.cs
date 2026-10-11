@@ -77,7 +77,11 @@ namespace KillingMahjong.UI
                 }
                 if (uiManager.PlayerInfoUI != null) uiManager.PlayerInfoUI.SetHP(20000);
                 
-                SetMatchUIVisibility(true);
+                // **本編では、ここで手牌・山・役の一覧を出さない（2026-10-11 のユーザー指摘）。**
+                // 出すと、直前に始めた暗転（対局開始）が画面を覆いきる前に、空の手牌の箱やボタンが一瞬見える。
+                // 手牌選択フェイズに入ったとき（ApplyHandSelectionVisibility）に、暗転の裏で出る。
+                // チュートリアルは暗転を通らない流れがあるので、今までどおりここで出す
+                SetMatchUIVisibility(uiManager.IsTutorialMode);
                 uiManager.SetCurrentPhaseStatus(RoundStatus.None);
 
                 if (AudioManager.Instance != null)
