@@ -9,6 +9,7 @@ namespace KillingMahjong.UI
     public class TitleUIManager : MonoBehaviour
     {
         private const string TutorialSceneName = "OpeningScene";
+        private const string TitleSceneName = "タイトルシーン";
         private const string RoomSceneName = "部屋シーン";
         private const string TutorialReturnToRoomKey = TutorialNavigation.ReturnKey;
 
@@ -35,6 +36,7 @@ namespace KillingMahjong.UI
                 // 以前はここで「見本の写し」（SavedRoomPreview）を捨て、RoomScreenUI が作り直していた。
                 // 写しはコードを変えても付いてこないので、置いてある物と再生時の物が食い違っていた。
                 OpenPreservedRoom();
+                FinishSceneLoading();
                 return;
             }
 
@@ -48,10 +50,23 @@ namespace KillingMahjong.UI
                 PlayerPrefs.DeleteKey(TutorialReturnToRoomKey);
                 PlayerPrefs.Save();
                 if (tutorialReturn == 2)
+                {
                     SceneManager.LoadScene(RoomSceneName);
+                    return; // 移動先の Start がローディングを閉じる。
+                }
                 else
                     OpenMatchMenu();
             }
+
+            FinishSceneLoading();
+        }
+
+        private static void FinishSceneLoading()
+        {
+            // ローダーはシーンをまたいで残る。画面の準備が終わった側で暗幕を外す。
+            // 初回起動では作らず、前のシーンで表示された物だけを閉じる。
+            var loading = FindFirstObjectByType<LoadingManager>();
+            if (loading != null) loading.FadeInScreen();
         }
 
         private TitleMultiMenuUI multiMenu;
@@ -324,6 +339,13 @@ namespace KillingMahjong.UI
 
         private void ReturnToTitle()
         {
+            if (startInPreservedRoom)
+            {
+                // 部屋シーンにはタイトルの開始ボタンが無いので、表示切替だけでは戻れない。
+                StartScene(TitleSceneName);
+                return;
+            }
+
             if (multiMenu != null) multiMenu.Close();
             if (roomScreen != null) roomScreen.Close();
             SetTitlePresentationVisible(true);

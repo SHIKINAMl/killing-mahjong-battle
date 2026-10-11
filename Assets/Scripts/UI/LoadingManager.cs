@@ -114,7 +114,7 @@ namespace KillingMahjong.UI
         {
             if (loadingCanvasObj != null && loadingCanvasObj.activeSelf && spinnerTransform != null)
             {
-                spinnerTransform.Rotate(0, 0, -360 * Time.deltaTime); // 1秒に1回転
+                spinnerTransform.Rotate(0, 0, -360 * Time.unscaledDeltaTime); // 1秒に1回転
             }
         }
 
@@ -188,7 +188,7 @@ namespace KillingMahjong.UI
             Color c = fadeBgImage.color;
             while (elapsed < duration)
             {
-                elapsed += Time.deltaTime;
+                elapsed += Time.unscaledDeltaTime;
                 c.a = Mathf.Lerp(startAlpha, endAlpha, elapsed / duration);
                 fadeBgImage.color = c;
                 yield return null;
