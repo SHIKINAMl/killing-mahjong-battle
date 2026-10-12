@@ -400,6 +400,44 @@ namespace KillingMahjong.Tests
             Assert.That(Prop(reveal, "IsPresentationVisible"), Is.True);
         }
 
+        private Vector2 OnInfo()
+        {
+            var rect = (RectTransform)reveal.transform.Find("StrengthPanel");
+            return RectTransformUtility.WorldToScreenPoint(null, rect.TransformPoint(rect.rect.center));
+        }
+        [Test]
+        public void HoveringTheLeftTableOpensRolesAndLeavingClosesThem()
+        {
+            Show(); var roles = Prop(reveal, "RoleConditions");
+            Call(reveal, "RefreshHoverVisibility", OnInfo());
+            Assert.That(Prop(roles, "IsHovered"), Is.True);
+            Call(reveal, "RefreshHoverVisibility", new Vector2(100000,100000));
+            Assert.That(Prop(roles, "IsHovered"), Is.False);
+        }
+        [Test]
+        public void ForcedConfirmationSuppressesRoleHover()
+        {
+            Show(); var roles = Prop(reveal, "RoleConditions");
+            Call(reveal, "RefreshHoverVisibility", OnInfo());
+            Call(reveal, "SetForcedVisible", true); Call(reveal, "RefreshHoverVisibility", OnInfo());
+            Assert.That(Prop(roles, "IsHovered"), Is.False);
+        }
+        [Test]
+        public void EmptyWaitsDoNotShowRoleCards()
+        {
+            Call(reveal, "Show", Array.CreateInstance(T("EngineData.WaitData"), 0), Get(manager, "tileResourceManager"), false);
+            Call(reveal, "RefreshHoverVisibility", OnInfo());
+            Assert.That(Prop(Prop(reveal, "RoleConditions"), "CardCount"), Is.Zero);
+        }
+        [UnityTest]
+        public IEnumerator FlightHidesRoleCardsBeforeItMovesWaitTiles()
+        {
+            Show(); var roles = Prop(reveal, "RoleConditions"); Call(reveal, "RefreshHoverVisibility", OnInfo());
+            var job = ((MonoBehaviour)selection).StartCoroutine((IEnumerator)Call(reveal, "Transfer", box));
+            Assert.That(Prop(roles, "IsHovered"), Is.False);
+            yield return job;
+        }
+
         [UnityTest]
         public IEnumerator HiddenReviewDialogCannotLeaveAnInvisibleConfirmationLock()
         {

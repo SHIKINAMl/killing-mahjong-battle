@@ -8,6 +8,7 @@ namespace KillingMahjong.UI
     public static class UIFrameCatalog
     {
         public const string DefaultId = "ui.frame.pixel_standard";
+        public const string RoleConditionsId = "ui.frame.role_condition_slant";
         private static Dictionary<string, UIFrameStyle> styles;
         public static int Revision { get; private set; }
 

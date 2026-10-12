@@ -20,5 +20,11 @@ namespace KillingMahjong.UI
         [Tooltip("任意の9スライス枠。未指定なら共通のドット描画を使う。入力矩形は変更しない。")]
         public Sprite hoverSprite;
         public Sprite selectedSprite;
+        [Header("役条件の枠")]
+        public Color panelBackground = new Color32(37, 27, 35, 238);
+        public Color panelBorder = new Color32(239, 238, 216, 255);
+        public Color panelText = new Color32(239, 238, 216, 255);
+        [Min(0)] public float panelSkew = 14;
+        [Min(1)] public float panelBorderWidth = 2;
     }
 }

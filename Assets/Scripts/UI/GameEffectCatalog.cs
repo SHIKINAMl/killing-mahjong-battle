@@ -46,6 +46,7 @@ namespace KillingMahjong.UI
             new Entry("phase.prompt", "フェイズ", "手牌選択の案内", "PhaseTransitionUI.PlayPromptText"),
             new Entry("hand.wait_reveal", "牌・血・ゲージ", "13枚成立：役名と待ち牌を表示", "HandRankCallUI.ShowRank / HandWaitRevealUI.Show"),
             new Entry("hand.wait_transfer", "牌・血・ゲージ", "手牌決定：光が待ち牌枠へ着地", "HandWaitRevealUI.Transfer / WaitUI.RevealArrivalTile"),
+            new Entry(HandRoleConditionsUI.EffectId, "牌・血・ゲージ", "役条件：1役1枠・順次登場・ホバー解除", "HandRoleConditionsUI / HandWaitRevealUI.RefreshHoverVisibility"),
             new Entry("hand.confirm", "フェイズ", "役名・待ち牌 → 手牌決定 → 光の着地", "GameUIHandSelectionController / HandWaitRevealUI"),
             new Entry("hand.confirm_below_mangan", "フェイズ", "満貫未満の待ち → 追加確認 → 手牌決定", "HandWeakConfirmationUI / HandWaitRevealUI"),
             new Entry("hand.confirm_no_waits", "フェイズ", "待ちなし：なしの枠 → 追加確認 → 手牌決定", "HandWeakConfirmationUI / HandWaitRevealUI"),
@@ -108,6 +109,7 @@ namespace KillingMahjong.UI
             new Entry("ui.button_hover", "画面効果", "ボタンのホバー枠・押下反応", "UIInteractionFeedback / UIButtonHoverEffect"),
             new Entry("ui.menu_hover", "画面効果", "メニューのホバー枠・押下反応", "UIInteractionFeedback / MenuButtonHover"),
             new Entry(UIFrameCatalog.DefaultId, "画面効果", "標準ドット枠：ホバー・押下・選択", "UIFrameCatalog / UIInteractionFeedback"),
+            new Entry(UIFrameCatalog.RoleConditionsId, "画面効果", "役条件の半透明・斜め枠", "UIFrameCatalog / HandRoleConditionsUI"),
             new Entry("unused.red_defeat", UnusedGroup, "赤い目の敗北（本編EDでは未使用）", "RedDefeatPrototypeUI.Play", unused: true),
             new Entry("unused.special_victory", UnusedGroup, "旧・特殊勝利の能力カットイン", "PhaseTransitionUI.PlaySkillCutinAnimationRoutine", unused: true)
         };

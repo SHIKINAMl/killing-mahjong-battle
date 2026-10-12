@@ -88,6 +88,8 @@ namespace KillingMahjong.UI
                 case "hand.wait_reveal": case "hand.wait_transfer": case "hand.confirm":
                 case "hand.confirm_below_mangan": case "hand.confirm_no_waits":
                     yield return PreviewHandConfirmation(); break;
+                case HandRoleConditionsUI.EffectId: case UIFrameCatalog.RoleConditionsId:
+                    yield return PreviewRoleConditions(); break;
                 case "phase.draw":
                     bool drawn = false; rig.phase.PlayDrawTransition(() => { }, () => drawn = true);
                     yield return Until(() => drawn); break;

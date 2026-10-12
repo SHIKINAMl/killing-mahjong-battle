@@ -82,7 +82,7 @@ namespace KillingMahjong.EditorTools
                 }
                 // 許可リスト。ネットワーク、GameUIManager、戦績、シーン遷移、台本は持ち込まない。
                 var keep = new[] { typeof(EffectPreviewRig), typeof(PhaseTransitionUI), typeof(RonAnimationUI),
-                    typeof(HandWaitRevealUI), typeof(HandWeakConfirmationUI), typeof(KillingMahjong.UI.Effects.PixelShapeGraphic),
+                    typeof(HandWaitRevealUI), typeof(HandWeakConfirmationUI), typeof(HandRoleConditionsUI), typeof(KillingMahjong.UI.Effects.PixelShapeGraphic),
                     typeof(PlayerInfoUI), typeof(EnemyInfoUI), typeof(BettingUI), typeof(BlinkEffectUI),
                     typeof(DialogueUI), typeof(KillingMahjong.UI.Effects.MatchMomentumUI),
                     typeof(KillingMahjong.UI.Effects.HeartbeatEffect), typeof(YakuListUI), typeof(YakuItemUI) };

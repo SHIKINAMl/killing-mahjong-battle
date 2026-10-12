@@ -26,6 +26,9 @@ namespace KillingMahjong.UI
         private RectTransform noWaitBox;
         private HandUI hoverHand;
         private bool hasPresentation, forceVisible;
+        private HandRoleConditionsUI roleConditions;
+        private GameUIManager owner;
+        public HandRoleConditionsUI RoleConditions => roleConditions;
         public bool IsPresentationVisible => gameObject.activeInHierarchy && (presentation == null || presentation.alpha > .001f);
         private int version;
         public bool IsTransferring { get; private set; }
@@ -40,6 +43,7 @@ namespace KillingMahjong.UI
             var root = SceneFirst.Child(parent, RootName, out bool made, typeof(RectTransform),
                 typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster), typeof(HandWaitRevealUI));
             var ui = root.GetComponent<HandWaitRevealUI>();
+            ui.owner = parent != null ? parent.GetComponent<GameUIManager>() : null;
             if (made)
             {
                 var canvas = root.GetComponent<Canvas>();
@@ -76,6 +80,10 @@ namespace KillingMahjong.UI
             Label(panel, "Yaku", 12, 80, 196, 88, 18, TextAlignmentOptions.TopLeft);
             Rect(transform, "Candidates", 0, 0, 800, 600, out _);
             info = panel.GetComponent<CanvasGroup>();
+            info.blocksRaycasts = true;
+            panel.GetComponent<Image>().raycastTarget = true;
+            UIInteractionFeedback.Attach(panel.gameObject);
+            roleConditions = HandRoleConditionsUI.Ensure(transform);
             content = transform.Find("Candidates");
             // PixelShapeGraphicの形は保存されないので、保存済みの位置・色から描き直す。
             var frameGraphic = panel.Find("Frame").GetComponent<PixelShapeGraphic>();
@@ -102,7 +110,13 @@ namespace KillingMahjong.UI
         public void RefreshHoverVisibility(Vector2 point)
         {
             if (presentation == null) return;
+            bool overInfo = presentation.alpha > .001f && info != null && info.alpha > .001f
+                && !forceVisible && !IsTransferring && Contains((RectTransform)info.transform, point)
+                && (hoverHand == null || !hoverHand.IsSubmitted)
+                && (owner == null || (owner.CurrentPhaseStatus == RoundStatus.HandSelection
+                    && (owner.DialogueUI == null || !owner.DialogueUI.IsLogOpen)));
             bool show = hoverHand == null || forceVisible || IsTransferring;
+            show |= overInfo;
             if (!show)
             {
                 foreach (var tile in hoverHand.GetHandSlots()) if (Contains(tile, point)) { show = true; break; }
@@ -115,6 +129,7 @@ namespace KillingMahjong.UI
                 : Mathf.MoveTowards(presentation.alpha, show ? 1 : 0, Time.unscaledDeltaTime / .08f);
             presentation.blocksRaycasts = show && !IsTransferring;
             presentation.interactable = show && !IsTransferring;
+            roleConditions?.SetHovered(overInfo);
         }
         private static bool Contains(RectTransform rect, Vector2 point)
         {
@@ -136,9 +151,10 @@ namespace KillingMahjong.UI
             waits = valid.ToArray();
             hasPresentation = true;
             info.alpha = animate ? 0f : 1f;
-            info.blocksRaycasts = false;
+            info.blocksRaycasts = true;
             if (waits.Length == 0)
             {
+                roleConditions.SetRoles(Array.Empty<string>(), info.GetComponent<Image>().color);
                 noWaitBox.gameObject.SetActive(true);
                 info.transform.Find("InfoLabel").GetComponent<TMP_Text>().text = "待ち牌 0種類";
                 info.transform.Find("Han").GetComponent<TMP_Text>().text = "";
@@ -199,6 +215,7 @@ namespace KillingMahjong.UI
             info.transform.Find("Han").GetComponent<TMP_Text>().text = w.han + "翻";
             info.transform.Find("Rank").GetComponent<TMP_Text>().text = Rank(w) + (w.multiplier > 0 ? " ×" + w.multiplier.ToString("0.#", CultureInfo.InvariantCulture) : "");
             info.transform.Find("Yaku").GetComponent<TMP_Text>().text = w.yaku == null ? "" : string.Join("\n", w.yaku);
+            roleConditions.SetRoles(w.yaku, info.GetComponent<Image>().color);
             for (int i = 0; i < marks.Count; i++)
             {
                 var mark = marks[i]; mark.Begin();
@@ -310,6 +327,7 @@ namespace KillingMahjong.UI
         public void Hide()
         {
             hasPresentation = false; forceVisible = false;
+            roleConditions?.Clear();
             if (noWaitBox != null) noWaitBox.gameObject.SetActive(false);
             version++; StopAllCoroutines(); ClearFlight();
             foreach (var card in cards) if (card != null) { card.SetParent(null, false); Destroy(card.gameObject); }
@@ -317,7 +335,7 @@ namespace KillingMahjong.UI
             gameObject.SetActive(false);
         }
         private void ClearFlight() { if (pixels != null) { pixels.gameObject.SetActive(false); Destroy(pixels.gameObject); pixels = null; } }
-        private void OnDisable() { version++; ClearFlight(); }
+        private void OnDisable() { version++; ClearFlight(); roleConditions?.HideImmediate(); }
 
         private static RectTransform Rect(Transform parent, string name, float x, float y, float w, float h, out bool made)
         {
