@@ -91,7 +91,16 @@ namespace KillingMahjong.UI
                     rig.blink.gameObject.SetActive(true); rig.blink.PlayWakeUpEffect(); break;
                 case "tile.sparkle": TileSparkleEffect.Attach(rig.handTiles[6]).SetContinuous(true); break;
                 case "tile.rays": TileRisingRayEffect.Attach(rig.handTiles[6]).SetContinuous(true); break;
-                case "tile.clatter": TileClatterEffect.Attach(rig.surface, 150f); break;
+                case TileClatterEffect.EffectId:
+                    bool clatterReady = false;
+                    rig.phase.PlayRoundStartDarken("第１局", onReady: () => clatterReady = true);
+                    yield return Until(() => clatterReady);
+                    yield return null;
+                    var clatterRoot = rig.phase.transform as RectTransform;
+                    var clatter = TileClatterEffect.Attach(clatterRoot, 112f);
+                    scope.AddCleanup(() => { if (clatter != null) TileClatterEffect.Hide(clatterRoot); });
+                    yield return new WaitForSecondsRealtime(8f);
+                    yield break;
                 case "blood.burst": PixelBloodEffect.Play(rig.surface, new Vector2(0, -160)); break;
                 case "blood.transfer": BloodTransferEffect.Play(rig.surface, new Vector2(-220, 40), new Vector2(330, -70), 2f); break;
                 case "blood.glow":
