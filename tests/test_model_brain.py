@@ -68,3 +68,17 @@ def test_create_brain_uses_model_file_when_present(tmp_path):
     assert isinstance(create_brain(config, random.Random(0)), mb.ModelBrain)
     # モデルがなければ規則で打つ
     assert type(create_brain({**config, "model_path": str(tmp_path / "none.npz")}, random.Random(0))) is RuleBrain
+
+
+def test_create_brain_falls_back_to_rules_when_model_cannot_be_used(tmp_path, monkeypatch):
+    """numpy がない・モデルが壊れているなどで ModelBrain を作れなくても、マッチは規則で続く。"""
+    path = tmp_path / "hard.npz"
+    path.write_bytes(b"broken")
+    assert type(create_brain({**_config(), "model_path": str(path)}, random.Random(0))) is RuleBrain
+
+    def unavailable(*_args, **_kwargs):
+        raise ImportError("No module named 'numpy'")
+
+    monkeypatch.setattr(mb, "ModelBrain", unavailable)
+    np.savez(path, x=np.zeros(1))
+    assert type(create_brain({**_config(), "model_path": str(path)}, random.Random(0))) is RuleBrain

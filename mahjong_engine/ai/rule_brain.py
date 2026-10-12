@@ -791,13 +791,15 @@ def create_brain(config: dict, rng: Optional[random.Random] = None) -> RuleBrain
     """
     brain = config["brain"]
     if brain == "model":
-        from .model_brain import ModelBrain, model_available, resolve_model_path
+        # numpy がない・モデルが読めないときも、マッチを止めずに規則で打つ
+        try:
+            from .model_brain import ModelBrain, model_available, resolve_model_path
 
-        path = resolve_model_path(config.get("model_path", ""))
-        if model_available(path):
-            try:
+            path = resolve_model_path(config.get("model_path", ""))
+            if model_available(path):
                 return ModelBrain({**config, "model_path": str(path)}, rng, mode="greedy")
-            except Exception:
-                logger.exception("つよいのモデルを読めないので、規則で打ちます: %s", path)
+            logger.warning("つよいのモデルがないので、規則で打ちます: %s", path)
+        except Exception:
+            logger.exception("つよいのモデルを使えないので、規則で打ちます")
     level = "easy" if brain == "easy" else "normal"
     return RuleBrain(level, config, rng)
