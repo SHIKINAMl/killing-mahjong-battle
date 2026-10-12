@@ -54,36 +54,13 @@ namespace KillingMahjong.Network.Handlers
                     IsTenpaiMessage tenpaiMsg = JsonUtility.FromJson<IsTenpaiMessage>(jsonString);
                     if (tenpaiMsg != null && tenpaiMsg.data != null && tenpaiMsg.data.waits != null)
                     {
-                        var waits = new List<int>();
-                        var nonManganList = new List<int>();
-                        var waitDataList = new List<WaitData>();
-
-                        foreach (var w in tenpaiMsg.data.waits)
-                        {
-                            waits.Add(w.tile);
-                            waitDataList.Add(w);
-                            if (!w.mangan_or_more)
-                            {
-                                nonManganList.Add(w.tile);
-                            }
-                        }
-
-                        // 保存
-                        board.LocalWaitDataList.Clear();
-                        board.LocalWaitDataList.AddRange(waitDataList);
-
-                        board.SetNonManganWaits(nonManganList);
-                        // テンパイ確認時(is_tenpai)の段階ではまだ手牌を「決定」していないため、
-                        // 左下のプレイヤー情報にはまだ待ち牌を表示しない（hand_selection_acceptedで表示する）
+                        // コントローラが送信時の13枚・局・取消を照合してから表示情報を保存する。
 
                         network.RaiseIsTenpaiReceived(tenpaiMsg.data);
                     }
                     break;
 
                 case "not_tenpai":
-                    board.SetLocalState(null, null, new List<int>());
-                    board.FireRebuildEvent();
-
                     NotTenpaiMessage notTenpaiMsg = JsonUtility.FromJson<NotTenpaiMessage>(jsonString);
                     network.RaiseNotTenpaiReceived(notTenpaiMsg?.message ?? "Hand is not in tenpai");
                     break;

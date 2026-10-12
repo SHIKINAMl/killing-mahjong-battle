@@ -95,6 +95,14 @@ namespace KillingMahjong.EditorTools
                 Scene scene = EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
                 report.Append(path).Append(": 役を選ぶ画面=").Append(BakeYakuSelection(scene));
                 report.Append(" / 牌交換の残す牌を選ぶ画面=").Append(BakeMulliganChoice(scene));
+                foreach (var root in scene.GetRootGameObjects())
+                {
+                    var manager = root.GetComponentInChildren<GameUIManager>(true);
+                    if (manager == null) continue;
+                    HandWaitRevealUI.Ensure(manager.transform).gameObject.SetActive(false);
+                    report.Append(" / 待ち牌の登場・移送=").Append(Describe(SceneFirst.Report(nameof(HandWaitRevealUI))));
+                    break;
+                }
                 EditorSceneManager.MarkSceneDirty(scene);
                 bool saved = EditorSceneManager.SaveScene(scene);
                 report.AppendLine(saved ? " / 保存しました" : " / **保存に失敗しました**");

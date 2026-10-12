@@ -44,6 +44,17 @@ namespace KillingMahjong.EditorTools
                 var data = new SerializedObject(victory);
                 rig.endings = ReadConfigs(data.FindProperty("configs"));
                 rig.victoryEndings = ReadConfigs(data.FindProperty("victoryEndingConfigs"));
+                var handWait = ui.GetComponentInChildren<HandWaitRevealUI>(true);
+                if (handWait != null) handWait.transform.SetParent(root.transform, false);
+                // 本編と同じ待ち牌枠を試写用に保存する。盤面Singletonは持ち込まない。
+                var waitBox = UnityEngine.Object.Instantiate(ui.WaitUI.gameObject);
+                waitBox.name = "HandConfirmationWaitBox";
+                var waitData = new SerializedObject(waitBox.GetComponent<WaitUI>());
+                waitData.FindProperty("tileResourceManager").objectReferenceValue = null;
+                waitData.ApplyModifiedPropertiesWithoutUndo();
+                waitBox.SetActive(false);
+                PrefabUtility.SaveAsPrefabAsset(waitBox, "Assets/Resources/Presentation/HandConfirmationWaitBox.prefab");
+                UnityEngine.Object.DestroyImmediate(waitBox);
                 // シーンの編集時はメニュー類が開いていてもよいが、試写には持ち込まない。
                 var visibleRoots = new Component[] { rig.phase, rig.ron, rig.player, rig.enemy, rig.betting, rig.blink, rig.dialogue, rig.momentum, rig.yakuList }
                     .Where(c => c != null).Select(c => c.transform).ToArray();
@@ -69,6 +80,7 @@ namespace KillingMahjong.EditorTools
                 }
                 // 許可リスト。ネットワーク、GameUIManager、戦績、シーン遷移、台本は持ち込まない。
                 var keep = new[] { typeof(EffectPreviewRig), typeof(PhaseTransitionUI), typeof(RonAnimationUI),
+                    typeof(HandWaitRevealUI), typeof(KillingMahjong.UI.Effects.PixelShapeGraphic),
                     typeof(PlayerInfoUI), typeof(EnemyInfoUI), typeof(BettingUI), typeof(BlinkEffectUI),
                     typeof(DialogueUI), typeof(KillingMahjong.UI.Effects.MatchMomentumUI),
                     typeof(KillingMahjong.UI.Effects.HeartbeatEffect), typeof(YakuListUI), typeof(YakuItemUI) };
@@ -92,6 +104,8 @@ namespace KillingMahjong.EditorTools
                 if (root.GetComponentsInChildren<GameUIManager>(true).Length != 0)
                     throw new InvalidOperationException("試写舞台に対局処理が残っています。");
                 root.SetActive(false);
+                HandWaitRevealUI.Ensure(root.transform).gameObject.SetActive(false);
+                SceneFirst.Report(nameof(HandWaitRevealUI));
                 if (!AssetDatabase.IsValidFolder("Assets/Resources/Presentation"))
                     AssetDatabase.CreateFolder("Assets/Resources", "Presentation");
                 PrefabUtility.SaveAsPrefabAsset(root, Path);

@@ -43,7 +43,8 @@ namespace KillingMahjong.UI
             player.bgmWasPlayingAtOpen = audio != null && (audio.IsBgmPlaying || audio.IsPairBgmRunning
                 || audio.AreLayersRunning || audio.IsProposal3Running);
             player.HideOriginal();
-            player.previewScene = SceneManager.CreateScene("EffectPreview");
+            // 前の舞台のUnloadSceneAsyncが完了する前でも、別の試写を開ける。
+            player.previewScene = SceneManager.CreateScene("EffectPreview_" + player.GetInstanceID());
             SceneManager.SetActiveScene(player.previewScene);
             player.BuildControls();
             player.StartCoroutine(player.Run());

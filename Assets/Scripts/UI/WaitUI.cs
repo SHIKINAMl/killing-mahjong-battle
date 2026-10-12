@@ -13,6 +13,7 @@ namespace KillingMahjong.UI
 
         /// <summary>チュートリアルで待ち牌の表示枠を指し示すための実表示領域。</summary>
         public RectTransform GuideTargetRect => waitContainer;
+        public void BindTileResources(TileResourceManager tiles) { tileResourceManager = tiles; }
         
         [Header("Dialog Position Settings")]
         [SerializeField] private Vector2 dialogCenterPosition = new Vector2(0, 50);
@@ -30,6 +31,9 @@ namespace KillingMahjong.UI
         private int currentPage = 0;
         private Coroutine paginationCoroutine = null;
         private const int MaxTilesPerPage = 3;
+        public bool IsArrivalInProgress { get; private set; }
+        public int ArrivalRevealFrame { get; private set; } = -1;
+        private HashSet<int> arrivalNonMangan = new HashSet<int>();
 
         private void Awake()
         {
@@ -59,6 +63,23 @@ namespace KillingMahjong.UI
 
         public void DisplayWaits(List<int> waitTileIds)
         {
+            // リビルドや可視性更新が、飛んでいる光より先に牌を表示しない。
+            if (IsArrivalInProgress) return;
+            if (gameObject.activeSelf && activeWaitTiles.Count > 0
+                && SameWaits(waitTileIds, currentWaitTileIds))
+            {
+                var board = KillingMahjong.Managers.BoardStateManager.Instance;
+                for (int i = 0; i < activeWaitTiles.Count; i++)
+                {
+                    int index = currentPage * MaxTilesPerPage + i;
+                    var visual = activeWaitTiles[i].GetComponent<TileVisual>();
+                    if (visual != null && index < currentWaitTileIds.Count)
+                        visual.SetAlpha(board != null && board.NonManganWaitTiles.Contains(currentWaitTileIds[index]) ? .3f : 1f);
+                }
+                if (currentWaitTileIds.Count > MaxTilesPerPage && paginationCoroutine == null)
+                    paginationCoroutine = StartCoroutine(PaginationRoutine());
+                return;
+            }
             ClearWaits();
 
             if (waitTileIds == null || waitTileIds.Count == 0)
@@ -69,7 +90,7 @@ namespace KillingMahjong.UI
             }
 
             gameObject.SetActive(true);
-            currentWaitTileIds = waitTileIds;
+            currentWaitTileIds = new List<int>(waitTileIds);
             currentPage = 0;
 
             if (currentWaitTileIds.Count > MaxTilesPerPage)
@@ -149,7 +170,9 @@ namespace KillingMahjong.UI
                     visual.SetExposed(false);
                     visual.SetFuritenHighlight(false);
 
-                    if (KillingMahjong.Managers.BoardStateManager.Instance.NonManganWaitTiles.Contains(id))
+                    var board = KillingMahjong.Managers.BoardStateManager.Instance;
+                    if (IsArrivalInProgress ? arrivalNonMangan.Contains(id)
+                        : board != null && board.NonManganWaitTiles.Contains(id))
                     {
                         visual.SetAlpha(0.3f);
                     }
@@ -259,12 +282,73 @@ namespace KillingMahjong.UI
 
         public void ClearWaits()
         {
+            IsArrivalInProgress = false;
             if (paginationCoroutine != null)
             {
                 StopCoroutine(paginationCoroutine);
                 paginationCoroutine = null;
             }
             ClearRenderedTiles();
+        }
+
+        // 本編とコレクションで同じ枠・レイアウト・牌描画を使う。判定は行わない。
+        public void PrepareArrival(List<int> ids, List<int> nonMangan)
+        {
+            ClearWaits();
+            currentWaitTileIds = new List<int>(ids);
+            arrivalNonMangan = new HashSet<int>(nonMangan ?? new List<int>());
+            currentPage = 0;
+            IsArrivalInProgress = true;
+            gameObject.SetActive(true);
+            var cg = waitContainer.GetComponent<CanvasGroup>();
+            if (cg != null) cg.alpha = 1f;
+        }
+
+        public void PrepareArrivalPage(int page)
+        {
+            if (!IsArrivalInProgress) return;
+            currentPage = page;
+            RenderPage(page);
+            foreach (var tile in activeWaitTiles)
+            {
+                var cg = tile.GetComponent<CanvasGroup>();
+                if (cg == null) cg = tile.AddComponent<CanvasGroup>();
+                cg.alpha = 0f;
+                cg.blocksRaycasts = false;
+            }
+            Canvas.ForceUpdateCanvases();
+        }
+
+        public RectTransform GetArrivalTileRect(int slot) =>
+            slot >= 0 && slot < activeWaitTiles.Count ? activeWaitTiles[slot].GetComponent<RectTransform>() : null;
+
+        public void RevealArrivalTile(int slot)
+        {
+            if (!IsArrivalInProgress || slot < 0 || slot >= activeWaitTiles.Count) return;
+            activeWaitTiles[slot].GetComponent<CanvasGroup>().alpha = 1f;
+            ArrivalRevealFrame = Time.frameCount;
+        }
+
+        public void FinishArrival()
+        {
+            if (!IsArrivalInProgress) return;
+            IsArrivalInProgress = false;
+            if (currentWaitTileIds.Count > MaxTilesPerPage)
+                paginationCoroutine = StartCoroutine(PaginationRoutine());
+        }
+
+        private static bool SameWaits(List<int> a, List<int> b)
+        {
+            if (a == null || b == null || a.Count != b.Count) return false;
+            for (int i = 0; i < a.Count; i++) if (a[i] != b[i]) return false;
+            return true;
+        }
+
+        private void OnDisable()
+        {
+            if (paginationCoroutine != null) StopCoroutine(paginationCoroutine);
+            paginationCoroutine = null;
+            if (IsArrivalInProgress) ClearWaits();
         }
 
         /// <summary>

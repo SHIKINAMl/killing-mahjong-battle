@@ -85,6 +85,8 @@ namespace KillingMahjong.UI
                 case "phase.local_turn": yield return rig.phase.PlayCenterTextAnimRoutine("先行"); break;
                 case "phase.enemy_turn": yield return rig.phase.PlayCenterTextAnimRoutine("後攻"); break;
                 case "phase.prompt": rig.phase.PlayPromptText("手牌を選んでください"); yield return new WaitForSeconds(3f); break;
+                case "hand.wait_reveal": case "hand.wait_transfer": case "hand.confirm":
+                    yield return PreviewHandConfirmation(); break;
                 case "phase.draw":
                     bool drawn = false; rig.phase.PlayDrawTransition(() => { }, () => drawn = true);
                     yield return Until(() => drawn); break;
