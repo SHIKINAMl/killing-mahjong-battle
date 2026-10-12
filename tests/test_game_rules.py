@@ -185,10 +185,33 @@ def test_round_continues_when_everyone_can_pay():
     engine.initialize_players(["A", "B"])
     a, b = engine.state.players
     a.bet, b.bet = 200, 200
-    b.health = 200
+    b.health = 400  # 流局後は 200 × 2 で精算されるので、400 あれば続けられる
     engine.end_round(is_draw=True)
     assert engine.game_end_reason is None
     assert engine.state.round_state.status == RoundStatus.ROUND_END_WAITING
+
+
+def test_draw_ends_game_when_accumulated_stake_is_unpayable():
+    """流局しても HP は減らないが、積み上がった掛け金（掛け金 × (流局の回数 + 1)）を払えなければ負け。"""
+    engine = GameEngine()
+    engine.initialize_players(["A", "B"])
+    a, b = engine.state.players
+    a.bet, b.bet = 1000, 1000
+    b.health = 1500  # 1 回目の流局: 次の局は 1000 × 2 = 2000 で精算される
+    engine.end_round(is_draw=True)
+    assert engine.game_end_reason == "bet_unpayable"
+    assert b.health == 1500  # HP は減らない
+
+    engine = GameEngine()
+    engine.initialize_players(["A", "B"])
+    a, b = engine.state.players
+    a.bet, b.bet = 1000, 1000
+    b.health = 2500
+    engine.end_round(is_draw=True)  # 2000 は払える
+    assert engine.game_end_reason is None
+    engine.end_round(is_draw=True)  # 2 回目の流局: 1000 × 3 = 3000 は払えない
+    assert engine.game_end_reason == "bet_unpayable"
+    assert engine.bet_unpayable_players == ["B"]  # HP の多い少ないではなく、払えなかった方が負け
 
 
 # ========== 掛け金の精算（案 B: 先払いなし。流局は同額のまま積み上げ） ==========
@@ -247,3 +270,43 @@ def test_draw_after_each_player_discards_17():
     engine.discard("L", 16)
     assert len(loser.discards) == 17
     assert engine.state.round_state.status == RoundStatus.ROUND_END_WAITING  # 17 枚目で流局
+
+
+def test_skill_cannot_break_carry_over_stake():
+    """流局の続きの局では、積み上がった掛け金を払えなくなるほど HP を使うスキルは使えない。"""
+    from mahjong_engine.engine.game_state import SkillType
+
+    engine = GameEngine()
+    engine.initialize_players(["A", "B"])
+    engine.start_game(5)
+    a = engine.get_player_by_id("A")
+    engine._carry_over_bets, engine._carry_over_draw_count = True, 1
+    a.bet = 1000
+    a.health = 2400  # 積み上がった掛け金は 1000 × 2 = 2000
+    assert engine.skill_health_floor(a) == 2000
+    assert engine.execute_skill(a, SkillType.PERSPECTIVE, {"suit": "manzu"}) is None  # 2400 − 500 < 2000
+    assert a.health == 2400
+    a.health = 2500
+    assert engine.execute_skill(a, SkillType.PERSPECTIVE, {"suit": "manzu"}) == 500  # ちょうど 2000 残る
+
+
+def test_voltage_rises_with_new_kinds_and_resumes_after_break():
+    engine = GameEngine()
+    engine.initialize_players(["A", "B"])
+    a = engine.get_player_by_id("A")
+    for kind in range(6):  # 初めての種類を 6 枚 → 6 点（1.3 倍）
+        engine._apply_voltage_discard(a, kind)
+    assert (a.voltage_points, engine._get_voltage_multiplier(a.voltage_points)) == (6, 1.3)
+    engine._apply_voltage_discard(a, 0)  # 出た種類で切れる。再開は 2 点から
+    assert (a.voltage_points, a.voltage_broken, a.voltage_resume_points) == (0, True, 2)
+    engine._apply_voltage_discard(a, 10)
+    assert (a.voltage_points, a.voltage_broken) == (3, False)
+
+
+def test_tanki_bonus_applies_to_any_single_kind_wait():
+    """待ちが 1 種類なら、雀頭の待ちでなくても（嵌張でも）単騎待ちボーナスの対象。"""
+    tanki = GameEngine._is_tanki_wait_agari
+    assert tanki([], 5, [5])  # 1 種類の待ちをその牌で和了
+    assert tanki([], 5 | 0b100000, [5])  # ドラの印が付いた牌 ID でも種類で比べる
+    assert not tanki([], 5, [5, 8])  # 2 種類の待ち
+    assert not tanki([], 8, [5])

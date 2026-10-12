@@ -92,7 +92,11 @@ def _game(args: tuple) -> dict:
     round_log: dict[str, list[dict]] = {pid: [] for pid in PLAYER_IDS}
     rounds = 0
     while not sim.ended and rounds < MAX_ROUNDS:
-        record = sim.play_round()
+        sim.start_round()
+        # 手牌を決めた後の待ちが 1 種類か（単騎待ちボーナスの対象の手を選んだか）
+        single_wait = {p.player_id: len({w & 0b11111 for w in p.waits}) == 1 for p in sim.engine.state.players}
+        sim.advance_discards()
+        record = sim.finish_round()
         liq = record.liquidation
         for pid in PLAYER_IDS:
             skills[pid].update(record.skills[pid])
@@ -104,6 +108,9 @@ def _game(args: tuple) -> dict:
                 "result": result,
                 "gain": liq["winner_gain"] if result == "win" else 0,
                 "loss": liq["loser_loss"] if result == "lose" else 0,
+                "tanki_hand": single_wait.get(pid, False),
+                "tanki_win": result == "win" and bool(liq.get("is_tanki_wait")),
+                "damage": (liq["loser_loss"] - liq.get("assault_bonus_damage", 0)) if result == "win" else 0,
             })
         rounds += 1
     return {
@@ -145,6 +152,7 @@ def summarize(results: list[dict], a: str, b: str) -> dict:
             "loss": sum(r["loss"] for r in rows) / n,
             "cost": sum(r["cost"] for r in rows) / n,
             "net": sum(r["gain"] - r["loss"] - r["cost"] for r in rows) / n,
+            "damage": sum(r.get("damage", 0) for r in rows) / n,  # 和了で相手に与えた損失（強襲の追加分を除く）
         }
 
     def per_game(name: str) -> dict:
@@ -163,6 +171,8 @@ def summarize(results: list[dict], a: str, b: str) -> dict:
             "loss_per_game": sum(row["loss"] for row in rows) / games,
             "all_rounds": round_stats(rows, games),
             "no_skill_rounds": round_stats([row for row in rows if not row["skills"]], games),
+            "tanki_rounds": round_stats([row for row in rows if row.get("tanki_hand")], games),
+            "non_tanki_rounds": round_stats([row for row in rows if not row.get("tanki_hand")], games),
             "rounds_with_skill": by_skill,
         }
 
@@ -185,7 +195,8 @@ def format_report(s: dict) -> str:
         uses = "、".join(f"{k} {v:.2f}" for k, v in usage["uses_per_game"].items()) or "なし"
         lines.append(f"  {name}: 1 対局あたり {uses}（払った HP {usage['cost_per_game']:.0f}、"
                      f"得た額 {usage['gain_per_game']:.0f}、失った額 {usage['loss_per_game']:.0f}）")
-        groups = [("全部の局", usage["all_rounds"]), ("スキルなしの局", usage["no_skill_rounds"])]
+        groups = [("全部の局", usage["all_rounds"]), ("スキルなしの局", usage["no_skill_rounds"]),
+                  ("単騎（1 種類待ち）の局", usage["tanki_rounds"]), ("それ以外の局", usage["non_tanki_rounds"])]
         groups += [(f"{k} を使った局", v) for k, v in usage["rounds_with_skill"].items()]
         for label, st in groups:
             if not st.get("rounds_per_game"):
@@ -193,7 +204,7 @@ def format_report(s: dict) -> str:
             lines.append(
                 f"    {label:<22} {st['rounds_per_game']:>5.2f} 局/対局  和了 {st['win_rate']:.1%}  放銃 {st['lose_rate']:.1%}  "
                 f"掛け金 {st['bet']:>5.0f}  得た額 {st['gain']:>5.0f}  失った額 {st['loss']:>5.0f}  "
-                f"払った HP {st['cost']:>5.0f}  差し引き {st['net']:>+6.0f}（1 局あたり）")
+                f"払った HP {st['cost']:>5.0f}  与えた損失 {st['damage']:>5.0f}  差し引き {st['net']:>+6.0f}（1 局あたり）")
     return "\n".join(lines)
 
 

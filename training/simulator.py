@@ -21,7 +21,7 @@ if str(ROOT) not in sys.path:
 
 from mahjong_engine.ai.cpu_config import HUMAN_PERKS, load_cpu_config  # noqa: E402
 from mahjong_engine.ai.observation import CpuObservation, PublicInfo, build_observation  # noqa: E402
-from mahjong_engine.ai.rule_brain import HandPlan, RuleBrain, fallback_bet, fallback_hand_indexes  # noqa: E402
+from mahjong_engine.ai.rule_brain import HandPlan, RuleBrain, fallback_bet  # noqa: E402
 from mahjong_engine.engine.game_engine import GameEngine  # noqa: E402
 from mahjong_engine.engine.game_state import RoundStatus, SkillType  # noqa: E402
 from mahjong_engine.engine.tile_wall import RoundDeal  # noqa: E402
@@ -65,7 +65,7 @@ class RuleAgent:
         return self.brain.choose_mulligan(obs, pending)
 
     def choose_hand(self, obs, plan):
-        return list(plan.hand_indexes) if plan is not None else fallback_hand_indexes(obs)
+        return self.brain.final_hand(obs, plan)
 
     def choose_bet(self, obs, plan):
         return self.fixed_bet if self.fixed_bet is not None else self.brain.choose_bet(obs, plan)

@@ -385,6 +385,15 @@ def test_perspective_reveals_only_the_chosen_suit():
     assert all(target.wall[i] & 0b11111 < 9 for i in target.exposed_hand_indexes)
 
 
+def test_perspective_up_to_five_times_per_round():
+    engine, user, target = _perspective_engine([0, 1, 2, 3, 4, 9, 10, 27])
+    for _ in range(5):
+        assert engine.execute_skill(user, SkillType.PERSPECTIVE, {"suit": "manzu"}) == 500
+    health = user.health
+    assert engine.execute_skill(user, SkillType.PERSPECTIVE, {"suit": "manzu"}) is None  # 6 回目は使えない
+    assert user.health == health and user.perspective_uses_this_round == 5
+
+
 def test_perspective_reveals_what_exists_and_charges_full_cost():
     engine, user, target = _perspective_engine([0, 1, 2, 3, 4, 9, 10, 27])
     assert engine.execute_skill(user, SkillType.PERSPECTIVE, {"suit": "pinzu"}) == 500

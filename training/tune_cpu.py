@@ -33,6 +33,18 @@ GROUPS: dict[str, list[tuple[str, list]]] = {
         ("hand_selection.bonus_wait_seen_in_opponent_wall", [0.0, 0.6]),
         ("hand_selection.candidate_limit", [20, 80]),
     ],
+    # ボルテージを考えた打牌（0 = 考えない）
+    "voltage": [
+        ("discard.weight_voltage", [10, 30, 100]),
+    ],
+    # ボルテージは、危険度がほぼ同じ牌どうしの選び分けにだけ効く小さな重み
+    "voltage_small": [
+        ("discard.weight_voltage", [1, 3]),
+    ],
+    # 単騎待ちを考えた手牌（0 = 考えない）
+    "tanki": [
+        ("hand_selection.tanki_bonus", [0.3, 0.6, 1.0]),
+    ],
     # 打牌の決め方
     "discard": [
         ("discard.weight_danger", [-5, -20]),
