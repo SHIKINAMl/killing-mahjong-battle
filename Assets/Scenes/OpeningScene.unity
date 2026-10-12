@@ -4631,10 +4631,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CustomCursor
   handCursor: {fileID: 2800000, guid: afdde632ffb9e634f86a843180336e1b, type: 3}
-  hotspot: {x: 20, y: 20}
+  hotspot: {x: 26, y: 24}
   cursorSize: 64
   clickRotationAngle: 8
-  rotationAnchor: {x: 0.5, y: 1}
 --- !u!4 &312065929
 Transform:
   m_ObjectHideFlags: 0
