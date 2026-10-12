@@ -35,6 +35,7 @@ namespace KillingMahjong.UI
             new Entry("skill.mulligan", "スキル", "牌交換：OUT / IN", "MulliganSwapAnimator.PlayRoutine"),
             new Entry("skill.boost_hand", "スキル", "役強化：暗転 → ベルルを呼ぶ → 力を借りて翻数が上がる → 右上の一覧へ積む", "BoostHandSkillEffect.Play"),
             new Entry("skill.assault", "スキル", "強襲：自分の血を溜める → 相手へ撃ち込む → 札が貼り付く", "AssaultSkillEffect.Play"),
+            new Entry("skill.assault_received_mark", "スキル", "強襲を受けた自分HPの札", "GameUISkillController.HandleSkillCasted / AssaultMarkUI.Show"),
             new Entry("skill.cutin.enemy", "スキル", "相手の能力カットイン", "PhaseTransitionUI.PlaySkillCutinAnimationRoutine"),
             new Entry("ui.ability_bell", "スキル", "能力を開くベルの音", "AbilityUI.OnTriggerClicked / AudioManager.PlayAbilityBellSE"),
             new Entry("phase.dealing", "フェイズ", "配牌：暗転 → 牌の山 → 明転", "PhaseTransitionUI.PlayRoundStartDarken / PlayRoundStartFadeOut"),

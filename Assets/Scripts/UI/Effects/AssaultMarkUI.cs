@@ -13,7 +13,7 @@ namespace KillingMahjong.UI.Effects
     /// 撃ったこと自体を忘れる。局が終わるまで印を出しっぱなしにして、「いま狙っている」を見せ続ける。
     ///
     /// 絵は、差し押さえの札（自分の血で判を押した小さな紙。<see cref="DrawTag"/>）。
-    /// 血の表示の右上に小さく置き、ゆっくり脈を打たせる。
+    /// 相手の血袋は右上、自分のHPは左上（対局中央側）に置き、ゆっくり脈を打たせる。
     /// 最初の版は血の表示を囲む照準（四隅のかぎ形）、次は血の粒だった。2026-10-10 に強襲の背景を
     /// 「ベルルとの追加の契約（配当を受け取らず、その分を相手から取り立てさせる）」と決めたので、札にした。
     ///
@@ -38,42 +38,58 @@ namespace KillingMahjong.UI.Effects
         /// <summary>印の粒の半径（Canvas の単位）。</summary>
         public const float Radius = 8f;
 
-        private static AssaultMarkUI _current;
+        private static readonly List<AssaultMarkUI> ActiveMarks = new List<AssaultMarkUI>();
 
         private SkillEffectStage _stage;
         private PixelShapeGraphic _shapes;
         private RectTransform _target;
+        private bool _attachToLeft;
         private float _clock;
 
-        /// <summary>対象の血の表示に印を出す。すでに出ていれば対象だけ差し替える。</summary>
-        public static void Show(RectTransform target)
+        /// <summary>対象の血の表示に印を出す。同じ対象には重ねず、両者の札は独立して残す。</summary>
+        public static void Show(RectTransform target, bool attachToLeft = false)
         {
             if (!Application.isPlaying || target == null) return;
 
-            if (_current == null)
+            var mark = ActiveMarks.Find(m => m != null && m._target == target);
+            if (mark == null)
             {
                 var go = new GameObject("AssaultMarkUI");
-                _current = go.AddComponent<AssaultMarkUI>();
-                _current._stage = new SkillEffectStage("Stage", UISortingOrders.AssaultMark, go.transform);
-                _current._shapes = _current._stage.AddShapes("Mark");
+                mark = go.AddComponent<AssaultMarkUI>();
+                mark._stage = new SkillEffectStage("Stage", UISortingOrders.AssaultMark, go.transform);
+                mark._shapes = mark._stage.AddShapes("Mark");
+                ActiveMarks.Add(mark);
             }
 
-            _current._target = target;
-            _current._clock = 0f;
-            _current.Redraw();
+            mark._target = target;
+            mark._attachToLeft = attachToLeft;
+            mark._clock = 0f;
+            mark._coverCheckedFrame = -100;
+            mark.Redraw();
         }
 
         /// <summary>印を消す。出ていなければ何もしない。</summary>
         public static void Clear()
         {
-            if (_current == null) return;
-            Destroy(_current.gameObject);
-            _current = null;
+            foreach (var mark in ActiveMarks.ToArray())
+                if (mark != null) Destroy(mark.gameObject);
+            ActiveMarks.Clear();
+        }
+
+        /// <summary>試写で作った対象の札だけを消す。本編の別のHPにある札は残す。</summary>
+        public static void ClearTarget(RectTransform target)
+        {
+            foreach (var mark in ActiveMarks.ToArray())
+            {
+                if (mark == null || mark._target != target) continue;
+                ActiveMarks.Remove(mark);
+                Destroy(mark.gameObject);
+            }
         }
 
         private void OnDestroy()
         {
-            if (_current == this) _current = null;
+            ActiveMarks.Remove(this);
         }
 
         private void LateUpdate()
@@ -90,7 +106,7 @@ namespace KillingMahjong.UI.Effects
             // 対象が消えた・隠れたあいだは描かない（印だけ宙に浮いて見えるのを防ぐ）
             if (_target != null && _target.gameObject.activeInHierarchy && !IsCovered())
             {
-                Vector2 at = MarkPosition(_stage, _target);
+                Vector2 at = MarkPosition(_stage, _target, _attachToLeft);
 
                 // 脈。1.2 秒に1回、輪が広がりながら薄くなる
                 float beat = Mathf.Repeat(_clock, 1.2f) / 1.2f;
@@ -201,13 +217,13 @@ namespace KillingMahjong.UI.Effects
         }
 
         /// <summary>
-        /// 印を置く場所。血が見えている所の右上の角。真ん中に置くと血の量が読めなくなる。
+        /// 印を置く場所。相手は右上、自分は左上。真ん中に置くと血の量が読めなくなる。
         /// 演出（<see cref="AssaultSkillEffect"/>）の撃ち込む先も、同じ式で決める。
         /// </summary>
-        internal static Vector2 MarkPosition(SkillEffectStage stage, RectTransform target)
+        internal static Vector2 MarkPosition(SkillEffectStage stage, RectTransform target, bool attachToLeft = false)
         {
             Rect hp = stage.LocalVisibleRectOf(target);
-            return SkillEffectStage.Snap(new Vector2(hp.xMax + 2f, hp.yMax - 2f));
+            return SkillEffectStage.Snap(new Vector2(attachToLeft ? hp.xMin - 2f : hp.xMax + 2f, hp.yMax - 2f));
         }
 
         /// <summary>血の粒を1つ描く。暗い縁、赤い玉、左上の照り。</summary>

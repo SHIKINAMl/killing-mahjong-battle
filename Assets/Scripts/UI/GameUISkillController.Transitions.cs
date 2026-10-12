@@ -410,6 +410,12 @@ namespace KillingMahjong.UI
                         if (!ownedLock.IsActive) yield break;
                     }
                 }
+                else if (!isLocalPlayer && uiManager.PlayerInfoUI != null)
+                {
+                    // 相手が強襲したとき、自分のHPにも差し押さえの札を残す。
+                    // 血・コスト・使用済み判定は既存のサーバー通知処理のまま。
+                    Effects.AssaultMarkUI.Show(uiManager.PlayerInfoUI.HpGaugeAnchor, attachToLeft: true);
+                }
             }
             else if (data.skillType == "mulligan")
             {

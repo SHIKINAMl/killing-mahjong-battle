@@ -50,10 +50,14 @@ namespace KillingMahjong.UI
                     yield return rig.phase.PlaySkillCutinAnimationRoutine("強襲", true, rig.player.CurrentCharacterData);
                     var assault = AssaultSkillEffect.Create();
                     // 差し押さえの札は本編だと局の終わりまで残る。試写では少し見せてから、抜けるときに消す
-                    scope.AddCleanup(() => { if (assault != null) assault.Dispose(); AssaultMarkUI.Clear(); });
+                    scope.AddCleanup(() => { if (assault != null) assault.Dispose(); if (rig != null) AssaultMarkUI.ClearTarget(rig.enemy.HpGaugeAnchor); });
                     yield return assault.Play(rig.enemy.HpGaugeAnchor, rig.player.HpGaugeAnchor, () => rig.enemy.PlayBounceAnimation(.4f),
                         rig.phase.PlayerCutinSprite);
                     yield return new WaitForSeconds(1.5f); break;
+                case "skill.assault_received_mark":
+                    scope.AddCleanup(() => { if (rig != null) AssaultMarkUI.ClearTarget(rig.player.HpGaugeAnchor); });
+                    AssaultMarkUI.Show(rig.player.HpGaugeAnchor, attachToLeft: true);
+                    yield return new WaitForSeconds(3f); break;
                 case "skill.cutin.enemy":
                     yield return rig.phase.PlaySkillCutinAnimationRoutine("透視", false, rig.enemy.CurrentCharacterData); break;
                 case "unused.special_victory":
