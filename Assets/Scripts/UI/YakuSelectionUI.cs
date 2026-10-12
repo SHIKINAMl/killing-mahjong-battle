@@ -437,6 +437,7 @@ namespace KillingMahjong.UI
             for (int i = 0; i < _rowBgs.Count; i++)
             {
                 if (_rowBgs[i] != null) _rowBgs[i].color = i == index ? RowSelected : Clear;
+                if (_rowBgs[i] != null) UIInteractionFeedback.Attach(_rowBgs[i].gameObject).SetSelected(i == index);
             }
 
             string yaku = Yakus[index];

@@ -31,6 +31,15 @@ namespace KillingMahjong.UI
 
         private TileVisual _tileVisual;
 
+        /// <summary>既存の操作可否をフレーム側に伝えるだけ。点数・成立判定は持たない。</summary>
+        public bool CanReceivePointerInput => TileId >= 0 && (_gameUIManager == null ||
+            (!_gameUIManager.IsTransitioning && !_gameUIManager.IsOpponentSkillProcessing
+             && (_gameUIManager.IsMulliganSelection || _gameUIManager.IsCurrentTile(this))
+             && (_gameUIManager.IsMulliganSelection || _gameUIManager.CurrentPhaseStatus == RoundStatus.HandSelection
+                 || (_gameUIManager.CurrentPhaseStatus == RoundStatus.Discard && !IsInHand
+                     && KillingMahjong.Managers.BoardStateManager.Instance != null
+                     && KillingMahjong.Managers.BoardStateManager.Instance.IsLocalTurn))));
+
         public void Initialize(int tileId, bool isInHand, GameUIManager manager, Canvas canvas)
         {
             TileId = tileId;
@@ -41,6 +50,7 @@ namespace KillingMahjong.UI
             _canvasGroup = GetComponent<CanvasGroup>();
             if (_canvasGroup == null) _canvasGroup = gameObject.AddComponent<CanvasGroup>();
             _tileVisual = GetComponent<TileVisual>();
+            UIInteractionFeedback.Attach(gameObject).Clear(true);
         }
 
         public void OnPointerClick(PointerEventData eventData)
@@ -157,28 +167,7 @@ namespace KillingMahjong.UI
             if (_gameUIManager != null && _gameUIManager.IsTransitioning) return;
             IsHovered = true;
             
-            bool canHighlight = false;
-            if (_gameUIManager != null && _gameUIManager.IsMulliganSelection)
-            {
-                if (TileId != -1)
-                {
-                    canHighlight = true;
-                }
-            }
-            else if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.HandSelection)
-            {
-                if (TileId != -1)
-                {
-                    canHighlight = true;
-                }
-            }
-            else if (_gameUIManager != null && _gameUIManager.CurrentPhaseStatus == RoundStatus.Discard)
-            {
-                if (KillingMahjong.Managers.BoardStateManager.Instance.IsLocalTurn && IsInHand && TileId != -1)
-                {
-                    canHighlight = true;
-                }
-            }
+            bool canHighlight = CanReceivePointerInput;
 
             if (canHighlight)
             {

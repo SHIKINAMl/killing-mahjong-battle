@@ -43,13 +43,27 @@ namespace KillingMahjong.UI
                     line.startColor = line.endColor = Color.cyan;
                     light.AddComponent<AuroraLightAnimator>();
                     scope.AddCleanup(() => { if (line != null) Destroy(line.material); }); break;
-                case "ui.button_hover": case "ui.menu_hover":
+                case "ui.button_hover": case "ui.menu_hover": case UIFrameCatalog.DefaultId:
                     var button = new GameObject("PreviewButton", typeof(RectTransform), typeof(Image), typeof(Button));
                     button.transform.SetParent(rig.surface, false);
                     var rect = button.GetComponent<RectTransform>(); rect.sizeDelta = new Vector2(230, 45);
                     button.GetComponent<Image>().color = new Color32(60, 25, 40, 255);
                     Text(button.transform, "ボタンの演出", Vector2.zero, new Vector2(230, 45), 18);
                     var data = new UnityEngine.EventSystems.PointerEventData(UnityEngine.EventSystems.EventSystem.current);
+                    Canvas.ForceUpdateCanvases();
+                    data.position = RectTransformUtility.WorldToScreenPoint(null, rect.TransformPoint(rect.rect.center));
+                    if (EffectId == UIFrameCatalog.DefaultId)
+                    {
+                        var feedback = UIInteractionFeedback.Attach(button);
+                        feedback.SetFrameId(UIFrameCatalog.DefaultId);
+                        feedback.OnPointerEnter(data); yield return new WaitForSecondsRealtime(1);
+                        feedback.OnPointerDown(data); yield return new WaitForSecondsRealtime(.5f);
+                        feedback.OnPointerUp(data); feedback.SetSelected(true);
+                        yield return new WaitForSecondsRealtime(1);
+                        feedback.OnPointerExit(data); yield return new WaitForSecondsRealtime(1);
+                        feedback.Clear(true);
+                        yield break;
+                    }
                     if (EffectId == "ui.button_hover") {
                         var hover = button.AddComponent<UIButtonHoverEffect>(); hover.OnPointerEnter(data);
                         yield return new WaitForSeconds(1f); hover.OnPointerDown(data);

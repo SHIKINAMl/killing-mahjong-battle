@@ -128,11 +128,10 @@ namespace KillingMahjong.UI
             for (int i = 0; i < _tileButtons.Count; i++)
             {
                 bool on = _picked.Contains(i);
-                if (_tileFrames[i] != null) _tileFrames[i].color = on ? PickFrame : Clear;
+                if (_tileFrames[i] != null) _tileFrames[i].color = Clear;
                 if (_tileButtons[i] != null)
                 {
-                    ((RectTransform)_tileButtons[i].transform).anchoredPosition =
-                        new Vector2(TileX[i], TileY + (on ? PickLift : 0f));
+                    UIInteractionFeedback.Attach(_tileButtons[i].gameObject).SetSelected(on);
                 }
             }
 

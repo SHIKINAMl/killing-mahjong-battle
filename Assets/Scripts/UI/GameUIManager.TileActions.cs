@@ -308,8 +308,7 @@ namespace KillingMahjong.UI
         {
             if (currentPhaseStatus == RoundStatus.Discard && BoardStateManager.Instance.IsLocalTurn && !interaction.IsInHand && interaction.TileId != -1)
             {
-                if (wallUI != null) wallUI.SetActiveDiscardTile(interaction);
-
+                // ホバーは共通の細枠だけ。選択済みの印をホバー先へ動かさない。
                 // 牌の上を行ったり来たりしている（Tile_HoverHesitation）。
                 // 自分の手番の打牌フェイズだけ数える。それ以外は普通にカーソルが通るだけ
                 var watcher = KillingMahjong.Managers.PlayerActivityWatcher.Instance;

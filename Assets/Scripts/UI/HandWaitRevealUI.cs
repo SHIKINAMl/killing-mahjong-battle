@@ -143,7 +143,7 @@ namespace KillingMahjong.UI
             for (int i = 0; i < marks.Count; i++)
             {
                 var mark = marks[i]; mark.Begin();
-                if (i == index) { mark.Frame(mark.rectTransform.rect, 2, Cream); mark.Box(mark.rectTransform.rect.xMin, mark.rectTransform.rect.yMax - 4, mark.rectTransform.rect.xMax, mark.rectTransform.rect.yMax, new Color32(194, 38, 46, 255)); }
+                UIInteractionFeedback.Attach(cards[i].gameObject).SetSelected(i == index);
                 mark.End();
             }
         }

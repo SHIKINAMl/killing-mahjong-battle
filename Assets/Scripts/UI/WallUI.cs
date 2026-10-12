@@ -436,47 +436,13 @@ namespace KillingMahjong.UI
 
         public void SetActiveDiscardTile(TileInteraction interaction)
         {
-            // 古いものを元に戻す
+            // 牌の座標・判定を動かさず、選択済みだけを固定の金枠で示す。
             if (currentActiveInteraction != null)
-            {
-                var oldSlot = currentActiveInteraction.GetComponent<RectTransform>();
-                if (oldSlot != null)
-                {
-                    oldSlot.anchoredPosition = new Vector2(currentActiveInteraction.OriginalWallPosition.x, currentActiveInteraction.OriginalWallPosition.y);
-                }
-            }
-
+                UIInteractionFeedback.Attach(currentActiveInteraction.gameObject).SetSelected(false);
             currentActiveInteraction = interaction;
-
-            // 新しいものを持ち上げて矢印をつける
             if (currentActiveInteraction != null)
-            {
-                var newSlot = currentActiveInteraction.GetComponent<RectTransform>();
-                if (newSlot != null)
-                {
-                    newSlot.anchoredPosition = new Vector2(currentActiveInteraction.OriginalWallPosition.x, currentActiveInteraction.OriginalWallPosition.y + 8f);
-
-                    if (arrowIndicator == null) CreateArrowIndicator();
-                    arrowIndicator.gameObject.SetActive(true);
-                    // 矢印は常にwallContainerの子として保持し、牌スロットへの依存を断ちプール汚染を防ぐ
-                    Transform arrowParent = wallContainer != null ? wallContainer : (Transform)this.transform;
-                    arrowIndicator.SetParent(arrowParent, false);
-                    // **SetParent だけでは前に出ない。** 既に同じ親の子だった場合、
-                    // SetParent は兄弟順を変えないので生成時の位置に居座る。
-                    // 山牌は LayoutWallTiles のたびに末尾へ追加されるので、
-                    // 放っておくと矢印が常に牌の後ろに回る（2026-08-19 に実機で sib=0/20 を確認）
-                    arrowIndicator.SetAsLastSibling();
-                    EnsureArrowSorting();
-                    arrowIndicator.anchoredPosition = new Vector2(
-                        currentActiveInteraction.OriginalWallPosition.x,
-                        currentActiveInteraction.OriginalWallPosition.y + 8f + 25f
-                    );
-                }
-            }
-            else
-            {
-                if (arrowIndicator != null) arrowIndicator.gameObject.SetActive(false);
-            }
+                UIInteractionFeedback.Attach(currentActiveInteraction.gameObject).SetSelected(true);
+            if (arrowIndicator != null) arrowIndicator.gameObject.SetActive(false);
         }
 
         public void ClearActiveDiscardTile(TileInteraction interaction)
@@ -491,13 +457,8 @@ namespace KillingMahjong.UI
         {
             if (isDiscardPhase && isLocalTurn)
             {
-                // 現在の有効な牌がなければ、壁の最初の牌をターゲットにする
-                if (currentActiveInteraction == null && wallSlots.Count > 0)
-                {
-                    var inter = wallSlots[0].GetComponent<TileInteraction>();
-                    if (inter != null) SetActiveDiscardTile(inter);
-                }
-                else if (currentActiveInteraction != null)
+                // 未選択の先頭牌に、選択済みの印を付けない。
+                if (currentActiveInteraction != null)
                 {
                     // 既にセットされていれば再適用
                     SetActiveDiscardTile(currentActiveInteraction);
@@ -506,6 +467,8 @@ namespace KillingMahjong.UI
             else
             {
                 SetActiveDiscardTile(null);
+                foreach (var slot in wallSlots)
+                    if (slot != null) UIInteractionFeedback.Attach(slot.gameObject).SetSelected(false);
             }
         }
 

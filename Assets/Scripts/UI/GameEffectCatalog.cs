@@ -103,8 +103,9 @@ namespace KillingMahjong.UI
             new Entry("ron.cutin", "ロン・清算", "ロンのカットイン：満貫級", "CutinAnimationUI.PlayCutin"),
             new Entry("ron.cutin_max", "ロン・清算", "ロンのカットイン：役満級", "CutinAnimationUI.PlayCutin"),
             new Entry("scene.aurora", "キャラクター・背景", "光のゆらぎ・色の変化", "AuroraLightAnimator"),
-            new Entry("ui.button_hover", "画面効果", "ボタンの拡大・押し込み", "UIButtonHoverEffect"),
-            new Entry("ui.menu_hover", "画面効果", "メニューの発光・目印", "MenuButtonHover"),
+            new Entry("ui.button_hover", "画面効果", "ボタンのホバー枠・押下反応", "UIInteractionFeedback / UIButtonHoverEffect"),
+            new Entry("ui.menu_hover", "画面効果", "メニューのホバー枠・押下反応", "UIInteractionFeedback / MenuButtonHover"),
+            new Entry(UIFrameCatalog.DefaultId, "画面効果", "標準ドット枠：ホバー・押下・選択", "UIFrameCatalog / UIInteractionFeedback"),
             new Entry("unused.red_defeat", UnusedGroup, "赤い目の敗北（本編EDでは未使用）", "RedDefeatPrototypeUI.Play", unused: true),
             new Entry("unused.special_victory", UnusedGroup, "旧・特殊勝利の能力カットイン", "PhaseTransitionUI.PlaySkillCutinAnimationRoutine", unused: true)
         };

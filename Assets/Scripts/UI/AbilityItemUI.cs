@@ -114,6 +114,7 @@ namespace KillingMahjong.UI
             this.Description = description ?? "";
 
             BuildTile();
+            UIInteractionFeedback.Attach(gameObject);
 
             if (nameText != null) nameText.text = name;
             if (costText != null) costText.text = $"-{cost}";
@@ -258,12 +259,14 @@ namespace KillingMahjong.UI
         public void Select()
         {
             isSelected = true;
+            UIInteractionFeedback.Attach(gameObject).SetSelected(true);
             ApplyColors();
         }
 
         public void Deselect()
         {
             isSelected = false;
+            UIInteractionFeedback.Attach(gameObject).SetSelected(false);
             ApplyColors();
         }
 
@@ -285,12 +288,13 @@ namespace KillingMahjong.UI
 
             if (!IsUsable)
             {
-                border = isSelected ? unaffordableCostColor : TileBorderDim;
+                border = TileBorderDim;
                 fill = TileFillDim;
             }
             else if (isSelected)
             {
-                border = TileBorderSelected;
+                // 選択枠の色は共通フレームIDから描く。ここに固定の金枠を残さない。
+                border = TileBorderColor;
                 fill = TileFillSelected;
             }
             else

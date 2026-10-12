@@ -162,7 +162,10 @@ namespace KillingMahjong.UI
                     var interaction = t.GetComponent<TileInteraction>();
                     if (interaction != null)
                     {
-                        t.localPosition = interaction.OriginalWallPosition;
+                        bool on = uiManager.CurrentPhaseStatus == RoundStatus.Discard && BoardStateManager.Instance.IsLocalTurn
+                            && BoardStateManager.Instance.SelectedWallIndex == interaction.WallIndex
+                            && interaction.WallIndex >= 0;
+                        UIInteractionFeedback.Attach(interaction.gameObject).SetSelected(on);
                     }
                 }
             }
