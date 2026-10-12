@@ -7,8 +7,7 @@ namespace KillingMahjong.Managers
     /// <summary>
     /// BGMを層で鳴らす（2026-09-12）。
     ///
-    /// **手法は Inscryption を参考にした。** あちらは `AudioController` が
-    /// ループ用の AudioSource を複数持ち、`FadeOutLoop(sourceIndices)` のように
+    /// ループ用の AudioSource を複数持ち、
     /// **層ごとに音量だけを動かしている。** 曲は変わらないまま厚みだけが変わる。
     ///
     /// じゃんぱいあはこれまで「濃さが変わるたびに曲ごと差し替える」方式だった。

@@ -355,8 +355,7 @@ namespace KillingMahjong.UI
         /// **保存値（PlayerPrefs）は消していない。** あとで機能を作ったときに
         /// そのまま復活できるようにしてある。
         ///
-        /// 参考にしたのは NEEDY GIRL OVERDOSE の設定で、あちらは BGM / SE / 解像度 /
-        /// 進行の速さ / 言語 の5項目だけだった。絞る方向に倣っている。
+        /// 設定項目は BGM / SE / 解像度 / 進行の速さ / 言語 のように絞る方向に倣っている。
         /// </summary>
         private void BuildSettingRows()
         {

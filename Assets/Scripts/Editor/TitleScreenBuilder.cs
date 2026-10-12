@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -10,7 +10,7 @@ namespace KillingMahjong.Editor
     /// <summary>
     /// タイトル画面「じゃんぱいあ」を組み直すエディタ拡張。
     ///
-    /// 構図はウディコン18の「あくま1/2」を参考にしている:
+    /// 構図は参考元に合わせてある:
     /// キャラを大きく左へ寄せて画面外へ切れさせ、右上に装飾的なロゴ、右下にメニュー。
     ///
     /// **既存オブジェクトは作り直さず、位置と見た目だけを変える。**
@@ -26,7 +26,7 @@ namespace KillingMahjong.Editor
 
         private const string TitleText = "じゃんぱいあ";
 
-        /// <summary>キャラの拡大率と位置。1を超えると画面外へ切れる（あくま1/2 の寄せ方）</summary>
+        /// <summary>キャラの拡大率と位置。1を超えると画面外へ切れる</summary>
         private static readonly float CharScale = 1.55f;
         private static readonly Vector2 CharPos = new Vector2(-215f, -150f);
 
@@ -236,7 +236,7 @@ namespace KillingMahjong.Editor
             return mat;
         }
 
-        /// <summary>ロゴの周りに散らすきらめき。位置は決め打ちで、あくま1/2 のように非対称に置く。</summary>
+        /// <summary>ロゴの周りに散らすきらめき。位置は決め打ちで、非対称に置く。</summary>
         private static void BuildSparkles(RectTransform logo, Sprite sparkle)
         {
             if (sparkle == null)

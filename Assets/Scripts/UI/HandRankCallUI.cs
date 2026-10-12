@@ -12,7 +12,7 @@ namespace KillingMahjong.UI
     /// 手牌を13枚そろえた時点で、その手が満貫以上になり得るなら、
     /// 届きうる中で**いちばん上の格**（満貫／跳満／倍満／役満）を画面へ一瞬出す。
     ///
-    /// **出し方は『逆転裁判』の「無罪」を写した**（2026-09-29 のユーザー指示）。
+    /// **出し方は参考映像の演出を写した**（2026-09-29 のユーザー指示）。
     /// 役名はどれも2文字なので、1文字目を左・2文字目を右に置き、
     /// **特大から縮んで定位置に着弾**させ、着いた瞬間に白く光らせる。
     ///
@@ -71,7 +71,7 @@ namespace KillingMahjong.UI
         /// 黒縁の太さ。
         ///
         /// **0.35 では字が潰れる（2026-09-29 に録画で確認）。**
-        /// 参考動画の「無罪」は縁が太いが、あちらは線の太い明朝体。
+        /// 参考動画の文字は縁が太いが、あちらは線の太い明朝体。
         /// こちらは `PixelMplus10` で、10px の字を21倍に伸ばしているため線が細く、
         /// 0.35 だと縁どうしがくっついて「役」「満」が塗りつぶれた塊になっていた。
         /// </summary>
@@ -138,7 +138,7 @@ namespace KillingMahjong.UI
             _group.interactable = false;
 
             // **フラッシュは文字より先に作る＝文字の奥に来る。**
-            // 参考動画では、白くなっている最中も「無」「罪」は読めたままだった。
+            // 参考動画では、白くなっている最中も文字は読めたままだった。
             // 手前に被せると、いちばん見せたい瞬間に文字が消える。
             var flashObject = new GameObject("Flash", typeof(RectTransform), typeof(Image));
             flashObject.transform.SetParent(transform, false);
@@ -174,7 +174,7 @@ namespace KillingMahjong.UI
             label.alignment = TextAlignmentOptions.Center;
             label.raycastTarget = false;
             label.fontStyle = FontStyles.Bold;
-            // **白抜き＋太い黒縁。** 参考動画の「無罪」と同じ。
+            // **白抜き＋太い黒縁。** 参考動画と同じ。
             // 盤面の緑・牌の白・立ち絵のどれに重なっても輪郭が残る。
             label.color = Color.white;
             ApplyOutline(label);

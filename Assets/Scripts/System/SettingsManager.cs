@@ -166,8 +166,7 @@ namespace KillingMahjong.Core
 
         // --- 文字送りの速さ ---
         //
-        // NEEDY GIRL OVERDOSE の設定を参考にした（2026-09-27）。あちらは設定項目が
-        // BGM / SE / 解像度 / 進行の速さ / 言語 の5つだけで、かなり絞ってある。
+        // 設定項目を BGM / SE / 解像度 / 進行の速さ / 言語 のように絞る方針（2026-09-27）。
         // じゃんぱいあも、読む所が無い設定（旧 High Speed Mode / Show Effects）を
         // 画面から下ろして、代わりに実際に効くものを置く。
         [Header("Text Speed")]

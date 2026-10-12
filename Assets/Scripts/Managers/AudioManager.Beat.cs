@@ -6,9 +6,7 @@ namespace KillingMahjong.Managers
     /// <summary>
     /// 拍の時計と、拍に合わせて鳴らす仕組み（2026-09-12）。いわゆる「音ハメ」。
     ///
-    /// **手法は Inscryption を参考にした。** あちらは Koreographer を噛ませて
-    /// `GetMusicBeatTime()` / `SubscribeToMusicEvent()` を持ち、
-    /// 演出を曲の拍に乗せている。じゃんぱいあは曲を自前で作っていて
+    /// 演出を曲の拍に乗せる仕組み（音ハメ）。じゃんぱいあは曲を自前で作っていて
     /// テンポ表（<see cref="Tempos"/>）を既に持っているので、外部ライブラリは要らない。
     ///
     /// **待たせてよいものと、いけないものがある。**

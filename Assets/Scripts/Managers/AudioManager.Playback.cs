@@ -141,7 +141,7 @@ namespace KillingMahjong.Managers
 
         // 以下、何度も鳴る音は**ピッチをばらして連打も絞る**（2026-09-12）。
         // 同じ波形を毎回そのまま出すと、数十回鳴るうちに作り物だと分かってしまう。
-        // 手法は AudioManager.Variation.cs を参照（Inscryption の AudioParams を参考にした）。
+        // 手法は AudioManager.Variation.cs を参照。
 
         public void PlayPickTileSE()
         {
