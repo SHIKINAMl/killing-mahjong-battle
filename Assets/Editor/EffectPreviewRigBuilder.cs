@@ -46,6 +46,8 @@ namespace KillingMahjong.EditorTools
                 rig.victoryEndings = ReadConfigs(data.FindProperty("victoryEndingConfigs"));
                 var handWait = ui.GetComponentInChildren<HandWaitRevealUI>(true);
                 if (handWait != null) handWait.transform.SetParent(root.transform, false);
+                var handWeak = ui.GetComponentInChildren<HandWeakConfirmationUI>(true);
+                if (handWeak != null) handWeak.transform.SetParent(root.transform, false);
                 // 本編と同じ待ち牌枠を試写用に保存する。盤面Singletonは持ち込まない。
                 var waitBox = UnityEngine.Object.Instantiate(ui.WaitUI.gameObject);
                 waitBox.name = "HandConfirmationWaitBox";
@@ -80,7 +82,7 @@ namespace KillingMahjong.EditorTools
                 }
                 // 許可リスト。ネットワーク、GameUIManager、戦績、シーン遷移、台本は持ち込まない。
                 var keep = new[] { typeof(EffectPreviewRig), typeof(PhaseTransitionUI), typeof(RonAnimationUI),
-                    typeof(HandWaitRevealUI), typeof(KillingMahjong.UI.Effects.PixelShapeGraphic),
+                    typeof(HandWaitRevealUI), typeof(HandWeakConfirmationUI), typeof(KillingMahjong.UI.Effects.PixelShapeGraphic),
                     typeof(PlayerInfoUI), typeof(EnemyInfoUI), typeof(BettingUI), typeof(BlinkEffectUI),
                     typeof(DialogueUI), typeof(KillingMahjong.UI.Effects.MatchMomentumUI),
                     typeof(KillingMahjong.UI.Effects.HeartbeatEffect), typeof(YakuListUI), typeof(YakuItemUI) };
@@ -105,6 +107,7 @@ namespace KillingMahjong.EditorTools
                     throw new InvalidOperationException("試写舞台に対局処理が残っています。");
                 root.SetActive(false);
                 HandWaitRevealUI.Ensure(root.transform).gameObject.SetActive(false);
+                HandWeakConfirmationUI.Ensure(root.transform).Hide();
                 SceneFirst.Report(nameof(HandWaitRevealUI));
                 if (!AssetDatabase.IsValidFolder("Assets/Resources/Presentation"))
                     AssetDatabase.CreateFolder("Assets/Resources", "Presentation");

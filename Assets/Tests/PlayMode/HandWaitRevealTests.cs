@@ -242,5 +242,188 @@ namespace KillingMahjong.Tests
             Assert.That(UnityEngine.SceneManagement.SceneManager.sceneCount, Is.EqualTo(scenes));
             Assert.That(type.GetProperty("Current").GetValue(null), Is.Null);
         }
+
+        private Array ReviewWaits(bool empty, bool hasMangan = false)
+        {
+            var result = Array.CreateInstance(T("EngineData.WaitData"), empty ? 0 : 2);
+            for (int i = 0; i < result.Length; i++)
+            {
+                var w = Activator.CreateInstance(T("EngineData.WaitData"));
+                Set(w, "tile", i + 1); Set(w, "han", i + 2); Set(w, "multiplier", 2f);
+                Set(w, "mangan_or_more", hasMangan && i == 1);
+                Set(w, "multiplier_label", hasMangan && i == 1 ? "満貫" : "満貫未満");
+                Set(w, "yaku", new[] { "立直" }); result.SetValue(w, i);
+            }
+            return result;
+        }
+        private void BeginCachedDecision(Array data)
+        {
+            var hand = (List<int>)Prop(board, "CurrentHandTiles");
+            var wall = (List<int>)Prop(board, "OriginalWallTiles");
+            var indexes = (List<int>)Prop(board, "LocalHandIndexes");
+            for (int i = 0; i < 13; i++) { hand.Add(i); wall.Add(i); indexes.Add(i); }
+            Set(selection, "_hasRankResult", true); Set(selection, "_rankResultIndexes", new List<int>(indexes));
+            Set(selection, "_rankSignature", Call(selection, "CurrentSelectionSignature")); Set(selection, "_rankWaits", data);
+            Call(selection, "CompleteHandSelection");
+        }
+
+        [Test]
+        public void BelowManganCandidatesAreDisplayedWithoutTheRankStamp()
+        {
+            var data = ReviewWaits(false); Call(selection, "ShowRankCall", data);
+            Assert.That(reveal.gameObject.activeSelf, Is.True);
+            Assert.That(Call(reveal, "HasCandidates", data), Is.True);
+            Assert.That(Get(selection, "_rankCallUI"), Is.Null);
+            Assert.That(((ICollection)Get(reveal, "cards")).Count, Is.EqualTo(2));
+        }
+        [Test]
+        public void EmptyResultHasExactlyOneNonInteractiveNoneBoxAndNoFakeTile()
+        {
+            var data = ReviewWaits(true); Call(selection, "ShowRankCall", data);
+            Assert.That(Call(reveal, "HasCandidates", data), Is.True);
+            Assert.That(((ICollection)Get(reveal, "cards")).Count, Is.Zero);
+            var none = reveal.transform.Find("Candidates/NoWaitBox");
+            Assert.That(none.gameObject.activeInHierarchy, Is.True);
+            Assert.That(none.GetComponent(Type.GetType("UnityEngine.UI.Button, UnityEngine.UI", true)), Is.Null);
+            Assert.That(none.childCount, Is.EqualTo(2));
+            Assert.That(Get(selection, "_rankCallUI"), Is.Null);
+        }
+        [UnityTest]
+        public IEnumerator NoneBoxDoesNotFlyOrRevealAnArrivalTile()
+        {
+            Call(reveal, "Show", ReviewWaits(true), Get(manager, "tileResourceManager"), false);
+            yield return ((MonoBehaviour)selection).StartCoroutine((IEnumerator)Call(reveal, "Transfer", box));
+            Assert.That(Prop(reveal, "ArrivalCount"), Is.Zero);
+            Assert.That(Call(box, "GetArrivalTileRect", 0), Is.Null);
+        }
+        [Test]
+        public void LowWaitsRequireApprovalEvenWhenTheirMultiplierIsLarge()
+        {
+            BeginCachedDecision(ReviewWaits(false));
+            Assert.That(Prop(selection, "IsAwaitingWeakHandConfirmation"), Is.True);
+            Assert.That(Get(selection, "_confirmationPresentationStarted"), Is.False);
+            Assert.That(Get(selection, "_selectionSubmitted"), Is.False);
+            Assert.That(Prop(Get(selection, "_weakConfirmation"), "IsOpen"), Is.True);
+            Call(selection, "CancelPendingConfirmation");
+        }
+        [Test]
+        public void NoWaitDecisionAlsoRequiresExplicitApproval()
+        {
+            BeginCachedDecision(ReviewWaits(true));
+            Assert.That(Prop(selection, "IsAwaitingWeakHandConfirmation"), Is.True);
+            Assert.That(Get(selection, "_confirmationPresentationStarted"), Is.False);
+            Call(selection, "CancelPendingConfirmation");
+        }
+        [Test]
+        public void OneManganWaitSkipsTheExtraConfirmation()
+        {
+            BeginCachedDecision(ReviewWaits(false, true));
+            Assert.That(Prop(selection, "IsAwaitingWeakHandConfirmation"), Is.False);
+            Assert.That(Get(selection, "_confirmationPresentationStarted"), Is.True);
+            Assert.That(Prop(Get(selection, "_weakConfirmation"), "IsOpen"), Is.False);
+            Call(selection, "CancelPendingConfirmation");
+        }
+        [Test]
+        public void NoDecisionPresentationStartsBeforeTheReply()
+        {
+            Call(selection, "BeginImmediateConfirmation");
+            Assert.That(Get(selection, "_confirmationPresentationStarted"), Is.False);
+            Assert.That(Get(selection, "_selectionSubmitted"), Is.False);
+            Call(selection, "CancelPendingConfirmation");
+        }
+        [Test]
+        public void BackKeepsThirteenTilesAndCachedWaitsAndReleasesTheLock()
+        {
+            var data = ReviewWaits(false); BeginCachedDecision(data);
+            Call(Get(selection, "_weakConfirmation"), "Cancel");
+            Assert.That(((List<int>)Prop(board, "CurrentHandTiles")).Count, Is.EqualTo(13));
+            Assert.That(Prop(selection, "IsConfirming"), Is.False);
+            Assert.That(Prop(manager, "IsTransitioning"), Is.False);
+            Assert.That(Get(selection, "_hasRankResult"), Is.True);
+            Assert.That(Call(reveal, "HasCandidates", data), Is.True);
+            Assert.That(Get(selection, "_selectionSubmitted"), Is.False);
+        }
+        [Test]
+        public void DoubleApprovalRunsItsCallbackOnce()
+        {
+            BeginCachedDecision(ReviewWaits(false));
+            var ui = Get(selection, "_weakConfirmation"); Call(ui, "Confirm"); Call(ui, "Confirm");
+            Assert.That(Get(selection, "_weakHandApproved"), Is.True);
+            Assert.That(Get(selection, "_confirmationPresentationStarted"), Is.True);
+            Assert.That(Prop(ui, "IsOpen"), Is.False);
+            Assert.That(Prop(selection, "IsAwaitingWeakHandConfirmation"), Is.False);
+            Call(selection, "CancelPendingConfirmation");
+        }
+        [UnityTest]
+        public IEnumerator ChangingTheHandWhileReviewingInvalidatesApproval()
+        {
+            BeginCachedDecision(ReviewWaits(false));
+            ((List<int>)Prop(board, "CurrentHandTiles"))[0] = 30;
+            Call(Get(selection, "_weakConfirmation"), "Confirm");
+            yield return null; yield return null;
+            Assert.That(Get(selection, "_confirmationPresentationStarted"), Is.False);
+            Assert.That(Prop(selection, "IsConfirming"), Is.False);
+            Assert.That(Prop(manager, "IsTransitioning"), Is.False);
+        }
+        [UnityTest]
+        public IEnumerator LeavingThePhaseWhileReviewingClearsTheDialogAndLock()
+        {
+            BeginCachedDecision(ReviewWaits(true));
+            Set(manager, "currentPhaseStatus", Enum.Parse(T("EngineData.RoundStatus"), "Betting"));
+            yield return null; yield return null;
+            Assert.That(Prop(Get(selection, "_weakConfirmation"), "IsOpen"), Is.False);
+            Assert.That(Prop(selection, "IsConfirming"), Is.False);
+            Assert.That(Prop(manager, "IsTransitioning"), Is.False);
+        }
+        [Test]
+        public void HoverVisibilityDoesNotDestroyTheStoredWaits()
+        {
+            var handObject = new GameObject("HoverHand", typeof(RectTransform)); handObject.transform.SetParent(root.transform, false);
+            var hand = handObject.AddComponent(T("UI.HandUI")); ((Behaviour)hand).enabled = false;
+            var tileObject = new GameObject("HoverTile", typeof(RectTransform)); tileObject.transform.SetParent(handObject.transform, false);
+            var rect = (RectTransform)tileObject.transform; rect.sizeDelta = new Vector2(45, 40);
+            var slots = (List<RectTransform>)Call(hand, "GetHandSlots"); slots.Add(rect);
+            Show(); Call(reveal, "BindHoverTargets", hand);
+            Vector2 onHand = RectTransformUtility.WorldToScreenPoint(null, rect.TransformPoint(rect.rect.center));
+            for (int i=0;i<30;i++) Call(reveal, "RefreshHoverVisibility", onHand);
+            Assert.That(Prop(reveal, "IsPresentationVisible"), Is.True);
+            var cards = (List<RectTransform>)Get(reveal, "cards");
+            var onCard = RectTransformUtility.WorldToScreenPoint(null, cards[0].TransformPoint(cards[0].rect.center));
+            Call(reveal, "RefreshHoverVisibility", onCard);
+            Assert.That(reveal.GetComponent<CanvasGroup>().blocksRaycasts, Is.True);
+            for (int i=0;i<30;i++) Call(reveal, "RefreshHoverVisibility", new Vector2(100000,100000));
+            Assert.That(Prop(reveal, "IsPresentationVisible"), Is.False);
+            Assert.That(reveal.GetComponent<CanvasGroup>().blocksRaycasts, Is.False);
+            Assert.That(Call(reveal, "HasCandidates", waits), Is.True);
+            Assert.That(cards.Count, Is.EqualTo(5));
+            Call(reveal, "SetForcedVisible", true);
+            Assert.That(Prop(reveal, "IsPresentationVisible"), Is.True);
+        }
+
+        [UnityTest]
+        public IEnumerator HiddenReviewDialogCannotLeaveAnInvisibleConfirmationLock()
+        {
+            BeginCachedDecision(ReviewWaits(true));
+            Call(Get(selection, "_weakConfirmation"), "Hide");
+            yield return null; yield return null;
+            Assert.That(Prop(selection, "IsConfirming"), Is.False);
+            Assert.That(Prop(manager, "IsTransitioning"), Is.False);
+            Assert.That(Get(selection, "_selectionSubmitted"), Is.False);
+        }
+        [Test]
+        public void ServerWarningForAnUnapprovedHandIsNeverAutoConfirmed()
+        {
+            BeginCachedDecision(ReviewWaits(false, true));
+            var handObject = new GameObject("SubmittedHand", typeof(RectTransform)); handObject.transform.SetParent(root.transform, false);
+            var hand = handObject.AddComponent(T("UI.HandUI")); ((Behaviour)hand).enabled = false;
+            Set(hand, "isSubmitted", true); Set(manager, "handUI", hand); Set(selection, "_selectionSubmitted", true);
+            var data = Activator.CreateInstance(T("EngineData.HandSelectionConfirmationData"));
+            Set(data, "hand_indexes", new List<int>((List<int>)Prop(board, "LocalHandIndexes"))); Set(data, "reason", "below_mangan");
+            Call(selection, "HandleHandSelectionConfirmation", data);
+            Assert.That(Get(selection, "_selectConfirmSent"), Is.False);
+            Assert.That(Get(selection, "_serverConfirmationPending"), Is.True);
+            Assert.That(Prop(Get(selection, "_weakConfirmation"), "IsOpen"), Is.True);
+            Call(selection, "CancelPendingConfirmation");
+        }
     }
 }

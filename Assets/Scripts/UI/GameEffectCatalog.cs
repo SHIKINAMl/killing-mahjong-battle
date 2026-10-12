@@ -47,6 +47,8 @@ namespace KillingMahjong.UI
             new Entry("hand.wait_reveal", "牌・血・ゲージ", "13枚成立：役名と待ち牌を表示", "HandRankCallUI.ShowRank / HandWaitRevealUI.Show"),
             new Entry("hand.wait_transfer", "牌・血・ゲージ", "手牌決定：光が待ち牌枠へ着地", "HandWaitRevealUI.Transfer / WaitUI.RevealArrivalTile"),
             new Entry("hand.confirm", "フェイズ", "役名・待ち牌 → 手牌決定 → 光の着地", "GameUIHandSelectionController / HandWaitRevealUI"),
+            new Entry("hand.confirm_below_mangan", "フェイズ", "満貫未満の待ち → 追加確認 → 手牌決定", "HandWeakConfirmationUI / HandWaitRevealUI"),
+            new Entry("hand.confirm_no_waits", "フェイズ", "待ちなし：なしの枠 → 追加確認 → 手牌決定", "HandWeakConfirmationUI / HandWaitRevealUI"),
             new Entry("phase.draw", "フェイズ", "流局の切り替え", "PhaseTransitionUI.PlayDrawTransition"),
             new Entry("ron.chance", "ロン・清算", "あたり牌：暗幕・牌の点滅", "RonChanceEffect.Show"),
             new Entry("ron.impact", "ロン・清算", "ロン入力：手振り・吹き出し", "RonImpactEffect.Play"),

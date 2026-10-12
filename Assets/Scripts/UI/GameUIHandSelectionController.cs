@@ -25,6 +25,7 @@ namespace KillingMahjong.UI
         private bool _hasRankResult;
         private WaitData[] _rankWaits;
         private HandWaitRevealUI _waitReveal;
+        private HandWeakConfirmationUI _weakConfirmation;
         private string _rankSignature, _rankRequestSignature;
         private int _rankRequestGeneration;
         private HandRankCallUI _rankCallUI;
@@ -83,7 +84,10 @@ namespace KillingMahjong.UI
         {
             this.uiManager = manager;
             _waitReveal = HandWaitRevealUI.Ensure(manager.transform);
+            _waitReveal.BindHoverTargets(manager.HandUI);
             _waitReveal.Hide();
+            _weakConfirmation = HandWeakConfirmationUI.Ensure(manager.transform, manager.HandUI != null ? manager.HandUI.DecideButtonRect : null);
+            _weakConfirmation.Hide();
             SceneFirst.Report(nameof(HandWaitRevealUI));
         }
 
@@ -100,7 +104,7 @@ namespace KillingMahjong.UI
         public void CompleteHandSelection()
         {
             if (uiManager.CurrentPhaseStatus != RoundStatus.HandSelection
-                || _confirming || (uiManager.HandUI != null && uiManager.HandUI.IsSubmitted)) return;
+                || _confirming || uiManager.IsTransitioning || (uiManager.HandUI != null && uiManager.HandUI.IsSubmitted)) return;
             if (uiManager.DialogueUI != null && uiManager.DialogueUI.IsLogOpen) return;
             if (!TryCaptureCurrentHandSelection(out _pendingHandIndexes, out _pendingHandTiles)) return;
             var cached = _hasRankResult && SameHandIndexes(_pendingHandIndexes, _rankResultIndexes)
@@ -282,6 +286,8 @@ namespace KillingMahjong.UI
         /// </summary>
         private void ShowRankCall(EngineData.WaitData[] waits)
         {
+            // 待ち牌は役名のスタンプと独立。満貫未満・待ちなしも表示できる。
+            _waitReveal?.Show(waits ?? System.Array.Empty<WaitData>(), uiManager.TileResourceManager, false);
             if (waits == null || waits.Length == 0) return;
 
             float best = 0f;
@@ -379,17 +385,12 @@ namespace KillingMahjong.UI
 
         public void HandleHandSelectionConfirmation(HandSelectionConfirmationData data)
         {
-            if (!_selectionSubmitted || uiManager.CurrentPhaseStatus != RoundStatus.HandSelection
-                || uiManager.HandUI == null || !uiManager.HandUI.IsSubmitted) return;
-            _autoConfirmNextHandSelection = false;
-            
-            // 満貫未満の警告ダイアログを表示せず、自動で確定を送信する
-            if (uiManager.HandUI != null) uiManager.HandUI.SetSubmittedState(true);
-            uiManager.SendActionToServer("select_confirm", new KillingMahjong.Network.ActionPayload { hand_indexes = data.hand_indexes, hand = _pendingHandTiles });
+            HandleServerWeakHandConfirmation(data);
         }
 
         public void OnHandSelectionAccepted()
         {
+            _serverConfirmationPending = false; _weakConfirmation?.Hide();
             _autoConfirmNextHandSelection = false;
             if (uiManager.HandUI != null && uiManager.HandUI.IsSubmitted) 
             {

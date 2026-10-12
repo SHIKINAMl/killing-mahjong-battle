@@ -22,6 +22,11 @@ namespace KillingMahjong.UI
         private CanvasGroup info;
         private Transform content;
         private PixelShapeGraphic pixels;
+        private CanvasGroup presentation;
+        private RectTransform noWaitBox;
+        private HandUI hoverHand;
+        private bool hasPresentation, forceVisible;
+        public bool IsPresentationVisible => gameObject.activeInHierarchy && (presentation == null || presentation.alpha > .001f);
         private int version;
         public bool IsTransferring { get; private set; }
         public int LastArrivalFrame { get; private set; } = -1;
@@ -52,6 +57,8 @@ namespace KillingMahjong.UI
 
         private void BuildStatic()
         {
+            presentation = GetComponent<CanvasGroup>();
+            if (presentation == null) presentation = gameObject.AddComponent<CanvasGroup>();
             var panel = Rect(transform, "StrengthPanel", 16, 418, 220, 178, out bool made);
             if (made)
             {
@@ -74,19 +81,70 @@ namespace KillingMahjong.UI
             var frameGraphic = panel.Find("Frame").GetComponent<PixelShapeGraphic>();
             if (made) frameGraphic.color = Cream;
             frameGraphic.Begin(); frameGraphic.Frame(frameGraphic.rectTransform.rect, 2, frameGraphic.color); frameGraphic.End();
+            noWaitBox = Rect(content, "NoWaitBox", 254, 430, 64, 74, out made);
+            if (made)
+            {
+                var image = noWaitBox.gameObject.AddComponent<Image>(); image.color = Ink; image.raycastTarget = false;
+                var border = Rect(noWaitBox, "PixelBorder", 0, 0, 64, 74, out _);
+                var graphic = border.gameObject.AddComponent<PixelShapeGraphic>(); graphic.raycastTarget = false; graphic.color = Cream;
+                Label(noWaitBox, "None", 2, 2, 60, 70, 22, TextAlignmentOptions.Center).text = "なし";
+                noWaitBox.gameObject.SetActive(false);
+            }
+            var noneFrame = noWaitBox.Find("PixelBorder").GetComponent<PixelShapeGraphic>();
+            noneFrame.Begin(); noneFrame.Frame(noneFrame.rectTransform.rect, 2, noneFrame.color); noneFrame.End();
+        }
+
+        private static Vector2 PointerPosition => UnityEngine.InputSystem.Mouse.current != null
+            ? UnityEngine.InputSystem.Mouse.current.position.ReadValue() : new Vector2(-100000, -100000);
+        public void BindHoverTargets(HandUI hand) { hoverHand = hand; RefreshHoverVisibility(PointerPosition); }
+        public void SetForcedVisible(bool visible) { forceVisible = visible; RefreshHoverVisibility(PointerPosition); }
+        private void Update() { RefreshHoverVisibility(PointerPosition); }
+        public void RefreshHoverVisibility(Vector2 point)
+        {
+            if (presentation == null) return;
+            bool show = hoverHand == null || forceVisible || IsTransferring;
+            if (!show)
+            {
+                foreach (var tile in hoverHand.GetHandSlots()) if (Contains(tile, point)) { show = true; break; }
+                show |= Contains(hoverHand.DecideButtonRect, point);
+                // 開いている候補にカーソルを移しても、選ぶ前に消さない。
+                if (!show && presentation.alpha > .001f)
+                    foreach (var card in cards) if (Contains(card, point)) { show = true; break; }
+            }
+            presentation.alpha = show && (hoverHand == null || forceVisible || IsTransferring) ? 1
+                : Mathf.MoveTowards(presentation.alpha, show ? 1 : 0, Time.unscaledDeltaTime / .08f);
+            presentation.blocksRaycasts = show && !IsTransferring;
+            presentation.interactable = show && !IsTransferring;
+        }
+        private static bool Contains(RectTransform rect, Vector2 point)
+        {
+            if (rect == null || !rect.gameObject.activeInHierarchy) return false;
+            var canvas = rect.GetComponentInParent<Canvas>();
+            return RectTransformUtility.RectangleContainsScreenPoint(rect, point,
+                canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay ? canvas.worldCamera : null);
         }
 
         public void Show(WaitData[] data, TileResourceManager tiles, bool animate = true)
         {
             Hide();
-            if (data == null || data.Length == 0 || tiles == null) return;
+            ArrivalCount = 0; LastArrivalFrame = -1;
+            if (data == null || tiles == null) return;
             gameObject.SetActive(true);
             BuildStatic();
             var valid = new List<WaitData>();
             foreach (var w in data) if (w != null) valid.Add(w);
             waits = valid.ToArray();
+            hasPresentation = true;
             info.alpha = animate ? 0f : 1f;
             info.blocksRaycasts = false;
+            if (waits.Length == 0)
+            {
+                noWaitBox.gameObject.SetActive(true);
+                info.transform.Find("InfoLabel").GetComponent<TMP_Text>().text = "待ち牌 0種類";
+                info.transform.Find("Han").GetComponent<TMP_Text>().text = "";
+                info.transform.Find("Rank").GetComponent<TMP_Text>().text = "待ち牌なし";
+                info.transform.Find("Yaku").GetComponent<TMP_Text>().text = "";
+            }
             float step = Mathf.Min(72f, 538f / Mathf.Max(1, waits.Length));
             for (int i = 0; i < waits.Length; i++)
             {
@@ -98,7 +156,7 @@ namespace KillingMahjong.UI
                 var tile = Rect(card, "WaitTile", (card.sizeDelta.x - 44) / 2, 0, 44, 59, out _);
                 var tileImage = tile.gameObject.AddComponent<Image>();
                 tileImage.sprite = tiles.GetTileSprite(waits[i].tile); tileImage.preserveAspect = true; tileImage.raycastTarget = false;
-                Label(card, "WaitRank", 2, 49, card.sizeDelta.x - 4, 23, 16, TextAlignmentOptions.Center).text = Rank(waits[i]);
+                Label(card, "WaitRank", 2, 49, card.sizeDelta.x - 4, 23, 16, TextAlignmentOptions.Center).text = waits[i].mangan_or_more ? Rank(waits[i]) : waits[i].han + "翻";
                 var markRect = Rect(card, "SelectedFrame", 0, 0, card.sizeDelta.x, 74, out _);
                 var mark = markRect.gameObject.AddComponent<PixelShapeGraphic>(); mark.raycastTarget = false; marks.Add(mark);
                 var cg = card.gameObject.AddComponent<CanvasGroup>(); cg.alpha = animate ? 0 : 1;
@@ -108,6 +166,7 @@ namespace KillingMahjong.UI
             for (int i = 1; i < waits.Length; i++) if (waits[i].multiplier > waits[best].multiplier) best = i;
             if (waits.Length > 0) Select(best);
             if (animate) StartCoroutine(Reveal(version));
+            presentation.alpha = hoverHand == null ? 1 : 0; RefreshHoverVisibility(PointerPosition);
         }
 
         private IEnumerator Reveal(int stamp)
@@ -153,7 +212,7 @@ namespace KillingMahjong.UI
 
         public bool HasCandidates(WaitData[] data)
         {
-            if (!gameObject.activeInHierarchy || data == null || data.Length != waits.Length) return false;
+            if (!hasPresentation || !gameObject.activeInHierarchy || data == null || data.Length != waits.Length) return false;
             for (int i = 0; i < data.Length; i++) if (data[i] == null || data[i].tile != waits[i].tile) return false;
             return true;
         }
@@ -164,6 +223,7 @@ namespace KillingMahjong.UI
             StopAllCoroutines();
             int stamp = ++version;
             IsTransferring = true; ArrivalCount = 0;
+            RefreshHoverVisibility(PointerPosition);
             info.alpha = 0;
             foreach (var cg in groups) cg.blocksRaycasts = false;
             var go = new GameObject("WaitFlightPixels", typeof(RectTransform), typeof(PixelShapeGraphic));
@@ -249,6 +309,8 @@ namespace KillingMahjong.UI
 
         public void Hide()
         {
+            hasPresentation = false; forceVisible = false;
+            if (noWaitBox != null) noWaitBox.gameObject.SetActive(false);
             version++; StopAllCoroutines(); ClearFlight();
             foreach (var card in cards) if (card != null) { card.SetParent(null, false); Destroy(card.gameObject); }
             cards.Clear(); groups.Clear(); marks.Clear(); waits = Array.Empty<WaitData>();
