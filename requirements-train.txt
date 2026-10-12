@@ -1,5 +1,5 @@
-# つよい（強化学習）の学習用の依存。本番のサーバー（requirements.txt）には入れない
+# Training only (hard CPU reinforcement learning). Not installed on the production server.
 -r requirements.txt
 numpy>=1.26
-# PyTorch（CPU 版で足りる）: pip install torch --index-url https://download.pytorch.org/whl/cpu
+# PyTorch CPU build is enough: pip install torch --index-url https://download.pytorch.org/whl/cpu
 torch>=2.0
