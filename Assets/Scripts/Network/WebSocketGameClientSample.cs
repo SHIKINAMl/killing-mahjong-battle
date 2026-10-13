@@ -65,6 +65,7 @@ public class WebSocketGameClientSample : MonoBehaviour
 
     /// <summary>接続を張っている最中。ConnectAsync の再入を弾くのに使う。</summary>
     private bool isConnecting;
+    private int connectionGeneration;
 
     /// <summary>
     /// UI がまだ居ないうちに届いたメッセージ。
@@ -79,11 +80,16 @@ public class WebSocketGameClientSample : MonoBehaviour
 
     /// <summary>対局が成立した合図（game_started）。</summary>
     public event Action OnMatchStarted;
+    public event Action<KillingMahjong.EngineData.GameStartedData> OnMatchStartedData;
+    public event Action<string> OnConnectionError;
 
     /// <summary>
     /// 接続中かどうか。
     /// </summary>
     public bool IsConnected => webSocket != null && webSocket.State == WebSocketState.Open;
+
+    /// <summary>タイトルの事前確認は明示的な操作で接続する。Startによる再試行を重ねない。</summary>
+    public void UseManualStartup() { autoConnectOnStart = false; }
 
     private void Awake()
     {
@@ -178,6 +184,7 @@ public class WebSocketGameClientSample : MonoBehaviour
     /// </summary>
     public async Task ResetConnectionAsync()
     {
+        connectionGeneration++;
         hasSentJoin = false;
         isConnecting = false;
         pendingMessages.Clear();
@@ -213,12 +220,14 @@ public class WebSocketGameClientSample : MonoBehaviour
         }
 
         isConnecting = true;
+        int connectGeneration = ++connectionGeneration;
 
         // 既存インスタンスが残っていれば破棄
         if (webSocket != null)
         {
             await DisconnectAsync();
         }
+        if (connectGeneration != connectionGeneration) return;
 
         string normalizedUrl = NormalizeServerUrl(serverUrl);
 
@@ -234,24 +243,31 @@ public class WebSocketGameClientSample : MonoBehaviour
         }
 
         webSocket = new WebSocket(connectUrl);
+        var connectingSocket = webSocket;
 
         webSocket.OnOpen += () =>
         {
+            if (webSocket != connectingSocket) return;
             Log($"Connected: {normalizedUrl}");
         };
 
         webSocket.OnError += (errMsg) =>
         {
+            if (webSocket != connectingSocket) return;
             Debug.LogError($"WebSocket error: {errMsg}");
+            OnConnectionError?.Invoke("接続できませんでした。もう一度お試しください");
         };
 
         webSocket.OnClose += (closeCode) =>
         {
+            if (webSocket != connectingSocket) return;
             Log($"Closed: {closeCode}");
+            OnConnectionError?.Invoke("接続が切れました。もう一度お試しください");
         };
 
         webSocket.OnMessage += (bytes) =>
         {
+            if (webSocket != connectingSocket) return;
             // NativeWebSocket はメインスレッドでコールバックするため直接処理して問題ない
             var message = Encoding.UTF8.GetString(bytes);
             HandleServerMessage(message);
@@ -260,16 +276,17 @@ public class WebSocketGameClientSample : MonoBehaviour
         try
         {
             // Connect() は接続がクローズされるまで完了しない（ネイティブ）ので await しっぱなしにする
-            await webSocket.Connect();
+            await connectingSocket.Connect();
         }
         catch (Exception ex)
         {
             Debug.LogError($"WebSocket connect failed: {ex.Message}");
+            if (webSocket == connectingSocket) OnConnectionError?.Invoke("接続できませんでした。もう一度お試しください");
         }
         finally
         {
             // Connect() は閉じるまで戻らないので、ここに来た時点で接続は終わっている
-            isConnecting = false;
+            if (connectGeneration == connectionGeneration) isConnecting = false;
         }
     }
 
@@ -357,6 +374,7 @@ public class WebSocketGameClientSample : MonoBehaviour
         catch (Exception ex)
         {
             Debug.LogError($"WebSocket send failed: {ex.Message}");
+            OnConnectionError?.Invoke("送信できませんでした。もう一度お試しください");
         }
     }
 
@@ -412,6 +430,8 @@ public class WebSocketGameClientSample : MonoBehaviour
 
             if (msgType == "game_started")
             {
+                var started = JsonUtility.FromJson<KillingMahjong.EngineData.GameStartedMessage>(raw);
+                OnMatchStartedData?.Invoke(started != null ? started.data : null);
                 OnMatchStarted?.Invoke();
             }
 

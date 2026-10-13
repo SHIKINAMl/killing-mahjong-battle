@@ -19,7 +19,14 @@ namespace KillingMahjong.EngineData
 
     // --- 共通データ構造 ---
     [Serializable]
-    public class PlayerRef { public string client_id; }
+    public class PlayerRef
+    {
+        public string client_id;
+        public bool is_cpu;
+        public CpuOpponentData cpu;
+    }
+    [Serializable]
+    public class CpuOpponentData { public string difficulty; }
 
     /// <summary>
     /// round_end の清算内訳。点数内訳の表示に使う対応は以下（キー名に注意）:
@@ -151,6 +158,7 @@ namespace KillingMahjong.EngineData
     public class GameStartedData
     {
         public string match_id;
+        public string mode;
         public PlayerRef[] players;
     }
 
