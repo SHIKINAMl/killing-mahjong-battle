@@ -6,10 +6,11 @@ using KillingMahjong.Network;
 
 namespace KillingMahjong.UI.Effects
 {
-    /// <summary>相手の待機スキルを1枚のカットインへまとめる。効果や対局状態は処理しない。</summary>
+    /// <summary>相手の待機スキルを連打する。効果や対局状態は処理しない。</summary>
     public static class EnemySkillBatchPresentation
     {
         public const string EffectId = "skill.cutin.enemy_batch";
+        public const string SummaryEffectId = "skill.cutin.enemy_summary";
 
         public static string BuildLabel(IReadOnlyList<SkillCastedData> casts)
         {
@@ -28,6 +29,15 @@ namespace KillingMahjong.UI.Effects
         }
 
         public static IEnumerator Play(PhaseTransitionUI phase, CharacterData character, IReadOnlyList<SkillCastedData> casts)
+        {
+            var names = new List<string>();
+            foreach (var cast in casts)
+                if (cast != null && !string.IsNullOrEmpty(cast.skillType)) names.Add(SkillNames.GetDisplayName(cast.skillType));
+            if (phase != null) yield return phase.PlayEnemySkillBurstRoutine(names, character);
+        }
+
+        // 旧・集約表示は没案の試写からだけ呼ぶ。
+        public static IEnumerator PlaySummary(PhaseTransitionUI phase, CharacterData character, IReadOnlyList<SkillCastedData> casts)
         {
             if (phase != null)
                 yield return phase.PlaySkillCutinAnimationRoutine(BuildLabel(casts), false, character);

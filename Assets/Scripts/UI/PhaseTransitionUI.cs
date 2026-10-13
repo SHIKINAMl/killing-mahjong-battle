@@ -423,6 +423,27 @@ namespace KillingMahjong.UI
                 yield return scope.Run(SkillCutinVisualsRoutine(scope, skillName, isLocalPlayer, characterData, duration, onComplete, subText));
         }
 
+        // 背景と立ち絵は共有し、発動名を順番に叩き込む。退出の合図は全段で共有する。
+        public IEnumerator PlayEnemySkillBurstRoutine(IReadOnlyList<string> names, CharacterData character)
+        {
+            if (names == null || names.Count == 0) yield break;
+            using (var scope = skillPresentations.Begin())
+            {
+                bool exit = false;
+                int completed = 0;
+                for (int i = 0; i < names.Count && scope.IsActive; i++)
+                {
+                    var routine = StartCoroutine(scope.Run(SkillCutinVisualsRoutine(scope, names[i], false,
+                        character, 2f, () => completed++, null, i, names.Count, () => exit)));
+                    scope.AddCleanup(() => { if (this != null && routine != null) StopCoroutine(routine); });
+                    if (i + 1 < names.Count) yield return new WaitForSeconds(0.18f);
+                }
+                yield return new WaitForSeconds(1.1f);
+                exit = true;
+                while (scope.IsActive && completed < names.Count) yield return null;
+            }
+        }
+
         /// <summary>
         /// 相手のカットインの立ち絵の高さ（Canvas の単位、4:3 のとき）。絵の全体でこの高さ。
         ///
@@ -463,9 +484,9 @@ namespace KillingMahjong.UI
             return sprite.rect.size / ppu * reference;
         }
 
-        private IEnumerator SkillCutinVisualsRoutine(PresentationScope scope, string skillName, bool isLocalPlayer, CharacterData characterData, float duration, Action onComplete, string subText)
+        private IEnumerator SkillCutinVisualsRoutine(PresentationScope scope, string skillName, bool isLocalPlayer, CharacterData characterData, float duration, Action onComplete, string subText, int burstIndex = 0, int burstCount = 1, Func<bool> burstExit = null)
         {
-            ResetVisuals();
+            if (burstIndex == 0) ResetVisuals();
 
             // 1. コンテナ作成
             GameObject container = scope.Own(new GameObject("DeathGameCutinContainer"));
@@ -479,7 +500,7 @@ namespace KillingMahjong.UI
             Canvas containerCanvas = container.AddComponent<Canvas>();
             container.AddComponent<UnityEngine.UI.GraphicRaycaster>();
             containerCanvas.overrideSorting = true;
-            containerCanvas.sortingOrder = UISortingOrders.PhaseTransitionTop;
+            containerCanvas.sortingOrder = UISortingOrders.PhaseTransitionTop + burstIndex;
 
             // 2. 即時ディマー（背景が少し見えるように半透明）
             GameObject dimmer = new GameObject("Dimmer");
@@ -762,6 +783,21 @@ namespace KillingMahjong.UI
             mainRt.localRotation = Quaternion.Euler(0, 0, -10f); // 少し傾ける
             mainRt.localScale = Vector3.one; // スケールは1にする
 
+            if (burstExit != null)
+            {
+                float step = Mathf.Min(86f, 300f / Mathf.Max(1, burstCount - 1));
+                mainRt.anchoredPosition += new Vector2(-12f * burstIndex, -step * burstIndex);
+                if (burstCount > 4) mainText.fontSize = Mathf.Min(mainText.fontSize, step / 1.25f);
+                mainText.textWrappingMode = TextWrappingModes.NoWrap;
+                // 後続の全面背景で、それまでに出た発動名を隠さない。
+                if (burstIndex > 0)
+                {
+                    dimmer.SetActive(false);
+                    foreach (var element in bgElements) element.gameObject.SetActive(false);
+                    if (portraitRt != null) portraitRt.gameObject.SetActive(false);
+                }
+            }
+
             // 6. サブテキスト（役の名前など）
             TextMeshProUGUI subTextUI = null;
             CanvasGroup subCg = null;
@@ -856,7 +892,8 @@ namespace KillingMahjong.UI
 
             // 少し待機（文字を見せる時間）
             float waitTime = Mathf.Max(0, duration - impactDuration - 0.2f);
-            yield return new WaitForSeconds(waitTime);
+            if (burstExit == null) yield return new WaitForSeconds(waitTime);
+            else while (!burstExit()) yield return null;
 
             // 退出アニメーション（一瞬でガラスが割れるように消える、または画面外へ吹き飛ぶ）
             t = 0;
@@ -879,7 +916,9 @@ namespace KillingMahjong.UI
                 }
                 
                 // メインテキストはさらに傾きながら下へ落ちる
-                mainRt.anchoredPosition = new Vector2(0, (string.IsNullOrEmpty(subText) ? 50 : 150) - (1000 * easeIn));
+                if (burstExit == null)
+                    mainRt.anchoredPosition = new Vector2(0, (string.IsNullOrEmpty(subText) ? 50 : 150) - (1000 * easeIn));
+                else mainText.alpha = 1f - progress;
                 mainRt.localRotation = Quaternion.Euler(0, 0, -15f - (30f * easeIn));
 
                 if (subCg != null)

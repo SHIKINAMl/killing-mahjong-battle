@@ -111,7 +111,7 @@ namespace KillingMahjong.Tests
         }
 
         [UnityTest]
-        public IEnumerator OneCutinPreservesEveryServerEffectAndFinalHealth()
+        public IEnumerator BurstCutinsOverlapAndFinishTogetherPreservingEveryServerEffect()
         {
             checker.SetActive(true);
             var enemyWall = (IList)Get(board, "CurrentEnemyWallTiles"); enemyWall.Add(9);
@@ -122,22 +122,40 @@ namespace KillingMahjong.Tests
             Send(swap); Send(Cast("perspective", 18200, "enemy", 4));
             Assert.That(Get(queue, "PendingCount"), Is.EqualTo(1));
             checker.SetActive(false);
-            int cutins = 0, previousId = 0;
-            string label = null;
+            var seen = new System.Collections.Generic.HashSet<int>();
+            var labels = new System.Collections.Generic.List<string>();
+            var positions = new System.Collections.Generic.List<float>();
+            var arrivals = new System.Collections.Generic.List<float>();
+            var sorting = new System.Collections.Generic.List<int>();
+            int maximum = 0;
+            bool allSeen = false, exited = false;
             float deadline = Time.realtimeSinceStartup + 12;
             do
             {
-                var current = GameObject.Find("DeathGameCutinContainer");
-                if (current != null && current.GetInstanceID() != previousId)
+                int alive = 0;
+                foreach (var current in phase.GetComponentsInChildren<Transform>())
                 {
-                    previousId = current.GetInstanceID(); cutins++;
-                    var text = current.transform.Find("MainText").GetComponent(Type.GetType("TMPro.TMP_Text, Unity.TextMeshPro", true));
-                    label = (string)Get(text, "text");
+                    if (current.name != "DeathGameCutinContainer") continue;
+                    alive++;
+                    if (!seen.Add(current.GetInstanceID())) continue;
+                    var text = current.Find("MainText").GetComponent(Type.GetType("TMPro.TMP_Text, Unity.TextMeshPro", true));
+                    labels.Add((string)Get(text, "text"));
+                    positions.Add(((RectTransform)text.transform).anchoredPosition.y);
+                    arrivals.Add(Time.realtimeSinceStartup);
+                    sorting.Add(current.GetComponent<Canvas>().sortingOrder);
                 }
+                maximum = Mathf.Max(maximum, alive);
+                if (alive == 3) allSeen = true;
+                if (allSeen && alive == 0) exited = true;
+                if (allSeen && !exited) Assert.That(alive, Is.EqualTo(3), "全カットインは同じフレームで終了する");
                 yield return null;
             } while (((int)Get(queue, "PendingCount") > 0 || Get(queue, "CurrentName") != null) && Time.realtimeSinceStartup < deadline);
-            Assert.That(cutins, Is.EqualTo(1));
-            Assert.That(label, Is.EqualTo("透視 × 2\n牌交換"));
+            Assert.That(labels, Is.EqualTo(new[] { "透視", "牌交換", "透視" }));
+            Assert.That(maximum, Is.EqualTo(3)); Assert.That(exited, Is.True);
+            Assert.That(positions[1], Is.LessThan(positions[0])); Assert.That(positions[2], Is.LessThan(positions[1]));
+            Assert.That(sorting[1], Is.GreaterThan(sorting[0])); Assert.That(sorting[2], Is.GreaterThan(sorting[1]));
+            Assert.That(arrivals[1] - arrivals[0], Is.InRange(0.15f, 0.5f));
+            Assert.That(arrivals[2] - arrivals[1], Is.InRange(0.15f, 0.5f));
             Assert.That(Get(board, "EnemyPlayerHp"), Is.EqualTo(18200));
             Assert.That(Get(board, "LocalPlayerHp"), Is.EqualTo(20000));
             Assert.That(enemyWall.Contains(10), Is.True); Assert.That(enemyWall.Contains(9), Is.False);
@@ -172,6 +190,46 @@ namespace KillingMahjong.Tests
             Assert.That(Get(board, "EnemyPlayerHp"), Is.EqualTo(20000));
             Assert.That(((IList)Get(board, "CurrentHandTiles")).Count, Is.Zero);
             Assert.That(GameObject.Find("DeathGameCutinContainer"), Is.Null);
+        }
+
+        [UnityTest]
+        public IEnumerator CancelDuringBurstRemovesEveryLayerAndReleasesLock()
+        {
+            Send(Cast("perspective", 18000)); Send(Cast("boost_hand", 17000)); Send(Cast("perspective", 16000));
+            float deadline = Time.realtimeSinceStartup + 3f;
+            while (phase.GetComponentsInChildren<Transform>().Length > 0 && Time.realtimeSinceStartup < deadline)
+            {
+                int count = 0;
+                foreach (var child in phase.GetComponentsInChildren<Transform>())
+                    if (child.name == "DeathGameCutinContainer") count++;
+                if (count == 3) break;
+                yield return null;
+            }
+            Assert.That(GameObject.Find("DeathGameCutinContainer"), Is.Not.Null);
+            Call(skill, "CancelActiveTransitions"); yield return null; yield return null;
+            Assert.That(GameObject.Find("DeathGameCutinContainer"), Is.Null);
+            Assert.That(Get(ui, "IsTransitioning"), Is.False);
+        }
+
+        [UnityTest]
+        public IEnumerator OldSummaryRemainsPlayableAsUnused()
+        {
+            // ID指定の再生も同じ旧実装を使い、対局には混ぜない。
+            var preview = Main("UI.EffectPreviewPlayer").GetMethod("Open").Invoke(null,
+                new object[] { "skill.cutin.enemy_summary", false, null });
+            string label = null;
+            float deadline = Time.realtimeSinceStartup + 5f;
+            while ((int)Get(preview, "CompletedPlays") < 1 && Time.realtimeSinceStartup < deadline)
+            {
+                var container = GameObject.Find("DeathGameCutinContainer");
+                if (container != null)
+                    label = (string)Get(container.transform.Find("MainText").GetComponent(Type.GetType("TMPro.TMP_Text, Unity.TextMeshPro", true)), "text");
+                yield return null;
+            }
+            Assert.That(label, Is.EqualTo("透視 × 2\n牌交換"));
+            Assert.That((int)Get(preview, "CompletedPlays"), Is.EqualTo(1));
+            Call(preview, "Close"); yield return null;
+            Assert.That(Get(board, "EnemyPlayerHp"), Is.EqualTo(20000));
         }
     }
 }

@@ -66,6 +66,14 @@ namespace KillingMahjong.UI
                         new List<SkillCastedData> {
                             new SkillCastedData { skillType = "perspective" },
                             new SkillCastedData { skillType = "perspective" },
+                            new SkillCastedData { skillType = "boost_hand" },
+                            new SkillCastedData { skillType = "perspective" }
+                        }); break;
+                case EnemySkillBatchPresentation.SummaryEffectId:
+                    yield return EnemySkillBatchPresentation.PlaySummary(rig.phase, rig.enemy.CurrentCharacterData,
+                        new List<SkillCastedData> {
+                            new SkillCastedData { skillType = "perspective" },
+                            new SkillCastedData { skillType = "perspective" },
                             new SkillCastedData { skillType = "mulligan" }
                         }); break;
                 case "unused.special_victory":
