@@ -31,6 +31,7 @@ namespace KillingMahjong.UI
 
         internal void CancelActiveTransitions()
         {
+            _pendingEnemyBatch = null;
             // 子の演出は別のMonoBehaviour上で進む場合もある。入力ロックより先に表示を片付ける。
             if (uiManager != null)
             {
@@ -87,7 +88,11 @@ namespace KillingMahjong.UI
                 StartCoroutine(HandleSkillCastedRoutine(data));
                 return;
             }
-            queue.Enqueue("skill:" + data.skillType, () => RunQueuedSkill(data));
+            var network = NetworkMessageHandler.Instance;
+            if (network != null && data.player_id != network.LocalPlayerId)
+                EnqueueEnemySkill(queue, data);
+            else
+                queue.Enqueue("skill:" + data.skillType, () => RunQueuedSkill(data));
         }
 
         /// <summary>
@@ -134,7 +139,7 @@ namespace KillingMahjong.UI
             if (finished) uiManager.RefreshBoardAfterTransition();
         }
 
-        private System.Collections.IEnumerator HandleSkillEffectsRoutine(SkillCastedData data, TransitionLockSet.Lease ownedLock)
+        private System.Collections.IEnumerator HandleSkillEffectsRoutine(SkillCastedData data, TransitionLockSet.Lease ownedLock, bool skipCutin = false)
         {
 
             // 発動の合図として一瞬だけ光らせる。カットインが出る前に置くこと
@@ -262,13 +267,13 @@ namespace KillingMahjong.UI
                 }
             }
             // 1. 以前の大迫力カットイン演出（血飛沫＋立ち絵＋巨大テキスト）を再生する
-            if (uiManager.PhaseTransitionUI != null)
+            if (!skipCutin && uiManager.PhaseTransitionUI != null)
             {
                 CharacterData cData = isLocalPlayer ? uiManager.PlayerInfoUI.CurrentCharacterData : uiManager.EnemyInfoUI.CurrentCharacterData;
                 yield return uiManager.PhaseTransitionUI.PlaySkillCutinAnimationRoutine(skillName, isLocalPlayer, cData, 2.0f, null, subText);
                 if (!ownedLock.IsActive) yield break;
             }
-            else if (uiManager.DialogueUI != null)
+            else if (!skipCutin && uiManager.DialogueUI != null)
             {
                 string castMessage = isLocalPlayer ? $"【あなた】がアビリティを発動！\n「{skillName}」" : $"【相手】がアビリティを発動！\n「{skillName}」";
                 uiManager.DialogueUI.ShowText(castMessage);

@@ -50,6 +50,7 @@ namespace KillingMahjong.UI.Effects
             internal Action OnCut;
             internal Func<bool> StillValid;
             internal Coroutine Running;
+            internal float Timeout = MaxItemSeconds;
         }
 
         /// <summary>「いま出ている、カットしてよい演出」の届け出。</summary>
@@ -63,6 +64,7 @@ namespace KillingMahjong.UI.Effects
         /// <summary>
         /// ここを通らない演出を待つ上限（秒）。
         /// ロックが外れないまま残ると、列が永久に止まる。上限を過ぎたら、重なってでも流す。
+        /// ただし黒幕の表示中は上限を数えず、盤面が見えるまで待つ。
         /// </summary>
         private const float MaxForeignWaitSeconds = 20f;
 
@@ -98,6 +100,10 @@ namespace KillingMahjong.UI.Effects
 
         /// <summary>順番を待っている演出の数。</summary>
         public int PendingCount { get { return _pending.Count; } }
+
+        /// <summary>最後尾だけに追加すれば、途中の別の演出を追い越さずにまとめられる。</summary>
+        internal bool IsLastPending(Ticket ticket) => ticket != null && !ticket.Finished
+            && _pending.Count > 0 && _pending[_pending.Count - 1] == ticket;
 
         /// <summary>確認用。いまの列の様子。</summary>
         public string DebugState
@@ -239,13 +245,17 @@ namespace KillingMahjong.UI.Effects
 
         private IEnumerator Run()
         {
+            // 同じフレームに届くフェイズ通知とスキル通知を受け終えてから再生する。
+            yield return null;
             while (_pending.Count > 0)
             {
                 // ここを通らない演出（フェイズの演出）が明けるのを待つ
                 float waited = 0f;
                 while (ForeignBusy)
                 {
-                    waited += Time.unscaledDeltaTime;
+                    // 黒幕は待機上限で飛び越さない。盤面が見えないまま演出を出さないため。
+                    if (_ui != null && _ui.IsPhaseBackdropVisible) waited = 0f;
+                    else waited += Time.unscaledDeltaTime;
                     if (waited >= MaxForeignWaitSeconds)
                     {
                         Debug.LogWarning("[EffectQueue] ほかの演出が " + MaxForeignWaitSeconds
@@ -274,9 +284,9 @@ namespace KillingMahjong.UI.Effects
                 while (!ticket.Finished)
                 {
                     ran += Time.unscaledDeltaTime;
-                    if (ran >= MaxItemSeconds)
+                    if (ran >= ticket.Timeout)
                     {
-                        Debug.LogWarning("[EffectQueue] '" + ticket.Name + "' が " + MaxItemSeconds
+                        Debug.LogWarning("[EffectQueue] '" + ticket.Name + "' が " + ticket.Timeout
                             + " 秒たっても終わりません。次へ進みます");
                         ticket.Finished = true;
                         break;

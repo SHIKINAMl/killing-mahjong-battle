@@ -222,6 +222,10 @@ namespace KillingMahjong.UI
 
         public bool IsDarkenTransitioning { get; private set; }
 
+        /// <summary>黒幕の降下・待機・フェードアウトを含む。盤面が見えるまでスキルを待たせる。</summary>
+        internal bool IsPhaseBackdropVisible => IsDarkenTransitioning || isDarkened
+            || (fullScreenCheckerImage != null && fullScreenCheckerImage.gameObject.activeInHierarchy);
+
         /// <summary>
         /// 局頭の黒幕が降りているあいだ true（2026-09-27）。
         ///
@@ -722,6 +726,12 @@ namespace KillingMahjong.UI
             TextMeshProUGUI mainText = mainTextObj.AddComponent<TextMeshProUGUI>();
             mainText.text = skillName;
             mainText.fontSize = KillingMahjong.Common.UITypography.Title; // スケールを1にする代わりにフォントサイズを大きくする
+            int skillLines = string.IsNullOrEmpty(skillName) ? 1 : skillName.Split('\n').Length;
+            if (skillLines > 1)
+            {
+                mainText.fontSize = Mathf.Min(60f, 150f / skillLines);
+                mainText.textWrappingMode = TextWrappingModes.NoWrap;
+            }
             mainText.color = new Color32(255, 255, 255, 0); // 白色字
             mainText.fontStyle = FontStyles.Bold;
             mainText.alignment = TextAlignmentOptions.Right;
@@ -746,6 +756,8 @@ namespace KillingMahjong.UI
             mainRt.anchorMax = new Vector2(1f, 1f);
             mainRt.pivot = new Vector2(1f, 1f);
             mainRt.sizeDelta = new Vector2(500, 150); // 幅を絞る
+            if (skillLines > 1)
+                mainRt.sizeDelta = new Vector2(500, Mathf.Max(150f, skillLines * mainText.fontSize * 1.35f + 16f));
             mainRt.anchoredPosition = new Vector2(-100, string.IsNullOrEmpty(subText) ? -120 : -80); // さらに下・左へ移動
             mainRt.localRotation = Quaternion.Euler(0, 0, -10f); // 少し傾ける
             mainRt.localScale = Vector3.one; // スケールは1にする

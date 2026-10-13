@@ -36,11 +36,13 @@ namespace KillingMahjong.UI
         /// </summary>
         internal bool IsCoveredByPhaseEffect =>
             Locks.IsLockedByOthers(owner => IsQuietTransitionOwner(owner) || (owner != null && owner.StartsWith("skill:")))
-            || (phaseTransitionUI != null && (phaseTransitionUI.IsDarkenTransitioning || PhaseTransitionUI.IsScreenDarkened));
+            || IsPhaseBackdropVisible;
 
         internal bool IsBusyForQueuedEffect =>
             Locks.IsLockedByOthers(IsQuietTransitionOwner)
-            || (phaseTransitionUI != null && phaseTransitionUI.IsDarkenTransitioning);
+            || IsPhaseBackdropVisible;
+
+        internal bool IsPhaseBackdropVisible => phaseTransitionUI != null && phaseTransitionUI.IsPhaseBackdropVisible;
 
         // 既存のInspector呼び出し口を保持。falseは互換入口自身のロックだけを解除する。
         public void SetIsTransitioning(bool value)

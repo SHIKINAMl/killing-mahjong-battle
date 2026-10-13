@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using KillingMahjong.EngineData;
+using KillingMahjong.Network;
 using KillingMahjong.UI.Effects;
 using KillingMahjong.Visuals;
 
@@ -60,6 +61,13 @@ namespace KillingMahjong.UI
                     yield return new WaitForSeconds(3f); break;
                 case "skill.cutin.enemy":
                     yield return rig.phase.PlaySkillCutinAnimationRoutine("透視", false, rig.enemy.CurrentCharacterData); break;
+                case EnemySkillBatchPresentation.EffectId:
+                    yield return EnemySkillBatchPresentation.Play(rig.phase, rig.enemy.CurrentCharacterData,
+                        new List<SkillCastedData> {
+                            new SkillCastedData { skillType = "perspective" },
+                            new SkillCastedData { skillType = "perspective" },
+                            new SkillCastedData { skillType = "mulligan" }
+                        }); break;
                 case "unused.special_victory":
                     yield return rig.phase.PlaySkillCutinAnimationRoutine("特殊勝利", true, rig.player.CurrentCharacterData); break;
                 case "phase.dealing":
