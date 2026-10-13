@@ -73,22 +73,10 @@ namespace KillingMahjong.UI
 
                 NotifyTileClicked();
 
-                if (eventData.button == PointerEventData.InputButton.Left)
+                if (eventData.button == PointerEventData.InputButton.Left
+                    || eventData.button == PointerEventData.InputButton.Right)
                 {
-                    // 既に選択されていたら（浮いている状態なら）捨てる
-                    if (_gameUIManager.IsTileSelected(TileId, this))
-                    {
-                        _gameUIManager.DiscardSelectedTile();
-                    }
-                    else
-                    {
-                        // 左クリック：選択（または選択解除）
-                        _gameUIManager.SelectTile(TileId, IsInHand, false, this);
-                    }
-                }
-                else if (eventData.button == PointerEventData.InputButton.Right)
-                {
-                    // 右クリック：選択して即座に打牌
+                    // 左右とも1クリックで押した実物を打牌する。手番・送信待ちの制限は既存処理で守る。
                     _gameUIManager.SelectTile(TileId, IsInHand, false, this);
                     _gameUIManager.DiscardSelectedTile();
                 }

@@ -30,6 +30,26 @@ namespace KillingMahjong.Tests
         private List<int> Indexes => (List<int>)Get(board, "LocalHandIndexes");
         private List<RectTransform> Slots(Component target, string method) => (List<RectTransform>)Call(target, method);
         private RectTransform Rect(Component tile) => (RectTransform)tile.transform;
+        private void PrepareDiscard()
+        {
+            Set(manager, "currentPhaseStatus", Phase("Discard"));
+            board.GetType().GetProperty("IsLocalTurn").SetValue(board, true);
+            var networkType = Main("KillingMahjong.Network.NetworkMessageHandler");
+            Assert.That(networkType.GetProperty("Instance").GetValue(null) == null, Is.True);
+            Assert.That(Main("WebSocketGameClientSample").GetProperty("Instance").GetValue(null) == null, Is.True);
+            var network = root.AddComponent(networkType);
+            ((Behaviour)network).enabled = false;
+        }
+        private void ExpectOfflineDiscard()
+        {
+            // 送信処理への到達を1回だけ検証する。実サーバーには接続しない。
+            LogAssert.Expect(LogType.Error, "[Network] 送信先のクライアントが居ないため action 'discard' を送れませんでした");
+        }
+        private void PointerButton(string name)
+        {
+            var property = pointer.GetType().GetProperty("button");
+            property.SetValue(pointer, Enum.Parse(property.PropertyType, name));
+        }
         private Component Tile(string name, int index)
         {
             var tile = Child(name).AddComponent(Main("KillingMahjong.UI.TileInteraction"));
@@ -104,17 +124,103 @@ namespace KillingMahjong.Tests
         }
 
         [Test]
-        public void ClickingAnotherEqualTileChangesSelectionInsteadOfDiscarding()
+        public void SelectingAnotherEqualTileTargetsThatObject()
         {
             Set(manager, "currentPhaseStatus", Phase("Discard"));
             board.GetType().GetProperty("IsLocalTurn").SetValue(board, true);
-            Call(first, "OnPointerClick", pointer);
+            Call(manager, "SelectTile", 0, false, false, first);
             Assert.That(Get(board, "SelectedWallIndex"), Is.EqualTo(0));
-            Call(second, "OnPointerClick", pointer);
+            Call(manager, "SelectTile", 0, false, false, second);
             Assert.That(Get(board, "SelectedWallIndex"), Is.EqualTo(2));
             Assert.That(Get(board, "IsLocalTurn"), Is.True);
             Assert.That(Call(manager, "IsTileSelected", 0, first), Is.False);
             Assert.That(Call(manager, "IsTileSelected", 0, second), Is.True);
+        }
+
+        [TestCase("Left", 0)]
+        [TestCase("Left", 2)]
+        [TestCase("Right", 0)]
+        [TestCase("Right", 2)]
+        public void OneClickDiscardsTheClickedObjectWithoutConfirmation(string button, int wallIndex)
+        {
+            PrepareDiscard();
+            PointerButton(button);
+            ExpectOfflineDiscard();
+            Call(wallIndex == 0 ? first : second, "OnPointerClick", pointer);
+            Assert.That(Get(board, "IsLocalTurn"), Is.False);
+            Assert.That((List<int>)Get(board, "SelectedTileIds"), Is.Empty);
+            Assert.That(manager.GetType().GetField("pendingDiscardWallIndex", Members).GetValue(manager), Is.EqualTo(wallIndex));
+            CollectionAssert.AreEquivalent(new[] { wallIndex }, (System.Collections.IEnumerable)Get(board, "DiscardedWallIndexes"));
+        }
+
+        [TestCase(0)]
+        [TestCase(2)]
+        public void OneClickUsesTheClickedIndexEvenWithAnExistingSelection(int clickedIndex)
+        {
+            PrepareDiscard();
+            Call(manager, "SelectTile", 0, false, false, first);
+            ExpectOfflineDiscard();
+            Call(clickedIndex == 0 ? first : second, "OnPointerClick", pointer);
+            Assert.That(manager.GetType().GetField("pendingDiscardWallIndex", Members).GetValue(manager), Is.EqualTo(clickedIndex));
+            CollectionAssert.AreEquivalent(new[] { clickedIndex }, (System.Collections.IEnumerable)Get(board, "DiscardedWallIndexes"));
+        }
+
+        [Test]
+        public void RepeatedClicksCannotDiscardMoreTilesWhileWaitingForTheServer()
+        {
+            PrepareDiscard();
+            ExpectOfflineDiscard();
+            Call(second, "OnPointerClick", pointer);
+            Call(first, "OnPointerClick", pointer);
+            Call(second, "OnPointerClick", pointer);
+            Assert.That(Get(board, "IsLocalTurn"), Is.False);
+            CollectionAssert.AreEquivalent(new[] { 2 }, (System.Collections.IEnumerable)Get(board, "DiscardedWallIndexes"));
+            Assert.That(Get(board, "SelectedWallIndex"), Is.EqualTo(-1));
+        }
+
+        [Test]
+        public void ClickingAHandTileDuringDiscardDoesNotDiscardIt()
+        {
+            PrepareDiscard();
+            Call(board, "SetLocalState", new List<int> { 0, 1, 0 }, new List<int> { 0 }, null, new List<int> { 2 });
+            Call(second, "Initialize", 0, true, manager, null);
+            Slots(wall, "GetWallSlots").Remove(Rect(second));
+            Slots(hand, "GetHandSlots").Add(Rect(second));
+            Call(second, "OnPointerClick", pointer);
+            Assert.That(Get(board, "IsLocalTurn"), Is.True);
+            Assert.That((System.Collections.IEnumerable)Get(board, "DiscardedWallIndexes"), Is.Empty);
+            CollectionAssert.AreEqual(new[] { 2 }, Indexes);
+        }
+
+        [Test]
+        public void MiddleClickAndTransitioningCannotDiscardATile()
+        {
+            PrepareDiscard();
+            PointerButton("Middle");
+            Call(second, "OnPointerClick", pointer);
+            PointerButton("Left");
+            Set(manager, "isTransitioning", true);
+            Call(second, "OnPointerClick", pointer);
+            Assert.That(Get(board, "IsLocalTurn"), Is.True);
+            Assert.That((System.Collections.IEnumerable)Get(board, "DiscardedWallIndexes"), Is.Empty);
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void TutorialStillRequiresPermissionAndDiscardsTheClickedObject(bool allowed)
+        {
+            PrepareDiscard();
+            var tutorial = root.AddComponent(Main("KillingMahjong.Managers.TutorialManager"));
+            ((Behaviour)tutorial).enabled = false;
+            Set(tutorial, "_round", Activator.CreateInstance(Main("KillingMahjong.Managers.TutorialRoundData")));
+            Set(tutorial, "_isWaitingForDiscard", allowed);
+            manager.GetType().GetProperty("IsTutorialMode").SetValue(manager, true);
+            manager.GetType().GetProperty("TutorialManager").SetValue(manager, tutorial);
+            Call(second, "OnPointerClick", pointer);
+            Assert.That(Get(board, "IsLocalTurn"), Is.EqualTo(!allowed));
+            Assert.That(Slots(wall, "GetWallSlots"), Contains.Item(Rect(first)));
+            Assert.That(Slots(wall, "GetWallSlots").Contains(Rect(second)), Is.EqualTo(!allowed));
+            Assert.That((List<int>)Get(board, "SelectedTileIds"), Is.Empty);
         }
 
         [Test]
