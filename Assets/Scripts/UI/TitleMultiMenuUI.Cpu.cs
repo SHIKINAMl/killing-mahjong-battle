@@ -12,9 +12,10 @@ namespace KillingMahjong.UI
     {
         private GameObject _cpuPanel;
         private readonly Button[] _cpuChoices = new Button[4];
-        private Button _cpuStart, _cpuBack;
+        private Button _cpuBack;
         private TMP_Text _cpuStatus, _cpuError;
         private CpuDifficulty _cpuDifficulty = CpuDifficulty.Normal;
+        private bool _cpuChoiceArmed;
         private CpuMatchJoinGate _cpuAttempt;
         private WebSocketGameClientSample _cpuJoinClient;
         private Action<GameStartedData> _cpuStartedHandler;
@@ -29,12 +30,19 @@ namespace KillingMahjong.UI
             {
                 var difficulty = (CpuDifficulty)i;
                 var go = CreateMenuItem(_cpuPanel.transform, CpuDifficultyCatalog.Label(difficulty), 90 - i * 51,
-                    () => SelectCpuDifficulty(difficulty));
+                    () => OnCpuDifficultySelected(difficulty));
                 _cpuChoices[i] = go.GetComponent<Button>();
             }
-            CpuText("SpecialHint", "CPUに特典あり", -98, 14, new Color32(200, 188, 196, 255));
-            _cpuStart = CreateMenuItem(_cpuPanel.transform, "対戦する", -140, OnCpuStartSelected).GetComponent<Button>();
-            _cpuBack = CreateMenuItem(_cpuPanel.transform, "もどる", -200, OnCpuBackSelected).GetComponent<Button>();
+            CpuText("SpecialHint", "CPUに特典あり", -63, 14, new Color32(200, 188, 196, 255));
+            // 旧ボタンは配置データに残すが、表示・入力には使わない。
+            var previousStart = _cpuPanel.transform.Find("対戦する");
+            if (previousStart != null)
+            {
+                var button = previousStart.GetComponent<Button>();
+                if (button != null) { button.onClick.RemoveAllListeners(); button.interactable = false; }
+                previousStart.gameObject.SetActive(false);
+            }
+            _cpuBack = CreateMenuItem(_cpuPanel.transform, "もどる", -140, OnCpuBackSelected).GetComponent<Button>();
             _cpuStatus = CpuText("Status", "", 123, 14, MenuText);
             _cpuError = CpuText("Error", "", -248, 14, ErrorText);
             SelectCpuDifficulty(CpuDifficulty.Normal);
@@ -46,10 +54,10 @@ namespace KillingMahjong.UI
             var label = go.GetComponent<TMP_Text>();
             if (made)
             {
-                Center((RectTransform)go.transform, new Vector2(name == "Error" ? 420 : ItemWidth, name == "Error" ? 40 : 22));
-                ((RectTransform)go.transform).anchoredPosition = new Vector2(0, y);
+                Center((RectTransform)go.transform, new Vector2(name == "Error" ? 420 : name == "SpecialHint" ? 140 : ItemWidth, name == "Error" ? 40 : 22));
+                ((RectTransform)go.transform).anchoredPosition = new Vector2(name == "SpecialHint" ? 70 : 0, y);
                 ApplyFont(label); label.text = text; label.fontSize = fontSize; label.color = color;
-                label.alignment = TextAlignmentOptions.Center; label.raycastTarget = false;
+                label.alignment = name == "SpecialHint" ? TextAlignmentOptions.Left : TextAlignmentOptions.Center; label.raycastTarget = false;
             }
             return label;
         }
@@ -60,17 +68,33 @@ namespace KillingMahjong.UI
             _cpuPanel.SetActive(true); _cpuError.text = _cpuStatus.text = "";
             SelectCpuDifficulty(CpuDifficulty.Normal); SetCpuBusy(false);
         }
+        private void OnCpuDifficultySelected(CpuDifficulty difficulty)
+        {
+            if (TryConfirmCpuDifficulty(difficulty)) OnCpuStartSelected();
+        }
+        private bool TryConfirmCpuDifficulty(CpuDifficulty difficulty)
+        {
+            if (_isCheckingRoom || _hasDecided || _cpuPanel == null || !_cpuPanel.activeInHierarchy) return false;
+            CpuDifficultyCatalog.WireName(difficulty);
+            if (_cpuChoiceArmed && _cpuDifficulty == difficulty)
+            {
+                _cpuChoiceArmed = false;
+                return true;
+            }
+            SelectCpuDifficulty(difficulty);
+            _cpuChoiceArmed = true;
+            return false;
+        }
         private void SelectCpuDifficulty(CpuDifficulty difficulty)
         {
             if (_isCheckingRoom) return;
-            CpuDifficultyCatalog.WireName(difficulty); _cpuDifficulty = difficulty;
+            CpuDifficultyCatalog.WireName(difficulty); _cpuDifficulty = difficulty; _cpuChoiceArmed = false;
             for (int i = 0; i < _cpuChoices.Length; i++)
                 if (_cpuChoices[i] != null) UIInteractionFeedback.Attach(_cpuChoices[i].gameObject).SetSelected(i == (int)difficulty);
         }
         private void SetCpuBusy(bool busy)
         {
             foreach (var choice in _cpuChoices) if (choice != null) choice.interactable = !busy;
-            if (_cpuStart != null) _cpuStart.interactable = !busy;
             if (_cpuBack != null) _cpuBack.interactable = true;
         }
         private void OnCpuBackSelected()
@@ -83,6 +107,7 @@ namespace KillingMahjong.UI
         private void OnCpuStartSelected()
         {
             if (_isCheckingRoom || _hasDecided || _cpuPanel == null || !_cpuPanel.activeInHierarchy) return;
+            _cpuChoiceArmed = false;
             MatchJoinRequest.RequestCpu(_cpuDifficulty);
             _isCheckingRoom = true;
             _cpuAttempt = new CpuMatchJoinGate(_cpuDifficulty, Time.realtimeSinceStartup);
@@ -141,6 +166,7 @@ namespace KillingMahjong.UI
         }
         private void CancelCpuJoin()
         {
+            _cpuChoiceArmed = false;
             if (_cpuAttempt == null) return;
             var attempt = _cpuAttempt; var client = _cpuJoinClient;
             attempt.Cancel(); UnsubscribeCpuClient(); _cpuAttempt = null; _isCheckingRoom = false; SetCpuBusy(false);
