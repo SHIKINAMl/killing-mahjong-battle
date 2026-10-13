@@ -43,6 +43,15 @@ namespace KillingMahjong.UI
             // （2026-09-24 に録画で確認）。シーンを直さずコードで潰す。
             if (dialogueText != null) dialogueText.text = string.Empty;
 
+            // 文字とLOGボタンを含むパネルは固定する。親の浮遊を文字にも当てると、
+            // ピクセルフォントが動くたびにちらつき、読み進めにくくなる。
+            // 対局とチュートリアルの両方で同じ設定にする。
+            if (dialoguePanel != null)
+            {
+                var floating = dialoguePanel.GetComponent<FloatingAnimator>();
+                if (floating != null) floating.enabled = false;
+            }
+
             ApplyBubbleSetting();
         }
 

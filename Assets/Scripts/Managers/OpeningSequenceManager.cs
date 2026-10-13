@@ -33,15 +33,7 @@ namespace KillingMahjong.Managers
             {
                 dialogueUI.gameObject.SetActive(false); // 吹き出しを最初は消す
 
-                // チュートリアルの文字は読みやすさを優先して固定する。
-                // DialoguePanel 自体を揺らすと、子の TMP 文字まで毎フレーム 3px / 5px
-                // 動いて録画でも読みにくくなるため、他画面の浮遊演出は変えずにここだけ止める。
-                Transform dialoguePanel = dialogueUI.transform.Find("DialoguePanel");
-                if (dialoguePanel != null)
-                {
-                    var floatingAnimator = dialoguePanel.GetComponent<FloatingAnimator>();
-                    if (floatingAnimator != null) floatingAnimator.enabled = false;
-                }
+                // セリフの位置固定は対局と共通の DialogueUI が行う。
             }
 
             // 不要なロード表示やマッチメイキングUIを強制オフ
