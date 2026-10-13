@@ -422,6 +422,24 @@ namespace KillingMahjong.EngineData
         public string[] base_yaku;
         public float multiplier;
         public string multiplier_label;
+        // 任意の表示補助情報。未対応の応答ではnullのままにし、Unityで役を推定しない。
+        public int[] source_wall_indexes;
+        public YakuSupportData[] yaku_supports;
+    }
+
+    [Serializable]
+    public class YakuSupportData
+    {
+        public string name;
+        public string kind;
+        public YakuSupportGroup[] groups;
+    }
+
+    [Serializable]
+    public class YakuSupportGroup
+    {
+        public int[] wall_indexes;
+        public bool include_wait_tile;
     }
 
     [Serializable]

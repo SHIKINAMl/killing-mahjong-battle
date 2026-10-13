@@ -21,11 +21,13 @@ namespace KillingMahjong.UI
         private readonly List<CanvasGroup> groups = new List<CanvasGroup>();
         private readonly List<Vector2> positions = new List<Vector2>();
         private readonly List<string> names = new List<string>();
+        private readonly List<string> baseNames = new List<string>();
         private string[] raw = Array.Empty<string>();
         private Color background;
         private float bottom, elapsed;
         private bool prepared, hovered;
         private string lastFrameId;
+        private string focusedRole;
         private int lastRevision = -1;
         public bool IsHovered => hovered;
         public int CardCount => names.Count;
@@ -87,7 +89,7 @@ namespace KillingMahjong.UI
             bool same = raw.Length == data.Length;
             for (int i = 0; same && i < data.Length; i++) same = raw[i] == data[i];
             if (same) { lastRevision = -1; RefreshStyle(); return; }
-            HideImmediate(); raw = (string[])data.Clone(); names.Clear(); positions.Clear();
+            HideImmediate(); raw = (string[])data.Clone(); names.Clear(); baseNames.Clear(); positions.Clear();
             var entries = YakuNameUtil.Summarize(raw);
             float rowHeight = template.sizeDelta.y;
             float height = entries.Count == 0 ? 0 : entries.Count * (rowHeight + gap) - gap;
@@ -105,6 +107,7 @@ namespace KillingMahjong.UI
                 var pos = template.anchoredPosition + new Vector2(i % 2 == 0 ? 0 : 6, -i * (rowHeight + gap));
                 positions.Add(pos); r.anchoredPosition = pos;
                 string name = YakuNameUtil.ToDisplayText(entries[i]); names.Add(name);
+                baseNames.Add(YakuNameUtil.ToVoiceKey(entries[i].BaseName));
                 r.Find("RoleName").GetComponent<TMP_Text>().text = name;
                 string description = YakuInfo.GetDescription(entries[i].BaseName);
                 r.Find("Condition").GetComponent<TMP_Text>().text = string.IsNullOrEmpty(description) ? "説明未登録" : description;
@@ -144,6 +147,31 @@ namespace KillingMahjong.UI
                 cards[i].Find("RoleName").GetComponent<TMP_Text>().color = style.panelText;
                 cards[i].Find("Condition").GetComponent<TMP_Text>().color = style.panelText;
             }
+            ApplyFocus();
+        }
+        public string GetHoveredRole(Vector2 point)
+        {
+            if (!hovered || gate == null || gate.alpha <= 0 || !gameObject.activeInHierarchy) return null;
+            var canvas = GetComponentInParent<Canvas>();
+            var camera = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay ? canvas.worldCamera : null;
+            if (!RectTransformUtility.RectangleContainsScreenPoint((RectTransform)transform, point, camera)) return null;
+            for (int i = 0; i < names.Count; i++)
+                if (groups[i].alpha > .95f && RectTransformUtility.RectangleContainsScreenPoint(cards[i], point, camera))
+                    return baseNames[i];
+            return null;
+        }
+        public void SetFocusedRole(string role)
+        {
+            string next = YakuNameUtil.ToVoiceKey(role); if (next == focusedRole) return;
+            focusedRole = next; ApplyFocus();
+        }
+        private void ApplyFocus()
+        {
+            var style = UIFrameCatalog.Resolve(FrameId);
+            for (int i = 0; i < names.Count; i++)
+                cards[i].Find("RoleName").GetComponent<TMP_Text>().color =
+                    focusedRole != null && baseNames[i] == focusedRole
+                        ? new Color32(255, 214, 59, 255) : style.panelText;
         }
         public void SetHovered(bool value)
         {
@@ -169,6 +197,8 @@ namespace KillingMahjong.UI
         public void HideImmediate()
         {
             hovered = false; elapsed = 0;
+            focusedRole = null;
+            if (prepared) ApplyFocus();
             if (gate != null) gate.alpha = 0;
             for (int i = 0; i < groups.Count; i++) { groups[i].alpha = 0; if (i < positions.Count) cards[i].anchoredPosition = positions[i]; }
         }

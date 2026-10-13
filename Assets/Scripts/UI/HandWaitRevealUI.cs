@@ -27,8 +27,15 @@ namespace KillingMahjong.UI
         private HandUI hoverHand;
         private bool hasPresentation, forceVisible;
         private HandRoleConditionsUI roleConditions;
+        private readonly HandRoleTileSupport roleSupport = new HandRoleTileSupport();
+        private RoleTileTarget[] explicitRoleTargets;
+        private readonly List<RoleTileTarget> roleTargets = new List<RoleTileTarget>(13);
+        private TMP_Text yakuText;
+        private PixelShapeGraphic hoveredRow;
+        private int selectedCandidate = -1;
         private GameUIManager owner;
         public HandRoleConditionsUI RoleConditions => roleConditions;
+        public int ActiveRoleTileCount => roleSupport.ActiveTileCount;
         public bool IsPresentationVisible => gameObject.activeInHierarchy && (presentation == null || presentation.alpha > .001f);
         private int version;
         public bool IsTransferring { get; private set; }
@@ -78,6 +85,15 @@ namespace KillingMahjong.UI
             Label(panel, "Han", 148, 10, 60, 25, 18, TextAlignmentOptions.MidlineRight);
             Label(panel, "Rank", 12, 39, 196, 34, 26);
             Label(panel, "Yaku", 12, 80, 196, 88, 18, TextAlignmentOptions.TopLeft);
+            yakuText = panel.Find("Yaku").GetComponent<TMP_Text>();
+            var row = SceneFirst.Child(yakuText.transform, "RoleHoverRow", out bool rowMade,
+                typeof(RectTransform), typeof(CanvasRenderer), typeof(PixelShapeGraphic));
+            if (rowMade)
+            {
+                var rect = (RectTransform)row.transform; rect.anchorMin = Vector2.zero; rect.anchorMax = Vector2.one;
+                rect.offsetMin = rect.offsetMax = Vector2.zero; rect.pivot = yakuText.rectTransform.pivot;
+            }
+            hoveredRow = row.GetComponent<PixelShapeGraphic>(); hoveredRow.raycastTarget = false;
             Rect(transform, "Candidates", 0, 0, 800, 600, out _);
             info = panel.GetComponent<CanvasGroup>();
             info.blocksRaycasts = true;
@@ -104,19 +120,27 @@ namespace KillingMahjong.UI
 
         private static Vector2 PointerPosition => UnityEngine.InputSystem.Mouse.current != null
             ? UnityEngine.InputSystem.Mouse.current.position.ReadValue() : new Vector2(-100000, -100000);
-        public void BindHoverTargets(HandUI hand) { hoverHand = hand; RefreshHoverVisibility(PointerPosition); }
+        public void BindHoverTargets(HandUI hand) { hoverHand = hand; RebindRoleSupport(); RefreshHoverVisibility(PointerPosition); }
+        public void BindRoleTileTargets(RoleTileTarget[] targets) { explicitRoleTargets = targets; RebindRoleSupport(); }
         public void SetForcedVisible(bool visible) { forceVisible = visible; RefreshHoverVisibility(PointerPosition); }
         private void Update() { RefreshHoverVisibility(PointerPosition); }
         public void RefreshHoverVisibility(Vector2 point)
         {
             if (presentation == null) return;
-            bool overInfo = presentation.alpha > .001f && info != null && info.alpha > .001f
-                && !forceVisible && !IsTransferring && Contains((RectTransform)info.transform, point)
+            bool canHover = hasPresentation && !forceVisible && !IsTransferring
                 && (hoverHand == null || !hoverHand.IsSubmitted)
                 && (owner == null || (owner.CurrentPhaseStatus == RoundStatus.HandSelection
                     && (owner.DialogueUI == null || !owner.DialogueUI.IsLogOpen)));
+            bool overInfo = canHover && presentation.alpha > .001f && info != null && info.alpha > .001f
+                && Contains((RectTransform)info.transform, point);
+            bool overRoles = canHover && roleConditions.IsHovered && Contains((RectTransform)roleConditions.transform, point);
+            bool overCandidate = false;
+            if (canHover && presentation.alpha > .001f)
+                foreach (var card in cards) if (Contains(card, point)) { overCandidate = true; break; }
+            bool bridge = canHover && roleConditions.IsHovered && IsRoleHoverBridge(point);
+            bool roleHover = overInfo || (roleConditions.IsHovered && (overRoles || overCandidate || bridge));
             bool show = hoverHand == null || forceVisible || IsTransferring;
-            show |= overInfo;
+            show |= overInfo || overRoles || bridge;
             if (!show)
             {
                 foreach (var tile in hoverHand.GetHandSlots()) if (Contains(tile, point)) { show = true; break; }
@@ -129,7 +153,85 @@ namespace KillingMahjong.UI
                 : Mathf.MoveTowards(presentation.alpha, show ? 1 : 0, Time.unscaledDeltaTime / .08f);
             presentation.blocksRaycasts = show && !IsTransferring;
             presentation.interactable = show && !IsTransferring;
-            roleConditions?.SetHovered(overInfo);
+            roleConditions.SetHovered(roleHover);
+            string focused = overRoles ? roleConditions.GetHoveredRole(point) : null;
+            int lineIndex = -1;
+            if (overInfo && Contains(yakuText.rectTransform, point)) focused = RoleAtLeftPoint(point, out lineIndex);
+            roleConditions.SetFocusedRole(focused);
+            if (canHover && !string.IsNullOrEmpty(focused)) roleSupport.SetHoveredRole(focused, RoleTargets());
+            else roleSupport.ClearHighlights();
+            hoveredRow.Begin();
+            if (lineIndex >= 0)
+            {
+                var line = yakuText.textInfo.lineInfo[lineIndex];
+                hoveredRow.Box(line.lineExtents.min.x - 2, line.descender - 1, line.lineExtents.max.x + 3,
+                    line.ascender + 1, new Color(1, .82f, .12f, .16f));
+            }
+            hoveredRow.End();
+        }
+        private string RoleAtLeftPoint(Vector2 point, out int lineIndex)
+        {
+            if (yakuText.havePropertiesChanged) yakuText.ForceMeshUpdate();
+            lineIndex = TMP_TextUtilities.FindIntersectingLine(yakuText, point, CameraFor(yakuText.rectTransform));
+            if (lineIndex < 0 || selectedCandidate < 0 || selectedCandidate >= waits.Length) return null;
+            var roles = waits[selectedCandidate].yaku;
+            if (roles == null || yakuText.textInfo.characterCount == 0) return null;
+            int first = yakuText.textInfo.lineInfo[lineIndex].firstCharacterIndex;
+            if (first < 0 || first >= yakuText.textInfo.characterCount) return null;
+            int sourceIndex = yakuText.textInfo.characterInfo[first].index, offset = 0;
+            foreach (string role in roles)
+            {
+                int length = role?.Length ?? 0;
+                if (sourceIndex < offset + length) return role;
+                offset += length + 1;
+            }
+            return null;
+        }
+        private IReadOnlyList<RoleTileTarget> RoleTargets()
+        {
+            if (hoverHand == null) return explicitRoleTargets;
+            roleTargets.Clear();
+            foreach (var tile in hoverHand.GetHandSlots())
+            {
+                if (tile == null || !tile.gameObject.activeInHierarchy) continue;
+                var interaction = tile.GetComponent<TileInteraction>();
+                if (interaction != null) roleTargets.Add(new RoleTileTarget(tile.GetComponent<Image>(), interaction.WallIndex, interaction.TileId));
+            }
+            return roleTargets;
+        }
+        private void RebindRoleSupport()
+        {
+            if (selectedCandidate < 0 || selectedCandidate >= waits.Length || selectedCandidate >= cards.Count)
+            { roleSupport.Clear(); return; }
+            roleSupport.Bind(waits[selectedCandidate], RoleTargets(), cards[selectedCandidate].Find("WaitTile").GetComponent<Image>());
+        }
+        private bool IsRoleHoverBridge(Vector2 point)
+        {
+            var a = ScreenRect((RectTransform)info.transform);
+            var b = ScreenRect((RectTransform)roleConditions.transform);
+            float unit = GetComponent<Canvas>().scaleFactor;
+            foreach (var card in cards)
+            {
+                var c = ScreenRect(card); float gap = c.xMin - a.xMax;
+                if (gap >= 0 && gap <= 32 * unit && UnityEngine.Rect.MinMaxRect(a.xMax - 4 * unit, c.yMin,
+                    c.xMin + 4 * unit, Mathf.Max(c.yMax, b.yMin) + 4 * unit).Contains(point)) return true;
+                gap = b.yMin - c.yMax;
+                if (gap >= 0 && gap <= 24 * unit && UnityEngine.Rect.MinMaxRect(Mathf.Max(b.xMin, c.xMin),
+                    c.yMax - 4 * unit, Mathf.Min(b.xMax, c.xMax), b.yMin + 4 * unit).Contains(point)) return true;
+            }
+            return false;
+        }
+        private static Camera CameraFor(RectTransform rect)
+        {
+            var canvas = rect.GetComponentInParent<Canvas>();
+            return canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay ? canvas.worldCamera : null;
+        }
+        private static UnityEngine.Rect ScreenRect(RectTransform rect)
+        {
+            var corners = new Vector3[4]; rect.GetWorldCorners(corners);
+            var a = RectTransformUtility.WorldToScreenPoint(CameraFor(rect), corners[0]);
+            var b = RectTransformUtility.WorldToScreenPoint(CameraFor(rect), corners[2]);
+            return UnityEngine.Rect.MinMaxRect(a.x, a.y, b.x, b.y);
         }
         private static bool Contains(RectTransform rect, Vector2 point)
         {
@@ -210,12 +312,14 @@ namespace KillingMahjong.UI
 
         private void Select(int index)
         {
+            selectedCandidate = index;
             var w = waits[index];
             info.transform.Find("InfoLabel").GetComponent<TMP_Text>().text = "待ち牌 " + waits.Length + "種類";
             info.transform.Find("Han").GetComponent<TMP_Text>().text = w.han + "翻";
             info.transform.Find("Rank").GetComponent<TMP_Text>().text = Rank(w) + (w.multiplier > 0 ? " ×" + w.multiplier.ToString("0.#", CultureInfo.InvariantCulture) : "");
             info.transform.Find("Yaku").GetComponent<TMP_Text>().text = w.yaku == null ? "" : string.Join("\n", w.yaku);
             roleConditions.SetRoles(w.yaku, info.GetComponent<Image>().color);
+            RebindRoleSupport();
             for (int i = 0; i < marks.Count; i++)
             {
                 var mark = marks[i]; mark.Begin();
@@ -327,6 +431,8 @@ namespace KillingMahjong.UI
         public void Hide()
         {
             hasPresentation = false; forceVisible = false;
+            roleSupport.Clear(); selectedCandidate = -1;
+            if (hoveredRow != null) { hoveredRow.Begin(); hoveredRow.End(); }
             roleConditions?.Clear();
             if (noWaitBox != null) noWaitBox.gameObject.SetActive(false);
             version++; StopAllCoroutines(); ClearFlight();
@@ -335,7 +441,8 @@ namespace KillingMahjong.UI
             gameObject.SetActive(false);
         }
         private void ClearFlight() { if (pixels != null) { pixels.gameObject.SetActive(false); Destroy(pixels.gameObject); pixels = null; } }
-        private void OnDisable() { version++; ClearFlight(); roleConditions?.HideImmediate(); }
+        private void OnDisable() { version++; ClearFlight(); roleSupport.Clear(); roleConditions?.HideImmediate(); }
+        private void OnDestroy() { roleSupport.Clear(); }
 
         private static RectTransform Rect(Transform parent, string name, float x, float y, float w, float h, out bool made)
         {

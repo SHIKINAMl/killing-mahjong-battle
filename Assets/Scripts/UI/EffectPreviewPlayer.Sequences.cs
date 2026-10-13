@@ -90,6 +90,8 @@ namespace KillingMahjong.UI
                     yield return PreviewHandConfirmation(); break;
                 case HandRoleConditionsUI.EffectId: case UIFrameCatalog.RoleConditionsId:
                     yield return PreviewRoleConditions(); break;
+                case HandRoleTileSupport.EffectId:
+                    yield return PreviewRoleTileSupport(); break;
                 case "phase.draw":
                     bool drawn = false; rig.phase.PlayDrawTransition(() => { }, () => drawn = true);
                     yield return Until(() => drawn); break;
