@@ -95,6 +95,11 @@ namespace KillingMahjong.UI
                 case "phase.draw":
                     bool drawn = false; rig.phase.PlayDrawTransition(() => { }, () => drawn = true);
                     yield return Until(() => drawn); break;
+                case TutorialDrawReplayUI.EffectId:
+                    var replay = TutorialDrawReplayUI.Create(transform);
+                    try { yield return replay.Play(true); }
+                    finally { if (replay != null) replay.Close(); }
+                    break;
                 case "ron.chance":
                     RonChanceEffect.Show(rig.handTiles[6]); yield return new WaitForSeconds(3f); break;
                 case "ron.impact":

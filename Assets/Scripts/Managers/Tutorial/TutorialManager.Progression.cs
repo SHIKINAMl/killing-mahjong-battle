@@ -528,7 +528,7 @@ namespace KillingMahjong.Managers
             yield return betting.WaitForSlideAnimation();
 
             // 増やし方を指してから、決め方を言う
-            GuideTo(betting.IncreaseButtonRect);
+            GuideTo(betting.IncreaseButtonRect, useMask: false);
             yield return StartCoroutine(PlayLines(new List<TutorialLine>
             {
                 new TutorialLine("賭け金が決まったら決定ボタンを押してね"),

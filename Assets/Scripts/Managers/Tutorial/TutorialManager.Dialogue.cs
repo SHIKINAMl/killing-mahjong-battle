@@ -38,6 +38,18 @@ namespace KillingMahjong.Managers
                     dialogueUI.ShowText(Decorate(line));
                     // 画面のどこをクリックしても進む（要望15）。小さなOKボタンは出さない
                     dialogueUI.ShowAdvanceOnAnyClick(() => clicked = true);
+                    // 説明待ちは誘導マスクやスマホより前で受ける。通常対局の層には触れない。
+                    var parentCanvas = dialogueUI.GetComponentInParent<Canvas>();
+                    var catcher = parentCanvas != null ? parentCanvas.transform.Find("DialogueAdvanceCatcher") : null;
+                    if (catcher != null)
+                    {
+                        var canvas = catcher.GetComponent<Canvas>();
+                        if (canvas == null) canvas = catcher.gameObject.AddComponent<Canvas>();
+                        canvas.overrideSorting = true;
+                        canvas.sortingOrder = Common.UISortingOrders.TutorialMask + 1;
+                        if (catcher.GetComponent<UnityEngine.UI.GraphicRaycaster>() == null)
+                            catcher.gameObject.AddComponent<UnityEngine.UI.GraphicRaycaster>();
+                    }
                 }
                 else
                 {

@@ -376,6 +376,9 @@ namespace KillingMahjong.Common
         /// </summary>
         public const int MouseCursor = 30100;
 
+        /// <summary>チュートリアル動画の字幕。通常セリフと画面効果より手前。</summary>
+        public const int TutorialSubtitle = 92;
+
         /// <summary>
         /// コレクションの演出の試写の操作欄（上の題名、下の「もう一度」「繰り返し」「一覧へ戻る」）。
         ///

@@ -29,10 +29,9 @@ namespace KillingMahjong.Managers
         //     → if 敵10打目 → フラッシュ → 制限時間の話（RunTimeLimitTalk）
         //     → 打牌数UI表示＆ハイライト
         //
-        // **フロー図はここで途切れている。** 「流出説明」の枠は本線から外して脇に置かれたまま。
-        // なので打牌数UIのハイライトより先は **これまでの第2局のまま**
-        // （自動で流す → 残り2手を打たせる → 流局）にしてある。
-        // 描き足されたら、<see cref="SecondBattleResumeLines"/> から先を差し替えること。
+        // 2026-10-14 の図で、打牌数の説明→動画空間で流局・手牌の組み直し→再生停止が追加された。
+        // RunDrawVideoExplanation がその部分を担当する。
+        // 以後はコメントだけで未指定なので、従来の第2局へ戻る。
         //
         // 「敵10打目まで汎用対局会話」の枠には、プレイヤーがアワセをした／ボルテージの段階を
         // 初めて上げたときの特殊セリフを流す、という条件だけが描いてある。
@@ -235,6 +234,9 @@ namespace KillingMahjong.Managers
                 {
                     // --- 制限時間の話（敵の10打目の手前） ---
                     yield return StartCoroutine(RunTimeLimitTalk());
+                    if (_aborted) yield break;
+
+                    yield return StartCoroutine(RunDrawVideoExplanation());
                     if (_aborted) yield break;
 
                     // ここから先はフロー図に無いので、これまでの第2局のまま流す
