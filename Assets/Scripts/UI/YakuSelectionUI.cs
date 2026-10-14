@@ -72,29 +72,33 @@ namespace KillingMahjong.UI
         private const float TileHeight = 37f;
 
         /// <summary>
-        /// 役一覧（閲覧）のときの並び。**型ごと**（2026-10-15、<see cref="HandArchetype"/>）。
-        /// 役強化で選ぶときは今までどおり翻数ごと（<see cref="Yakus"/>）。
-        /// どの型にも入らない役は最後の「その他」へ。
+        /// 役一覧（閲覧）で出す役。強化できる役（<see cref="Yakus"/>）に、強化できないが型に入る役
+        /// （一気通貫・ドラなど）を足し、翻数の順に並べる（<see cref="AllYakus"/>）。
+        /// 2026-10-15 にいったん型ごとに並べたが、ユーザーの指示で翻数ごとに戻し、
+        /// 型は役名の横の札で出すことにした。
         /// </summary>
-        private static readonly string OtherSection = "その他";
-        private static readonly string[] OtherYakus = { "東", "西", "一発", "河底撈魚" };
-        private static readonly HandArchetype.Info[] TypeOrder =
+        private static string[] AllYakus()
         {
-            HandArchetype.Some, HandArchetype.Chiitoi, HandArchetype.Koutsu, HandArchetype.Hashi,
-            HandArchetype.Narabi, HandArchetype.Dora, HandArchetype.Yakuman,
-        };
+            var list = new List<string>(Yakus);
+            foreach (var info in HandArchetype.All)
+                foreach (var yaku in info.Yaku)
+                    if (!list.Contains(yaku)) list.Add(yaku);
+            // 翻数の順。同じ翻数の中では先に入れた順（OrderBy は並びを崩さない）
+            return System.Linq.Enumerable.ToArray(
+                System.Linq.Enumerable.OrderBy(list, y => GameRules.GetBaseHan(y)));
+        }
 
         private GameObject _body;
         private readonly List<Image> _rowBgs = new List<Image>();
         private readonly List<TextMeshProUGUI> _rowBadges = new List<TextMeshProUGUI>();
         private RectTransform _hanContent;
-        private RectTransform _typeContent;
-        private readonly List<Image> _typeRowBgs = new List<Image>();
-        private readonly List<TextMeshProUGUI> _typeRowBadges = new List<TextMeshProUGUI>();
-        private readonly List<string> _typeRowYaku = new List<string>();
+        private RectTransform _allContent;
+        private readonly List<Image> _allRowBgs = new List<Image>();
+        private readonly List<TextMeshProUGUI> _allRowBadges = new List<TextMeshProUGUI>();
+        private readonly List<string> _allRowYaku = new List<string>();
         private TextMeshProUGUI _typeText;
         private HandTypeBadge _typeBadge;
-        private int _selectedType;
+        private int _selectedAll;
         private TextMeshProUGUI _nameText;
         private TextMeshProUGUI _hanText;
         private TextMeshProUGUI _descText;
@@ -145,7 +149,7 @@ namespace KillingMahjong.UI
             _boosts = boosts;
 
             _body.SetActive(true);
-            UseTypeList(false);
+            UseAllList(false);
 
             for (int i = 0; i < _rowBadges.Count; i++)
             {
@@ -175,46 +179,40 @@ namespace KillingMahjong.UI
             IDictionary<string, int> localBoosts, IDictionary<string, int> enemyBoosts)
         {
             bool wasOpen = IsOpen;
-            int selected = _selectedType;
+            int selected = _selectedAll;
             float scroll = _scroll != null ? _scroll.verticalNormalizedPosition : 1;
             _enemyBoosts = enemyBoosts;
             Show(null, onClose, tiles, localBoosts);
             _body.transform.Find("Panel/Title").GetComponent<TMP_Text>().text = "役一覧";
             _confirm.gameObject.SetActive(false);
             _cancel.GetComponentInChildren<TMP_Text>().text = "閉じる";
-            // 一覧として見るときは型ごとに並べる。どの型にどの役が入るかを覚えてもらうため
-            UseTypeList(_typeContent != null);
-            if (_typeContent == null)
+            // 一覧として見るときは、強化できない役も入れた並び（翻数ごと、役名の横に型の札）
+            UseAllList(_allContent != null);
+            if (_allContent == null)
             {
                 Select(wasOpen ? _selected : 0);
                 return;
             }
-            for (int i = 0; i < _typeRowBadges.Count; i++)
+            for (int i = 0; i < _allRowBadges.Count; i++)
             {
-                int local = BonusOf(_typeRowYaku[i]);
-                int enemy = EnemyBonusOf(_typeRowYaku[i]);
-                var badge = _typeRowBadges[i];
-                badge.text = (local > 0 ? "<color=#33CCFF>+" + local + "</color> " : "")
+                int local = BonusOf(_allRowYaku[i]);
+                int enemy = EnemyBonusOf(_allRowYaku[i]);
+                _allRowBadges[i].text = (local > 0 ? "<color=#33CCFF>+" + local + "</color> " : "")
                     + (enemy > 0 ? "<color=#FF4858>+" + enemy + "</color>" : "");
-                badge.rectTransform.sizeDelta = new Vector2(62, 18);
-                badge.rectTransform.anchoredPosition = new Vector2(ListWidth * .5f - 34, 0);
-                var name = badge.transform.parent.Find("Name").GetComponent<TMP_Text>();
-                name.rectTransform.sizeDelta = new Vector2(ListWidth - 76, 18);
-                name.rectTransform.anchoredPosition = new Vector2(-30, 0);
             }
-            SelectTypeRow(wasOpen ? selected : 0);
+            SelectAllRow(wasOpen ? selected : 0);
             if (_scroll != null) _scroll.verticalNormalizedPosition = wasOpen ? scroll : 1f;
         }
 
-        /// <summary>左の一覧を、型ごとの並びと翻数ごとの並びで切り替える。</summary>
-        private void UseTypeList(bool byType)
+        /// <summary>左の一覧を、役一覧用の並び（全部の役）と役強化用の並び（強化できる役）で切り替える。</summary>
+        private void UseAllList(bool all)
         {
-            if (_typeContent == null) byType = false;
-            if (_hanContent != null) _hanContent.gameObject.SetActive(!byType);
-            if (_typeContent != null) _typeContent.gameObject.SetActive(byType);
+            if (_allContent == null) all = false;
+            if (_hanContent != null) _hanContent.gameObject.SetActive(!all);
+            if (_allContent != null) _allContent.gameObject.SetActive(all);
             if (_scroll != null)
             {
-                var content = byType ? _typeContent : _hanContent;
+                var content = all ? _allContent : _hanContent;
                 if (content != null) _scroll.content = content;
             }
         }
@@ -262,9 +260,9 @@ namespace KillingMahjong.UI
 
             _rowBgs.Clear();
             _rowBadges.Clear();
-            _typeRowBgs.Clear();
-            _typeRowBadges.Clear();
-            _typeRowYaku.Clear();
+            _allRowBgs.Clear();
+            _allRowBadges.Clear();
+            _allRowYaku.Clear();
             _font = BorrowJapaneseFont();
 
             // 自前の Canvas。対局の Canvas は種類がまちまち（カメラに貼った物もある）なので、借りない
@@ -393,7 +391,7 @@ namespace KillingMahjong.UI
             }
             _hanContent = content;
 
-            BuildTypeList(viewport);
+            BuildAllList(viewport);
 
             _scroll = viewportGo.GetComponent<ScrollRect>();
             if (madeViewport)
@@ -444,12 +442,12 @@ namespace KillingMahjong.UI
         }
 
         /// <summary>
-        /// 役一覧で使う、型ごとの並び（2026-10-15）。翻数ごとの並びと同じ枠に重ねて置き、
-        /// 開き方で片方だけ出す（<see cref="UseTypeList"/>）。
+        /// 役一覧で使う並び（2026-10-15）。全部の役を翻数ごとに並べ、役名の横に型の札（角丸の文字の札）を置く。
+        /// 役強化の並びと同じ枠に重ねて置き、開き方で片方だけ出す（<see cref="UseAllList"/>）。
         /// </summary>
-        private void BuildTypeList(RectTransform viewport)
+        private void BuildAllList(RectTransform viewport)
         {
-            GameObject contentGo = SceneFirst.Child(viewport, "ContentByType", out bool madeContent, typeof(RectTransform));
+            GameObject contentGo = SceneFirst.Child(viewport, "ContentAll", out bool madeContent, typeof(RectTransform));
             var content = (RectTransform)contentGo.transform;
             if (madeContent)
             {
@@ -458,82 +456,84 @@ namespace KillingMahjong.UI
                 content.pivot = new Vector2(0.5f, 1f);
             }
 
+            string[] yakus = AllYakus();
             float y = -4f;
-            int row = 0;
-            for (int s = 0; s <= TypeOrder.Length; s++)
+            int lastHan = int.MinValue;
+            for (int i = 0; i < yakus.Length; i++)
             {
-                HandArchetype.Info info = s < TypeOrder.Length ? TypeOrder[s] : null;
-                string[] yakus = info != null ? info.Yaku : OtherYakus;
-
-                if (s > 0) y -= 6f;
-                BuildTypeHead(content, s, info, y);
-                y -= TypeHeadPitch;
-
-                foreach (var yaku in yakus)
+                string yaku = yakus[i];
+                int han = GameRules.GetBaseHan(yaku);
+                if (han != lastHan)
                 {
-                    GameObject rowGo = SceneFirst.Child(content, "TypeYaku_" + row, out bool madeRow,
-                        typeof(RectTransform), typeof(Image), typeof(Button));
-                    var rowImage = rowGo.GetComponent<Image>();
-                    var button = rowGo.GetComponent<Button>();
-                    if (madeRow)
-                    {
-                        var rt = (RectTransform)rowGo.transform;
-                        rt.sizeDelta = new Vector2(ListWidth, 20f);
-                        PlaceRow(rt, y);
-                        rowImage.color = Clear;
-                        rowImage.raycastTarget = true;
-                        button.targetGraphic = rowImage;
-                    }
-
-                    Txt(rowGo.transform, "Name", YakuExamples.DisplayName(yaku), new Vector2(-14f, 0f),
-                        new Vector2(ListWidth - 44f, 18f), 14f, TextAlignmentOptions.Left, TextMain);
-                    TextMeshProUGUI badge = Txt(rowGo.transform, "Boost", "", new Vector2(ListWidth * 0.5f - 22f, 0f),
-                        new Vector2(36f, 18f), 13f, TextAlignmentOptions.Right, BoostColor);
-
-                    int index = row;
-                    button.onClick.RemoveAllListeners();
-                    button.onClick.AddListener(() => SelectTypeRow(index));
-
-                    _typeRowBgs.Add(rowImage);
-                    _typeRowBadges.Add(badge);
-                    _typeRowYaku.Add(yaku);
+                    lastHan = han;
+                    if (i > 0) y -= 6f;
+                    TextMeshProUGUI head = Txt(content, "AllSection_" + han, YakuExamples.SectionName(han), Vector2.zero,
+                        new Vector2(ListWidth - 8f, 20f), 13f, TextAlignmentOptions.Left, Marker, out bool madeHead);
+                    if (madeHead) PlaceRow(head.rectTransform, y);
                     y -= RowPitch;
-                    row++;
                 }
+
+                GameObject rowGo = SceneFirst.Child(content, "AllYaku_" + i, out bool madeRow,
+                    typeof(RectTransform), typeof(Image), typeof(Button));
+                var rowImage = rowGo.GetComponent<Image>();
+                var button = rowGo.GetComponent<Button>();
+                if (madeRow)
+                {
+                    var rt = (RectTransform)rowGo.transform;
+                    rt.sizeDelta = new Vector2(ListWidth, 20f);
+                    PlaceRow(rt, y);
+                    rowImage.color = Clear;
+                    rowImage.raycastTarget = true;
+                    button.targetGraphic = rowImage;
+                }
+
+                // 名前は左寄せ。右端の「+1 +1」（自分・敵の強化）のぶん幅を空ける
+                TextMeshProUGUI name = Txt(rowGo.transform, "Name", YakuExamples.DisplayName(yaku), new Vector2(-30f, 0f),
+                    new Vector2(ListWidth - 76f, 18f), 14f, TextAlignmentOptions.Left, TextMain);
+                TextMeshProUGUI badge = Txt(rowGo.transform, "Boost", "", new Vector2(ListWidth * 0.5f - 34f, 0f),
+                    new Vector2(62f, 18f), 13f, TextAlignmentOptions.Right, BoostColor);
+                BuildRowType(rowGo.transform, name, HandArchetype.Of(yaku));
+
+                int index = i;
+                button.onClick.RemoveAllListeners();
+                button.onClick.AddListener(() => SelectAllRow(index));
+
+                _allRowBgs.Add(rowImage);
+                _allRowBadges.Add(badge);
+                _allRowYaku.Add(yaku);
+                y -= RowPitch;
             }
 
             if (madeContent)
             {
                 content.sizeDelta = new Vector2(ListWidth, -y + 6f);
                 content.anchoredPosition = Vector2.zero;
-                // 置いた時点では翻数の並びを出しておく（役強化で開くのはこちら）
+                // 置いた時点では役強化の並びを出しておく（役強化で開くのはこちら）
                 contentGo.SetActive(false);
             }
-            _typeContent = content;
+            _allContent = content;
         }
 
-        // ---- 型の見出し：角丸の文字の札（2026-10-15） ----
-        //
-        // Gemini のアイコンと見比べて、ユーザーが「角丸の文字の札で」と決めた。
+        // ---- 役名の横の型の札（2026-10-15、ユーザーの指示「型はその役名の横に文字のアイコンを」） ----
 
-        /// <summary>見出しの行の高さ。札（文字18＋上下の余白）が入る高さ。</summary>
-        private const float TypeHeadPitch = 30f;
-        private const float TypeHeadFontSize = 18f;
+        private const float RowTypeFontSize = 12f;
 
-        private static readonly Color OtherPlate = new Color32(0x84, 0x7E, 0x87, 0xFF);
-
-        private void BuildTypeHead(RectTransform content, int index, HandArchetype.Info info, float y)
+        private void BuildRowType(Transform row, TextMeshProUGUI name, HandArchetype.Info info)
         {
-            HandTypeBadge badge = HandTypeBadge.Ensure(content, "TypeHead_" + index, TypeHeadFontSize, _font,
-                true, out bool made);
+            HandTypeBadge badge = HandTypeBadge.Ensure(row, "TypeBadge", RowTypeFontSize, _font, true, out bool made);
             if (!made) return;
 
+            // 役名の文字の幅のすぐ右。役名は置いたあと変わらないので、置くときに一度だけ測る
+            float width = name.GetPreferredValues(name.text).x;
+            if (width <= 0f) width = name.fontSize * name.text.Length;
+            var nameRt = name.rectTransform;
+            float nameLeft = nameRt.anchoredPosition.x - nameRt.sizeDelta.x * 0.5f;
+
             var rt = (RectTransform)badge.transform;
-            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 1f);
-            rt.pivot = new Vector2(0f, 1f);
-            rt.anchoredPosition = new Vector2(-ListWidth * 0.5f + 4f, y);
-            if (info != null) badge.Show(info);
-            else badge.ShowPlain(OtherSection, OtherPlate, Color.black);
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot = new Vector2(0f, 0.5f);
+            rt.anchoredPosition = new Vector2(Mathf.Round(nameLeft + width + 4f), 0f);
+            badge.Show(info);
         }
 
         // ---- 右: 選んだ役の説明と例 ----
@@ -642,14 +642,14 @@ namespace KillingMahjong.UI
             ShowDetail(Yakus[index]);
         }
 
-        /// <summary>型ごとの並びで行を選ぶ（役一覧のとき）。</summary>
-        private void SelectTypeRow(int index)
+        /// <summary>役一覧の並びで行を選ぶ。</summary>
+        private void SelectAllRow(int index)
         {
-            if (index < 0 || index >= _typeRowYaku.Count) index = 0;
-            if (_typeRowYaku.Count == 0) return;
-            _selectedType = index;
-            HighlightRows(_typeRowBgs, index);
-            ShowDetail(_typeRowYaku[index]);
+            if (index < 0 || index >= _allRowYaku.Count) index = 0;
+            if (_allRowYaku.Count == 0) return;
+            _selectedAll = index;
+            HighlightRows(_allRowBgs, index);
+            ShowDetail(_allRowYaku[index]);
         }
 
         private static void HighlightRows(List<Image> rows, int index)

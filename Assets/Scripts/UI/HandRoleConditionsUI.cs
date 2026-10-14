@@ -63,27 +63,25 @@ namespace KillingMahjong.UI
             template.GetComponent<PixelShapeGraphic>().raycastTarget = false;
             Label(template, "RoleName", 26, 88, 18, 12);
             Label(template, "Condition", 120, ConditionWidth, 14, 12);
-            TypeIcon(template);
+            TypeBadge(template);
             go.SetActive(false); prepared = true;
         }
-        // 右端に型のアイコンを置くぶん、説明の幅を詰めた（306 → 286）。
-        private const float ConditionWidth = 286;
+        // 右端に型の札を置くぶん、説明の幅を詰めた（306 → 250。いちばん広い札「ドラ頼み」が入る幅）。
+        private const float ConditionWidth = 250;
         /// <summary>
-        /// 役の型のアイコン（2026-10-15、ユーザーの指示「それぞれの役にそのアイコンを枠の中の右側に」）。
-        /// 絵は <see cref="HandArchetype.Info.Icon"/>（Gemini が描いたもの）。型に入らない役では隠す。
-        /// 枠の右の辺は斜めなので、上の端でも辺に掛からない位置に置く。
+        /// 役の型の札（2026-10-15、ユーザーの指示「それぞれの役に…枠の中の右側に」「文字のアイコンです」）。
+        /// 角丸の文字の札（<see cref="HandTypeBadge"/>）。型に入らない役では隠す。
+        /// 札の幅は型で変わるので右端を揃える。枠の右の辺は斜めなので、上の端でも辺に掛からない位置に置く。
         /// </summary>
-        private static void TypeIcon(Transform parent)
+        private static void TypeBadge(Transform parent)
         {
-            var go = SceneFirst.Child(parent, "TypeIcon", out bool made, typeof(RectTransform), typeof(Image));
-            var image = go.GetComponent<Image>();
-            if (made)
-            {
-                Place((RectTransform)go.transform, 410, 3, 28, 28);
-                image.preserveAspect = true;
-                image.enabled = false;
-            }
-            image.raycastTarget = false;
+            var badge = HandTypeBadge.Ensure(parent, "TypeBadge", 12, Resources.Load<TMP_FontAsset>("PixelMplus10_DynamicFixed"),
+                true, out bool made);
+            if (!made) return;
+            var rt = (RectTransform)badge.transform;
+            rt.anchorMin = rt.anchorMax = new Vector2(0, 1); rt.pivot = new Vector2(1, .5f);
+            rt.anchoredPosition = new Vector2(438, -17);
+            badge.Show(null);
         }
         private static void Place(RectTransform rt, float x, float y, float w, float h)
         { rt.anchorMin = rt.anchorMax = new Vector2(0, 1); rt.pivot = new Vector2(0, 1); rt.anchoredPosition = new Vector2(x, -y); rt.sizeDelta = new Vector2(w, h); }
@@ -131,12 +129,8 @@ namespace KillingMahjong.UI
                 r.Find("RoleName").GetComponent<TMP_Text>().text = name;
                 string description = YakuInfo.GetDescription(entries[i].BaseName);
                 r.Find("Condition").GetComponent<TMP_Text>().text = string.IsNullOrEmpty(description) ? "説明未登録" : description;
-                var icon = r.Find("TypeIcon")?.GetComponent<Image>();
-                if (icon != null)
-                {
-                    var sprite = HandArchetype.Of(entries[i].BaseName)?.Icon;
-                    icon.sprite = sprite; icon.enabled = sprite != null;
-                }
+                var typeBadge = r.Find("TypeBadge")?.GetComponent<HandTypeBadge>();
+                if (typeBadge != null) typeBadge.Show(HandArchetype.Of(entries[i].BaseName));
                 groups[i].alpha = 0; groups[i].blocksRaycasts = groups[i].interactable = false;
             }
             for (int i = entries.Count; i < cards.Count; i++) cards[i].gameObject.SetActive(false);
