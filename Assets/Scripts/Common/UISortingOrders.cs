@@ -161,6 +161,9 @@ namespace KillingMahjong.Common
         /// コードからは設定しないが、他の値との関係を把握するためここに記録する</summary>
         public const int ResultPanel = 55;
 
+        /// <summary>役一覧の閲覧画面。チュートリアルの会話・送り受付より奥。</summary>
+        public const int YakuOverview = 55;
+
         /// <summary>MulliganSwapAnimator: マリガン牌交換アニメーションのコンテナ</summary>
         public const int MulliganSwapAnimation = 55;
 

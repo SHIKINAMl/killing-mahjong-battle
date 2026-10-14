@@ -92,6 +92,8 @@ namespace KillingMahjong.UI
         private IDictionary<string, int> _boosts;
         private Action<string> _onSelected;
         private Action _onCanceled;
+        private bool _browseOnly;
+        private IDictionary<string, int> _enemyBoosts;
 
         /// <summary>いま開いているか。</summary>
         public bool IsOpen { get { return _body != null && _body.activeSelf; } }
@@ -99,8 +101,8 @@ namespace KillingMahjong.UI
         /// <summary>シーンに置いてある画面を探す。無ければ作る（そのときは再生時に警告が出る）。</summary>
         public static YakuSelectionUI FindOrCreate()
         {
-            var found = FindFirstObjectByType<YakuSelectionUI>(FindObjectsInactive.Include);
-            if (found != null) return found;
+            foreach (var found in FindObjectsByType<YakuSelectionUI>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                if (!found._browseOnly) return found;
 
             GameObject go = SceneFirst.Root(RootName, out bool _, typeof(RectTransform));
             var ui = go.GetComponent<YakuSelectionUI>();
@@ -132,6 +134,53 @@ namespace KillingMahjong.UI
             // 開くたびに、いちばん上の役から。前に選んだ役を残すと、一覧の見えていない所が選ばれたままになる
             if (_scroll != null) _scroll.verticalNormalizedPosition = 1f;
             Select(0);
+        }
+
+        /// <summary>同じ部品を使った独立した閲覧画面。スキル選択画面と状態を共有しない。</summary>
+        public static YakuSelectionUI CreateBrowser()
+        {
+            var copy = Instantiate(FindOrCreate().gameObject);
+            copy.name = "AllYakuBrowser";
+            var ui = copy.GetComponent<YakuSelectionUI>();
+            ui._browseOnly = true;
+            // 一覧は従来と同じ重なり順。チュートリアルの会話・クリック受付を覆わない。
+            copy.GetComponent<Canvas>().sortingOrder = UISortingOrders.YakuOverview;
+            ui.Hide();
+            return ui;
+        }
+
+        public void ShowBrowser(Action onClose, TileResourceManager tiles,
+            IDictionary<string, int> localBoosts, IDictionary<string, int> enemyBoosts)
+        {
+            bool wasOpen = IsOpen;
+            int selected = _selected;
+            float scroll = _scroll != null ? _scroll.verticalNormalizedPosition : 1;
+            _enemyBoosts = enemyBoosts;
+            Show(null, onClose, tiles, localBoosts);
+            _body.transform.Find("Panel/Title").GetComponent<TMP_Text>().text = "役一覧";
+            _confirm.gameObject.SetActive(false);
+            _cancel.GetComponentInChildren<TMP_Text>().text = "閉じる";
+            for (int i = 0; i < _rowBadges.Count; i++)
+            {
+                int local = BonusOf(Yakus[i]);
+                int enemy = EnemyBonusOf(Yakus[i]);
+                var badge = _rowBadges[i];
+                badge.text = (local > 0 ? "<color=#33CCFF>+" + local + "</color> " : "")
+                    + (enemy > 0 ? "<color=#FF4858>+" + enemy + "</color>" : "");
+                badge.rectTransform.sizeDelta = new Vector2(62, 18);
+                badge.rectTransform.anchoredPosition = new Vector2(ListWidth * .5f - 34, 0);
+                var name = badge.transform.parent.Find("Name").GetComponent<TMP_Text>();
+                name.rectTransform.sizeDelta = new Vector2(ListWidth - 76, 18);
+                name.rectTransform.anchoredPosition = new Vector2(-30, 0);
+            }
+            Select(wasOpen ? selected : 0);
+            if (wasOpen && _scroll != null) _scroll.verticalNormalizedPosition = scroll;
+        }
+
+        private int EnemyBonusOf(string yaku)
+        {
+            int value;
+            return _enemyBoosts != null && _enemyBoosts.TryGetValue(yaku, out value) ? value : 0;
         }
 
         /// <summary>閉じる。どちらの合図も出さない。</summary>
@@ -452,12 +501,16 @@ namespace KillingMahjong.UI
             if (_hanText != null)
             {
                 string cap = "<color=" + BoostHex + ">倍率 1段昇格（" + GameRules.GetBoostTierCapLabel(yaku) + "まで）</color>";
-                _hanText.text = baseHan > 0 ? baseHan + "翻  " + cap : cap;
+                _hanText.text = _browseOnly ? (baseHan > 0 ? baseHan + "翻" : "役満")
+                    : baseHan > 0 ? baseHan + "翻  " + cap : cap;
             }
             if (_descText != null) _descText.text = YakuInfo.GetDescription(yaku);
             if (_boostText != null)
             {
-                _boostText.text = bonus > 0 ? "強化済み。1つの役は1回だけ強化できる" : "";
+                _boostText.text = _browseOnly
+                    ? "<color=#33CCFF>自分：" + (bonus > 0 ? "強化済み +" + bonus : "強化なし")
+                        + "</color>　<color=#FF4858>敵：" + (EnemyBonusOf(yaku) > 0 ? "強化済み +" + EnemyBonusOf(yaku) : "強化なし") + "</color>"
+                    : bonus > 0 ? "強化済み。1つの役は1回だけ強化できる" : "";
             }
             // 強化済みの役は選べない（送るとサーバーがエラーを返す）
             if (_confirm != null) _confirm.interactable = bonus <= 0;

@@ -176,6 +176,7 @@ namespace KillingMahjong.UI
 
         public void StartBoostHandSelection()
         {
+            uiManager.YakuListUI?.CloseYakuList();
             // 画面はシーンに置いてある（YakuSelection）。前はここで部品として付け、中身も再生時に組んでいた。
             // yakuSelectionFont は前の画面（旧 Text）用で、いまは使っていない（シーンの参照を壊さないよう残してある）
             if (yakuSelectionUI == null) yakuSelectionUI = YakuSelectionUI.FindOrCreate();

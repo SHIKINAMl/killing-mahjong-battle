@@ -17,6 +17,7 @@ namespace KillingMahjong.UI
         [SerializeField] private YakuItemUI itemPrefab;
         [SerializeField] private Transform contentContainer;
         private List<YakuItemUI> spawnedItems = new List<YakuItemUI>();
+        private YakuSelectionUI browser;
 
         [Header("Active Boosts (Always Visible)")]
         [SerializeField] private TextMeshProUGUI[] localActiveBoostTexts = new TextMeshProUGUI[3];
@@ -59,7 +60,7 @@ namespace KillingMahjong.UI
         }
 
         /// <summary>役一覧が開いているか。チュートリアルの誘導待ちに使う。</summary>
-        public bool IsOpen => yakuListPanel != null && yakuListPanel.activeSelf;
+        public bool IsOpen => browser != null && browser.IsOpen;
 
         /// <summary>役一覧を開くボタン。</summary>
         public RectTransform ToggleButtonRect =>
@@ -84,21 +85,24 @@ namespace KillingMahjong.UI
 
         public void OpenYakuList()
         {
-            if (yakuListPanel != null)
-            {
-                yakuListPanel.SetActive(true);
-            }
-
-            CenterYakuGrid();
+            if (yakuListPanel != null) yakuListPanel.SetActive(false);
+            if (browser == null) browser = YakuSelectionUI.CreateBrowser();
+            var owner = FindFirstObjectByType<GameUIManager>();
+            browser.ShowBrowser(CloseYakuList, owner != null ? owner.TileResourceManager : null,
+                _lastLocalBoost, _lastEnemyBoost);
         }
 
         public void CloseYakuList()
         {
+            browser?.Hide();
             if (yakuListPanel != null)
             {
                 yakuListPanel.SetActive(false);
             }
         }
+
+        private void OnDisable() { CloseYakuList(); }
+        private void OnDestroy() { if (browser != null) Destroy(browser.gameObject); }
 
         /// <summary>全役一覧の最初と最後の行を、表示領域の縁から離す余白。2ドット。</summary>
         private const int GridPaddingVertical = 4;
@@ -194,6 +198,8 @@ namespace KillingMahjong.UI
             if (enemyBoost == null) enemyBoost = new Dictionary<string, int>();
             _lastLocalBoost = localBoost;
             _lastEnemyBoost = enemyBoost;
+            if (browser != null && browser.IsOpen)
+                browser.ShowBrowser(CloseYakuList, FindFirstObjectByType<GameUIManager>()?.TileResourceManager, localBoost, enemyBoost);
 
             for (int i = 0; i < allYakus.Length; i++)
             {
