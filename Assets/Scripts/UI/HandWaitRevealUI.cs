@@ -31,6 +31,7 @@ namespace KillingMahjong.UI
         private RoleTileTarget[] explicitRoleTargets;
         private readonly List<RoleTileTarget> roleTargets = new List<RoleTileTarget>(13);
         private TMP_Text yakuText;
+        private HandTypeBadge typeBadge;
         private PixelShapeGraphic hoveredRow;
         private int selectedCandidate = -1;
         private GameUIManager owner;
@@ -86,6 +87,17 @@ namespace KillingMahjong.UI
             Label(panel, "Rank", 12, 39, 196, 34, 26);
             Label(panel, "Yaku", 12, 80, 196, 88, 18, TextAlignmentOptions.TopLeft);
             yakuText = panel.Find("Yaku").GetComponent<TMP_Text>();
+            // 選んだ待ちで和了ったときの型（2026-10-15）。パネルの中は役と倍率で埋まっているので、
+            // 上の辺の外側にタブのように付ける
+            typeBadge = HandTypeBadge.Ensure(panel, "HandTypeBadge", 16f,
+                Resources.Load<TMP_FontAsset>("PixelMplus10_DynamicFixed"), true, out bool badgeMade);
+            if (badgeMade)
+            {
+                var rect = (RectTransform)typeBadge.transform;
+                rect.anchorMin = rect.anchorMax = new Vector2(0, 1); rect.pivot = new Vector2(0, 0);
+                rect.anchoredPosition = new Vector2(10, 2);
+                typeBadge.Show(null);
+            }
             var row = SceneFirst.Child(yakuText.transform, "RoleHoverRow", out bool rowMade,
                 typeof(RectTransform), typeof(CanvasRenderer), typeof(PixelShapeGraphic));
             if (rowMade)
@@ -262,6 +274,7 @@ namespace KillingMahjong.UI
                 info.transform.Find("Han").GetComponent<TMP_Text>().text = "";
                 info.transform.Find("Rank").GetComponent<TMP_Text>().text = "待ち牌なし";
                 info.transform.Find("Yaku").GetComponent<TMP_Text>().text = "";
+                if (typeBadge != null) typeBadge.Show(null);
             }
             float step = Mathf.Min(72f, 538f / Mathf.Max(1, waits.Length));
             for (int i = 0; i < waits.Length; i++)
@@ -319,6 +332,7 @@ namespace KillingMahjong.UI
             info.transform.Find("Han").GetComponent<TMP_Text>().text = w.han + "翻";
             info.transform.Find("Rank").GetComponent<TMP_Text>().text = Rank(w) + (w.multiplier > 0 ? " ×" + w.multiplier.ToString("0.#", CultureInfo.InvariantCulture) : "");
             info.transform.Find("Yaku").GetComponent<TMP_Text>().text = w.yaku == null ? "" : string.Join("\n", w.yaku);
+            if (typeBadge != null) typeBadge.Show(HandArchetype.Classify(w.yaku));
             roleConditions.SetRoles(w.yaku, info.GetComponent<Image>().color);
             RebindRoleSupport();
             for (int i = 0; i < marks.Count; i++)

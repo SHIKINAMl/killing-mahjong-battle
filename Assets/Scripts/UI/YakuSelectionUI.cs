@@ -93,6 +93,7 @@ namespace KillingMahjong.UI
         private readonly List<TextMeshProUGUI> _typeRowBadges = new List<TextMeshProUGUI>();
         private readonly List<string> _typeRowYaku = new List<string>();
         private TextMeshProUGUI _typeText;
+        private HandTypeBadge _typeBadge;
         private int _selectedType;
         private TextMeshProUGUI _nameText;
         private TextMeshProUGUI _hanText;
@@ -183,7 +184,6 @@ namespace KillingMahjong.UI
             _cancel.GetComponentInChildren<TMP_Text>().text = "閉じる";
             // 一覧として見るときは型ごとに並べる。どの型にどの役が入るかを覚えてもらうため
             UseTypeList(_typeContent != null);
-            ApplyTypeHeadStyle();
             if (_typeContent == null)
             {
                 Select(wasOpen ? _selected : 0);
@@ -460,7 +460,6 @@ namespace KillingMahjong.UI
 
             float y = -4f;
             int row = 0;
-            _typeHeads.Clear();
             for (int s = 0; s <= TypeOrder.Length; s++)
             {
                 HandArchetype.Info info = s < TypeOrder.Length ? TypeOrder[s] : null;
@@ -511,109 +510,30 @@ namespace KillingMahjong.UI
                 contentGo.SetActive(false);
             }
             _typeContent = content;
-            ApplyTypeHeadStyle();
         }
 
-        // ---- 型の見出し：アイコンか、文字の札か（2026-10-15、見比べるために両方置く） ----
+        // ---- 型の見出し：角丸の文字の札（2026-10-15） ----
+        //
+        // Gemini のアイコンと見比べて、ユーザーが「角丸の文字の札で」と決めた。
 
-        /// <summary>型の見出しの見せ方。</summary>
-        public enum TypeHeadStyle
-        {
-            /// <summary>型のアイコン（Gemini の絵）＋型の名前</summary>
-            Icon,
-            /// <summary>型の名前を一色の札で囲む</summary>
-            Badge,
-        }
+        /// <summary>見出しの行の高さ。札（文字18＋上下の余白）が入る高さ。</summary>
+        private const float TypeHeadPitch = 30f;
+        private const float TypeHeadFontSize = 18f;
 
-        /// <summary>
-        /// いまの見せ方。ユーザーが「アイコンでもいいが、文字を一色で囲んだものも試したい」と言ったので、
-        /// 両方をシーンに置いてここで切り替える。決まったら片方を消す。
-        /// </summary>
-        public static TypeHeadStyle HeadStyle = TypeHeadStyle.Icon;
-
-        /// <summary>見出しの行の高さ。アイコンが 32 なので、役の行（21）より高い。</summary>
-        private const float TypeHeadPitch = 36f;
-        private const float TypeIconSize = 32f;
-
-        private readonly List<GameObject[]> _typeHeads = new List<GameObject[]>();
+        private static readonly Color OtherPlate = new Color32(0x84, 0x7E, 0x87, 0xFF);
 
         private void BuildTypeHead(RectTransform content, int index, HandArchetype.Info info, float y)
         {
-            string label = info != null ? info.Name : OtherSection;
-            float left = -ListWidth * 0.5f + 4f;
+            HandTypeBadge badge = HandTypeBadge.Ensure(content, "TypeHead_" + index, TypeHeadFontSize, _font,
+                true, out bool made);
+            if (!made) return;
 
-            GameObject head = SceneFirst.Child(content, "TypeHead_" + index, out bool madeHead, typeof(RectTransform));
-            var headRt = (RectTransform)head.transform;
-            if (madeHead)
-            {
-                headRt.sizeDelta = new Vector2(ListWidth, TypeIconSize);
-                PlaceRow(headRt, y);
-            }
-
-            // アイコン＋名前
-            GameObject icon = null;
-            if (info != null)
-            {
-                icon = SceneFirst.Child(head.transform, "Icon", out bool madeIcon, typeof(RectTransform), typeof(Image));
-                if (madeIcon)
-                {
-                    var img = icon.GetComponent<Image>();
-                    Center(img.rectTransform, new Vector2(TypeIconSize, TypeIconSize));
-                    img.rectTransform.anchoredPosition = new Vector2(left + TypeIconSize * 0.5f, 0f);
-                    img.sprite = info.Icon;
-                    img.raycastTarget = false;
-                }
-            }
-            float textLeft = info != null ? left + TypeIconSize + 6f : left;
-            float textWidth = ListWidth * 0.5f - textLeft;
-            TextMeshProUGUI name = Txt(head.transform, "Label", label, new Vector2(textLeft + textWidth * 0.5f, 0f),
-                new Vector2(textWidth, 20f), 15f, TextAlignmentOptions.Left, Marker);
-
-            // 一色の札（地の色に型の名前）
-            GameObject badge = SceneFirst.Child(head.transform, "Badge", out bool madeBadge,
-                typeof(RectTransform), typeof(Image), typeof(HorizontalLayoutGroup), typeof(ContentSizeFitter));
-            if (madeBadge)
-            {
-                var rt = (RectTransform)badge.transform;
-                rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
-                rt.pivot = new Vector2(0f, 0.5f);
-                rt.anchoredPosition = new Vector2(left, 0f);
-                var plate = badge.GetComponent<Image>();
-                plate.color = info != null ? (Color)info.Badge : TextDim;
-                plate.raycastTarget = false;
-                // 角を丸くする（2026-10-15 のユーザー指示）。8x8 の板の角を階段状に削った絵を9分割で伸ばす。
-                // 板の1点を画面の2単位にして、角の削れをほかのドット絵と同じ粗さに揃える
-                plate.sprite = Resources.Load<Sprite>("HandTypes/hand_type_badge_plate");
-                plate.type = Image.Type.Sliced;
-                plate.pixelsPerUnitMultiplier = 0.5f;
-                var layout = badge.GetComponent<HorizontalLayoutGroup>();
-                // 1ドット＝2単位の格子に合わせた余白
-                layout.padding = new RectOffset(8, 8, 2, 2);
-                layout.childControlWidth = true;
-                layout.childControlHeight = true;
-                layout.childForceExpandWidth = false;
-                layout.childForceExpandHeight = false;
-                var fit = badge.GetComponent<ContentSizeFitter>();
-                fit.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
-                fit.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            }
-            TextMeshProUGUI badgeText = Txt(badge.transform, "Text", label, Vector2.zero, new Vector2(80f, 22f),
-                18f, TextAlignmentOptions.Center, info != null ? (Color)info.BadgeInk : Color.black, out bool madeBadgeText);
-            if (madeBadgeText) badgeText.textWrappingMode = TextWrappingModes.NoWrap;
-
-            _typeHeads.Add(new[] { icon, name.gameObject, badge });
-        }
-
-        /// <summary>見出しの見せ方を <see cref="HeadStyle"/> に合わせる。</summary>
-        public void ApplyTypeHeadStyle()
-        {
-            bool badge = HeadStyle == TypeHeadStyle.Badge;
-            foreach (var parts in _typeHeads)
-            {
-                if (parts[0] != null) parts[0].SetActive(!badge);
-                if (parts[1] != null) parts[1].SetActive(!badge);
-                if (parts[2] != null) parts[2].SetActive(badge);
-            }
+            var rt = (RectTransform)badge.transform;
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 1f);
+            rt.pivot = new Vector2(0f, 1f);
+            rt.anchoredPosition = new Vector2(-ListWidth * 0.5f + 4f, y);
+            if (info != null) badge.Show(info);
+            else badge.ShowPlain(OtherSection, OtherPlate, Color.black);
         }
 
         // ---- 右: 選んだ役の説明と例 ----
@@ -671,8 +591,18 @@ namespace KillingMahjong.UI
             }
 
             // その役が入る型と、相手がその型のときに捨て牌に出る特徴（2026-10-15）
-            _typeText = Txt(parent, "YakuType", "", new Vector2(DetailCenterX, -166f),
-                new Vector2(DetailWidth, 18f), 12.5f, TextAlignmentOptions.Left, TextDim);
+            // 左に型の札、右に特徴。札の幅は型で変わるので、文は一番広い札（ドラ頼み）の右から始める
+            _typeBadge = HandTypeBadge.Ensure(parent, "YakuTypeBadge", 13f, _font, true, out bool madeBadge);
+            if (madeBadge)
+            {
+                var rt = (RectTransform)_typeBadge.transform;
+                rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+                rt.pivot = new Vector2(0f, 0.5f);
+                rt.anchoredPosition = new Vector2(left, -166f);
+                _typeBadge.Show(HandArchetype.Some);
+            }
+            _typeText = Txt(parent, "YakuType", "", new Vector2(DetailCenterX + 40f, -166f),
+                new Vector2(DetailWidth - 80f, 18f), 12.5f, TextAlignmentOptions.Left, TextDim);
 
         }
 
@@ -763,12 +693,9 @@ namespace KillingMahjong.UI
             if (_exampleHead != null) _exampleHead.gameObject.SetActive(hasExample);
             if (_noteText != null) _noteText.text = YakuExamples.NoteOf(entry);
 
-            if (_typeText != null)
-            {
-                var type = HandArchetype.Of(yaku);
-                _typeText.text = type == null ? ""
-                    : "<color=#D6283E>型：" + type.Name + "</color>　相手がこの型なら、" + type.Tell;
-            }
+            var type = HandArchetype.Of(yaku);
+            if (_typeBadge != null) _typeBadge.Show(type);
+            if (_typeText != null) _typeText.text = type == null ? "" : "相手がこの型なら、" + type.Tell;
         }
 
         /// <summary>例の牌を並べる。並べたら true。牌の絵はその場で作る（選ぶたびに入れ替わる）。</summary>

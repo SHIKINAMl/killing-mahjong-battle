@@ -55,8 +55,12 @@ namespace KillingMahjong.UI
             // 次からその捨て牌の特徴を覚えていける。行を足すと役5行で画面からはみ出すので見出しに入れる
             var archetype = HandArchetype.Classify(RowNames(s));
             if (archetype != null)
-                MakeText(head.transform, (s.LocalWon ? "自分の型 " : "相手の型 ") + archetype.Name, 18f,
-                    s.LocalWon ? AccentMine : AccentThem, TextAlignmentOptions.Right, false, 190f);
+            {
+                MakeText(head.transform, s.LocalWon ? "自分の型" : "相手の型", 16f,
+                    s.LocalWon ? AccentMine : AccentThem, TextAlignmentOptions.Right, false, 120f);
+                // 型は角丸の文字の札で出す（役一覧・手牌選択と同じ札）
+                HandTypeBadge.Create(head.transform, "TypeBadge", 18f, customFont, false).Show(archetype);
+            }
             MakeText(head.transform, s.RankName, 30f, AccentGold, TextAlignmentOptions.Right, false, 200f);
 
             // ---- 中身（地の色） ----
