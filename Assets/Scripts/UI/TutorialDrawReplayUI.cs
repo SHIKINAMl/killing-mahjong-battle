@@ -73,7 +73,7 @@ namespace KillingMahjong.UI
             viewport.gameObject.AddComponent<RectMask2D>();
             Art("Room","2",new Vector2(820,615),Vector2.zero);
             Art("Girl","女の子/通常時身体",new Vector2(600,600),new Vector2(0,15));
-            Art("Face","女の子/笑顔",new Vector2(600,600),new Vector2(0,15));
+            Art("Face","女の子/通常顔",new Vector2(600,600),new Vector2(0,15));
             girlBody = viewport.Find("Girl").GetComponent<Image>();
             girlFace = viewport.Find("Face").GetComponent<Image>();
             Art("Table","マージャン卓",new Vector2(820,615),Vector2.zero);
@@ -147,6 +147,9 @@ namespace KillingMahjong.UI
         }
         public IEnumerator Play(bool autoAdvance=false)
         {
+            tauntBobbing = false;
+            SetCharacter("通常時身体", "通常顔");
+            SetCharacterPosition(CharacterPosition);
             automatic=autoAdvance; IsPaused=false; StepIndex=0; transform.localScale=Vector3.one*.4f;
             for(float t=0;t<1;t+=Time.unscaledDeltaTime) { transform.localScale=Vector3.one*Mathf.SmoothStep(.4f,1,t); yield return null; }
             transform.localScale=Vector3.one;
@@ -207,8 +210,11 @@ namespace KillingMahjong.UI
             if (tauntBobbing)
             {
                 float elapsed = Time.unscaledTime - tauntStarted;
-                float offset = 6f * Mathf.Sin(elapsed * Mathf.PI * 2f / 3f) * Mathf.Clamp01(elapsed / .3f);
+                // 3秒かけて一度だけ上がり、元の位置へ戻る。セリフ待ちが長くても繰り返さない。
+                float progress = Mathf.Clamp01(elapsed / 3f);
+                float offset = 6f * Mathf.Sin(Mathf.PI * Mathf.SmoothStep(0f, 1f, progress));
                 SetCharacterPosition(CharacterPosition + Vector2.up * Mathf.Round(offset));
+                if (progress >= 1f) { tauntBobbing = false; SetCharacterPosition(CharacterPosition); }
             }
             if(noise==null||IsPaused||Time.unscaledTime<noiseNext) return;
             noiseNext=Time.unscaledTime+.12f; noise.Begin();
