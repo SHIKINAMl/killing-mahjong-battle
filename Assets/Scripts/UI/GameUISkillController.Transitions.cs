@@ -76,6 +76,7 @@ namespace KillingMahjong.UI
         public void HandleSkillCasted(SkillCastedData data)
         {
             if (data == null) return;
+            uiManager?.DialogueUI?.AddSkillToLog(data.skillType, data.player_id == SkillLocalPlayerId);
             if (uiManager != null && uiManager.IsTutorialMode)
             {
                 StartCoroutine(HandleSkillCastedRoutine(data));
@@ -123,6 +124,9 @@ namespace KillingMahjong.UI
         public System.Collections.IEnumerator PlayTutorialSkillRoutine(SkillCastedData data, bool skipCutin = false)
         {
             if (uiManager == null || !uiManager.IsTutorialMode) yield break;
+            // 1回の牌交換を複数の牌の演出に分けても、使用ログは1行にする。
+            if (data != null && !skipCutin)
+                uiManager.DialogueUI?.AddSkillToLog(data.skillType, data.player_id == SkillLocalPlayerId);
             yield return HandleSkillCastedRoutine(data, skipCutin);
         }
 
