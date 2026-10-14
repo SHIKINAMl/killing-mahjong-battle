@@ -578,8 +578,14 @@ namespace KillingMahjong.UI
                 rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
                 rt.pivot = new Vector2(0f, 0.5f);
                 rt.anchoredPosition = new Vector2(left, 0f);
-                badge.GetComponent<Image>().color = info != null ? (Color)info.Badge : TextDim;
-                badge.GetComponent<Image>().raycastTarget = false;
+                var plate = badge.GetComponent<Image>();
+                plate.color = info != null ? (Color)info.Badge : TextDim;
+                plate.raycastTarget = false;
+                // 角を丸くする（2026-10-15 のユーザー指示）。8x8 の板の角を階段状に削った絵を9分割で伸ばす。
+                // 板の1点を画面の2単位にして、角の削れをほかのドット絵と同じ粗さに揃える
+                plate.sprite = Resources.Load<Sprite>("HandTypes/hand_type_badge_plate");
+                plate.type = Image.Type.Sliced;
+                plate.pixelsPerUnitMultiplier = 0.5f;
                 var layout = badge.GetComponent<HorizontalLayoutGroup>();
                 // 1ドット＝2単位の格子に合わせた余白
                 layout.padding = new RectOffset(8, 8, 2, 2);
