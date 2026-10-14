@@ -73,7 +73,7 @@ def test_extends_and_invalid_values(config_file, caplog):
     with caplog.at_level(logging.WARNING):
         config = load_cpu_config()
     assert config["special"]["bet"]["health_lead_factor"] == 0.5  # normal から引き継ぐ
-    assert config["normal"]["hand_selection"]["candidate_limit"] == 160  # 型違いは既定値へ
+    assert config["normal"]["hand_selection"]["candidate_limit"] == 40  # 型違いは既定値へ
     assert config["special"]["perks"]["skill_cost_rate"] == 0.6  # 範囲外は、その難易度の既定値へ
     messages = " ".join(r.getMessage() for r in caplog.records)
     assert "candidate_limit" in messages and "skill_cost_rate" in messages

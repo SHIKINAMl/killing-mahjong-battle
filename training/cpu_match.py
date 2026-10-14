@@ -7,6 +7,7 @@ CPU どうしの対局で、考え方の強さを比べる
 variant:
 - value   … いまの「ふつう」（スキルの効果を見積もって使う。cpu_config.json の value_model）
 - hard    … 「つよい」の設定を規則で打つもの（ふつうの土台。学習モデルができるまでのつよい）
+- model   … 本番のつよい（学習したモデル。cpu_config.json の hard.model_path）
 - rule    … 「ふつう」から value_model を外したもの（決まった条件で使う、前の考え方）
 - stepbet … 「ふつう」から掛け金の見積もり式（bet.model）を外したもの（手の強さの段階で決める、前の掛け金）
 - noskill … 「ふつう」でスキルを使わない
@@ -18,6 +19,7 @@ variant:
 """
 import argparse
 import copy
+import logging
 import json
 import os
 import random
@@ -33,13 +35,13 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from mahjong_engine.ai.cpu_config import load_cpu_config  # noqa: E402
-from mahjong_engine.ai.rule_brain import RuleBrain  # noqa: E402
+from mahjong_engine.ai.rule_brain import RuleBrain, create_brain  # noqa: E402
 from mahjong_engine.engine.game_state import SkillType, get_skill_cost  # noqa: E402
 from training.deal_pool import DealPool  # noqa: E402
 from training.simulator import PLAYER_IDS, MatchSimulator, RuleAgent  # noqa: E402
 from training.skill_game import MAX_ROUNDS, game_winner  # noqa: E402
 
-VARIANTS = ("value", "hard", "rule", "stepbet", "noskill", "easy")
+VARIANTS = ("value", "hard", "model", "rule", "stepbet", "noskill", "easy")
 
 _POOL: Optional[DealPool] = None
 _CONFIGS: dict[str, dict] = {}
@@ -57,7 +59,7 @@ def variant_config(name: str, override: Optional[dict] = None) -> tuple[str, dic
     """(考え方の水準, 設定, スキルを使うか)。override は設定の上書き（調整の比較用）"""
     configs = load_cpu_config()
     level = "easy" if name == "easy" else "normal"
-    config = copy.deepcopy(configs["hard" if name == "hard" else level])
+    config = copy.deepcopy(configs["hard" if name in ("hard", "model") else level])
     if name == "rule":
         config["skill"].pop("value_model", None)
     if name == "stepbet":
@@ -68,6 +70,7 @@ def variant_config(name: str, override: Optional[dict] = None) -> tuple[str, dic
 
 def _init_worker(pool_dir: str, overrides: dict) -> None:
     global _POOL
+    logging.getLogger("mahjong_engine").setLevel(logging.ERROR)  # 決着の警告は集計に要らない
     _POOL = DealPool(Path(pool_dir))
     for key, (name, override) in overrides.items():
         _CONFIGS[key] = variant_config(name, override)
@@ -75,6 +78,8 @@ def _init_worker(pool_dir: str, overrides: dict) -> None:
 
 def _agent(name: str, seed: int) -> RuleAgent:
     level, config, use_skills = _CONFIGS[name]
+    if name.split(":")[-1] == "model":
+        return RuleAgent(create_brain(config, random.Random(seed)), use_skills=use_skills)
     return RuleAgent(RuleBrain(level, config, random.Random(seed)), use_skills=use_skills)
 
 
