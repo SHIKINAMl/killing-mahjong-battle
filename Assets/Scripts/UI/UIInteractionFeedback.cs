@@ -15,6 +15,9 @@ namespace KillingMahjong.UI
         [SerializeField] private Image hoverArt, selectedArt;
         private Selectable selectable;
         private TileInteraction tile;
+        private Image tileImage;
+        private Sprite boundsSprite;
+        private Rect spriteVisibleRect;
         private CanvasGroup[] groups;
         private bool hovered, pressed, selected, focused, dirty = true;
         private bool wasAllowed;
@@ -39,6 +42,7 @@ namespace KillingMahjong.UI
         private void CacheInputs()
         {
             selectable = GetComponent<Selectable>(); tile = GetComponent<TileInteraction>();
+            tileImage = tile != null ? GetComponent<Image>() : null;
             groups = GetComponentsInParent<CanvasGroup>(true);
         }
         private void OnTransformParentChanged() { CacheInputs(); dirty = true; }
@@ -153,8 +157,9 @@ namespace KillingMahjong.UI
             if (isActiveAndEnabled && toggle != null && selected != toggle.isOn) { selected = toggle.isOn; dirty = true; }
             string id = FrameId;
             int revision = UIFrameCatalog.Revision + UIFrameSelection.Revision;
-            if (!dirty && allowed == wasAllowed && lastRect == frame.rectTransform.rect && lastFrameId == id && lastRevision == revision) return;
-            wasAllowed = allowed; lastRect = frame.rectTransform.rect; lastFrameId = id; lastRevision = revision; dirty = false;
+            var displayRect = TileFrameRect();
+            if (!dirty && allowed == wasAllowed && lastRect == displayRect && lastFrameId == id && lastRevision == revision) return;
+            wasAllowed = allowed; lastRect = displayRect; lastFrameId = id; lastRevision = revision; dirty = false;
             var style = UIFrameCatalog.Resolve(id);
             bool hover = allowed && (hovered || focused);
             var rect = lastRect;
@@ -187,11 +192,56 @@ namespace KillingMahjong.UI
                 frame.Frame(rect, Mathf.Max(1, isTile ? style.tileHoverWidth : style.hoverWidth), style.hoverColor);
             }
             frame.End();
+            if (isTile)
+            {
+                FitArt(hoverArt.rectTransform, rect);
+                FitArt(selectedArt.rectTransform, Inset(lastRect, 2));
+            }
             selectedArt.sprite = style.selectedSprite; selectedArt.enabled = selected && style.selectedSprite != null;
             hoverArt.sprite = style.hoverSprite; hoverArt.enabled = hover && style.hoverSprite != null;
         }
 
         private static Rect Inset(Rect rect, float amount)
         { rect.xMin += amount; rect.yMin += amount; rect.xMax -= amount; rect.yMax -= amount; return rect; }
+
+        // 入力矩形ではなく、スプライトの透明な余白を除いた範囲に枠を合わせる。
+        private Rect TileFrameRect()
+        {
+            if (tileImage == null || tileImage.type != Image.Type.Simple) return frame.rectTransform.rect;
+            var sprite = tileImage.overrideSprite;
+            if (sprite == null) return frame.rectTransform.rect;
+            if (boundsSprite != sprite)
+            {
+                boundsSprite = sprite;
+                var vertices = sprite.vertices;
+                if (vertices.Length == 0) return frame.rectTransform.rect;
+                Vector2 min = vertices[0], max = min;
+                foreach (var vertex in vertices) { min = Vector2.Min(min, vertex); max = Vector2.Max(max, vertex); }
+                min = (min * sprite.pixelsPerUnit + sprite.pivot) / sprite.rect.size;
+                max = (max * sprite.pixelsPerUnit + sprite.pivot) / sprite.rect.size;
+                spriteVisibleRect = Rect.MinMaxRect(min.x, min.y, max.x, max.y);
+            }
+            var imageRect = tileImage.GetPixelAdjustedRect();
+            if (tileImage.preserveAspect)
+            {
+                float scale = Mathf.Min(imageRect.width / sprite.rect.width, imageRect.height / sprite.rect.height);
+                Vector2 size = sprite.rect.size * scale;
+                imageRect.position += Vector2.Scale(imageRect.size - size, tileImage.rectTransform.pivot);
+                imageRect.size = size;
+            }
+            Vector2 bottom = imageRect.position + Vector2.Scale(imageRect.size, spriteVisibleRect.min);
+            Vector2 top = imageRect.position + Vector2.Scale(imageRect.size, spriteVisibleRect.max);
+            bottom = frame.rectTransform.InverseTransformPoint(tileImage.rectTransform.TransformPoint(bottom));
+            top = frame.rectTransform.InverseTransformPoint(tileImage.rectTransform.TransformPoint(top));
+            // 色枠は輪郭の外側1単位、黒縁はさらに1単位だけ外へ出す。
+            return Rect.MinMaxRect(bottom.x - 3, bottom.y - 3, top.x + 3, top.y + 3);
+        }
+
+        private void FitArt(RectTransform art, Rect rect)
+        {
+            var parentRect = ((RectTransform)transform).rect;
+            art.offsetMin = rect.min - parentRect.min;
+            art.offsetMax = rect.max - parentRect.max;
+        }
     }
 }
