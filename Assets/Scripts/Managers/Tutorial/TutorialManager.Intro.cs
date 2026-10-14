@@ -154,6 +154,25 @@ namespace KillingMahjong.Managers
         private bool _wallRevealDeferred;
 
         private GameObject _introRoot;
+        private Canvas _introSettingsCanvas;
+        private int _introSettingsOriginalOrder;
+
+        private void RaiseIntroSettings()
+        {
+            RestoreIntroSettings();
+            var button = gameUIManager != null ? gameUIManager.OptionButtonRect : null;
+            var canvas = button != null ? button.GetComponentInParent<Canvas>() : null;
+            if (canvas == null) return;
+            _introSettingsCanvas = canvas;
+            _introSettingsOriginalOrder = canvas.sortingOrder;
+            canvas.sortingOrder = Mathf.Max(canvas.sortingOrder, UISortingOrders.TutorialSettings);
+        }
+
+        private void RestoreIntroSettings()
+        {
+            if (_introSettingsCanvas != null) _introSettingsCanvas.sortingOrder = _introSettingsOriginalOrder;
+            _introSettingsCanvas = null;
+        }
 
         /// <summary>
         /// 導入のセリフが終わったあとに問いかけるか。**`StartTutorial()` でだけ立つ。**

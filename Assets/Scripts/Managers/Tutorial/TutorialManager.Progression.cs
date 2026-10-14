@@ -184,6 +184,7 @@ namespace KillingMahjong.Managers
             // フロー図では導入の会話がひととおり終わってから分岐する。
             // 頭から始めたときだけ聞く。中身は TutorialManager.Intro.cs。
             yield return StartCoroutine(AskExperienceIfNeeded());
+            RestoreIntroSettings();
 
             // 念のため: 山牌を遅らせたのに「じゃーん」の行を通らなかったら、ここで出す
             if (_wallRevealDeferred)

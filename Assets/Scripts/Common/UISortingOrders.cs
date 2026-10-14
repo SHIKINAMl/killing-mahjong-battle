@@ -357,6 +357,9 @@ namespace KillingMahjong.Common
         /// 奥なのは、押している間もカーソルが見えていてよいため。</summary>
         public const int TutorialIntro = 98;
 
+        /// <summary>導入中の設定。会話送りと説明の覆いより手前で操作できるようにする。</summary>
+        public const int TutorialSettings = 99;
+
         /// <summary>
         /// CustomCusor: 自前マウスカーソル。常に全UIより手前。
         ///

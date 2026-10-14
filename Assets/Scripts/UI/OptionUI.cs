@@ -575,6 +575,11 @@ namespace KillingMahjong.UI
 
             // 資料を読んでいる間は、背後の設定を誤って操作できないようオプション自体を伏せる。
             gameObject.SetActive(false);
+            // 導入中は設定を前へ出しているので、資料も説明の覆いより手前に置く。
+            var parentCanvas = GetComponentInParent<Canvas>();
+            var archiveCanvas = tutorialArchiveUI.GetComponent<Canvas>();
+            archiveCanvas.sortingOrder = Mathf.Max(KillingMahjong.Common.UISortingOrders.TutorialArchive,
+                parentCanvas != null ? parentCanvas.sortingOrder + 1 : 0);
             tutorialArchiveUI.Open(Open);
         }
 
