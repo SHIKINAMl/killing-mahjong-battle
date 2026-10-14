@@ -30,7 +30,7 @@ namespace KillingMahjong.UI
         [SerializeField] private Toggle fullscreenToggle;
 
         [Header("Buttons")]
-        [SerializeField] private Button closeButton; // 保存せずに閉じる
+        [SerializeField] private Button closeButton; // 変更を保持して閉じる
         [SerializeField] private Button saveAndCloseButton; // 保存して閉じる
         [SerializeField] private Button returnToTitleButton; // タイトル（または別シーン）に戻る
         [SerializeField] private Button quitButton; // ゲーム終了
@@ -246,15 +246,15 @@ namespace KillingMahjong.UI
             {
                 var settings = Core.SettingsManager.Instance;
                 
-                if (bgmSlider != null) bgmSlider.value = settings.BgmVolume;
-                if (seSlider != null) seSlider.value = settings.SeVolume;
-                if (voiceSlider != null) voiceSlider.value = settings.VoiceVolume;
+                if (bgmSlider != null) bgmSlider.SetValueWithoutNotify(settings.BgmVolume);
+                if (seSlider != null) seSlider.SetValueWithoutNotify(settings.SeVolume);
+                if (voiceSlider != null) voiceSlider.SetValueWithoutNotify(settings.VoiceVolume);
                 
-                if (highSpeedToggle != null) highSpeedToggle.isOn = settings.IsHighSpeedMode;
-                if (effectToggle != null) effectToggle.isOn = settings.IsEffectEnabled;
+                if (highSpeedToggle != null) highSpeedToggle.SetIsOnWithoutNotify(settings.IsHighSpeedMode);
+                if (effectToggle != null) effectToggle.SetIsOnWithoutNotify(settings.IsEffectEnabled);
                 
                 if (resolutionDropdown != null) resolutionDropdown.value = 0;
-                if (fullscreenToggle != null) fullscreenToggle.isOn = settings.IsFullScreen;
+                if (fullscreenToggle != null) fullscreenToggle.SetIsOnWithoutNotify(settings.IsFullScreen);
 
                 // **通知を止めてから入れる。** そのまま代入すると onValueChanged が走り、
                 // 画面を開いただけで曲が鳴り直したり、画面サイズが切り替わったりする
@@ -306,7 +306,7 @@ namespace KillingMahjong.UI
         private readonly System.Collections.Generic.HashSet<string> _missingSettingsWarned
             = new System.Collections.Generic.HashSet<string>();
 
-        // --- 値が変更された時に呼ばれる処理（SettingsManagerの仮の値を更新） ---
+        // --- 値が変更された時に呼ばれる処理（即時反映・保存） ---
         private void OnBgmChanged(float value)
         {
             var settings = RequireSettings("BGM音量");
@@ -593,9 +593,7 @@ namespace KillingMahjong.UI
 
         public void CloseWithoutSave()
         {
-            // キャンセルして閉じる場合は、変更前の値を再ロードして元に戻す
-            var settings = RequireSettings("取り消し");
-            if (settings != null) settings.LoadSettings();
+            // 既存のシーン・ボタンから参照される名前を維持する。変更は操作時点で保存済み。
             Close();
         }
 

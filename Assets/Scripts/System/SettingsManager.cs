@@ -315,6 +315,20 @@ namespace KillingMahjong.Core
         /// </summary>
         public void SaveSettings()
         {
+            PersistSettings();
+            ApplySettings();
+            OnSettingsChanged?.Invoke();
+        }
+
+        /// <summary>各項目の変更を保存する。反映済みのBGM・画面サイズをここで当て直さない。</summary>
+        private void CommitChange()
+        {
+            PersistSettings();
+            OnSettingsChanged?.Invoke();
+        }
+
+        private void PersistSettings()
+        {
             PlayerPrefs.SetFloat("BgmVolume", bgmVolume);
             PlayerPrefs.SetFloat("SeVolume", seVolume);
             PlayerPrefs.SetFloat("VoiceVolume", voiceVolume);
@@ -332,8 +346,6 @@ namespace KillingMahjong.Core
 
             PlayerPrefs.Save();
             
-            ApplySettings();
-            OnSettingsChanged?.Invoke();
         }
 
         // --- 設定値の変更メソッド ---
@@ -345,6 +357,7 @@ namespace KillingMahjong.Core
                 KillingMahjong.Managers.AudioManager.Instance.bgmVolume = volume;
                 KillingMahjong.Managers.AudioManager.Instance.ApplyVolumes();
             }
+            CommitChange();
         }
         
         /// <summary>
@@ -356,12 +369,14 @@ namespace KillingMahjong.Core
             matchBgmSet = NormalizeMatchBgmSet(kind);
             var am = KillingMahjong.Managers.AudioManager.Instance;
             if (am != null) am.ApplyMatchBgmSet(matchBgmSet);
+            CommitChange();
         }
 
         /// <summary>文字送りの速さを変える。次に出るセリフから効く。</summary>
         public void SetTextSpeed(int kind)
         {
             textSpeed = Mathf.Clamp(kind, 0, TextSpeedLabels.Length - 1);
+            CommitChange();
         }
 
         /// <summary>
@@ -372,6 +387,7 @@ namespace KillingMahjong.Core
         {
             dialogueBubble = Mathf.Clamp(kind, 0, DialogueBubbleLabels.Length - 1);
             KillingMahjong.UI.DialogueUI.ApplyBubbleSettingToAll();
+            CommitChange();
         }
 
         /// <summary>画面サイズを変える。**その場で切り替わる。**</summary>
@@ -379,6 +395,7 @@ namespace KillingMahjong.Core
         {
             screenMode = Mathf.Clamp(kind, 0, ScreenModeLabels.Length - 1);
             ApplyResolution();
+            CommitChange();
         }
 
         public void SetSeVolume(float volume) 
@@ -389,6 +406,7 @@ namespace KillingMahjong.Core
                 KillingMahjong.Managers.AudioManager.Instance.seVolume = volume;
                 KillingMahjong.Managers.AudioManager.Instance.ApplyVolumes();
             }
+            CommitChange();
         }
         
         public void SetVoiceVolume(float volume) 
@@ -399,11 +417,12 @@ namespace KillingMahjong.Core
                 KillingMahjong.Managers.AudioManager.Instance.voiceVolume = volume;
                 KillingMahjong.Managers.AudioManager.Instance.ApplyVolumes();
             }
+            CommitChange();
         }
-        public void SetHighSpeedMode(bool isHighSpeed) { isHighSpeedMode = isHighSpeed; }
-        public void SetEffectEnabled(bool isEnabled) { isEffectEnabled = isEnabled; }
-        public void SetResolutionIndex(int index) { resolutionIndex = index; }
-        public void SetFullScreen(bool isFull) { isFullScreen = isFull; }
+        public void SetHighSpeedMode(bool isHighSpeed) { isHighSpeedMode = isHighSpeed; CommitChange(); }
+        public void SetEffectEnabled(bool isEnabled) { isEffectEnabled = isEnabled; CommitChange(); }
+        public void SetResolutionIndex(int index) { resolutionIndex = index; ApplyResolution(); CommitChange(); }
+        public void SetFullScreen(bool isFull) { isFullScreen = isFull; ApplyResolution(); CommitChange(); }
 
         private void OnValidate()
         {
