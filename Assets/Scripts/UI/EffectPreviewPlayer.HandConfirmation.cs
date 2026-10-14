@@ -39,8 +39,8 @@ namespace KillingMahjong.UI
             int[] hand = {0,0,0,1,1,1,2,2,2,3,3,3,4};
             for (int i = 0; i < rig.handTiles.Count; i++)
             {
-                var rt = rig.handTiles[i]; rt.anchoredPosition = new Vector2(-148 + i * 27, -225);
-                rt.sizeDelta = new Vector2(40, 54); rt.GetComponent<UnityEngine.UI.Image>().sprite = rig.tiles.GetTileSprite(hand[i]);
+                var rt = rig.handTiles[i];
+                rt.GetComponent<TileVisual>().SetTile(Tile(hand[i]), rig.tiles.GetTileSprite(Tile(hand[i])), rig.tiles);
             }
             if (!needsReview && EffectId != "hand.wait_transfer") rank.ShowRank("役満");
             reveal.Show(data, rig.tiles, EffectId != "hand.wait_transfer");

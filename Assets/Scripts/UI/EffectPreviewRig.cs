@@ -54,22 +54,11 @@ namespace KillingMahjong.UI
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(800, 600);
             scaler.matchWidthOrHeight = .5f;
-            for (int i = 0; i < 34; i++)
-                enemyTiles.Add(Tile("Enemy" + i, -1, new Vector2(-208 + (i % 17) * 26, -74 - (i / 17) * 33)));
-            for (int i = 0; i < 13; i++)
-                handTiles.Add(Tile("Hand" + i, KillingMahjong.Managers.TutorialTiles.Encode(i % 9, false),
-                    new Vector2(-156 + i * 26, -235)));
-        }
-
-        private RectTransform Tile(string name, int id, Vector2 position)
-        {
-            var go = new GameObject(name, typeof(RectTransform), typeof(Image));
-            go.transform.SetParent(surface, false);
-            var rt = go.GetComponent<RectTransform>();
-            rt.sizeDelta = new Vector2(25, 33); rt.anchoredPosition = position;
-            var img = go.GetComponent<Image>();
-            img.sprite = tiles.GetTileSprite(id); img.raycastTarget = false;
-            return rt;
+            // 対局から保存した牌・コンテナ・配置処理を共用する。
+            var prefab = Resources.Load<TutorialReplayBoard>("Presentation/TutorialReplayBoard");
+            if (prefab == null) throw new InvalidOperationException("試写の盤面がありません。試写舞台を更新してください。");
+            var board = Instantiate(prefab, surface, false);
+            board.InitializeEffectTiles(tiles, enemyTiles, handTiles);
         }
 
         public VictoryConfig Ending(VictoryType type)

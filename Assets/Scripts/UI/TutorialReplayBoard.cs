@@ -24,6 +24,31 @@ namespace KillingMahjong.UI
         private float enemyRiverTop;
         private float enemyHandCenter;
 
+        /// <summary>演出試写の固定局面。牌の寸法・縮尺・間隔は本編の設定を使う。</summary>
+        public void InitializeEffectTiles(TileResourceManager resources,
+            List<RectTransform> enemyTargets, List<RectTransform> handTargets)
+        {
+            tiles = resources;
+            gameObject.SetActive(true);
+            localRiver.gameObject.SetActive(false);
+            enemyRiver.gameObject.SetActive(false);
+            wallUI.gameObject.SetActive(false);
+            enemyHandUI.gameObject.SetActive(false);
+            var ids = new List<int>();
+            for (int i = 0; i < 34; i++) { enemyTargets.Add(Tile(-1)); ids.Add(-1); }
+            enemyWallUI.LayoutEnemyWallTiles(enemyTargets, ids, false);
+            for (int i = 0; i < 13; i++)
+            {
+                int id = TutorialTiles.Encode(i % 9, false);
+                handUI.AddTileToHand(Tile(id), id);
+            }
+            handUI.UpdateLayout(KillingMahjong.EngineData.RoundStatus.HandSelection);
+            handUI.SnapToLayout();
+            // 理牌などの試写中は、通常の追従処理と牌を取り合わない。
+            handUI.enabled = false;
+            handTargets.AddRange(handUI.GetHandSlots());
+        }
+
         public void Initialize(TileResourceManager resources)
         {
             tiles = resources;

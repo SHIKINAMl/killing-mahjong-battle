@@ -175,6 +175,13 @@ namespace KillingMahjong.UI
             targetPositions.Clear();
         }
 
+        /// <summary>保存済みの配置目標へ即座に揃える。試写の初期配置などで使用する。</summary>
+        public void SnapToLayout()
+        {
+            foreach (var pair in targetPositions)
+                if (pair.Key != null) pair.Key.anchoredPosition = pair.Value;
+        }
+
         public virtual void SortHandSlots()
         {
         }

@@ -118,7 +118,7 @@ namespace KillingMahjong.UI
                 case "hp.zoom_enemy": yield return rig.enemy.ZoomInRoutine(); yield return new WaitForSeconds(1f); yield return rig.enemy.ResetZoomRoutine(); break;
                 case "tile.dora":
                     var id = KillingMahjong.Managers.TutorialTiles.Encode(4, true);
-                    rig.handTiles[6].gameObject.AddComponent<TileVisual>().SetTile(id, rig.tiles.GetTileSprite(id), rig.tiles); break;
+                    rig.handTiles[6].GetComponent<TileVisual>().SetTile(id, rig.tiles.GetTileSprite(id), rig.tiles); break;
                 case "gauge.absorb":
                     var gauge = rig.gameObject.AddComponent<ScoreGaugeUI>();
                     gauge.SetVisible(true); gauge.SetStakes(2000, 2000);
