@@ -28,6 +28,10 @@ namespace KillingMahjong.UI
         private TutorialReplayBoard board;
         private bool advanced, automatic;
         private float noiseNext;
+        private Image girlBody, girlFace;
+        private bool tauntBobbing;
+        private float tauntStarted;
+        private static readonly Vector2 CharacterPosition = new Vector2(0, 15);
 
         public static TutorialDrawReplayUI Create(Transform owner = null)
         {
@@ -70,6 +74,8 @@ namespace KillingMahjong.UI
             Art("Room","2",new Vector2(820,615),Vector2.zero);
             Art("Girl","女の子/通常時身体",new Vector2(600,600),new Vector2(0,15));
             Art("Face","女の子/笑顔",new Vector2(600,600),new Vector2(0,15));
+            girlBody = viewport.Find("Girl").GetComponent<Image>();
+            girlFace = viewport.Find("Face").GetComponent<Image>();
             Art("Table","マージャン卓",new Vector2(820,615),Vector2.zero);
             var prefab = Resources.Load<GameObject>("Presentation/EffectPreviewRig");
             var rig = prefab != null ? prefab.GetComponent<EffectPreviewRig>() : null;
@@ -133,7 +139,7 @@ namespace KillingMahjong.UI
             }
             Debug.Log("[TutorialDrawReplay] Step "+StepIndex+(subtitle?" subtitle: ":" normal: ")+text);
             if(automatic) {
-                yield return new WaitForSecondsRealtime(1.8f);
+                yield return new WaitForSecondsRealtime(loud ? 3.6f : 1.8f);
                 if(subtitle) subtitles.CompleteLine(); else advanced=true;
             }
             else yield return new WaitUntil(()=>advanced);
@@ -150,8 +156,19 @@ namespace KillingMahjong.UI
             }
             yield return Step("おっ立ち上がったね",true);
             yield return Step("今からアタシが流局するから見ててよ",true);
+            SetCharacter("ピース身体", "どや顔");
             yield return Step("では惨めに最後の牌を出しなさい？",false);
+            SetCharacter("通常時身体", "笑顔");
+            tauntStarted = Time.unscaledTime; tauntBobbing = true;
             yield return Step("ざぁーこ♡",false,true);
+            tauntBobbing = false;
+            Vector2 from = girlBody.rectTransform.anchoredPosition;
+            for (float t = 0; t < 1; t += Time.unscaledDeltaTime * 5)
+            {
+                SetCharacterPosition(Vector2.Lerp(from, CharacterPosition, Mathf.SmoothStep(0, 1, t)));
+                yield return null;
+            }
+            SetCharacterPosition(CharacterPosition);
             yield return board.DiscardLastTile();
             bool done=false; phase.PlayDrawTransition(ShowNewWall,()=>done=true);
             float limit=Time.realtimeSinceStartup+12; yield return new WaitUntil(()=>done||Time.realtimeSinceStartup>=limit);
@@ -187,6 +204,12 @@ namespace KillingMahjong.UI
         }
         private void Update()
         {
+            if (tauntBobbing)
+            {
+                float elapsed = Time.unscaledTime - tauntStarted;
+                float offset = 6f * Mathf.Sin(elapsed * Mathf.PI * 2f / 3f) * Mathf.Clamp01(elapsed / .3f);
+                SetCharacterPosition(CharacterPosition + Vector2.up * Mathf.Round(offset));
+            }
             if(noise==null||IsPaused||Time.unscaledTime<noiseNext) return;
             noiseNext=Time.unscaledTime+.12f; noise.Begin();
             for(int i=0;i<18;i++) {
@@ -197,6 +220,16 @@ namespace KillingMahjong.UI
             noise.End();
         }
         public void Close() { StopAllCoroutines(); if(phase!=null) phase.CancelTransitions(); if(subtitles!=null) subtitles.Hide(); Destroy(gameObject); }
-        private void OnDisable() { StopAllCoroutines(); if(phase!=null) phase.CancelTransitions(); if(subtitles!=null) subtitles.Hide(); }
+        private void SetCharacter(string body, string face)
+        {
+            girlBody.sprite = Resources.Load<Sprite>("女の子/" + body);
+            girlFace.sprite = Resources.Load<Sprite>("女の子/" + face);
+        }
+        private void SetCharacterPosition(Vector2 position)
+        {
+            if (girlBody != null) girlBody.rectTransform.anchoredPosition = position;
+            if (girlFace != null) girlFace.rectTransform.anchoredPosition = position;
+        }
+        private void OnDisable() { tauntBobbing = false; SetCharacterPosition(CharacterPosition); StopAllCoroutines(); if(phase!=null) phase.CancelTransitions(); if(subtitles!=null) subtitles.Hide(); }
     }
 }

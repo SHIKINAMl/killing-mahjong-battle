@@ -41,6 +41,7 @@ namespace KillingMahjong.EditorTools
             board.enemyRiver = Copy(source.EnemyRiverUI, root.transform, "EnemyRiver", "riverContainer");
             board.wallUI = Copy(source.WallUI, root.transform, "Wall", "wallContainer");
             board.enemyWallUI = Copy(source.EnemyWallUI, root.transform, "EnemyWall", "enemyWallContainer");
+            board.enemyHandUI = Copy(source.EnemyHandUI, root.transform, "EnemyHand", "handSlotContainer");
             board.enemyRiver.AlignToOpponentRiver(board.localRiver);
             foreach (var river in new[] { board.localRiver, board.enemyRiver })
             {
@@ -88,6 +89,8 @@ namespace KillingMahjong.EditorTools
             rect.pivot = source.pivot; rect.sizeDelta = source.sizeDelta;
             rect.anchoredPosition = source.anchoredPosition;
             rect.localScale = source.localScale; rect.localRotation = source.localRotation;
+            var layout = source.GetComponent<UnityEngine.UI.LayoutGroup>();
+            if (layout != null) EditorUtility.CopySerialized(layout, rect.gameObject.AddComponent(layout.GetType()));
             return rect;
         }
 

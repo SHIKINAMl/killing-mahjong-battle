@@ -14,12 +14,15 @@ namespace KillingMahjong.UI
         public RiverUI localRiver, enemyRiver;
         public WallUI wallUI;
         public EnemyWallUI enemyWallUI;
+        public EnemyHandUI enemyHandUI;
         public HandBaseUI handUI;
         private TileResourceManager tiles;
         private readonly List<RectTransform> wall = new List<RectTransform>(), enemyWall = new List<RectTransform>();
         private readonly List<int> wallIds = new List<int>();
         private readonly List<GameObject> ownedTiles = new List<GameObject>();
         private TutorialRoundData example;
+        private float enemyRiverTop;
+        private float enemyHandCenter;
 
         public void Initialize(TileResourceManager resources)
         {
@@ -34,8 +37,15 @@ namespace KillingMahjong.UI
             wallUI.LayoutWallTiles(wall, wallIds, null, true);
             for (int i = 0; i < 4; i++) enemyWall.Add(Tile(-1));
             enemyWallUI.LayoutEnemyWallTiles(enemyWall, new List<int> { -1, -1, -1, -1 }, true);
+            ShowEnemyHand(true);
             for (int i = 0; i < 16; i++) localRiver.AddPresentationTile(Tile(TutorialTiles.Encode(9 + i % 9, false)), TutorialTiles.Encode(9 + i % 9, false));
             for (int i = 0; i < 17; i++) enemyRiver.AddPresentationTile(Tile(TutorialTiles.Encode(18 + i % 9, false)), TutorialTiles.Encode(18 + i % 9, false));
+            var corners = new Vector3[4];
+            enemyRiver.GetTilesBoundsRect().GetWorldCorners(corners);
+            enemyRiverTop = float.MinValue;
+            foreach (var corner in corners) enemyRiverTop = Mathf.Max(enemyRiverTop, transform.InverseTransformPoint(corner).y);
+            PositionEnemyHand(true);
+            enemyWallUI.gameObject.SetActive(false);
         }
 
         private RectTransform Tile(int id)
@@ -67,13 +77,46 @@ namespace KillingMahjong.UI
 
         public void ShowNewWall()
         {
-            foreach (var go in ownedTiles) if (go != null) Destroy(go);
+            foreach (var go in ownedTiles) if (go != null) { go.SetActive(false); Destroy(go); }
             ownedTiles.Clear(); wall.Clear(); wallIds.Clear(); enemyWall.Clear();
             localRiver.gameObject.SetActive(false); enemyRiver.gameObject.SetActive(false);
             foreach (int id in TutorialTiles.EncodeAll(example.wallBaseIds, example.doraBaseId)) { wallIds.Add(id); wall.Add(Tile(id)); }
             wallUI.LayoutWallTiles(wall, wallIds, null, false);
-            for (int i = 0; i < 34; i++) enemyWall.Add(Tile(-1));
-            enemyWallUI.LayoutEnemyWallTiles(enemyWall, new List<int>(new int[34]), false);
+            // 手牌選択中の敵側も、34枚の山牌ではなく13枚の伏せた手牌を見せる。
+            enemyWallUI.gameObject.SetActive(false);
+            enemyHandUI.ClearHand();
+            ShowEnemyHand(false);
+            PositionEnemyHand(false);
+        }
+
+        private void ShowEnemyHand(bool discardPhase)
+        {
+            for (int i = 0; i < 13; i++) enemyHandUI.AddEnemyTile(Tile(-1), -1, i % 9);
+            enemyHandUI.UpdateLayout(discardPhase ? KillingMahjong.EngineData.RoundStatus.Discard
+                : KillingMahjong.EngineData.RoundStatus.HandSelection);
+        }
+
+        private void PositionEnemyHand(bool rememberCenter)
+        {
+            Canvas.ForceUpdateCanvases();
+            var corners = new Vector3[4];
+            float bottom = float.MaxValue;
+            float left = float.MaxValue, right = float.MinValue;
+            foreach (var tile in enemyHandUI.GetHandSlots())
+            {
+                tile.GetWorldCorners(corners);
+                foreach (var corner in corners)
+                {
+                    var point = transform.InverseTransformPoint(corner);
+                    bottom = Mathf.Min(bottom, point.y);
+                    left = Mathf.Min(left, point.x); right = Mathf.Max(right, point.x);
+                }
+            }
+            float center = (left + right) * .5f;
+            if (rememberCenter) enemyHandCenter = center;
+            // 動画では手牌を常時見せるため、河の上に12単位の隙間を確保する。
+            var root = (RectTransform)enemyHandUI.transform;
+            root.anchoredPosition += new Vector2(enemyHandCenter - center, enemyRiverTop + 12f - bottom);
         }
 
         public IEnumerator BuildHand(Action completed)
