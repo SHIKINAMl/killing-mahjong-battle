@@ -184,6 +184,28 @@ namespace KillingMahjong.UI
 
                 var interaction = obj.GetComponent<TileInteraction>();
                 if (interaction != null) Destroy(interaction);
+                var owner = GetComponentInParent<GameUIManager>();
+                if (owner == null || owner.EnemyWaitUI != this)
+                {
+                    var countObject = new GameObject("OutsideCount", typeof(RectTransform));
+                    var countRect = countObject.GetComponent<RectTransform>();
+                    countRect.SetParent(obj.transform, false);
+                    countRect.anchorMin = new Vector2(0, 0);
+                    countRect.anchorMax = new Vector2(1, 0);
+                    countRect.pivot = new Vector2(.5f, 1);
+                    countRect.anchoredPosition = new Vector2(0, -1);
+                    countRect.sizeDelta = new Vector2(0, 16);
+                    var label = countObject.AddComponent<TMPro.TextMeshProUGUI>();
+                    label.font = Resources.Load<TMPro.TMP_FontAsset>("PixelMplus10_DynamicFixed");
+                    label.fontSize = 12;
+                    label.alignment = TMPro.TextAlignmentOptions.Center;
+                    label.color = new Color32(239, 238, 216, 255);
+                    label.outlineColor = new Color32(37, 27, 35, 255);
+                    label.outlineWidth = .2f;
+                    label.raycastTarget = false;
+                    label.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
+                    WaitTileCountUI.Bind(label, id, compact: true);
+                }
             }
 
             var hlg = waitContainer.GetComponent<UnityEngine.UI.HorizontalLayoutGroup>();

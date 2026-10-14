@@ -267,7 +267,7 @@ namespace KillingMahjong.UI
             for (int i = 0; i < waits.Length; i++)
             {
                 int index = i;
-                var card = Rect(content, "WaitChoice" + i, 254 + i * step, 430, Mathf.Min(64, step - 4), 74, out _);
+                var card = Rect(content, "WaitChoice" + i, 254 + i * step, 430, Mathf.Min(64, step - 4), 92, out _);
                 var image = card.gameObject.AddComponent<Image>(); image.color = Ink;
                 var button = card.gameObject.AddComponent<Button>(); button.targetGraphic = image;
                 button.onClick.AddListener(() => Select(index));
@@ -275,7 +275,8 @@ namespace KillingMahjong.UI
                 var tileImage = tile.gameObject.AddComponent<Image>();
                 tileImage.sprite = tiles.GetTileSprite(waits[i].tile); tileImage.preserveAspect = true; tileImage.raycastTarget = false;
                 Label(card, "WaitRank", 2, 49, card.sizeDelta.x - 4, 23, 16, TextAlignmentOptions.Center).text = waits[i].mangan_or_more ? Rank(waits[i]) : waits[i].han + "翻";
-                var markRect = Rect(card, "SelectedFrame", 0, 0, card.sizeDelta.x, 74, out _);
+                WaitTileCountUI.Bind(Label(card, "OutsideCount", 2, 72, card.sizeDelta.x - 4, 18, 12, TextAlignmentOptions.Center), waits[i].tile);
+                var markRect = Rect(card, "SelectedFrame", 0, 0, card.sizeDelta.x, 92, out _);
                 var mark = markRect.gameObject.AddComponent<PixelShapeGraphic>(); mark.raycastTarget = false; marks.Add(mark);
                 var cg = card.gameObject.AddComponent<CanvasGroup>(); cg.alpha = animate ? 0 : 1;
                 cards.Add(card); groups.Add(cg);
