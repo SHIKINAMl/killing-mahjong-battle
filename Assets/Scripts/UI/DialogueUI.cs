@@ -264,10 +264,10 @@ namespace KillingMahjong.UI
         {
             if (string.IsNullOrEmpty(skillType)) return;
             string text = (isLocalPlayer ? "自分" : "敵") + "：" + Common.SkillNames.GetDisplayName(skillType);
-            AddToLog(text, isLocalPlayer ? new Color32(63, 158, 239, 255) : new Color32(237, 72, 88, 255));
+            AddToLog(text, isLocalPlayer ? new Color32(63, 158, 239, 255) : new Color32(237, 72, 88, 255), isLocalPlayer);
         }
 
-        private void AddToLog(string text, Color? skillColor = null)
+        private void AddToLog(string text, Color? skillColor = null, bool isLocalPlayer = false)
         {
             dialogueHistory.Add(text);
             
@@ -287,30 +287,14 @@ namespace KillingMahjong.UI
                 {
                     var color = skillColor.Value;
                     var rowRect = newLogItem.GetComponent<RectTransform>();
-                    if (rowRect != null) rowRect.sizeDelta = new Vector2(rowRect.sizeDelta.x, 46);
+                    if (rowRect != null) rowRect.sizeDelta = new Vector2(rowRect.sizeDelta.x, 36);
                     var layout = newLogItem.GetComponent<LayoutElement>();
                     if (layout == null) layout = newLogItem.AddComponent<LayoutElement>();
-                    layout.minHeight = layout.preferredHeight = 46;
+                    layout.minHeight = layout.preferredHeight = 36;
                     layout.flexibleHeight = 0;
                     var background = newLogItem.GetComponent<Image>();
-                    if (background != null) background.color = new Color(color.r * .18f, color.g * .18f, color.b * .18f, 1f);
-                    if (tmp != null)
-                    {
-                        tmp.color = color;
-                        tmp.alignment = TextAlignmentOptions.MidlineLeft;
-                        tmp.margin += new Vector4(8, 0, 0, 0);
-                    }
-                    var borderObject = new GameObject("SkillBorder", typeof(RectTransform), typeof(Effects.PixelShapeGraphic));
-                    var borderRect = borderObject.GetComponent<RectTransform>();
-                    borderRect.SetParent(newLogItem.transform, false);
-                    borderRect.anchorMin = Vector2.zero;
-                    borderRect.anchorMax = Vector2.one;
-                    borderRect.sizeDelta = Vector2.zero;
-                    var border = borderObject.GetComponent<Effects.PixelShapeGraphic>();
-                    border.raycastTarget = false;
-                    border.color = color;
-                    Canvas.ForceUpdateCanvases();
-                    border.Begin(); border.Frame(borderRect.rect, 2, color); border.End();
+                    if (background != null) background.enabled = false;
+                    newLogItem.AddComponent<SkillLogRowUI>().Configure(tmp, color, isLocalPlayer);
                 }
 
                 // ログが追加されたら一番下まで自動スクロールさせる
