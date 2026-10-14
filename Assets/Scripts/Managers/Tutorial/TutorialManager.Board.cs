@@ -139,7 +139,9 @@ namespace KillingMahjong.Managers
         private IEnumerator RunDiscardEntryTransition()
         {
             var transition = gameUIManager != null ? gameUIManager.PhaseTransitionUI : null;
-            if (transition == null)
+            if (transition != null && !transition.gameObject.activeSelf) transition.gameObject.SetActive(true);
+            // 親ごと消えていると演出が始まらない。来ない合図を待たずに進める
+            if (transition == null || !transition.isActiveAndEnabled)
             {
                 SetPhase(RoundStatus.Discard);
                 yield break;
