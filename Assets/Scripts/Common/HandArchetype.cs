@@ -27,10 +27,40 @@ namespace KillingMahjong.Common
             public string Summary;
             /// <summary>相手がこの型のとき、捨て牌に出る特徴（1行）。</summary>
             public string Tell;
+
+            /// <summary>アイコンの名前（`Resources/HandTypes/hand_type_<Id>`）。</summary>
+            public string Id;
+            /// <summary>文字の札（型の名前を一色で囲んだもの）の地の色と文字の色。</summary>
+            public UnityEngine.Color32 Badge;
+            public UnityEngine.Color32 BadgeInk;
+
+            private UnityEngine.Sprite _icon;
+            private bool _iconLoaded;
+
+            /// <summary>
+            /// 型のアイコン（32x32 ドット）。無ければ null。
+            /// **絵は Gemini が描いたもの**（2026-10-15、ユーザーの指示。指示書は km-docs の
+            /// `tasks/hand_type_icons/`）。1枚の JPG で届いたので、こちらで切り出して 32x32 に直した。
+            /// </summary>
+            public UnityEngine.Sprite Icon
+            {
+                get
+                {
+                    if (!_iconLoaded)
+                    {
+                        _iconLoaded = true;
+                        _icon = UnityEngine.Resources.Load<UnityEngine.Sprite>("HandTypes/hand_type_" + Id);
+                    }
+                    return _icon;
+                }
+            }
         }
 
         public static readonly Info Yakuman = new Info
         {
+            Id = "yakuman",
+            Badge = new UnityEngine.Color32(0x76, 0x42, 0x8A, 0xFF),
+            BadgeInk = new UnityEngine.Color32(0xFF, 0xFF, 0xFF, 0xFF),
             Name = "役満",
             Yaku = new[] { "四暗刻", "緑一色", "清老頭", "九蓮宝燈", "純正九蓮宝燈" },
             Summary = "それだけで役満になる手",
@@ -39,6 +69,9 @@ namespace KillingMahjong.Common
 
         public static readonly Info Some = new Info
         {
+            Id = "some",
+            Badge = new UnityEngine.Color32(0xAC, 0x32, 0x32, 0xFF),
+            BadgeInk = new UnityEngine.Color32(0xFF, 0xFF, 0xFF, 0xFF),
             Name = "染め",
             Yaku = new[] { "混一色", "清一色" },
             Summary = "1つの柄（と東・西）に寄せる",
@@ -47,6 +80,9 @@ namespace KillingMahjong.Common
 
         public static readonly Info Chiitoi = new Info
         {
+            Id = "chiitoi",
+            Badge = new UnityEngine.Color32(0xD9, 0x57, 0x63, 0xFF),
+            BadgeInk = new UnityEngine.Color32(0x00, 0x00, 0x00, 0xFF),
             Name = "七対子",
             Yaku = new[] { "七対子" },
             Summary = "同じ牌2枚の組を7つ",
@@ -55,6 +91,9 @@ namespace KillingMahjong.Common
 
         public static readonly Info Koutsu = new Info
         {
+            Id = "koutsu",
+            Badge = new UnityEngine.Color32(0xCB, 0xDB, 0xFC, 0xFF),
+            BadgeInk = new UnityEngine.Color32(0x00, 0x00, 0x00, 0xFF),
             Name = "刻子",
             Yaku = new[] { "対々和", "三暗刻", "三色同刻" },
             Summary = "同じ牌3枚の組を重ねる",
@@ -63,6 +102,9 @@ namespace KillingMahjong.Common
 
         public static readonly Info Hashi = new Info
         {
+            Id = "hashi",
+            Badge = new UnityEngine.Color32(0xDF, 0x71, 0x26, 0xFF),
+            BadgeInk = new UnityEngine.Color32(0x00, 0x00, 0x00, 0xFF),
             Name = "端",
             Yaku = new[] { "純全帯么九", "混全帯么九", "混老頭" },
             Summary = "どの組にも1・9（か東・西）を入れる",
@@ -71,6 +113,9 @@ namespace KillingMahjong.Common
 
         public static readonly Info Narabi = new Info
         {
+            Id = "narabi",
+            Badge = new UnityEngine.Color32(0x63, 0x9B, 0xFF, 0xFF),
+            BadgeInk = new UnityEngine.Color32(0x00, 0x00, 0x00, 0xFF),
             Name = "並び",
             Yaku = new[] { "一気通貫", "三色同順", "二盃口", "一盃口", "平和", "断么九" },
             Summary = "順子（123のような並び）で役を重ねる",
@@ -79,6 +124,9 @@ namespace KillingMahjong.Common
 
         public static readonly Info Dora = new Info
         {
+            Id = "dora",
+            Badge = new UnityEngine.Color32(0xFB, 0xF2, 0x36, 0xFF),
+            BadgeInk = new UnityEngine.Color32(0x00, 0x00, 0x00, 0xFF),
             Name = "ドラ頼み",
             Yaku = new[] { "ドラ", "赤ドラ" },
             Summary = "ドラの枚数で満貫に届かせる",

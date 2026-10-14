@@ -183,6 +183,7 @@ namespace KillingMahjong.UI
             _cancel.GetComponentInChildren<TMP_Text>().text = "閉じる";
             // 一覧として見るときは型ごとに並べる。どの型にどの役が入るかを覚えてもらうため
             UseTypeList(_typeContent != null);
+            ApplyTypeHeadStyle();
             if (_typeContent == null)
             {
                 Select(wasOpen ? _selected : 0);
@@ -457,21 +458,19 @@ namespace KillingMahjong.UI
                 content.pivot = new Vector2(0.5f, 1f);
             }
 
-            var sections = new List<KeyValuePair<string, string[]>>();
-            foreach (var info in TypeOrder) sections.Add(new KeyValuePair<string, string[]>(info.Name, info.Yaku));
-            sections.Add(new KeyValuePair<string, string[]>(OtherSection, OtherYakus));
-
             float y = -4f;
             int row = 0;
-            for (int s = 0; s < sections.Count; s++)
+            _typeHeads.Clear();
+            for (int s = 0; s <= TypeOrder.Length; s++)
             {
-                if (s > 0) y -= 6f;
-                TextMeshProUGUI head = Txt(content, "TypeSection_" + s, "型：" + sections[s].Key, Vector2.zero,
-                    new Vector2(ListWidth - 8f, 20f), 13f, TextAlignmentOptions.Left, Marker, out bool madeHead);
-                if (madeHead) PlaceRow(head.rectTransform, y);
-                y -= RowPitch;
+                HandArchetype.Info info = s < TypeOrder.Length ? TypeOrder[s] : null;
+                string[] yakus = info != null ? info.Yaku : OtherYakus;
 
-                foreach (var yaku in sections[s].Value)
+                if (s > 0) y -= 6f;
+                BuildTypeHead(content, s, info, y);
+                y -= TypeHeadPitch;
+
+                foreach (var yaku in yakus)
                 {
                     GameObject rowGo = SceneFirst.Child(content, "TypeYaku_" + row, out bool madeRow,
                         typeof(RectTransform), typeof(Image), typeof(Button));
@@ -512,6 +511,103 @@ namespace KillingMahjong.UI
                 contentGo.SetActive(false);
             }
             _typeContent = content;
+            ApplyTypeHeadStyle();
+        }
+
+        // ---- 型の見出し：アイコンか、文字の札か（2026-10-15、見比べるために両方置く） ----
+
+        /// <summary>型の見出しの見せ方。</summary>
+        public enum TypeHeadStyle
+        {
+            /// <summary>型のアイコン（Gemini の絵）＋型の名前</summary>
+            Icon,
+            /// <summary>型の名前を一色の札で囲む</summary>
+            Badge,
+        }
+
+        /// <summary>
+        /// いまの見せ方。ユーザーが「アイコンでもいいが、文字を一色で囲んだものも試したい」と言ったので、
+        /// 両方をシーンに置いてここで切り替える。決まったら片方を消す。
+        /// </summary>
+        public static TypeHeadStyle HeadStyle = TypeHeadStyle.Icon;
+
+        /// <summary>見出しの行の高さ。アイコンが 32 なので、役の行（21）より高い。</summary>
+        private const float TypeHeadPitch = 36f;
+        private const float TypeIconSize = 32f;
+
+        private readonly List<GameObject[]> _typeHeads = new List<GameObject[]>();
+
+        private void BuildTypeHead(RectTransform content, int index, HandArchetype.Info info, float y)
+        {
+            string label = info != null ? info.Name : OtherSection;
+            float left = -ListWidth * 0.5f + 4f;
+
+            GameObject head = SceneFirst.Child(content, "TypeHead_" + index, out bool madeHead, typeof(RectTransform));
+            var headRt = (RectTransform)head.transform;
+            if (madeHead)
+            {
+                headRt.sizeDelta = new Vector2(ListWidth, TypeIconSize);
+                PlaceRow(headRt, y);
+            }
+
+            // アイコン＋名前
+            GameObject icon = null;
+            if (info != null)
+            {
+                icon = SceneFirst.Child(head.transform, "Icon", out bool madeIcon, typeof(RectTransform), typeof(Image));
+                if (madeIcon)
+                {
+                    var img = icon.GetComponent<Image>();
+                    Center(img.rectTransform, new Vector2(TypeIconSize, TypeIconSize));
+                    img.rectTransform.anchoredPosition = new Vector2(left + TypeIconSize * 0.5f, 0f);
+                    img.sprite = info.Icon;
+                    img.raycastTarget = false;
+                }
+            }
+            float textLeft = info != null ? left + TypeIconSize + 6f : left;
+            float textWidth = ListWidth * 0.5f - textLeft;
+            TextMeshProUGUI name = Txt(head.transform, "Label", label, new Vector2(textLeft + textWidth * 0.5f, 0f),
+                new Vector2(textWidth, 20f), 15f, TextAlignmentOptions.Left, Marker);
+
+            // 一色の札（地の色に型の名前）
+            GameObject badge = SceneFirst.Child(head.transform, "Badge", out bool madeBadge,
+                typeof(RectTransform), typeof(Image), typeof(HorizontalLayoutGroup), typeof(ContentSizeFitter));
+            if (madeBadge)
+            {
+                var rt = (RectTransform)badge.transform;
+                rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+                rt.pivot = new Vector2(0f, 0.5f);
+                rt.anchoredPosition = new Vector2(left, 0f);
+                badge.GetComponent<Image>().color = info != null ? (Color)info.Badge : TextDim;
+                badge.GetComponent<Image>().raycastTarget = false;
+                var layout = badge.GetComponent<HorizontalLayoutGroup>();
+                // 1ドット＝2単位の格子に合わせた余白
+                layout.padding = new RectOffset(8, 8, 2, 2);
+                layout.childControlWidth = true;
+                layout.childControlHeight = true;
+                layout.childForceExpandWidth = false;
+                layout.childForceExpandHeight = false;
+                var fit = badge.GetComponent<ContentSizeFitter>();
+                fit.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+                fit.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            }
+            TextMeshProUGUI badgeText = Txt(badge.transform, "Text", label, Vector2.zero, new Vector2(80f, 22f),
+                18f, TextAlignmentOptions.Center, info != null ? (Color)info.BadgeInk : Color.black, out bool madeBadgeText);
+            if (madeBadgeText) badgeText.textWrappingMode = TextWrappingModes.NoWrap;
+
+            _typeHeads.Add(new[] { icon, name.gameObject, badge });
+        }
+
+        /// <summary>見出しの見せ方を <see cref="HeadStyle"/> に合わせる。</summary>
+        public void ApplyTypeHeadStyle()
+        {
+            bool badge = HeadStyle == TypeHeadStyle.Badge;
+            foreach (var parts in _typeHeads)
+            {
+                if (parts[0] != null) parts[0].SetActive(!badge);
+                if (parts[1] != null) parts[1].SetActive(!badge);
+                if (parts[2] != null) parts[2].SetActive(badge);
+            }
         }
 
         // ---- 右: 選んだ役の説明と例 ----
