@@ -51,6 +51,12 @@ namespace KillingMahjong.UI
             // ---- 見出しの帯：左に「和了」、右にランク ----
             GameObject head = MakeBox(root.transform, PanelLine, 8, 4);
             MakeText(head.transform, "和了", 20f, PanelInk, TextAlignmentOptions.Left, true);
+            // 型の答え合わせ（2026-10-15）。相手に和了られたときに「相手は染めだった」と分かれば、
+            // 次からその捨て牌の特徴を覚えていける。行を足すと役5行で画面からはみ出すので見出しに入れる
+            var archetype = HandArchetype.Classify(RowNames(s));
+            if (archetype != null)
+                MakeText(head.transform, (s.LocalWon ? "自分の型 " : "相手の型 ") + archetype.Name, 18f,
+                    s.LocalWon ? AccentMine : AccentThem, TextAlignmentOptions.Right, false, 190f);
             MakeText(head.transform, s.RankName, 30f, AccentGold, TextAlignmentOptions.Right, false, 200f);
 
             // ---- 中身（地の色） ----
@@ -142,6 +148,12 @@ namespace KillingMahjong.UI
             hpRow.SetActive(false);
 
             return group;
+        }
+
+        private static IEnumerable<string> RowNames(RonSettlementInfo s)
+        {
+            foreach (var row in s.Rows)
+                if (row != null) yield return row.Name;
         }
 
         /// <summary>横1列の入れ物。中身は左から順に並ぶ。</summary>
