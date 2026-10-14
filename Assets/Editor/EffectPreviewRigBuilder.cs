@@ -30,6 +30,7 @@ namespace KillingMahjong.EditorTools
                 rig.player = ui.PlayerInfoUI; rig.enemy = ui.EnemyInfoUI; rig.betting = ui.BettingUI;
                 rig.blink = root.GetComponentInChildren<BlinkEffectUI>(true);
                 rig.tiles = ui.TileResourceManager;
+                TutorialReplayBoardBuilder.Save(ui);
                 rig.dialogue = ui.DialogueUI;
                 rig.momentum = root.GetComponentInChildren<KillingMahjong.UI.Effects.MatchMomentumUI>(true);
                 // 右上の役一覧と強化の枠。役強化の演出が最後にここへ飛んでいくので、試写にも置く

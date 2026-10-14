@@ -25,7 +25,7 @@ namespace KillingMahjong.UI
         private PhaseTransitionUI phase;
         private TileResourceManager tiles;
         private PixelShapeGraphic noise;
-        private readonly List<RectTransform> river = new List<RectTransform>(), wall = new List<RectTransform>();
+        private TutorialReplayBoard board;
         private bool advanced, automatic;
         private float noiseNext;
 
@@ -75,6 +75,10 @@ namespace KillingMahjong.UI
             var rig = prefab != null ? prefab.GetComponent<EffectPreviewRig>() : null;
             if (rig == null) throw new InvalidOperationException("流局の試写用素材がありません。");
             tiles = rig.tiles;
+            var boardPrefab = Resources.Load<GameObject>("Presentation/TutorialReplayBoard");
+            if (boardPrefab == null) throw new InvalidOperationException("流局の盤面素材を更新してください。");
+            board = Instantiate(boardPrefab.GetComponent<TutorialReplayBoard>(), viewport, false);
+            board.Initialize(tiles);
             var p = Instantiate(rig.phase.gameObject, transform); phase = p.GetComponent<PhaseTransitionUI>(); p.SetActive(true);
             // 独立Canvasのプレハブを子Canvasへ置くと、保存時の0サイズ・0スケールが残る。
             var phaseRect=(RectTransform)p.transform;
@@ -111,23 +115,12 @@ namespace KillingMahjong.UI
             pauseRect.offsetMin=Vector2.zero; pauseRect.offsetMax=Vector2.zero; pauseRect.localScale=Vector3.one;
             paused=Label("ReplayPaused",pauseLayer.transform,new Vector2(160,70),new Vector2(300,240),24);
             paused.text="Ⅱ\n再生停止"; paused.gameObject.SetActive(false);
-            for(int i=0;i<16;i++) {
-                river.Add(Tile("OwnDiscard"+i,9+i%9,new Vector2(-170+i%6*27,-115-i/6*35),true));
-                river.Add(Tile("EnemyDiscard"+i,18+i%9,new Vector2(170-i%6*27,-115-i/6*35),true,true));
-            }
-            river.Add(Tile("EnemyDiscard16",25,new Vector2(62,-185),true,true));
-            Tile("LastTile",27,new Vector2(-100,-205));
         }
         private static void Stretch(RectTransform rect)
         {
             rect.anchorMin=Vector2.zero; rect.anchorMax=Vector2.one;
             rect.offsetMin=Vector2.zero; rect.offsetMax=Vector2.zero;
             rect.localScale=Vector3.one; rect.localRotation=Quaternion.identity;
-        }
-        private RectTransform Tile(string name,int baseId,Vector2 position,bool discard=false,bool enemy=false)
-        {
-            var r=Box(name,viewport,new Vector2(25,33),position,Color.white); int id=TutorialTiles.Encode(baseId,false);
-            r.GetComponent<Image>().sprite=discard?tiles.GetDiscardTileSprite(id,enemy):tiles.GetTileSprite(id); return r;
         }
         private IEnumerator Step(string text,bool subtitle,bool loud=false)
         {
@@ -159,12 +152,7 @@ namespace KillingMahjong.UI
             yield return Step("今からアタシが流局するから見ててよ",true);
             yield return Step("では惨めに最後の牌を出しなさい？",false);
             yield return Step("ざぁーこ♡",false,true);
-            var last=viewport.Find("LastTile") as RectTransform;
-            if(last!=null) {
-                Vector2 from=last.anchoredPosition,to=new Vector2(-62,-185);
-                for(float t=0;t<1;t+=Time.unscaledDeltaTime*2) {last.anchoredPosition=Vector2.Lerp(from,to,Mathf.SmoothStep(0,1,t));yield return null;}
-                last.anchoredPosition=to;
-            }
+            yield return board.DiscardLastTile();
             bool done=false; phase.PlayDrawTransition(ShowNewWall,()=>done=true);
             float limit=Time.realtimeSinceStartup+12; yield return new WaitUntil(()=>done||Time.realtimeSinceStartup>=limit);
             if(!done) {phase.CancelTransitions();ShowNewWall();}
@@ -191,25 +179,11 @@ namespace KillingMahjong.UI
         }
         private void ShowNewWall()
         {
-            foreach(var r in river) if(r!=null) Destroy(r.gameObject); river.Clear();
-            var last=viewport.Find("LastTile"); if(last!=null) Destroy(last.gameObject);
-            // 本編と同じチュートリアル配牌を例に使う。牌姿を推測で組み立てない。
-            var scenario=Resources.Load<TutorialScenario>("TutorialScenario");
-            bool temporary=scenario==null;
-            if(temporary) scenario=TutorialScenario.BuildDefault();
-            var example=scenario.rounds[0].wallBaseIds;
-            for(int i=0;i<example.Count;i++)
-                wall.Add(Tile("ReplayWall"+i,example[i],new Vector2(-208+i%17*26,-150-i/17*35)));
-            if(temporary) Destroy(scenario);
+            board.ShowNewWall();
         }
         private IEnumerator BuildHand(Action completed)
         {
-            for(int i=0;i<Mathf.Min(13,wall.Count);i++) {
-                var r=wall[i]; Vector2 from=r.anchoredPosition,to=new Vector2(-156+i*26,-205);
-                for(float t=0;t<1;t+=Time.unscaledDeltaTime*5) {r.anchoredPosition=Vector2.Lerp(from,to,t);yield return null;}
-                r.anchoredPosition=to; yield return new WaitForSecondsRealtime(.15f);
-            }
-            completed?.Invoke();
+            yield return board.BuildHand(completed);
         }
         private void Update()
         {

@@ -275,6 +275,17 @@ namespace KillingMahjong.UI
             if (willFly) FinishVoltage(rt);
         }
 
+        /// <summary>独立した試写盤面に配置する。ボルテージ・打牌数・対局状態は変更しない。</summary>
+        public void AddPresentationTile(RectTransform rt, int tileId)
+        {
+            rt.SetParent(riverContainer, false);
+            ApplyRiverLayout(rt);
+            var visual = rt.GetComponent<TileVisual>();
+            if (visual != null) visual.SetTile(tileId, tileResourceManager.GetDiscardTileSprite(tileId, isEnemyRiver));
+            discardedTiles.Add(rt);
+            UpdateSiblingOrder();
+        }
+
         /// <summary>
         /// 牌が河に置かれた直後の心音（弱・詰まった1拍）。
         ///
