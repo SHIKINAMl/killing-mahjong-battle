@@ -138,9 +138,6 @@ namespace KillingMahjong.Managers
             if (KillingMahjong.Managers.AudioManager.Instance != null)
             {
                 KillingMahjong.Managers.AudioManager.Instance.PlayPaperSlideSE();
-                // 契約書が迫り上がる厚みを足す（2026-09-11）。
-                // **ここまでは無音。** 契約書の場面は、この効果音だけで静かに進める。
-                KillingMahjong.Managers.AudioManager.Instance.PlayStinger("se_paper");
             }
             largePaperUI.SetActive(true);
             RectTransform rt = largePaperUI.GetComponent<RectTransform>();
