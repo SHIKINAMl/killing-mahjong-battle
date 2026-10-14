@@ -35,8 +35,8 @@ namespace KillingMahjong.UI
                 label.transform.SetParent(panel, false);
                 var textRect = label.rectTransform;
                 textRect.anchorMin = Vector2.zero; textRect.anchorMax = Vector2.one;
-                textRect.offsetMin = new Vector2(local ? 12 : 22, 0);
-                textRect.offsetMax = new Vector2(local ? -22 : -12, 0);
+                textRect.offsetMin = new Vector2(local ? 22 : 12, 0);
+                textRect.offsetMax = new Vector2(local ? -12 : -22, 0);
                 label.margin = Vector4.zero; label.color = new Color32(239, 238, 216, 255);
                 label.alignment = local ? TextAlignmentOptions.MidlineRight : TextAlignmentOptions.MidlineLeft;
             }
@@ -50,7 +50,6 @@ namespace KillingMahjong.UI
         {
             if (border == null) return;
             var rect = border.rectTransform.rect;
-            var ink = new Color32(12, 15, 23, 255);
             var fill = new Color(color.r * .14f, color.g * .14f, color.b * .14f, 1);
             float half = rect.height * .5f;
             if (half <= 0) return;
@@ -60,13 +59,12 @@ namespace KillingMahjong.UI
             {
                 float top = Mathf.Min(y + 2, rect.yMax);
                 float inset = Mathf.Round(12 * Mathf.Abs((y + top) * .5f - rect.center.y) / half / 2) * 2;
-                float left = rect.xMin + (isLocal ? 0 : inset);
-                float right = rect.xMax - (isLocal ? inset : 0);
-                border.Box(left, y, right, top, ink);
-                if (y >= rect.yMin + 1 && top <= rect.yMax - 1)
-                    border.Box(left + 1, y, right - 1, top, color);
-                if (y >= rect.yMin + 3 && top <= rect.yMax - 3)
-                    border.Box(left + 3, y, right - 3, top, fill);
+                float left = rect.xMin + (isLocal ? inset : 0);
+                float right = rect.xMax - (isLocal ? 0 : inset);
+                border.Box(left, y, right, top, fill);
+                // 色の線は中央を向く斜めの先端だけ。四角い側は囲わない。
+                if (isLocal) border.Box(left, y, left + 2, top, color);
+                else border.Box(right - 2, y, right, top, color);
             }
             border.End();
         }
