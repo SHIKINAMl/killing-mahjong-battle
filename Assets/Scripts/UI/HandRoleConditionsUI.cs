@@ -186,13 +186,17 @@ namespace KillingMahjong.UI
         }
         private void RenderElapsed(float time)
         {
+            bool entered = false;
             for (int i = 0; i < names.Count; i++)
             {
                 float u = Mathf.Clamp01((time - i * stagger) / Mathf.Max(.001f, duration));
+                if (u > 0 && groups[i].alpha == 0) entered = true;
                 float ease = 1 - Mathf.Pow(1 - u, 3);
                 groups[i].alpha = Mathf.Min(1, u * 4);
                 cards[i].anchoredPosition = positions[i] + new Vector2(Mathf.Round(slide * (1 - ease)), 0);
             }
+            // 低FPSで複数行が同時に出ても、大きな音を重ねず1回だけ鳴らす。
+            if (entered && hovered && gate.alpha > 0) HandSelectionFeedbackAudio.PlayRoleEntry();
         }
         public void HideImmediate()
         {

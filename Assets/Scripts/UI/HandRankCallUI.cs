@@ -256,6 +256,7 @@ namespace KillingMahjong.UI
             _rightRect.localScale = Vector3.one;
 
             // ---- 着弾の白フラッシュ ----
+            KillingMahjong.UI.Effects.HandSelectionFeedbackAudio.PlayRankImpact();
             StartCoroutine(FlashRoutine());
 
             yield return new WaitForSecondsRealtime(HoldSeconds);
