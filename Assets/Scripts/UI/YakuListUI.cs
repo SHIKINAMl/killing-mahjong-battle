@@ -100,6 +100,9 @@ namespace KillingMahjong.UI
             }
         }
 
+        /// <summary>全役一覧の最初と最後の行を、表示領域の縁から離す余白。2ドット。</summary>
+        private const int GridPaddingVertical = 4;
+
         /// <summary>
         /// 全役一覧のボックスを表示領域の中央へ寄せる。
         ///
@@ -136,10 +139,14 @@ namespace KillingMahjong.UI
             if (slack <= 0f) return;            // 入りきっている。寄せる余地が無い
 
             int left = Mathf.RoundToInt(slack * 0.5f);
-            if (grid.padding.left == left) return;
+
+            // 上下も枠に貼りつかないよう少し空ける（2026-10-14）。シーンの値が 0 のときだけ足す
+            int top = grid.padding.top > 0 ? grid.padding.top : GridPaddingVertical;
+            int bottom = grid.padding.bottom > 0 ? grid.padding.bottom : GridPaddingVertical;
+            if (grid.padding.left == left && grid.padding.top == top && grid.padding.bottom == bottom) return;
 
             // RectOffset は中の値を書き換えても再計算されないことがあるので、入れ替える
-            grid.padding = new RectOffset(left, grid.padding.right, grid.padding.top, grid.padding.bottom);
+            grid.padding = new RectOffset(left, grid.padding.right, top, bottom);
             LayoutRebuilder.ForceRebuildLayoutImmediate(content);
         }
 
