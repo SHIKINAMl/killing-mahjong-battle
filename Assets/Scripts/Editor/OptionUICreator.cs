@@ -138,8 +138,7 @@ namespace KillingMahjong.Editor
             Button returnBtn = CreateButton(panelObj.transform, "ReturnButton", "Title", new Vector2(-250, -280), new Vector2(180, 50));
             Button quitBtn = CreateButton(panelObj.transform, "QuitButton", "Quit", new Vector2(-50, -280), new Vector2(180, 50));
 
-            // Buttons (Save/Close)
-            Button saveBtn = CreateButton(panelObj.transform, "SaveButton", "Save & Close", new Vector2(200, -280), new Vector2(220, 50));
+            // Close button (settings are applied and saved immediately)
             Button cancelBtn = CreateButton(panelObj.transform, "CancelButton", "X", new Vector2(360, 310), new Vector2(50, 50));
 
             // スクリプトにアタッチ
@@ -151,7 +150,6 @@ namespace KillingMahjong.Editor
             serializedObject.FindProperty("effectToggle").objectReferenceValue = effectToggle;
             serializedObject.FindProperty("resolutionDropdown").objectReferenceValue = resolutionDropdown;
             serializedObject.FindProperty("fullscreenToggle").objectReferenceValue = fullscreenToggle;
-            serializedObject.FindProperty("saveAndCloseButton").objectReferenceValue = saveBtn;
             serializedObject.FindProperty("closeButton").objectReferenceValue = cancelBtn;
             serializedObject.FindProperty("returnToTitleButton").objectReferenceValue = returnBtn;
             serializedObject.FindProperty("quitButton").objectReferenceValue = quitBtn;

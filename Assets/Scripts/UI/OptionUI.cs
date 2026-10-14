@@ -31,11 +31,10 @@ namespace KillingMahjong.UI
 
         [Header("Buttons")]
         [SerializeField] private Button closeButton; // 変更を保持して閉じる
-        [SerializeField] private Button saveAndCloseButton; // 保存して閉じる
         [SerializeField] private Button returnToTitleButton; // タイトル（または別シーン）に戻る
         [SerializeField] private Button quitButton; // ゲーム終了
 
-        // シーンを編集せず、既存の保存ボタンをひな形にして実行時に追加する。
+        // 既存のタイトルボタンをひな形にして実行時に追加する。
         private Button tutorialArchiveButton;
         private TutorialArchiveUI tutorialArchiveUI;
 
@@ -112,8 +111,7 @@ namespace KillingMahjong.UI
         {
             InitializeUI();
 
-            // ひな形の Button にはまだ Start 内のクリック処理が入っていない段階で複製する。
-            // こうして資料ボタンへ「保存して閉じる」の処理が混ざるのを防ぐ。
+            // タイトルへ戻るクリック処理を登録する前に資料ボタンを複製する。
             CreateTutorialArchiveButton();
             BuildSettingRows();
 
@@ -131,7 +129,6 @@ namespace KillingMahjong.UI
 
             // --- ボタンのイベント登録 ---
             if (closeButton != null) closeButton.onClick.AddListener(CloseWithoutSave);
-            if (saveAndCloseButton != null) saveAndCloseButton.onClick.AddListener(SaveAndClose);
             
             if (returnToTitleButton != null) 
             {
@@ -521,8 +518,7 @@ namespace KillingMahjong.UI
         {
             if (tutorialArchiveButton != null) return;
 
-            // 保存ボタンは長い日本語ラベルを収められる横幅なので、見た目のひな形に使う。
-            Button template = saveAndCloseButton != null ? saveAndCloseButton : returnToTitleButton;
+            Button template = returnToTitleButton;
             if (template == null)
             {
                 Debug.LogWarning("[OptionUI] チュートリアル資料のひな形ボタンが見つかりません。");
@@ -531,6 +527,8 @@ namespace KillingMahjong.UI
 
             GameObject buttonObject = Instantiate(template.gameObject, template.transform.parent, false);
             buttonObject.name = "TutorialArchiveButton";
+            // 削除した保存ボタンと同じ幅を維持し、日本語ラベルを収める。
+            ((RectTransform)buttonObject.transform).SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, 220f);
             tutorialArchiveButton = buttonObject.GetComponent<Button>();
             tutorialArchiveButton.onClick.RemoveAllListeners();
 
@@ -548,14 +546,9 @@ namespace KillingMahjong.UI
 
         private void ArrangeSystemButtons()
         {
-            // **「やめる」を下ろしたので3つ（2026-09-27）。**
-            // 上段に「タイトルへ」と「チュートリアル資料」、下段の中央に「保存して閉じる」。
-            // 保存がいちばん押す操作なので、単独で目立つ位置に置く。
-            //
-            // 以前は4つを2段2列に並べ、いちばん下が画面の端に張り付いていた。
+            // 「タイトルへ」と「チュートリアル資料」を同じ段に並べる。
             SetButtonPosition(returnToTitleButton, new Vector2(-135f, -172f));
             SetButtonPosition(tutorialArchiveButton, new Vector2(135f, -172f));
-            SetButtonPosition(saveAndCloseButton, new Vector2(0f, -232f));
         }
 
         private static void SetButtonPosition(Button button, Vector2 position)
