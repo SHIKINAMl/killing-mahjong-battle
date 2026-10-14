@@ -155,7 +155,7 @@ namespace KillingMahjong.Managers
         private void ShakeScreen(float duration, float magnitude, Vector2 axis)
         {
             var pt = gameUIManager != null ? gameUIManager.PhaseTransitionUI : null;
-            if (pt != null) pt.PlayScreenShake(duration, magnitude, axis);
+            if (pt != null) StartCoroutine(pt.PlayScreenShakeRoutine(duration, magnitude, axis));
         }
 
         private void FlashScreen()
@@ -180,34 +180,44 @@ namespace KillingMahjong.Managers
         /// </summary>
         private IEnumerator RunAbilityIntroduction()
         {
-            yield return StartCoroutine(PlayLines(AbilityOpeningLines));
+            var restoreBoard = CaptureIntroDemoBoard();
+            try
+            {
+                yield return StartCoroutine(PlayLines(AbilityOpeningLines));
 
-            FlashScreen();
-            yield return new WaitForSeconds(0.35f);
-            yield return StartCoroutine(PlayLines(AbilityRichLines));
+                FlashScreen();
+                yield return new WaitForSeconds(0.35f);
+                yield return StartCoroutine(PlayLines(AbilityRichLines));
 
-            // 縦揺れ＆フラッシュ → 上から能力ベルが落ちてくる
-            ShakeScreen(0.25f, 18f, new Vector2(0f, 1f));
-            FlashScreen();
-            yield return new WaitForSeconds(0.3f);
-            yield return StartCoroutine(DropAbilityBellRoutine());
+                // 縦揺れ＆フラッシュ → 上から能力ベルが落ちてくる
+                ShakeScreen(0.25f, 18f, new Vector2(0f, 1f));
+                FlashScreen();
+                yield return new WaitForSeconds(0.3f);
+                yield return StartCoroutine(DropAbilityBellRoutine());
 
-            yield return StartCoroutine(PlayLines(AbilityBellArrivedLines));
+                yield return StartCoroutine(PlayLines(AbilityBellArrivedLines));
 
-            ShakeScreen(0.2f, 16f, new Vector2(1f, 0f));
-            yield return new WaitForSeconds(0.2f);
-            yield return StartCoroutine(PlayLines(AbilityExorcistLines));
+                ShakeScreen(0.2f, 16f, new Vector2(1f, 0f));
+                yield return new WaitForSeconds(0.2f);
+                yield return StartCoroutine(PlayLines(AbilityExorcistLines));
 
-            yield return StartCoroutine(RingBellRoutine());
+                yield return StartCoroutine(RingBellRoutine());
 
-            yield return StartCoroutine(PlayLines(AbilityBelleLines));
+                yield return StartCoroutine(PlayLines(AbilityBelleLines));
 
-            yield return StartCoroutine(RunAbilityShowcaseLoop());
+                yield return StartCoroutine(RunAbilityShowcaseLoop());
 
-            yield return StartCoroutine(PlayLines(AbilityCostWarnLines));
-            FlashScreen();
-            yield return new WaitForSeconds(0.35f);
-            yield return StartCoroutine(PlayLines(AbilityCostWarnAfterLines));
+                yield return StartCoroutine(PlayLines(AbilityCostWarnLines));
+                FlashScreen();
+                yield return new WaitForSeconds(0.35f);
+                yield return StartCoroutine(PlayLines(AbilityCostWarnAfterLines));
+            }
+            finally
+            {
+                restoreBoard();
+                if (gameUIManager != null && gameUIManager.AbilityUI != null)
+                    gameUIManager.AbilityUI.TutorialActivationHandler = null;
+            }
         }
 
         /// <summary>
@@ -336,19 +346,39 @@ namespace KillingMahjong.Managers
             if (!ability.IsWindowOpen) ability.OpenWindow();
             yield return null;
 
-            // 能力一覧ハイライト。**一覧そのものを囲む。**
-            // 行を1つだけ囲むと「これを押せ」に見えて、選ばせる意味が消える
-            GuideTo(ability.AbilityListRect, false, null, UI.TutorialHighlightUI.Style.Frame);
-            yield return new WaitUntil(() => ability.SelectedSkillType != null);
-            string picked = ability.SelectedSkillType;
-            ClearGuide();
-
-            // 発動ボタンハイライト → プレイヤー発動ボタンを押す
-            RectTransform activate = ability.ActivateButtonRect;
-            if (activate != null)
+            string picked = null;
+            System.Func<string, bool> activation = type =>
             {
-                GuideTo(activate, false, null, UI.TutorialHighlightUI.Style.Frame);
-                yield return new WaitUntil(() => ability.SelectedSkillType == null || !ability.IsWindowOpen);
+                if (this == null || !isActiveAndEnabled || picked != null || !CanActivateIntroSkill(type)) return false;
+                picked = type;
+                return true;
+            };
+            ability.TutorialActivationHandler = activation;
+            try
+            {
+                string highlighted = null;
+                GuideTo(ability.AbilityListRect, false, null, UI.TutorialHighlightUI.Style.Frame);
+                // 選んだ行の再クリックが現在の発動操作。選択解除・Xでは実演済みにしない。
+                while (picked == null)
+                {
+                    if (!ability.IsWindowOpen) { ability.OpenWindow(); highlighted = null; }
+                    string selected = ability.SelectedSkillType;
+                    if (selected != highlighted)
+                    {
+                        highlighted = selected;
+                        GuideTo(selected == null ? ability.AbilityListRect
+                            : ability.ActivateButtonRect ?? ability.GetAbilityItemRect(selected),
+                            false, null, UI.TutorialHighlightUI.Style.Frame);
+                    }
+                    yield return null;
+                }
+                ClearGuide();
+                yield return PlayIntroSkillEffect(picked);
+            }
+            finally
+            {
+                if (ability != null && ability.TutorialActivationHandler == activation)
+                    ability.TutorialActivationHandler = null;
                 ClearGuide();
             }
 

@@ -120,21 +120,30 @@ namespace KillingMahjong.UI
             finally { onDone(); }
         }
 
-        private System.Collections.IEnumerator HandleSkillCastedRoutine(SkillCastedData data)
+        public System.Collections.IEnumerator PlayTutorialSkillRoutine(SkillCastedData data, bool skipCutin = false)
+        {
+            if (uiManager == null || !uiManager.IsTutorialMode) yield break;
+            yield return HandleSkillCastedRoutine(data, skipCutin);
+        }
+
+        private string SkillLocalPlayerId => NetworkMessageHandler.Instance != null
+            ? NetworkMessageHandler.Instance.LocalPlayerId : "tutorial-local";
+
+        private System.Collections.IEnumerator HandleSkillCastedRoutine(SkillCastedData data, bool skipCutin = false)
         {
             if (data == null) yield break;
             var ownedLock = uiManager.BeginTransition("skill:" + data.skillType);
             skillTransitions.Add(ownedLock);
             // 演出のロックを取得してから、同じマリガン要求の待ちを解除する。
-            if (data.skillType == "mulligan" && data.player_id == NetworkMessageHandler.Instance.LocalPlayerId)
+            if (data.skillType == "mulligan" && data.player_id == SkillLocalPlayerId)
             {
                 pendingMulligan?.Dispose();
                 pendingMulligan = null;
             }
             bool finished = false;
             _ownMulliganCastSeenAt = data.skillType == "mulligan"
-                && data.player_id == NetworkMessageHandler.Instance.LocalPlayerId ? Time.unscaledTime : _ownMulliganCastSeenAt;
-            try { yield return HandleSkillEffectsRoutine(data, ownedLock); finished = ownedLock.IsActive; }
+                && data.player_id == SkillLocalPlayerId ? Time.unscaledTime : _ownMulliganCastSeenAt;
+            try { yield return HandleSkillEffectsRoutine(data, ownedLock, skipCutin); finished = ownedLock.IsActive; }
             finally { skillTransitions.Remove(ownedLock); ownedLock.Dispose(); }
             if (finished) uiManager.RefreshBoardAfterTransition();
         }
@@ -158,7 +167,7 @@ namespace KillingMahjong.UI
             // ロンより弱くする。能力は局に何度も飛ぶので、同じ強さだと疲れる。
             Effects.ScreenQuake.Play(12f, 0.22f);
 
-            string localPlayerId = KillingMahjong.Network.NetworkMessageHandler.Instance.LocalPlayerId;
+            string localPlayerId = SkillLocalPlayerId;
             bool isLocalPlayer = (data.player_id == localPlayerId);
             string skillName = SkillNames.GetDisplayName(data.skillType);
 
@@ -174,9 +183,9 @@ namespace KillingMahjong.UI
             string subText = null;
 
             // 役強化で強まった役の名前。発動後の演出でも出すので、外に出しておく
-            string boostedYakuName = "";
+            string boostedYakuName = uiManager.IsTutorialMode ? data.yaku_name : "";
 
-            if (data.skillType == "boost_hand")
+            if (data.skillType == "boost_hand" && !uiManager.IsTutorialMode)
             {
                 var oldLocalBonus = Managers.BoardStateManager.Instance.LocalBoostHandBonus != null ?
                     new Dictionary<string, int>(Managers.BoardStateManager.Instance.LocalBoostHandBonus) : new Dictionary<string, int>();

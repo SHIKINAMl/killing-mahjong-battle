@@ -17,6 +17,11 @@ namespace KillingMahjong.UI
             StartCoroutine(ScreenShakeRoutine(duration, magnitude, axis));
         }
 
+        public IEnumerator PlayScreenShakeRoutine(float duration, float magnitude, Vector2 axis)
+        {
+            return ScreenShakeRoutine(duration, magnitude, axis);
+        }
+
         private IEnumerator ScreenShakeRoutine(float duration, float magnitude)
         {
             return ScreenShakeRoutine(duration, magnitude, Vector2.one);

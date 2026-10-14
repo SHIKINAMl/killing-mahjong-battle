@@ -275,6 +275,8 @@ namespace KillingMahjong.Managers
         {
             KillingMahjong.UI.TutorialNavigation.Cancel();
             _aborted = true;
+            if (gameUIManager != null && gameUIManager.AbilityUI != null)
+                gameUIManager.AbilityUI.TutorialActivationHandler = null;
 
             if (_scenarioRoutine != null) { StopCoroutine(_scenarioRoutine); _scenarioRoutine = null; }
             if (_interruptRoutine != null) { StopCoroutine(_interruptRoutine); _interruptRoutine = null; }

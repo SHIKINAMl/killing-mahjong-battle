@@ -31,6 +31,81 @@ namespace KillingMahjong.Tests
         private void Enqueue(Func<IEnumerator> body) => Call(queue, "Enqueue", "test-boundary", body, false, null, null);
         private static IEnumerator Flag(Action action) { action(); yield break; }
 
+        private Component IntroAbility(Func<string, bool> activation, out Component item)
+        {
+            ui.GetType().GetProperty("IsTutorialMode").SetValue(ui, true);
+            var go = new GameObject("IntroAbility", typeof(RectTransform)); go.transform.SetParent(root.transform);
+            var ability = go.AddComponent(Main("UI.AbilityUI")); ((Behaviour)ability).enabled = false;
+            var window = new GameObject("AbilityWindow", typeof(RectTransform)); window.transform.SetParent(go.transform);
+            Set(ability, "abilityWindow", (RectTransform)window.transform);
+            Call(ability, "EnsureAbilities"); Set(ability, "isWindowVisible", true);
+            var row = new GameObject("IntroAbilityRow", typeof(RectTransform)); row.transform.SetParent(window.transform);
+            item = row.AddComponent(Main("UI.AbilityItemUI"));
+            ((IList)Field(ability, "instantiatedItems")).Add(item);
+            ability.GetType().GetProperty("TutorialActivationHandler", Members).SetValue(ability, activation);
+            return ability;
+        }
+
+        [UnityTest]
+        public IEnumerator TutorialSelectionNeedsAnActualSecondActivation()
+        {
+            int accepted = 0;
+            var ability = IntroAbility(type => { Assert.That(type, Is.EqualTo("mulligan")); accepted++; return true; }, out Component item);
+            Call(ability, "OnAbilitySelected", item);
+            Assert.That(accepted, Is.Zero, "選択だけで実演済みにしない");
+            Assert.That(Get(ability, "SelectedSkillType"), Is.EqualTo("mulligan"));
+            Call(ability, "OnAbilitySelected", item);
+            Assert.That(accepted, Is.EqualTo(1));
+            Assert.That(Get(ability, "IsWindowOpen"), Is.False);
+            Assert.That(Get(ability, "SelectedSkillType"), Is.Null);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator RejectedTutorialActivationKeepsTheChoiceOpen()
+        {
+            int attempts = 0;
+            var ability = IntroAbility(type => { attempts++; return false; }, out Component item);
+            Call(ability, "OnAbilitySelected", item); Call(ability, "OnAbilitySelected", item);
+            Assert.That(attempts, Is.EqualTo(1));
+            Assert.That(Get(ability, "IsWindowOpen"), Is.True);
+            Assert.That(Get(ability, "SelectedSkillType"), Is.EqualTo("mulligan"));
+            Assert.That(Get(board, "LocalPlayerHp"), Is.EqualTo(20000));
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator TutorialSkillEntryCannotMutateAnOnlineMatch()
+        {
+            ui.GetType().GetProperty("IsTutorialMode").SetValue(ui, false);
+            yield return (IEnumerator)Call(skill, "PlayTutorialSkillRoutine", Cast("perspective", 12345, "local", 1), false);
+            Assert.That(Get(board, "LocalPlayerHp"), Is.EqualTo(20000));
+            Assert.That(((System.Collections.Generic.HashSet<int>)Get(board, "ExposedEnemyHandWallIndexes")).Count, Is.Zero);
+            Assert.That(Get(ui, "IsTransitioning"), Is.False);
+        }
+
+        [UnityTest]
+        public IEnumerator IntroDemoRestoresPracticeTilesButKeepsConsumedHealth()
+        {
+            var tm = root.AddComponent(Main("Managers.TutorialManager")); ((Behaviour)tm).enabled = false;
+            Set(tm, "gameUIManager", ui);
+            Call(board, "SetLocalState", new System.Collections.Generic.List<int> { 9, 9, 9, 10 },
+                new System.Collections.Generic.List<int> { 9 }, new System.Collections.Generic.List<int> { 10 }, null);
+            var restore = (Action)Call(tm, "CaptureIntroDemoBoard");
+            Call(board, "ReplaceWallTileAt", 0, 11);
+            Call(board, "SetEnemyState", new System.Collections.Generic.List<int> { 12, 13 }, new System.Collections.Generic.List<int>(), null);
+            ((System.Collections.Generic.HashSet<int>)Get(board, "ExposedEnemyHandWallIndexes")).Add(0);
+            board.GetType().GetProperty("LocalBoostHandBonus").SetValue(board, new System.Collections.Generic.Dictionary<string, int> { { "清一色", 1 } });
+            Call(board, "UpdateHp", 19500, 20000);
+            restore();
+            Assert.That((IList)Get(board, "OriginalWallTiles"), Is.EqualTo(new[] { 9, 9, 9, 10 }));
+            Assert.That((IList)Get(board, "CurrentHandTiles"), Is.EqualTo(new[] { 9 }));
+            Assert.That(((IList)Get(board, "OriginalEnemyWallTiles")).Count, Is.Zero);
+            Assert.That(((System.Collections.Generic.HashSet<int>)Get(board, "ExposedEnemyHandWallIndexes")).Count, Is.Zero);
+            Assert.That(Get(board, "LocalPlayerHp"), Is.EqualTo(19500));
+            yield return null;
+        }
+
         [UnitySetUp]
         public IEnumerator SetUp()
         {

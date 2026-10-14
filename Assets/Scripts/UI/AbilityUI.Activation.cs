@@ -5,6 +5,8 @@ namespace KillingMahjong.UI
 {
     public partial class AbilityUI
     {
+        // 紹介中だけ台本側へ渡す。通常対局の通信経路には入れない。
+        internal System.Func<string, bool> TutorialActivationHandler { get; set; }
         private void OnActivateClicked()
         {
             if (IsDisplayOnly || !isWindowVisible) return;
@@ -28,6 +30,15 @@ namespace KillingMahjong.UI
                         // 制約「チュートリアル中はプレイヤーの能力使用は不可」に合わせて明示的に弾く。
                         if (uiMgr.IsTutorialMode)
                         {
+                            if (TutorialActivationHandler != null)
+                            {
+                                if (TutorialActivationHandler(data.skillType))
+                                {
+                                    DeselectAll();
+                                    ToggleAbilityWindow(false);
+                                }
+                                return;
+                            }
                             if (uiMgr.DialogueUI != null)
                                 uiMgr.DialogueUI.ShowText("「今は見てるだけでいいわ。能力の使い方は後で教えてあげる」");
                             DeselectAll();
