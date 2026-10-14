@@ -27,7 +27,7 @@ namespace KillingMahjong.Managers
                 requireAutoManganToConfirm = true, // ④ オートへ誘導
 
                 betAmount = 2000, // 各自2000払い、満貫1.0倍で自分+2000 / 相手-2000
-                enemyDiscardBaseIds = new List<int> { d1, d2, d3, d4, TutorialTiles.Man(8) },
+                enemyDiscardBaseIds = new List<int> { d1, d2, d3, TutorialTiles.Man(8) },
                 outcome = TutorialOutcome.PlayerRon,
                 playerWinningTileBaseId = TutorialTiles.Man(8),
                 yakuList = new List<string> { "混一色", "一気通貫" },
