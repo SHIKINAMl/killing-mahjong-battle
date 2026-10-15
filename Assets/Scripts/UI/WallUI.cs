@@ -70,8 +70,9 @@ namespace KillingMahjong.UI
         // 押すたびに、山の牌がいったん中央へ寄り集まり（少しばらけて）、元の位置へ散って戻る。
         // 動かすのは Update の Lerp の行き先（targetPositions）だけで、位置そのものは触らない
         private const float ShuffleGatherSeconds = 0.16f;
-        private const float ShuffleGatherAmount = 0.55f;   // 中央へどれだけ寄せるか（0〜1）
-        private const float ShuffleJitter = 14f;
+        // 中央へどれだけ寄せるか（0〜1）。0.55 は「少し弱く」と言われて 0.35 にした（2026-10-15）
+        private const float ShuffleGatherAmount = 0.35f;
+        private const float ShuffleJitter = 10f;
         private Coroutine shuffleRoutine;
         private Dictionary<RectTransform, Vector2> shuffleHomes;
 
