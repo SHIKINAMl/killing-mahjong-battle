@@ -15,7 +15,6 @@ namespace KillingMahjong.UI.Effects
     {
         private const float HandFrameSeconds = 0.22f;
         private const float HandRiseSeconds = 0.14f;
-        private const float FinalHandLeadSeconds = 0.16f;
         private const float HpShakeSeconds = 0.30f;
         private const float CalloutHoldSeconds = 0.56f;
         private const float HpShakePixels = 12f;
@@ -28,7 +27,7 @@ namespace KillingMahjong.UI.Effects
         };
 
         /// <summary>
-        /// 手1、手2、手3を順に出した後、指差しのまま「ロン!!!」を出す。
+        /// 手1、手2を順に出し、手3への切り替えと同じフレームで「ロン!!!」を出す。
         /// 体力表示だけを同時に一度揺らしてから、既存の決着処理へ返す。
         /// </summary>
         public static IEnumerator Play(MonoBehaviour runner, IList<RectTransform> hpPanels)
@@ -69,8 +68,7 @@ namespace KillingMahjong.UI.Effects
                 handImage.gameObject.SetActive(true);
                 displayedAnyHand = true;
                 if (i == 0) yield return RaiseHandFromBottom(handImage.rectTransform);
-                else yield return new WaitForSeconds(i == HandFrameNames.Length - 1
-                    ? FinalHandLeadSeconds : HandFrameSeconds);
+                else if (i < HandFrameNames.Length - 1) yield return new WaitForSeconds(HandFrameSeconds);
             }
 
             if (!displayedAnyHand) handImage.gameObject.SetActive(false);
