@@ -19,9 +19,11 @@ namespace KillingMahjong.UI.Effects
         [Header("Prefabs & Assets")]
         [SerializeField, Tooltip("線を表現する細長いImageプレハブ")] 
         private GameObject lineSegmentPrefab; 
-        [SerializeField, Tooltip("交差（逆転）時の★マークプレハブ")] 
-        private GameObject crossPointPrefab;  
-        
+        [SerializeField, Tooltip("交差（逆転）時の★マークプレハブ")]
+        private GameObject crossPointPrefab;
+        [SerializeField, Tooltip("ロンした点に出す「ロン!」の吹き出し。子に Outline / Fill（Image）と Text（TMP）")]
+        private GameObject ronCalloutPrefab;
+
         [Header("Settings")]
         [SerializeField] private float displayDuration = 2.0f;
         [SerializeField] private float fadeDuration = 0.5f;
@@ -45,6 +47,51 @@ namespace KillingMahjong.UI.Effects
         {
             public GameObject Object;
             public float Progress;
+        }
+
+        /// <summary>
+        /// 履歴のどの点がロンだったか。流局や賭け金での増減と見分けるために、ロンの点にだけ付ける。
+        /// Index は HP 履歴の添字（その点でロンの清算が済んでいる）。Rank は 満貫・跳満…役満。
+        /// </summary>
+        public struct RonMark
+        {
+            public int Index;
+            public bool IsLocalWin;
+            public string Rank;
+        }
+
+        // ロンの点では線の伸びをスローにして吹き出しを出す（2026-10-15 のユーザーの要望
+        // 「ロン！したとき、その場所にロン！の吹き出しを出して少しだけ溜めが欲しい」。
+        // 最初は止めていたが「止まるのではなく、少しスローに」と直された）。流局の点ではスローにしない。
+        // RonSlowRange は進み具合（0〜1）で測った前後の幅、RonSlowSpeed は点の上での速さの倍率
+        private const float RonSlowRange = 0.07f;
+        private const float RonSlowSpeed = 0.18f;
+        private const float RonPopSeconds = 0.16f;
+        private readonly List<RonCallout> ronCallouts = new List<RonCallout>();
+        private static Sprite burstSprite;
+
+        private struct RonCallout
+        {
+            public RectTransform Rect;
+            public float Progress;
+            public float Scale;
+        }
+
+        /// <summary>
+        /// 吹き出しの大きさをロンの強さで変える（2026-10-15 のユーザーの要望）。
+        /// 本編のロンは満貫以上なので、満貫を基準の 1 にする。
+        /// </summary>
+        private static float RankScale(string rank)
+        {
+            switch (rank)
+            {
+                case "ダブル役満": return 1.9f;
+                case "役満": return 1.7f;
+                case "三倍満": return 1.45f;
+                case "倍満": return 1.3f;
+                case "跳満": return 1.15f;
+                default: return 1f;
+            }
         }
 
         private void Awake()
@@ -74,7 +121,7 @@ namespace KillingMahjong.UI.Effects
         /// <summary>
         /// HPの推移を受け取り、モメンタムグラフを描画・表示する
         /// </summary>
-        public void ShowMomentum(List<int> playerHpHistory, List<int> enemyHpHistory)
+        public void ShowMomentum(List<int> playerHpHistory, List<int> enemyHpHistory, IList<RonMark> ronMarks = null)
         {
             // シーン上で非アクティブに置かれていると Awake が未実行なので、ここで取得しておく
             EnsureCanvasGroup();
@@ -85,13 +132,13 @@ namespace KillingMahjong.UI.Effects
             gameObject.SetActive(true);
             ClearGraph();
 
-            StartCoroutine(DisplayRoutine(playerHpHistory, enemyHpHistory));
+            StartCoroutine(DisplayRoutine(playerHpHistory, enemyHpHistory, ronMarks));
         }
 
-        private IEnumerator DisplayRoutine(List<int> playerHpHistory, List<int> enemyHpHistory)
+        private IEnumerator DisplayRoutine(List<int> playerHpHistory, List<int> enemyHpHistory, IList<RonMark> ronMarks)
         {
             // 完成形を先に見せず、線の長さを0から始める。
-            DrawGraph(playerHpHistory, enemyHpHistory);
+            DrawGraph(playerHpHistory, enemyHpHistory, ronMarks);
             SetGraphProgress(0f);
             yield return StartCoroutine(FadeRoutine(1f));
             yield return StartCoroutine(GrowGraphRoutine());
@@ -114,11 +161,17 @@ namespace KillingMahjong.UI.Effects
         private IEnumerator GrowGraphRoutine()
         {
             if (strokes.Count == 0) yield break;
-            float elapsed = 0f;
+            ronCallouts.Sort((a, b) => a.Progress.CompareTo(b.Progress));
+            int nextRon = 0;
+            float progress = 0f;
             int lastPulse = -1;
-            while (elapsed < GrowthDuration)
+            while (progress < 1f)
             {
-                float progress = Mathf.Clamp01(elapsed / GrowthDuration);
+                // ロンの点に近づくと線の伸びがスローになり、点を過ぎると元の速さへ戻る
+                // （2026-10-15 のユーザーの指摘「止まるのではなく、ロンで少しスローになる感じに」）
+                progress = Mathf.Min(1f, progress + Time.deltaTime / GrowthDuration * RonSpeedAt(progress));
+                while (nextRon < ronCallouts.Count && progress >= ronCallouts[nextRon].Progress)
+                    StartCoroutine(PopRonCallout(ronCallouts[nextRon++]));
                 SetGraphProgress(progress);
                 int pulse = Mathf.FloorToInt(progress * (GrowthPulseCount - 1));
                 if (pulse != lastPulse)
@@ -127,10 +180,51 @@ namespace KillingMahjong.UI.Effects
                     lastPulse = pulse;
                 }
                 yield return null;
-                elapsed += Time.deltaTime;
             }
-            SetGraphProgress(1f);
-            PlayGrowthPulse(GrowthPulseCount - 1);
+            // 吹き出しが弾け終わるまでは待つ（決着のロンは最後の点なので、伸び終わりと同時に出る）
+            yield return new WaitForSeconds(RonPopSeconds);
+        }
+
+        /// <summary>
+        /// 線の伸びる速さの倍率。ロンの点の前後 RonSlowRange の間だけ下げ、点の上で RonSlowSpeed になる。
+        /// </summary>
+        private float RonSpeedAt(float progress)
+        {
+            float speed = 1f;
+            foreach (var callout in ronCallouts)
+            {
+                float distance = Mathf.Abs(progress - callout.Progress) / RonSlowRange;
+                if (distance >= 1f) continue;
+                float slow = Mathf.Lerp(RonSlowSpeed, 1f, Mathf.SmoothStep(0f, 1f, distance));
+                speed = Mathf.Min(speed, slow);
+            }
+            return speed;
+        }
+
+        /// <summary>小さく出て一度ふくらみ、ロンの強さの大きさに落ち着く。</summary>
+        private IEnumerator PopRonCallout(RonCallout callout)
+        {
+            if (callout.Rect == null) yield break;
+            callout.Rect.gameObject.SetActive(true);
+            var audio = KillingMahjong.Managers.AudioManager.Instance;
+            if (audio != null)
+            {
+                // 強いロンほど低く太い音にする
+                float frequency = 140f / callout.Scale;
+                audio.PlaySynthSound(KillingMahjong.Managers.SynthWaveType.Square,
+                    frequency, frequency * 0.5f, 0.18f, 1f);
+            }
+            float t = 0f;
+            while (t < RonPopSeconds && callout.Rect != null)
+            {
+                float k = t / RonPopSeconds;
+                // 0 → 1.25倍 → 1倍
+                float s = k < 0.6f ? Mathf.Lerp(0.3f, 1.25f, k / 0.6f) : Mathf.Lerp(1.25f, 1f, (k - 0.6f) / 0.4f);
+                callout.Rect.localScale = Vector3.one * (s * callout.Scale);
+                yield return null;
+                t += Time.deltaTime;
+            }
+            if (callout.Rect != null) callout.Rect.localScale = Vector3.one * callout.Scale;
         }
 
         private static void PlayGrowthPulse(int pulse)
@@ -160,7 +254,7 @@ namespace KillingMahjong.UI.Effects
             ClearGraph();
         }
 
-        private void DrawGraph(List<int> pHistory, List<int> eHistory)
+        private void DrawGraph(List<int> pHistory, List<int> eHistory, IList<RonMark> ronMarks)
         {
             if (pHistory == null || eHistory == null || pHistory.Count == 0 || eHistory.Count == 0 || graphContainer == null) return;
 
@@ -207,6 +301,52 @@ namespace KillingMahjong.UI.Effects
             
             // 交差（逆転）箇所のチェックとアイコン配置
             CheckIntersections(pHistory, eHistory, pPoints, ePoints);
+
+            PlaceRonCallouts(ronMarks, pPoints, ePoints, maxPoints, height);
+        }
+
+        /// <summary>
+        /// ロンの点ごとに吹き出しを置く（伸びる線が届くまで隠しておく）。
+        /// 置くのはロンした側の線の上。枠の色はその側の線の色。
+        /// </summary>
+        private void PlaceRonCallouts(IList<RonMark> ronMarks, Vector2[] pPoints, Vector2[] ePoints, int maxPoints, float height)
+        {
+            if (ronMarks == null || ronCalloutPrefab == null || maxPoints < 2) return;
+            if (burstSprite == null)
+            {
+                var texture = RonImpactEffect.CreateBurstTexture();
+                burstSprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height),
+                    new Vector2(0.5f, 0.5f), 100f);
+            }
+
+            foreach (var mark in ronMarks)
+            {
+                var points = mark.IsLocalWin ? pPoints : ePoints;
+                if (mark.Index < 1 || mark.Index >= points.Length) continue;
+
+                GameObject go = Instantiate(ronCalloutPrefab, graphContainer);
+                spawnedUIElements.Add(go);
+                var rt = go.GetComponent<RectTransform>();
+                float scale = RankScale(mark.Rank);
+
+                // 点の少し上に出す。上に収まらないときは下に出す
+                float lift = rt.rect.height * 0.5f * scale + 10f;
+                Vector2 at = points[mark.Index];
+                bool fitsAbove = at.y + lift + rt.rect.height * 0.5f * scale <= height * 0.5f + 20f;
+                at.y += fitsAbove ? lift : -lift;
+                rt.anchoredPosition = at;
+
+                Color lineColor = mark.IsLocalWin ? playerColor : enemyColor;
+                foreach (var image in go.GetComponentsInChildren<Image>(true))
+                {
+                    image.sprite = burstSprite;
+                    if (image.name == "Outline") image.color = Color.Lerp(lineColor, Color.black, 0.45f);
+                }
+
+                go.SetActive(false);
+                ronCallouts.Add(new RonCallout { Rect = rt, Scale = scale,
+                    Progress = (float)mark.Index / (maxPoints - 1) });
+            }
         }
         
         private void DrawLines(Vector2[] points, Color color, int maxPoints)
@@ -323,6 +463,7 @@ namespace KillingMahjong.UI.Effects
             spawnedUIElements.Clear();
             strokes.Clear();
             markers.Clear();
+            ronCallouts.Clear();
             if (statusText != null) statusText.text = "";
         }
     }

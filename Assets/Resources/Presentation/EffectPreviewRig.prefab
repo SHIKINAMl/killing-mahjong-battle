@@ -12344,6 +12344,7 @@ MonoBehaviour:
   statusText: {fileID: 557630381457154185}
   lineSegmentPrefab: {fileID: 3855166734256614346, guid: 47f941c84f6a5d44da9d45abf27cc379, type: 3}
   crossPointPrefab: {fileID: 2474531745303295654, guid: 85c65aa809c0e7c4489c5f7933238142, type: 3}
+  ronCalloutPrefab: {fileID: 2784929789998168217, guid: 9822203248e91ed4887863aadffcfd91, type: 3}
   displayDuration: 2
   fadeDuration: 0.5
   playerColor: {r: 0.2, g: 0.6, b: 1, a: 1}

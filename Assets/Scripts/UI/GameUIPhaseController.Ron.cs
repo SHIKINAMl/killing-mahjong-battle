@@ -127,6 +127,13 @@ namespace KillingMahjong.UI
                 yield return new WaitForSecondsRealtime(RonHitStopSeconds);
                 if (!roundEnd.IsCurrent(ticket) || !ownedLock.IsActive) yield break;
 
+                // 戦況グラフに、この点がロン（どちらが・どの強さで）だったと残す
+                var hpBoard = Managers.BoardStateManager.Instance;
+                if (hpBoard != null)
+                    uiManager.RecordRonHistory(isLocalWin, rank,
+                        hpBoard.HpBeforeLiquidationLocal, hpBoard.HpBeforeLiquidationEnemy,
+                        hpBoard.LocalPlayerHp, hpBoard.EnemyPlayerHp);
+
                 // ロンの一撃を予感させる合図。自分のロン（ExecuteRonAction）も
                 // 相手のロン（HandleAgari）もここを通るので、1箇所で両方に効く。
                 // **白フラッシュは止めた（2026-08-20 の演出削減バッチ1）。**

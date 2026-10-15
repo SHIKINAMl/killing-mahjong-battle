@@ -29,6 +29,29 @@ namespace KillingMahjong.UI
             enemyHpHistory.Add(enemyHp);
         }
 
+        // 履歴のどの点がロンだったか。戦況グラフでその点に「ロン!」を出す（流局の点には付けない）
+        private readonly List<Effects.MatchMomentumUI.RonMark> ronHistoryMarks = new List<Effects.MatchMomentumUI.RonMark>();
+
+        /// <summary>
+        /// ロンの清算を履歴に記録する。清算前の HP と清算後の HP を順に積み、後ろの点をロンの点とする。
+        /// フェイズ切り替えの記録が先に清算後の HP を積んでいることがあるので、
+        /// そのときは積み直さずにその点へ印を付ける。
+        /// </summary>
+        public void RecordRonHistory(bool isLocalWin, string rank, int prevLocalHp, int prevEnemyHp, int newLocalHp, int newEnemyHp)
+        {
+            int last = playerHpHistory.Count - 1;
+            bool alreadyRecorded = last >= 0 && playerHpHistory[last] == newLocalHp && enemyHpHistory[last] == newEnemyHp;
+            if (!alreadyRecorded)
+            {
+                RecordHpHistory(prevLocalHp, prevEnemyHp);
+                RecordHpHistory(newLocalHp, newEnemyHp);
+            }
+            int index = playerHpHistory.Count - 1;
+            if (index < 1) return;
+            foreach (var mark in ronHistoryMarks) if (mark.Index == index) return;
+            ronHistoryMarks.Add(new Effects.MatchMomentumUI.RonMark { Index = index, IsLocalWin = isLocalWin, Rank = rank });
+        }
+
         /// <summary>直近の game_end。勝敗を決めるときに決着理由を見るため保持する。</summary>
         private GameEndInfo lastGameEndInfo;
 
@@ -132,6 +155,7 @@ namespace KillingMahjong.UI
             LocalFinalScore = EnemyFinalScore = 0;
             playerHpHistory.Clear();
             enemyHpHistory.Clear();
+            ronHistoryMarks.Clear();
         }
 
         private System.Collections.IEnumerator ShowGameResultRoutine(int generation)
@@ -142,7 +166,7 @@ namespace KillingMahjong.UI
             // 戦況グラフの表示（履歴が2件以上あれば表示）
             if (matchMomentumUI != null && playerHpHistory.Count >= 2)
             {
-                matchMomentumUI.ShowMomentum(playerHpHistory, enemyHpHistory);
+                matchMomentumUI.ShowMomentum(playerHpHistory, enemyHpHistory, ronHistoryMarks);
                 // 線が伸び終わり、表示とフェードが完了してから結果へ進む。
                 yield return new WaitUntil(() => matchMomentumUI == null || !matchMomentumUI.IsShowing);
             }

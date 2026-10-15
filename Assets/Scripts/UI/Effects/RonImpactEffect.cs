@@ -185,8 +185,9 @@ namespace KillingMahjong.UI.Effects
         /// <summary>
         /// PDF最終ページの太い輪郭を、既存UIだけで再現する不規則な破裂形。
         /// 外側と内側で同じスプライトを重ね、濃色の太枠を作る。
+        /// 戦況グラフのロンの吹き出し（MatchMomentumUI）も同じ形を使う。
         /// </summary>
-        private static Texture2D CreateBurstTexture()
+        internal static Texture2D CreateBurstTexture()
         {
             const int width = 292;
             const int height = 234;

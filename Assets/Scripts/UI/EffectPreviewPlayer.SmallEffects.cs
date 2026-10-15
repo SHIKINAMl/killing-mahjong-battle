@@ -153,8 +153,14 @@ namespace KillingMahjong.UI
                     yield return zoom.ZoomToTargetRoutine(rig.character.transform); yield return new WaitForSeconds(1f);
                     yield return zoom.ResetZoomRoutine(); break;
                 case "scene.momentum":
-                    rig.momentum.ShowMomentum(new System.Collections.Generic.List<int> { 20000, 18000, 24000 },
-                        new System.Collections.Generic.List<int> { 20000, 22000, 16000 });
+                    // 相手の満貫ロン → 流局 → 自分の跳満ロン → 賭け金 → 自分の役満ロン。吹き出しはロンの点だけに出る
+                    rig.momentum.ShowMomentum(
+                        new System.Collections.Generic.List<int> { 20000, 19000, 13000, 13500, 22000, 21000, 36000 },
+                        new System.Collections.Generic.List<int> { 20000, 19000, 25000, 24500, 16000, 15000, 0 },
+                        new[] {
+                            new Effects.MatchMomentumUI.RonMark { Index = 2, IsLocalWin = false, Rank = "満貫" },
+                            new Effects.MatchMomentumUI.RonMark { Index = 4, IsLocalWin = true, Rank = "跳満" },
+                            new Effects.MatchMomentumUI.RonMark { Index = 6, IsLocalWin = true, Rank = "役満" } });
                     yield return new WaitUntil(() => rig.momentum == null || !rig.momentum.IsShowing);
                     break;
                 case "dora.float":
