@@ -193,7 +193,9 @@ namespace KillingMahjong.Managers
             float phase1 = 0f;
             float phase2 = 0f;
             float noiseValue = 0f;
-            float noiseLpfAlpha = 0.5f;
+            float noiseValue2 = 0f;
+            // ノイズは 2.5kHz の低域通過を2段かける（以前は α0.5 の1段で、5kHz より上まで「シュッ」が残っていた）
+            float noiseLpfAlpha = 1f - Mathf.Exp(-2f * Mathf.PI * NoiseCutoffHz / (float)sampleRate);
             float attackTime = 0.01f;
             double sampleDur = 1.0 / sampleRate;
 
@@ -220,12 +222,12 @@ namespace KillingMahjong.Managers
                 }
 
                 // 波形1のサンプリング
-                float sample1 = GenerateSample(type1, currentFreq, ref phase1, sampleDur, ref noiseValue, noiseLpfAlpha);
+                float sample1 = GenerateSample(type1, currentFreq, ref phase1, sampleDur, ref noiseValue, ref noiseValue2, noiseLpfAlpha);
 
                 float mixedSample = sample1;
                 if (isDual)
                 {
-                    float sample2 = GenerateSample(type2, currentFreq, ref phase2, sampleDur, ref noiseValue, noiseLpfAlpha);
+                    float sample2 = GenerateSample(type2, currentFreq, ref phase2, sampleDur, ref noiseValue, ref noiseValue2, noiseLpfAlpha);
                     mixedSample = (sample1 + sample2) * 0.5f;
                 }
 
@@ -238,9 +240,29 @@ namespace KillingMahjong.Managers
             return clip;
         }
 
-        private float GenerateSample(SynthWaveType type, float currentFreq, ref float phase, double sampleDur, ref float noiseValue, float noiseLpfAlpha)
+        // --- 耳に痛い高音を出さない（2026-10-15） ---
+        // 外部で「AI が作った効果音は 2〜5kHz とその上が強すぎて耳が痛い」と指摘されているのを受けて測ると、
+        // ノイズ入りの音（被弾・打撃・強襲）だけ 2kHz 以上が全体の 2〜3 割あった。原因は2つ：
+        //   ・ノイズの低域通過が弱い（α0.5 の1段）→ 2段・2.5kHz に
+        //   ・矩形波・のこぎり波を値の切り替えだけで作っていて、倍音が折り返して音程と無関係な高音が出る
+        //     → PolyBLEP（切り替わりの前後だけ角を丸める）で帯域を制限する
+        // 正弦波・三角波の音は元から高音がほぼ無いので変わらない
+        private const float NoiseCutoffHz = 2500f;
+
+        /// <summary>PolyBLEP の補正量。t は位相（0〜1）、dt は1サンプルで進む位相。</summary>
+        private static float PolyBlep(float t, float dt)
+        {
+            if (dt <= 0f) return 0f;
+            if (t < dt) { t /= dt; return t + t - t * t - 1f; }
+            if (t > 1f - dt) { t = (t - 1f) / dt; return t * t + t + t + 1f; }
+            return 0f;
+        }
+
+        private float GenerateSample(SynthWaveType type, float currentFreq, ref float phase, double sampleDur, ref float noiseValue, ref float noiseValue2, float noiseLpfAlpha)
         {
             float s = 0f;
+            float t = phase % 1.0f;
+            float dt = (float)(currentFreq * sampleDur);
             switch (type)
             {
                 case SynthWaveType.Sine:
@@ -250,15 +272,16 @@ namespace KillingMahjong.Managers
                     s = Mathf.PingPong(phase * 2f, 1f) * 2f - 1f;
                     break;
                 case SynthWaveType.Square:
-                    s = (phase % 1.0f) < 0.5f ? 1f : -1f;
+                    s = (t < 0.5f ? 1f : -1f) + PolyBlep(t, dt) - PolyBlep((t + 0.5f) % 1f, dt);
                     break;
                 case SynthWaveType.Sawtooth:
-                    s = (phase % 1.0f) * 2f - 1f;
+                    s = t * 2f - 1f - PolyBlep(t, dt);
                     break;
                 case SynthWaveType.Noise:
                     float rawNoise = (float)(rnd.NextDouble() * 2.0 - 1.0);
                     noiseValue = noiseValue + noiseLpfAlpha * (rawNoise - noiseValue);
-                    s = noiseValue;
+                    noiseValue2 = noiseValue2 + noiseLpfAlpha * (noiseValue - noiseValue2);
+                    s = noiseValue2;
                     break;
             }
 
