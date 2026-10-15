@@ -99,7 +99,7 @@ namespace KillingMahjong.UI
             new Entry("scene.atmosphere", "キャラクター・背景", "背景の粒子・暗い縁", "SceneAtmosphere.Attach"),
             new Entry("scene.room", "キャラクター・背景", "部屋の待機：浮遊・ホタル", "RoomAmbience.Attach"),
             new Entry("scene.battle", "キャラクター・背景", "対局の雰囲気", "BattleAtmosphere.SetVisible"),
-            new Entry("scene.momentum", "キャラクター・背景", "HP推移のモメンタムグラフ", "MatchMomentumUI.ShowMomentum", unused: true),
+            new Entry("scene.momentum", "キャラクター・背景", "HP推移のモメンタムグラフ", "MatchMomentumUI.ShowMomentum"), // 2026-10-15 に採用（没案から戻した）
             new Entry("dora.float", "キャラクター・背景", "ドラ牌の浮遊・回転", "DoraFloatAnimator"),
             new Entry("dialogue.typewriter", "チュートリアル", "セリフの文字送り", "DialogueUI.ShowText"),
             new Entry("tutorial.highlight", "チュートリアル", "注目する場所の枠", "TutorialHighlightUI.Show"),
