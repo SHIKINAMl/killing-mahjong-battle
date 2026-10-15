@@ -6,6 +6,47 @@ namespace KillingMahjong.UI
 {
     public partial class HandUI
     {
+        private Button sortTilesButton;
+
+        private void CreateSortTilesButton()
+        {
+            sortTilesButton = Instantiate(decideButton, decideButton.transform.parent);
+            sortTilesButton.name = "SortTilesButton";
+            sortTilesButton.onClick.RemoveAllListeners();
+            sortTilesButton.onClick.AddListener(OnSortTilesClicked);
+            SetButtonLabel(sortTilesButton, "並べ直す");
+            var rect = (RectTransform)sortTilesButton.transform;
+            rect.sizeDelta = new Vector2(ActionButtonWidth, 32f);
+            rect.anchoredPosition += new Vector2(-16f, 46f);
+            sortTilesButton.gameObject.SetActive(false);
+        }
+
+        private bool CanSortTiles()
+        {
+            return gameUIManager != null && !isSubmitted && !gameUIManager.IsGameOver
+                && gameUIManager.CurrentPhaseStatus == RoundStatus.HandSelection
+                && !gameUIManager.IsTransitioning && !gameUIManager.IsMulliganSelection
+                && !gameUIManager.IsOpponentSkillProcessing;
+        }
+
+        private void UpdateSortTilesButton()
+        {
+            if (sortTilesButton == null || gameUIManager == null) return;
+            bool visible = gameUIManager.CurrentPhaseStatus == RoundStatus.HandSelection && !isSubmitted;
+            if (gameUIManager.IsTutorialMode)
+                visible &= autoManganButton != null && autoManganButton.gameObject.activeInHierarchy;
+            sortTilesButton.gameObject.SetActive(visible);
+            sortTilesButton.interactable = CanSortTiles();
+        }
+
+        private void OnSortTilesClicked()
+        {
+            if (!CanSortTiles()) return;
+            gameUIManager.ClearSelection();
+            gameUIManager.WallUI?.SortCurrentTiles(false);
+            UpdateLayout(gameUIManager.CurrentPhaseStatus);
+        }
+
         private void OnAutoDiscardClicked()
         {
             IsAutoDiscardEnabled = !IsAutoDiscardEnabled;

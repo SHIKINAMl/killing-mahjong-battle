@@ -144,6 +144,7 @@ namespace KillingMahjong.UI
                 autoDiscardButton.gameObject.SetActive(false);
 
                 CreatePeekButton();
+                CreateSortTilesButton();
             }
         }
 
@@ -319,6 +320,7 @@ namespace KillingMahjong.UI
             // 牌をクリックしても UpdateLayout が呼ばれるとは限らないので、
             // 枚数の表示だけはここで追う（変化が無ければ何もしない）
             if (gameUIManager != null) UpdatePhaseGuide(gameUIManager.CurrentPhaseStatus);
+            UpdateSortTilesButton();
         }
         private const float ActionButtonWidth = 120f;
         private const float ActionButtonHeight = 40f;

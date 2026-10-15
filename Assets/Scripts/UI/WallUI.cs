@@ -44,6 +44,27 @@ namespace KillingMahjong.UI
         private List<RectTransform> wallSlots = new List<RectTransform>();
         public List<RectTransform> GetWallSlots() => wallSlots;
 
+        /// <summary>牌を作り直さず、現在の絵柄で整列する。元の山の位置番号は維持する。</summary>
+        public void SortCurrentTiles(bool isDiscardPhase)
+        {
+            var slots = new List<RectTransform>();
+            var ids = new List<int>();
+            var indexes = new List<int>();
+            var originalIndexes = new Dictionary<TileInteraction, int>();
+            foreach (var slot in wallSlots)
+            {
+                var tile = slot != null ? slot.GetComponent<TileInteraction>() : null;
+                if (tile == null) continue;
+                slots.Add(slot);
+                ids.Add(tile.TileId);
+                indexes.Add(tile.WallIndex);
+                originalIndexes[tile] = tile.WallIndex;
+            }
+            LayoutWallTiles(slots, ids, null, isDiscardPhase, indexes);
+            // 同一牌が複数ある場合も、各オブジェクトの通信上の位置番号を入れ替えない。
+            foreach (var pair in originalIndexes) pair.Key.WallIndex = pair.Value;
+        }
+
         /// <summary>チュートリアルで山牌エリアを指し示すための実表示領域。</summary>
         public RectTransform GuideTargetRect => wallContainer as RectTransform;
 
