@@ -28,6 +28,9 @@ namespace KillingMahjong.UI
         [SerializeField] private TextMeshProUGUI enemyHpObj;
         [SerializeField] private TextMeshProUGUI playerHpObj;
 
+        /// <summary>対局開始演出で自分の賭け金を出す文字。チュートリアルの流局動画で囲んで見せる。</summary>
+        public RectTransform PlayerBetRect => playerBetObj != null ? playerBetObj.rectTransform : null;
+
         [Header("スキルカットインの描画負荷")]
         // WebGL は塗り面積（フィルレート）が効くので、半透明で重ねる面積を絞れるようにしている。
         // 血飛沫は 800x600 基準で 1200px にすると画面の4倍の面積を半透明で塗ることになる。

@@ -391,7 +391,10 @@ namespace KillingMahjong.Managers
         /// はい／いいえの問いかけ。**冒頭の「麻雀とか知ってたっけ？」と同じ見た目にする。**
         /// 0=はい / 1=いいえ を返す。
         /// </summary>
-        private IEnumerator AskYesNo(string question, System.Action<int> onAnswered)
+        /// <param name="yesLabel">0 を返すボタンの文字。省略すると「はい」</param>
+        /// <param name="noLabel">1 を返すボタンの文字。省略すると「いいえ」</param>
+        private IEnumerator AskYesNo(string question, System.Action<int> onAnswered,
+            string yesLabel = null, string noLabel = null)
         {
             int answer = -1;
             TMP_FontAsset font = BorrowJapaneseFont();
@@ -401,9 +404,11 @@ namespace KillingMahjong.Managers
             if (dialogueUI != null)
             {
                 dialogueUI.gameObject.SetActive(true);
-                dialogueUI.ShowText(question);
+                // 問いかけの文にも、フロー図の青い太字（→黄色の太字）を当てる
+                dialogueUI.ShowText(Tutorial.TutorialEmphasis.Apply(question));
             }
-            BuildQuestionPanel(parent, font, onYes: () => answer = 0, onNo: () => answer = 1);
+            BuildQuestionPanel(parent, font, onYes: () => answer = 0, onNo: () => answer = 1,
+                yesLabel: yesLabel, noLabel: noLabel);
             yield return new WaitUntil(() => answer >= 0);
             CloseIntro();
             onAnswered(answer);

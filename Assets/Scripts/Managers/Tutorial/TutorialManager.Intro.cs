@@ -415,14 +415,15 @@ namespace KillingMahjong.Managers
         /// 「経験あり」「初めて」の2つ。**問いかけの文はここには出さない。**
         /// 文は吹き出し（DialogueUI）が受け持つ（2026-09-12）。
         /// </summary>
-        private void BuildQuestionPanel(Transform parent, TMP_FontAsset font, Action onYes, Action onNo)
+        private void BuildQuestionPanel(Transform parent, TMP_FontAsset font, Action onYes, Action onNo,
+            string yesLabel = null, string noLabel = null)
         {
             // **卓の空いている帯に置く（2026-09-12）。** 暗転をやめたので置き場所が効く。
             // y=-40 だと相手の体に重なり、y=-150 だと手牌に被る。
             // 相手の下端と手牌の上端のあいだ（800x600 基準で y=-105 あたり）が唯一空いている。
             // **手牌を出したあとに聞く場面なので、ここは必ず空けておくこと。**
-            CreateButton(parent, font, YesLabel, new Vector2(-130f, -105f), onYes);
-            CreateButton(parent, font, NoLabel, new Vector2(130f, -105f), onNo);
+            CreateButton(parent, font, yesLabel ?? YesLabel, new Vector2(-130f, -105f), onYes);
+            CreateButton(parent, font, noLabel ?? NoLabel, new Vector2(130f, -105f), onNo);
         }
 
         /// <summary>全画面を覆う Canvas を作る。すでにあれば作り直さない。</summary>

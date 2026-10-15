@@ -31,7 +31,8 @@ namespace KillingMahjong.Managers
         //
         // 2026-10-14 の図で、打牌数の説明→動画空間で流局・手牌の組み直し→再生停止が追加された。
         // RunDrawVideoExplanation がその部分を担当する。
-        // 以後はコメントだけで未指定なので、従来の第2局へ戻る。
+        // 2026-10-15 の図で、動画の中の賭け金の話と、動画のあとの会話・1巡・「動画の続きを見ますか？」が
+        // 足された（RunAfterDrawVideo）。その分岐の先は未指定なので、従来の第2局へ戻る。
         //
         // 「敵10打目まで汎用対局会話」の枠には、プレイヤーがアワセをした／ボルテージの段階を
         // 初めて上げたときの特殊セリフを流す、という条件だけが描いてある。
@@ -239,9 +240,14 @@ namespace KillingMahjong.Managers
                     yield return StartCoroutine(RunDrawVideoExplanation());
                     if (_aborted) yield break;
 
+                    // 動画のあとの会話（2026-10-15 の図）。**この巡はプレイヤー→先輩の順に、ここで打ち終える**
+                    yield return StartCoroutine(RunAfterDrawVideo(data, turn, seen));
+                    if (_aborted) yield break;
+
                     // ここから先はフロー図に無いので、これまでの第2局のまま流す
-                    if (turn <= autoTurns)
+                    if (turn + 1 <= autoTurns)
                         yield return StartCoroutine(PlayLines(SecondBattleResumeLines));
+                    continue;
                 }
 
                 // 制限時間の話までは自分で打たせる（図の「普通の対局」「敵10打目まで汎用対局会話」）。
@@ -312,13 +318,22 @@ namespace KillingMahjong.Managers
         private int DiscardForEnemyInSecondBattle(TutorialRoundData data, int turn, HashSet<int> seen)
         {
             int discardBase = PickEnemyDiscardForSecondBattle(data, turn, seen);
+            DiscardEnemyTileInSecondBattle(data, discardBase, seen);
+            return discardBase;
+        }
+
+        /// <summary>
+        /// 決めてある牌種を敵が打つ。打つ前にその牌の名前をセリフに入れたいとき
+        /// （「コレXGO」）のために、選ぶのと打つのを分けてある。
+        /// </summary>
+        private void DiscardEnemyTileInSecondBattle(TutorialRoundData data, int discardBase, HashSet<int> seen)
+        {
             int discardId = TutorialTiles.Encode(discardBase, discardBase == data.doraBaseId);
             seen.Add(discardBase);
 
             if (gameUIManager != null && gameUIManager.EnemyRiverUI != null)
                 gameUIManager.EnemyRiverUI.AddTile(discardId);
             if (AudioManager.Instance != null) AudioManager.Instance.PlayDiscardSE();
-            return discardBase;
         }
 
         /// <summary>

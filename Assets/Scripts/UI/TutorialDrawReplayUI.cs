@@ -128,9 +128,12 @@ namespace KillingMahjong.UI
             rect.offsetMin=Vector2.zero; rect.offsetMax=Vector2.zero;
             rect.localScale=Vector3.one; rect.localRotation=Quaternion.identity;
         }
+        // シークバーは、最後のセリフでちょうど半分まで進んだところで終わる
+        // （2026-10-15 のフロー図「動画のシークバーはまだ半分くらい残して終了」）。動画は途中で閉じられる
+        private const int StepCount = 18;
         private IEnumerator Step(string text,bool subtitle,bool loud=false)
         {
-            StepIndex++; progress.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal,764f*StepIndex/10f); advanced=false;
+            StepIndex++; progress.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal,764f*.5f*Mathf.Min(StepIndex,StepCount)/StepCount); advanced=false;
             if(subtitle) { marker.gameObject.SetActive(false); advance.gameObject.SetActive(false); subtitles.Show("先輩",text,()=>advanced=true); }
             else {
                 string formatted=TutorialEmphasis.Apply(text);
@@ -191,11 +194,50 @@ namespace KillingMahjong.UI
                 LocalHpAfter=18000,EnemyHpAfter=18000,HasServerHealth=true
             },()=>dark=true,()=>{},false);
             limit=Time.realtimeSinceStartup+12; yield return new WaitUntil(()=>dark||Time.realtimeSinceStartup>=limit); yield return null;
-            phase.StopAllCoroutines(); IsPaused=true; StepIndex=10;
-            progress.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal,764); paused.gameObject.SetActive(true);
-            advance.gameObject.SetActive(true); advanced=false; Debug.Log("[TutorialDrawReplay] paused at betting screen");
-            if(automatic) yield return new WaitForSecondsRealtime(2);
-            else yield return new WaitUntil(()=>advanced);
+            // 賭け金が出てくる黒い画面で止める。ここから先は 2026-10-15 のフロー図で足された、
+            // 流局すると賭け金を自分で決められない（前と同じ額を強制的に賭けさせられる）話
+            phase.StopAllCoroutines(); IsPaused=true; paused.gameObject.SetActive(true);
+            Debug.Log("[TutorialDrawReplay] paused at betting screen");
+            yield return Step("はーいここストップ！",true);
+            yield return Step("今賭け金を決めるとこがスキップされたのがわかったかな？",true);
+            yield return Step("普通のゲームだと対局前に自分で賭け金を決めるよね",true);
+            yield return Step("でも流局すると前に賭けた額と同じ額を強制的に賭けさせられるんだ！",true);
+            yield return Step("この画面だと……",true);
+            // プレイヤー側の賭け金にハイライト（動画の中なので、動画の画面の上に枠を出す）
+            var betFrame=ShowFrame(phase.PlayerBetRect);
+            // X は動画で先輩が賭けている額（BettingCompletedInfo.LocalBet）。前に X、今回も X で合計 2X
+            yield return Step($"アタシは前に{ReplayBet}賭けてたから今回の流局で{TutorialEmphasis.Open}合計{ReplayBet*2}賭ける{TutorialEmphasis.Close}って感じかな",true);
+            if(betFrame!=null) Destroy(betFrame);
+            yield return Step("ちなみに流局が起こる回数に制限はないから…このまま連続で流局すれば",true);
+            yield return Step($"アタシはまた次の流局で{ReplayBet}賭けてかなきゃいけないってワケ",true);
+            yield return Step("まぁ誰かがロンして流局を止めれば次からはまた自由に賭けれるから",true);
+            yield return Step("そんな合計が元々賭けた額の何倍にも積みあがったりはしないけど",true);
+            // スマホを引っ込めて動画空間終了（シークバーは半分残したまま）
+            for(float t=0;t<1;t+=Time.unscaledDeltaTime*2.5f) { transform.localScale=Vector3.one*Mathf.SmoothStep(1,.4f,t); yield return null; }
+        }
+
+        /// <summary>動画で先輩が賭けている額。上の BettingCompletedInfo と同じ値。</summary>
+        private const int ReplayBet=2000;
+
+        /// <summary>動画の画面の上に、指定した文字の周りを囲む金色の枠を出す。消すのは呼んだ側。</summary>
+        private GameObject ShowFrame(RectTransform target)
+        {
+            if(target==null) return null;
+            var layer=paused.transform.parent as RectTransform;
+            var corners=new Vector3[4]; target.GetWorldCorners(corners);
+            Vector2 min=layer.InverseTransformPoint(corners[0]), max=layer.InverseTransformPoint(corners[2]);
+            // 文字の枠は文字より広いことがあるので、実際に描いた範囲で囲む
+            var tmp=target.GetComponent<TextMeshProUGUI>();
+            if(tmp!=null) { tmp.ForceMeshUpdate(); var b=tmp.textBounds;
+                min=layer.InverseTransformPoint(target.TransformPoint(b.min)); max=layer.InverseTransformPoint(target.TransformPoint(b.max)); }
+            const float pad=6f, w=3f; min-=Vector2.one*pad; max+=Vector2.one*pad;
+            var root=new GameObject("ReplayBetFrame",typeof(RectTransform)); root.transform.SetParent(layer,false);
+            Color gold=new Color32(255,215,0,255); Vector2 size=max-min, mid=(min+max)*.5f;
+            Box("Top",root.transform,new Vector2(size.x,w),new Vector2(mid.x,max.y),gold);
+            Box("Bottom",root.transform,new Vector2(size.x,w),new Vector2(mid.x,min.y),gold);
+            Box("Left",root.transform,new Vector2(w,size.y),new Vector2(min.x,mid.y),gold);
+            Box("Right",root.transform,new Vector2(w,size.y),new Vector2(max.x,mid.y),gold);
+            return root;
         }
         private void ShowNewWall()
         {
