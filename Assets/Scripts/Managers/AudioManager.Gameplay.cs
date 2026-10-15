@@ -115,6 +115,16 @@ namespace KillingMahjong.Managers
             PlayStinger("se_bet_confirm");
         }
 
+        /// <summary>
+        /// 手牌の「選び直す」を押したとき（2026-10-15 のユーザーの要望）。
+        /// 短い3音を上へ駆け上がる「ピ・ピ・ピン」（F5→C6→F6、0.36秒）。自作の合成で、
+        /// 作り方は km-docs/sound/make_reselect.py。2〜5kHz は 2.7%、5kHz 以上は 0%。
+        /// </summary>
+        public void PlayReselectSE()
+        {
+            PlayStinger("se_reselect");
+        }
+
     }
 }
 
