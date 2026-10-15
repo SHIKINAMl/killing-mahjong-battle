@@ -357,15 +357,13 @@ namespace KillingMahjong.UI
             {
                 if (isLocalPlayer)
                 {
-                    if (newlyExposed.Count > 0 && uiManager.VisualController != null)
+                    // 新しく透視できた牌が0枚でも、発動したことを青い演出で伝える。
+                    // 公開する牌が無ければ、共通演出は牌を返す処理だけを省く。
+                    if (uiManager.VisualController != null)
                     {
                         // 演出を見せるため、アニメーション完了を待つ
                         yield return StartCoroutine(uiManager.VisualController.PlayPerspectiveAnimation(newlyExposed));
                         if (!ownedLock.IsActive) yield break;
-
-                    }
-                    else
-                    {
 
                     }
                 }
