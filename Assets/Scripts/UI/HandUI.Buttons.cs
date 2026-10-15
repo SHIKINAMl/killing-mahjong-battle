@@ -51,6 +51,8 @@ namespace KillingMahjong.UI
             if (KillingMahjong.Managers.BoardStateManager.Instance != null)
                 KillingMahjong.Managers.BoardStateManager.Instance.ReturnHandToWall();
             gameUIManager.WallUI?.SortCurrentTiles(false);
+            // 並びが同じでも、並べ直したと分かる動きを見せる
+            gameUIManager.WallUI?.PlayRearrangeShuffle();
             UpdateLayout(gameUIManager.CurrentPhaseStatus);
         }
 

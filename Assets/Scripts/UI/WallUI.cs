@@ -65,6 +65,69 @@ namespace KillingMahjong.UI
             foreach (var pair in originalIndexes) pair.Key.WallIndex = pair.Value;
         }
 
+        // --- 「並べ直す」の動き（2026-10-15 のユーザーの要望） ---
+        // 並びが変わらないとき（2回目以降）は牌が1枚も動かず、押せたのか分からなかった。
+        // 押すたびに、山の牌がいったん中央へ寄り集まり（少しばらけて）、元の位置へ散って戻る。
+        // 動かすのは Update の Lerp の行き先（targetPositions）だけで、位置そのものは触らない
+        private const float ShuffleGatherSeconds = 0.16f;
+        private const float ShuffleGatherAmount = 0.55f;   // 中央へどれだけ寄せるか（0〜1）
+        private const float ShuffleJitter = 14f;
+        private Coroutine shuffleRoutine;
+        private Dictionary<RectTransform, Vector2> shuffleHomes;
+
+        /// <summary>今の並び（targetPositions）を行き先として、寄り集まって散る動きを1回見せる。</summary>
+        public void PlayRearrangeShuffle()
+        {
+            if (shuffleRoutine != null)
+            {
+                StopCoroutine(shuffleRoutine);
+                RestoreShuffleHomes(null);
+            }
+            shuffleRoutine = StartCoroutine(RearrangeShuffleRoutine());
+        }
+
+        private IEnumerator RearrangeShuffleRoutine()
+        {
+            shuffleHomes = new Dictionary<RectTransform, Vector2>();
+            var gathered = new Dictionary<RectTransform, Vector2>();
+            Vector2 center = Vector2.zero;
+            foreach (var rt in wallSlots)
+            {
+                if (rt == null || !targetPositions.TryGetValue(rt, out Vector2 home)) continue;
+                shuffleHomes[rt] = home;
+                center += home;
+            }
+            if (shuffleHomes.Count == 0) { shuffleRoutine = null; yield break; }
+            center /= shuffleHomes.Count;
+
+            foreach (var pair in shuffleHomes)
+            {
+                Vector2 jitter = new Vector2(Random.Range(-ShuffleJitter, ShuffleJitter), Random.Range(-ShuffleJitter, ShuffleJitter) * 0.7f);
+                Vector2 to = Vector2.Lerp(pair.Value, center, ShuffleGatherAmount) + jitter;
+                gathered[pair.Key] = to;
+                targetPositions[pair.Key] = to;
+            }
+
+            yield return new WaitForSecondsRealtime(ShuffleGatherSeconds);
+            RestoreShuffleHomes(gathered);
+            shuffleRoutine = null;
+        }
+
+        /// <summary>
+        /// 寄せた行き先を元の並びへ戻す。途中で別の並べ替えが入って行き先が変わった牌は、その新しい行き先を残す。
+        /// </summary>
+        private void RestoreShuffleHomes(Dictionary<RectTransform, Vector2> gathered)
+        {
+            if (shuffleHomes == null) return;
+            foreach (var pair in shuffleHomes)
+            {
+                if (pair.Key == null || !targetPositions.TryGetValue(pair.Key, out Vector2 now)) continue;
+                if (gathered != null && (!gathered.TryGetValue(pair.Key, out Vector2 g) || now != g)) continue;
+                targetPositions[pair.Key] = pair.Value;
+            }
+            shuffleHomes = null;
+        }
+
         /// <summary>チュートリアルで山牌エリアを指し示すための実表示領域。</summary>
         public RectTransform GuideTargetRect => wallContainer as RectTransform;
 
