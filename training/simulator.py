@@ -255,6 +255,10 @@ class MatchSimulator:
             skills=self._skills,
             liquidation=liquidation,
         )
+        # CpuController が round_end で覚えるのと同じ、相手のくせ
+        for pid in PLAYER_IDS:
+            me, opponent = engine.get_player_by_id(pid), engine.get_player_by_id(self._other(pid))
+            self.public[pid].record_round_end(pid, me.discards, opponent.discards, liquidation)
         if advance and not self.ended and engine.state.round_state.status == RoundStatus.ROUND_END_WAITING:
             for pid in PLAYER_IDS:
                 engine.confirm_next_round(pid)

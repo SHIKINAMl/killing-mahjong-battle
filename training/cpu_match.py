@@ -12,6 +12,11 @@ variant:
 - stepbet … 「ふつう」から掛け金の見積もり式（bet.model）を外したもの（手の強さの段階で決める、前の掛け金）
 - noskill … 「ふつう」でスキルを使わない
 - easy    … 「よわい」
+- exploit … 人間の読みをまねる打ち手（一九字牌待ち＋字牌の透視。training/exploiters.py）。CPU の弱点の測定用。
+            土台の打ち方は legacy（前のふつう）に固定する（CPU を直しても、測る相手が変わらないように）。
+            つよいと比べるときは --a-override '{"hand_selection": {"candidate_limit": 160}}' で探索をそろえる
+- legacy  … 前のふつう（読まれにくくする仕組みを入れる前: 危険度は決まった値、揺らぎ・戦術なし）
+- oldmodel … 前のつよい（学習したモデルを、legacy と同じく読まれにくくする仕組みなしで打つ）
 
 使い方（リポジトリ直下で）:
     python -m training.cpu_match --pool training/data/deals --games 1000 --a value --b rule \\
@@ -38,10 +43,19 @@ from mahjong_engine.ai.cpu_config import load_cpu_config  # noqa: E402
 from mahjong_engine.ai.rule_brain import RuleBrain, create_brain  # noqa: E402
 from mahjong_engine.engine.game_state import SkillType, get_skill_cost  # noqa: E402
 from training.deal_pool import DealPool  # noqa: E402
+from training.exploiters import ExploitBrain  # noqa: E402
 from training.simulator import PLAYER_IDS, MatchSimulator, RuleAgent  # noqa: E402
 from training.skill_game import MAX_ROUNDS, game_winner  # noqa: E402
 
-VARIANTS = ("value", "hard", "model", "rule", "stepbet", "noskill", "easy")
+VARIANTS = ("value", "hard", "model", "rule", "stepbet", "noskill", "easy", "exploit", "legacy", "oldmodel")
+
+# 読まれにくくする仕組み（危険度の数え方・揺らぎ・戦術）を入れる前の打ち方にする上書き
+LEGACY_OVERRIDE = {
+    "discard": {"danger_model": "table", "weight_seen_by_opponent": 0.0},
+    "variation": {"discard_temperature": 0.0, "hand_temperature": 0.0, "bet_noise": 0.0, "bluff_rate": 0.0,
+                  "slowplay_rate": 0.0, "skill_noise": 0.0, "model_temperature": 0.0},
+    "tactics": {"yaochu": {"counter_prior": 1.0, "counter_weight": 0.0, "adopt_weight": 0.0}},
+}
 
 _POOL: Optional[DealPool] = None
 _CONFIGS: dict[str, dict] = {}
@@ -59,11 +73,13 @@ def variant_config(name: str, override: Optional[dict] = None) -> tuple[str, dic
     """(考え方の水準, 設定, スキルを使うか)。override は設定の上書き（調整の比較用）"""
     configs = load_cpu_config()
     level = "easy" if name == "easy" else "normal"
-    config = copy.deepcopy(configs["hard" if name in ("hard", "model") else level])
+    config = copy.deepcopy(configs["hard" if name in ("hard", "model", "oldmodel") else level])
     if name == "rule":
         config["skill"].pop("value_model", None)
     if name == "stepbet":
         config["bet"].pop("model", None)
+    if name in ("exploit", "legacy", "oldmodel"):
+        _deep_update(config, copy.deepcopy(LEGACY_OVERRIDE))
     _deep_update(config, override or {})
     return level, config, name != "noskill"
 
@@ -78,8 +94,10 @@ def _init_worker(pool_dir: str, overrides: dict) -> None:
 
 def _agent(name: str, seed: int) -> RuleAgent:
     level, config, use_skills = _CONFIGS[name]
-    if name.split(":")[-1] == "model":
+    if name.split(":")[-1] in ("model", "oldmodel"):
         return RuleAgent(create_brain(config, random.Random(seed)), use_skills=use_skills)
+    if name.split(":")[-1] == "exploit":
+        return RuleAgent(ExploitBrain(config, random.Random(seed)), use_skills=use_skills)
     return RuleAgent(RuleBrain(level, config, random.Random(seed)), use_skills=use_skills)
 
 
