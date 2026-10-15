@@ -82,7 +82,10 @@ namespace KillingMahjong.Core
             /// 番号は保存データに残っているので欠番にしてある。選ばれていたら第4案へ読み替える。
             /// </summary>
             Pair = 0,
-            /// <summary>従来のフェイズ別BGM。打牌中の場のBGMは4層のステムで鳴る</summary>
+            /// <summary>
+            /// 従来のフェイズ別BGM。打牌中の場のBGMは4層のステムで鳴る。
+            /// **曲は 2026-10-15 に消した**（流局 bgm_draw 以外。ユーザーの判断）。欠番。選ばれていたら第4案へ読み替える。
+            /// </summary>
             PerPhase = 1,
             /// <summary>
             /// 従来のフェイズ別BGMだが、**場のBGMを層で鳴らさない。**
@@ -128,8 +131,8 @@ namespace KillingMahjong.Core
             (int)MatchBgmSetKind.ReturningTheme,
             (int)MatchBgmSetKind.KakeNoAizu1,
             (int)MatchBgmSetKind.KakeNoAizu2,
-            (int)MatchBgmSetKind.PerPhase,
-            (int)MatchBgmSetKind.PerPhaseNoLayers,
+            // 「従来（層あり／層なし）」は 2026-10-15 に曲ごと消した（流局の bgm_draw だけ残した。ユーザーの判断）。
+            // 保存データに 1 / 2 が残っていたら、NormalizeMatchBgmSet が第4案へ読み替える
         };
 
         /// <summary>
@@ -144,8 +147,6 @@ namespace KillingMahjong.Core
             "夜卓の灯火",
             "賭けの合図 I",
             "賭けの合図 II",
-            "従来（層あり）",
-            "従来（層なし）",
         };
 
         /// <summary>種類の番号が、選択欄の何番目か。選べない番号なら 0（第4案）。</summary>

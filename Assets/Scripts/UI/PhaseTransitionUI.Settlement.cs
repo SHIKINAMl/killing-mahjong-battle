@@ -85,7 +85,7 @@ namespace KillingMahjong.UI
                 // 決着の一撃（2026-09-11）。一式で最も大きい音を、文字が着弾する瞬間に当てる。
                 // BGM も勝敗で分ける。次の小節頭まで待ってから切り替わるので、
                 // ここで頼んでおけば演出が進むあいだに自然に入れ替わる。
-                PlayTransitionStinger("st_ron_impact");
+                // 音（st_ron_impact）は 2026-10-15 に消した。この清算表示は没案で、本編では使っていない
                 var audio = KillingMahjong.Managers.AudioManager.Instance;
                 if (audio != null) audio.SetResultBgm(isLocalWin);
 

@@ -34,7 +34,33 @@ namespace KillingMahjong.UI
             public string Id;       // Resources のファイル名
             public string Folder;   // "Bgm" / "Stingers"
             public string Label;    // 画面に出す名前
-            public Track(string folder, string id, string label) { Folder = folder; Id = id; Label = label; }
+            /// <summary>Resources に無い音の取り出し方（Inspector で割り当てた音）。null なら Folder/Id から読む</summary>
+            public Func<AudioClip> Source;
+            /// <summary>ファイルの無い合成音の鳴らし方。null でなければ AudioManager で鳴らす</summary>
+            public Action Synth;
+            public Track(string folder, string id, string label) { Folder = folder; Id = id; Label = label; Source = null; Synth = null; }
+        }
+
+        /// <summary>AudioManager に Inspector で割り当てた音（Resources の外にある素材）。</summary>
+        private static Track ManagerClip(string field, string file, string label)
+        {
+            var t = new Track("Se", file, label);
+            t.Source = () =>
+            {
+                var audio = KillingMahjong.Managers.AudioManager.Instance;
+                var f = typeof(KillingMahjong.Managers.AudioManager).GetField(field,
+                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                return audio != null && f != null ? f.GetValue(audio) as AudioClip : null;
+            };
+            return t;
+        }
+
+        /// <summary>ファイルの無い合成音（AudioSynth）。本編と同じ呼び方で鳴らす。</summary>
+        private static Track SynthSe(string label, Action<KillingMahjong.Managers.AudioManager> play)
+        {
+            var t = new Track("Synth", "（合成音）", label);
+            t.Synth = () => { var audio = KillingMahjong.Managers.AudioManager.Instance; if (audio != null) play(audio); };
+            return t;
         }
 
         // ------------------------------------------------------------
@@ -122,11 +148,12 @@ namespace KillingMahjong.UI
         /// **「負け」の曲（bgm_lose）は 2026-10-09 に消した**ので、ここからも外す（ユーザーの判断）。
         /// 従来で負けたときは、結果の曲がそのまま続く。
         /// </summary>
-        private static readonly Track[] BgmsLegacy = Without("bgm_lose", MatchTracks("Bgm", "", false,
-            new Track("Bgm", "field_base",    "場の層　土台（層あり）"),
-            new Track("Bgm", "field_melody",  "場の層　旋律（層あり）"),
-            new Track("Bgm", "field_drums",   "場の層　打楽器（層あり）"),
-            new Track("Bgm", "field_sparkle", "場の層　きらめき（層あり）")));
+        /// **2026-10-15 に流局（bgm_draw）以外を消した**（ユーザーの判断「従来は流局のBGM以外全部いらない」）。
+        /// 設定の「従来（層あり／層なし）」も外したので、この曲は対局では鳴らず、ここで聴けるだけ。
+        private static readonly Track[] BgmsLegacy =
+        {
+            new Track("Bgm", "bgm_draw", "流局"),
+        };
 
         /// <summary>曲の並びから、名前の合う1曲を除く。</summary>
         private static Track[] Without(string id, Track[] tracks)
@@ -194,7 +221,8 @@ namespace KillingMahjong.UI
             new MusicGroup { Label = "夜卓の灯火", Path = "対局BGM ＞ 夜卓の灯火", Indent = 1, Tracks = BgmsReturningTheme },
             new MusicGroup { Label = "賭けの合図", Path = "対局BGM ＞ 賭けの合図", Indent = 1, Tracks = BgmsKake,
                              Note = "選んだ1曲を、対局のあいだ通して流す" },
-            new MusicGroup { Label = "従来", Path = "対局BGM ＞ 従来", Indent = 1, Tracks = BgmsLegacy },
+            new MusicGroup { Label = "従来", Path = "対局BGM ＞ 従来", Indent = 1, Tracks = BgmsLegacy,
+                             Note = "流局の曲だけ残した。対局では鳴らない" },
             new MusicGroup { Label = "未使用", Path = "未使用", Tracks = BgmsUnused },
             };
         }
@@ -224,10 +252,8 @@ namespace KillingMahjong.UI
         /// </summary>
         private static readonly Track[] BgmsUnused =
         {
-            new Track("Bgm", "bgm_title",        "タイトル（旧）"),
+            // タイトル（旧）・打牌　激・対局（旧）は 2026-10-15 に消した（ユーザーの判断）
             new Track("Bgm", "bgm_discard",      "打牌"),
-            new Track("Bgm", "bgm_discard_hot",  "打牌　激"),
-            new Track("Bgm", "bgm_battle",       "対局（旧）"),
             new Track("Bgm", "bgm_ex_glitch",    "グリッチ"),
             new Track("Bgm", "bgm_ex_midnight",  "真夜中のアーケード"),
             new Track("Bgm", "bgm_ex_fantasy",   "はるかな地平線"),
@@ -262,21 +288,60 @@ namespace KillingMahjong.UI
             new Track("Stingers", "se_collapse",    "崩壊"),
         };
 
+        /// <summary>
+        /// 「効果音」タブ左列: **本編でいま鳴っている効果音を全部**（2026-10-15 のユーザー指示
+        /// 「今使っている効果音をちゃんとリストに載せて」）。
+        /// 以前は演出のスティンガー13本だけで、そのうち8本（ロンの一撃・流局・能力発動・リーチ・危険牌・
+        /// 賭け金確定・勝ち・負け）はどこでも鳴っておらず、同じ日にファイルごと消した。
+        /// 牌・賭け・能力・心音などの実際に鳴っている音は、逆に1つも載っていなかった。
+        ///
+        /// **音を足したり外したりしたら、ここも直すこと。** 置き場所は3通り：
+        ///   Resources の音        … Track("フォルダ", "ファイル名", 名前)
+        ///   Inspector で割り当てた音 … ManagerClip("AudioManager のフィールド名", "ファイル名", 名前)
+        ///   合成音（ファイル無し）  … SynthSe(名前, 本編と同じ呼び方)
+        /// 手牌決定の確認の音（手牌決定！.mp3）は対局シーンの ConfirmationDialogUI に割り当ててあり、
+        /// コレクションのある部屋シーンからは取れないので載せていない。
+        /// </summary>
         private static readonly Track[] Stingers =
         {
             new Track("Stingers", "br_band_open",  "黒帯　開く"),
             new Track("Stingers", "br_band_close", "黒帯　閉じる"),
             new Track("Stingers", "br_fall",       "暗転"),
             new Track("Stingers", "br_riser",      "明転"),
-            new Track("Stingers", "br_blackout",   "着弾"),
-            new Track("Stingers", "st_ron_impact", "ロンの一撃"),
-            new Track("Stingers", "st_draw",       "流局"),
-            new Track("Stingers", "st_ability",    "能力発動"),
-            new Track("Stingers", "st_riichi",     "リーチ"),
-            new Track("Stingers", "st_danger",     "危険牌"),
-            new Track("Stingers", "st_bet_lock",   "賭け金確定"),
-            new Track("Stingers", "st_win",        "勝ち"),
-            new Track("Stingers", "st_lose",       "負け"),
+            new Track("Stingers", "br_blackout",   "着弾（局の頭の文字）"),
+            ManagerClip("selectTileSE", "決定ボタンを押す32", "牌に触れる"),
+            ManagerClip("discardSE",    "牌を置く音",         "牌を捨てる"),
+            ManagerClip("hoverSE",      "選択",               "牌にカーソル"),
+            new Track("Se/HandSelection", "role_entry",  "役条件の登場"),
+            new Track("Se/HandSelection", "rank_impact", "役名・待ち牌の着弾"),
+            new Track("Stingers", "se_reselect", "選び直す"),
+            new Track("Stingers", "se_bet_tick_1",  "賭け金の増減　低"),
+            new Track("Stingers", "se_bet_tick_2",  "賭け金の増減　中"),
+            new Track("Stingers", "se_bet_tick_3",  "賭け金の増減　高"),
+            new Track("Stingers", "se_bet_confirm", "賭け金確定"),
+            new Track("Stingers", "se_ability_bell",  "能力を開くベル"),
+            new Track("Stingers", "se_skill_swap",    "能力発動　牌交換"),
+            new Track("Stingers", "se_skill_peek",    "能力発動　透視"),
+            new Track("Stingers", "se_skill_heavy",   "能力発動　役強化"),
+            new Track("Stingers", "se_skill_strike",  "能力発動　強襲"),
+            ManagerClip("clairvoyanceLoop",        "clairvoyance_concentration_submerged_loop_v1", "透視　集中"),
+            ManagerClip("clairvoyanceFlashReturn", "clairvoyance_flash_focus_return_v1",           "透視　戻る光"),
+            ManagerClip("clairvoyanceHeartbeat",   "clairvoyance_heartbeat_return_v1",             "透視　戻る鼓動"),
+            SynthSe("被弾",         a => a.PlayDamageSE(1f)),
+            SynthSe("打撃",         a => a.PlayHitSE(1f)),
+            SynthSe("回復",         a => a.PlayHealSE()),
+            SynthSe("強襲　発射",   a => a.PlaySynthSoundDual(KillingMahjong.Managers.SynthWaveType.Sine,
+                                         KillingMahjong.Managers.SynthWaveType.Noise, 620f, 180f, 0.16f, 0.9f)),
+            SynthSe("強襲　着弾",   a => a.PlaySynthSoundDual(KillingMahjong.Managers.SynthWaveType.Sine,
+                                         KillingMahjong.Managers.SynthWaveType.Noise, 200f, 60f, 0.24f, 1.0f)),
+            ManagerClip("heartbeatWeakSpaced",     "se_heartbeat_weak_spaced",     "瀕死の心音　弱"),
+            ManagerClip("heartbeatWeakCompact",    "se_heartbeat_weak_compact",    "瀕死の心音　弱・詰"),
+            ManagerClip("heartbeatMediumSpaced",   "se_heartbeat_medium_spaced",   "瀕死の心音　中"),
+            ManagerClip("heartbeatMediumCompact",  "se_heartbeat_medium_compact",  "瀕死の心音　中・詰"),
+            ManagerClip("heartbeatStrongSpaced",   "se_heartbeat_strong_spaced",   "瀕死の心音　強"),
+            ManagerClip("heartbeatStrongCompact",  "se_heartbeat_strong_compact",  "瀕死の心音　強・詰"),
+            new Track("Stingers", "se_click_empty", "何も無い所のクリック"),
+            ManagerClip("paperSlideSE", "ページめくり", "紙をめくる（設定・オープニング）"),
         };
 
         private GameObject root;
@@ -383,7 +448,7 @@ namespace KillingMahjong.UI
             // 行数の上限は無い。枠からはみ出た分はスクロールで見る（2026-09-27）
             sePage = NewEmpty(panel.transform, "SePage");
             Stretch(sePage.GetComponent<RectTransform>());
-            BuildColumn(sePage.transform, -178f, "演出", Stingers);
+            BuildColumn(sePage.transform, -178f, "使っている効果音", Stingers);
             BuildColumn(sePage.transform, 178f, "チュートリアル", TutorialSes);
 
             cgPage = NewEmpty(panel.transform, "CgPage");
@@ -770,11 +835,27 @@ namespace KillingMahjong.UI
 
             var t = flat[index];
 
+            // 合成音はファイルが無いので、本編と同じく AudioManager に鳴らさせる
+            if (t.Synth != null)
+            {
+                pendingBankIndex = -1;
+                if (preview.isPlaying) preview.Stop();
+                selected = index;
+                HighlightSelected();
+                t.Synth();
+                if (nowPlayingText != null) nowPlayingText.text = t.Label;
+                return;
+            }
+
             // **第4案・夜卓の灯火の曲は、本体と別のファイルにある**（KillingMahjong.Managers.BgmBank）。
             // まだ届いていなければ取りに行かせて、届いたら鳴らす
             AudioClip clip;
             string bankPrefix = KillingMahjong.Managers.BgmBank.PrefixOf(t.Id);
-            if (bankPrefix != null)
+            if (t.Source != null)
+            {
+                clip = t.Source();
+            }
+            else if (bankPrefix != null)
             {
                 if (!KillingMahjong.Managers.BgmBank.IsReady(bankPrefix))
                 {
