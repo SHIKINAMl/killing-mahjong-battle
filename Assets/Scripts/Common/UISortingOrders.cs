@@ -264,6 +264,9 @@ namespace KillingMahjong.Common
         /// 待ち牌表示(84)より手前に出さないと、覗いた手牌が隠れてしまう</summary>
         public const int HandPeekTiles = 86;
 
+        /// <summary>会話ログ。ボルテージなどの盤面表示より手前に出す。</summary>
+        public const int DialogueLog = 87;
+
         /// <summary>YakuSelectionUI: 役選択パネル（モーダルなので待ち牌表示より手前）</summary>
         public const int YakuSelection = 88;
 

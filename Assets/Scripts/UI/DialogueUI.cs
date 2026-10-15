@@ -362,6 +362,14 @@ namespace KillingMahjong.UI
         public void OpenLog()
         {
             logPanel.SetActive(true);
+            // 会話本体のCanvasは盤面用なので、ログだけを独立した描画順へ上げる。
+            var canvas = logPanel.GetComponent<Canvas>();
+            if (canvas == null) canvas = logPanel.AddComponent<Canvas>();
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = KillingMahjong.Common.UISortingOrders.DialogueLog;
+            // 子Canvasへ移したGraphicもスクロール・閉じる操作を受けられるようにする。
+            if (logPanel.GetComponent<GraphicRaycaster>() == null)
+                logPanel.AddComponent<GraphicRaycaster>();
             var scroll = logContainer != null ? logContainer.GetComponentInParent<ScrollRect>(true) : null;
             if (!hasOpenedLog) followLatestLog = true;
             hasOpenedLog = true;
