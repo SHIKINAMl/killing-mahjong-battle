@@ -14,6 +14,7 @@ namespace KillingMahjong.UI.Effects
     public static class RonImpactEffect
     {
         private const float HandFrameSeconds = 0.22f;
+        private const float HandRiseSeconds = 0.14f;
         private const float FinalHandLeadSeconds = 0.16f;
         private const float HpShakeSeconds = 0.30f;
         private const float CalloutHoldSeconds = 0.56f;
@@ -38,6 +39,9 @@ namespace KillingMahjong.UI.Effects
             Image handImage = CreateImage("RonHand", overlayRt);
             handImage.preserveAspect = true;
             SetRect(handImage.rectTransform, Vector2.zero, new Vector2(800f, 600f));
+            // 画像内の腕は下端まで描かれている。中央基準では縦長の画面で腕が浮く。
+            handImage.rectTransform.anchorMin = handImage.rectTransform.anchorMax = new Vector2(.5f, 0);
+            handImage.rectTransform.pivot = new Vector2(.5f, 0);
 
             // 声「それ、ロン」は、指が動いている間に「それ」、吹き出しで「ロン」（2026-10-15）
             var audio = KillingMahjong.Managers.AudioManager.Instance;
@@ -64,7 +68,8 @@ namespace KillingMahjong.UI.Effects
                 if (previousHandSprite != null) Object.Destroy(previousHandSprite);
                 handImage.gameObject.SetActive(true);
                 displayedAnyHand = true;
-                yield return new WaitForSeconds(i == HandFrameNames.Length - 1
+                if (i == 0) yield return RaiseHandFromBottom(handImage.rectTransform);
+                else yield return new WaitForSeconds(i == HandFrameNames.Length - 1
                     ? FinalHandLeadSeconds : HandFrameSeconds);
             }
 
@@ -93,6 +98,20 @@ namespace KillingMahjong.UI.Effects
             if (handSprite != null) Object.Destroy(handSprite);
             Object.Destroy(burstSprite);
             Object.Destroy(burstTexture);
+        }
+
+        private static IEnumerator RaiseHandFromBottom(RectTransform hand)
+        {
+            float start = -hand.rect.height;
+            hand.anchoredPosition = new Vector2(0, start);
+            for (float elapsed = 0; elapsed < HandFrameSeconds; elapsed += Time.deltaTime)
+            {
+                float progress = Mathf.Clamp01(elapsed / HandRiseSeconds);
+                float eased = 1 - Mathf.Pow(1 - progress, 3);
+                hand.anchoredPosition = new Vector2(0, Mathf.Round(Mathf.Lerp(start, 0, eased)));
+                yield return null;
+            }
+            hand.anchoredPosition = Vector2.zero;
         }
 
         private static GameObject CreateOverlay(out RectTransform overlayRt)
