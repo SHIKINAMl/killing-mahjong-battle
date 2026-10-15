@@ -49,10 +49,14 @@ namespace KillingMahjong.UI
             Canvas canvas = animContainer.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = UISortingOrders.MulliganSwapAnimation;
-            animContainer.AddComponent<UnityEngine.UI.CanvasScaler>().uiScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            var scaler = animContainer.AddComponent<UnityEngine.UI.CanvasScaler>();
+            scaler.uiScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(800f, 600f);
+            scaler.matchWidthOrHeight = 0.5f;
+            Canvas.ForceUpdateCanvases();
 
             Vector2 startPos = new Vector2(0, -400); // 見つからなかった場合のデフォルト
-            Vector2 initialSize = new Vector2(120, 180);
+            Vector2 initialSize = new Vector2(45, 40); // 元のスロットが無い場合も通常の牌サイズを使う
             Vector3 initialScale = Vector3.one;
 
             if (originalSlotRt != null)

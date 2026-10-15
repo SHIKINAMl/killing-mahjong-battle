@@ -485,6 +485,19 @@ namespace KillingMahjong.UI
 
                         // アニメーション用のスロットを取得（直前の操作時の記録があればそれを使う、無ければデフォルト）
                         RectTransform targetSlot = _lastMulliganOutSlotRt;
+                        if (targetSlot == null && uiManager.WallUI != null)
+                        {
+                            // 紹介では手牌に入っていない山牌を交換する。牌IDではなく山の位置で探す。
+                            foreach (var slot in uiManager.WallUI.GetWallSlots())
+                            {
+                                var tile = slot != null ? slot.GetComponent<TileInteraction>() : null;
+                                if (tile != null && tile.WallIndex == targetHandIndex)
+                                {
+                                    targetSlot = slot;
+                                    break;
+                                }
+                            }
+                        }
                         if (targetSlot == null && uiManager.HandUI != null)
                         {
                             targetSlot = uiManager.HandUI.GetTileSlotRectTransform(oldTileId);

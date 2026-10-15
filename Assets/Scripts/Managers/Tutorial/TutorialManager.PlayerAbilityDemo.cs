@@ -81,17 +81,14 @@ namespace KillingMahjong.Managers
             }
             else
             {
-                // 選択前の山から3枚を交換する実演。支払いと発動カットインは1回だけ。
-                for (int i = 0; i < board.OriginalWallTiles.Count && casts.Count <= 3; i++)
+                // 紹介では山の1枚だけを交換し、交換演出も1回にする。
+                for (int i = 0; i < board.OriginalWallTiles.Count; i++)
                 {
                     int old = board.OriginalWallTiles[i];
                     if (board.CurrentHandTiles.Contains(old)) continue;
-                    var swap = casts.Count == 1 && cast.mulliganResult == null ? cast
-                        : new SkillCastedData { player_id = local, skillType = type, health = remaining };
-                    swap.mulliganResult = new MulliganResultData { targetHandIndex = i, oldTile = old,
+                    cast.mulliganResult = new MulliganResultData { targetHandIndex = i, oldTile = old,
                         newTile = TutorialTiles.Encode((TutorialTiles.BaseOf(old) + 1) % 34) };
-                    if (swap != cast) casts.Add(swap);
-                    if (casts.Count == 3) break;
+                    break;
                 }
             }
             var phase = gameUIManager.PhaseTransitionUI;
