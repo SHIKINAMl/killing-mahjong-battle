@@ -265,31 +265,11 @@ namespace KillingMahjong.UI
             new Track("Bgm", "bgm_ex_think",     "長考"),
         };
 
-        /// <summary>
-        /// 「効果音」タブ右列: チュートリアルでセリフに合わせて鳴る効果音（2026-09-19 に追加）。
-        /// 意味は km-docs/tutorial/04_演出と音_統合.md。並びは意味の対が隣り合うようにしてある
-        /// （一滴↔一滴、ひび↔崩れる亀裂、選択↔選ばされた、能力の予兆↔崩壊）。
-        /// </summary>
-        private static readonly Track[] TutorialSes =
-        {
-            new Track("Stingers", "se_paper",       "契約書"),
-            new Track("Stingers", "se_drop",        "一滴"),
-            new Track("Stingers", "se_tube_slow",   "管を流れる　遅"),
-            new Track("Stingers", "se_tube_fast",   "管を流れる　速"),
-            new Track("Stingers", "se_choice",      "選択"),
-            new Track("Stingers", "se_choice_dark", "選ばされた"),
-            new Track("Stingers", "se_stack",       "積み上がる"),
-            new Track("Stingers", "se_two_pulses",  "二つの鼓動"),
-            new Track("Stingers", "se_crack",       "ひび"),
-            new Track("Stingers", "se_crack_long",  "崩れる亀裂"),
-            new Track("Stingers", "se_ability_1",   "能力の予兆　1"),
-            new Track("Stingers", "se_ability_2",   "能力の予兆　2"),
-            new Track("Stingers", "se_ability_3",   "能力の予兆　3"),
-            new Track("Stingers", "se_collapse",    "崩壊"),
-        };
+        // 「効果音」タブ右列にあったチュートリアルの効果音14本（se_paper〜se_collapse）は、
+        // 台本から外れてどこでも鳴っておらず、2026-10-15 にファイルごと消した（ユーザーの判断）。
 
         /// <summary>
-        /// 「効果音」タブ左列: **本編でいま鳴っている効果音を全部**（2026-10-15 のユーザー指示
+        /// 「効果音」タブの一覧: **本編でいま鳴っている効果音を全部**（2026-10-15 のユーザー指示
         /// 「今使っている効果音をちゃんとリストに載せて」）。
         /// 以前は演出のスティンガー13本だけで、そのうち8本（ロンの一撃・流局・能力発動・リーチ・危険牌・
         /// 賭け金確定・勝ち・負け）はどこでも鳴っておらず、同じ日にファイルごと消した。
@@ -448,8 +428,9 @@ namespace KillingMahjong.UI
             // 行数の上限は無い。枠からはみ出た分はスクロールで見る（2026-09-27）
             sePage = NewEmpty(panel.transform, "SePage");
             Stretch(sePage.GetComponent<RectTransform>());
-            BuildColumn(sePage.transform, -178f, "使っている効果音", Stingers);
-            BuildColumn(sePage.transform, 178f, "チュートリアル", TutorialSes);
+            // チュートリアルの効果音（右列）は、どこでも鳴っていなかったので 2026-10-15 にファイルごと消した
+            // （ユーザーの判断）。残る1列を2列ぶんの幅で中央に置く
+            BuildColumn(sePage.transform, 0f, "使っている効果音", Stingers, ColumnWidth * 2f + 26f);
 
             cgPage = NewEmpty(panel.transform, "CgPage");
             Stretch(cgPage.GetComponent<RectTransform>());
