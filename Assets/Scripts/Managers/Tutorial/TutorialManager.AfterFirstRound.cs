@@ -17,7 +17,7 @@ namespace KillingMahjong.Managers
         //   → 「とまぁこれがゲームの流れね」 → 「わかった？」 → 分岐
         //        はい　 → 「おっ後輩ちゃんできるねぇ」 → 「うーん…じゃあいらないと思うけど……ハイコレ」
         //        いいえ → 「そうだねぇ……気持ちわかるわー」 → 「ならとりあえず……ハイコレ！」
-        //   → オプションハイライト → プレイヤーオプションクリック
+        //   → 左下に設定画面の画像を表示し、資料への入口を案内
         //   → オプション内：チュートリアル資料ハイライト → プレイヤーチュートリアル資料クリック
         //   → チュートリアル資料表示 → プレイヤーオプション画面を閉じる
         //   → 「ここに今までのチュートリアルがまとめてあるから困ったら見て」
@@ -109,122 +109,60 @@ namespace KillingMahjong.Managers
             yield return StartCoroutine(RunAbilityIntroduction());
         }
 
-        /// <summary>
-        /// 「ハイコレ」の中身。資料の開き方を、実際に開かせて覚えさせる。
-        ///
-        /// **押させる所は枠で囲み、押されるまで待つ。**
-        /// ここだけ帯ではなく枠なのは、相手がボタンだから。実機で見比べると、
-        /// 帯を敷いたボタンは色が濁って**押せないボタンに見える**（2026-09-24 に確認）。
-        /// 読ませたい表や数字は帯、押させるボタンは枠、と使い分ける。
-        ///
-        /// マスクは使わない。オプション画面は自前で入力を受けるので、
-        /// 上から穴あきマスクをかぶせるとスライダーもボタンも触れなくなる。
-        /// </summary>
+        /// <summary>資料への入口を画像で案内する。設定を開く操作は要求しない。</summary>
         private IEnumerator RunTutorialArchiveGuide()
         {
-            var option = gameUIManager != null ? gameUIManager.OptionUI : null;
-            RectTransform optionButton = gameUIManager != null ? gameUIManager.OptionButtonRect : null;
-
-            // 盤面にオプションが無い状態（局を指定して始めた等）では、言うだけにして進む。
-            // ここで待つと、開きようがないまま止まってしまう。
-            if (option == null || optionButton == null)
+            ClearGuide();
+            var hint = ShowArchiveAccessHint();
+            try
             {
                 yield return StartCoroutine(PlayLines(ArchiveClosingLines));
-                yield break;
             }
-
-            // オプションハイライト → プレイヤーオプションクリック
-            GuideTo(optionButton, false, null, UI.TutorialHighlightUI.Style.Frame);
-            yield return new WaitUntil(() => option.IsOpen);
-            ClearGuide();
-
-            // オプション内：チュートリアル資料ハイライト → プレイヤーチュートリアル資料クリック
-            // 資料ボタンは OptionUI が実行時に作るので、開いてから取りに行く。
-            yield return null;
-            GuideTo(option.TutorialArchiveButtonRect, false, null, UI.TutorialHighlightUI.Style.Frame);
-
-            // 資料を開かずに閉じられたら、そこで誘導は終わりにする。付き合わせ続けない。
-            yield return new WaitUntil(() => option.IsTutorialArchiveOpen || !option.IsOpen);
-            ClearGuide();
-
-            // チュートリアル資料表示。**中でも目線を運ぶ（2026-09-29 の指示）。**
-            // 開いただけだと、どこから読めばいいのか分からないまま閉じられる。
-            yield return StartCoroutine(RunArchiveReadingGuide(option));
-
-            // プレイヤーオプション画面を閉じる
-            // 資料を閉じるとオプションへ戻るので、**オプションが閉じるまで**待つ。
-            yield return new WaitUntil(() => !option.IsOpen);
-
-            yield return StartCoroutine(PlayLines(ArchiveClosingLines));
+            finally
+            {
+                if (hint != null) Destroy(hint);
+            }
         }
 
-        /// <summary>
-        /// 資料の中を指す。**資料より手前の描画順で出す。**
-        /// 既定（63）のままだと資料（83）の下に潜って、実機で一切見えなかった。
-        /// </summary>
-        private void ShowArchiveHighlight(RectTransform target, UI.TutorialHighlightUI.Style style)
+        private GameObject ShowArchiveAccessHint()
         {
-            UI.TutorialHighlightUI.Show(target, style, Common.UISortingOrders.TutorialArchiveHighlight);
-        }
+            var texture = Resources.Load<Texture2D>("Tutorial/archive_access_hint");
+            if (texture == null) return null;
 
-        /// <summary>見出しを指している時間。読むものではないので短く。</summary>
-        private const float ArchiveTitleDwell = 0.7f;
+            var root = new GameObject("TutorialArchiveAccessHint", typeof(RectTransform),
+                typeof(UnityEngine.Canvas), typeof(UnityEngine.UI.CanvasScaler));
+            root.transform.SetParent(transform, false);
+            var canvas = root.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = Common.UISortingOrders.TutorialIntro;
+            var scaler = root.GetComponent<UnityEngine.UI.CanvasScaler>();
+            scaler.uiScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(800f, 600f);
+            scaler.matchWidthOrHeight = 0.5f;
 
-        /// <summary>本文に帯を敷いている時間。**ここだけは読ませる。**</summary>
-        private const float ArchiveBodyDwell = 1.6f;
+            var picture = new GameObject("OptionsExample", typeof(RectTransform), typeof(UnityEngine.UI.RawImage));
+            picture.transform.SetParent(root.transform, false);
+            var rect = (RectTransform)picture.transform;
+            rect.anchorMin = rect.anchorMax = rect.pivot = Vector2.zero;
+            rect.anchoredPosition = new Vector2(16f, 16f);
+            rect.sizeDelta = new Vector2(320f, 320f * texture.height / texture.width);
+            var image = picture.GetComponent<UnityEngine.UI.RawImage>();
+            image.texture = texture;
+            image.raycastTarget = false;
 
-        /// <summary>
-        /// 資料の中で目線を運ぶ（2026-09-29 の指示）。
-        ///
-        /// ページごとに **見出し → 本文 → 次のボタン** の順で指す。
-        /// 帯と枠の使い分けは既存の決まりに従う。読ませたい本文は帯、
-        /// 押させるボタンは枠（帯を敷いたボタンは押せないものに見える）。
-        ///
-        /// **ボタンでだけ待つ。** 見出しと本文はクリックできないので、
-        /// そこで待つと進めなくなる。短く置いて次へ送る。
-        ///
-        /// 途中で閉じられたら、そこで誘導をやめる。**付き合わせ続けない。**
-        /// </summary>
-        private IEnumerator RunArchiveReadingGuide(UI.OptionUI option)
-        {
-            var archive = option != null ? option.TutorialArchive : null;
-            if (archive == null)
-            {
-                // 資料そのものが取れないときは、開いている間だけ待って抜ける
-                yield return new WaitUntil(() => !option.IsTutorialArchiveOpen || !option.IsOpen);
-                ClearGuide();
-                yield break;
-            }
-
-            // **何周もしないよう、ページ数ぶんで打ち切る。** 前へ戻られても回り続けない
-            for (int step = 0; step < archive.PageCount; step++)
-            {
-                if (!option.IsTutorialArchiveOpen) break;
-
-                ShowArchiveHighlight(archive.PageTitleRect, UI.TutorialHighlightUI.Style.Band);
-                yield return new WaitForSeconds(ArchiveTitleDwell);
-                if (!option.IsTutorialArchiveOpen) break;
-
-                ShowArchiveHighlight(archive.PageBodyRect, UI.TutorialHighlightUI.Style.Band);
-                yield return new WaitForSeconds(ArchiveBodyDwell);
-                if (!option.IsTutorialArchiveOpen) break;
-
-                if (archive.IsLastPage)
-                {
-                    // 最後のページ。閉じるところまで案内して終わり
-                    ShowArchiveHighlight(archive.CloseButtonRect, UI.TutorialHighlightUI.Style.Frame);
-                    break;
-                }
-
-                int shown = archive.PageIndex;
-                ShowArchiveHighlight(archive.NextButtonRect, UI.TutorialHighlightUI.Style.Frame);
-                yield return new WaitUntil(
-                    () => !option.IsTutorialArchiveOpen || archive.PageIndex != shown);
-            }
-
-            // 閉じられるまでは枠を出したままにしておく
-            yield return new WaitUntil(() => !option.IsTutorialArchiveOpen || !option.IsOpen);
-            ClearGuide();
+            var label = new GameObject("AccessLabel", typeof(RectTransform), typeof(TextMeshProUGUI));
+            label.transform.SetParent(root.transform, false);
+            var labelRect = (RectTransform)label.transform;
+            labelRect.anchorMin = labelRect.anchorMax = labelRect.pivot = Vector2.zero;
+            labelRect.anchoredPosition = new Vector2(16f, 24f + rect.sizeDelta.y);
+            labelRect.sizeDelta = new Vector2(320f, 40f);
+            var text = label.GetComponent<TextMeshProUGUI>();
+            text.font = BorrowJapaneseFont();
+            text.fontSize = 16f;
+            text.text = "設定 → チュートリアル資料\n困ったときに読み返せます";
+            text.color = new Color32(255, 244, 210, 255);
+            text.raycastTarget = false;
+            return root;
         }
     }
 }
