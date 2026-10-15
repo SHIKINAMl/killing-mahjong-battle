@@ -105,7 +105,8 @@ namespace KillingMahjong.Managers
             }
         }
 
-        private void ResetHandToWall()
+        /// <summary>手牌を全て山へ戻す。「並べ直す」も使う。</summary>
+        public void ResetHandToWall()
         {
             List<int> currentHandCopy = new List<int>(board.CurrentHandTiles);
             foreach (int id in currentHandCopy)

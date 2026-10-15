@@ -351,8 +351,6 @@ namespace KillingMahjong.UI
             if (uiManager.IsTransitioning) return;
             // ボタン側でも隠しているが、連打で滑り込まれると手牌が消えるのでここでも弾く
             if (IsSelectionLockedIn) return;
-            // 「選び直す」の音（2026-10-15）
-            if (KillingMahjong.Managers.AudioManager.Instance != null) KillingMahjong.Managers.AudioManager.Instance.PlayReselectSE();
             CancelPendingConfirmation();
             _hasRankResult = false;
             _rankWaits = null;

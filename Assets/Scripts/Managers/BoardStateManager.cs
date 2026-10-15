@@ -528,6 +528,12 @@ namespace KillingMahjong.Managers
             _handSelection.SelectRandomHand();
         }
 
+        /// <summary>手牌を全て山へ戻す（手牌選択の「並べ直す」）。</summary>
+        public void ReturnHandToWall()
+        {
+            _handSelection.ResetHandToWall();
+        }
+
 
         public void SelectTile(int tileId, bool multiSelect, int wallIndex = -1)
         {

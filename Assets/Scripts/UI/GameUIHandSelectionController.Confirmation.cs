@@ -103,8 +103,6 @@ namespace KillingMahjong.UI
         private void ReturnToHandSelection(int stamp, int generation)
         {
             if (!ConfirmationIsCurrent(stamp, generation)) return;
-            // 満貫未満の確認の「選び直す」。サーバー確認経由の方は CancelHandSelection が鳴らす
-            if (KillingMahjong.Managers.AudioManager.Instance != null) KillingMahjong.Managers.AudioManager.Instance.PlayReselectSE();
             var waits = _confirmationData?.waits ?? System.Array.Empty<WaitData>();
             var indexes = new List<int>(_pendingHandIndexes); var signature = _pendingSignature;
             CancelPendingConfirmation();
