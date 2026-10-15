@@ -196,6 +196,9 @@ namespace KillingMahjong.Managers
             float noiseValue2 = 0f;
             // ノイズは 2.5kHz の低域通過を2段かける（以前は α0.5 の1段で、5kHz より上まで「シュッ」が残っていた）
             float noiseLpfAlpha = 1f - Mathf.Exp(-2f * Mathf.PI * NoiseCutoffHz / (float)sampleRate);
+            // 矩形波は 1.8kHz の低域通過を2段（波形1・2で別々の状態を持つ）
+            float squareLpfAlpha = 1f - Mathf.Exp(-2f * Mathf.PI * SquareCutoffHz / (float)sampleRate);
+            float sq1a = 0f, sq1b = 0f, sq2a = 0f, sq2b = 0f;
             float attackTime = 0.01f;
             double sampleDur = 1.0 / sampleRate;
 
@@ -223,11 +226,13 @@ namespace KillingMahjong.Managers
 
                 // 波形1のサンプリング
                 float sample1 = GenerateSample(type1, currentFreq, ref phase1, sampleDur, ref noiseValue, ref noiseValue2, noiseLpfAlpha);
+                if (type1 == SynthWaveType.Square) sample1 = LowPass2(sample1, ref sq1a, ref sq1b, squareLpfAlpha);
 
                 float mixedSample = sample1;
                 if (isDual)
                 {
                     float sample2 = GenerateSample(type2, currentFreq, ref phase2, sampleDur, ref noiseValue, ref noiseValue2, noiseLpfAlpha);
+                    if (type2 == SynthWaveType.Square) sample2 = LowPass2(sample2, ref sq2a, ref sq2b, squareLpfAlpha);
                     mixedSample = (sample1 + sample2) * 0.5f;
                 }
 
@@ -248,6 +253,18 @@ namespace KillingMahjong.Managers
         //     → PolyBLEP（切り替わりの前後だけ角を丸める）で帯域を制限する
         // 正弦波・三角波の音は元から高音がほぼ無いので変わらない
         private const float NoiseCutoffHz = 2500f;
+
+        // 打撃（矩形波＋ノイズ）は PolyBLEP の後も 2〜5kHz が 1割強残り、ユーザーの判断で「打撃も抑えて」となった。
+        // 矩形波だけ 1.8kHz の2段で丸める（2〜5kHz：HP満の打撃 13.5%→3.3%、音量 -2.8dB）。
+        // 矩形波を使うのは打撃と戦況グラフのロン!（140Hz で元から低い）
+        private const float SquareCutoffHz = 1800f;
+
+        private static float LowPass2(float x, ref float a, ref float b, float alpha)
+        {
+            a += alpha * (x - a);
+            b += alpha * (a - b);
+            return b;
+        }
 
         /// <summary>PolyBLEP の補正量。t は位相（0〜1）、dt は1サンプルで進む位相。</summary>
         private static float PolyBlep(float t, float dt)
