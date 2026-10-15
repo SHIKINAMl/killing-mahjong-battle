@@ -141,6 +141,20 @@ namespace KillingMahjong.UI
         public void RefreshHoverVisibility(Vector2 point)
         {
             if (presentation == null) return;
+            // この表示はカーソル座標で判定するため、役一覧の入力遮断だけでは止まらない。
+            // 開いた時点で既存の表示も即座に消し、閉じるまで背後の牌に反応させない。
+            if (owner != null && owner.YakuListUI != null && owner.YakuListUI.IsOpen)
+            {
+                presentation.alpha = 0f;
+                presentation.blocksRaycasts = false;
+                presentation.interactable = false;
+                roleConditions.SetHovered(false);
+                roleConditions.SetFocusedRole(null);
+                roleSupport.ClearHighlights();
+                hoveredRow.Begin();
+                hoveredRow.End();
+                return;
+            }
             KeepAutoButtonClear();
             bool canHover = hasPresentation && !forceVisible && !IsTransferring
                 && (hoverHand == null || !hoverHand.IsSubmitted)
