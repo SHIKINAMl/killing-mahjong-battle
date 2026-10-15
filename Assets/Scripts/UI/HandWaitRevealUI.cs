@@ -139,6 +139,7 @@ namespace KillingMahjong.UI
         public void RefreshHoverVisibility(Vector2 point)
         {
             if (presentation == null) return;
+            KeepAutoButtonClear();
             bool canHover = hasPresentation && !forceVisible && !IsTransferring
                 && (hoverHand == null || !hoverHand.IsSubmitted)
                 && (owner == null || (owner.CurrentPhaseStatus == RoundStatus.HandSelection
@@ -157,6 +158,7 @@ namespace KillingMahjong.UI
             {
                 foreach (var tile in hoverHand.GetHandSlots()) if (Contains(tile, point)) { show = true; break; }
                 show |= Contains(hoverHand.DecideButtonRect, point);
+                show |= Contains(hoverHand.AutoManganButtonRect, point);
                 // 開いている候補にカーソルを移しても、選ぶ前に消さない。
                 if (!show && presentation.alpha > .001f)
                     foreach (var card in cards) if (Contains(card, point)) { show = true; break; }
@@ -180,6 +182,21 @@ namespace KillingMahjong.UI
                     line.ascender + 1, new Color(1, .82f, .12f, .16f));
             }
             hoveredRow.End();
+        }
+
+        private void KeepAutoButtonClear()
+        {
+            var button = hoverHand != null ? hoverHand.AutoManganButtonRect : null;
+            if (button == null || !button.gameObject.activeInHierarchy || info == null) return;
+            var panel = (RectTransform)info.transform;
+            var panelBounds = ScreenRect(panel);
+            var buttonBounds = ScreenRect(button);
+            if (panelBounds.xMax <= buttonBounds.xMin || panelBounds.xMin >= buttonBounds.xMax) return;
+            float scale = GetComponent<Canvas>().scaleFactor;
+            float lift = buttonBounds.yMax + 8f * scale - panelBounds.yMin;
+            // パネル全体を上げて、表示もクリック領域もボタンから離す。
+            if (lift > .1f && panelBounds.yMax > buttonBounds.yMin)
+                panel.anchoredPosition += new Vector2(0, lift / Mathf.Max(.001f, scale));
         }
         private string RoleAtLeftPoint(Vector2 point, out int lineIndex)
         {
