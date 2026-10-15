@@ -32,24 +32,23 @@ namespace KillingMahjong.UI
         private void UpdateSortTilesButton()
         {
             if (sortTilesButton == null || gameUIManager == null) return;
-            bool visible = gameUIManager.CurrentPhaseStatus == RoundStatus.HandSelection && !isSubmitted;
-            if (gameUIManager.IsTutorialMode)
-                visible &= autoManganButton != null && autoManganButton.gameObject.activeInHierarchy;
+            // チュートリアルでは出さない（2026-10-15 のユーザー指示）。台本が手牌を決めているため
+            bool visible = gameUIManager.CurrentPhaseStatus == RoundStatus.HandSelection && !isSubmitted
+                && !gameUIManager.IsTutorialMode;
             sortTilesButton.gameObject.SetActive(visible);
             sortTilesButton.interactable = CanSortTiles();
         }
 
         private void OnSortTilesClicked()
         {
-            if (!CanSortTiles()) return;
+            if (!CanSortTiles() || gameUIManager.IsTutorialMode) return;
             if (KillingMahjong.Managers.AudioManager.Instance != null) KillingMahjong.Managers.AudioManager.Instance.PlayReselectSE();
             gameUIManager.ClearSelection();
             // **手牌も山へ戻す**（2026-10-15 のユーザーの要望「並べなおすを押すと、手牌も元に戻るように」）。
             // 戻さずに山だけ詰めて並べると、手牌の牌が覚えている山の位置（OriginalWallPosition）が
             // 詰める前のままになり、あとで1枚ずつ戻したときに隙間や他の牌の上へ落ちていた。
-            // 全部戻してから並べれば、山は配られたときと同じ並びになる。
-            // チュートリアルは台本が手牌を決めているので、山を並べるだけにする
-            if (!gameUIManager.IsTutorialMode && KillingMahjong.Managers.BoardStateManager.Instance != null)
+            // 全部戻してから並べれば、山は配られたときと同じ並びになる
+            if (KillingMahjong.Managers.BoardStateManager.Instance != null)
                 KillingMahjong.Managers.BoardStateManager.Instance.ReturnHandToWall();
             gameUIManager.WallUI?.SortCurrentTiles(false);
             UpdateLayout(gameUIManager.CurrentPhaseStatus);
