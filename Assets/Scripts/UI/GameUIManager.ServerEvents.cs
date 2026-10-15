@@ -179,12 +179,9 @@ namespace KillingMahjong.UI
             if (PlayerInfoUI != null && PlayerInfoUI.HpAnchor != null) hpPanels.Add(PlayerInfoUI.HpAnchor);
             if (EnemyInfoUI != null && EnemyInfoUI.HpAnchor != null) hpPanels.Add(EnemyInfoUI.HpAnchor);
 
+            // 声「それ、ロン」は RonImpactEffect の中で、手振りと吹き出しに合わせて鳴らす（2026-10-15）。
+            // 前はここ（演出を見せ終えた後）でまるごと鳴らしていて、「ロン」が大きく遅れていた
             yield return Effects.RonImpactEffect.Play(this, hpPanels);
-
-            if (KillingMahjong.Managers.AudioManager.Instance != null)
-            {
-                KillingMahjong.Managers.AudioManager.Instance.PlayVoice(KillingMahjong.Managers.AudioManager.Instance.ronVoice);
-            }
 
             next?.Invoke();
         }

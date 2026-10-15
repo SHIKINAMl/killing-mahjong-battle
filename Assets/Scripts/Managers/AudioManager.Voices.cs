@@ -19,6 +19,63 @@ namespace KillingMahjong.Managers
             }
         }
 
+        // --- 自分のロン入力の声「それ、ロン」（2026-10-15） ---
+        //
+        // 素材は Inspector の ronVoice（Se/レコーディング.mp3、3.67秒）。波形で測ると
+        // 頭に 1.14 秒の無音、「それ」1.14〜1.69 秒、0.6 秒空いて「ロン」2.30〜2.56 秒。
+        // 前は手振りと吹き出しを見せ終えてからまるごと鳴らしていたので、「ロン」が押してから約3.5秒後になっていた
+        // （ユーザーの指摘「ロンして結構経ってから聞こえる」）。
+        // 指が動いている間に「それ」、吹き出しが出た瞬間に「ロン」が来るよう、2つに分けて鳴らす（RonImpactEffect が呼ぶ）。
+        // **素材を差し替えたら区切りを測り直すこと。**
+        private const float RonSoreFrom = 1.10f, RonSoreTo = 1.72f, RonRonFrom = 2.28f;
+
+        /// <summary>「それ」。手振りの始まりで呼ぶ。</summary>
+        public void PlayRonInputSore()
+        {
+            if (ronVoice != null && ronVoice.loadState == AudioDataLoadState.Unloaded) ronVoice.LoadAudioData();
+            PlayVoiceRange(ronVoice, RonSoreFrom, RonSoreTo);
+        }
+
+        /// <summary>「ロン」。吹き出しが出た瞬間に呼ぶ。</summary>
+        public void PlayRonInputRon()
+        {
+            PlayVoiceRange(ronVoice, RonRonFrom, ronVoice != null ? ronVoice.length : 0f);
+        }
+
+        /// <summary>
+        /// 声の素材の一部（from〜to 秒）だけ鳴らす。PlayOneShot では途中から鳴らせないので、
+        /// 使い捨ての AudioSource を作って鳴らす。GetData で切り出す方法は Web 版で使えないので使わない。
+        /// **止めるのは音の時計（dspTime）で決める。** ゲームの時間で消すと、フレームが落ちたときに
+        /// 止まるのが遅れ、「それ」が「ロン」まで鳴ってしまう（エディタの試写で 0.13 秒はみ出した）。
+        /// </summary>
+        private void PlayVoiceRange(AudioClip clip, float from, float to)
+        {
+            if (!CanPlay || clip == null || voiceSource == null) return;
+            from = Mathf.Clamp(from, 0f, clip.length);
+            to = Mathf.Clamp(to, from, clip.length);
+            if (to - from <= 0.01f) return;
+
+            var go = new GameObject("VoiceRange_" + clip.name);
+            go.transform.SetParent(transform, false);
+            var src = go.AddComponent<AudioSource>();
+            src.playOnAwake = false;
+            src.clip = clip;
+            // 音量は PlayVoice と同じ（設定の音量 × 素材ごとの倍率）。AudioSource の音量は 1 が上限
+            src.volume = Mathf.Min(1f, voiceSource.volume * VoiceGain.Of(clip));
+            src.outputAudioMixerGroup = voiceSource.outputAudioMixerGroup;
+            src.time = from;
+            double start = AudioSettings.dspTime;
+            src.PlayScheduled(start);
+            src.SetScheduledEndTime(start + (to - from));
+            StartCoroutine(DestroyAfterRealtime(go, to - from + 0.1f));
+        }
+
+        private static System.Collections.IEnumerator DestroyAfterRealtime(GameObject go, float seconds)
+        {
+            yield return new WaitForSecondsRealtime(seconds);
+            if (go != null) Destroy(go);
+        }
+
         /// <summary>
         /// 役名→ファイル名のマッピング辞書を初期化し、Audio/Voice/ からロードする
         /// </summary>

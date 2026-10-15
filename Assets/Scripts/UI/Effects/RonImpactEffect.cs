@@ -39,6 +39,10 @@ namespace KillingMahjong.UI.Effects
             handImage.preserveAspect = true;
             SetRect(handImage.rectTransform, Vector2.zero, new Vector2(800f, 600f));
 
+            // 声「それ、ロン」は、指が動いている間に「それ」、吹き出しで「ロン」（2026-10-15）
+            var audio = KillingMahjong.Managers.AudioManager.Instance;
+            if (audio != null) audio.PlayRonInputSore();
+
             bool displayedAnyHand = false;
             Sprite handSprite = null;
             for (int i = 0; i < HandFrameNames.Length; i++)
@@ -73,6 +77,7 @@ namespace KillingMahjong.UI.Effects
                 new Vector2(0.5f, 0.5f),
                 100f);
             CreateBurstCallout(overlayRt, burstSprite);
+            if (audio != null) audio.PlayRonInputRon();
 
             if (hpPanels != null)
             {
