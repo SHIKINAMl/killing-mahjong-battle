@@ -106,6 +106,24 @@ namespace KillingMahjong.UI
             }
         }
 
+        /// <summary>待ち牌の型一覧。最多の型は明るい縁と大きめの文字で強調する。</summary>
+        public void ShowCounted(HandArchetype.Info info, int count, bool dominant)
+        {
+            Show(info);
+            if (info == null) return;
+            label.text = info.Name + "×" + count;
+            label.enableAutoSizing = true;
+            label.fontSize = label.fontSizeMax = dominant ? 16 : 14;
+            label.fontSizeMin = 10;
+            plate.color = dominant ? (Color)info.Badge : Color.Lerp(info.Badge, Color.black, .25f);
+            label.color = info.BadgeInk;
+            var outline = GetComponent<Outline>();
+            if (outline == null) outline = gameObject.AddComponent<Outline>();
+            outline.effectColor = new Color32(239, 238, 216, 255);
+            outline.effectDistance = Vector2.one;
+            outline.enabled = dominant;
+        }
+
         /// <summary>型に入らないもの（役一覧の「その他」）を、灰色の札で出す。</summary>
         public void ShowPlain(string text, Color plateColor, Color ink)
         {

@@ -31,7 +31,8 @@ namespace KillingMahjong.UI
         private RoleTileTarget[] explicitRoleTargets;
         private readonly List<RoleTileTarget> roleTargets = new List<RoleTileTarget>(13);
         private TMP_Text yakuText;
-        private HandTypeBadge typeBadge;
+        private RectTransform typeStrip;
+        private readonly List<HandTypeBadge> typeBadges = new List<HandTypeBadge>();
         private PixelShapeGraphic hoveredRow;
         private int selectedCandidate = -1;
         private GameUIManager owner;
@@ -87,16 +88,17 @@ namespace KillingMahjong.UI
             Label(panel, "Rank", 12, 39, 196, 34, 26);
             Label(panel, "Yaku", 12, 80, 196, 88, 18, TextAlignmentOptions.TopLeft);
             yakuText = panel.Find("Yaku").GetComponent<TMP_Text>();
-            // 選んだ待ちで和了ったときの型（2026-10-15）。パネルの中は役と倍率で埋まっているので、
-            // 上の辺の外側にタブのように付ける
-            typeBadge = HandTypeBadge.Ensure(panel, "HandTypeBadge", 16f,
-                Resources.Load<TMP_FontAsset>("PixelMplus10_DynamicFixed"), true, out bool badgeMade);
-            if (badgeMade)
+            // 旧来の1種類だけの札は隠し、該当する型をパネルの上にすべて並べる。
+            var oldBadge = panel.Find("HandTypeBadge");
+            if (oldBadge != null) oldBadge.gameObject.SetActive(false);
+            typeStrip = Rect(panel, "HandTypes", 10, 0, 200, 24, out bool stripMade);
+            if (stripMade)
             {
-                var rect = (RectTransform)typeBadge.transform;
-                rect.anchorMin = rect.anchorMax = new Vector2(0, 1); rect.pivot = new Vector2(0, 0);
-                rect.anchoredPosition = new Vector2(10, 2);
-                typeBadge.Show(null);
+                typeStrip.pivot = new Vector2(0, 0);
+                typeStrip.anchoredPosition = new Vector2(10, 4);
+                var layout = typeStrip.gameObject.AddComponent<GridLayoutGroup>();
+                layout.cellSize = new Vector2(98, 24); layout.spacing = new Vector2(4, 4);
+                layout.constraint = GridLayoutGroup.Constraint.FixedColumnCount; layout.constraintCount = 2;
             }
             var row = SceneFirst.Child(yakuText.transform, "RoleHoverRow", out bool rowMade,
                 typeof(RectTransform), typeof(CanvasRenderer), typeof(PixelShapeGraphic));
@@ -291,7 +293,7 @@ namespace KillingMahjong.UI
                 info.transform.Find("Han").GetComponent<TMP_Text>().text = "";
                 info.transform.Find("Rank").GetComponent<TMP_Text>().text = "待ち牌なし";
                 info.transform.Find("Yaku").GetComponent<TMP_Text>().text = "";
-                if (typeBadge != null) typeBadge.Show(null);
+                ShowHandTypes(null);
             }
             float step = Mathf.Min(72f, 538f / Mathf.Max(1, waits.Length));
             for (int i = 0; i < waits.Length; i++)
@@ -354,7 +356,7 @@ namespace KillingMahjong.UI
             info.transform.Find("Han").GetComponent<TMP_Text>().text = w.han + "翻";
             info.transform.Find("Rank").GetComponent<TMP_Text>().text = Rank(w) + (w.multiplier > 0 ? " ×" + w.multiplier.ToString("0.#", CultureInfo.InvariantCulture) : "");
             info.transform.Find("Yaku").GetComponent<TMP_Text>().text = w.yaku == null ? "" : string.Join("\n", w.yaku);
-            if (typeBadge != null) typeBadge.Show(HandArchetype.Classify(w.yaku));
+            ShowHandTypes(w.yaku);
             roleConditions.SetRoles(w.yaku, info.GetComponent<Image>().color);
             RebindRoleSupport();
             for (int i = 0; i < marks.Count; i++)
@@ -363,6 +365,23 @@ namespace KillingMahjong.UI
                 UIInteractionFeedback.Attach(cards[i].gameObject).SetSelected(i == index);
                 mark.End();
             }
+        }
+
+        private void ShowHandTypes(string[] yaku)
+        {
+            var matches = HandArchetype.Summarize(yaku);
+            for (int i = 0; i < matches.Count; i++)
+            {
+                if (i == typeBadges.Count)
+                    typeBadges.Add(HandTypeBadge.Ensure(typeStrip, "Type" + i, 14,
+                        Resources.Load<TMP_FontAsset>("PixelMplus10_DynamicFixed"), false, out _));
+                typeBadges[i].ShowCounted(matches[i].Type, matches[i].Count, i == 0);
+            }
+            for (int i = matches.Count; i < typeBadges.Count; i++) typeBadges[i].Show(null);
+            typeStrip.sizeDelta = new Vector2(200, Mathf.Max(1, (matches.Count + 1) / 2) * 28 - 4);
+            var color = matches.Count == 0 ? Ink : Color.Lerp(Ink, matches[0].Type.Badge, .35f);
+            color.a = Ink.a;
+            info.GetComponent<Image>().color = color;
         }
 
         public static string Rank(WaitData w) => !string.IsNullOrEmpty(w.multiplier_label)

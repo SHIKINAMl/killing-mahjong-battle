@@ -136,6 +136,33 @@ namespace KillingMahjong.Common
         /// <summary>優先順。役一覧の並びもこの順。</summary>
         public static readonly Info[] All = { Yakuman, Some, Chiitoi, Koutsu, Hashi, Narabi, Dora };
 
+        public struct Match
+        {
+            public Info Type;
+            public int Count;
+        }
+
+        /// <summary>届いた役の個数で型を集計する。翻数は再判定しない。ドラは枚数分、強化回数は含めない。</summary>
+        public static List<Match> Summarize(IEnumerable<string> yakuNames)
+        {
+            var counts = new Dictionary<Info, int>();
+            foreach (var entry in YakuNameUtil.Summarize(yakuNames))
+            {
+                var type = Of(YakuNameUtil.ToVoiceKey(entry.BaseName));
+                if (type == null) continue;
+                counts.TryGetValue(type, out int count);
+                counts[type] = count + entry.Count;
+            }
+            var result = new List<Match>();
+            foreach (var type in All)
+            {
+                if (!counts.TryGetValue(type, out int count)) continue;
+                int at = result.FindIndex(item => item.Count < count);
+                result.Insert(at < 0 ? result.Count : at, new Match { Type = type, Count = count });
+            }
+            return result;
+        }
+
         /// <summary>
         /// 役の一覧から型を決める。役名は清算パネルの表示名（`ドラ×3` のように枚数が付いたもの）でもよい。
         /// 決められなければ null。
