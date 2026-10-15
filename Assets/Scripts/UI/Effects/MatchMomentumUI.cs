@@ -29,6 +29,23 @@ namespace KillingMahjong.UI.Effects
         [SerializeField] private Color enemyColor = new Color(1f, 0.3f, 0.3f);  // 敵用（赤系）
 
         private List<GameObject> spawnedUIElements = new List<GameObject>();
+        private const float GrowthDuration = 1.5f;
+        private const int GrowthPulseCount = 24;
+        private readonly List<GraphStroke> strokes = new List<GraphStroke>();
+        private readonly List<GraphMarker> markers = new List<GraphMarker>();
+        public bool IsShowing { get; private set; }
+
+        private struct GraphStroke
+        {
+            public RectTransform Rect;
+            public float Length, Start, End;
+        }
+
+        private struct GraphMarker
+        {
+            public GameObject Object;
+            public float Progress;
+        }
 
         private void Awake()
         {
@@ -42,7 +59,7 @@ namespace KillingMahjong.UI.Effects
             // Awake で SetActive(false) すると、シーン上で非アクティブに置かれていた場合に
             // ShowMomentum() の SetActive(true) が Awake を誘発し、その場で自分を非アクティブへ
             // 戻してしまうため、直後の StartCoroutine が "game object is inactive" で失敗する。
-            gameObject.SetActive(false);
+            if (!IsShowing) gameObject.SetActive(false);
         }
 
         private void EnsureCanvasGroup()
@@ -61,8 +78,10 @@ namespace KillingMahjong.UI.Effects
         {
             // シーン上で非アクティブに置かれていると Awake が未実行なので、ここで取得しておく
             EnsureCanvasGroup();
+            StopAllCoroutines();
             canvasGroup.alpha = 0f;
 
+            IsShowing = true;
             gameObject.SetActive(true);
             ClearGraph();
 
@@ -71,11 +90,11 @@ namespace KillingMahjong.UI.Effects
 
         private IEnumerator DisplayRoutine(List<int> playerHpHistory, List<int> enemyHpHistory)
         {
-            // フェードイン
-            yield return StartCoroutine(FadeRoutine(1f));
-            
-            // グラフの描画
+            // 完成形を先に見せず、線の長さを0から始める。
             DrawGraph(playerHpHistory, enemyHpHistory);
+            SetGraphProgress(0f);
+            yield return StartCoroutine(FadeRoutine(1f));
+            yield return StartCoroutine(GrowGraphRoutine());
             
             // テキスト演出の決定
             UpdateStatusText(playerHpHistory, enemyHpHistory);
@@ -88,7 +107,57 @@ namespace KillingMahjong.UI.Effects
             
             // グラフクリア & 非表示
             ClearGraph();
+            IsShowing = false;
             gameObject.SetActive(false);
+        }
+
+        private IEnumerator GrowGraphRoutine()
+        {
+            if (strokes.Count == 0) yield break;
+            float elapsed = 0f;
+            int lastPulse = -1;
+            while (elapsed < GrowthDuration)
+            {
+                float progress = Mathf.Clamp01(elapsed / GrowthDuration);
+                SetGraphProgress(progress);
+                int pulse = Mathf.FloorToInt(progress * (GrowthPulseCount - 1));
+                if (pulse != lastPulse)
+                {
+                    PlayGrowthPulse(pulse);
+                    lastPulse = pulse;
+                }
+                yield return null;
+                elapsed += Time.deltaTime;
+            }
+            SetGraphProgress(1f);
+            PlayGrowthPulse(GrowthPulseCount - 1);
+        }
+
+        private static void PlayGrowthPulse(int pulse)
+        {
+            var audio = KillingMahjong.Managers.AudioManager.Instance;
+            if (audio == null) return;
+            float frequency = 220f * Mathf.Pow(2f, pulse / 12f);
+            audio.PlaySynthSound(KillingMahjong.Managers.SynthWaveType.Triangle,
+                frequency, frequency * 0.9f, 0.045f, 0.9f);
+        }
+
+        private void SetGraphProgress(float progress)
+        {
+            foreach (var stroke in strokes)
+            {
+                float amount = Mathf.InverseLerp(stroke.Start, stroke.End, progress);
+                stroke.Rect.sizeDelta = new Vector2(stroke.Length * amount, 5f);
+            }
+            foreach (var marker in markers)
+                marker.Object.SetActive(progress >= marker.Progress);
+        }
+
+        private void OnDisable()
+        {
+            StopAllCoroutines();
+            IsShowing = false;
+            ClearGraph();
         }
 
         private void DrawGraph(List<int> pHistory, List<int> eHistory)
@@ -133,14 +202,14 @@ namespace KillingMahjong.UI.Effects
             }
             
             // 線の描画
-            DrawLines(pPoints, playerColor);
-            DrawLines(ePoints, enemyColor);
+            DrawLines(pPoints, playerColor, maxPoints);
+            DrawLines(ePoints, enemyColor, maxPoints);
             
             // 交差（逆転）箇所のチェックとアイコン配置
             CheckIntersections(pHistory, eHistory, pPoints, ePoints);
         }
         
-        private void DrawLines(Vector2[] points, Color color)
+        private void DrawLines(Vector2[] points, Color color, int maxPoints)
         {
             if (lineSegmentPrefab == null) return;
 
@@ -159,9 +228,12 @@ namespace KillingMahjong.UI.Effects
                 float dist = dir.magnitude;
                 float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
                 
-                rt.anchoredPosition = p1 + dir / 2;
-                rt.sizeDelta = new Vector2(dist, 5f); // 線の太さ(5f)
+                rt.pivot = new Vector2(0f, 0.5f);
+                rt.anchoredPosition = p1;
+                rt.sizeDelta = new Vector2(0f, 5f);
                 rt.localRotation = Quaternion.Euler(0, 0, angle);
+                strokes.Add(new GraphStroke { Rect = rt, Length = dist,
+                    Start = (float)i / (maxPoints - 1), End = (float)(i + 1) / (maxPoints - 1) });
             }
         }
         
@@ -186,6 +258,9 @@ namespace KillingMahjong.UI.Effects
                     // 中間地点にアイコンを配置
                     Vector2 midPoint = (pPoints[i] + ePoints[i] + pPoints[i-1] + ePoints[i-1]) / 4f;
                     rt.anchoredPosition = midPoint;
+                    markers.Add(new GraphMarker { Object = cross,
+                        Progress = (float)i / (Mathf.Max(pHistory.Count, eHistory.Count) - 1) });
+                    cross.SetActive(false);
                 }
             }
         }
@@ -246,6 +321,8 @@ namespace KillingMahjong.UI.Effects
                 if (element != null) Destroy(element);
             }
             spawnedUIElements.Clear();
+            strokes.Clear();
+            markers.Clear();
             if (statusText != null) statusText.text = "";
         }
     }

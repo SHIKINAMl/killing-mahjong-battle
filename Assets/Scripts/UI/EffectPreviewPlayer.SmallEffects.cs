@@ -154,7 +154,9 @@ namespace KillingMahjong.UI
                     yield return zoom.ResetZoomRoutine(); break;
                 case "scene.momentum":
                     rig.momentum.ShowMomentum(new System.Collections.Generic.List<int> { 20000, 18000, 24000 },
-                        new System.Collections.Generic.List<int> { 20000, 22000, 16000 }); break;
+                        new System.Collections.Generic.List<int> { 20000, 22000, 16000 });
+                    yield return new WaitUntil(() => rig.momentum == null || !rig.momentum.IsShowing);
+                    break;
                 case "dora.float":
                     var dora = new GameObject("DoraFloatSample", typeof(SpriteRenderer));
                     dora.transform.position = rig.character.transform.position + Vector3.left * 2;

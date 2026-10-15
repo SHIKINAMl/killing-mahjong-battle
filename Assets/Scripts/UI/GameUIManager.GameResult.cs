@@ -143,8 +143,8 @@ namespace KillingMahjong.UI
             if (matchMomentumUI != null && playerHpHistory.Count >= 2)
             {
                 matchMomentumUI.ShowMomentum(playerHpHistory, enemyHpHistory);
-                // グラフ演出が終わるまで待つ（表示時間2秒 + 前後フェード1秒 = 約3秒。MatchMomentumUI側の設定に合わせる）
-                yield return new WaitForSeconds(3.0f);
+                // 線が伸び終わり、表示とフェードが完了してから結果へ進む。
+                yield return new WaitUntil(() => matchMomentumUI == null || !matchMomentumUI.IsShowing);
             }
 
             if (generation != gameResultGeneration) yield break;
