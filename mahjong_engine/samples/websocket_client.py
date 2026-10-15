@@ -58,8 +58,9 @@ def build_action_message(command: str) -> dict[str, Any] | None:
         bet <amount>                # 掛け金を設定
         discard <wall_index>        # 指定 wall index の牌を打牌
         next_round                  # 次局進行を承認
-        skill mulligan <hand_idx>   # 手牌の hand 内インデックスを交換
-        skill boost_hand <役名>     # 役の翻数を +1
+        skill mulligan a,b,c        # 山内 index 3 つを交換に出す
+        mulligan_select a,b,c       # マリガンの候補 6 枚から残す 3 枚の番号
+        skill boost_hand <役名>     # 役を含む和了の倍率を 1 段昇格
         skill perspective           # 相手の手牌 3 枚を公開
         skill special_victory       # 特殊勝利スキル
         help
@@ -116,6 +117,22 @@ def build_action_message(command: str) -> dict[str, Any] | None:
             },
         }
 
+    if name == "mulligan_select":
+        try:
+            choices = parse_int_list(arg1)
+        except ValueError:
+            choices = []
+        if len(choices) != 3:
+            print("[入力エラー] mulligan_select は 'mulligan_select a,b,c'（残す候補の番号 3 つ）の形式で指定してください")
+            return None
+        return {
+            "type": "action",
+            "data": {
+                "action": "mulligan_select",
+                "data": {"choices": choices},
+            },
+        }
+
     if name == "bet":
         try:
             amount = int(arg1.strip())
@@ -163,9 +180,11 @@ def build_action_message(command: str) -> dict[str, Any] | None:
 
         if skill_type == "mulligan":
             try:
-                data["target_hand_index"] = int(arg2.strip())
+                data["target_hand_indexes"] = parse_int_list(arg2)
             except ValueError:
-                print("[入力エラー] mulligan は 'skill mulligan <hand内index>' の形式で指定してください")
+                data["target_hand_indexes"] = []
+            if len(data["target_hand_indexes"]) != 3:
+                print("[入力エラー] mulligan は 'skill mulligan a,b,c'（交換に出す山内 index 3 つ）の形式で指定してください")
                 return None
 
         elif skill_type == "boost_hand":
@@ -205,8 +224,9 @@ def print_help() -> None:
     print("  bet <amount>                掛け金設定")
     print("  discard <wall_index>        打牌")
     print("  next_round                  次局進行を承認")
-    print("  skill mulligan <idx>        手牌交換 (hand 内 index)")
-    print("  skill boost_hand <役名>     役翻数 +1")
+    print("  skill mulligan a,b,c        手牌交換 (山内 index 3 つを出す)")
+    print("  mulligan_select a,b,c       マリガンで残す候補の番号 3 つ")
+    print("  skill boost_hand <役名>     役を含む和了の倍率を 1 段昇格")
     print("  skill perspective           相手手牌 3 枚を公開")
     print("  skill special_victory       特殊勝利スキル")
     print("  help                        このヘルプを表示")

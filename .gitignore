@@ -141,3 +141,6 @@ test.py
 /Assets/StreamingAssets/Bgm/
 /Assets/StreamingAssets/Bgm.meta
 /Assets/StreamingAssets.meta
+
+# つよい の学習用に生成した配牌・学習の出力（大きいのでコミットしない）
+/training/data/

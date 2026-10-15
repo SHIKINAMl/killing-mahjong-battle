@@ -1,0 +1,5 @@
+# Training only (hard CPU reinforcement learning). Not installed on the production server.
+-r requirements.txt
+numpy>=1.26
+# PyTorch CPU build is enough: pip install torch --index-url https://download.pytorch.org/whl/cpu
+torch>=2.0
