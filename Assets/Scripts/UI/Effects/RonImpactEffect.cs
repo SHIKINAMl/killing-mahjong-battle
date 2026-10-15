@@ -230,6 +230,7 @@ namespace KillingMahjong.UI.Effects
             if (floatingAnimator != null) floatingAnimator.enabled = false;
 
             Vector2 home = target.anchoredPosition;
+            EdgeCuts(target, out bool cutLeft, out bool cutRight, out bool cutBottom, out bool cutTop);
             float elapsed = 0f;
             while (elapsed < HpShakeSeconds && target != null)
             {
@@ -237,12 +238,46 @@ namespace KillingMahjong.UI.Effects
                 float progress = Mathf.Clamp01(elapsed / HpShakeSeconds);
                 float decay = 1f - progress;
                 float offset = Mathf.Sin(progress * Mathf.PI * 8f) * amplitude * decay;
-                target.anchoredPosition = home + new Vector2(offset, -offset * 0.35f);
+                var shake = new Vector2(offset, -offset * 0.35f);
+                // 画面の端で切れている絵は、その端から内側へは動かさない（切れ目が見えてしまう。
+                // 2026-10-15 のユーザーの指摘「右のhpゲージが揺れて、画像になってない部分が現れる」）。
+                // 外側へだけ振れば、揺れは見えたまま切れ目は画面の外に留まる
+                if (cutRight) shake.x = Mathf.Max(shake.x, 0f);
+                if (cutLeft) shake.x = Mathf.Min(shake.x, 0f);
+                if (cutTop) shake.y = Mathf.Max(shake.y, 0f);
+                if (cutBottom) shake.y = Mathf.Min(shake.y, 0f);
+                target.anchoredPosition = home + shake;
                 yield return null;
             }
 
             if (target != null) target.anchoredPosition = home;
             if (floatingAnimator != null) floatingAnimator.enabled = wasFloating;
+        }
+
+        /// <summary>
+        /// 揺らす物の絵（見えている Graphic）が、画面のどの端に接しているか・はみ出しているか。
+        /// 端から少しでも内側に収まっていれば「切れていない」とする。
+        /// </summary>
+        private static void EdgeCuts(RectTransform target, out bool left, out bool right, out bool bottom, out bool top)
+        {
+            left = right = bottom = top = false;
+            const float touch = 2f; // 画面の端から 2px 以内なら、端で切れているとみなす
+            var corners = new Vector3[4];
+            foreach (var graphic in target.GetComponentsInChildren<Graphic>())
+            {
+                if (!graphic.isActiveAndEnabled || graphic.color.a <= 0.01f) continue;
+                var canvas = graphic.canvas;
+                Camera cam = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay ? canvas.worldCamera : null;
+                graphic.rectTransform.GetWorldCorners(corners);
+                for (int i = 0; i < 4; i++)
+                {
+                    Vector2 p = RectTransformUtility.WorldToScreenPoint(cam, corners[i]);
+                    if (p.x <= touch) left = true;
+                    if (p.x >= Screen.width - touch) right = true;
+                    if (p.y <= touch) bottom = true;
+                    if (p.y >= Screen.height - touch) top = true;
+                }
+            }
         }
     }
 }
