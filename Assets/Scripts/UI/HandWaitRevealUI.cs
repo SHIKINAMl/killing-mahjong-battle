@@ -287,6 +287,7 @@ namespace KillingMahjong.UI
                 var tile = Rect(card, "WaitTile", (card.sizeDelta.x - 44) / 2, 0, 44, 59, out _);
                 var tileImage = tile.gameObject.AddComponent<Image>();
                 tileImage.sprite = tiles.GetTileSprite(waits[i].tile); tileImage.preserveAspect = true; tileImage.raycastTarget = false;
+                tileImage.color = new Color(1, 1, 1, waits[i].mangan_or_more ? 1 : WaitUI.NonManganTileAlpha);
                 Label(card, "WaitRank", 2, 49, card.sizeDelta.x - 4, 23, 16, TextAlignmentOptions.Center).text = waits[i].mangan_or_more ? Rank(waits[i]) : waits[i].han + "翻";
                 // 登場する牌・役名と一緒に読める大きさで、自分の山牌・手牌の外の枚数を示す。
                 var countLabel = Label(card, "OutsideCount", 2, 72, card.sizeDelta.x - 4, 20, 16, TextAlignmentOptions.Center);

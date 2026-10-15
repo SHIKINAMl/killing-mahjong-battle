@@ -6,6 +6,7 @@ namespace KillingMahjong.UI
 {
     public class WaitUI : MonoBehaviour
     {
+        public const float NonManganTileAlpha = .6f;
         [Header("Wait UI Settings")]
         [SerializeField] private RectTransform waitContainer;
         [SerializeField] private GameObject tilePrefab;
@@ -74,7 +75,7 @@ namespace KillingMahjong.UI
                     int index = currentPage * MaxTilesPerPage + i;
                     var visual = activeWaitTiles[i].GetComponent<TileVisual>();
                     if (visual != null && index < currentWaitTileIds.Count)
-                        visual.SetAlpha(board != null && board.NonManganWaitTiles.Contains(currentWaitTileIds[index]) ? .3f : 1f);
+                        visual.SetAlpha(board != null && board.NonManganWaitTiles.Contains(currentWaitTileIds[index]) ? NonManganTileAlpha : 1f);
                 }
                 if (currentWaitTileIds.Count > MaxTilesPerPage && paginationCoroutine == null)
                     paginationCoroutine = StartCoroutine(PaginationRoutine());
@@ -174,7 +175,7 @@ namespace KillingMahjong.UI
                     if (IsArrivalInProgress ? arrivalNonMangan.Contains(id)
                         : board != null && board.NonManganWaitTiles.Contains(id))
                     {
-                        visual.SetAlpha(0.3f);
+                        visual.SetAlpha(NonManganTileAlpha);
                     }
                     else 
                     {
