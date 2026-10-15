@@ -20,6 +20,9 @@ namespace KillingMahjong.UI
 
         private List<string> dialogueHistory = new List<string>();
         private GameObject nextRoundButtonObj;
+        private Coroutine logScrollRoutine;
+        private bool followLatestLog = true;
+        private bool hasOpenedLog;
 
         public bool IsLogOpen => logPanel != null && logPanel.activeSelf;
 
@@ -257,6 +260,8 @@ namespace KillingMahjong.UI
         private void OnDisable()
         {
             IsTalking = false;
+            if (logScrollRoutine != null) StopCoroutine(logScrollRoutine);
+            logScrollRoutine = null;
         }
 
         /// <summary>確定したスキル使用を記録する。セリフ表示・演出の再生は行わない。</summary>
@@ -273,6 +278,10 @@ namespace KillingMahjong.UI
             
             if (logContainer != null && logItemPrefab != null)
             {
+                var scroll = logContainer.GetComponentInParent<ScrollRect>(true);
+                bool visible = logPanel != null && logPanel.activeInHierarchy;
+                if (visible) followLatestLog = IsNearLatestLog(scroll);
+                var position = ((RectTransform)logContainer).anchoredPosition;
                 // 新しいログ枠（四角）を生成して配置
                 GameObject newLogItem = Instantiate(logItemPrefab, logContainer);
                 
@@ -294,31 +303,45 @@ namespace KillingMahjong.UI
                     layout.flexibleHeight = 0;
                     var background = newLogItem.GetComponent<Image>();
                     if (background != null) background.enabled = false;
-                    newLogItem.AddComponent<SkillLogRowUI>().Configure(tmp, color, isLocalPlayer);
+                    newLogItem.AddComponent<SkillLogRowUI>().Configure(tmp, color, isLocalPlayer,
+                        animate: visible && followLatestLog);
                 }
 
-                // ログが追加されたら一番下まで自動スクロールさせる
-                if (gameObject.activeInHierarchy)
-                {
-                    StartCoroutine(ScrollToBottom());
-                }
+                if (visible) ScheduleLogScroll(scroll, position);
             }
         }
 
-        private System.Collections.IEnumerator ScrollToBottom()
+        private static bool IsNearLatestLog(ScrollRect scroll)
         {
-            // UIのレイアウト更新を1フレーム待つ（WebGL互換のため yield return null を使用）
-            yield return null;
-            
-            if (logContainer != null)
+            if (scroll == null || scroll.content == null) return true;
+            var viewport = scroll.viewport != null ? scroll.viewport : (RectTransform)scroll.transform;
+            float overflow = Mathf.Max(0, scroll.content.rect.height - viewport.rect.height);
+            return overflow * scroll.verticalNormalizedPosition <= 16f;
+        }
+
+        private void ScheduleLogScroll(ScrollRect scroll, Vector2 position)
+        {
+            if (scroll == null || !isActiveAndEnabled) return;
+            if (logScrollRoutine != null) StopCoroutine(logScrollRoutine);
+            logScrollRoutine = StartCoroutine(RefreshLogScroll(scroll, position, followLatestLog));
+        }
+
+        private System.Collections.IEnumerator RefreshLogScroll(ScrollRect scroll, Vector2 position, bool follow)
+        {
+            yield return null; // 追加した行のレイアウト確定を待つ。
+            logScrollRoutine = null;
+            if (scroll == null || scroll.content == null || logPanel == null || !logPanel.activeInHierarchy) yield break;
+            var current = scroll.content.anchoredPosition;
+            // 待機中に読み手が動かした場合も、その位置を優先する。
+            if (Mathf.Abs(current.y - position.y) > 1f) follow = false;
+            Canvas.ForceUpdateCanvases();
+            if (follow)
             {
-                ScrollRect scrollRect = logContainer.GetComponentInParent<ScrollRect>();
-                if (scrollRect != null)
-                {
-                    // 0が一番下、1が一番上
-                    scrollRect.verticalNormalizedPosition = 0f;
-                }
+                scroll.StopMovement();
+                scroll.verticalNormalizedPosition = 0f;
             }
+            else scroll.content.anchoredPosition = current;
+            followLatestLog = follow;
         }
 
         public void ToggleLog()
@@ -339,10 +362,18 @@ namespace KillingMahjong.UI
         public void OpenLog()
         {
             logPanel.SetActive(true);
+            var scroll = logContainer != null ? logContainer.GetComponentInParent<ScrollRect>(true) : null;
+            if (!hasOpenedLog) followLatestLog = true;
+            hasOpenedLog = true;
+            if (scroll != null && scroll.content != null) ScheduleLogScroll(scroll, scroll.content.anchoredPosition);
         }
 
         public void CloseLog()
         {
+            var scroll = logContainer != null ? logContainer.GetComponentInParent<ScrollRect>(true) : null;
+            followLatestLog = IsNearLatestLog(scroll);
+            if (logScrollRoutine != null) StopCoroutine(logScrollRoutine);
+            logScrollRoutine = null;
             logPanel.SetActive(false);
 
             // ログが閉じられたら、GameUIManager側で止まっていたリアクションの消化を再開する

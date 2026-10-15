@@ -15,7 +15,7 @@ namespace KillingMahjong.UI
         private Color color;
         private bool isLocal;
 
-        public void Configure(TMP_Text label, Color tint, bool local)
+        public void Configure(TMP_Text label, Color tint, bool local, bool animate = true)
         {
             color = tint; isLocal = local;
             var go = new GameObject("SkillPanel", typeof(RectTransform), typeof(Image), typeof(CanvasGroup));
@@ -41,10 +41,12 @@ namespace KillingMahjong.UI
                 label.alignment = local ? TextAlignmentOptions.MidlineRight : TextAlignmentOptions.MidlineLeft;
             }
             Redraw();
-            if (isActiveAndEnabled) Enter();
+            if (animate && isActiveAndEnabled) Enter();
+            else Settle();
         }
 
-        private void OnEnable() { if (panel != null) Enter(); }
+        // 履歴を開き直す操作では、過去の行を再び飛び込ませない。
+        private void OnEnable() { Settle(); }
         private void OnRectTransformDimensionsChange() { Redraw(); }
         private void Redraw()
         {
@@ -75,10 +77,11 @@ namespace KillingMahjong.UI
             panel.DOAnchorPosX(0, .18f).SetEase(Ease.OutQuad).SetUpdate(true);
             group.DOFade(1, .18f).SetUpdate(true);
         }
-        private void OnDisable()
+        private void Settle()
         {
             if (panel == null) return;
             panel.DOKill(); group.DOKill(); panel.anchoredPosition = Vector2.zero; group.alpha = 1;
         }
+        private void OnDisable() { Settle(); }
     }
 }
