@@ -197,6 +197,7 @@ namespace KillingMahjong.Tests
             Send(swap); Send(Cast("perspective", 18200, "enemy", 4));
             Assert.That(Get(queue, "PendingCount"), Is.EqualTo(1));
             checker.SetActive(false);
+            float startedAt = Time.realtimeSinceStartup;
             var seen = new System.Collections.Generic.HashSet<int>();
             var labels = new System.Collections.Generic.List<string>();
             var positions = new System.Collections.Generic.List<float>();
@@ -238,6 +239,32 @@ namespace KillingMahjong.Tests
             Assert.That(exposed.SetEquals(new[] { 1, 3, 4 }), Is.True);
             Assert.That(Get(queue, "CurrentName"), Is.Null);
             Assert.That(Get(ui, "IsTransitioning"), Is.False);
+            Assert.That(Time.realtimeSinceStartup - startedAt, Is.LessThan(3.5f),
+                "連打の後に発動ごとの1秒待ちを繰り返さない");
+        }
+
+        [UnityTest]
+        public IEnumerator OverlappingShakesRestoreTheOriginalPositionAndCancelCleanly()
+        {
+            // ルートCanvasはレイアウトで座標が動く。揺れの原点復帰は固定Transformで検査する。
+            var targetObject = new GameObject("FixedShakeTarget");
+            targetObject.transform.SetParent(root.transform);
+            var target = targetObject.AddComponent(Main("UI.PhaseTransitionUI"));
+            ((Behaviour)target).enabled = false;
+            var origin = new Vector3(37f, -19f, 0f);
+            target.transform.localPosition = origin;
+            Call(target, "PlayScreenShake", 0.2f, 15f, Vector2.one);
+            yield return null;
+            Call(target, "PlayScreenShake", 0.15f, 20f, Vector2.one);
+            yield return new WaitForSeconds(0.3f);
+            Assert.That(Vector3.Distance(target.transform.localPosition, origin), Is.LessThan(0.001f));
+            Call(target, "PlayScreenShake", 1f, 20f, Vector2.one);
+            yield return null;
+            Call(target, "CancelTransitions");
+            Assert.That(Vector3.Distance(target.transform.localPosition, origin), Is.LessThan(0.001f));
+            Call(target, "PlayScreenShake", 0.05f, 5f, Vector2.one);
+            yield return new WaitForSeconds(0.1f);
+            Assert.That(Vector3.Distance(target.transform.localPosition, origin), Is.LessThan(0.001f));
         }
 
         [UnityTest]

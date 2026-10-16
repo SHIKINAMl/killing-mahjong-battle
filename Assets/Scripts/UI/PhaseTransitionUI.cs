@@ -209,6 +209,7 @@ namespace KillingMahjong.UI
         {
             skillPresentations.CancelAll();
             StopAllCoroutines();
+            ResetScreenShake();
             isDarkened = false;
             IsDarkenTransitioning = false;
             IsScreenDarkened = false;
@@ -427,7 +428,7 @@ namespace KillingMahjong.UI
         }
 
         // 背景と立ち絵は共有し、発動名を順番に叩き込む。退出の合図は全段で共有する。
-        public IEnumerator PlayEnemySkillBurstRoutine(IReadOnlyList<string> names, CharacterData character)
+        public IEnumerator PlayEnemySkillBurstRoutine(IReadOnlyList<string> names, CharacterData character, IReadOnlyList<string> skillTypes = null)
         {
             if (names == null || names.Count == 0) yield break;
             using (var scope = skillPresentations.Begin())
@@ -436,6 +437,9 @@ namespace KillingMahjong.UI
                 int completed = 0;
                 for (int i = 0; i < names.Count && scope.IsActive; i++)
                 {
+                    // 発動音は名前が登場する瞬間に。後段の通知適用では繰り返さない。
+                    if (skillTypes != null && i < skillTypes.Count && Managers.AudioManager.Instance != null)
+                        Managers.AudioManager.Instance.PlaySkillSE(skillTypes[i]);
                     var routine = StartCoroutine(scope.Run(SkillCutinVisualsRoutine(scope, names[i], false,
                         character, 2f, () => completed++, null, i, names.Count, () => exit)));
                     scope.AddCleanup(() => { if (this != null && routine != null) StopCoroutine(routine); });

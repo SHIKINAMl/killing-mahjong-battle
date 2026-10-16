@@ -162,14 +162,15 @@ namespace KillingMahjong.UI
 
             // 能力麻雀の核であるスキル発動が完全に無音だったため、種類別の音を鳴らす
             var audioMgr = Managers.AudioManager.Instance;
-            if (audioMgr != null) audioMgr.PlaySkillSE(data.skillType);
+            if (!skipCutin && audioMgr != null) audioMgr.PlaySkillSE(data.skillType);
 
             // **発動の手応えは揺れで出す（2026-09-13）。**
             // 上のフラッシュを止めたとき、合図が音だけになっていた。
             // 音は切ってあることがある（`AudioManager.AudioEnabled`）ので、
             // 無音でも「何かが起きた」と分かる合図が要る。
             // ロンより弱くする。能力は局に何度も飛ぶので、同じ強さだと疲れる。
-            Effects.ScreenQuake.Play(12f, 0.22f);
+            // カットイン側が着弾を担当する。連打の終了後に同じ揺れを再生しない。
+            if (!skipCutin && uiManager.PhaseTransitionUI == null) Effects.ScreenQuake.Play(12f, 0.22f);
 
             string localPlayerId = SkillLocalPlayerId;
             bool isLocalPlayer = (data.player_id == localPlayerId);
@@ -347,8 +348,8 @@ namespace KillingMahjong.UI
                 }
             }
 
-            // 体力が減る様子をしっかり見せるためのタメ（待機）
-            yield return new WaitForSeconds(1.0f);
+            // 単発はHPの変化を短く見せて固有演出へ。連打は各件の空待ちを挟まない。
+            if (!skipCutin) yield return new WaitForSeconds(0.2f);
             if (!ownedLock.IsActive) yield break;
 
             // --- 以降、実際のアビリティ効果（透視以外も含む）を実行 ---

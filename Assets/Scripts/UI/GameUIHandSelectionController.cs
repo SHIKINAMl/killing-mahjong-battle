@@ -316,7 +316,7 @@ namespace KillingMahjong.UI
             if (queue == null || uiManager.IsTutorialMode)
             {
                 GetRankCallUI().ShowRank(rank);
-                _waitReveal?.Show(waits, uiManager.TileResourceManager);
+                // 候補は上で構築済み。同じ牌を消して再登場させない。
                 return;
             }
             queue.Enqueue("rank-call", () => ShowRankCallRoutine(rank, waits), cuttable: true,
@@ -331,7 +331,9 @@ namespace KillingMahjong.UI
         {
             var ui = GetRankCallUI();
             ui.ShowRank(rank);
-            _waitReveal?.Show(waits, uiManager.TileResourceManager);
+            // 順番待ちの前に表示した候補は、そのまま保つ。
+            if (_waitReveal != null && !_waitReveal.HasCandidates(waits))
+                _waitReveal.Show(waits, uiManager.TileResourceManager);
             while (ui != null && ui.IsShowing) yield return null;
         }
 

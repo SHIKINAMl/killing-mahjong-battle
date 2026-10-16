@@ -109,7 +109,8 @@ namespace KillingMahjong.UI
                 if (n < newlyExposed.Count - 1) yield return new WaitForSeconds(TileRevealGap);
             }
 
-            yield return new WaitForSeconds(HoldBeforeFlash);
+            // 0枚でも青い発動は見せる。牌を読む必要がないときの静止だけ短くする。
+            yield return new WaitForSeconds(glowingImages.Count > 0 ? HoldBeforeFlash : 0.12f);
 
             // ---- ③ フラッシュ → ④ もとに戻る ----
             if (effect != null)
