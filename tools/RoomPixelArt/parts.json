@@ -2,148 +2,148 @@
   {
     "name": "RoomBackdrop",
     "layer": "RoomLayerFar",
-    "width": 960.0,
-    "height": 600.0,
+    "width": 960,
+    "height": 600,
     "color": [
       0.08627451,
       0.05882353,
       0.09411765,
-      1.0
+      1
     ],
     "position": [
-      0.0,
-      0.0
+      0,
+      0
     ],
     "size": [
-      0.0,
-      0.0
+      0,
+      0
     ]
   },
   {
     "name": "RoomWall",
     "layer": "RoomLayerFar",
-    "width": 960.0,
-    "height": 400.0,
+    "width": 960,
+    "height": 400,
     "color": [
       0.180392161,
       0.109803922,
       0.152941182,
-      1.0
+      1
     ],
     "position": [
-      0.0,
-      100.0
+      0,
+      100
     ],
     "size": [
-      960.0,
-      400.0
+      960,
+      400
     ]
   },
   {
     "name": "RoomCeilingTrim",
     "layer": "RoomLayerFar",
-    "width": 960.0,
-    "height": 18.0,
+    "width": 960,
+    "height": 18,
     "color": [
       0.294117659,
       0.1764706,
       0.215686277,
-      1.0
+      1
     ],
     "position": [
-      0.0,
-      286.0
+      0,
+      286
     ],
     "size": [
-      960.0,
-      18.0
+      960,
+      18
     ]
   },
   {
     "name": "RoomWindowFrame",
     "layer": "RoomLayerFar",
-    "width": 248.0,
-    "height": 228.0,
+    "width": 248,
+    "height": 228,
     "color": [
       0.117647059,
       0.08235294,
       0.121568628,
-      1.0
+      1
     ],
     "position": [
-      190.0,
-      92.0
+      190,
+      92
     ],
     "size": [
-      248.0,
-      228.0
+      248,
+      228
     ]
   },
   {
     "name": "RoomWindowNight",
     "layer": "RoomLayerFar",
-    "width": 224.0,
-    "height": 204.0,
+    "width": 224,
+    "height": 204,
     "color": [
       0.149019614,
       0.215686277,
       0.309803933,
-      1.0
+      1
     ],
     "position": [
-      190.0,
-      92.0
+      190,
+      92
     ],
     "size": [
-      224.0,
-      204.0
+      224,
+      204
     ]
   },
   {
     "name": "RoomWindowCrossVertical",
     "layer": "RoomLayerFar",
-    "width": 7.0,
-    "height": 204.0,
+    "width": 7,
+    "height": 204,
     "color": [
       0.121568628,
       0.09019608,
       0.13333334,
-      1.0
+      1
     ],
     "position": [
-      190.0,
-      92.0
+      190,
+      92
     ],
     "size": [
-      7.0,
-      204.0
+      7,
+      204
     ]
   },
   {
     "name": "RoomWindowCrossHorizontal",
     "layer": "RoomLayerFar",
-    "width": 224.0,
-    "height": 7.0,
+    "width": 224,
+    "height": 7,
     "color": [
       0.121568628,
       0.09019608,
       0.13333334,
-      1.0
+      1
     ],
     "position": [
-      190.0,
-      92.0
+      190,
+      92
     ],
     "size": [
-      224.0,
-      7.0
+      224,
+      7
     ]
   },
   {
     "name": "RoomWindowGlow",
     "layer": "RoomLayerMid",
-    "width": 314.0,
-    "height": 106.0,
+    "width": 314,
+    "height": 106,
     "color": [
       0.349019617,
       0.470588237,
@@ -151,419 +151,419 @@
       0.13
     ],
     "position": [
-      116.0,
-      -46.0
+      116,
+      -46
     ],
     "size": [
-      314.0,
-      106.0
+      314,
+      106
     ]
   },
   {
     "name": "RoomBookshelf",
     "layer": "RoomLayerMid",
-    "width": 158.0,
-    "height": 292.0,
+    "width": 158,
+    "height": 292,
     "color": [
       0.1882353,
       0.109803922,
       0.109803922,
-      1.0
+      1
     ],
     "position": [
-      -304.0,
-      8.0
+      -304,
+      8
     ],
     "size": [
-      158.0,
-      292.0
+      158,
+      292
     ]
   },
   {
     "name": "RoomBookshelfInner",
     "layer": "RoomLayerMid",
-    "width": 134.0,
-    "height": 268.0,
+    "width": 134,
+    "height": 268,
     "color": [
       0.117647059,
       0.0784313753,
       0.105882354,
-      1.0
+      1
     ],
     "position": [
-      -304.0,
-      8.0
+      -304,
+      8
     ],
     "size": [
-      134.0,
-      268.0
+      134,
+      268
     ]
   },
   {
     "name": "RoomShelf0",
     "layer": "RoomLayerMid",
-    "width": 136.0,
-    "height": 6.0,
+    "width": 136,
+    "height": 6,
     "color": [
       0.356862754,
       0.20784314,
       0.1764706,
-      1.0
+      1
     ],
     "position": [
-      -304.0,
-      104.0
+      -304,
+      78
     ],
     "size": [
-      136.0,
-      6.0
+      136,
+      6
     ]
   },
   {
     "name": "RoomBookRed0",
     "layer": "RoomLayerMid",
-    "width": 12.0,
-    "height": 32,
+    "width": 12,
+    "height": 52,
     "color": [
       0.545098066,
       0.20784314,
       0.227450982,
-      1.0
+      1
     ],
     "position": [
-      -348,
-      123
+      -363,
+      107
     ],
     "size": [
-      12.0,
-      32
+      12,
+      52
     ]
   },
   {
     "name": "RoomBookCream0",
     "layer": "RoomLayerMid",
-    "width": 11.0,
-    "height": 28,
+    "width": 10,
+    "height": 58,
     "color": [
       0.7607843,
       0.619607866,
       0.466666669,
-      1.0
+      1
     ],
     "position": [
-      -330,
-      121
+      -351,
+      110
     ],
     "size": [
-      11.0,
-      28
+      10,
+      58
     ]
   },
   {
     "name": "RoomBookBlue0",
     "layer": "RoomLayerMid",
-    "width": 10.0,
-    "height": 26,
+    "width": 14,
+    "height": 54,
     "color": [
       0.227450982,
       0.329411775,
       0.435294122,
-      1.0
+      1
     ],
     "position": [
-      -314,
-      120
+      -338,
+      108
     ],
     "size": [
-      10.0,
-      26
+      14,
+      54
     ]
   },
   {
     "name": "RoomShelf1",
     "layer": "RoomLayerMid",
-    "width": 136.0,
-    "height": 6.0,
+    "width": 136,
+    "height": 6,
     "color": [
       0.356862754,
       0.20784314,
       0.1764706,
-      1.0
+      1
     ],
     "position": [
-      -304.0,
-      40.0
+      -304,
+      12
     ],
     "size": [
-      136.0,
-      6.0
+      136,
+      6
     ]
   },
   {
     "name": "RoomBookRed1",
     "layer": "RoomLayerMid",
-    "width": 12.0,
-    "height": 32,
+    "width": 12,
+    "height": 54,
     "color": [
       0.545098066,
       0.20784314,
       0.227450982,
-      1.0
+      1
     ],
     "position": [
-      -342,
-      59
+      -363,
+      42
     ],
     "size": [
-      12.0,
-      32
+      12,
+      54
     ]
   },
   {
     "name": "RoomBookCream1",
     "layer": "RoomLayerMid",
-    "width": 11.0,
-    "height": 28,
+    "width": 10,
+    "height": 56,
     "color": [
       0.7607843,
       0.619607866,
       0.466666669,
-      1.0
+      1
     ],
     "position": [
-      -324,
-      57
+      -351,
+      43
     ],
     "size": [
-      11.0,
-      28
+      10,
+      56
     ]
   },
   {
     "name": "RoomBookBlue1",
     "layer": "RoomLayerMid",
-    "width": 10.0,
-    "height": 26,
+    "width": 14,
+    "height": 50,
     "color": [
       0.227450982,
       0.329411775,
       0.435294122,
-      1.0
+      1
     ],
     "position": [
-      -308,
-      56
+      -338,
+      40
     ],
     "size": [
-      10.0,
-      26
+      14,
+      50
     ]
   },
   {
     "name": "RoomShelf2",
     "layer": "RoomLayerMid",
-    "width": 136.0,
-    "height": 6.0,
+    "width": 136,
+    "height": 6,
     "color": [
       0.356862754,
       0.20784314,
       0.1764706,
-      1.0
+      1
     ],
     "position": [
-      -304.0,
-      -24.0
+      -304,
+      -54
     ],
     "size": [
-      136.0,
-      6.0
+      136,
+      6
     ]
   },
   {
     "name": "RoomBookRed2",
     "layer": "RoomLayerMid",
-    "width": 12.0,
-    "height": 32,
+    "width": 12,
+    "height": 50,
     "color": [
       0.545098066,
       0.20784314,
       0.227450982,
-      1.0
+      1
     ],
     "position": [
-      -336,
-      -5
+      -363,
+      -26
     ],
     "size": [
-      12.0,
-      32
+      12,
+      50
     ]
   },
   {
     "name": "RoomBookCream2",
     "layer": "RoomLayerMid",
-    "width": 11.0,
-    "height": 28,
+    "width": 10,
+    "height": 58,
     "color": [
       0.7607843,
       0.619607866,
       0.466666669,
-      1.0
+      1
     ],
     "position": [
-      -318,
-      -7
+      -351,
+      -22
     ],
     "size": [
-      11.0,
-      28
+      10,
+      58
     ]
   },
   {
     "name": "RoomBookBlue2",
     "layer": "RoomLayerMid",
-    "width": 10.0,
-    "height": 26,
+    "width": 14,
+    "height": 54,
     "color": [
       0.227450982,
       0.329411775,
       0.435294122,
-      1.0
+      1
     ],
     "position": [
-      -302,
-      -8
+      -338,
+      -24
     ],
     "size": [
-      10.0,
-      26
+      14,
+      54
     ]
   },
   {
     "name": "RoomShelf3",
     "layer": "RoomLayerMid",
-    "width": 136.0,
-    "height": 6.0,
+    "width": 136,
+    "height": 6,
     "color": [
       0.356862754,
       0.20784314,
       0.1764706,
-      1.0
+      1
     ],
     "position": [
-      -304.0,
-      -88.0
+      -304,
+      -120
     ],
     "size": [
-      136.0,
-      6.0
+      136,
+      6
     ]
   },
   {
     "name": "RoomBookRed3",
     "layer": "RoomLayerMid",
-    "width": 12.0,
-    "height": 32,
+    "width": 12,
+    "height": 54,
     "color": [
       0.545098066,
       0.20784314,
       0.227450982,
-      1.0
+      1
     ],
     "position": [
-      -330,
-      -69
+      -363,
+      -90
     ],
     "size": [
-      12.0,
-      32
+      12,
+      54
     ]
   },
   {
     "name": "RoomBookCream3",
     "layer": "RoomLayerMid",
-    "width": 11.0,
-    "height": 28,
+    "width": 10,
+    "height": 56,
     "color": [
       0.7607843,
       0.619607866,
       0.466666669,
-      1.0
+      1
     ],
     "position": [
-      -312,
-      -71
+      -351,
+      -89
     ],
     "size": [
-      11.0,
-      28
+      10,
+      56
     ]
   },
   {
     "name": "RoomBookBlue3",
     "layer": "RoomLayerMid",
-    "width": 10.0,
-    "height": 26,
+    "width": 14,
+    "height": 52,
     "color": [
       0.227450982,
       0.329411775,
       0.435294122,
-      1.0
+      1
     ],
     "position": [
-      -296,
-      -72
+      -338,
+      -91
     ],
     "size": [
-      10.0,
-      26
+      14,
+      52
     ]
   },
   {
     "name": "RoomDesk",
     "layer": "RoomLayerMid",
-    "width": 168.0,
-    "height": 106.0,
+    "width": 168,
+    "height": 106,
     "color": [
       0.1882353,
       0.109803922,
       0.109803922,
-      1.0
+      1
     ],
     "position": [
-      257.0,
-      -121.0
+      257,
+      -121
     ],
     "size": [
-      168.0,
-      106.0
+      168,
+      106
     ]
   },
   {
     "name": "RoomDeskTop",
     "layer": "RoomLayerMid",
-    "width": 190.0,
-    "height": 13.0,
+    "width": 190,
+    "height": 13,
     "color": [
       0.356862754,
       0.20784314,
       0.1764706,
-      1.0
+      1
     ],
     "position": [
-      257.0,
-      -72.0
+      257,
+      -72
     ],
     "size": [
-      190.0,
-      13.0
+      190,
+      13
     ]
   },
   {
     "name": "RoomLampGlow",
     "layer": "RoomLayerMid",
-    "width": 94.0,
-    "height": 108.0,
+    "width": 94,
+    "height": 108,
     "color": [
       0.9098039,
       0.68235296,
@@ -571,92 +571,652 @@
       0.16
     ],
     "position": [
-      260.0,
-      15.0
+      260,
+      15
     ],
     "size": [
-      94.0,
-      108.0
+      94,
+      108
     ]
   },
   {
     "name": "RoomCurtain",
     "layer": "RoomLayerMid",
-    "width": 103.0,
-    "height": 424.0,
+    "width": 103,
+    "height": 424,
     "color": [
       0.274509817,
       0.09411765,
       0.152941182,
-      1.0
+      1
     ],
     "position": [
-      349.0,
-      90.0
+      349,
+      90
     ],
     "size": [
-      103.0,
-      424.0
+      103,
+      424
     ]
   },
   {
     "name": "RoomFloor",
     "layer": "RoomLayerNear",
-    "width": 960.0,
-    "height": 200.0,
+    "width": 960,
+    "height": 200,
     "color": [
       0.137254909,
       0.0784313753,
       0.105882354,
-      1.0
+      1
     ],
     "position": [
-      0.0,
-      -200.0
+      0,
+      -200
     ],
     "size": [
-      960.0,
-      200.0
+      960,
+      200
     ]
   },
   {
     "name": "RoomRug",
     "layer": "RoomLayerNear",
-    "width": 435.0,
-    "height": 118.0,
+    "width": 435,
+    "height": 118,
     "color": [
       0.360784322,
       0.184313729,
       0.227450982,
-      1.0
+      1
     ],
     "position": [
-      -58.0,
-      -144.0
+      -58,
+      -144
     ],
     "size": [
-      435.0,
-      118.0
+      435,
+      118
     ]
   },
   {
     "name": "RoomRugInner",
     "layer": "RoomLayerNear",
-    "width": 392.0,
-    "height": 88.0,
+    "width": 392,
+    "height": 88,
     "color": [
       0.254901975,
       0.137254909,
       0.180392161,
-      1.0
+      1
     ],
     "position": [
-      -58.0,
-      -144.0
+      -58,
+      -144
     ],
     "size": [
-      392.0,
-      88.0
+      392,
+      88
+    ]
+  },
+  {
+    "name": "RoomBookPacked0_3",
+    "layer": "RoomLayerMid",
+    "color": [
+      0.36470588235294116,
+      0.23921568627450981,
+      0.39215686274509803,
+      1
+    ],
+    "width": 12,
+    "height": 56,
+    "position": [
+      -324,
+      109
+    ],
+    "size": [
+      12,
+      56
+    ]
+  },
+  {
+    "name": "RoomBookPacked0_4",
+    "layer": "RoomLayerMid",
+    "color": [
+      0.29411764705882354,
+      0.39215686274509803,
+      0.3137254901960784,
+      1
+    ],
+    "width": 10,
+    "height": 50,
+    "position": [
+      -312,
+      106
+    ],
+    "size": [
+      10,
+      50
+    ]
+  },
+  {
+    "name": "RoomBookPacked0_5",
+    "layer": "RoomLayerMid",
+    "color": [
+      0.5803921568627451,
+      0.4117647058823529,
+      0.25098039215686274,
+      1
+    ],
+    "width": 14,
+    "height": 58,
+    "position": [
+      -299,
+      110
+    ],
+    "size": [
+      14,
+      58
+    ]
+  },
+  {
+    "name": "RoomBookPacked0_6",
+    "layer": "RoomLayerMid",
+    "color": [
+      0.5450980392156862,
+      0.20784313725490197,
+      0.22745098039215686,
+      1
+    ],
+    "width": 12,
+    "height": 54,
+    "position": [
+      -285,
+      108
+    ],
+    "size": [
+      12,
+      54
+    ]
+  },
+  {
+    "name": "RoomBookPacked0_7",
+    "layer": "RoomLayerMid",
+    "color": [
+      0.7607843137254902,
+      0.6196078431372549,
+      0.4666666666666667,
+      1
+    ],
+    "width": 10,
+    "height": 56,
+    "position": [
+      -273,
+      109
+    ],
+    "size": [
+      10,
+      56
+    ]
+  },
+  {
+    "name": "RoomBookPacked0_8",
+    "layer": "RoomLayerMid",
+    "color": [
+      0.22745098039215686,
+      0.32941176470588235,
+      0.43529411764705883,
+      1
+    ],
+    "width": 12,
+    "height": 52,
+    "position": [
+      -261,
+      107
+    ],
+    "size": [
+      12,
+      52
+    ]
+  },
+  {
+    "name": "RoomBookPacked0_9",
+    "layer": "RoomLayerMid",
+    "color": [
+      0.36470588235294116,
+      0.23921568627450981,
+      0.39215686274509803,
+      1
+    ],
+    "width": 14,
+    "height": 58,
+    "position": [
+      -247,
+      110
+    ],
+    "size": [
+      14,
+      58
+    ]
+  },
+  {
+    "name": "RoomBookPacked1_3",
+    "layer": "RoomLayerMid",
+    "color": [
+      0.29411764705882354,
+      0.39215686274509803,
+      0.3137254901960784,
+      1
+    ],
+    "width": 12,
+    "height": 58,
+    "position": [
+      -324,
+      44
+    ],
+    "size": [
+      12,
+      58
+    ]
+  },
+  {
+    "name": "RoomBookPacked1_4",
+    "layer": "RoomLayerMid",
+    "color": [
+      0.5803921568627451,
+      0.4117647058823529,
+      0.25098039215686274,
+      1
+    ],
+    "width": 10,
+    "height": 54,
+    "position": [
+      -312,
+      42
+    ],
+    "size": [
+      10,
+      54
+    ]
+  },
+  {
+    "name": "RoomBookPacked1_5",
+    "layer": "RoomLayerMid",
+    "color": [
+      0.5450980392156862,
+      0.20784313725490197,
+      0.22745098039215686,
+      1
+    ],
+    "width": 14,
+    "height": 56,
+    "position": [
+      -299,
+      43
+    ],
+    "size": [
+      14,
+      56
+    ]
+  },
+  {
+    "name": "RoomBookPacked1_6",
+    "layer": "RoomLayerMid",
+    "color": [
+      0.7607843137254902,
+      0.6196078431372549,
+      0.4666666666666667,
+      1
+    ],
+    "width": 12,
+    "height": 52,
+    "position": [
+      -285,
+      41
+    ],
+    "size": [
+      12,
+      52
+    ]
+  },
+  {
+    "name": "RoomBookPacked1_7",
+    "layer": "RoomLayerMid",
+    "color": [
+      0.22745098039215686,
+      0.32941176470588235,
+      0.43529411764705883,
+      1
+    ],
+    "width": 10,
+    "height": 58,
+    "position": [
+      -273,
+      44
+    ],
+    "size": [
+      10,
+      58
+    ]
+  },
+  {
+    "name": "RoomBookPacked1_8",
+    "layer": "RoomLayerMid",
+    "color": [
+      0.36470588235294116,
+      0.23921568627450981,
+      0.39215686274509803,
+      1
+    ],
+    "width": 12,
+    "height": 52,
+    "position": [
+      -261,
+      41
+    ],
+    "size": [
+      12,
+      52
+    ]
+  },
+  {
+    "name": "RoomBookPacked1_9",
+    "layer": "RoomLayerMid",
+    "color": [
+      0.29411764705882354,
+      0.39215686274509803,
+      0.3137254901960784,
+      1
+    ],
+    "width": 14,
+    "height": 58,
+    "position": [
+      -247,
+      44
+    ],
+    "size": [
+      14,
+      58
+    ]
+  },
+  {
+    "name": "RoomBookPacked2_3",
+    "layer": "RoomLayerMid",
+    "color": [
+      0.5803921568627451,
+      0.4117647058823529,
+      0.25098039215686274,
+      1
+    ],
+    "width": 12,
+    "height": 56,
+    "position": [
+      -324,
+      -23
+    ],
+    "size": [
+      12,
+      56
+    ]
+  },
+  {
+    "name": "RoomBookPacked2_4",
+    "layer": "RoomLayerMid",
+    "color": [
+      0.5450980392156862,
+      0.20784313725490197,
+      0.22745098039215686,
+      1
+    ],
+    "width": 10,
+    "height": 52,
+    "position": [
+      -312,
+      -25
+    ],
+    "size": [
+      10,
+      52
+    ]
+  },
+  {
+    "name": "RoomBookPacked2_5",
+    "layer": "RoomLayerMid",
+    "color": [
+      0.7607843137254902,
+      0.6196078431372549,
+      0.4666666666666667,
+      1
+    ],
+    "width": 14,
+    "height": 58,
+    "position": [
+      -299,
+      -22
+    ],
+    "size": [
+      14,
+      58
+    ]
+  },
+  {
+    "name": "RoomBookPacked2_6",
+    "layer": "RoomLayerMid",
+    "color": [
+      0.22745098039215686,
+      0.32941176470588235,
+      0.43529411764705883,
+      1
+    ],
+    "width": 12,
+    "height": 52,
+    "position": [
+      -285,
+      -25
+    ],
+    "size": [
+      12,
+      52
+    ]
+  },
+  {
+    "name": "RoomBookPacked2_7",
+    "layer": "RoomLayerMid",
+    "color": [
+      0.36470588235294116,
+      0.23921568627450981,
+      0.39215686274509803,
+      1
+    ],
+    "width": 10,
+    "height": 58,
+    "position": [
+      -273,
+      -22
+    ],
+    "size": [
+      10,
+      58
+    ]
+  },
+  {
+    "name": "RoomBookPacked2_8",
+    "layer": "RoomLayerMid",
+    "color": [
+      0.29411764705882354,
+      0.39215686274509803,
+      0.3137254901960784,
+      1
+    ],
+    "width": 12,
+    "height": 54,
+    "position": [
+      -261,
+      -24
+    ],
+    "size": [
+      12,
+      54
+    ]
+  },
+  {
+    "name": "RoomBookPacked2_9",
+    "layer": "RoomLayerMid",
+    "color": [
+      0.5803921568627451,
+      0.4117647058823529,
+      0.25098039215686274,
+      1
+    ],
+    "width": 14,
+    "height": 56,
+    "position": [
+      -247,
+      -23
+    ],
+    "size": [
+      14,
+      56
+    ]
+  },
+  {
+    "name": "RoomBookPacked3_3",
+    "layer": "RoomLayerMid",
+    "color": [
+      0.5450980392156862,
+      0.20784313725490197,
+      0.22745098039215686,
+      1
+    ],
+    "width": 12,
+    "height": 58,
+    "position": [
+      -324,
+      -88
+    ],
+    "size": [
+      12,
+      58
+    ]
+  },
+  {
+    "name": "RoomBookPacked3_4",
+    "layer": "RoomLayerMid",
+    "color": [
+      0.7607843137254902,
+      0.6196078431372549,
+      0.4666666666666667,
+      1
+    ],
+    "width": 10,
+    "height": 52,
+    "position": [
+      -312,
+      -91
+    ],
+    "size": [
+      10,
+      52
+    ]
+  },
+  {
+    "name": "RoomBookPacked3_5",
+    "layer": "RoomLayerMid",
+    "color": [
+      0.22745098039215686,
+      0.32941176470588235,
+      0.43529411764705883,
+      1
+    ],
+    "width": 14,
+    "height": 58,
+    "position": [
+      -299,
+      -88
+    ],
+    "size": [
+      14,
+      58
+    ]
+  },
+  {
+    "name": "RoomBookPacked3_6",
+    "layer": "RoomLayerMid",
+    "color": [
+      0.36470588235294116,
+      0.23921568627450981,
+      0.39215686274509803,
+      1
+    ],
+    "width": 12,
+    "height": 54,
+    "position": [
+      -285,
+      -90
+    ],
+    "size": [
+      12,
+      54
+    ]
+  },
+  {
+    "name": "RoomBookPacked3_7",
+    "layer": "RoomLayerMid",
+    "color": [
+      0.29411764705882354,
+      0.39215686274509803,
+      0.3137254901960784,
+      1
+    ],
+    "width": 10,
+    "height": 56,
+    "position": [
+      -273,
+      -89
+    ],
+    "size": [
+      10,
+      56
+    ]
+  },
+  {
+    "name": "RoomBookPacked3_8",
+    "layer": "RoomLayerMid",
+    "color": [
+      0.5803921568627451,
+      0.4117647058823529,
+      0.25098039215686274,
+      1
+    ],
+    "width": 12,
+    "height": 50,
+    "position": [
+      -261,
+      -92
+    ],
+    "size": [
+      12,
+      50
+    ]
+  },
+  {
+    "name": "RoomBookPacked3_9",
+    "layer": "RoomLayerMid",
+    "color": [
+      0.5450980392156862,
+      0.20784313725490197,
+      0.22745098039215686,
+      1
+    ],
+    "width": 14,
+    "height": 58,
+    "position": [
+      -247,
+      -88
+    ],
+    "size": [
+      14,
+      58
     ]
   }
 ]

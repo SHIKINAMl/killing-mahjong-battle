@@ -42,7 +42,7 @@ namespace KillingMahjong.EditorTools
             foreach (var part in parts)
             {
                 string path = AssetPath(part);
-                if (!File.Exists(path) || content.Find(part.layer + "/" + part.name) == null)
+                if (!File.Exists(path) || (content.Find(part.layer + "/" + part.name) == null && !IsBook(part)))
                     throw new InvalidOperationException("部品がありません: " + part.name);
                 AssetDatabase.ImportAsset(path);
                 var importer = (TextureImporter)AssetImporter.GetAtPath(path);
@@ -65,12 +65,22 @@ namespace KillingMahjong.EditorTools
             }
             foreach (var part in parts)
             {
-                var image = content.Find(part.layer + "/" + part.name).GetComponent<Image>();
+                var target = content.Find(part.layer + "/" + part.name);
+                if (target == null)
+                {
+                    var created = new GameObject(part.name, typeof(RectTransform), typeof(Image));
+                    Undo.RegisterCreatedObjectUndo(created, "本棚に本を追加");
+                    created.transform.SetParent(content.Find(part.layer), false);
+                    var rect = (RectTransform)created.transform;
+                    rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0.5f, 0.5f);
+                    target = rect;
+                    created.GetComponent<Image>().raycastTarget = false;
+                }
+                var image = target.GetComponent<Image>();
                 Undo.RecordObject(image, "部屋のドット素材を配置");
                 image.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(AssetPath(part));
                 image.type = Image.Type.Simple;
-                if (part.name.StartsWith("RoomBook", StringComparison.Ordinal)
-                    && !part.name.StartsWith("RoomBookshelf", StringComparison.Ordinal))
+                if (IsBook(part) || part.name.StartsWith("RoomShelf", StringComparison.Ordinal))
                 {
                     Undo.RecordObject(image.rectTransform, "本を棚板に揃える");
                     image.rectTransform.anchoredPosition = new Vector2(part.position[0], part.position[1]);
@@ -89,5 +99,9 @@ namespace KillingMahjong.EditorTools
 
         private static string AssetPath(Part part) =>
             "Assets/Resources/Room/PixelParts/" + part.name + ".png";
+
+        private static bool IsBook(Part part) =>
+            part.name.StartsWith("RoomBook", StringComparison.Ordinal)
+            && !part.name.StartsWith("RoomBookshelf", StringComparison.Ordinal);
     }
 }
