@@ -95,8 +95,9 @@ namespace KillingMahjong.Managers
 
             // **チュートリアルの曲。** ここに載っていないと拍の時計が動かず、
             // 揺れ（`FloatingAnimator`）も音に合わせられない。
-            // `tut_lesson` は `km-docs/tools/compose.py` で作っていて、
-            // **135.00 ちょうど・1拍目がサンプル0**。実測ではなく設計値。
+            // `tut_lesson` は 2026-10-16 に作り直した（ピアノ・ドラムは SoundFont、
+            // ベースは `km-docs/tools/compose.py` の合成音。音の位置は全部拍ちょうど）。
+            // **135.00 ちょうど・1拍目がサンプル0・24小節**。実測ではなく設計値。
             { "tut_lesson",       new Tempo(135f, 4) },
 
             // プランナー採用の2曲（2026-09-26）。**AudioManager.PairBgm.cs がここから拍を引く。**
