@@ -19,6 +19,8 @@ namespace KillingMahjong.EditorTools
             public string name;
             public string layer;
             public float[] color;
+            public float[] position;
+            public float[] size;
         }
 
         [MenuItem("Tools/UI/部屋の個別ドット素材を配置")]
@@ -67,6 +69,13 @@ namespace KillingMahjong.EditorTools
                 Undo.RecordObject(image, "部屋のドット素材を配置");
                 image.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(AssetPath(part));
                 image.type = Image.Type.Simple;
+                if (part.name.StartsWith("RoomBook", StringComparison.Ordinal)
+                    && !part.name.StartsWith("RoomBookshelf", StringComparison.Ordinal))
+                {
+                    Undo.RecordObject(image.rectTransform, "本を棚板に揃える");
+                    image.rectTransform.anchoredPosition = new Vector2(part.position[0], part.position[1]);
+                    image.rectTransform.sizeDelta = new Vector2(part.size[0], part.size[1]);
+                }
                 // 光の画像は白いマスク。元の色とalphaを残し、既存の明滅を使う。
                 image.color = part.name.EndsWith("Glow", StringComparison.Ordinal)
                     ? new Color(part.color[0], part.color[1], part.color[2], part.color[3])

@@ -359,12 +359,13 @@ namespace KillingMahjong.UI
             {
                 float y = 104f - i * 64f;
                 CreateCenteredImage(midLayer, "RoomShelf" + i, new Vector2(-304f, y), new Vector2(136f, 6f), WoodLight);
-                CreateCenteredImage(midLayer, "RoomBookRed" + i, new Vector2(-342f + i * 7f, y + 22f),
-                    new Vector2(12f, 38f), new Color32(139, 53, 58, 255));
-                CreateCenteredImage(midLayer, "RoomBookCream" + i, new Vector2(-326f + i * 8f, y + 20f),
-                    new Vector2(11f, 34f), new Color32(194, 158, 119, 255));
-                CreateCenteredImage(midLayer, "RoomBookBlue" + i, new Vector2(-307f + i * 5f, y + 18f),
-                    new Vector2(10f, 31f), new Color32(58, 84, 111, 255));
+                // 各段の上端を越えず、本の下端が棚板上面(y + 3)に揃う寸法。
+                CreateCenteredImage(midLayer, "RoomBookRed" + i, new Vector2(-348f + i * 6f, y + 19f),
+                    new Vector2(12f, 32f), new Color32(139, 53, 58, 255));
+                CreateCenteredImage(midLayer, "RoomBookCream" + i, new Vector2(-330f + i * 6f, y + 17f),
+                    new Vector2(11f, 28f), new Color32(194, 158, 119, 255));
+                CreateCenteredImage(midLayer, "RoomBookBlue" + i, new Vector2(-314f + i * 6f, y + 16f),
+                    new Vector2(10f, 26f), new Color32(58, 84, 111, 255));
             }
 
             CreateCenteredImage(midLayer, "RoomDesk", new Vector2(257f, -121f), new Vector2(168f, 106f), WoodDark);
