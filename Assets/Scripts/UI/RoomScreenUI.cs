@@ -355,8 +355,7 @@ namespace KillingMahjong.UI
             CreateCenteredImage(midLayer, "RoomBookshelf", new Vector2(-304f, 8f), new Vector2(158f, 292f), WoodDark);
             CreateCenteredImage(midLayer, "RoomBookshelfInner", new Vector2(-304f, 8f), new Vector2(134f, 268f),
                 new Color32(30, 20, 27, 255));
-            var bookWidths = new[] { 12f, 10f, 14f, 12f, 10f, 14f, 12f, 10f, 12f, 14f };
-            var bookHeights = new[] { 52f, 58f, 54f, 56f, 50f, 58f, 54f, 56f, 52f, 58f };
+            var bookWidths = new[] { 14f, 12f, 14f, 12f, 12f, 14f, 12f, 12f, 14f, 14f };
             var bookColors = new[] {
                 new Color32(139, 53, 58, 255), new Color32(194, 158, 119, 255),
                 new Color32(58, 84, 111, 255), new Color32(93, 61, 100, 255),
@@ -370,11 +369,11 @@ namespace KillingMahjong.UI
                 {
                     string name = column < 3 ? "RoomBook" + new[] { "Red", "Cream", "Blue" }[column] + i
                         : "RoomBookPacked" + i + "_" + column;
-                    float width = bookWidths[column], height = bookHeights[(column + i * 2) % bookHeights.Length];
+                    float width = bookWidths[column], height = i == 0 ? 59f : 60f;
                     var color = bookColors[column < 3 ? column : (column + i) % bookColors.Length];
                     CreateCenteredImage(midLayer, name, new Vector2(left + width / 2f, y + 3f + height / 2f),
                         new Vector2(width, height), color);
-                    left += width + 1f;
+                    left += width;
                 }
             }
 

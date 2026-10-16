@@ -12,6 +12,7 @@ const bayer=[[0,8,2,10],[12,4,14,6],[3,11,1,9],[15,7,13,5]];
 const results=[];
 for(const p of parts){
   const glow=p.name.endsWith('Glow');
+  const book=p.name.startsWith('RoomBook')&&!p.name.startsWith('RoomBookshelf');
   const width=Math.max(4,Math.round(p.width)),height=Math.max(4,Math.round(p.height));
   const image=new PNG({width,height});
   const rgb=glow?[255,255,255]:p.color.slice(0,3).map(v=>v*255);
@@ -27,9 +28,9 @@ for(const p of parts){
     size:{mode:'width',width:Math.max(2,Math.round(width/2)),height:Math.max(2,Math.round(height/2)),resample:'box'},
     palette:{source:'custom',colors:[...new Set(palette)],distance:'oklab'},
     dither:{method:'bayer4',strength:0.18},
-    outline:{mode:glow?'none':'inner',color:'#000000',corners:true}
+    outline:{mode:glow||book?'none':'inner',color:'#000000',corners:true}
   });
-  if(!glow){
+  if(!glow&&!book){
     // 完全不透明の矩形には透明境界がないため、キャンバス端も明示的に黒縁にする。
     for(let y=0;y<result.height;y++)for(let x=0;x<result.width;x++){
       if(x!==0&&y!==0&&x!==result.width-1&&y!==result.height-1)continue;
@@ -45,7 +46,18 @@ for(const p of parts){
       result.data[(y*result.width+x)*4+3]=(bayer[y%4][x%4]+0.5)/16<coverage?255:0;
     }
   }
-  fs.writeFileSync(new URL(p.name+'.png',output),await result.toPNG({width,height}));
+  let png=await result.toPNG({width,height});
+  if(book){
+    // 接する本同士の縁が太い隙間に見えないよう、黒縁は出力解像度で1pxに揃える。
+    const native=PNG.sync.read(Buffer.from(png));
+    for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+      if(x!==0&&y!==0&&x!==width-1&&y!==height-1)continue;
+      const at=(y*width+x)*4;
+      native.data[at]=native.data[at+1]=native.data[at+2]=0;
+    }
+    png=PNG.sync.write(native);
+  }
+  fs.writeFileSync(new URL(p.name+'.png',output),png);
   results.push({name:p.name,width,height,colors:result.usedColors().length,glow});
 }
 engine.destroy();
