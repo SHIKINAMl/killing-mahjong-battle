@@ -63,13 +63,19 @@ namespace KillingMahjong.UI
         {
             var mouse = Mouse.current;
             if (mouse == null || !mouse.rightButton.wasPressedThisFrame) return;
-            if (IsPointerOverTile(mouse.position.ReadValue())) return;
-
-            Button target = FindCancelButton();
+            Button target = FindCancelButtonAt(mouse.position.ReadValue());
             if (target == null) return;
 
             Debug.Log("[RightClickCancel] 右クリックで '" + target.name + "' を押しました");
             target.onClick.Invoke();
+        }
+
+        /// <summary>カーソルの案内と実際の右クリックが同じ条件を見る。</summary>
+        public static Button FindCancelButtonAt(Vector2 screenPosition)
+        {
+            if (_instance == null || !_instance.isActiveAndEnabled || _instance.IsPointerOverTile(screenPosition))
+                return null;
+            return FindCancelButton();
         }
 
         /// <summary>いま押せる「戻る」系のボタンのうち、いちばん手前のもの。無ければ null。</summary>

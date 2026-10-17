@@ -117,5 +117,48 @@ namespace KillingMahjong.Tests
             Assert.That(raycaster.enabled, Is.False);
             Assert.That((bool)image.GetType().GetProperty("raycastTarget").GetValue(image), Is.False);
         }
+
+        [UnityTest]
+        public IEnumerator HoverFeedbackRespectsDisabledButtonsAndFrontmostBlockers()
+        {
+            var eventType = Type.GetType("UnityEngine.EventSystems.EventSystem, UnityEngine.UI", true);
+            var canvasType = typeof(Canvas);
+            var imageType = Type.GetType("UnityEngine.UI.Image, UnityEngine.UI", true);
+            var buttonType = Type.GetType("UnityEngine.UI.Button, UnityEngine.UI", true);
+            var raycasterType = Type.GetType("UnityEngine.UI.GraphicRaycaster, UnityEngine.UI", true);
+            var eventOwner = new GameObject("CursorFeedbackTestEvents", eventType);
+            var panel = new GameObject("CursorFeedbackTestCanvas", typeof(RectTransform), canvasType, raycasterType);
+            var canvas = panel.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = short.MaxValue;
+            var target = new GameObject("TestClickable", typeof(RectTransform), imageType, buttonType);
+            target.transform.SetParent(panel.transform, false);
+            var targetRect = target.GetComponent<RectTransform>();
+            targetRect.sizeDelta = new Vector2(180, 80);
+            var button = target.GetComponent(buttonType);
+            var interactable = buttonType.GetProperty("interactable");
+            var method = cursorType.GetMethod("IsClickableAt", Members);
+            try
+            {
+                yield return null;
+                Canvas.ForceUpdateCanvases();
+                Vector2 center = RectTransformUtility.WorldToScreenPoint(null, targetRect.position);
+                Assert.That((bool)method.Invoke(cursor, new object[] { center }), Is.True);
+                interactable.SetValue(button, false);
+                Assert.That((bool)method.Invoke(cursor, new object[] { center }), Is.False, "Disabled controls must not glow.");
+                interactable.SetValue(button, true);
+                var blocker = new GameObject("TestBlockingPanel", typeof(RectTransform), imageType);
+                blocker.transform.SetParent(panel.transform, false);
+                blocker.GetComponent<RectTransform>().sizeDelta = new Vector2(200, 100);
+                yield return null;
+                Canvas.ForceUpdateCanvases();
+                Assert.That((bool)method.Invoke(cursor, new object[] { center }), Is.False, "Do not glow through a foreground panel.");
+            }
+            finally
+            {
+                UnityEngine.Object.Destroy(panel);
+                UnityEngine.Object.Destroy(eventOwner);
+            }
+        }
     }
 }
