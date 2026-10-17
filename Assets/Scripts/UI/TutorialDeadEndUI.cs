@@ -30,6 +30,9 @@ namespace KillingMahjong.UI
             if (defeat == null) throw new System.InvalidOperationException("チュートリアルの敗北演出素材がありません。");
             defeat.transform.SetParent(transform, false);
             yield return new WaitUntil(() => finished);
+            // 赤い演出の黒幕は結果画面と同じ重なり順なので、残すと本文・結果・クレジットが隠れる
+            Destroy(defeat.gameObject);
+            defeat = null;
             Managers.Tutorial.TutorialAudioDirector.ResetVisuals();
             var ending = new GameObject("TutorialEndingSequence", typeof(RectTransform));
             ending.transform.SetParent(transform, false);
