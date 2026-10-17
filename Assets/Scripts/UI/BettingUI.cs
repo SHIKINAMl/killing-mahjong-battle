@@ -376,6 +376,8 @@ namespace KillingMahjong.UI
             gameObject.SetActive(true);
             ShowDimmer();
             UpdateUI();
+            var fx = EnsureStakeFx();
+            if (fx != null) fx.Begin(currentBet, currentMoney);
             StartPanelSlideIn();
             
             // Start Auto Dialogue
@@ -406,6 +408,7 @@ namespace KillingMahjong.UI
 
             currentBet = Mathf.Max(0, fixedBet);
             _outcomePreviewAllowed = false;
+            if (_stakeFx != null) _stakeFx.End();
 
             if (increaseBetButton != null) increaseBetButton.interactable = false;
             if (decreaseBetButton != null) decreaseBetButton.interactable = false;
@@ -432,6 +435,7 @@ namespace KillingMahjong.UI
             }
 
             _outcomePreviewAllowed = false;
+            if (_stakeFx != null) _stakeFx.End();
             UpdateUI();
         }
 
@@ -471,6 +475,8 @@ namespace KillingMahjong.UI
 
         public void HideBettingPhase(bool immediate = false)
         {
+            if (_stakeFx != null) _stakeFx.End();
+
             if (autoDialogueCoroutine != null)
             {
                 StopCoroutine(autoDialogueCoroutine);
@@ -645,11 +651,18 @@ namespace KillingMahjong.UI
         /// </summary>
         private void UpdateOutcomePreview(int reward, bool assault, float multiplier)
         {
+            // 血の演出（説明ではなく体で見せる方）。額を変えるたびに重さを渡す
+            var fx = EnsureStakeFx();
+            if (fx != null && _outcomePreviewAllowed) fx.SetStake(currentBet, currentMoney);
+
             if (_outcomePreview == null) _outcomePreview = BetOutcomePreviewUI.Ensure(PreviewParent(transform));
             if (_outcomePreview == null) return;
 
-            _outcomePreview.gameObject.SetActive(_outcomePreviewAllowed);
-            if (!_outcomePreviewAllowed) return;
+            // 説明の札は出さない（2026-10-17「説明口調すぎます。演出で見せて」）。
+            // 部品と計算は残してあるので、戻すなら ShowOutcomeCard を true にする
+            bool showCard = ShowOutcomeCard && _outcomePreviewAllowed;
+            _outcomePreview.gameObject.SetActive(showCard);
+            if (!showCard) return;
 
             // 管のいちばん上 = いまの血（または初期の血）に、最大額で勝ったぶんを足した量
             int top = Mathf.Max(initialMoney, currentMoney) + Mathf.RoundToInt(maxBet * Mathf.Max(1f, multiplier));
@@ -665,12 +678,38 @@ namespace KillingMahjong.UI
 
         private BetOutcomePreviewUI _outcomePreview;
         private bool _outcomePreviewAllowed = true;
+        private const bool ShowOutcomeCard = false;
+
+        private Effects.BetStakeFx _stakeFx;
+
+        /// <summary>
+        /// 血の演出の部品。賭け金の数字が載っている紺の枠（BetMoneyText の親）に血を溜め、
+        /// 揺らすのはパネルの中身（「角度調整」）。パネル自体は出入りのアニメーションが動かすので触らない。
+        /// </summary>
+        private Effects.BetStakeFx EnsureStakeFx()
+        {
+            if (_stakeFx != null) return _stakeFx;
+            if (currentBetText == null) return null;
+            var betBox = currentBetText.rectTransform.parent as RectTransform;
+            RectTransform shake = null;
+            for (Transform t = betBox; t != null && t != transform; t = t.parent)
+            {
+                if (t.parent == hpBarPanel) { shake = t as RectTransform; break; }
+            }
+            _stakeFx = Effects.BetStakeFx.Ensure(transform, betBox, shake);
+            return _stakeFx;
+        }
+
+        /// <summary>シーンに部品を置くとき（SceneFirstBaker）に呼ぶ。</summary>
+        public void EnsureStakeFxForEditor() => EnsureStakeFx();
 
         private void ConfirmBet()
         {
             // Lock UI
             LockBetButtons();
             SetPanelInputEnabled(false);
+
+            if (_stakeFx != null) _stakeFx.End();
 
             var audio = Managers.AudioManager.Instance;
             if (audio != null) audio.PlayBetConfirmSE();

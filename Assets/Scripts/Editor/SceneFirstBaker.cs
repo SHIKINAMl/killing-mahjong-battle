@@ -102,6 +102,8 @@ namespace KillingMahjong.EditorTools
                     var preview = BetOutcomePreviewUI.Ensure(BettingUI.PreviewParent(betting.transform));
                     if (preview != null) preview.gameObject.SetActive(false);
                     report.Append(" / 賭けたあとの血=").Append(Describe(SceneFirst.Report(nameof(BetOutcomePreviewUI))));
+                    betting.EnsureStakeFxForEditor();
+                    report.Append(" / 血を賭ける演出=").Append(Describe(SceneFirst.Report(nameof(KillingMahjong.UI.Effects.BetStakeFx))));
                     break;
                 }
                 foreach (var root in scene.GetRootGameObjects())
