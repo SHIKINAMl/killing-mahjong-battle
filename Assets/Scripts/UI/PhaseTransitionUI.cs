@@ -344,6 +344,15 @@ namespace KillingMahjong.UI
         /// 計算で確かめてある。
         /// </summary>
         private const float CutinSpriteWidthRatio = 0.85f;
+
+        /// <summary>自分のカットインの絵（ベルル）を、画面の幅のこの割合だけ左へ寄せる。右上の能力名を避けるため</summary>
+        private const float CutinSpriteLeftShift = 0.19f;
+
+        /// <summary>
+        /// 自分のカットインの絵を、これだけ小さくする。左へ寄せるだけだと左の翼が画面から切れるので、
+        /// 少し縮めて、左の翼を画面に残したまま右の翼を能力名の手前で止める
+        /// </summary>
+        private const float CutinSpriteShrink = 0.88f;
         private const float CutinSpriteHeightRatio = 0.78f;
 
         [SerializeField] private Sprite playerCutinSprite;
@@ -654,14 +663,15 @@ namespace KillingMahjong.UI
 
                     // 幅・高さの両方で頭打ちにして、狭いほうに合わせる
                     float fit = Mathf.Min(areaW * CutinSpriteWidthRatio / spriteW,
-                                          areaH * CutinSpriteHeightRatio / spriteH);
+                                          areaH * CutinSpriteHeightRatio / spriteH) * CutinSpriteShrink;
                     portraitRt.localScale = new Vector3(fit, fit, 1f);
 
-                    // 画面中央。看板を掲げる絵なので、寄せずに真ん中で見せる
+                    // 看板を掲げる絵なので真ん中近くに置くが、**少し左へ寄せる**。
+                    // 真ん中だと右の翼が右上の能力名（右寄せ）にかぶっていた（2026-10-17 のユーザー指示）
                     portraitRt.pivot = new Vector2(0.5f, 0.5f);
                     portraitRt.anchorMin = new Vector2(0.5f, 0.5f);
                     portraitRt.anchorMax = new Vector2(0.5f, 0.5f);
-                    portraitTargetPos = Vector2.zero;
+                    portraitTargetPos = new Vector2(-areaW * CutinSpriteLeftShift, 0f);
                     portraitStartPos = portraitTargetPos + new Vector2(0f, -areaH);
                 }
                 else
