@@ -120,6 +120,42 @@ namespace KillingMahjong.UI
             new Entry("unused.special_victory", UnusedGroup, "旧・特殊勝利の能力カットイン", "PhaseTransitionUI.PlaySkillCutinAnimationRoutine", unused: true)
         };
         public static IReadOnlyList<Entry> Entries { get; } = Array.AsReadOnly(entries);
+
+        /// <summary>
+        /// コレクションのフェイズ別タブ（2026-10-17「演出が多くなってきたので、フェイズごとにタブ付けして」）。
+        /// 1局の流れの順に並べる。先頭の「すべて」は絞り込まない。
+        /// </summary>
+        public const string AllPhases = "すべて";
+        public static readonly string[] Phases =
+        {
+            AllPhases, "手牌選択", "掛け金", "対局", "ロン・流局", "勝敗・ED", "常時・画面", "チュートリアル"
+        };
+
+        /// <summary>
+        /// 演出がどのフェイズで出るか。**表の行には書かず、ID から決める**
+        /// （行ごとに足すと、新しい演出で書き忘れる）。決まらないものは「常時・画面」。
+        /// 新しい演出の ID は、ここで拾える頭（`hand.` `phase.bet` `ron.` …）で付けること。
+        /// </summary>
+        public static string PhaseOf(Entry entry)
+        {
+            string id = entry.Id;
+            if (entry.Group == "チュートリアル" || Starts(id, "tutorial.", "dialogue.")) return "チュートリアル";
+            if (Starts(id, "skill.", "hand.", "phase.dealing", "phase.prompt", "tile.sort", "tile.clatter",
+                    "ui.ability_bell", "unused.special_victory")) return "手牌選択";
+            if (Starts(id, "phase.bet", "phase.battle_start", "gauge.absorb")) return "掛け金";
+            if (Starts(id, "phase.local_turn", "phase.enemy_turn", "voltage.", "tile.dora", "dora.", "ron.chance"))
+                return "対局";
+            if (Starts(id, "ron.", "phase.draw", "settlement.", "hp.damage", "hp.heal", "hp.glitch", "hp.zoom",
+                    "blood.", "scene.momentum")) return "ロン・流局";
+            if (Starts(id, "ending.", "character.death", "unused.red_defeat")) return "勝敗・ED";
+            return "常時・画面";
+        }
+
+        private static bool Starts(string id, params string[] heads)
+        {
+            foreach (var h in heads) if (id.StartsWith(h, StringComparison.Ordinal)) return true;
+            return false;
+        }
         public static Entry Find(string id)
         {
             foreach (var item in entries) if (item.Id == id) return item;

@@ -20,6 +20,10 @@ namespace KillingMahjong.UI
             public RectTransform Content;
             public TextMeshProUGUI Name, Details, Count;
             public GameEffectCatalog.Entry Selected;
+            /// <summary>フェイズ別タブで選んでいるもの（<see cref="GameEffectCatalog.Phases"/>）。</summary>
+            public string Phase = GameEffectCatalog.AllPhases;
+            public string Query = "";
+            public readonly List<(string phase, Image image)> PhaseTabs = new List<(string, Image)>();
             public readonly List<Image> Rows = new List<Image>();
             public readonly List<GameEffectCatalog.Entry> Visible = new List<GameEffectCatalog.Entry>();
         }
@@ -45,18 +49,41 @@ namespace KillingMahjong.UI
                 if (page.Selected == null || entry.Id == firstSelectedId) page.Selected = entry;
             }
 
-            page.Count = Label(parent, "Count", "", new Vector2(0, 164), new Vector2(680, 24),
-                14, TextAlignmentOptions.Left, TextDim);
+            // フェイズ別のタブ。1局の流れの順に横へ並べる（件数の行があった場所）
+            const float tabW = 82f, tabGap = 3f;
+            var phases = GameEffectCatalog.Phases;
+            float tabsLeft = -(phases.Length * tabW + (phases.Length - 1) * tabGap) / 2f + tabW / 2f;
+            for (int i = 0; i < phases.Length; i++)
+            {
+                string phase = phases[i];
+                string tabName = "Phase_" + i;
+                Button(parent, tabName, phase, new Vector2(tabsLeft + i * (tabW + tabGap), 164),
+                    new Vector2(tabW, 24), 13, () => { page.Phase = phase; RebuildEffectRows(page, page.Query); });
+                var tab = parent.Find(tabName);
+                var tabLabel = tab.GetComponentInChildren<TextMeshProUGUI>();
+                // 「チュートリアル」は幅に入りきらないので、折り返さずに縮める
+                tabLabel.textWrappingMode = TextWrappingModes.NoWrap;
+                tabLabel.enableAutoSizing = true; tabLabel.fontSizeMin = 9; tabLabel.fontSizeMax = 13;
+                int inPhase = 0;
+                foreach (var entry in GameEffectCatalog.Entries)
+                    if (filter(entry) && (phase == GameEffectCatalog.AllPhases || GameEffectCatalog.PhaseOf(entry) == phase)) inPhase++;
+                // 没案タブでは、そのフェイズに1件も無いタブは押せなくする
+                if (inPhase == 0) tab.GetComponent<Button>().interactable = false;
+                page.PhaseTabs.Add((phase, tab.GetComponent<Image>()));
+            }
+
             var inputObject = NewImage(parent, "Search", new Color32(48, 32, 42, 255));
-            Center(inputObject.rectTransform, new Vector2(680, 30));
-            inputObject.rectTransform.anchoredPosition = new Vector2(0, 132);
-            var text = Label(inputObject.transform, "Text", "", Vector2.zero, new Vector2(660, 28),
+            Center(inputObject.rectTransform, new Vector2(540, 30));
+            inputObject.rectTransform.anchoredPosition = new Vector2(-70, 132);
+            var text = Label(inputObject.transform, "Text", "", Vector2.zero, new Vector2(520, 28),
                 15, TextAlignmentOptions.Left, TextMain);
             var hint = Label(inputObject.transform, "Hint", searchHint, Vector2.zero,
-                new Vector2(660, 28), 14, TextAlignmentOptions.Left, TextDim);
+                new Vector2(520, 28), 14, TextAlignmentOptions.Left, TextDim);
             var input = inputObject.gameObject.AddComponent<TMP_InputField>();
             input.textViewport = inputObject.rectTransform; input.textComponent = text; input.placeholder = hint;
-            input.onValueChanged.AddListener(query => RebuildEffectRows(page, query));
+            input.onValueChanged.AddListener(query => { page.Query = query; RebuildEffectRows(page, query); });
+            page.Count = Label(parent, "Count", "", new Vector2(275, 132), new Vector2(130, 30),
+                13, TextAlignmentOptions.Right, TextDim);
 
             var view = NewImage(parent, "EffectsViewport", new Color32(20, 12, 18, 255));
             Center(view.rectTransform, new Vector2(420, 350));
@@ -83,12 +110,17 @@ namespace KillingMahjong.UI
 
         private void RebuildEffectRows(EffectListPage page, string query)
         {
-            foreach (Transform child in page.Content) { child.gameObject.SetActive(false); Destroy(child.gameObject); }
+            // **親から外してから消す。** Destroy はフレームの終わりまで残るので、外さないと
+            // 下の Find が同じ名前の古い行を拾い、新しい行が並ばない（フェイズを切り替えたときに起きた）
+            var old = new List<Transform>();
+            foreach (Transform child in page.Content) old.Add(child);
+            foreach (var child in old) { child.gameObject.SetActive(false); child.SetParent(null, false); Destroy(child.gameObject); }
             page.Rows.Clear(); page.Visible.Clear();
             query = (query ?? "").Trim();
             foreach (var entry in GameEffectCatalog.Entries)
             {
                 if (!page.Filter(entry)) continue;
+                if (page.Phase != GameEffectCatalog.AllPhases && GameEffectCatalog.PhaseOf(entry) != page.Phase) continue;
                 string searchable = entry.Id + " " + entry.Group + " " + entry.Name;
                 if (query.Length > 0 && searchable.IndexOf(query, StringComparison.OrdinalIgnoreCase) < 0) continue;
                 int index = page.Visible.Count; page.Visible.Add(entry);
@@ -102,7 +134,12 @@ namespace KillingMahjong.UI
             }
             page.Content.sizeDelta = new Vector2(0, Mathf.Max(350, page.Visible.Count * 51));
             page.Content.anchoredPosition = Vector2.zero;
-            page.Count.text = $"{page.Title} {page.Visible.Count} / {page.Total} 件　スクロールして選択";
+            page.Count.text = $"{page.Visible.Count} / {page.Total} 件";
+            foreach (var (phase, image) in page.PhaseTabs)
+                image.color = phase == page.Phase ? (Color)RowSelected : new Color32(52, 30, 42, 255);
+            // 選んでいた演出がこのタブに無ければ、先頭を選ぶ
+            if (page.Selected == null || !page.Visible.Contains(page.Selected))
+                page.Selected = page.Visible.Count > 0 ? page.Visible[0] : null;
             SelectEffect(page, page.Selected);
         }
 
