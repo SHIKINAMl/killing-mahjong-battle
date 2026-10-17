@@ -249,6 +249,16 @@ namespace KillingMahjong.Network
             info = new GameEndInfo();
             info.VictoryMethod = ExtractStringField(jsonString, "victory_method");
 
+            // 払えずに負けた側。**HP の多い方が払えないこともある**ので、勝敗は HP ではなくこれで決める
+            var unpayable = ExtractStringArray(jsonString, "bet_unpayable_players");
+            // 自分の ID が分からないと、誰が払えなかったのか自分か相手か決められないので読まない
+            if (unpayable != null && !string.IsNullOrEmpty(localPlayerId))
+            {
+                info.BetUnpayableKnown = true;
+                info.LocalBetUnpayable = unpayable.Contains(localPlayerId);
+                info.EnemyBetUnpayable = unpayable.Exists(id => id != localPlayerId);
+            }
+
             int scoresStart = jsonString.IndexOf("\"final_scores\"");
             if (scoresStart < 0) return false;
 
@@ -280,6 +290,30 @@ namespace KillingMahjong.Network
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// トップレベルの文字列の配列（`"key": ["a", "b"]`）を取り出す。キーが無ければ null。
+        /// </summary>
+        private static System.Collections.Generic.List<string> ExtractStringArray(string jsonString, string fieldName)
+        {
+            if (string.IsNullOrEmpty(jsonString)) return null;
+
+            int keyIndex = jsonString.IndexOf("\"" + fieldName + "\"");
+            if (keyIndex < 0) return null;
+
+            int open = jsonString.IndexOf('[', keyIndex);
+            if (open < 0) return null;
+            int close = FindMatchingBracket(jsonString, open);
+            if (close < 0) return null;
+
+            var list = new System.Collections.Generic.List<string>();
+            foreach (var token in jsonString.Substring(open + 1, close - open - 1).Split(','))
+            {
+                string id = token.Trim().Trim('"');
+                if (id.Length > 0) list.Add(id);
+            }
+            return list;
         }
 
         /// <summary>

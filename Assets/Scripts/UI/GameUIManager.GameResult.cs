@@ -107,8 +107,17 @@ namespace KillingMahjong.UI
                 }
             }
 
-            // hp_zero / max_rounds / unknown（最低賭け金を払えない）は、**残った血が多い方が勝ち**。
-            // unknown が一番多い経路であることに注意（サーバーは払えなくなった側を負けにしている）
+            // 次の賭け金を払えずに終わったときは、**払えなかった側が負け**（サーバーの判定）。
+            // HP の多い方が払えないこともある（流局で自分の賭け金だけ大きく積み上がった）ので、
+            // HP の大小で決めると**負けた側に「勝利」が出る**（2026-10-17 の調査で発覚）。
+            // 両方とも払えなかったときの勝者はまだ決まっていないので、下の HP 比較に任せる
+            if (lastGameEndInfo != null && lastGameEndInfo.BetUnpayableKnown &&
+                lastGameEndInfo.LocalBetUnpayable != lastGameEndInfo.EnemyBetUnpayable)
+            {
+                return lastGameEndInfo.EnemyBetUnpayable;
+            }
+
+            // hp_zero / max_rounds / unknown は、**残った血が多い方が勝ち**
             if (LocalFinalScore != EnemyFinalScore) return LocalFinalScore > EnemyFinalScore;
 
             // HP が同点。累計獲得で割る

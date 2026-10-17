@@ -49,11 +49,14 @@ namespace KillingMahjong.UI
                     return;
                 }
 
+                // **満貫未満の待ち（NonManganWaitTiles）でも、ここでは断らない。**
+                // サーバーは満貫以上で上がれるとき（can_agari）にしか agari_pending を送らない。
+                // 手牌を決めたときの判定には一発・河底が入っていないので、そこでは満貫未満だった待ちが
+                // 和了のときに満貫に届くことがある。以前はその一覧で自動辞退していて、
+                // 「当たり牌が出たのにロンできない」になっていた（2026-10-17）
                 if (BoardStateManager.Instance.NonManganWaitTiles.Contains(data.tile))
                 {
-                    Debug.Log($"[GameUIManager] Ignored agari_pending because tile {data.tile} is non-mangan.");
-                    SendActionToServer("agari", new KillingMahjong.Network.ActionPayload { accept = false });
-                    return;
+                    Debug.Log($"[GameUIManager] tile {data.tile} was non-mangan at hand selection, but the server allows agari (situational yaku). Showing RonWaitPanel.");
                 }
 
                 Debug.Log("[GameUIManager] I am the winner! Showing RonWaitPanel.");
