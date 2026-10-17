@@ -120,9 +120,20 @@ namespace KillingMahjong.UI
                     var id = KillingMahjong.Managers.TutorialTiles.Encode(4, true);
                     rig.handTiles[6].GetComponent<TileVisual>().SetTile(id, rig.tiles.GetTileSprite(id), rig.tiles); break;
                 case "gauge.absorb":
-                    var gauge = rig.gameObject.AddComponent<ScoreGaugeUI>();
+                    // **舞台（rig）に直接付けない。** ScoreGaugeUI.SetVisible は自分の子を全部
+                    // 表示に切り替えるので、舞台に付けると控えの演出（まばたきの黒幕など）まで出て、
+                    // 画面が真っ暗になっていた（2026-10-17 のユーザー報告）。専用の入れ物に付ける
+                    var gaugeHolder = new GameObject("PreviewScoreGauge", typeof(RectTransform));
+                    gaugeHolder.transform.SetParent(rig.transform, false);
+                    var gauge = gaugeHolder.AddComponent<ScoreGaugeUI>();
                     gauge.SetVisible(true); gauge.SetStakes(2000, 2000);
-                    yield return new WaitForSeconds(1f); gauge.AbsorbStakesIntoGauge(true, 2000); break;
+                    // 本編では画面の上端にあるが、試写では上端に演出名の見出し（高さ 38）が被さる。
+                    // 試写のときだけ見出しの下まで下げる
+                    var gaugeBar = gauge.GuideTargetRect;
+                    if (gaugeBar != null) gaugeBar.anchoredPosition += new Vector2(0f, -40f);
+                    yield return new WaitForSeconds(1.2f);
+                    gauge.AbsorbStakesIntoGauge(true, 3000);
+                    yield return new WaitForSeconds(1.8f); break;   // 吸い込み 0.45 秒 + ゲージが伸びる 0.6 秒
                 case "voltage.flight":
                     var target = new GameObject("VoltageUI_Self", typeof(RectTransform), typeof(Image)).GetComponent<Image>();
                     target.transform.SetParent(rig.surface, false); target.color = new Color32(110, 240, 220, 255);
