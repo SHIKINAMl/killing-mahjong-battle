@@ -297,6 +297,16 @@ namespace KillingMahjong
         }
 
         /// <summary>
+        /// 勝者が得る額を、サーバーが返した倍率（役強化の昇格込み）から出す。ボルテージは含まない。
+        /// 役強化は飜数を上げずに倍率の段を上げるので、飜数版では強化ぶんが抜ける。
+        /// </summary>
+        public static int CalculateWinnerGain(int winnerBet, float multiplier)
+        {
+            if (winnerBet <= 0 || multiplier <= 0f) return 0;
+            return (int)System.Math.Round(winnerBet * (double)multiplier);
+        }
+
+        /// <summary>
         /// 敗者が失う額。自分が賭けた額 × 相手の役の倍率。相手が単騎で上がっていれば2倍。
         /// </summary>
         public static int CalculateLoserLoss(int loserBet, int winnerHan, bool winnerWonWithTanki)

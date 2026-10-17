@@ -579,13 +579,19 @@ namespace KillingMahjong.UI
             //
             // 手牌決定ダイアログのランク表示（GameUIHandSelectionController）も
             // もともと `wait.han` と `wait.mangan_or_more` を見ているので、そちらに揃える。
+            //
+            // **倍率もサーバーの `multiplier` を使う**（2026-10-17）。役強化は飜数を上げずに
+            // 倍率の段を上げる方式になったので、飜数から倍率を引くと強化ぶんが抜ける
+            // （強化済みの4飜で、実際は1.5倍なのに1倍の額が出ていた）。
             int maxHan = 0;
+            float maxMultiplier = 0f;
             bool isManganOrMore = false;
             if (isTenpai)
             {
                 foreach (var wait in Managers.BoardStateManager.Instance.LocalWaitDataList)
                 {
                     if (wait.han > maxHan) maxHan = wait.han;
+                    if (wait.multiplier > maxMultiplier) maxMultiplier = wait.multiplier;
                     if (wait.mangan_or_more) isManganOrMore = true;
                 }
             }
@@ -602,9 +608,17 @@ namespace KillingMahjong.UI
             {
                 if (isTenpai && isManganOrMore)
                 {
-                    // 実際の精算と同じ計算を使う（端数処理が違うと表示と結果がずれる）
-                    int reward = GameRules.CalculateWinnerGain(currentBet, maxHan);
-                    rewardText.text = $"予想報酬: {reward}";
+                    // 実際の精算と同じ計算を使う（端数処理が違うと表示と結果がずれる）。
+                    // 古いサーバーで multiplier が来ないときだけ飜数から引く
+                    int reward = maxMultiplier > 0f
+                        ? GameRules.CalculateWinnerGain(currentBet, maxMultiplier)
+                        : GameRules.CalculateWinnerGain(currentBet, maxHan);
+
+                    // 強襲を撃った局は、獲得が 0 になって同じ額が相手への追加ダメージに回る
+                    var board = Managers.BoardStateManager.Instance;
+                    rewardText.text = board != null && board.LocalAssaultUsedThisRound
+                        ? $"強襲ダメージ: +{reward}"
+                        : $"予想報酬: {reward}";
                 }
                 else
                 {
