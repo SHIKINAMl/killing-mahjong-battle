@@ -5,7 +5,7 @@ using UnityEngine.UI;
 
 namespace KillingMahjong.UI
 {
-    /// <summary>コレクションの没案専用。対局の勝敗経路からは呼ばない。</summary>
+    /// <summary>赤い敗北演出。コレクションの旧案とチュートリアルNo1で共用する。本編の勝敗経路には使用しない。</summary>
     public sealed class RedDefeatPrototypeUI : MonoBehaviour
     {
         public enum SequenceStage { Silhouette, EyesOpening, Laugh, Tilt, EyesClosing, Thud, Wait, Completed }
@@ -21,8 +21,9 @@ namespace KillingMahjong.UI
         private Canvas cursorCanvas;
         private bool cursorWasEnabled;
         private System.Action onPreviewCompleted;
+        private bool playAudio;
 
-        public static RedDefeatPrototypeUI Play(System.Action onPreviewCompleted = null)
+        public static RedDefeatPrototypeUI Play(System.Action onPreviewCompleted = null, bool playAudio = true)
         {
             var existing = FindFirstObjectByType<RedDefeatPrototypeUI>();
             if (existing != null) return existing;
@@ -37,6 +38,7 @@ namespace KillingMahjong.UI
             var root = new GameObject("RedDefeatPrototype", typeof(RectTransform));
             var sequence = root.AddComponent<RedDefeatPrototypeUI>();
             sequence.onPreviewCompleted = onPreviewCompleted;
+            sequence.playAudio = playAudio;
             sequence.Build(closed, open, background);
             sequence.StartCoroutine(sequence.Run());
             return sequence;
@@ -95,7 +97,7 @@ namespace KillingMahjong.UI
             sound.playOnAwake = false;
             sound.spatialBlend = 0;
             var settings = KillingMahjong.Core.SettingsManager.Instance;
-            sound.volume = settings != null ? settings.SeVolume : .5f;
+            sound.volume = playAudio ? (settings != null ? settings.SeVolume : .5f) : 0f;
             thud = CreateThud();
         }
 

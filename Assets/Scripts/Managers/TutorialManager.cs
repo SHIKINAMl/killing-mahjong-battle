@@ -238,6 +238,7 @@ namespace KillingMahjong.Managers
             _playerHp = _scenario.playerStartHp;
             _enemyHp = _scenario.enemyStartHp;
             _aborted = false;
+            _reachedFlowEnd = false;
 
             _playerStake = 0;
             _enemyStake = 0;

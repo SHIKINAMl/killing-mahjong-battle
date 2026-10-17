@@ -24,6 +24,7 @@ namespace KillingMahjong.Managers
                 yield return StartCoroutine(RunRound(_round));
 
                 if (_aborted) yield break;
+                if (_reachedFlowEnd) { _scenarioRoutine = null; yield break; }
 
                 PlayerPrefs.SetInt(ProgressKey, i + 1);
                 PlayerPrefs.Save();
@@ -379,6 +380,8 @@ namespace KillingMahjong.Managers
                 yield return StartCoroutine(RunSecondRoundBattle(data));
             else
                 yield return StartCoroutine(RunBattle(data));
+
+            if (_aborted || _reachedFlowEnd) yield break;
 
             // 流局なら賭け金は場に残したまま次局へ持ち越す
             _prevRoundWasDraw = data.outcome == TutorialOutcome.Draw;

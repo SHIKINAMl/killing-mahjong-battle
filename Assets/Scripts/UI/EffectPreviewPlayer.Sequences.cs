@@ -131,6 +131,12 @@ namespace KillingMahjong.UI
                         won ? 22000 : 18000, won ? 18000 : 22000, "満貫", () => paid = true);
                     yield return Until(() => paid); break;
                 case "ending.normal_win": yield return Ending(VictoryType.NormalVictory); break;
+                case TutorialDeadEndUI.EffectId:
+                    var tutorialEnding = TutorialDeadEndUI.Create(transform);
+                    scope.AddCleanup(() => { if (tutorialEnding != null) tutorialEnding.Close(); });
+                    try { yield return tutorialEnding.Play(rig.font, true); }
+                    finally { if (tutorialEnding != null) tutorialEnding.Close(); }
+                    break;
                 case "ending.normal_lose": yield return Ending(VictoryType.NormalDefeat); break;
                 case "ending.special_win": yield return Ending(VictoryType.SpecialVictory); break;
                 case "ending.special_lose": yield return Ending(VictoryType.SpecialDefeat); break;

@@ -20,14 +20,18 @@ namespace KillingMahjong.UI
         private string[] pages;
         private Action returnToTitle;
         private bool returned;
+        private bool returnOnAnyClick;
         private const float ResultFadeDuration = 0.8f;
         private Coroutine resultFade;
 
-        public void Show(VictoryConfig config, TMP_FontAsset font, Action onReturnToTitle)
+        public void Show(VictoryConfig config, TMP_FontAsset font, Action onReturnToTitle,
+            string returnText = "タイトルへ戻る▼", bool returnOnAnyClick = false)
         {
             if (background == null) Build(font);
             StopResultFade();
             returnToTitle = onReturnToTitle;
+            this.returnOnAnyClick = returnOnAnyClick;
+            returnLabel.text = returnText;
             returned = false;
             pages = config != null && config.dialoguePages != null && config.dialoguePages.Length > 0
                 ? config.dialoguePages : new[] { config != null ? config.text ?? "" : "" };
@@ -47,6 +51,11 @@ namespace KillingMahjong.UI
         public void Advance()
         {
             if (resultFade != null) return;
+            if (Stage == EndingStage.Credits)
+            {
+                if (returnOnAnyClick) ReturnToTitle();
+                return;
+            }
             if (Stage == EndingStage.Dialogue)
             {
                 if (++PageIndex >= pages.Length)
@@ -111,7 +120,7 @@ namespace KillingMahjong.UI
             endingName.gameObject.SetActive(Stage == EndingStage.Result);
             credits.gameObject.SetActive(Stage == EndingStage.Credits);
             returnButton.gameObject.SetActive(Stage == EndingStage.Credits);
-            advanceButton.gameObject.SetActive(Stage != EndingStage.Credits);
+            advanceButton.gameObject.SetActive(Stage != EndingStage.Credits || returnOnAnyClick);
             returnButton.interactable = !returned;
             if (Stage == EndingStage.Dialogue) dialogue.text = (pages[PageIndex] ?? "") + " ▼";
         }
@@ -135,7 +144,7 @@ namespace KillingMahjong.UI
             endingName = CreateText("EndingName", font, new Vector2(.51f, .29f), new Vector2(.95f, .39f), 22, TextAlignmentOptions.Center);
             credits = CreateText("Credits", font, new Vector2(.44f, .22f), new Vector2(.98f, .81f), 22, TextAlignmentOptions.Center);
             credits.text = Credits;
-            advanceButton = CreateButton("Advance", new Vector2(.50f, .18f), new Vector2(.98f, .82f), Advance);
+            advanceButton = CreateButton("Advance", Vector2.zero, Vector2.one, Advance);
             returnButton = CreateButton("ReturnToTitle", new Vector2(.58f, .07f), new Vector2(.94f, .16f), ReturnToTitle);
             returnLabel = CreateText("ReturnLabel", font, new Vector2(.58f, .07f), new Vector2(.94f, .16f), 22, TextAlignmentOptions.Center);
             returnLabel.transform.SetParent(returnButton.transform, false);

@@ -506,6 +506,26 @@ namespace KillingMahjong.UI
             discardedTiles.Clear();
         }
 
+        /// <summary>チュートリアルの分岐中に追加した牌だけを片付ける。既存の河は保持する。</summary>
+        internal System.Action CaptureTutorialCheckpoint()
+        {
+            int count = discardedTiles.Count;
+            return () => {
+                var manager = FindFirstObjectByType<GameUIManager>();
+                while (discardedTiles.Count > count)
+                {
+                    int last = discardedTiles.Count - 1;
+                    var tile = discardedTiles[last];
+                    discardedTiles.RemoveAt(last);
+                    if (tile == null) continue;
+                    if (manager != null && manager.VisualController != null)
+                        manager.VisualController.poolManager.ReturnTileToPool(tile.gameObject);
+                    else Destroy(tile.gameObject);
+                }
+                UpdateTurnText();
+            };
+        }
+
         public void SetRiver(List<int> tileIds)
         {
             Clear();

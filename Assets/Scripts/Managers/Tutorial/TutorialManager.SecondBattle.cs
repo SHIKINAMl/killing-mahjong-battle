@@ -32,7 +32,7 @@ namespace KillingMahjong.Managers
         // 2026-10-14 の図で、打牌数の説明→動画空間で流局・手牌の組み直し→再生停止が追加された。
         // RunDrawVideoExplanation がその部分を担当する。
         // 2026-10-15 の図で、動画の中の賭け金の話と、動画のあとの会話・1巡・「動画の続きを見ますか？」が
-        // 足された（RunAfterDrawVideo）。その分岐の先は未指定なので、従来の第2局へ戻る。
+        // 足された（RunAfterDrawVideo）。分岐の先は2026-10-17版のDEADENDと復帰を使う。
         //
         // 「敵10打目まで汎用対局会話」の枠には、プレイヤーがアワセをした／ボルテージの段階を
         // 初めて上げたときの特殊セリフを流す、という条件だけが描いてある。
@@ -243,11 +243,8 @@ namespace KillingMahjong.Managers
                     // 動画のあとの会話（2026-10-15 の図）。**この巡はプレイヤー→先輩の順に、ここで打ち終える**
                     yield return StartCoroutine(RunAfterDrawVideo(data, turn, seen));
                     if (_aborted) yield break;
-
-                    // ここから先はフロー図に無いので、これまでの第2局のまま流す
-                    if (turn + 1 <= autoTurns)
-                        yield return StartCoroutine(PlayLines(SecondBattleResumeLines));
-                    continue;
+                    // 最新図の「はい」は一言で終端。未記載の旧局へ自動で進めない。
+                    yield break;
                 }
 
                 // 制限時間の話までは自分で打たせる（図の「普通の対局」「敵10打目まで汎用対局会話」）。

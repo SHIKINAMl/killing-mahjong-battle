@@ -57,6 +57,22 @@ namespace KillingMahjong.Managers
         /// <summary>段数か途切れ状態が変わったときに呼ばれる。表示側はこれを見て描き直す。</summary>
         public static event Action Changed;
 
+        /// <summary>チュートリアルの分岐前を控える。本編の通信・確定値には使用しない。</summary>
+        internal static Action CaptureTutorialCheckpoint()
+        {
+            var seen = new HashSet<int>(SeenBaseIds);
+            int local = _localPoints, enemy = _enemyPoints;
+            int localResume = _localResumePoints, enemyResume = _enemyResumePoints;
+            bool localBroken = _localBroken, enemyBroken = _enemyBroken;
+            return () => {
+                SeenBaseIds.Clear(); SeenBaseIds.UnionWith(seen);
+                _localPoints = local; _enemyPoints = enemy;
+                _localResumePoints = localResume; _enemyResumePoints = enemyResume;
+                _localBroken = localBroken; _enemyBroken = enemyBroken;
+                Changed?.Invoke();
+            };
+        }
+
         /// <summary>いまのボルテージポイント。途切れている間は 0。</summary>
         public static int GetPoints(bool isEnemy) => isEnemy ? _enemyPoints : _localPoints;
 

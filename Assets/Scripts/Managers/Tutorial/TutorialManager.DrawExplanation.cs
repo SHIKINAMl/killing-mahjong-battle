@@ -35,7 +35,7 @@ namespace KillingMahjong.Managers
         //  → フラッシュ →「さっきの動画の女の子は誰なのか」→ BGM止まる
         //  →「動画の続きを見てみる？」→ 分岐「対局動画の続きを見ますか？」
         //
-        // **分岐の先はまだ図に無い。** どちらを選んでも、これまでの第2局の続きへ戻す。
+        // 分岐と復帰は2026-10-17版に従う。いいえはDEADEND、はいは図に記載された一言まで。
 
         private const string DrawUnderstoodQuestion = "だいたい流局についてはわかったかな？";
         private const string DrawUnderstoodLabel = "わかった";
@@ -97,7 +97,7 @@ namespace KillingMahjong.Managers
 
         /// <summary>
         /// 「対局動画の続きを見ますか？」の答え。0=はい / 1=いいえ / -1=まだ聞いていない。
-        /// **この先はまだフロー図に無い。** 続きが描かれたら、ここで分ける。
+        /// いいえはDEADEND No1へ進み、復帰後に再び選ぶ。
         /// </summary>
         private int _watchRestAnswer = -1;
 
@@ -146,17 +146,7 @@ namespace KillingMahjong.Managers
             yield return new WaitForSeconds(discardInterval);
 
             yield return PlayLines(DrawSafeLines);
-            FlashScreen();
-            yield return new WaitForSeconds(0.35f);
-            yield return PlayLines(DrawWhoIsGirlLines);
-
-            // BGM止まる
-            if (AudioManager.Instance != null) AudioManager.Instance.CutBgmImmediately();
-
-            yield return AskYesNo(WatchRestQuestion, a => _watchRestAnswer = a);
-
-            // ここから先はフロー図に無い。黙ったまま続けないよう、曲だけ戻しておく
-            if (AudioManager.Instance != null) AudioManager.Instance.PlayTutorialBgm("tut_lesson");
+            yield return RunWatchRestBranch(data);
         }
     }
 }

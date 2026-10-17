@@ -135,14 +135,14 @@ namespace KillingMahjong.Managers.Tutorial
             get
             {
                 return UsesBoldFont
-                    ? ColorTag + "<font=\"" + BoldFontName + "\">"
+                    ? "<b>" + ColorTag + "<font=\"" + BoldFontName + "\">"
                     : ColorTag + "<size=+1>";
             }
         }
 
         private static string CloseTag
         {
-            get { return UsesBoldFont ? "</font></color>" : "</size></color>"; }
+            get { return UsesBoldFont ? "</font></color></b>" : "</size></color>"; }
         }
 
         /// <summary>
@@ -172,6 +172,8 @@ namespace KillingMahjong.Managers.Tutorial
                     return;
                 }
                 bold.name = BoldFontName;
+                // 実物の太字字形を使うため、<b>でさらに輪郭を膨らませない。
+                bold.boldStyle = 0f;
 
                 // 行の高さや基線は、セリフのフォントアセットに合わせる。
                 // 同じ書体の太字なので寸法は同じはずだが、あちらは手で調整が入っていることがある。
