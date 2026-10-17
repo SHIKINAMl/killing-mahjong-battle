@@ -50,7 +50,8 @@ namespace KillingMahjong.UI
             }
 
             // フェイズ別のタブ。1局の流れの順に横へ並べる（件数の行があった場所）
-            const float tabW = 82f, tabGap = 3f;
+            // 間は上の大きいタブ（音楽・効果音…）と同じくらい空ける（2026-10-17、詰まって見えたため）
+            const float tabW = 78f, tabGap = 8f;
             var phases = GameEffectCatalog.Phases;
             float tabsLeft = -(phases.Length * tabW + (phases.Length - 1) * tabGap) / 2f + tabW / 2f;
             for (int i = 0; i < phases.Length; i++)
@@ -99,6 +100,8 @@ namespace KillingMahjong.UI
 
             page.Name = Label(parent, "EffectName", "", new Vector2(220, 68), new Vector2(230, 65),
                 18, TextAlignmentOptions.TopLeft, TextMain);
+            // 長い名前（役強化など）が4行になって下の分類・ID に重なっていたので、枠に収まるまで縮める
+            page.Name.enableAutoSizing = true; page.Name.fontSizeMin = 12; page.Name.fontSizeMax = 18;
             page.Details = Label(parent, "EffectDetails", "", new Vector2(220, -45), new Vector2(230, 155),
                 13, TextAlignmentOptions.TopLeft, TextDim);
             Button(parent, "PlayEffect", "再生", new Vector2(220, -157), new Vector2(230, 36), 18,
