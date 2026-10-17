@@ -616,6 +616,12 @@ namespace KillingMahjong.UI
 
             // 実際の精算と同じ計算を使う（端数処理が違うと表示と結果がずれる）。
             // 古いサーバーで multiplier が来ないときだけ飜数から引く
+            // 演出コレクションには手牌が無いので、見本の倍率で上がれる手として見せる
+            if (!isTenpai && PreviewWinMultiplier > 0f)
+            {
+                isTenpai = isManganOrMore = true;
+                maxMultiplier = PreviewWinMultiplier;
+            }
             bool canWin = isTenpai && isManganOrMore;
             int reward = !canWin ? -1 : maxMultiplier > 0f
                 ? GameRules.CalculateWinnerGain(currentBet, maxMultiplier)
@@ -660,7 +666,7 @@ namespace KillingMahjong.UI
 
             // 説明の札は出さない（2026-10-17「説明口調すぎます。演出で見せて」）。
             // 部品と計算は残してあるので、戻すなら ShowOutcomeCard を true にする
-            bool showCard = ShowOutcomeCard && _outcomePreviewAllowed;
+            bool showCard = (ShowOutcomeCard || PreviewOutcomeCard) && _outcomePreviewAllowed;
             _outcomePreview.gameObject.SetActive(showCard);
             if (!showCard) return;
 
@@ -678,7 +684,22 @@ namespace KillingMahjong.UI
 
         private BetOutcomePreviewUI _outcomePreview;
         private bool _outcomePreviewAllowed = true;
-        private const bool ShowOutcomeCard = false;
+        private static readonly bool ShowOutcomeCard = false;
+
+        /// <summary>演出コレクションで没案の札を見せるときだけ立てる。</summary>
+        public static bool PreviewOutcomeCard;
+
+        /// <summary>演出コレクション用。0 より大きいと、手牌が無くてもこの倍率で上がれる手として扱う。</summary>
+        public static float PreviewWinMultiplier;
+
+        /// <summary>
+        /// 掛け金を自分で選ぶ本編と同じ形で開く（演出コレクション用）。煽りのセリフは止める。
+        /// </summary>
+        public void ShowPreviewBettingPhase(int hp)
+        {
+            ShowBettingPhase(hp, hp, 0, amount => { });
+            if (autoDialogueCoroutine != null) { StopCoroutine(autoDialogueCoroutine); autoDialogueCoroutine = null; }
+        }
 
         private Effects.BetStakeFx _stakeFx;
 

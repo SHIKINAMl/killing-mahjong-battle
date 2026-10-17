@@ -21,6 +21,11 @@ namespace KillingMahjong.UI.Effects
     /// </summary>
     public sealed class BetStakeFx : MonoBehaviour
     {
+        /// <summary>演出コレクションの ID。</summary>
+        public const string EffectId = "phase.bet_stake";
+        /// <summary>没案「賭けたあとの血」の札（<see cref="BetOutcomePreviewUI"/>）の ID。</summary>
+        public const string CardEffectId = "phase.bet_outcome_card";
+
         public const string FillName = "BetBloodFill";
         public const string VignetteName = "BetStakeVignette";
 

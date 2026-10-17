@@ -91,6 +91,9 @@ namespace KillingMahjong.UI
                     yield return rig.betting.WaitForSlideAnimation();
                     yield return new WaitForSeconds(2f);
                     rig.betting.HideBettingPhase(); yield return rig.betting.WaitForSlideAnimation(); break;
+                case Effects.BetStakeFx.EffectId:
+                case Effects.BetStakeFx.CardEffectId:
+                    yield return PreviewBetStake(EffectId == Effects.BetStakeFx.CardEffectId); break;
                 case "phase.battle_start":
                     bool started = false;
                     rig.phase.PlayTransition("1 Round", rig.player, new BettingCompletedInfo {
@@ -139,6 +142,30 @@ namespace KillingMahjong.UI
                 default: yield return PlaySmallEffect(); break;
             }
             yield return new WaitForSeconds(.6f);
+        }
+
+        /// <summary>
+        /// 掛け金の重さ（<see cref="BetStakeFx"/>）。本編と同じく自分で選ぶ形で開き、
+        /// 200 → 5000 まで上げて少し置き、1200 まで下げて閉じる。
+        /// <paramref name="card"/> なら没案の「賭けたあとの血」の札を出した版。
+        /// </summary>
+        private IEnumerator PreviewBetStake(bool card)
+        {
+            BettingUI.PreviewOutcomeCard = card;
+            BettingUI.PreviewWinMultiplier = 1.5f;   // 録画したときの手と同じ倍率
+            try
+            {
+                rig.betting.gameObject.SetActive(true);
+                rig.betting.ShowPreviewBettingPhase(20000);
+                yield return rig.betting.WaitForSlideAnimation();
+                yield return new WaitForSeconds(1.5f);
+                for (int bet = 400; bet <= 5000; bet += 200) { rig.betting.ForceSetBet(bet); yield return new WaitForSeconds(.22f); }
+                yield return new WaitForSeconds(3f);
+                for (int bet = 4800; bet >= 1200; bet -= 200) { rig.betting.ForceSetBet(bet); yield return new WaitForSeconds(.1f); }
+                yield return new WaitForSeconds(2f);
+                rig.betting.HideBettingPhase(); yield return rig.betting.WaitForSlideAnimation();
+            }
+            finally { BettingUI.PreviewOutcomeCard = false; BettingUI.PreviewWinMultiplier = 0f; }
         }
 
         private IEnumerator Until(Func<bool> predicate)
