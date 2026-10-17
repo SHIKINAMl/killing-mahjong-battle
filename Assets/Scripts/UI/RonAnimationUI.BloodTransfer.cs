@@ -208,10 +208,12 @@ namespace KillingMahjong.UI
             Destroy(flyObj);
 
             // ④ 着弾。**両方のHPの隣に増減が出て、両方のメーターが同時に動き出す**
-            if (playerInfo != null) SpawnHpDeltaLabel(stageRt, playerInfo.HpAnchor, s.MyDelta, AccentMine);
-            if (enemyInfo != null) SpawnHpDeltaLabel(stageRt, enemyInfo.HpAnchor, s.TheirDelta, AccentThem);
+            // 横に出す増減は「画面の血が動く量」。賭けた血は先に場へ出しているので、
+            // サーバーの増減とは違う（RonSettlementInfo.MyShownDelta）。動かない側（満貫で負けた側など）は出さない
+            if (playerInfo != null && s.MyShownDelta != 0) SpawnHpDeltaLabel(stageRt, playerInfo.HpAnchor, s.MyShownDelta, AccentMine);
+            if (enemyInfo != null && s.TheirShownDelta != 0) SpawnHpDeltaLabel(stageRt, enemyInfo.HpAnchor, s.TheirShownDelta, AccentThem);
 
-            PlayBloodSE(isLocalSide: true, delta: s.MyDelta, newHp: newLocalHp,
+            PlayBloodSE(isLocalSide: true, delta: s.MyShownDelta, newHp: newLocalHp,
                         maxHp: playerInfo != null ? playerInfo.MaxHp : 0);
 
             const float hpTime = 0.8f;
@@ -227,14 +229,14 @@ namespace KillingMahjong.UI
                 if (!enemySePlayed && t >= 0.12f)
                 {
                     enemySePlayed = true;
-                    PlayBloodSE(isLocalSide: false, delta: s.TheirDelta, newHp: newEnemyHp,
+                    PlayBloodSE(isLocalSide: false, delta: s.TheirShownDelta, newHp: newEnemyHp,
                                 maxHp: enemyInfo != null ? enemyInfo.MaxHp : 0);
                 }
                 yield return null;
             }
             if (!enemySePlayed)
             {
-                PlayBloodSE(isLocalSide: false, delta: s.TheirDelta, newHp: newEnemyHp,
+                PlayBloodSE(isLocalSide: false, delta: s.TheirShownDelta, newHp: newEnemyHp,
                             maxHp: enemyInfo != null ? enemyInfo.MaxHp : 0);
             }
 

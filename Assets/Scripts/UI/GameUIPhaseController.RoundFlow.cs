@@ -33,6 +33,7 @@ namespace KillingMahjong.UI
                 // 血の初期値もサーバーが持っている（game_engine.py:61）。
                 // ここではつなぎの値を置くだけにして、本物は status で取り直す。
                 // つなぎを置かないと、前の対局の残り血（0 など）がゲージに残る。
+                Managers.BoardStateManager.Instance.ClearStakesOnTable();   // 前の対局の場の血を持ち越さない
                 Managers.BoardStateManager.Instance.UpdateHp(
                     Managers.BoardStateManager.PlaceholderInitialHp,
                     Managers.BoardStateManager.PlaceholderInitialHp);

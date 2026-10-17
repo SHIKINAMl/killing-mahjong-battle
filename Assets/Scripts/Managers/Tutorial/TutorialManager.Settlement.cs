@@ -57,8 +57,12 @@ namespace KillingMahjong.Managers
             int loss = GameRules.CalculateLoserLoss(theirBet, han, data.isTankiWin);
             ClearStakes();
 
-            _playerHp = prevPlayerHp + gain;
-            _enemyHp = Mathf.Max(0, prevEnemyHp - loss);
+            // **賭けた血は賭けた時点で場へ出してある**（Progression の賭けフェイズで引いている）。
+            // 勝った側は場の血が戻って儲けが乗る。負けた側は場の血を取られ、足りない分だけさらに引かれる。
+            // こうすると本編のサーバー（賭けた時点では引かず、精算で ±）と同じ結果になる（2026-10-17）。
+            // 以前は場の血を返していなかったので、勝っても開始時から ±0 になっていた
+            _playerHp = prevPlayerHp + myBet + gain;
+            _enemyHp = Mathf.Max(0, prevEnemyHp + theirBet - loss);
 
             var settlementInfo = BuildSettlementInfo(
                 data, isLocalWin: true, han: han, myBet: myBet, theirBet: theirBet,
@@ -208,8 +212,8 @@ namespace KillingMahjong.Managers
             var lossSettlement = BuildSettlementInfo(
                 data, isLocalWin: false, han: han, myBet: myBet, theirBet: theirBet,
                 carryRounds: carryRounds, myDelta: -previewLoss, theirDelta: previewGain,
-                prevLocalHp: prevPlayerHp, newLocalHp: Mathf.Max(0, prevPlayerHp - previewLoss),
-                prevEnemyHp: prevEnemyHp, newEnemyHp: prevEnemyHp + previewGain);
+                prevLocalHp: prevPlayerHp, newLocalHp: Mathf.Max(0, prevPlayerHp + myBet - previewLoss),
+                prevEnemyHp: prevEnemyHp, newEnemyHp: prevEnemyHp + theirBet + previewGain);
 
             if (ronUI != null)
             {
@@ -287,8 +291,9 @@ namespace KillingMahjong.Managers
             int loss = GameRules.CalculateLoserLoss(myBet, han, data.isTankiWin);
             ClearStakes();
 
-            _playerHp = Mathf.Max(0, prevPlayerHp - loss);
-            _enemyHp = prevEnemyHp + gain;
+            // 場の血の扱いは RunPlayerRon と同じ（賭けた血は賭けた時点で引いてある）
+            _playerHp = Mathf.Max(0, prevPlayerHp + myBet - loss);
+            _enemyHp = prevEnemyHp + theirBet + gain;
 
             // 演出に出す額は「自分の血がどれだけ動いたか」に合わせる
             int settlement = loss;

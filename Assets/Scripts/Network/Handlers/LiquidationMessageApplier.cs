@@ -22,7 +22,10 @@ namespace KillingMahjong.Network.Handlers
             beforeApply?.Invoke();
             board.LastIsLocalWin = isLocalWin;
             board.LastLiquidationData = data;
+            // 「減る前」は画面の血（場に出した血を引いたあと）。精算で場を空にしてからサーバーの値を置く。
+            // 勝った側は場の血が戻って儲けが乗り、負けた側は場の血が相手のものになる
             board.RememberHpBeforeLiquidation();
+            board.ClearStakesOnTable();
             board.UpdateHp(isLocalWin ? data.winner_health : data.loser_health,
                 isLocalWin ? data.loser_health : data.winner_health);
             network.RaisePhaseStatusChanged(RoundStatus.Agari);

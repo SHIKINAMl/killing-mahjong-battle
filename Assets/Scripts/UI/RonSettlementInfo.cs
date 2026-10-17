@@ -66,6 +66,17 @@ namespace KillingMahjong.UI
         public int TheirHpBefore;
         public int TheirHpAfter;
 
+        /// <summary>
+        /// **画面の血が実際に動く量**（後 − 前）。HP の横に出す増減と、血の音に使う。
+        ///
+        /// 2026-10-17 から、賭けた血は賭けた時点で画面から場へ出している（<c>BoardStateManager.LocalStakeOnTable</c>）。
+        /// そのため勝った側は「場の血が戻る＋儲け」、満貫で負けた側は「場の血を取られるだけ（±0）」と、
+        /// サーバーの増減（<see cref="MyDelta"/>）と画面の動きがずれる。飛ばす数字（掛け金×倍率の式）は
+        /// サーバーの増減のまま、メーターの横はこちらを出す。前後が入っていなければサーバーの増減に戻す。
+        /// </summary>
+        public int MyShownDelta => MyHpBefore == 0 && MyHpAfter == 0 ? MyDelta : MyHpAfter - MyHpBefore;
+        public int TheirShownDelta => TheirHpBefore == 0 && TheirHpAfter == 0 ? TheirDelta : TheirHpAfter - TheirHpBefore;
+
         /// <summary>ローカルプレイヤーが勝った側か。</summary>
         public bool LocalWon;
     }

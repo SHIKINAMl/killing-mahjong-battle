@@ -62,8 +62,51 @@ namespace KillingMahjong.Managers
         /// </summary>
         public const int PlaceholderInitialHp = 20000;
 
+        /// <summary>
+        /// **画面に出す血。** サーバーの HP から「場に出した血」（この局で賭けた額）を引いたもの。
+        ///
+        /// 2026-10-17 のユーザー指示「かけた時点で血を引きたい」。サーバーは賭けた時点では HP を引かず、
+        /// ロンの精算でだけ増減させる（`game_engine.py: place_bet`）。ルールは変えずに、
+        /// **画面の上でだけ賭けた血を場へ出す。** 精算で場を空にし、サーバーの値へ戻るので、
+        /// 局が終わった時点では必ずサーバーと一致する。
+        ///
+        /// 流局すると場の血は残り、次の局の `bet_completed` でまた同じ額が積まれる。
+        /// サーバーの精算額「賭け金 ×（流局の回数＋1）」とそのまま一致する。
+        ///
+        /// 本物の HP が要るとき（サーバーへの問い合わせと突き合わせる等）は <see cref="LocalServerHp"/>。
+        /// </summary>
         public int LocalPlayerHp { get; private set; } = PlaceholderInitialHp;
         public int EnemyPlayerHp { get; private set; } = PlaceholderInitialHp;
+
+        /// <summary>サーバーが持っている本物の HP（場に出した血を引く前）。</summary>
+        public int LocalServerHp { get; private set; } = PlaceholderInitialHp;
+        public int EnemyServerHp { get; private set; } = PlaceholderInitialHp;
+
+        /// <summary>場に出している血（この局と、流局で持ち越した局の賭け金の合計）。</summary>
+        public int LocalStakeOnTable { get; private set; }
+        public int EnemyStakeOnTable { get; private set; }
+
+        /// <summary>賭けが確定したとき（`bet_completed`）に呼ぶ。流局の続きでも毎局呼ばれ、積み上がる。</summary>
+        public void AddStakesOnTable(int local, int enemy)
+        {
+            LocalStakeOnTable += Mathf.Max(0, local);
+            EnemyStakeOnTable += Mathf.Max(0, enemy);
+            ApplyShownHp();
+        }
+
+        /// <summary>精算（ロン）で場を空にする。新しい対局でも呼ぶ。流局では呼ばない。</summary>
+        public void ClearStakesOnTable()
+        {
+            LocalStakeOnTable = 0;
+            EnemyStakeOnTable = 0;
+            ApplyShownHp();
+        }
+
+        private void ApplyShownHp()
+        {
+            LocalPlayerHp = Mathf.Max(0, LocalServerHp - LocalStakeOnTable);
+            EnemyPlayerHp = Mathf.Max(0, EnemyServerHp - EnemyStakeOnTable);
+        }
         public int LocalPlayerSpecialVictoryCount { get; set; } = 0;
 
         /// <summary>
@@ -203,8 +246,8 @@ namespace KillingMahjong.Managers
         {
             CurrentWallTiles = new List<int>(initialWall);
             ClearAllBoardData();
-            LocalPlayerHp = PlaceholderInitialHp;
-            EnemyPlayerHp = PlaceholderInitialHp;
+            LocalStakeOnTable = EnemyStakeOnTable = 0;
+            UpdateHp(PlaceholderInitialHp, PlaceholderInitialHp);
             OnBoardStateRebuilt?.Invoke();
         }
 
@@ -395,10 +438,14 @@ namespace KillingMahjong.Managers
             HpBeforeLiquidationEnemy = EnemyPlayerHp;
         }
 
+        /// <summary>
+        /// **サーバーの HP** を受け取る。画面の血（<see cref="LocalPlayerHp"/>）は、ここから場に出した血を引いて出す。
+        /// </summary>
         public void UpdateHp(int localHp, int enemyHp)
         {
-            LocalPlayerHp = localHp;
-            EnemyPlayerHp = enemyHp;
+            LocalServerHp = localHp;
+            EnemyServerHp = enemyHp;
+            ApplyShownHp();
         }
 
         public void FireRebuildEvent()
