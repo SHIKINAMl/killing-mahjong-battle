@@ -356,6 +356,7 @@ namespace KillingMahjong.UI
             this.currentMoney = currentHp;
             this.currentBet = bettingUnit; // Reset bet to minimum
             this.onConfirmAction = onConfirm;
+            _outcomePreviewAllowed = true;   // チュートリアル用の入口（Fixed / Free）はこのあと下ろす
 
             if (confirmButton != null) confirmButton.interactable = true;
 
@@ -404,6 +405,7 @@ namespace KillingMahjong.UI
             }
 
             currentBet = Mathf.Max(0, fixedBet);
+            _outcomePreviewAllowed = false;
 
             if (increaseBetButton != null) increaseBetButton.interactable = false;
             if (decreaseBetButton != null) decreaseBetButton.interactable = false;
@@ -428,6 +430,9 @@ namespace KillingMahjong.UI
                 StopCoroutine(autoDialogueCoroutine);
                 autoDialogueCoroutine = null;
             }
+
+            _outcomePreviewAllowed = false;
+            UpdateUI();
         }
 
         /// <summary>矢印UIの誘導先として使う「賭け金アップ」ボタンの RectTransform。</summary>
@@ -603,28 +608,23 @@ namespace KillingMahjong.UI
                 currentBetText.text = currentBet.ToString();
             }
 
+            // 実際の精算と同じ計算を使う（端数処理が違うと表示と結果がずれる）。
+            // 古いサーバーで multiplier が来ないときだけ飜数から引く
+            bool canWin = isTenpai && isManganOrMore;
+            int reward = !canWin ? -1 : maxMultiplier > 0f
+                ? GameRules.CalculateWinnerGain(currentBet, maxMultiplier)
+                : GameRules.CalculateWinnerGain(currentBet, maxHan);
+            // 強襲を撃った局は、獲得が 0 になって同じ額が相手への追加ダメージに回る
+            var boardState = Managers.BoardStateManager.Instance;
+            bool assault = boardState != null && boardState.LocalAssaultUsedThisRound;
+
             var rewardText = EnsureExpectedRewardText();
             if (rewardText != null)
             {
-                if (isTenpai && isManganOrMore)
-                {
-                    // 実際の精算と同じ計算を使う（端数処理が違うと表示と結果がずれる）。
-                    // 古いサーバーで multiplier が来ないときだけ飜数から引く
-                    int reward = maxMultiplier > 0f
-                        ? GameRules.CalculateWinnerGain(currentBet, maxMultiplier)
-                        : GameRules.CalculateWinnerGain(currentBet, maxHan);
-
-                    // 強襲を撃った局は、獲得が 0 になって同じ額が相手への追加ダメージに回る
-                    var board = Managers.BoardStateManager.Instance;
-                    rewardText.text = board != null && board.LocalAssaultUsedThisRound
-                        ? $"強襲ダメージ: +{reward}"
-                        : $"予想報酬: {reward}";
-                }
-                else
-                {
-                    rewardText.text = "";
-                }
+                rewardText.text = !canWin ? "" : assault ? $"強襲ダメージ: +{reward}" : $"予想報酬: {reward}";
             }
+
+            UpdateOutcomePreview(reward, assault, maxMultiplier);
             
             // Disable buttons appropriately
             increaseBetButton.interactable = (currentBet + bettingUnit <= maxBet && currentBet + bettingUnit <= currentMoney);
@@ -637,6 +637,34 @@ namespace KillingMahjong.UI
                 fullBetButton.interactable = (currentBet < validMax);
             }
         }
+
+        /// <summary>
+        /// 「賭けたあとの血」の札（<see cref="BetOutcomePreviewUI"/>）を、いまの額に合わせる。
+        /// チュートリアルでは出さない（あちらは賭けた時点で血を引く精算で、本編と数字が合わないため。
+        /// 2026-10-17 の調査の問題3。精算をどちらに揃えるか決まったら出してよい）。
+        /// </summary>
+        private void UpdateOutcomePreview(int reward, bool assault, float multiplier)
+        {
+            if (_outcomePreview == null) _outcomePreview = BetOutcomePreviewUI.Ensure(PreviewParent(transform));
+            if (_outcomePreview == null) return;
+
+            _outcomePreview.gameObject.SetActive(_outcomePreviewAllowed);
+            if (!_outcomePreviewAllowed) return;
+
+            // 管のいちばん上 = いまの血（または初期の血）に、最大額で勝ったぶんを足した量
+            int top = Mathf.Max(initialMoney, currentMoney) + Mathf.RoundToInt(maxBet * Mathf.Max(1f, multiplier));
+            _outcomePreview.SetOutcome(currentMoney, currentBet, reward, assault, top);
+        }
+
+        /// <summary>札を置く親。スマホ型の枠（BettingPanel）の子にして、一緒に出入りさせる。</summary>
+        public static Transform PreviewParent(Transform bettingUiRoot)
+        {
+            var panel = SceneFirst.FindChild(bettingUiRoot, "BettingPanel");
+            return panel != null ? panel.transform : bettingUiRoot;
+        }
+
+        private BetOutcomePreviewUI _outcomePreview;
+        private bool _outcomePreviewAllowed = true;
 
         private void ConfirmBet()
         {

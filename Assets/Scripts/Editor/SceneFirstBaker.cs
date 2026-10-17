@@ -97,6 +97,15 @@ namespace KillingMahjong.EditorTools
                 report.Append(" / 牌交換の残す牌を選ぶ画面=").Append(BakeMulliganChoice(scene));
                 foreach (var root in scene.GetRootGameObjects())
                 {
+                    var betting = root.GetComponentInChildren<BettingUI>(true);
+                    if (betting == null) continue;
+                    var preview = BetOutcomePreviewUI.Ensure(BettingUI.PreviewParent(betting.transform));
+                    if (preview != null) preview.gameObject.SetActive(false);
+                    report.Append(" / 賭けたあとの血=").Append(Describe(SceneFirst.Report(nameof(BetOutcomePreviewUI))));
+                    break;
+                }
+                foreach (var root in scene.GetRootGameObjects())
+                {
                     var manager = root.GetComponentInChildren<GameUIManager>(true);
                     if (manager == null) continue;
                     HandWaitRevealUI.Ensure(manager.transform).gameObject.SetActive(false);
