@@ -70,6 +70,12 @@ namespace KillingMahjong.UI
         private const float DetailWidth = 460f;
         private const float TileWidth = 28f;
         private const float TileHeight = 37f;
+        /// <summary>
+        /// 牌の絵を置く正方形の一辺。**牌の絵は 320x320 の正方形の中に、牌が 190x270 で描いてある**（周りは透明）。
+        /// 以前は 28x37 の枠に正方形ごと押し込んでいて、牌が横に潰れて細く見えていた（2026-10-18）。
+        /// 正方形のまま 48 で置くと、牌は 28.5x40.5 で元の縦横比になる。並べる間隔は今までどおり。
+        /// </summary>
+        private const float TileSpriteBox = 48f;
 
         /// <summary>
         /// 役一覧（閲覧）で出す役。強化できる役（<see cref="Yakus"/>）に、強化できないが型に入る役
@@ -725,7 +731,7 @@ namespace KillingMahjong.UI
                 var img = go.GetComponent<Image>();
                 img.sprite = _tiles.GetTileSprite(ids[i]);
                 img.raycastTarget = false;
-                Center(img.rectTransform, new Vector2(TileWidth, TileHeight));
+                Center(img.rectTransform, new Vector2(TileSpriteBox, TileSpriteBox));
                 img.rectTransform.anchoredPosition = new Vector2(x, 0f);
                 x += TileWidth + gap;
             }

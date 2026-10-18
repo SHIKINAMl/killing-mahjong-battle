@@ -31,6 +31,12 @@ namespace KillingMahjong.UI
         private const float YakuDetailWidth = 480f;
         private const float YakuTileWidth = 28f;
         private const float YakuTileHeight = 37f;
+        /// <summary>
+        /// 牌の絵を置く正方形の一辺。**牌の絵は 320x320 の正方形の中に、牌が 190x270 で描いてある**（周りは透明）。
+        /// 以前は 28x37 の枠に正方形ごと押し込んでいて、牌が横に潰れて細く見えていた（2026-10-18）。
+        /// 正方形のまま 48 で置くと、牌は 28.5x40.5 で元の縦横比になる。並べる間隔は今までどおり。
+        /// </summary>
+        private const float YakuTileSpriteBox = 48f;
 
         private readonly List<Image> yakuRowBgs = new List<Image>();
         private readonly List<int> yakuRowEntry = new List<int>();   // 行 → YakuEntries の番号（見出しは -1）
@@ -281,7 +287,7 @@ namespace KillingMahjong.UI
                 var img = NewImage(yakuTileRow, "Tile" + i, Color.white);
                 img.sprite = tiles.GetTileSprite(ids[i]);
                 img.raycastTarget = false;
-                Center(img.rectTransform, new Vector2(YakuTileWidth, YakuTileHeight));
+                Center(img.rectTransform, new Vector2(YakuTileSpriteBox, YakuTileSpriteBox));
                 img.rectTransform.anchoredPosition = new Vector2(x, 0f);
                 x += YakuTileWidth + gap;
             }
