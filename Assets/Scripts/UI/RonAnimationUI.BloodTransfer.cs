@@ -150,9 +150,14 @@ namespace KillingMahjong.UI
             // **場に出ていた血を、卓の上の血だまりとして見せる（2026-10-18）。**
             // 「血を掛け合っている」ことを形で見せるため。数字の下、卓の真ん中に広がる。
             // 大きさは場の血の額で決める（両者の賭け金の合計。8000 で最大）
-            var pool = Effects.BloodPoolEffect.Create(stageRt, TablePoolPosition());
-            pool.transform.SetAsFirstSibling();
-            pool.SetTarget(Mathf.Clamp(PoolAmountFor(s.MyBet + s.TheirBet), 0.25f, 1f));
+            // 没案の霧では出さない（血は弾けて終わる）
+            Effects.BloodPoolEffect pool = null;
+            if (!PreviewMistDrain)
+            {
+                pool = Effects.BloodPoolEffect.Create(stageRt, TablePoolPosition());
+                pool.transform.SetAsFirstSibling();
+                pool.SetTarget(Mathf.Clamp(PoolAmountFor(s.MyBet + s.TheirBet), 0.25f, 1f));
+            }
 
             // ② 数値が変わる。**潰れきった瞬間に入れ替える**ので、途中の混ざった数字が読めてしまわない
             string landed = FormatDelta(toValue);
@@ -358,6 +363,16 @@ namespace KillingMahjong.UI
                 : (playerInfo != null ? playerInfo.HpGaugeAnchor : null);
             int loserDelta = mineWins ? s.TheirShownDelta : s.MyShownDelta;
             int winnerDelta = mineWins ? s.MyShownDelta : s.TheirShownDelta;
+
+            // 没案の霧: 負けた側の血が弾けて霧散するだけで終わる。卓にもホースにも流さない
+            // （2026-10-19「霧散するバージョンは、ホースにいかせなくていいです。ただ血が弾けているだけで終わっていいです」）
+            if (PreviewMistDrain)
+            {
+                if (loserDelta < 0)
+                    mist = StartBloodMist(stageRt, mineWins ? enemyInfo : null,
+                                          Mathf.Lerp(0.7f, 1.8f, Mathf.Clamp01(-loserDelta / 12000f)));
+                return list;
+            }
             if (winnerGauge == null) return list;
 
             Vector3 poolPos = pool != null ? pool.transform.position : TablePoolPosition();
@@ -368,24 +383,16 @@ namespace KillingMahjong.UI
             if (pool != null)
             {
                 // 自分のホースは上から入るので高く弧を描く。相手のチューブは卓の上を横へ這わせる
-                // 没案の霧では、霧が卓へ集まってから勝った側へ流す
-                float wait = PreviewMistDrain && loserDelta < 0 ? MistGatherSeconds : 0f;
                 list.Add(Effects.BloodStreamEffect.Pour(stageRt, poolPos, winnerHose.Mouth,
                                                         BloodStreamSeconds, arc: mineWins ? 150f : 24f, thickness: thick,
-                                                        enterHoseAt: winnerHose.Outer, delay: wait));
-                if (wait > 0f) StartCoroutine(DrainPoolLater(pool, wait));
-                else pool.SetTarget(0f);
+                                                        enterHoseAt: winnerHose.Outer));
+                pool.SetTarget(0f);
             }
 
             // 負けた側が賭け金より多く失う（倍率が掛かった）ときは、その血袋からも卓へ流す。
             // **血袋から血袋へ直接流すと、筋がキャラの顔を横切った**（2026-10-18 の試写）。
             // 卓の血だまりを通して勝った側へ渡すので、「血は場を通って奪われる」形にもそろう
-            if (PreviewMistDrain && loserDelta < 0)
-            {
-                mist = StartBloodMist(stageRt, mineWins ? enemyInfo : null, poolPos,
-                                      Mathf.Lerp(0.7f, 1.8f, Mathf.Clamp01(-loserDelta / 12000f)));
-            }
-            else if (loserDelta < 0 && loserGauge != null)
+            if (loserDelta < 0 && loserGauge != null)
             {
                 BagHose loserHose = HoseOf(mineWins, loserGauge, poolPos);
                 list.Add(Effects.BloodStreamEffect.Pour(stageRt, loserHose.Mouth, poolPos,
@@ -402,9 +409,6 @@ namespace KillingMahjong.UI
         /// 「ボツアンになる可能性が高い」ので、演出コレクションの没案（ron.mist_local / ron.mist_enemy）だけが立てる。
         /// </summary>
         public static bool PreviewMistDrain;
-
-        /// <summary>霧が噴き出して卓へ集まるまで[秒]。勝った側へ流すのはこのあと。</summary>
-        private const float MistGatherSeconds = 0.75f;
 
         /// <summary>噴いた瞬間に体が赤く染まり、抜けたあと少し青白くなって戻る。色は必ず元へ戻す。</summary>
         private static IEnumerator BleachBody(SpriteRenderer body)
@@ -430,18 +434,12 @@ namespace KillingMahjong.UI
             finally { if (body != null) body.color = original; }
         }
 
-        private static IEnumerator DrainPoolLater(Effects.BloodPoolEffect pool, float seconds)
-        {
-            yield return new WaitForSeconds(seconds);
-            if (pool != null) pool.SetTarget(0f);
-        }
-
         /// <summary>
         /// 噴き出す位置。相手は立ち絵の形（スプライトの三角形）の中から面積に比例して拾う。
         /// 自分は画面に体が映っていないので、画面の下の縁と左右の下半分から噴かせる（一人称の自分の体）。
         /// </summary>
         private Effects.BloodMistEffect StartBloodMist(RectTransform stageRt, EnemyInfoUI enemyLoser,
-                                                             Vector3 poolPos, float amount)
+                                                             float amount)
         {
             var points = new List<Vector2>();
             Vector2 center;
@@ -486,7 +484,7 @@ namespace KillingMahjong.UI
             }
             if (points.Count == 0) return null;
             // 自分の体は画面の外（手前）にあるので、縁から内側へ噴かせる
-            return Effects.BloodMistEffect.Burst(stageRt, points, center, poolPos, amount, inward: body == null);
+            return Effects.BloodMistEffect.Burst(stageRt, points, center, amount, inward: body == null);
         }
     }
 }

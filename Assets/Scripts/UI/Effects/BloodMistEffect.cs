@@ -20,7 +20,8 @@ namespace KillingMahjong.UI.Effects
     ///   ・色は明るい→濃い→暗い、と年をとるほど沈む
     ///   ・ところどころ「＋」の形のきらめきを混ぜる
     /// 最初の版は半透明の点を体のまわりに密に並べたので、もやの塊に見えて霧散しなかった。
-    /// 今は大半の粒が広がって点滅しながら消え、一部の大きな粒だけが卓の血だまりへ吸い寄せられる。
+    /// 今は粒が広がって点滅しながら消える。**卓やホースへは流さず、弾けて終わる**
+    /// （同日「霧散するバージョンは、ホースにいかせなくていいです。ただ血が弾けているだけで終わっていいです」）。
     ///
     /// 位置はすべて**ワールド座標（Overlay ならスクリーン座標）**。
     /// </summary>
@@ -54,41 +55,38 @@ namespace KillingMahjong.UI.Effects
         private const float Grid = 4f;
         /// <summary>噴き出す時間[秒]。この間に全部の粒が出る（「ドパッ」）。</summary>
         private const float BurstSeconds = 0.12f;
-        /// <summary>噴き出してから漂う時間[秒]。このあと大きな粒だけ卓へ吸い寄せられる。</summary>
-        private const float HangSeconds = 0.36f;
         /// <summary>点滅の速さ[回/秒]。ドット絵のコマ送りに合わせて速すぎない値。</summary>
         private const float BlinkRate = 15f;
         /// <summary>寿命のこの割合を過ぎたら点滅させながら消す。</summary>
         private const float BlinkFrom = 0.55f;
-        /// <summary>吸い寄せが終わらなくても、ここで打ち切る[秒]。</summary>
+        /// <summary>消え残りがあっても、ここで打ち切る[秒]。</summary>
         private const float MaxSeconds = 2.0f;
 
         private struct Mote
         {
             public Image Img;
             public Vector2 Pos, Vel;
-            public float Born, Life, Pull;
+            public float Born, Life;
             public int Size, Size0;   // マス数
             public int Phase;          // 点滅のずれ
-            public bool Pulled, Sparkle, Split, Alive;
+            public bool Sparkle, Split, Alive;
         }
 
         private readonly List<Mote> motes = new List<Mote>();
         private readonly List<Mote> born = new List<Mote>();
         private RectTransform stage;
-        private Vector2 target;
         private float scale, elapsed;
         private bool running;
 
         public bool IsRunning => running;
 
         /// <summary>
-        /// <paramref name="sources"/> の各点から霧を噴き出させる。大きな粒は <paramref name="targetWorld"/> へ吸い寄せる。
+        /// <paramref name="sources"/> の各点から霧を噴き出させ、その場で霧散させる。
         /// <paramref name="center"/> は体の真ん中（噴き出す向きを決める）。
         /// <paramref name="inward"/> なら真ん中へ向かって噴く（画面の縁から噴かせる、一人称の自分の体）。
         /// </summary>
         public static BloodMistEffect Burst(RectTransform stage, IList<Vector2> sources, Vector2 center,
-                                            Vector3 targetWorld, float amount = 1f, bool inward = false)
+                                            float amount = 1f, bool inward = false)
         {
             if (stage == null || sources == null || sources.Count == 0) return null;
             var go = new GameObject("BloodMist", typeof(RectTransform));
@@ -101,7 +99,6 @@ namespace KillingMahjong.UI.Effects
             fx.stage = rt;
             var canvas = stage.GetComponentInParent<Canvas>();
             fx.scale = canvas != null ? Mathf.Max(0.25f, canvas.rootCanvas.transform.lossyScale.x) : 1f;
-            fx.target = targetWorld;
             fx.Spawn(sources, center, Mathf.Clamp(amount, 0.4f, 2f), inward);
             fx.running = true;
             return fx;
@@ -127,14 +124,11 @@ namespace KillingMahjong.UI.Effects
                 int size = roll < 0.25f ? 3 : roll < 0.6f ? 2 : 1;
                 bool sparkle = size == 1 && Random.value < 0.15f;
                 motes.Add(NewMote(p, dir * Random.Range(120f, 380f) * (inward ? 1.6f : 1f) * scale,
-                                  Random.Range(0f, BurstSeconds), size, sparkle,
-                                  // 大きなかたまりの半分ほどが卓へ向かう。残りは広がって消える
-                                  pulled: size == 3 && Random.value < 0.6f,
-                                  life: Random.Range(0.55f, 1.15f)));
+                                  Random.Range(0f, BurstSeconds), size, sparkle, Random.Range(0.55f, 1.15f)));
             }
         }
 
-        private Mote NewMote(Vector2 pos, Vector2 vel, float bornAt, int size, bool sparkle, bool pulled, float life)
+        private Mote NewMote(Vector2 pos, Vector2 vel, float bornAt, int size, bool sparkle, float life)
         {
             var go = new GameObject(sparkle ? "Glint" : "Mote", typeof(RectTransform), typeof(Image));
             go.transform.SetParent(stage, false);
@@ -145,8 +139,8 @@ namespace KillingMahjong.UI.Effects
             return new Mote
             {
                 Img = img, Pos = pos, Vel = vel, Born = bornAt, Life = life,
-                Pull = Random.Range(0f, 0.2f), Size = size, Size0 = size,
-                Phase = Random.Range(0, 2), Pulled = pulled, Sparkle = sparkle, Alive = true,
+                Size = size, Size0 = size,
+                Phase = Random.Range(0, 2), Sparkle = sparkle, Alive = true,
             };
         }
 
@@ -172,52 +166,29 @@ namespace KillingMahjong.UI.Effects
 
                 float age = elapsed - m.Born;
                 float f = age / m.Life;
-                float pullStart = BurstSeconds + HangSeconds + m.Pull;
-                bool pulling = m.Pulled && elapsed >= pullStart;
-
-                if (!pulling)
-                {
-                    // 噴いた勢いがすぐ抜けて、ふわっと広がる。霧なので少しだけ浮く
-                    m.Vel *= Mathf.Exp(-4.5f * dt);
-                    m.Vel += (Vector2.up * 18f + Random.insideUnitCircle * 90f) * scale * dt;
-                }
-                else
-                {
-                    // 卓の血だまりへ吸い寄せられる。近いほど速い
-                    Vector2 to = target - m.Pos;
-                    float k = Mathf.Clamp01((elapsed - pullStart) / 0.35f);
-                    m.Vel = Vector2.Lerp(m.Vel, to.normalized * Mathf.Lerp(200f, 900f, k) * scale, 1f - Mathf.Exp(-9f * dt));
-                    float dist = to.magnitude;
-                    if (dist < Grid * 3f * scale || Vector2.Dot(to, m.Vel) < 0f && dist < Grid * 8f * scale) { Kill(ref m); motes[i] = m; continue; }
-                }
+                // 噴いた勢いがすぐ抜けて、ふわっと広がる。霧なので少しだけ浮く
+                m.Vel *= Mathf.Exp(-4.5f * dt);
+                m.Vel += (Vector2.up * 18f + Random.insideUnitCircle * 90f) * scale * dt;
                 m.Pos += m.Vel * dt;
 
-                if (!m.Pulled)
+                if (f >= 1f) { Kill(ref m); motes[i] = m; continue; }
+                // 年をとるほど小さく。3マスのかたまりは縮むときに小さな粒へ割れる
+                int size = f < 0.3f ? m.Size0 : f < 0.6f ? Mathf.Max(1, m.Size0 - 1) : 1;
+                if (size < m.Size && m.Size0 == 3 && !m.Split)
                 {
-                    if (f >= 1f) { Kill(ref m); motes[i] = m; continue; }
-                    // 年をとるほど小さく。3マスのかたまりは縮むときに小さな粒へ割れる
-                    int size = f < 0.3f ? m.Size0 : f < 0.6f ? Mathf.Max(1, m.Size0 - 1) : 1;
-                    if (size < m.Size && m.Size0 == 3 && !m.Split)
-                    {
-                        m.Split = true;
-                        for (int c = 0; c < 2; c++)
-                            born.Add(NewMote(m.Pos, m.Vel * 0.6f + Random.insideUnitCircle * 140f * scale, elapsed, 1,
-                                             Random.value < 0.2f, false, Random.Range(0.3f, 0.6f)));
-                    }
-                    m.Size = size;
+                    m.Split = true;
+                    for (int c = 0; c < 2; c++)
+                        born.Add(NewMote(m.Pos, m.Vel * 0.6f + Random.insideUnitCircle * 140f * scale, elapsed, 1,
+                                         Random.value < 0.2f, Random.Range(0.3f, 0.6f)));
                 }
-                else if (pulling)
-                {
-                    m.Size = Mathf.Max(1, m.Size0 - 1);
-                }
+                m.Size = size;
 
                 // 色は数色だけ。明るい芯 → 明るい → 濃い → 暗い
                 Color col = m.Sparkle ? (f < 0.5f ? Hot : Bright)
                           : age < 0.06f ? Hot : f < 0.25f ? Bright : f < 0.6f ? Body : Dark;
-                if (m.Pulled) col = age < 0.06f ? Hot : pulling ? Body : Bright;
 
                 // 消えぎわは点滅させながら消す（半透明にはしない）
-                bool shown = m.Pulled || f < BlinkFrom || ((frame + m.Phase) & 1) == 0;
+                bool shown = f < BlinkFrom || ((frame + m.Phase) & 1) == 0;
                 if (m.Img.gameObject.activeSelf != shown) m.Img.gameObject.SetActive(shown);
                 if (shown)
                 {
