@@ -44,6 +44,8 @@ namespace KillingMahjong.Managers
         private const string YesLabel = "はい";
         private const string NoLabel = "いいえ";
         private const string GuideStartLabel = "閉じる";
+        private const string PreviousPageLabel = "◀ 前へ";
+        private const string NextPageLabel = "次へ ▶";
 
         // 「いいえ」を選んだときの流れ。**麻雀そのものを知らない人向け。**
         // 麻雀ルール説明UI を挟んでから、17歩ルール説明UI へ合流する。
@@ -132,14 +134,22 @@ namespace KillingMahjong.Managers
         private int _mahjongExperienceAnswer = -1;
 
         /// <summary>
-        /// 「17歩ルール説明UI」の**仮の板**（2026-09-19）。
+        /// 「17歩ルール説明UI」の絵（2026-10-18 に届いた）。
         ///
-        /// フロー図は説明UIを3枚（麻雀ルール／17歩ルール／満貫）要求しているが、絵は2枚しかない。
-        /// `案内板_満貫` は中身が「13枚の牌から満貫手を組もう」なので**満貫説明UI**に当たり、
-        /// 17歩ルール（この賭場の決まり）に当たる絵が無い。
-        /// ルールの文面は企画の領分なので**こちらで書かない**。絵が届いたら差し替えること。
+        /// ユーザーが描いた「まとめ①〜⑤」（手牌選択 → 掛け金 → 打牌 → 流局と持ち越し → 勝ち方）。
+        /// 元は 800x600 で周りが透明だったので、余白だけ切って取り込んである。
+        /// それまでは絵が無く、下の文字板を仮に出していた。いまは絵が読めなかったときの控え。
         /// **AIで絵を描かないこと。**
         /// </summary>
+        private static readonly string[] Rule17PagePaths =
+        {
+            "Tutorial/ゲームの流れ_まとめ1",
+            "Tutorial/ゲームの流れ_まとめ2",
+            "Tutorial/ゲームの流れ_まとめ3",
+            "Tutorial/ゲームの流れ_まとめ4",
+            "Tutorial/ゲームの流れ_まとめ5",
+        };
+
         private const string Rule17Title = "17歩ルール説明";
         private static readonly string[] Rule17Placeholder =
         {
@@ -245,9 +255,9 @@ namespace KillingMahjong.Managers
             }
 
             // ここで合流。**この賭場の決まりは、どちらの経路でも必ず見せる。**
-            // フロー図の「17歩ルール説明UI」。絵がまだ無いので仮の文字板（Rule17Placeholder）。
+            // フロー図の「17歩ルール説明UI」。ユーザーが描いたまとめ①〜⑤を順に送って見せる（2026-10-18）。
             // 以前はここに `案内板_満貫` を出していたが、あれは満貫の説明なので下へ移した（2026-09-19）
-            yield return ShowRulePanelRoutine(font, Rule17Title, Rule17Placeholder, null);
+            yield return ShowRulePagesRoutine(font, Rule17Title, Rule17Placeholder, Rule17PagePaths);
 
             yield return PlayLines(AfterRuleUiLines);
 
@@ -356,6 +366,83 @@ namespace KillingMahjong.Managers
             bool done = false;
             CreateButton(parent, font, GuideStartLabel, new Vector2(0f, -250f), () => done = true);
             yield return new WaitUntil(() => done);
+
+            CloseIntro();
+        }
+
+        /// <summary>
+        /// 絵を数枚、前へ・次へで送って見せる。**最後のページでだけ「閉じる」を出す。**
+        /// 1枚も読めなかったときは、文字の板1枚に落とす（<see cref="ShowRulePanelRoutine"/> と同じ控え）。
+        /// </summary>
+        private IEnumerator ShowRulePagesRoutine(TMP_FontAsset font, string fallbackTitle,
+                                                 string[] fallbackBody, string[] spritePaths)
+        {
+            var pages = new List<Sprite>();
+            foreach (var path in spritePaths)
+            {
+                var sprite = Resources.Load<Sprite>(path);
+                if (sprite != null) pages.Add(sprite);
+                else Debug.LogWarning("[TutorialIntro] 説明の絵が見つかりません: " + path);
+            }
+            if (pages.Count == 0)
+            {
+                yield return ShowRulePanelRoutine(font, fallbackTitle, fallbackBody, null);
+                yield break;
+            }
+
+            CloseIntro();
+            Transform parent = BuildIntroCanvas();
+            if (parent == null) yield break;
+
+            var image = new GameObject("RuleBoard", typeof(RectTransform), typeof(Image));
+            image.transform.SetParent(parent, false);
+            var imageRect = (RectTransform)image.transform;
+            imageRect.anchorMin = new Vector2(0.5f, 0.5f);
+            imageRect.anchorMax = new Vector2(0.5f, 0.5f);
+            imageRect.anchoredPosition = new Vector2(0f, 30f);
+            var boardImage = image.GetComponent<Image>();
+            boardImage.raycastTarget = false;
+
+            var counter = new GameObject("PageNumber", typeof(RectTransform), typeof(TextMeshProUGUI));
+            counter.transform.SetParent(parent, false);
+            var counterRect = (RectTransform)counter.transform;
+            counterRect.anchorMin = new Vector2(0.5f, 0.5f);
+            counterRect.anchorMax = new Vector2(0.5f, 0.5f);
+            counterRect.anchoredPosition = new Vector2(0f, -250f);
+            counterRect.sizeDelta = new Vector2(120f, 40f);
+            var counterText = counter.GetComponent<TextMeshProUGUI>();
+            if (font != null) counterText.font = font;
+            counterText.fontSize = 22f;
+            counterText.color = new Color32(240, 232, 236, 255);
+            counterText.alignment = TextAlignmentOptions.Center;
+            counterText.raycastTarget = false;
+
+            int index = 0;
+            bool done = false;
+            var previous = CreateButton(parent, font, PreviousPageLabel, new Vector2(-220f, -250f), () => index--);
+            var next = CreateButton(parent, font, NextPageLabel, new Vector2(220f, -250f), () => index++);
+            // 「閉じる」は「次へ」と同じ場所。最後まで送った人だけが押せる。
+            var close = CreateButton(parent, font, GuideStartLabel, new Vector2(220f, -250f), () => done = true);
+
+            int shown = -1;
+            while (!done)
+            {
+                index = Mathf.Clamp(index, 0, pages.Count - 1);
+                if (index != shown)
+                {
+                    shown = index;
+                    Sprite page = pages[index];
+                    boardImage.sprite = page;
+                    // 元画像の縦横比のまま。この絵は 722x418 なので等倍で収まる。
+                    float scale = Mathf.Min(1f, Mathf.Min(760f / page.rect.width, 450f / page.rect.height));
+                    imageRect.sizeDelta = new Vector2(page.rect.width * scale, page.rect.height * scale);
+                    counterText.text = string.Format("{0} / {1}", index + 1, pages.Count);
+                    previous.SetActive(index > 0);
+                    next.SetActive(index < pages.Count - 1);
+                    close.SetActive(index == pages.Count - 1);
+                }
+                yield return null;
+            }
 
             CloseIntro();
         }
@@ -470,8 +557,8 @@ namespace KillingMahjong.Managers
             return _introRoot.transform;
         }
 
-        private void CreateButton(Transform parent, TMP_FontAsset font, string label,
-                                  Vector2 position, Action onClick)
+        private GameObject CreateButton(Transform parent, TMP_FontAsset font, string label,
+                                        Vector2 position, Action onClick)
         {
             var go = new GameObject("Button_" + label, typeof(RectTransform), typeof(Image), typeof(Button));
             go.transform.SetParent(parent, false);
@@ -497,6 +584,7 @@ namespace KillingMahjong.Managers
             text.raycastTarget = false;
 
             go.GetComponent<Button>().onClick.AddListener(() => onClick?.Invoke());
+            return go;
         }
 
         private void CloseIntro()
