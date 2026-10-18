@@ -7,74 +7,28 @@ using UnityEngine.UI;
 namespace KillingMahjong.UI
 {
     /// <summary>
-    /// オプションから読む、6ページのチュートリアル資料。
+    /// オプションから読む、チュートリアル資料。中身はユーザーが描いた「まとめ①〜⑤」の絵（2026-10-18 に差し替え）。
+    /// 以前は文字だけの6ページで、ルールが変わった後も古い文面のままだった。
+    /// 冒頭のルール説明（TutorialManager の17歩ルール説明UI）と同じ絵なので、読み返しても食い違わない。
     /// 対局シーンは本編とチュートリアルの2つあるため、どちらにも保存せず実行時に組み立てる。
     /// </summary>
     public class TutorialArchiveUI : MonoBehaviour
     {
-        private const int MaximumLinesPerPage = 7;
-        private const int MaximumCharactersPerLine = 24;
         private const float ReferenceWidth = 800f;
         private const float ReferenceHeight = 600f;
 
-        private readonly struct ArchivePage
+        private static readonly string[] PageSpritePaths =
         {
-            public readonly string Title;
-            public readonly string Body;
-
-            public ArchivePage(string title, string body)
-            {
-                Title = title;
-                Body = body;
-            }
-        }
-
-        private static readonly ArchivePage[] Pages =
-        {
-            new ArchivePage(
-                "① このギャンブルについて",
-                "ここは麻雀をベースにした特殊なギャンブル。\n"
-                + "勝てば賭けた点数が増え、負ければ減る。\n"
-                + "先に累計30000点を取るか、\n"
-                + "相手の点数を0にした方が勝ち。\n\n"
-                + "（この賭場の決まりは、ここに入ります）"),
-            new ArchivePage(
-                "② 麻雀のおさらい",
-                "配られた牌から強い役を作って戦う。\n\n"
-                + "「テンパイ」とは、あと1牌でアガれる状態のこと。\n"
-                + "普通にアガる手を作って、\n"
-                + "そこから1牌抜くのがラク。"),
-            new ArchivePage(
-                "③ 手牌の作り方",
-                "山牌から13枚選んでテンパイの形を作る。\n"
-                + "ただし満貫以上の手でないと座れない。\n\n"
-                + "牌をクリックすると手牌に登録できる。\n"
-                + "困ったら「おまかせ」ボタンを押せば、\n"
-                + "満貫以上の形を自動で組んでくれる。"),
-            new ArchivePage(
-                "④ 賭け金",
-                "手牌が決まったら賭け金を決める。\n"
-                + "賭けた分はその場で持ち点から引かれる。\n"
-                + "勝てば役の倍率をかけて返ってくる。"),
-            new ArchivePage(
-                "⑤ 対局の流れ",
-                "お互い1ターンに1枚ずつ、山牌から打っていく。\n"
-                + "先に相手に自分の待ち牌を出させた方の勝ち。\n\n"
-                + "自分の待ち牌は画面に表示されるので、\n"
-                + "相手がそれを出すのを祈りながら打つ。"),
-            new ArchivePage(
-                "⑥ 点数",
-                "勝つと賭けた分が戻り、\n"
-                + "さらに役の分のボーナスがもらえる。\n"
-                + "満貫なら2000賭けて2000の儲け。\n"
-                + "役満などもっと強い役ならさらに増える。\n\n"
-                + "負けると賭け金分を失う。\n"
-                + "賭けた額も戻らないので、マイナスは2倍。")
+            "Tutorial/ゲームの流れ_まとめ1",
+            "Tutorial/ゲームの流れ_まとめ2",
+            "Tutorial/ゲームの流れ_まとめ3",
+            "Tutorial/ゲームの流れ_まとめ4",
+            "Tutorial/ゲームの流れ_まとめ5",
         };
 
         private TMP_FontAsset font;
-        private TextMeshProUGUI pageTitle;
-        private TextMeshProUGUI pageBody;
+        private Sprite[] pages;
+        private Image pageImage;
         private TextMeshProUGUI pageNumber;
         private Button previousButton;
         private Button nextButton;
@@ -90,38 +44,27 @@ namespace KillingMahjong.UI
 
         private void Awake()
         {
+            LoadPages();
             Build();
-            ValidatePageBounds();
             gameObject.SetActive(false);
         }
-
-        // --- チュートリアルの誘導から見るための口（2026-09-29） ---
-        //
-        // **資料の中でも目線を運ぶ**ため、見出し・本文・ボタンをそれぞれ
-        // 外から指せるようにしてある。光らせるのは誘導側（TutorialManager）の仕事。
 
         /// <summary>いま開いているページ（0 始まり）。</summary>
         public int PageIndex { get { return pageIndex; } }
 
         /// <summary>ページの総数。</summary>
-        public int PageCount { get { return Pages.Length; } }
+        public int PageCount { get { return pages.Length; } }
 
         /// <summary>最後のページを開いているか。</summary>
-        public bool IsLastPage { get { return pageIndex >= Pages.Length - 1; } }
+        public bool IsLastPage { get { return pageIndex >= pages.Length - 1; } }
 
-        /// <summary>ページの見出し。</summary>
-        public RectTransform PageTitleRect
-        {
-            get { return pageTitle != null ? pageTitle.rectTransform : null; }
-        }
-
-        /// <summary>本文。**帯を敷く相手。**</summary>
+        /// <summary>ページの絵。</summary>
         public RectTransform PageBodyRect
         {
-            get { return pageBody != null ? pageBody.rectTransform : null; }
+            get { return pageImage != null ? pageImage.rectTransform : null; }
         }
 
-        /// <summary>「次へ」。**枠で囲む相手。** 押せないときは null を返す。</summary>
+        /// <summary>「次へ」。押せないときは null を返す。</summary>
         public RectTransform NextButtonRect
         {
             get
@@ -131,7 +74,7 @@ namespace KillingMahjong.UI
             }
         }
 
-        /// <summary>「閉じる」。**枠で囲む相手。**</summary>
+        /// <summary>「閉じる」。</summary>
         public RectTransform CloseButtonRect
         {
             get { return closeButton != null ? closeButton.transform as RectTransform : null; }
@@ -144,6 +87,18 @@ namespace KillingMahjong.UI
             pageIndex = 0;
             gameObject.SetActive(true);
             RefreshPage();
+        }
+
+        private void LoadPages()
+        {
+            var loaded = new System.Collections.Generic.List<Sprite>();
+            foreach (string path in PageSpritePaths)
+            {
+                var sprite = Resources.Load<Sprite>(path);
+                if (sprite != null) loaded.Add(sprite);
+                else Debug.LogWarning("[TutorialArchiveUI] 資料の絵が見つかりません: " + path);
+            }
+            pages = loaded.ToArray();
         }
 
         private void Build()
@@ -168,51 +123,27 @@ namespace KillingMahjong.UI
             var dimmer = new GameObject("Dimmer", typeof(RectTransform), typeof(Image));
             dimmer.transform.SetParent(transform, false);
             Stretch((RectTransform)dimmer.transform);
-            dimmer.GetComponent<Image>().color = new Color(0.02f, 0.02f, 0.04f, 0.78f);
+            dimmer.GetComponent<Image>().color = new Color(0.02f, 0.02f, 0.04f, 0.86f);
 
-            var panel = new GameObject("Panel", typeof(RectTransform), typeof(Image), typeof(Outline));
-            panel.transform.SetParent(transform, false);
-            var panelRect = (RectTransform)panel.transform;
-            Center(panelRect, new Vector2(740f, 480f));
-            var panelImage = panel.GetComponent<Image>();
-            panelImage.color = new Color(0.08f, 0.06f, 0.12f, 0.98f);
-            var panelOutline = panel.GetComponent<Outline>();
-            panelOutline.effectColor = new Color32(214, 40, 62, 220);
-            panelOutline.effectDistance = new Vector2(2f, -2f);
+            var root = (RectTransform)transform;
+            CreateText(root, "ArchiveTitle", "チュートリアル資料", new Vector2(0f, 262f), new Vector2(460f, 34f), 24f, TextAlignmentOptions.Center);
 
-            CreateText(panelRect, "ArchiveTitle", "チュートリアル資料", new Vector2(0f, 202f), new Vector2(460f, 34f), 26f, TextAlignmentOptions.Center);
-            pageNumber = CreateText(panelRect, "PageNumber", string.Empty, new Vector2(302f, 202f), new Vector2(96f, 28f), 18f, TextAlignmentOptions.Center);
-            pageTitle = CreateText(panelRect, "PageTitle", string.Empty, new Vector2(0f, 157f), new Vector2(620f, 32f), 22f, TextAlignmentOptions.Center);
+            // 絵は 722x418。等倍で出す（拡大縮小するとドットが不揃いになる）
+            var picture = new GameObject("Page", typeof(RectTransform), typeof(Image));
+            picture.transform.SetParent(root, false);
+            Center((RectTransform)picture.transform, new Vector2(722f, 418f));
+            ((RectTransform)picture.transform).anchoredPosition = new Vector2(0f, 20f);
+            pageImage = picture.GetComponent<Image>();
+            pageImage.raycastTarget = false;
 
-            var bodyPanel = new GameObject("BodyPanel", typeof(RectTransform), typeof(Image), typeof(Outline));
-            bodyPanel.transform.SetParent(panelRect, false);
-            var bodyPanelRect = (RectTransform)bodyPanel.transform;
-            Center(bodyPanelRect, new Vector2(640f, 280f));
-            bodyPanelRect.anchoredPosition = new Vector2(0f, 0f);
-            bodyPanel.GetComponent<Image>().color = new Color(0.025f, 0.02f, 0.05f, 0.9f);
-            var bodyOutline = bodyPanel.GetComponent<Outline>();
-            bodyOutline.effectColor = new Color(0.42f, 0.23f, 0.48f, 0.9f);
-            bodyOutline.effectDistance = new Vector2(1f, -1f);
-
-            pageBody = CreateBodyText(bodyPanelRect);
-            previousButton = CreateButton(panelRect, "PreviousButton", "◀ 前へ", new Vector2(-210f, -195f), new Vector2(150f, 48f));
-            nextButton = CreateButton(panelRect, "NextButton", "次へ ▶", new Vector2(0f, -195f), new Vector2(150f, 48f));
-            closeButton = CreateButton(panelRect, "CloseButton", "閉じる", new Vector2(210f, -195f), new Vector2(150f, 48f));
+            pageNumber = CreateText(root, "PageNumber", string.Empty, new Vector2(330f, 262f), new Vector2(96f, 34f), 20f, TextAlignmentOptions.Center);
+            previousButton = CreateButton(root, "PreviousButton", "◀ 前へ", new Vector2(-210f, -250f), new Vector2(150f, 48f));
+            nextButton = CreateButton(root, "NextButton", "次へ ▶", new Vector2(0f, -250f), new Vector2(150f, 48f));
+            closeButton = CreateButton(root, "CloseButton", "閉じる", new Vector2(210f, -250f), new Vector2(150f, 48f));
 
             previousButton.onClick.AddListener(ShowPreviousPage);
             nextButton.onClick.AddListener(ShowNextPage);
             closeButton.onClick.AddListener(CloseArchive);
-        }
-
-        private TextMeshProUGUI CreateBodyText(RectTransform parent)
-        {
-            var text = CreateText(parent, "Body", string.Empty, Vector2.zero, new Vector2(592f, 240f), 20f, TextAlignmentOptions.TopLeft);
-            text.margin = new Vector4(0f, 0f, 0f, 0f);
-            text.enableWordWrapping = false;
-            text.lineSpacing = 5f;
-            // 800x600基準で検証済みの本文量を超えた場合も、枠の外へ文字を出さない。
-            text.overflowMode = TextOverflowModes.Ellipsis;
-            return text;
         }
 
         private Button CreateButton(RectTransform parent, string name, string label, Vector2 position, Vector2 size)
@@ -278,7 +209,7 @@ namespace KillingMahjong.UI
 
         private void ShowNextPage()
         {
-            if (pageIndex >= Pages.Length - 1) return;
+            if (pageIndex >= pages.Length - 1) return;
 
             pageIndex++;
             RefreshPage();
@@ -286,12 +217,11 @@ namespace KillingMahjong.UI
 
         private void RefreshPage()
         {
-            ArchivePage page = Pages[pageIndex];
-            pageTitle.text = page.Title;
-            pageBody.text = page.Body;
-            pageNumber.text = string.Format("{0} / {1}", pageIndex + 1, Pages.Length);
+            pageImage.sprite = pages.Length > 0 ? pages[pageIndex] : null;
+            pageImage.enabled = pages.Length > 0;
+            pageNumber.text = string.Format("{0} / {1}", pages.Length > 0 ? pageIndex + 1 : 0, pages.Length);
             SetPagingButtonEnabled(previousButton, pageIndex > 0);
-            SetPagingButtonEnabled(nextButton, pageIndex < Pages.Length - 1);
+            SetPagingButtonEnabled(nextButton, pageIndex < pages.Length - 1);
         }
 
         /// <summary>端のページで送りボタンを無効にする色（2026-09-23 に実機で見て足した）。</summary>
@@ -324,24 +254,6 @@ namespace KillingMahjong.UI
             Action callback = onClosed;
             onClosed = null;
             callback?.Invoke();
-        }
-
-        private static void ValidatePageBounds()
-        {
-            for (int i = 0; i < Pages.Length; i++)
-            {
-                string[] lines = Pages[i].Body.Split('\n');
-                int longestLine = 0;
-                for (int lineIndex = 0; lineIndex < lines.Length; lineIndex++)
-                {
-                    longestLine = Mathf.Max(longestLine, lines[lineIndex].Length);
-                }
-
-                if (lines.Length > MaximumLinesPerPage || longestLine > MaximumCharactersPerLine)
-                {
-                    Debug.LogError($"[TutorialArchiveUI] {i + 1}ページ目が表示枠の上限を超えています。");
-                }
-            }
         }
 
         private static void Stretch(RectTransform rect)
