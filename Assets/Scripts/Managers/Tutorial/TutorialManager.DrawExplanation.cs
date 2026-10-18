@@ -57,7 +57,7 @@ namespace KillingMahjong.Managers
         };
 
         /// <summary>
-        /// 「流局説明用UI」の**仮の板**。ボルテージのときと同じく、絵が届くまで「ここに入ります」とだけ出す。
+        /// 「流局説明用UI」の**控えの板**。絵（<see cref="DrawPanelSpritePath"/>）が読めなかったときだけ出る。
         /// 文面は企画の領分なので書かない。**AIで絵を描かないこと。**
         /// </summary>
         private const string DrawPanelTitle = "流局の説明";
@@ -67,8 +67,12 @@ namespace KillingMahjong.Managers
             "画像が届いたら差し替えます",
         };
 
-        /// <summary>流局説明用UIの絵。Resources 直下からの相対パス（拡張子なし）。まだ無いので null。</summary>
-        private const string DrawPanelSpritePath = null;
+        /// <summary>
+        /// 流局説明用UIの絵。Resources 直下からの相対パス（拡張子なし）。
+        /// 冒頭のルール説明で見せる「まとめ④ 流局と持ち越し」を、ここでも使ってよいと言われた（2026-10-18）。
+        /// 上の文字板は、絵が読めなかったときの控え。
+        /// </summary>
+        private const string DrawPanelSpritePath = "Tutorial/ゲームの流れ_まとめ4";
 
         private static readonly List<TutorialLine> DrawCannotPayLines = new List<TutorialLine>
         {

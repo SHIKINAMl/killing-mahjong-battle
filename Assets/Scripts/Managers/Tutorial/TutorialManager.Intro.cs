@@ -351,7 +351,11 @@ namespace KillingMahjong.Managers
                 imageRect.anchorMax = new Vector2(0.5f, 0.5f);
                 imageRect.anchoredPosition = new Vector2(0f, 30f);
                 // 元画像の縦横比のまま、画面に収まる大きさへ。
-                float scale = Mathf.Min(700f / board.rect.width, 450f / board.rect.height);
+                // 幅は 760 まで取る。まとめ④（722x418）を流局説明に流用したとき、700 だと等倍から少し縮んで
+                // ドットが不揃いになった。400x300 の絵は高さで決まるので、この幅では変わらない。
+                float scale = Mathf.Min(760f / board.rect.width, 450f / board.rect.height);
+                // 等倍に近い絵は等倍のまま（1.05倍などに引き伸ばすと、やはりドットが不揃いになる）
+                if (scale > 1f && scale < 1.25f) scale = 1f;
                 imageRect.sizeDelta = new Vector2(board.rect.width * scale, board.rect.height * scale);
 
                 var boardImage = image.GetComponent<Image>();
