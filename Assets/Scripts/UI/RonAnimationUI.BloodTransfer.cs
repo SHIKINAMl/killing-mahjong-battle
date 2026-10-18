@@ -278,24 +278,58 @@ namespace KillingMahjong.UI
         /// <summary>卓の真ん中（山牌の手前）。800x600 で下から 32% の高さ。</summary>
         private static Vector3 TablePoolPosition() => new Vector3(Screen.width * 0.5f, Screen.height * 0.32f, 0f);
 
+        // ホースの絵の位置（絵の左上を 0,0 とした割合）。血袋の絵のピクセルから測った（2026-10-18）。
+        // 相手: 点滴の下から伸びるピンクのチューブ。ENEHPUI_NO（640x2560）の x=300〜329、y=1942 から下の端まで
+        private static readonly Vector2 EnemyHoseMouthUv = new Vector2(0.491f, 0.759f);
+        // 自分: メーターの左上の針から右上へ伸びる黄色いホース。HPUI0heart（54x140）の (34,30)〜(53,17)
+        private static readonly Vector2 PlayerHoseMouthUv = new Vector2(0.63f, 0.21f);
+        private static readonly Vector2 PlayerHoseOuterUv = new Vector2(0.98f, 0.12f);
+
         /// <summary>
-        /// 血が流れ込む／出ていく所。**横はメーターの真ん中、高さは体力の欄の真ん中**（血袋の上のほう）。
+        /// 血袋のホース。<see cref="Mouth"/> は血袋につながっている所、<see cref="Outer"/> は血が宙へ出入りする所。
         ///
-        /// メーターの矩形はそのまま使えない。絵は縦に塗る量（fillAmount）で切っているだけで、
-        /// 矩形は血袋よりずっと高く、相手の血袋では上の縁が画面の外にあった。
-        /// 塗る量から水面を出しても、絵の中の袋は矩形の一部にしか描かれていないので合わない
-        /// （2026-10-18 の試写で、どちらも画面の上へ流れていった）。
+        /// **血袋の真ん中へ直接流していたのをやめた**（2026-10-18 のユーザー指示「ホースのところから流れ込んでる感じに」）。
         /// </summary>
-        private static Vector3 BagMouth(RectTransform gauge, RectTransform anchor)
+        private struct BagHose
         {
-            Rect g = ScreenRectOf(gauge);
-            Rect a = anchor != null ? ScreenRectOf(anchor) : g;
-            Vector3 p = new Vector3(g.center.x, a.center.y, 0f);
-            // 画面の外に出ている血袋（自分のメーターは右端で切れている）は、見えている所まで寄せる
-            float margin = Screen.width * 0.03f;
-            p.x = Mathf.Clamp(p.x, margin, Screen.width - margin);
-            p.y = Mathf.Clamp(p.y, margin, Screen.height - margin);
-            return p;
+            public Vector3 Mouth, Outer;
+        }
+
+        /// <summary>メーターの絵の中の点（左上が 0,0 の割合）を画面座標にする。縦横比を保つ設定なら、その余白も除く。</summary>
+        private static Vector3 GaugePoint(RectTransform gauge, Vector2 uv)
+        {
+            Rect r = ScreenRectOf(gauge);
+            var img = gauge.GetComponent<Image>();
+            if (img != null && img.preserveAspect && img.sprite != null && r.width > 0f && r.height > 0f)
+            {
+                float aspect = img.sprite.rect.width / img.sprite.rect.height;
+                if (r.width / r.height > aspect)
+                {
+                    float w = r.height * aspect;
+                    r = new Rect(r.center.x - w * 0.5f, r.y, w, r.height);
+                }
+                else
+                {
+                    float h = r.width / aspect;
+                    r = new Rect(r.x, r.center.y - h * 0.5f, r.width, h);
+                }
+            }
+            return new Vector3(r.xMin + uv.x * r.width, r.yMax - uv.y * r.height, 0f);
+        }
+
+        /// <summary>
+        /// 相手のチューブは牌の裏を通って卓へ下りている。卓の血だまりの高さを、宙へ出入りする所にする。
+        /// 自分のホースは右上へ伸びて画面の外へ出るので、見えている端を出入りする所にする。
+        /// </summary>
+        private static BagHose HoseOf(bool enemy, RectTransform gauge, Vector3 poolPos)
+        {
+            if (enemy)
+            {
+                Vector3 mouth = GaugePoint(gauge, EnemyHoseMouthUv);
+                Vector3 bottom = GaugePoint(gauge, new Vector2(EnemyHoseMouthUv.x, 1f));
+                return new BagHose { Mouth = mouth, Outer = new Vector3(mouth.x, Mathf.Clamp(poolPos.y, bottom.y, mouth.y), 0f) };
+            }
+            return new BagHose { Mouth = GaugePoint(gauge, PlayerHoseMouthUv), Outer = GaugePoint(gauge, PlayerHoseOuterUv) };
         }
 
         /// <summary>
@@ -317,27 +351,24 @@ namespace KillingMahjong.UI
             RectTransform winnerGauge = mineWins
                 ? (playerInfo != null ? playerInfo.HpGaugeAnchor : null)
                 : (enemyInfo != null ? enemyInfo.HpGaugeAnchor : null);
-            RectTransform winnerAnchor = mineWins
-                ? (playerInfo != null ? playerInfo.HpAnchor : null)
-                : (enemyInfo != null ? enemyInfo.HpAnchor : null);
             RectTransform loserGauge = mineWins
                 ? (enemyInfo != null ? enemyInfo.HpGaugeAnchor : null)
                 : (playerInfo != null ? playerInfo.HpGaugeAnchor : null);
-            RectTransform loserAnchor = mineWins
-                ? (enemyInfo != null ? enemyInfo.HpAnchor : null)
-                : (playerInfo != null ? playerInfo.HpAnchor : null);
             int loserDelta = mineWins ? s.TheirShownDelta : s.MyShownDelta;
             int winnerDelta = mineWins ? s.MyShownDelta : s.TheirShownDelta;
             if (winnerGauge == null) return list;
 
-            Vector3 mouth = BagMouth(winnerGauge, winnerAnchor);
+            Vector3 poolPos = pool != null ? pool.transform.position : TablePoolPosition();
+            BagHose winnerHose = HoseOf(!mineWins, winnerGauge, poolPos);
             // 太さは勝った側に入る額で決める（満貫 2000 前後で 1、大きい手ほど太い）
             float thick = Mathf.Lerp(0.8f, 2f, Mathf.Clamp01(winnerDelta / 12000f));
 
             if (pool != null)
             {
-                list.Add(Effects.BloodStreamEffect.Pour(stageRt, pool.transform.position, mouth,
-                                                        BloodStreamSeconds, arc: 70f, thickness: thick));
+                // 自分のホースは上から入るので高く弧を描く。相手のチューブは卓の上を横へ這わせる
+                list.Add(Effects.BloodStreamEffect.Pour(stageRt, poolPos, winnerHose.Mouth,
+                                                        BloodStreamSeconds, arc: mineWins ? 150f : 24f, thickness: thick,
+                                                        enterHoseAt: winnerHose.Outer));
                 pool.SetTarget(0f);
             }
 
@@ -346,10 +377,11 @@ namespace KillingMahjong.UI
             // 卓の血だまりを通して勝った側へ渡すので、「血は場を通って奪われる」形にもそろう
             if (loserDelta < 0 && loserGauge != null)
             {
-                Vector3 poolPos = pool != null ? pool.transform.position : TablePoolPosition();
-                list.Add(Effects.BloodStreamEffect.Pour(stageRt, BagMouth(loserGauge, loserAnchor), poolPos,
-                                                        BloodStreamSeconds, arc: 40f,
-                                                        thickness: Mathf.Lerp(0.7f, 1.8f, Mathf.Clamp01(-loserDelta / 12000f))));
+                BagHose loserHose = HoseOf(mineWins, loserGauge, poolPos);
+                list.Add(Effects.BloodStreamEffect.Pour(stageRt, loserHose.Mouth, poolPos,
+                                                        BloodStreamSeconds, arc: mineWins ? 24f : 150f,
+                                                        thickness: Mathf.Lerp(0.7f, 1.8f, Mathf.Clamp01(-loserDelta / 12000f)),
+                                                        leaveHoseAt: loserHose.Outer));
             }
             return list;
         }

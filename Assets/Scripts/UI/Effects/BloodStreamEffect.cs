@@ -21,6 +21,10 @@ namespace KillingMahjong.UI.Effects
     ///   ・終点では跳ねが出続ける
     /// 座標はグリッドに量子化し、色は数色だけにする（なめらかにしない）。
     ///
+    /// **血袋に出入りするときはホースを通す**（同日のユーザー指示「ホースのところから流れ込んでる感じに」）。
+    /// 血袋の真ん中へ直接刺さっていたのをやめ、宙を飛ぶ部分のあとに、ホースの絵に沿ったまっすぐな区間をつなぐ。
+    /// ホースの中は細く（絵のホースの太さ）、うねらせない。ホースが赤く染まっていくように見える。
+    ///
     /// 位置はすべて**ワールド座標（Overlay ならスクリーン座標）**で受け取る。
     /// 入れ物は呼び出し側の全画面の RectTransform を使う。
     /// </summary>
@@ -59,7 +63,13 @@ namespace KillingMahjong.UI.Effects
         private readonly List<Image> dots = new List<Image>();
         private readonly List<Splash> splashes = new List<Splash>();
         private RectTransform stage;
-        private Vector2 from, to, control;
+        private Vector2 from, to;
+        // 経路を細かい点に分けたもの。累積の長さで 0〜1 の位置から引く
+        private readonly List<Vector2> pathPts = new List<Vector2>();
+        private readonly List<float> pathLen = new List<float>();
+        private readonly List<bool> pathHose = new List<bool>();
+        private float totalLength;
+        private bool endsInHose;
         private float pourSeconds, elapsed, scale, width, splashCarry;
         private bool running;
 
@@ -77,9 +87,13 @@ namespace KillingMahjong.UI.Effects
         /// <paramref name="fromWorld"/> から <paramref name="toWorld"/> へ、<paramref name="seconds"/> 秒のあいだ血を流す。
         /// <paramref name="arc"/> は弧の高さ（800x600 基準の px、正で上へふくらむ）。
         /// <paramref name="thickness"/> は筋の太さの倍率（額が大きいほど太くする）。0.6〜2.2。
+        ///
+        /// <paramref name="leaveHoseAt"/> を渡すと、始点（血袋の口）からそこまではホースの中を流れ、そこから宙へ出る。
+        /// <paramref name="enterHoseAt"/> を渡すと、宙からそこでホースに入り、終点（血袋の口）までホースの中を流れる。
         /// </summary>
         public static BloodStreamEffect Pour(RectTransform stage, Vector3 fromWorld, Vector3 toWorld,
-                                             float seconds, float arc = 60f, float thickness = 1f)
+                                             float seconds, float arc = 60f, float thickness = 1f,
+                                             Vector3? leaveHoseAt = null, Vector3? enterHoseAt = null)
         {
             if (stage == null) return null;
             var go = new GameObject("BloodStream", typeof(RectTransform));
@@ -95,8 +109,7 @@ namespace KillingMahjong.UI.Effects
             fx.scale = canvas != null ? Mathf.Max(0.25f, canvas.rootCanvas.transform.lossyScale.x) : 1f;
             fx.from = fromWorld;
             fx.to = toWorld;
-            Vector2 mid = (fx.from + fx.to) * 0.5f;
-            fx.control = mid + Vector2.up * arc * fx.scale;
+            fx.BuildPath(arc, leaveHoseAt, enterHoseAt);
             fx.pourSeconds = Mathf.Max(0.05f, seconds);
             fx.width = Mathf.Clamp(thickness, 0.6f, 2.2f);
             fx.running = true;
@@ -109,11 +122,52 @@ namespace KillingMahjong.UI.Effects
             while (this != null && running) yield return null;
         }
 
-        private Vector2 PathPoint(float t)
+        /// <summary>ホースの区間（直線）＋ 宙の区間（弧）＋ ホースの区間（直線）を、細かい点の列にする。</summary>
+        private void BuildPath(float arc, Vector3? leaveHoseAt, Vector3? enterHoseAt)
         {
-            float u = 1f - t;
-            return u * u * from + 2f * u * t * control + t * t * to;
+            Vector2 airFrom = leaveHoseAt.HasValue ? (Vector2)leaveHoseAt.Value : from;
+            Vector2 airTo = enterHoseAt.HasValue ? (Vector2)enterHoseAt.Value : to;
+            endsInHose = enterHoseAt.HasValue;
+
+            if (leaveHoseAt.HasValue) AddLine(from, airFrom, true);
+            Vector2 control = (airFrom + airTo) * 0.5f + Vector2.up * arc * scale;
+            const int airSteps = 32;
+            for (int i = pathPts.Count == 0 ? 0 : 1; i <= airSteps; i++)
+            {
+                float t = i / (float)airSteps, u = 1f - t;
+                AddPoint(u * u * airFrom + 2f * u * t * control + t * t * airTo, false);
+            }
+            if (enterHoseAt.HasValue) AddLine(airTo, to, true);
+            totalLength = pathLen[pathLen.Count - 1];
         }
+
+        private void AddLine(Vector2 a, Vector2 b, bool hose)
+        {
+            int steps = Mathf.Max(1, Mathf.CeilToInt(Vector2.Distance(a, b) / (Grid * scale)));
+            for (int i = pathPts.Count == 0 ? 0 : 1; i <= steps; i++) AddPoint(Vector2.Lerp(a, b, i / (float)steps), hose);
+        }
+
+        private void AddPoint(Vector2 p, bool hose)
+        {
+            pathLen.Add(pathPts.Count == 0 ? 0f : pathLen[pathLen.Count - 1] + Vector2.Distance(pathPts[pathPts.Count - 1], p));
+            pathPts.Add(p);
+            pathHose.Add(hose);
+        }
+
+        /// <summary>経路上の位置 0〜1（長さの割合）の点。<paramref name="inHose"/> はホースの中か。</summary>
+        private Vector2 PathPoint(float t, out bool inHose)
+        {
+            float d = Mathf.Clamp01(t) * totalLength;
+            int i = 1;
+            while (i < pathLen.Count - 1 && pathLen[i] < d) i++;
+            float seg = pathLen[i] - pathLen[i - 1];
+            float k = seg > 1e-5f ? (d - pathLen[i - 1]) / seg : 1f;
+            // 区間の境目では、先の区間（ホースに入ったら細く）を優先する
+            inHose = pathHose[i];
+            return Vector2.Lerp(pathPts[i - 1], pathPts[i], k);
+        }
+
+        private Vector2 PathPoint(float t) => PathPoint(t, out _);
 
         private Vector2 Snap(Vector2 p)
         {
@@ -146,12 +200,12 @@ namespace KillingMahjong.UI.Effects
 
             // 経路の長さから、1グリッドおきに点を置く数を決める
             float g = Grid * scale;
-            float length = 0f;
-            Vector2 prev = from;
-            for (int i = 1; i <= 16; i++) { var p = PathPoint(i / 16f); length += Vector2.Distance(prev, p); prev = p; }
+            float length = totalLength;
             int along = Mathf.Max(2, Mathf.CeilToInt(length * Mathf.Max(0f, head - tail) / g));
             // 太さは横に並べる点の数。真ん中ほど濃い
             int across = width < 0.9f ? 2 : width < 1.4f ? 3 : 4;
+            // ホースの中は絵のホースの太さ（1〜2点）にする
+            int hoseAcross = width < 1.4f ? 1 : 2;
             int need = head > tail ? along * across : 0;
             while (dots.Count < need) dots.Add(NewDot());
 
@@ -159,28 +213,30 @@ namespace KillingMahjong.UI.Effects
             for (int i = 0; i < along && need > 0; i++)
             {
                 float u = Mathf.Lerp(tail, head, along == 1 ? 1f : i / (float)(along - 1));
-                Vector2 p = PathPoint(u);
+                Vector2 p = PathPoint(u, out bool inHose);
                 Vector2 tangent = PathPoint(Mathf.Min(1f, u + 0.01f)) - PathPoint(Mathf.Max(0f, u - 0.01f));
                 Vector2 normal = tangent.sqrMagnitude > 1e-6f ? new Vector2(-tangent.y, tangent.x).normalized : Vector2.up;
-                // 液体らしく少しうねる。うねりも終点へ流れていく
-                p += normal * Mathf.Sin(u * 18f - elapsed * 14f) * g * 0.35f;
+                // 液体らしく少しうねる。うねりも終点へ流れていく。ホースの中はうねらない
+                if (!inHose) p += normal * Mathf.Sin(u * 18f - elapsed * 14f) * g * 0.35f;
+                int n = inHose ? hoseAcross : across;
 
                 // 明るい帯が終点へ走る。先頭の数マスは明るく
                 float band = Mathf.Repeat(u * 3f - elapsed * BandSpeed, 1f);
                 bool tip = head - u < 0.04f && head < 1f;
-                for (int k = 0; k < across; k++)
+                for (int k = 0; k < n; k++)
                 {
                     var img = dots[used++];
                     img.gameObject.SetActive(true);
-                    float off = (k - (across - 1) * 0.5f) * g;
+                    float off = (k - (n - 1) * 0.5f) * g;
                     img.rectTransform.position = Snap(p + normal * off);
-                    bool edge = across > 1 && (k == 0 || k == across - 1);
+                    bool edge = !inHose && n > 1 && (k == 0 || k == n - 1);
                     img.color = tip ? Bright : band < 0.18f ? Bright : edge ? Dark : Body;
                 }
             }
             for (int i = used; i < dots.Count; i++) dots[i].gameObject.SetActive(false);
 
-            UpdateSplashes(dt, head >= 1f && tail < 1f);
+            // ホースから血袋へ入るときは跳ねない（中へ吸い込まれる）
+            UpdateSplashes(dt, head >= 1f && tail < 1f && !endsInHose);
 
             if (tail >= 1f && splashes.Count == 0)
             {
