@@ -10,14 +10,24 @@ namespace KillingMahjong.UI.Effects
     /// <summary>
     /// ロン入力直後の手振り、破裂吹き出し、体力表示の揺れ。
     /// 画面、盤面、立ち絵には ScreenQuake / ScreenFlash を使わない。
+    /// 勢いは吹き出しの叩きつけ・集中線・音・体力表示の揺れで出す（2026-10-18）。
     /// </summary>
     public static class RonImpactEffect
     {
         private const float HandFrameSeconds = 0.22f;
         private const float HandRiseSeconds = 0.14f;
-        private const float HpShakeSeconds = 0.30f;
-        private const float CalloutHoldSeconds = 0.56f;
-        private const float HpShakePixels = 12f;
+        // 2026-10-18「自分からロンする時の勢いも強くして」で、揺れと間を大きくした（前は 0.30秒 / 0.56秒 / 12px）
+        private const float HpShakeSeconds = 0.45f;
+        private const float CalloutHoldSeconds = 0.85f;
+        private const float HpShakePixels = 22f;
+
+        /// <summary>吹き出しを叩きつけるときの、出始めの大きさ（倍）と、そこから落ちる時間。</summary>
+        private const float SlamFromScale = 2.4f;
+        private const float SlamSeconds = 0.06f;
+        /// <summary>当たった瞬間に潰れた形で止める時間（ヒットストップ）。</summary>
+        private const float HitStopSeconds = 0.07f;
+        /// <summary>吹き出しの震えの幅[px]。だんだん収まる。</summary>
+        private const float CalloutTremblePixels = 6f;
 
         private static readonly string[] HandFrameNames =
         {
@@ -79,8 +89,17 @@ namespace KillingMahjong.UI.Effects
                 new Rect(0f, 0f, burstTexture.width, burstTexture.height),
                 new Vector2(0.5f, 0.5f),
                 100f);
-            CreateBurstCallout(overlayRt, burstSprite);
-            if (audio != null) audio.PlayRonInputRon();
+            // 集中線は手と吹き出しの奥。吹き出しへ向けて集める
+            var lines = CreateFocusLines(overlayRt);
+            RectTransform callout = CreateBurstCallout(overlayRt, burstSprite);
+
+            // 吹き出し・声・ドン・揺れを**同じ1コマに揃える**
+            if (audio != null)
+            {
+                audio.PlayRonInputRon();
+                audio.PlayStinger("br_blackout");
+                audio.PlayStinger("se_skill_strike");
+            }
 
             if (hpPanels != null)
             {
@@ -91,11 +110,83 @@ namespace KillingMahjong.UI.Effects
                 }
             }
 
-            yield return new WaitForSeconds(CalloutHoldSeconds);
+            yield return SlamCallout(callout, lines, CalloutHoldSeconds);
             Object.Destroy(overlay);
             if (handSprite != null) Object.Destroy(handSprite);
             Object.Destroy(burstSprite);
             Object.Destroy(burstTexture);
+        }
+
+        /// <summary>
+        /// 吹き出しを大きいところから叩きつけ、潰れた形で一瞬止めてから、震わせながら収める。
+        /// 吹き出しの中だけを白く光らせる（画面全体は光らせない）。
+        /// </summary>
+        private static IEnumerator SlamCallout(RectTransform callout, Effects.PerspectiveFocusLines lines, float total)
+        {
+            Image inner = callout.Find("RonBurstInner")?.GetComponent<Image>();
+            Color innerColor = inner != null ? inner.color : Color.white;
+            if (inner != null) inner.color = Color.white;
+            if (lines != null) lines.Progress = 1f;
+            Vector2 home = callout.anchoredPosition;
+
+            float t = 0f;
+            while (t < SlamSeconds)
+            {
+                float k = t / SlamSeconds;
+                callout.localScale = Vector3.one * Mathf.Lerp(SlamFromScale, 1f, k * k);
+                t += Time.deltaTime;
+                yield return null;
+            }
+
+            // ヒットストップ。潰れた形のまま止める
+            callout.localScale = new Vector3(1.12f, 0.86f, 1f);
+            yield return new WaitForSeconds(HitStopSeconds);
+
+            float rest = Mathf.Max(0.1f, total - SlamSeconds - HitStopSeconds);
+            float nextJitter = 0f;
+            Vector2 jitter = Vector2.zero;
+            t = 0f;
+            while (t < rest && callout != null)
+            {
+                float k = Mathf.Clamp01(t / rest);
+                // 少し行き過ぎてから戻る
+                float settle = Mathf.Clamp01(t / 0.16f);
+                float over = Mathf.Sin(settle * Mathf.PI) * 0.08f;
+                callout.localScale = Vector3.Lerp(new Vector3(1.12f, 0.86f, 1f), Vector3.one, settle) + Vector3.one * over;
+                if (inner != null) inner.color = Color.Lerp(Color.white, innerColor, Mathf.Clamp01(t / 0.12f));
+                if (lines != null) lines.Progress = Mathf.Lerp(1f, 0f, Mathf.Clamp01(t / 0.5f));
+
+                // 震えはコマ打ち（毎秒15回）
+                if (t >= nextJitter)
+                {
+                    float amp = CalloutTremblePixels * (1f - k);
+                    jitter = new Vector2(Mathf.Round(Random.Range(-amp, amp)), Mathf.Round(Random.Range(-amp, amp)));
+                    nextJitter = t + 1f / 15f;
+                }
+                callout.anchoredPosition = home + jitter;
+
+                t += Time.deltaTime;
+                yield return null;
+            }
+        }
+
+        /// <summary>吹き出しへ向かう集中線。手と吹き出しより奥に置く。</summary>
+        private static Effects.PerspectiveFocusLines CreateFocusLines(RectTransform overlay)
+        {
+            var go = new GameObject("RonFocusLines", typeof(RectTransform));
+            go.transform.SetParent(overlay, false);
+            go.transform.SetAsFirstSibling();
+            var rt = (RectTransform)go.transform;
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = rt.offsetMax = Vector2.zero;
+            var lines = go.AddComponent<Effects.PerspectiveFocusLines>();
+            lines.raycastTarget = false;
+            Canvas.ForceUpdateCanvases();
+            float w = Mathf.Max(1f, rt.rect.width);
+            lines.Setup(BurstPosition, new Vector2(190f, 150f), w / 800f);
+            lines.Progress = 0f;
+            return lines;
         }
 
         private static IEnumerator RaiseHandFromBottom(RectTransform hand)
@@ -145,9 +236,17 @@ namespace KillingMahjong.UI.Effects
             return image;
         }
 
-        private static void CreateBurstCallout(RectTransform parent, Sprite burstSprite)
+        /// <summary>吹き出しの中心。画面中央からのずれ。</summary>
+        private static readonly Vector2 BurstPosition = new Vector2(202f, 62f);
+
+        /// <summary>吹き出しを1つの入れ物にまとめて作る。叩きつけと震えは入れ物ごと動かす。</summary>
+        private static RectTransform CreateBurstCallout(RectTransform root, Sprite burstSprite)
         {
-            Vector2 position = new Vector2(202f, 62f);
+            var group = new GameObject("RonBurst", typeof(RectTransform));
+            group.transform.SetParent(root, false);
+            var parent = (RectTransform)group.transform;
+            SetRect(parent, BurstPosition, new Vector2(292f, 234f));
+            Vector2 position = Vector2.zero;
 
             Image outline = CreateImage("RonBurstOutline", parent);
             outline.sprite = burstSprite;
@@ -163,14 +262,19 @@ namespace KillingMahjong.UI.Effects
             textObject.transform.SetParent(parent, false);
             TextMeshProUGUI text = textObject.GetComponent<TextMeshProUGUI>();
             text.text = "\u30ed\u30f3!!!";
-            text.fontSize = 57f;
+            // **吹き出しの白の中に収める。** 57 固定だと「ロ」が左へはみ出して赤い背景に沈み、
+            // 最後の「!」も切れていた（2026-10-18 の録画で確認。「コン!!」に見えた）
+            text.enableAutoSizing = true;
+            text.fontSizeMax = 57f;
+            text.fontSizeMin = 28f;
             text.fontStyle = FontStyles.Bold;
             text.color = new Color32(46, 17, 24, 255);
             text.alignment = TextAlignmentOptions.Center;
             text.enableWordWrapping = false;
             text.raycastTarget = false;
-            SetRect(text.rectTransform, position, new Vector2(230f, 138f));
+            SetRect(text.rectTransform, position, new Vector2(176f, 110f));
             text.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -5f);
+            return parent;
         }
 
         private static void SetRect(RectTransform rect, Vector2 position, Vector2 size)
