@@ -57,6 +57,9 @@ namespace KillingMahjong.UI
             }
         }
 
+        /// <summary>相手のロンのカットインで使う顔。キャラ設定の faceSprites の ID。</summary>
+        private const string EnemyRonFaceId = "キメ顔";
+
         private IEnumerator SequenceRoutine(List<int> handTiles, int ronTile, List<string> yakuList, string formula, string rankName, int score, bool isLocalPlayerWin,
             PlayerInfoUI playerInfo, EnemyInfoUI enemyInfo, int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp, System.Action onComplete,
             string scoreFormula, RonSettlementInfo settlement = null,
@@ -94,7 +97,10 @@ namespace KillingMahjong.UI
                 winnerSprite = enemyInfo.CurrentCharacterData.normalSprite;
                 if (enemyInfo.CurrentCharacterData.faceSprites != null && enemyInfo.CurrentCharacterData.faceSprites.Count > 0)
                 {
-                    var match = enemyInfo.CurrentCharacterData.faceSprites.Find(x => x.id == enemyInfo.CurrentCharacterData.defaultFaceId);
+                    // 相手のロンは威圧の見せ場なので、キメ顔（牙を見せて笑う顔）で叩きつける（2026-10-18）。
+                    // その顔が無いキャラは、いつもの顔のまま
+                    var match = enemyInfo.CurrentCharacterData.faceSprites.Find(x => x.id == EnemyRonFaceId)
+                             ?? enemyInfo.CurrentCharacterData.faceSprites.Find(x => x.id == enemyInfo.CurrentCharacterData.defaultFaceId);
                     faceSprite = match != null ? match.sprite : enemyInfo.CurrentCharacterData.faceSprites[0].sprite;
                 }
             }
@@ -103,11 +109,8 @@ namespace KillingMahjong.UI
             // ここで同じ内容のカットインを重ねず、役表示へ直行する。
             if (!isLocalPlayerWin && winnerSprite != null)
             {
-                // カットインと同時に「ロン！」ボイスを再生
-                if (KillingMahjong.Managers.AudioManager.Instance != null)
-                {
-                    KillingMahjong.Managers.AudioManager.Instance.PlayRonVoice();
-                }
+                // **「ロン！」の声もカットインの中で鳴らす（2026-10-18 に移した）。**
+                // カットインの頭に「溜め」が入ったので、ここで鳴らすと叩きつける前に声が出てしまう。
 
                 // **揺れはカットインの中で鳴らす（2026-09-15 に移した）。**
                 // ここで鳴らすと、帯が出てくる途中で揺れ終わってしまう。
