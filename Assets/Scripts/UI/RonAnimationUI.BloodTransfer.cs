@@ -147,6 +147,13 @@ namespace KillingMahjong.UI
             flyRt.localScale = Vector3.one;
             if (panelContainer != null) Destroy(panelContainer);
 
+            // **場に出ていた血を、卓の上の血だまりとして見せる（2026-10-18）。**
+            // 「血を掛け合っている」ことを形で見せるため。数字の下、卓の真ん中に広がる。
+            // 大きさは場の血の額で決める（両者の賭け金の合計。8000 で最大）
+            var pool = Effects.BloodPoolEffect.Create(stageRt, TablePoolPosition());
+            pool.transform.SetAsFirstSibling();
+            pool.SetTarget(Mathf.Clamp(PoolAmountFor(s.MyBet + s.TheirBet), 0.25f, 1f));
+
             // ② 数値が変わる。**潰れきった瞬間に入れ替える**ので、途中の混ざった数字が読めてしまわない
             string landed = FormatDelta(toValue);
             bool swapped = false;
@@ -192,6 +199,11 @@ namespace KillingMahjong.UI
             // **飛ぶ数字の色は自分が #57C7E8、相手が #F2705A で、どちらも着地先とほぼ同じ色**なので、
             // 素の色のまま落とすと最後の数桁が背景に溶けて、いちばん見せたい着弾が読めなくなる。
             // 黒縁を太くするのは**ドット絵の細い字には効かない**ので採らなかった。
+            //
+            // **数字と一緒に、血が勝った側の血袋へ流れ込む（2026-10-18）。**
+            // 場の血だまりから勝った側へ。負けた側が賭け金より多く失うときは、その血袋からも勝った側へ流す。
+            // メーターが動く間（④）も流し続ける
+            var streams = StartBloodStreams(stageRt, pool, s, playerInfo, enemyInfo);
             const float diveTime = 0.30f;
             for (float t = 0; t < diveTime; t += Time.deltaTime)
             {
@@ -245,11 +257,101 @@ namespace KillingMahjong.UI
 
             // 読み切るための間。**実機で見て一番余っていたので 1.00 → 0.50 に詰めた（8/29）**
             yield return new WaitForSeconds(0.5f);
+            // 血の最後の一滴が届くまで待つ（入れ物ごと消すと途中で消える）
+            foreach (var stream in streams)
+                if (stream != null) yield return stream.WaitDone();
 
             if (playerInfo != null) playerInfo.SuppressHpPopup = false;
             if (enemyInfo != null) enemyInfo.SuppressHpPopup = false;
             Destroy(stage);
             yield return new WaitForSeconds(0.2f);
+        }
+
+        /// <summary>血が流れている長さ[秒]。数字が落ちる 0.30秒と、メーターが動く 0.8秒に合わせる。</summary>
+        private const float BloodStreamSeconds = 1.0f;
+
+        /// <summary>この額（両者の賭け金の合計）で、卓の血だまりがいちばん大きくなる。</summary>
+        private const int PoolFullAmount = 8000;
+
+        private static float PoolAmountFor(int pot) => Mathf.Clamp01(pot / (float)PoolFullAmount);
+
+        /// <summary>卓の真ん中（山牌の手前）。800x600 で下から 32% の高さ。</summary>
+        private static Vector3 TablePoolPosition() => new Vector3(Screen.width * 0.5f, Screen.height * 0.32f, 0f);
+
+        /// <summary>
+        /// 血が流れ込む／出ていく所。**横はメーターの真ん中、高さは体力の欄の真ん中**（血袋の上のほう）。
+        ///
+        /// メーターの矩形はそのまま使えない。絵は縦に塗る量（fillAmount）で切っているだけで、
+        /// 矩形は血袋よりずっと高く、相手の血袋では上の縁が画面の外にあった。
+        /// 塗る量から水面を出しても、絵の中の袋は矩形の一部にしか描かれていないので合わない
+        /// （2026-10-18 の試写で、どちらも画面の上へ流れていった）。
+        /// </summary>
+        private static Vector3 BagMouth(RectTransform gauge, RectTransform anchor)
+        {
+            Rect g = ScreenRectOf(gauge);
+            Rect a = anchor != null ? ScreenRectOf(anchor) : g;
+            Vector3 p = new Vector3(g.center.x, a.center.y, 0f);
+            // 画面の外に出ている血袋（自分のメーターは右端で切れている）は、見えている所まで寄せる
+            float margin = Screen.width * 0.03f;
+            p.x = Mathf.Clamp(p.x, margin, Screen.width - margin);
+            p.y = Mathf.Clamp(p.y, margin, Screen.height - margin);
+            return p;
+        }
+
+        /// <summary>
+        /// 場の血だまり → 勝った側、と、負けた側の血袋 → 勝った側、の血の筋を流し始める。
+        /// どちらも勝っていない（増えた側がいない）ときは何も流さない。
+        /// </summary>
+        private List<Effects.BloodStreamEffect> StartBloodStreams(RectTransform stageRt, Effects.BloodPoolEffect pool,
+            RonSettlementInfo s, PlayerInfoUI playerInfo, EnemyInfoUI enemyInfo)
+        {
+            var list = new List<Effects.BloodStreamEffect>();
+            bool mineWins = s.MyShownDelta > 0;
+            bool theirsWins = s.TheirShownDelta > 0;
+            if (!mineWins && !theirsWins)
+            {
+                if (pool != null) pool.SetTarget(0f);
+                return list;
+            }
+
+            RectTransform winnerGauge = mineWins
+                ? (playerInfo != null ? playerInfo.HpGaugeAnchor : null)
+                : (enemyInfo != null ? enemyInfo.HpGaugeAnchor : null);
+            RectTransform winnerAnchor = mineWins
+                ? (playerInfo != null ? playerInfo.HpAnchor : null)
+                : (enemyInfo != null ? enemyInfo.HpAnchor : null);
+            RectTransform loserGauge = mineWins
+                ? (enemyInfo != null ? enemyInfo.HpGaugeAnchor : null)
+                : (playerInfo != null ? playerInfo.HpGaugeAnchor : null);
+            RectTransform loserAnchor = mineWins
+                ? (enemyInfo != null ? enemyInfo.HpAnchor : null)
+                : (playerInfo != null ? playerInfo.HpAnchor : null);
+            int loserDelta = mineWins ? s.TheirShownDelta : s.MyShownDelta;
+            int winnerDelta = mineWins ? s.MyShownDelta : s.TheirShownDelta;
+            if (winnerGauge == null) return list;
+
+            Vector3 mouth = BagMouth(winnerGauge, winnerAnchor);
+            // 太さは勝った側に入る額で決める（満貫 2000 前後で 1、大きい手ほど太い）
+            float thick = Mathf.Lerp(0.8f, 2f, Mathf.Clamp01(winnerDelta / 12000f));
+
+            if (pool != null)
+            {
+                list.Add(Effects.BloodStreamEffect.Pour(stageRt, pool.transform.position, mouth,
+                                                        BloodStreamSeconds, arc: 70f, thickness: thick));
+                pool.SetTarget(0f);
+            }
+
+            // 負けた側が賭け金より多く失う（倍率が掛かった）ときは、その血袋からも卓へ流す。
+            // **血袋から血袋へ直接流すと、筋がキャラの顔を横切った**（2026-10-18 の試写）。
+            // 卓の血だまりを通して勝った側へ渡すので、「血は場を通って奪われる」形にもそろう
+            if (loserDelta < 0 && loserGauge != null)
+            {
+                Vector3 poolPos = pool != null ? pool.transform.position : TablePoolPosition();
+                list.Add(Effects.BloodStreamEffect.Pour(stageRt, BagMouth(loserGauge, loserAnchor), poolPos,
+                                                        BloodStreamSeconds, arc: 40f,
+                                                        thickness: Mathf.Lerp(0.7f, 1.8f, Mathf.Clamp01(-loserDelta / 12000f))));
+            }
+            return list;
         }
     }
 }
