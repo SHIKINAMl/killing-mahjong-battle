@@ -241,6 +241,9 @@ namespace KillingMahjong.Managers
         public List<TutorialLine> endingLines = new List<TutorialLine>();
         public string titleSceneName = "タイトルシーン";
 
+        [Header("● セリフを変える ─ マルチモード導入・復活")]
+        public TutorialRevivalData revival = new TutorialRevivalData();
+
 
         /// <summary>
         /// `Resources/TutorialLines` があればセリフを差し替える。無ければ何もしない。

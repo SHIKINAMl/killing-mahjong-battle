@@ -139,6 +139,12 @@ namespace KillingMahjong.Managers.Tutorial
             }
 
             VisitList("ending", scenario.endingLines, visit);
+            if (scenario.revival != null)
+            {
+                VisitList("revival.enemyLines", scenario.revival.enemyLines, visit);
+                VisitList("revival.monologueLines", scenario.revival.monologueLines, visit);
+                VisitList("revival.beruruLines", scenario.revival.beruruLines, visit);
+            }
         }
 
         private static void VisitList(string listId, List<TutorialLine> lines, Action<string, TutorialLine> visit)

@@ -142,6 +142,16 @@ namespace KillingMahjong.UI
                     try { yield return tutorialEnding.Play(rig.font, true); }
                     finally { if (tutorialEnding != null) tutorialEnding.Close(); }
                     break;
+                case TutorialRevivalUI.EffectId:
+                    var revival = TutorialRevivalUI.Create(transform);
+                    scope.AddCleanup(() => { if (revival != null) revival.Close(); });
+                    try
+                    {
+                        yield return revival.Play(new KillingMahjong.Managers.TutorialRevivalData(), rig.font, true);
+                        yield return revival.PlayTitleReturn(null);
+                    }
+                    finally { if (revival != null) revival.Close(); }
+                    break;
                 case TutorialDrawReplayUI.ContinuationEffectId:
                     var continuedReplay = TutorialDrawReplayUI.Create(transform);
                     try { yield return continuedReplay.PlayContinuation(true); }

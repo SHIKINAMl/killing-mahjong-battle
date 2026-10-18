@@ -228,6 +228,7 @@ namespace KillingMahjong.Managers
 
         public void StartTutorialFrom(int roundIndex)
         {
+            CloseRevivalFinale();
             _scenario = scenario != null ? scenario : TutorialScenario.BuildDefault();
             _scenario.Validate();
 
@@ -278,6 +279,7 @@ namespace KillingMahjong.Managers
         /// <summary>チュートリアルを打ち切ってタイトルへ戻す（スキップボタン用）。</summary>
         public void SkipTutorial()
         {
+            CloseRevivalFinale();
             KillingMahjong.UI.TutorialNavigation.Cancel();
             _aborted = true;
             RestoreIntroSettings();

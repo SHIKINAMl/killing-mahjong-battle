@@ -117,7 +117,7 @@ namespace KillingMahjong.Managers
                 yield return PlayLines(new List<TutorialLine> {
                     new TutorialLine("たかだか他人の死に熱くなりすぎなのよね"),
                 });
-                // 遷移先のマルチモード用ページは空。旧局・旧エンディングへは進めない。
+                yield return RunRevivalFinale();
             }
             finally
             {

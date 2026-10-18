@@ -54,11 +54,21 @@ namespace KillingMahjong.UI
                     SceneManager.LoadScene(RoomSceneName);
                     return; // 移動先の Start がローディングを閉じる。
                 }
+                else if (tutorialReturn == TutorialNavigation.RevivalToMatchMenu)
+                    StartCoroutine(OpenMatchMenuAfterRevival());
                 else
                     OpenMatchMenu();
             }
 
             FinishSceneLoading();
+        }
+
+        private System.Collections.IEnumerator OpenMatchMenuAfterRevival()
+        {
+            // 図の順序はタイトル、白い光、メニュー。通常の帰還はこの待ちを通さない。
+            var transition = TutorialRevivalUI.Create(transform);
+            try { yield return transition.PlayTitleReturn(OpenMatchMenu); }
+            finally { if (transition != null) transition.Close(); }
         }
 
         private static void FinishSceneLoading()

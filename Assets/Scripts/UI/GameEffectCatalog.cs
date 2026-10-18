@@ -60,6 +60,7 @@ namespace KillingMahjong.UI
             new Entry(TutorialDrawReplayUI.ContinuationEffectId, "チュートリアル", "動画後半：決着・再生終了・閉じる", "TutorialDrawReplayUI.PlayContinuation"),
             new Entry(EnemyInfoUI.TutorialRevealEffectId, "チュートリアル", "正体判明：先輩から女の子へ", "EnemyInfoUI.RevealTutorialCharacter"),
             new Entry(TutorialDeadEndUI.EffectId, "チュートリアル", "DEADEND No1：赤い遷移・本文・結果・クレジット・復帰", "TutorialManager.RunTutorialDeadEnd / TutorialDeadEndUI.Play"),
+            new Entry(TutorialRevivalUI.EffectId, "チュートリアル", "復活：暗転・ベル・ベルル・メニューへの導入", "TutorialManager.RunRevivalFinale / TutorialRevivalUI.Play"),
             new Entry("ron.chance", "ロン・清算", "あたり牌：暗幕・牌の点滅", "RonChanceEffect.Show"),
             new Entry("ron.impact", "ロン・清算", "ロン入力：手振り・吹き出し", "RonImpactEffect.Play"),
             new Entry("ron.local", "ロン・清算", "自分のロン：カットイン・清算・血移動", "RonAnimationUI.PlayRonSequence"),

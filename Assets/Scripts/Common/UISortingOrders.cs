@@ -388,6 +388,9 @@ namespace KillingMahjong.Common
         /// <summary>チュートリアル動画の字幕。通常セリフと画面効果より手前。</summary>
         public const int TutorialSubtitle = 92;
 
+        /// <summary>チュートリアル復活の黒い空間。通常字幕・台詞より前、試写の操作より後ろ。</summary>
+        public const int TutorialRevival = 100;
+
         /// <summary>
         /// コレクションの演出の試写の操作欄（上の題名、下の「もう一度」「繰り返し」「一覧へ戻る」）。
         ///

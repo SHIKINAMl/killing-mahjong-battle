@@ -6,6 +6,7 @@ namespace KillingMahjong.UI
     public static class TutorialNavigation
     {
         public const string ReturnKey = "Title_ReturnToRoom";
+        public const int RevivalToMatchMenu = 3;
         private const string PendingKey = "Tutorial_PendingReturn";
 
         public static void Begin(int destination)
@@ -15,9 +16,9 @@ namespace KillingMahjong.UI
             PlayerPrefs.Save();
         }
 
-        public static void Complete()
+        public static void Complete(int destinationOverride = 0)
         {
-            int destination = PlayerPrefs.GetInt(PendingKey, 0);
+            int destination = destinationOverride != 0 ? destinationOverride : PlayerPrefs.GetInt(PendingKey, 0);
             PlayerPrefs.DeleteKey(PendingKey);
             if (destination != 0) PlayerPrefs.SetInt(ReturnKey, destination);
             PlayerPrefs.Save();
