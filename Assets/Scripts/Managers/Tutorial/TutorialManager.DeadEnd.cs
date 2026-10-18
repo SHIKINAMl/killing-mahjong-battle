@@ -24,7 +24,8 @@ namespace KillingMahjong.Managers
                 if (_aborted) yield break;
                 if (_watchRestAnswer == 0)
                 {
-                    yield return PlayLines(new List<TutorialLine> { new TutorialLine("おっ後輩ちゃんじゃーん") });
+                    yield return PlayLines(new List<TutorialLine> { new TutorialLine("じゃあ") });
+                    yield return RunWatchRestContinuation(data);
                     _reachedFlowEnd = true;
                     yield break;
                 }
@@ -58,17 +59,7 @@ namespace KillingMahjong.Managers
                 yield return new WaitForSeconds(discardInterval);
                 if (board != null) board.SetLocalTurn(false);
 
-                // HP0は最新版の台本で確定している。この分岐用の勝敗式は新設しない。
-                SetPhase(RoundStatus.Agari);
-                var ronData = _scenario.rounds.Count > 2 ? _scenario.rounds[2] : data;
-                int tile = TutorialTiles.Encode(_lastPlayerDiscardBaseId,
-                    _lastPlayerDiscardBaseId == data.doraBaseId);
-                var hand = TutorialTiles.EncodeAll(ronData.enemyRonMeldBaseIds, data.doraBaseId);
-                hand.Add(tile);
-                yield return PlayRonAnimation(hand, tile, ronData, false, hpBefore, 0,
-                    _enemyHp, _enemyHp, hpBefore, suppressSettlementPanel: true);
-                _playerHp = 0;
-                ApplyHpToUI();
+                yield return PlayScriptedTutorialDefeat(data, _lastPlayerDiscardBaseId);
                 yield return PlayLines(new List<TutorialLine> {
                     new TutorialLine("そ・れ・ローン"),
                     new TutorialLine("単騎ボーナスとボルテージの合わせで死亡ってとこかな"),

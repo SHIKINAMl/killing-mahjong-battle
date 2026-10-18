@@ -243,7 +243,7 @@ namespace KillingMahjong.Managers
                     // 動画のあとの会話（2026-10-15 の図）。**この巡はプレイヤー→先輩の順に、ここで打ち終える**
                     yield return StartCoroutine(RunAfterDrawVideo(data, turn, seen));
                     if (_aborted) yield break;
-                    // 最新図の「はい」は一言で終端。未記載の旧局へ自動で進めない。
+                    // 正体の会話までで最新図の記載が終わる。未記載の旧局へ自動で進めない。
                     yield break;
                 }
 

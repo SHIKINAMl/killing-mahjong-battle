@@ -137,6 +137,17 @@ namespace KillingMahjong.UI
                     try { yield return tutorialEnding.Play(rig.font, true); }
                     finally { if (tutorialEnding != null) tutorialEnding.Close(); }
                     break;
+                case TutorialDrawReplayUI.ContinuationEffectId:
+                    var continuedReplay = TutorialDrawReplayUI.Create(transform);
+                    try { yield return continuedReplay.PlayContinuation(true); }
+                    finally { if (continuedReplay != null) continuedReplay.Close(); }
+                    break;
+                case EnemyInfoUI.TutorialRevealEffectId:
+                    rig.character.sprite = Resources.Load<Sprite>("女の子/tutorial_girl_body");
+                    rig.face.sprite = Resources.Load<Sprite>("女の子/tutorial_girl_face");
+                    try { yield return rig.enemy.RevealTutorialCharacter(); }
+                    finally { if (rig.enemy != null) rig.enemy.RestoreTutorialCharacter(); }
+                    break;
                 case "ending.normal_lose": yield return Ending(VictoryType.NormalDefeat); break;
                 case "ending.special_win": yield return Ending(VictoryType.SpecialVictory); break;
                 case "ending.special_lose": yield return Ending(VictoryType.SpecialDefeat); break;

@@ -5,6 +5,69 @@ namespace KillingMahjong.UI
 {
     public partial class EnemyInfoUI
     {
+        public const string TutorialRevealEffectId = "tutorial.character_reveal";
+        private CharacterData tutorialOriginalCharacter, tutorialRevealedCharacter;
+
+        /// <summary>チュートリアルで先輩から本来の姿へ切り替える。共有アセットには書き込まない。</summary>
+        public System.Collections.IEnumerator RevealTutorialCharacter()
+        {
+            var body = Resources.Load<Sprite>("女の子/通常時身体");
+            var face = Resources.Load<Sprite>("女の子/通常顔");
+            if (body == null || face == null)
+                throw new System.InvalidOperationException("正体を見せるための立ち絵がありません。");
+            if (tutorialRevealedCharacter != null) yield break;
+            tutorialOriginalCharacter = characterData;
+            tutorialRevealedCharacter = ScriptableObject.CreateInstance<CharacterData>();
+            tutorialRevealedCharacter.characterName = "ヴァンちゃん";
+            tutorialRevealedCharacter.normalSprite = body;
+            tutorialRevealedCharacter.discardSprite = body;
+            tutorialRevealedCharacter.bodySprites.Add(new NamedSprite { id = "normal", sprite = body });
+            tutorialRevealedCharacter.faceSprites.Add(new NamedSprite { id = "normal", sprite = face });
+            tutorialRevealedCharacter.enableBlink = false;
+            if (blinkCoroutine != null) { StopCoroutine(blinkCoroutine); blinkCoroutine = null; }
+            if (reactionCoroutine != null) { StopCoroutine(reactionCoroutine); reactionCoroutine = null; }
+            if (bounceCoroutine != null) { StopCoroutine(bounceCoroutine); bounceCoroutine = null; }
+            Color bodyColor = characterRenderer != null ? characterRenderer.color : Color.white;
+            Color faceColor = faceRenderer != null ? faceRenderer.color : Color.white;
+            try
+            {
+                for (float t = 0; t < 1f; t += Time.unscaledDeltaTime * 2f)
+                {
+                    SetPortraitAlpha(bodyColor, faceColor, 1f - Mathf.SmoothStep(0f, 1f, t));
+                    yield return null;
+                }
+                SetPortraitAlpha(bodyColor, faceColor, 0f);
+                ApplyCharacterData(tutorialRevealedCharacter);
+                for (float t = 0; t < 1f; t += Time.unscaledDeltaTime * 2f)
+                {
+                    SetPortraitAlpha(bodyColor, faceColor, Mathf.SmoothStep(0f, 1f, t));
+                    yield return null;
+                }
+            }
+            finally { SetPortraitAlpha(bodyColor, faceColor, 1f); }
+        }
+
+        private void SetPortraitAlpha(Color body, Color face, float alpha)
+        {
+            if (characterRenderer != null) { body.a *= alpha; characterRenderer.color = body; }
+            if (faceRenderer != null) { face.a *= alpha; faceRenderer.color = face; }
+        }
+
+        public void RestoreTutorialCharacter()
+        {
+            if (tutorialRevealedCharacter == null) return;
+            ApplyCharacterData(tutorialOriginalCharacter);
+            Destroy(tutorialRevealedCharacter);
+            tutorialRevealedCharacter = null;
+            tutorialOriginalCharacter = null;
+            if (isActiveAndEnabled && blinkCoroutine == null) blinkCoroutine = StartCoroutine(BlinkRoutine());
+        }
+
+        private void OnDestroy()
+        {
+            if (tutorialRevealedCharacter != null) Destroy(tutorialRevealedCharacter);
+        }
+
         private void OnEnable()
         {
             if (blinkCoroutine == null)

@@ -1,6 +1,6 @@
 // このファイルは自動で作っている。手で直さないこと。
 // 作り方: km-docs/tools/tutorial_emphasis/gen_emphasis.py <フロー図.drawio> <このリポジトリ>
-// 元: フロー図（tutorial_flow_20261017.drawio）の、セリフのうち青い太字になっている部分。
+// 元: フロー図（tutorial-flow-20261018.drawio）の、セリフのうち青い太字になっている部分。
 using System.Collections.Generic;
 
 namespace KillingMahjong.Managers.Tutorial
@@ -102,6 +102,8 @@ namespace KillingMahjong.Managers.Tutorial
             { "……そういえばさっきの動画の女の子は誰なのかって", new[] { "さっきの動画の女の子は誰なのか" } },
             { "……気になるなら動画の続きを見てみる？", new[] { "動画の続きを見てみる" } },
             { "単騎ボーナスとボルテージの合わせで死亡ってとこかな", new[] { "単騎ボーナスとボルテージの合わせで死亡" } },
+            { "ゲームに負けた相手の魂を勝者が自由にできる……", new[] { "ゲームに負けた相手の魂を勝者が自由にできる" } },
+            { "まぁ点と呼んでるけど…賭けの代金は血液だものね", new[] { "賭けの代金は血液" } },
             // ---- DEADENDNo1
             { "初心者とはいえあの女が言うから期待してたんだけど……", new[] { "あの女" } },
         };

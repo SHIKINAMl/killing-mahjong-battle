@@ -35,7 +35,7 @@ namespace KillingMahjong.Managers
         //  → フラッシュ →「さっきの動画の女の子は誰なのか」→ BGM止まる
         //  →「動画の続きを見てみる？」→ 分岐「対局動画の続きを見ますか？」
         //
-        // 分岐と復帰は2026-10-17版に従う。いいえはDEADEND、はいは図に記載された一言まで。
+        // 分岐と復帰は2026-10-18版に従う。いいえはDEADEND、はいは動画後半と正体の会話へ。
 
         private const string DrawUnderstoodQuestion = "だいたい流局についてはわかったかな？";
         private const string DrawUnderstoodLabel = "わかった";

@@ -57,6 +57,8 @@ namespace KillingMahjong.UI
             new Entry("hand.confirm_no_waits", "フェイズ", "待ちなし：なしの枠 → 追加確認 → 手牌決定", "HandWeakConfirmationUI / HandWaitRevealUI"),
             new Entry("phase.draw", "フェイズ", "流局の切り替え", "PhaseTransitionUI.PlayDrawTransition"),
             new Entry(TutorialDrawReplayUI.EffectId, "チュートリアル", "流局解説：動画空間・独立字幕・再生停止", "TutorialDrawReplayUI.Play"),
+            new Entry(TutorialDrawReplayUI.ContinuationEffectId, "チュートリアル", "動画後半：決着・再生終了・閉じる", "TutorialDrawReplayUI.PlayContinuation"),
+            new Entry(EnemyInfoUI.TutorialRevealEffectId, "チュートリアル", "正体判明：先輩から女の子へ", "EnemyInfoUI.RevealTutorialCharacter"),
             new Entry(TutorialDeadEndUI.EffectId, "チュートリアル", "DEADEND No1：赤い遷移・本文・結果・クレジット・復帰", "TutorialManager.RunTutorialDeadEnd / TutorialDeadEndUI.Play"),
             new Entry("ron.chance", "ロン・清算", "あたり牌：暗幕・牌の点滅", "RonChanceEffect.Show"),
             new Entry("ron.impact", "ロン・清算", "ロン入力：手振り・吹き出し", "RonImpactEffect.Play"),

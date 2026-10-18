@@ -12,7 +12,7 @@ using KillingMahjong.UI.Effects;
 namespace KillingMahjong.UI
 {
     /// <summary>既存素材で流局を再現する動画空間。通信・HP・戦績・対局の盤面には触れない。</summary>
-    public sealed class TutorialDrawReplayUI : MonoBehaviour
+    public sealed partial class TutorialDrawReplayUI : MonoBehaviour
     {
         public const string EffectId = "tutorial.draw_replay";
         public int StepIndex { get; private set; }
@@ -131,9 +131,12 @@ namespace KillingMahjong.UI
         // シークバーは、最後のセリフでちょうど半分まで進んだところで終わる
         // （2026-10-15 のフロー図「動画のシークバーはまだ半分くらい残して終了」）。動画は途中で閉じられる
         private const int StepCount = 18;
+        private int stepCount = StepCount;
+        private float progressStart, progressEnd = .5f;
         private IEnumerator Step(string text,bool subtitle,bool loud=false)
         {
-            StepIndex++; progress.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal,764f*.5f*Mathf.Min(StepIndex,StepCount)/StepCount); advanced=false;
+            StepIndex++; progress.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal,
+                764f * Mathf.Lerp(progressStart, progressEnd, Mathf.Min(StepIndex, stepCount) / (float)stepCount)); advanced=false;
             if(subtitle) { marker.gameObject.SetActive(false); advance.gameObject.SetActive(false); subtitles.Show("先輩",text,()=>advanced=true); }
             else {
                 string formatted=TutorialEmphasis.Apply(text);
@@ -154,6 +157,7 @@ namespace KillingMahjong.UI
             SetCharacter("通常時身体", "通常顔");
             SetCharacterPosition(CharacterPosition);
             automatic=autoAdvance; IsPaused=false; StepIndex=0; transform.localScale=Vector3.one*.4f;
+            stepCount=StepCount; progressStart=0f; progressEnd=.5f;
             for(float t=0;t<1;t+=Time.unscaledDeltaTime) { transform.localScale=Vector3.one*Mathf.SmoothStep(.4f,1,t); yield return null; }
             transform.localScale=Vector3.one;
             // PhaseTransitionUI.Start が通常対局の層へ戻すので、初期化後に動画内の層を適用する。

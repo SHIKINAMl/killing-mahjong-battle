@@ -268,6 +268,8 @@ namespace KillingMahjong.Managers
             if (roundIndex <= 0) SetFirstRoundChromeVisible(false);
 
             if (_scenarioRoutine != null) StopCoroutine(_scenarioRoutine);
+            if (gameUIManager != null && gameUIManager.EnemyInfoUI != null)
+                gameUIManager.EnemyInfoUI.RestoreTutorialCharacter();
             RestoreIntroSettings();
             if (_askExperienceAfterIntro) RaiseIntroSettings();
             _scenarioRoutine = StartCoroutine(ScenarioRoutine(Mathf.Max(0, roundIndex)));
