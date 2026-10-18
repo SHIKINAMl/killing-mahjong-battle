@@ -90,10 +90,12 @@ namespace KillingMahjong.UI.Effects
         ///
         /// <paramref name="leaveHoseAt"/> を渡すと、始点（血袋の口）からそこまではホースの中を流れ、そこから宙へ出る。
         /// <paramref name="enterHoseAt"/> を渡すと、宙からそこでホースに入り、終点（血袋の口）までホースの中を流れる。
+        /// <paramref name="delay"/> 秒待ってから流し始める。
         /// </summary>
         public static BloodStreamEffect Pour(RectTransform stage, Vector3 fromWorld, Vector3 toWorld,
                                              float seconds, float arc = 60f, float thickness = 1f,
-                                             Vector3? leaveHoseAt = null, Vector3? enterHoseAt = null)
+                                             Vector3? leaveHoseAt = null, Vector3? enterHoseAt = null,
+                                             float delay = 0f)
         {
             if (stage == null) return null;
             var go = new GameObject("BloodStream", typeof(RectTransform));
@@ -112,6 +114,8 @@ namespace KillingMahjong.UI.Effects
             fx.BuildPath(arc, leaveHoseAt, enterHoseAt);
             fx.pourSeconds = Mathf.Max(0.05f, seconds);
             fx.width = Mathf.Clamp(thickness, 0.6f, 2.2f);
+            // 待つ間は先頭も尻尾も 0 のままなので、何も描かれない
+            fx.elapsed = -Mathf.Max(0f, delay);
             fx.running = true;
             return fx;
         }

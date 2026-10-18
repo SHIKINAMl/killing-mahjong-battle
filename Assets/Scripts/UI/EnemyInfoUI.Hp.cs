@@ -77,6 +77,11 @@ namespace KillingMahjong.UI
         /// </summary>
         public RectTransform HpGaugeAnchor => hpFillImage != null ? hpFillImage.rectTransform : HpAnchor;
 
+        /// <summary>立ち絵。没案の「全身から霧状に血が抜ける」で、体の形から噴き出す位置を取る。</summary>
+        public SpriteRenderer CharacterRenderer => characterRenderer;
+        /// <summary>表情の重ね。立ち絵と一緒に色を変えるときに使う。</summary>
+        public SpriteRenderer FaceRenderer => faceRenderer;
+
         private HpPopupPresenter HpPopup
         {
             get

@@ -64,6 +64,9 @@ namespace KillingMahjong.UI
             new Entry("ron.impact", "ロン・清算", "ロン入力：手振り・吹き出し", "RonImpactEffect.Play"),
             new Entry("ron.local", "ロン・清算", "自分のロン：カットイン・清算・血移動", "RonAnimationUI.PlayRonSequence"),
             new Entry("ron.enemy", "ロン・清算", "相手のロン：カットイン・清算・血移動", "RonAnimationUI.PlayRonSequence"),
+            // 2026-10-19「全身の毛細血管からドパって霧状に抜かれてる」イメージ。没になる見込みが高いので没案に置く
+            new Entry("ron.mist_local", "ロン・清算", "自分のロン：相手の全身から霧状に血が抜ける", "RonAnimationUI.PreviewMistDrain", unused: true),
+            new Entry("ron.mist_enemy", "ロン・清算", "相手のロン：自分の全身から霧状に血が抜ける", "RonAnimationUI.PreviewMistDrain", unused: true),
             new Entry("settlement.local", "ロン・清算", "自分が得る血の表示", "PhaseTransitionUI.PlayScoreSettlementAnimation", unused: true),
             new Entry("settlement.enemy", "ロン・清算", "相手が得る血の表示", "PhaseTransitionUI.PlayScoreSettlementAnimation", unused: true),
             new Entry("ending.normal_win", "勝敗・ED", "通常勝利（現在は共通EDの仮内容）", "EndingSequenceUI.Show"),

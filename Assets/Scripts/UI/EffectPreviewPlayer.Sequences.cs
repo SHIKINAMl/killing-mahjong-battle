@@ -125,6 +125,11 @@ namespace KillingMahjong.UI
                     yield return RonImpactEffect.Play(this, new List<RectTransform> { rig.player.HpAnchor, rig.enemy.HpAnchor }); break;
                 case "ron.local": case "ron.enemy":
                     yield return Ron(EffectId == "ron.local"); break;
+                case "ron.mist_local": case "ron.mist_enemy":
+                    RonAnimationUI.PreviewMistDrain = true;
+                    try { yield return Ron(EffectId == "ron.mist_local"); }
+                    finally { RonAnimationUI.PreviewMistDrain = false; }
+                    break;
                 case "settlement.local": case "settlement.enemy":
                     bool paid = false; bool won = EffectId == "settlement.local";
                     rig.phase.PlayScoreSettlementAnimation(won, 2000, 2000, 20000, 20000,
