@@ -301,7 +301,7 @@ namespace KillingMahjong.UI
             labelRect.sizeDelta = new Vector2(PipRowWidth + 40f, MultiplierFontSize + 6f);
 
             _multiplierText = label.GetComponent<TextMeshProUGUI>();
-            _multiplierText.font = BorrowJapaneseFont();
+            _multiplierText.font = LoadMultiplierFont();
             _multiplierText.fontSize = MultiplierFontSize;
             _multiplierText.alignment = TextAlignmentOptions.Center;
             _multiplierText.raycastTarget = false;
@@ -413,6 +413,20 @@ namespace KillingMahjong.UI
                 if (_chargePips[i] == null) continue;
                 _chargePips[i].color = i < filled ? onColor : PipOff;
             }
+        }
+
+        /// <summary>倍率の文字のフォント。Resources 直下からの相対パス（拡張子なし）。</summary>
+        private const string MultiplierFontPath = "x8y12pxDenkiChip/x8y12pxDenkiChip_Dynamic";
+
+        /// <summary>
+        /// 倍率は「でんきチップ」で出す（MnoAさんの要望、2026-09-18）。
+        /// このフォントは教育漢字1〜4年までしか無く本文には使えないが、倍率は `×` と数字と `.` だけなので足りる。
+        /// 読めなかったときは、画面の日本語フォントを借りる。
+        /// </summary>
+        private static TMP_FontAsset LoadMultiplierFont()
+        {
+            var font = Resources.Load<TMP_FontAsset>(MultiplierFontPath);
+            return font != null ? font : BorrowJapaneseFont();
         }
 
         /// <summary>
