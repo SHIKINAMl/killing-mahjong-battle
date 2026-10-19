@@ -231,9 +231,12 @@ namespace KillingMahjong.UI.Effects
         {
             var audio = KillingMahjong.Managers.AudioManager.Instance;
             if (audio == null) return;
-            float frequency = 220f * Mathf.Pow(2f, pulse / 12f);
-            audio.PlaySynthSound(KillingMahjong.Managers.SynthWaveType.Triangle,
-                frequency, frequency * 0.9f, 0.045f, 0.9f);
+            // 線が伸びるにつれて高くなる。最後の1回で1オクターブ上に届く。
+            // 合成の三角波（2オクターブ上がる）から Freesound（CC0）の電子音2つを重ねたものに替えた（2026-10-19）。
+            // 録音を2オクターブも上げると細くキンキンするので、上がり幅は1オクターブにしてある
+            float pitch = Mathf.Pow(2f, pulse / (float)(GrowthPulseCount - 1));
+            audio.PlayStingerPitched("se_graph_tick", pitch,
+                KillingMahjong.Managers.AudioManager.PitchJitter.None);
         }
 
         private void SetGraphProgress(float progress)
