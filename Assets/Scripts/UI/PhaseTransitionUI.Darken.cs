@@ -10,9 +10,11 @@ namespace KillingMahjong.UI
         /// 暗転まわりの一発物を鳴らす（2026-09-11）。`Resources/Stingers/` から読む。
         ///
         /// **繋ぎの尺は `checkerFadeDuration` に合わせて作ってある。**
-        /// `br_riser` は 1.0 秒かけて上がり切った瞬間にキックが着地する。
+        /// `br_riser` は 1.0 秒かけて上がり切った瞬間に着地の音が鳴る。
         /// 市松模様が晴れる瞬間と打点を合わせるためなので、
         /// `checkerFadeDuration` を変えたら音も作り直すこと。ずれると打点だけ遅れて聞こえる。
+        /// 暗転・明転・着弾は Freesound（CC0）の素材を重ねたものに替えた（2026-10-19、
+        /// 作り方は km-bridge/効果音/game_se_make.py）。黒帯の開く・閉じるは、まだ前の合成のまま。
         /// </summary>
         private void PlayTransitionStinger(string name)
         {
