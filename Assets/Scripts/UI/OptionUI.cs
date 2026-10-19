@@ -184,7 +184,9 @@ namespace KillingMahjong.UI
             
             if (KillingMahjong.Managers.AudioManager.Instance != null)
             {
-                KillingMahjong.Managers.AudioManager.Instance.PlayPaperSlideSE();
+                // グラスを鳴らす「チン」を 8bit 風にした音（2026-10-19、以前は紙をめくる音）
+                KillingMahjong.Managers.AudioManager.Instance.PlayStinger("se_settings",
+                    KillingMahjong.Managers.AudioManager.PitchJitter.VerySmall);
             }
 
             // 確実に画面中央に配置
@@ -218,7 +220,9 @@ namespace KillingMahjong.UI
             
             if (KillingMahjong.Managers.AudioManager.Instance != null)
             {
-                KillingMahjong.Managers.AudioManager.Instance.PlayPaperSlideSE();
+                // 開くときと同じ音を、少し低く鳴らして区別する
+                KillingMahjong.Managers.AudioManager.Instance.PlayStingerPitched("se_settings", 0.89f,
+                    KillingMahjong.Managers.AudioManager.PitchJitter.None);
             }
 
             _rectTransform.DOScale(Vector3.one * 0.9f, 0.15f).SetEase(Ease.InQuad).SetUpdate(true);

@@ -327,7 +327,8 @@ namespace KillingMahjong.UI
             ManagerClip("heartbeatStrongSpaced",   "se_heartbeat_strong_spaced",   "瀕死の心音　強"),
             ManagerClip("heartbeatStrongCompact",  "se_heartbeat_strong_compact",  "瀕死の心音　強・詰"),
             new Track("Stingers", "se_click_empty", "何も無い所のクリック"),
-            ManagerClip("paperSlideSE", "ページめくり", "紙をめくる（設定・オープニング）"),
+            ManagerClip("paperSlideSE", "ページめくり", "紙をめくる（オープニング）"),
+            new Track("Stingers", "se_settings", "設定を開く・閉じる"),
         };
 
         private GameObject root;
