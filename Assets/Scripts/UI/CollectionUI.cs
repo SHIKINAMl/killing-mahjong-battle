@@ -316,6 +316,8 @@ namespace KillingMahjong.UI
             new Track("Stingers", "se_voltage_up", "ボルテージの段が上がる"),
             new Track("Stingers", "se_jingle_win",  "決着　勝ち"),
             new Track("Stingers", "se_jingle_lose", "決着　負け"),
+            new Track("Stingers", "se_flash",       "白いフラッシュ"),
+            new Track("Stingers", "se_ron_pop",     "戦況グラフ　ロンの吹き出し"),
             ManagerClip("heartbeatWeakSpaced",     "se_heartbeat_weak_spaced",     "瀕死の心音　弱"),
             ManagerClip("heartbeatWeakCompact",    "se_heartbeat_weak_compact",    "瀕死の心音　弱・詰"),
             ManagerClip("heartbeatMediumSpaced",   "se_heartbeat_medium_spaced",   "瀕死の心音　中"),

@@ -209,10 +209,10 @@ namespace KillingMahjong.UI.Effects
             var audio = KillingMahjong.Managers.AudioManager.Instance;
             if (audio != null)
             {
-                // 強いロンほど低く太い音にする
-                float frequency = 140f / callout.Scale;
-                audio.PlaySynthSound(KillingMahjong.Managers.SynthWaveType.Square,
-                    frequency, frequency * 0.5f, 0.18f, 1f);
+                // 強いロンほど低く太い音にする（ダブル役満で約1オクターブ下）。
+                // 音は Freesound（CC0）のポップ音2つを重ねたもの（2026-10-19）
+                audio.PlayStingerPitched("se_ron_pop", 1f / callout.Scale,
+                    KillingMahjong.Managers.AudioManager.PitchJitter.None);
             }
             float t = 0f;
             while (t < RonPopSeconds && callout.Rect != null)

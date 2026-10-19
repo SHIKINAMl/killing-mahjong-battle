@@ -34,13 +34,9 @@ namespace KillingMahjong.UI.Effects
         // 60fps なら約2フレーム。光が一度は画面に残り、「叩いた」合図として読める長さにする。
         private const float PeakHoldDuration = 0.03f;
 
-        // 白フラッシュの輪郭を耳でも読ませる、短い上昇音。「キーーン」と伸びるが、
-        // 画面の操作を待たせるほど長くは残さない。鋭すぎる倍音は足さず、純音にして
-        // BGM やボイスの上でも耳に痛くなりにくくしている。
-        private const float FlashSeStartFrequency = 1800f;
-        private const float FlashSeEndFrequency = 3600f;
-        private const float FlashSeDuration = 0.18f;
-        private const float FlashSeVolume = 1.4f;
+        // 白フラッシュの輪郭を耳でも読ませる音。以前は 1800→3600Hz の合成の「キーーン」だったが、
+        // 高い音ばかりで耳に痛く、合成音らしさも強かったので、Freesound（CC0）の
+        // ウインクの音とカメラのフラッシュの音を重ねたもの（se_flash）に替えた（2026-10-19）。
 
         // ------------------------------------------------------------
         //  場面が変わるときの白飛ばし（2026-09-25）
@@ -123,17 +119,12 @@ namespace KillingMahjong.UI.Effects
             flash.StartCoroutine(flash.SceneBreakRoutine());
         }
 
-        /// <summary>フラッシュ開始と同時に、上へ抜ける「キーーン」を一度だけ鳴らす。</summary>
+        /// <summary>フラッシュ開始と同時に、フラッシュの音を一度だけ鳴らす。</summary>
         private static void PlayFlashSe()
         {
             if (AudioManager.Instance == null) return;
 
-            AudioManager.Instance.PlaySynthSound(
-                SynthWaveType.Sine,
-                FlashSeStartFrequency,
-                FlashSeEndFrequency,
-                FlashSeDuration,
-                FlashSeVolume);
+            AudioManager.Instance.PlayStinger("se_flash", AudioManager.PitchJitter.VerySmall);
         }
 
         private IEnumerator SceneBreakRoutine()
