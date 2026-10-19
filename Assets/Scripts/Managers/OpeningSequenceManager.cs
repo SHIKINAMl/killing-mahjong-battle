@@ -118,11 +118,19 @@ namespace KillingMahjong.Managers
                 if (cg != null) cg.alpha = 1f;
 
                 // ボタンはスライド完了まで押せないようにする
+                _paperShown = false;
                 largePaperNextButton.interactable = false;
                 largePaperNextButton.onClick.RemoveAllListeners();
-                largePaperNextButton.onClick.AddListener(() => {
-                    StartCoroutine(SlideOutLargePaperRoutine());
-                });
+                largePaperNextButton.onClick.AddListener(OnContractSigned);
+
+                // 「私＿＿＿」の名前の欄（2026-10-20）。名前を書くまで「次へ」は押せない
+                var label = largePaperNextButton.GetComponentInChildren<TMPro.TMP_Text>(true);
+                _nameInput = ContractNameField.Ensure(largePaperUI.transform, label != null ? label.font : null);
+                _nameInput.text = KillingMahjong.Core.PlayerProfile.Name;
+                _nameInput.onValueChanged.RemoveAllListeners();
+                _nameInput.onValueChanged.AddListener(_ => UpdateNextButton());
+                _nameInput.onSubmit.RemoveAllListeners();
+                _nameInput.onSubmit.AddListener(_ => { if (largePaperNextButton.interactable) OnContractSigned(); });
 
                 StartCoroutine(SlideInLargePaperRoutine());
             }
@@ -165,7 +173,33 @@ namespace KillingMahjong.Managers
             pos.y = targetY;
             rt.anchoredPosition = pos;
 
-            largePaperNextButton.interactable = true;
+            _paperShown = true;
+            UpdateNextButton();
+            if (_nameInput != null) _nameInput.ActivateInputField();
+        }
+
+        private TMPro.TMP_InputField _nameInput;
+        private bool _paperShown;
+
+        /// <summary>「次へ」は、契約書が出きって、名前が書いてあるときだけ押せる。</summary>
+        private void UpdateNextButton()
+        {
+            if (largePaperNextButton == null) return;
+            bool hasName = _nameInput == null || KillingMahjong.Core.PlayerProfile.Normalize(_nameInput.text).Length > 0;
+            largePaperNextButton.interactable = _paperShown && hasName;
+        }
+
+        /// <summary>「次へ」（または入力欄で Enter）。名前を保存してから契約書を閉じる。</summary>
+        private void OnContractSigned()
+        {
+            if (!largePaperNextButton.interactable) return;
+            if (_nameInput != null)
+            {
+                KillingMahjong.Core.PlayerProfile.SetName(_nameInput.text);
+                _nameInput.DeactivateInputField();
+                _nameInput.interactable = false;
+            }
+            StartCoroutine(SlideOutLargePaperRoutine());
         }
 
         private IEnumerator SlideOutLargePaperRoutine()
