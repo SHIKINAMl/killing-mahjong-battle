@@ -150,9 +150,9 @@ namespace KillingMahjong.UI
             // **場に出ていた血を、卓の上の血だまりとして見せる（2026-10-18）。**
             // 「血を掛け合っている」ことを形で見せるため。数字の下、卓の真ん中に広がる。
             // 大きさは場の血の額で決める（両者の賭け金の合計。8000 で最大）
-            // 没案の霧では出さない（血は弾けて終わる）
+            // **本編の霧では出さない**（血は全身から弾けて霧散して終わる）。没案のホースの筋のときだけ出す
             Effects.BloodPoolEffect pool = null;
-            if (!PreviewMistDrain)
+            if (PreviewStreamDrain)
             {
                 pool = Effects.BloodPoolEffect.Create(stageRt, TablePoolPosition());
                 pool.transform.SetAsFirstSibling();
@@ -209,9 +209,9 @@ namespace KillingMahjong.UI
             // 素の色のまま落とすと最後の数桁が背景に溶けて、いちばん見せたい着弾が読めなくなる。
             // 黒縁を太くするのは**ドット絵の細い字には効かない**ので採らなかった。
             //
-            // **数字と一緒に、血が勝った側の血袋へ流れ込む（2026-10-18）。**
-            // 場の血だまりから勝った側へ。負けた側が賭け金より多く失うときは、その血袋からも勝った側へ流す。
-            // メーターが動く間（④）も流し続ける
+            // **数字と一緒に、負けた側の全身から血が霧になって噴き出し、霧散する（2026-10-19 から本編）。**
+            // 以前の本編（2026-10-18〜）は、場の血だまりから勝った側の血袋へホースを通して流す筋だった。
+            // それは没案（ron.stream_local / ron.stream_enemy）として残してある
             var streams = StartBloodStreams(stageRt, pool, s, playerInfo, enemyInfo, out var mist);
             const float diveTime = 0.30f;
             for (float t = 0; t < diveTime; t += Time.deltaTime)
@@ -368,9 +368,10 @@ namespace KillingMahjong.UI
             int loserDelta = mineWins ? s.TheirShownDelta : s.MyShownDelta;
             int winnerDelta = mineWins ? s.MyShownDelta : s.TheirShownDelta;
 
-            // 没案の霧: 負けた側の血が弾けて霧散するだけで終わる。卓にもホースにも流さない
-            // （2026-10-19「霧散するバージョンは、ホースにいかせなくていいです。ただ血が弾けているだけで終わっていいです」）
-            if (PreviewMistDrain)
+            // 本編の霧: 負けた側の血が弾けて霧散するだけで終わる。卓にもホースにも流さない
+            // （2026-10-19「霧散するバージョンは、ホースにいかせなくていいです。ただ血が弾けているだけで終わっていいです」。
+            // 同日「血の演出は、体から血が霧散している演出にして」で没案から本編になった）
+            if (!PreviewStreamDrain)
             {
                 if (loserDelta < 0)
                     mist = StartBloodMist(stageRt, mineWins ? enemyInfo : null,
@@ -408,11 +409,11 @@ namespace KillingMahjong.UI
         }
 
         /// <summary>
-        /// **没案**: 負けた側の血を、ホースの筋ではなく全身から霧状に抜く（2026-10-19）。
-        /// 伝えられたイメージ:「全身の毛細血管からドパって霧状に抜かれてる」。
-        /// 「ボツアンになる可能性が高い」ので、演出コレクションの没案（ron.mist_local / ron.mist_enemy）だけが立てる。
+        /// **没案**: 以前の本編だった、卓の血だまりから勝った側の血袋へホースを通して流す筋（2026-10-18〜19）。
+        /// 本編は全身から霧状に血が抜ける演出になった（2026-10-19「血の演出は、体から血が霧散している演出にして」）。
+        /// 演出コレクションの没案（ron.stream_local / ron.stream_enemy）だけが立てる。
         /// </summary>
-        public static bool PreviewMistDrain;
+        public static bool PreviewStreamDrain;
 
         /// <summary>噴いた瞬間に体が赤く染まり、抜けたあと少し青白くなって戻る。色は必ず元へ戻す。</summary>
         private static IEnumerator BleachBody(SpriteRenderer body)
