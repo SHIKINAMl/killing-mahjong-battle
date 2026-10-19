@@ -11,6 +11,7 @@ namespace KillingMahjong.UI
     /// 下線は絵の (125〜290, 262) あたり。800x600 では x=250〜580、上から 524 で、真ん中からは (+15, -224)。
     ///
     /// **シーンに置いてある物が正**（<see cref="SceneFirst"/>）。ここの数字は、シーンに無かったときに作るための控え。
+    /// Web 版で日本語を打てるように、<see cref="WebImeInput"/> も同じ物に付ける。
     /// 押したときの動き（入力が変わったとき）は <see cref="KillingMahjong.Managers.OpeningSequenceManager"/> がつなぐ。
     /// </summary>
     public static class ContractNameField
@@ -27,7 +28,7 @@ namespace KillingMahjong.UI
         public static TMP_InputField Ensure(Transform paper, TMP_FontAsset font)
         {
             var fieldObj = SceneFirst.Child(paper, ObjectName, out bool made,
-                typeof(RectTransform), typeof(Image), typeof(TMP_InputField));
+                typeof(RectTransform), typeof(Image), typeof(TMP_InputField), typeof(WebImeInput));
             var input = fieldObj.GetComponent<TMP_InputField>();
             if (!made) return input;
 
