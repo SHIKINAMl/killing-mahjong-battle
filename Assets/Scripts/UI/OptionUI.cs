@@ -76,7 +76,7 @@ namespace KillingMahjong.UI
         private bool _isOpen;
 
         // 【聞き比べ中・決まったら戻す】設定を開く音の候補（2026-10-19）。開くたびに次へ進む
-        private static readonly string[] SettingsSeTrials = { "se_settings", "se_settings_try_a", "se_settings_try_b" };
+        private static readonly string[] SettingsSeTrials = { "se_settings", "se_settings_try_a", "se_settings_try_b", "se_settings_try_c" };
         private static int _settingsSeTrial;
         private string _settingsSe = "se_settings";
 
@@ -190,7 +190,7 @@ namespace KillingMahjong.UI
             if (KillingMahjong.Managers.AudioManager.Instance != null)
             {
                 // グラスを鳴らす「チン」を 8bit 風にした音（2026-10-19、以前は紙をめくる音）
-                // 【聞き比べ中・決まったら戻す】開くたびに 今 → 試しA → 試しB の順で入れ替える
+                // 【聞き比べ中・決まったら戻す】開くたびに 今 → 試しA → 試しB → 試しC の順で入れ替える
                 _settingsSe = SettingsSeTrials[_settingsSeTrial++ % SettingsSeTrials.Length];
                 Debug.Log("[OptionUI] 設定の音の聞き比べ: " + _settingsSe);
                 KillingMahjong.Managers.AudioManager.Instance.PlayStinger(_settingsSe,
