@@ -140,6 +140,9 @@ namespace KillingMahjong.UI
             charRt.localRotation = Quaternion.Euler(0, 0, -15f); // キャラは傾きをキャンセルしてまっすぐに
             charRt.anchoredPosition = new Vector2(-200f, -150f); // 左側に寄せつつ、少し上に調整
 
+            // 立ち絵の背面に置き、寄り・傾き・マスク・終了をカットインと共有する。
+            Effects.RonAuraUI.BehindCharacter(charRt);
+
             // 4.5 顔パーツ画像（身体の上に乗せる）
             if (faceSprite != null)
             {

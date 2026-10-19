@@ -122,6 +122,7 @@ namespace KillingMahjong.UI
                 case "ron.chance":
                     RonChanceEffect.Show(rig.handTiles[6]); yield return new WaitForSeconds(3f); break;
                 case "ron.impact":
+                case RonAuraUI.LocalEffectId:
                     yield return RonImpactEffect.Play(this, new List<RectTransform> { rig.player.HpAnchor, rig.enemy.HpAnchor }); break;
                 case "ron.local": case "ron.enemy":
                     yield return Ron(EffectId == "ron.local"); break;

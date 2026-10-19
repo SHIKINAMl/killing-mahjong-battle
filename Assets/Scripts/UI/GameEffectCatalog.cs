@@ -63,6 +63,8 @@ namespace KillingMahjong.UI
             new Entry(TutorialRevivalUI.EffectId, "チュートリアル", "復活：暗転・ベル・ベルル・メニューへの導入", "TutorialManager.RunRevivalFinale / TutorialRevivalUI.Play"),
             new Entry("ron.chance", "ロン・清算", "あたり牌：暗幕・牌の点滅", "RonChanceEffect.Show"),
             new Entry("ron.impact", "ロン・清算", "ロン入力：手振り・吹き出し", "RonImpactEffect.Play"),
+            new Entry(Effects.RonAuraUI.LocalEffectId, "ロン・清算", "自分のロン：吹き出し背面の青いオーラ", "RonImpactEffect.Play / RonAuraUI.BehindCallout"),
+            new Entry(Effects.RonAuraUI.EnemyEffectId, "ロン・清算", "相手のロン：立ち絵背面の赤いオーラ", "CutinAnimationUI.PlayCutin / RonAuraUI.BehindCharacter"),
             new Entry("ron.local", "ロン・清算", "自分のロン：カットイン・清算・相手の全身から血が霧散", "RonAnimationUI.PlayRonSequence"),
             new Entry("ron.enemy", "ロン・清算", "相手のロン：カットイン・清算・自分の全身から血が霧散", "RonAnimationUI.PlayRonSequence"),
             // 2026-10-19 に本編が霧（全身から血が霧散）になったので、それまでのホースを通る筋を没案に置く

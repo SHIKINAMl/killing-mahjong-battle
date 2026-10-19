@@ -29,6 +29,7 @@ namespace KillingMahjong.UI
                     }
                     yield return TileMoveAnimator.AnimatePositions(from, to); break;
                 case "ron.cutin": case "ron.cutin_max":
+                case RonAuraUI.EnemyEffectId:
                     bool cutinDone = false;
                     var cutin = rig.surface.gameObject.AddComponent<CutinAnimationUI>();
                     cutin.PlayCutin(rig.character.sprite, rig.face.sprite, rig.font, "ロン", () => cutinDone = true,

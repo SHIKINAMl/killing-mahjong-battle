@@ -92,6 +92,7 @@ namespace KillingMahjong.UI.Effects
             // 集中線は手と吹き出しの奥。吹き出しへ向けて集める
             var lines = CreateFocusLines(overlayRt);
             RectTransform callout = CreateBurstCallout(overlayRt, burstSprite);
+            RonAuraUI.BehindCallout(callout);
 
             // 吹き出し・声・ドン・揺れを**同じ1コマに揃える**
             if (audio != null)
