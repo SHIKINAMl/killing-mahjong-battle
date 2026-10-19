@@ -203,12 +203,11 @@ namespace KillingMahjong.UI.Effects
         {
             if (KillingMahjong.Managers.AudioManager.Instance != null)
             {
-                // 心臓の鼓動（低くて丸い音）
-                // SynthWaveType は AudioSynth.cs と同じ KillingMahjong.Managers 名前空間にある
-                KillingMahjong.Managers.AudioManager.Instance.PlaySynthSoundDual(
-                    KillingMahjong.Managers.SynthWaveType.Sine,
-                    KillingMahjong.Managers.SynthWaveType.Triangle,
-                    150f, 60f, 0.2f, 1.0f);
+                // 心臓の鼓動。合成音から、Freesound（CC0）の心音2つを重ねたものに替えた（2026-10-19）。
+                // 打牌の心音とは別の素材にしてあり、体力が少ない状態だと耳で分かる。
+                // 1割以下では 0.6 秒おきに鳴るので、音は 0.55 秒で切ってある
+                KillingMahjong.Managers.AudioManager.Instance.PlayStinger("se_lowhp_heartbeat",
+                    KillingMahjong.Managers.AudioManager.PitchJitter.None);
             }
         }
 
