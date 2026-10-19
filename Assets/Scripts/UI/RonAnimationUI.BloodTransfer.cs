@@ -197,6 +197,10 @@ namespace KillingMahjong.UI
             // 満貫サイズのまま静止。**ここが読ませる時間**
             yield return new WaitForSeconds(0.25f);
 
+            // 血を抜く前に、相手が一言しゃべる（2026-10-19）。
+            // **表が消えてから出す。** 表を出したまま喋らせると、吹き出しが表の裏に隠れて読めなかった（実機で確認）
+            yield return BloodDrawLineRoutine(prevLocalHp, newLocalHp, prevEnemyHp, newEnemyHp);
+
             // ③ 収縮しながらHPへ落ちる
             //
             // **落ちながら白へ寄せる（2026-08-29 の実機確認で決めた）。**

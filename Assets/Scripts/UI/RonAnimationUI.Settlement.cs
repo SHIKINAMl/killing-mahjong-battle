@@ -402,8 +402,53 @@ namespace KillingMahjong.UI
             yield return new WaitForSeconds(ReadHold);
 
             // ⑤ 血が動く。**パネルを消しながら**素点の数字を持ち出す
+            // 血を抜く直前に相手が一言しゃべる（BloodDrawLineRoutine）
             yield return BloodTransferRoutine(container, s, myBetText, theirBetText,
                 playerInfo, enemyInfo, prevLocalHp, newLocalHp, prevEnemyHp, newEnemyHp);
+        }
+
+        /// <summary>相手が負けて血を抜かれるときのセリフ。</summary>
+        private const string EnemyBledLine = "「いいわ、血を抜きなさい」";
+        /// <summary>自分が負けて血を抜かれるときのセリフ。</summary>
+        private const string LocalBledLine = "「血を抜くわ」";
+        /// <summary>セリフを出し終えてから血を動かすまでの間[秒]。</summary>
+        private const float BloodDrawLineHold = 0.6f;
+        /// <summary>文字送りが終わらなくても、ここで打ち切って先へ進む[秒]。</summary>
+        private const float BloodDrawLineMaxWait = 3f;
+
+        /// <summary>
+        /// 清算の表を読ませたあと、血を抜く前に相手のセリフを出す（2026-10-19 のユーザー指示）。
+        /// 敵がダメージを受けるとき「いいわ、血を抜きなさい」、自分がダメージを受けるとき「血を抜くわ」。
+        ///
+        /// **チュートリアルでは出さない。** 吹き出しは台本が使っていて、ここで上書きすると台本の行が消える。
+        /// 演出コレクションの試写では、試写の舞台の吹き出しに出す。吹き出しが見つからなければ何もしない。
+        /// </summary>
+        private IEnumerator BloodDrawLineRoutine(int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp)
+        {
+            string line = newEnemyHp < prevEnemyHp ? EnemyBledLine
+                        : newLocalHp < prevLocalHp ? LocalBledLine
+                        : null;
+            if (line == null) yield break;
+
+            DialogueUI dialogue = null;
+            var rig = FindFirstObjectByType<EffectPreviewRig>();
+            if (rig != null && rig.ron == this) dialogue = rig.dialogue;
+            else
+            {
+                var uiMgr = FindFirstObjectByType<GameUIManager>();
+                if (uiMgr == null || uiMgr.IsTutorialMode) yield break;
+                dialogue = uiMgr.DialogueUI;
+            }
+            if (dialogue == null) yield break;
+
+            if (!dialogue.gameObject.activeSelf) dialogue.gameObject.SetActive(true);
+            dialogue.ShowText(line);
+
+            // 文字送りが始まるのは次のフレーム（DialogueUI.TypeMessageRoutine）
+            yield return null;
+            for (float t = 0f; DialogueUI.IsTalking && t < BloodDrawLineMaxWait; t += Time.deltaTime)
+                yield return null;
+            yield return new WaitForSeconds(BloodDrawLineHold);
         }
 
         private static string FormatDelta(int v)
