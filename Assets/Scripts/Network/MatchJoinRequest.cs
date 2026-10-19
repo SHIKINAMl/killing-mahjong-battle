@@ -40,12 +40,19 @@ namespace KillingMahjong.Network
         public static string Password { get; private set; } = "";
         public static CpuDifficulty Difficulty { get; private set; } = CpuDifficulty.Normal;
 
+        /// <summary>
+        /// 入り方が決まったとき（Request〜 を呼んだとき）に知らせる。
+        /// 対局BGMの「自動」が、対局の種類で曲を選び直すのに使う（SettingsManager、2026-10-19）。
+        /// </summary>
+        public static event System.Action Changed;
+
         /// <summary>野良で探す。</summary>
         public static void RequestPublic()
         {
             Mode = MatchJoinMode.Public;
             Password = "";
             Difficulty = CpuDifficulty.Normal;
+            Changed?.Invoke();
         }
 
         /// <summary>部屋を作る。合言葉はサーバーが決めて `matching_waiting` で返してくる。</summary>
@@ -54,6 +61,7 @@ namespace KillingMahjong.Network
             Mode = MatchJoinMode.PrivateCreate;
             Password = "";
             Difficulty = CpuDifficulty.Normal;
+            Changed?.Invoke();
         }
 
         /// <summary>合言葉で相手の部屋に入る。小文字で渡されても通るよう大文字に直す。</summary>
@@ -62,6 +70,7 @@ namespace KillingMahjong.Network
             Mode = MatchJoinMode.PrivateJoin;
             Password = Normalize(password);
             Difficulty = CpuDifficulty.Normal;
+            Changed?.Invoke();
         }
 
         public static void RequestCpu(CpuDifficulty difficulty)
@@ -70,6 +79,7 @@ namespace KillingMahjong.Network
             Mode = MatchJoinMode.Cpu;
             Password = "";
             Difficulty = difficulty;
+            Changed?.Invoke();
         }
 
         /// <summary>入力欄の検証用。サーバーと同じ条件（英大文字と数字ちょうど5文字）。</summary>

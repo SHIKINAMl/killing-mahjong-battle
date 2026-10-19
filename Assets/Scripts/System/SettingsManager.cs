@@ -70,8 +70,15 @@ namespace KillingMahjong.Core
         // 従来のフェイズ別BGM（bgm_prepare / bgm_betting / 場の4層 / bgm_ron）が
         // 一切鳴らなくなっていた。リマスター版を入れても聞こえない、という状態だった。
         [Header("Match BGM")]
-        [SerializeField] private int matchBgmSet = (int)MatchBgmSetKind.Proposal4;
+        [SerializeField] private int matchBgmSet = (int)MatchBgmSetKind.Auto;
         public int MatchBgmSet => matchBgmSet;
+
+        /// <summary>
+        /// 保存の鍵。**2026-10-19 に「自動」を足したとき、鍵を "MatchBgmSet" から替えた。**
+        /// 前の鍵には第4案などが保存されているので、そのまま読むと「自動」が既定にならず、
+        /// 対局の種類で曲が変わらないように見える。全員いったん「自動」から始める。
+        /// </summary>
+        private const string MatchBgmSetPrefsKey = "MatchBgmSetV2";
 
         /// <summary>対局中に鳴らすBGMの種類。</summary>
         public enum MatchBgmSetKind
@@ -116,6 +123,33 @@ namespace KillingMahjong.Core
             KakeNoAizu1 = 6,
             /// <summary>賭けの合図 II（bgm_kake_2）。鳴らし方は I と同じ。</summary>
             KakeNoAizu2 = 7,
+            /// <summary>
+            /// 自動（2026-10-19、既定）。対局の種類で曲を決める（<see cref="ResolveMatchBgmSet"/>）。
+            ///   野良・フレンド（部屋を作る／合言葉で入る） … 夜卓の灯火
+            ///   CPU（やさしい・ふつう・つよい）             … 第4案
+            ///   CPU（とくしゅ）                             … 賭けの合図 I
+            /// **AudioManager へは、この番号のまま渡さない。** 必ず解決してから渡す。
+            /// </summary>
+            Auto = 8,
+        }
+
+        /// <summary>
+        /// 「自動」を、いまの対局の種類（タイトルで選んだ <see cref="Network.MatchJoinRequest"/>）から実際の曲の案へ解決する。
+        /// 「自動」以外はそのまま返す。
+        /// </summary>
+        public static int ResolveMatchBgmSet(int kind)
+        {
+            if (kind != (int)MatchBgmSetKind.Auto) return kind;
+            switch (Network.MatchJoinRequest.Mode)
+            {
+                case Network.MatchJoinMode.Cpu:
+                    return Network.MatchJoinRequest.Difficulty == Network.CpuDifficulty.Special
+                        ? (int)MatchBgmSetKind.KakeNoAizu1
+                        : (int)MatchBgmSetKind.Proposal4;
+                default:
+                    // 野良・部屋を作る・合言葉で入る
+                    return (int)MatchBgmSetKind.ReturningTheme;
+            }
         }
 
         /// <summary>
@@ -127,6 +161,7 @@ namespace KillingMahjong.Core
         /// </summary>
         public static readonly int[] MatchBgmChoiceKinds =
         {
+            (int)MatchBgmSetKind.Auto,
             (int)MatchBgmSetKind.Proposal4,
             (int)MatchBgmSetKind.ReturningTheme,
             (int)MatchBgmSetKind.KakeNoAizu1,
@@ -143,13 +178,14 @@ namespace KillingMahjong.Core
         /// </summary>
         public static readonly string[] MatchBgmChoiceLabels =
         {
+            "自動",
             "第4案",
             "夜卓の灯火",
             "賭けの合図 I",
             "賭けの合図 II",
         };
 
-        /// <summary>種類の番号が、選択欄の何番目か。選べない番号なら 0（第4案）。</summary>
+        /// <summary>種類の番号が、選択欄の何番目か。選べない番号なら 0（自動）。</summary>
         public static int MatchBgmChoiceIndexOf(int kind)
         {
             int index = System.Array.IndexOf(MatchBgmChoiceKinds, kind);
@@ -281,10 +317,12 @@ namespace KillingMahjong.Core
         private void Start()
         {
             ApplySettings();
+            Network.MatchJoinRequest.Changed += OnMatchJoinRequestChanged;
         }
 
         private void OnDestroy()
         {
+            Network.MatchJoinRequest.Changed -= OnMatchJoinRequestChanged;
             // 破棄済みオブジェクトを指したままにしない
             if (Instance == this) Instance = null;
         }
@@ -300,7 +338,7 @@ namespace KillingMahjong.Core
             isHighSpeedMode = PlayerPrefs.GetInt("IsHighSpeedMode", isHighSpeedMode ? 1 : 0) == 1;
             isEffectEnabled = PlayerPrefs.GetInt("IsEffectEnabled", isEffectEnabled ? 1 : 0) == 1;
 
-            matchBgmSet = NormalizeMatchBgmSet(PlayerPrefs.GetInt("MatchBgmSet", matchBgmSet));
+            matchBgmSet = NormalizeMatchBgmSet(PlayerPrefs.GetInt(MatchBgmSetPrefsKey, (int)MatchBgmSetKind.Auto));
             textSpeed = PlayerPrefs.GetInt("TextSpeed", textSpeed);
             screenMode = PlayerPrefs.GetInt("ScreenMode", screenMode);
             dialogueBubble = PlayerPrefs.GetInt("DialogueBubble", dialogueBubble);
@@ -337,7 +375,7 @@ namespace KillingMahjong.Core
             PlayerPrefs.SetInt("IsHighSpeedMode", isHighSpeedMode ? 1 : 0);
             PlayerPrefs.SetInt("IsEffectEnabled", isEffectEnabled ? 1 : 0);
 
-            PlayerPrefs.SetInt("MatchBgmSet", matchBgmSet);
+            PlayerPrefs.SetInt(MatchBgmSetPrefsKey, matchBgmSet);
             PlayerPrefs.SetInt("TextSpeed", textSpeed);
             PlayerPrefs.SetInt("ScreenMode", screenMode);
             PlayerPrefs.SetInt("DialogueBubble", dialogueBubble);
@@ -369,8 +407,20 @@ namespace KillingMahjong.Core
         {
             matchBgmSet = NormalizeMatchBgmSet(kind);
             var am = KillingMahjong.Managers.AudioManager.Instance;
-            if (am != null) am.ApplyMatchBgmSet(matchBgmSet);
+            if (am != null) am.ApplyMatchBgmSet(ResolveMatchBgmSet(matchBgmSet));
             CommitChange();
+        }
+
+        /// <summary>
+        /// タイトルで対局の種類が決まったとき（<see cref="Network.MatchJoinRequest.Changed"/>）。
+        /// 「自動」なら、その種類の曲へ当て直す。**このクラスはシーンをまたいで残るので、
+        /// 起動時の当て直しだけでは、タイトルで選んだ対局の種類が曲に届かない。**
+        /// </summary>
+        private void OnMatchJoinRequestChanged()
+        {
+            if (matchBgmSet != (int)MatchBgmSetKind.Auto) return;
+            var am = KillingMahjong.Managers.AudioManager.Instance;
+            if (am != null) am.ApplyMatchBgmSet(ResolveMatchBgmSet(matchBgmSet));
         }
 
         /// <summary>文字送りの速さを変える。次に出るセリフから効く。</summary>
@@ -446,8 +496,8 @@ namespace KillingMahjong.Core
                 KillingMahjong.Managers.AudioManager.Instance.voiceVolume = voiceVolume;
                 KillingMahjong.Managers.AudioManager.Instance.ApplyVolumes();
                 // 保存した選択を当て直す。ここで当てないと、起動のたびに
-                // AudioManager の既定（採用2曲）へ戻ってしまう
-                KillingMahjong.Managers.AudioManager.Instance.ApplyMatchBgmSet(matchBgmSet);
+                // AudioManager の既定（採用2曲）へ戻ってしまう。「自動」は対局の種類から解決して渡す
+                KillingMahjong.Managers.AudioManager.Instance.ApplyMatchBgmSet(ResolveMatchBgmSet(matchBgmSet));
             }
             // **`AudioListener.volume` を代用してはいけない。**
             // あれはゲーム全体のマスターで、BGMの値を入れるとSEもボイスも巻き添えになる。
