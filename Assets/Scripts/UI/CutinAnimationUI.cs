@@ -260,8 +260,7 @@ namespace KillingMahjong.UI
             // ① ばん！ 帯・文字・光・音・揺れを**同じ1コマに揃える。** ずれると当たりが弱くなる
             if (audio != null)
             {
-                audio.PlayStinger("br_blackout");
-                audio.PlayStinger("se_skill_strike");
+                audio.PlayImpactSE();
                 audio.PlayRonVoice();
             }
             revealObj.SetActive(true);

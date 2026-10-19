@@ -69,12 +69,13 @@ namespace KillingMahjong.Managers
 
         /// <summary>
         /// 未出牌の光がゲージに着いて、ポイントが増えたときの心音。
-        /// 段が上がったかどうかで強さを分ける。
+        /// 段が上がったかどうかで強さを分ける。段が上がったときは、上がった合図の音も重ねる（2026-10-19）。
         /// </summary>
         public void PlayVoltageHeartbeat(bool leveledUp)
         {
             PlayHeartbeat(leveledUp ? HeartbeatStrength.Strong : HeartbeatStrength.Medium,
                           HeartbeatSpacing.Spaced);
+            if (leveledUp) PlayStinger("se_voltage_up", PitchJitter.None);
         }
 
         private AudioClip GetHeartbeatClip(HeartbeatStrength strength, HeartbeatSpacing spacing)

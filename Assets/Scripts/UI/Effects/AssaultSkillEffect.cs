@@ -133,7 +133,7 @@ namespace KillingMahjong.UI.Effects
             }
 
             // ---- ③ 撃つ。筋を引いて、相手へ一直線 ----
-            if (audio != null) audio.PlaySynthSoundDual(SynthWaveType.Sine, SynthWaveType.Noise, 620f, 180f, 0.16f, 0.9f);
+            if (audio != null) audio.PlayAssaultSE();
             ScreenQuake.Play(5f, 0.1f);                       // 撃った反動
             for (float t = 0f; t < ShotSeconds; t += Time.deltaTime)
             {
@@ -147,7 +147,8 @@ namespace KillingMahjong.UI.Effects
             // ---- ④ 当たる。相手が跳ね、札が叩きつけられる。印が残る ----
             if (onHit != null) onHit();
             ScreenQuake.Play(14f, 0.22f);
-            if (audio != null) audio.PlaySynthSoundDual(SynthWaveType.Sine, SynthWaveType.Noise, 200f, 60f, 0.24f, 1.0f);
+            // 当たりは打撃音を低くして重く鳴らす
+            if (audio != null) audio.PlayStingerPitched("se_hit", 0.8f, AudioManager.PitchJitter.None);
             AssaultMarkUI.Show(targetHpAnchor);
 
             // 当たった所から輪が2つ広がり、しぶきが散る。札は大きい所から叩きつけられる。

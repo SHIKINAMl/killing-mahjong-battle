@@ -97,8 +97,7 @@ namespace KillingMahjong.UI.Effects
             if (audio != null)
             {
                 audio.PlayRonInputRon();
-                audio.PlayStinger("br_blackout");
-                audio.PlayStinger("se_skill_strike");
+                audio.PlayImpactSE();
             }
 
             if (hpPanels != null)

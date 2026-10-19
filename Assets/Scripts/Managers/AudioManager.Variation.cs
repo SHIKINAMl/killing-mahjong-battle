@@ -128,6 +128,17 @@ namespace KillingMahjong.Managers
         /// <param name="minInterval">この秒数より短い間隔の2発目は捨てる。0で制限なし</param>
         public void PlayStinger(string name, PitchJitter jitter, float minInterval = 0f)
         {
+            PlayStingerPitched(name, 1f, jitter, 1f, minInterval);
+        }
+
+        /// <summary>
+        /// 基準の音程と音量を変えて、スティンガーを鳴らす（2026-10-19）。
+        /// 1つの素材を、HPの残りや段階で高さを変えて使い回すときに使う。ばらつきはこの基準の上に掛かる。
+        /// </summary>
+        /// <param name="basePitch">基準の音程（1で素材のまま。0.5で1オクターブ下）</param>
+        /// <param name="volumeScale">いつものスティンガーの音量に掛ける倍率</param>
+        public void PlayStingerPitched(string name, float basePitch, PitchJitter jitter, float volumeScale = 1f, float minInterval = 0f)
+        {
             if (!CanPlay) return;
             if (string.IsNullOrEmpty(name) || seSource == null) return;
             if (!PassesRateLimit(name, minInterval)) return;
@@ -142,8 +153,8 @@ namespace KillingMahjong.Managers
             if (clip == null) return;
 
             float range = JitterRange(jitter);
-            float pitch = range > 0f ? 1f + Random.Range(-range, range) : 1f;
-            PlayOneShotWithPitch(clip, seVolume * masterVolume * stingerVolume, pitch);
+            float pitch = basePitch * (range > 0f ? 1f + Random.Range(-range, range) : 1f);
+            PlayOneShotWithPitch(clip, seVolume * masterVolume * stingerVolume * volumeScale, pitch);
         }
 
         /// <summary>

@@ -263,7 +263,8 @@ namespace KillingMahjong.UI.Effects
             if (hasDemon)
             {
                 // ---- ② 呼ぶ。黄色い輪が描かれて、ベルルが出てくる（スキル一覧が開くときと同じコマ）----
-                if (audio != null) audio.PlaySynthSound(SynthWaveType.Sine, 880f, 1320f, 0.25f, 0.35f);
+                // 役強化の音は1つの素材を、場面ごとに高さと大きさを変えて使う。呼ぶ所は低く小さく
+                if (audio != null) audio.PlayBoostSE(0.84f, 0.5f);
                 demon.enabled = true;
                 for (int i = 0; i < frames.Length; i++)
                 {
@@ -280,7 +281,7 @@ namespace KillingMahjong.UI.Effects
                     powered.enabled = true;
                     figure = powered;
                 }
-                if (audio != null) audio.PlaySynthSoundDual(SynthWaveType.Sine, SynthWaveType.Triangle, 330f, 990f, 0.3f, 0.6f);
+                if (audio != null) audio.PlayBoostSE(1f, 1f);
                 ScreenQuake.Play(6f, 0.15f);
                 plusText.alpha = 1f;
                 for (float t = 0f; t < 0.3f; t += Time.deltaTime)
@@ -306,7 +307,7 @@ namespace KillingMahjong.UI.Effects
                 yield return new WaitForSeconds(PowerHoldSeconds);
 
                 // ---- ④ 上がる。「+1翻」が板から降りてきて、新しい翻数になる ----
-                if (audio != null) audio.PlaySynthSound(SynthWaveType.Sine, 520f, 780f, 0.28f, 0.45f);
+                if (audio != null) audio.PlayBoostSE(1.12f, 0.6f);
                 float grow = newText.fontSize / plusText.fontSize;
                 for (float t = 0f; t < GrantSeconds; t += Time.deltaTime)
                 {
@@ -359,7 +360,7 @@ namespace KillingMahjong.UI.Effects
             else
             {
                 // ---- ベルルの絵が無いとき。新しい翻数が上から降りてくる（牌交換の IN と同じ動き）----
-                if (audio != null) audio.PlaySynthSound(SynthWaveType.Sine, 520f, 780f, 0.28f, 0.45f);
+                if (audio != null) audio.PlayBoostSE(1.12f, 0.6f);
                 for (float t = 0f; t < DropSeconds; t += Time.deltaTime)
                 {
                     float p = Mathf.Sin(Mathf.Clamp01(t / DropSeconds) * Mathf.PI * 0.5f);
@@ -423,7 +424,7 @@ namespace KillingMahjong.UI.Effects
                 // 強化が枠より多いと、飛んでいった先は「+2」（あと2件）の枠になる。
                 // しばらくだけ、そこに強めた役を名前で出す（明滅が終わったあとも少し残して読ませる）
                 board.SpotlightLocalBoost(yakuName, GlowSeconds + SpotlightLinger);
-                if (audio != null) audio.PlaySynthSound(SynthWaveType.Sine, 780f, 1170f, 0.14f, 0.5f);
+                if (audio != null) audio.PlayBoostSE(1.26f, 0.45f);
                 ReleaseTrance(dim, demon, powered);
 
                 _poppedChip = chip;

@@ -71,7 +71,12 @@ namespace KillingMahjong.UI
                     type == VictoryType.SpecialVictory);
             }
 
-            if (type == VictoryType.NormalVictory || type == VictoryType.SpecialVictory)
+            bool won = type == VictoryType.NormalVictory || type == VictoryType.SpecialVictory;
+            // 決着のジングル（2026-10-19）
+            if (KillingMahjong.Managers.AudioManager.Instance != null)
+                KillingMahjong.Managers.AudioManager.Instance.PlayMatchEndJingle(won);
+
+            if (won)
                 PlayVictoryEnding(type);
             else
                 PlayDefeatEnding(type);
