@@ -351,6 +351,24 @@ namespace KillingMahjong.UI
         {
             var list = new List<Effects.BloodStreamEffect>();
             mist = null;
+
+            // 本編の霧: 負けた側の血が弾けて霧散するだけで終わる。卓にもホースにも流さない
+            // （2026-10-19「霧散するバージョンは、ホースにいかせなくていいです。ただ血が弾けているだけで終わっていいです」。
+            // 同日「血の演出は、体から血が霧散している演出にして」で没案から本編になった）。
+            //
+            // **負けた側は画面の増減（ShownDelta）ではなく、勝ち負けとサーバーの増減で決める。**
+            // 本編では賭けた血を賭けた時点で場へ出しているので、満貫で負けた側の画面の増減は ±0 になる。
+            // ShownDelta で判定していたら、演出プレビューでは出るのに本編の対局では霧が出なかった（2026-10-19 のユーザー指摘）
+            if (!PreviewStreamDrain)
+            {
+                bool localLost = !s.LocalWon;
+                int lost = localLost ? Mathf.Min(s.MyDelta, s.MyShownDelta) : Mathf.Min(s.TheirDelta, s.TheirShownDelta);
+                if (lost < 0)
+                    mist = StartBloodMist(stageRt, localLost ? null : enemyInfo,
+                                          Mathf.Lerp(0.7f, 1.8f, Mathf.Clamp01(-lost / 12000f)));
+                return list;
+            }
+
             bool mineWins = s.MyShownDelta > 0;
             bool theirsWins = s.TheirShownDelta > 0;
             if (!mineWins && !theirsWins)
@@ -368,16 +386,6 @@ namespace KillingMahjong.UI
             int loserDelta = mineWins ? s.TheirShownDelta : s.MyShownDelta;
             int winnerDelta = mineWins ? s.MyShownDelta : s.TheirShownDelta;
 
-            // 本編の霧: 負けた側の血が弾けて霧散するだけで終わる。卓にもホースにも流さない
-            // （2026-10-19「霧散するバージョンは、ホースにいかせなくていいです。ただ血が弾けているだけで終わっていいです」。
-            // 同日「血の演出は、体から血が霧散している演出にして」で没案から本編になった）
-            if (!PreviewStreamDrain)
-            {
-                if (loserDelta < 0)
-                    mist = StartBloodMist(stageRt, mineWins ? enemyInfo : null,
-                                          Mathf.Lerp(0.7f, 1.8f, Mathf.Clamp01(-loserDelta / 12000f)));
-                return list;
-            }
             if (winnerGauge == null) return list;
 
             Vector3 poolPos = pool != null ? pool.transform.position : TablePoolPosition();
