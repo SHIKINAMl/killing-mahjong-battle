@@ -14,7 +14,8 @@ namespace KillingMahjong.UI
         /// 市松模様が晴れる瞬間と打点を合わせるためなので、
         /// `checkerFadeDuration` を変えたら音も作り直すこと。ずれると打点だけ遅れて聞こえる。
         /// 暗転・明転・着弾は Freesound（CC0）の素材を重ねたものに替えた（2026-10-19、
-        /// 作り方は km-bridge/効果音/game_se_make.py）。黒帯の開く・閉じるは、まだ前の合成のまま。
+        /// 作り方は km-bridge/効果音/game_se_make.py）。黒帯の開く・閉じるは、吸血鬼のマントとコウモリの
+        /// 羽ばたきを 8bit 風に荒くしたもの（閉じるは、前の音のいちばん強い所と同じ時刻に「バサッ」が来る）。
         /// </summary>
         private void PlayTransitionStinger(string name)
         {
