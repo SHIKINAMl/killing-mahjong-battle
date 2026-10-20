@@ -15,7 +15,7 @@ npm run verify
 ```
 
 `generate` は `Assets/Resources/UI/Cutin/gothic_band.png` を上書きし、比較画像と合成見本を
-`C:/Unity/km-docs/screenshots/20261020/cutin_pixel_bg/v4_bat_blood/` に出す。
+`C:/Unity/km-docs/screenshots/20261020/cutin_pixel_bg/v5_step_up/` に出す。
 別の見本出力先にする場合は `CUTIN_REVIEW_DIR` に絶対パスを設定する。
 今回の実行ではネットワーク取得をせず、同一バージョンの依存一式を `RoomPixelArt/node_modules/` からコピーした。
 `node_modules/` はGit対象外。バージョンと完全性情報は `package-lock.json` に固定。
@@ -41,8 +41,9 @@ Image-to-Pixelの同梱ライセンスは `LICENSE.image-to-pixel.txt`。
 
 - 左右2列、横24px・縦36px間隔。隣の列は縦18pxずらす。行ごとに雫とコウモリを交互にする。
 - コウモリ18×10px（2倍表示36×20単位）、雫10×14px（同20×28単位）。
-- 布は `#3E1522` / `#461827` / `#4E1B2C`。柄は `#4E1B2C`。
-  黒い輪郭・目・光沢は付けない。明るいひだと同色になる部分は布へ溶け込ませる。
+- 布は `#3E1522` / `#461827` / `#4E1B2C`。柄は `#663931`（布の明るいひだより1段明るい）。
+  最初の版（v4）は柄も `#4E1B2C` だったが、薄すぎたので 2026-10-20 に1段上げた。
+  黒い輪郭・目・光沢は付けない。
 - 全体の可視色は従来と同じ8色:
   `#000000` `#160F18` `#1E0707` `#3E1522` `#461827` `#4E1B2C` `#663931` `#786E55`。
   追加の色はない。中央は従来どおり無地。

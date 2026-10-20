@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import {fileURLToPath} from 'node:url';
+import {fileURLToPath,pathToFileURL} from 'node:url';
 import {createPixelator} from 'image-to-pixel';
 import {PNG} from 'pngjs';
 import {palette,rgb,read,write,clone,editable,scale,put,polygon,canvas,paste,label} from './art.mjs';
@@ -7,7 +7,7 @@ import {verify} from './verify.mjs';
 
 const here=new URL('./',import.meta.url);
 const out=new URL('../../Assets/Resources/UI/Cutin/gothic_band.png',here);
-const review=new URL(process.env.CUTIN_REVIEW_DIR ? process.env.CUTIN_REVIEW_DIR.replaceAll('\\','/').replace(/\/?$/,'/') : 'file:///C:/Unity/km-docs/screenshots/20261020/cutin_pixel_bg/v4_bat_blood/');
+const review=process.env.CUTIN_REVIEW_DIR ? pathToFileURL(process.env.CUTIN_REVIEW_DIR.replace(/[\\/]?$/,'/')) : new URL('file:///C:/Unity/km-docs/screenshots/20261020/cutin_pixel_bg/v5_step_up/');
 fs.mkdirSync(review,{recursive:true});
 const before=read(new URL('gothic_band_before.png',here));
 const source=scale(before,2);
@@ -26,8 +26,8 @@ for(let row=0;row<9;row++) for(let col=0;col<2;col++) {
   const type=(row+col)%2?'drop':'bat';
   for(const cx of [x,399-x]) {
     const points=(type==='bat'?bat:drop).map(([dx,dy])=>[(cx+dx)*2,(y+dy)*2]);
-    // 地色に近い一段明るい赤のみ。黒縁・目・光沢は描かない。
-    polygon(source,points,rgb('#4E1B2C'));
+    // 布の明るいひだより一段明るい赤茶（2026-10-20 に #4E1B2C から1段上げた）。黒縁・目・光沢は描かない。
+    polygon(source,points,rgb('#663931'));
   }
 }
 write(new URL('source_800x600.png',review),source);
