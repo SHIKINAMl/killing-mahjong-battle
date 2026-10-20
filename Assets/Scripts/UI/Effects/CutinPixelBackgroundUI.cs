@@ -3,7 +3,12 @@ using UnityEngine.UI;
 
 namespace KillingMahjong.UI.Effects
 {
-    /// <summary>ロンとスキルで共用する、2倍表示の静止ドット背景。</summary>
+    /// <summary>
+    /// ロンとスキルで共用する、2倍表示の静止ドット背景。
+    ///
+    /// 絵の透明でないところだけを切り抜く Mask も持つ。子に置いた物（ロンの立ち絵など）は、
+    /// 背景の絵の外に出ない（2026-10-20、ユーザー指示「女の子はカットインの背景の中だけ写す」）。
+    /// </summary>
     public sealed class CutinPixelBackgroundUI : MonoBehaviour
     {
         private const float PixelScale = 2f;
@@ -11,13 +16,14 @@ namespace KillingMahjong.UI.Effects
         private RectTransform rect;
         private RectTransform canvasRect;
 
-        public static void Attach(RectTransform band)
+        /// <summary>帯の最初の子として背景を置き、その RectTransform を返す（中身を切り抜く入れ物にもなる）。</summary>
+        public static RectTransform Attach(RectTransform band)
         {
             var texture = Resources.Load<Texture2D>("UI/Cutin/gothic_band");
             if (texture == null)
             {
                 Debug.LogError("[CutinPixelBackgroundUI] Background texture is missing.");
-                return;
+                return null;
             }
             var go = new GameObject("PixelBackground", typeof(RectTransform), typeof(RawImage));
             go.transform.SetParent(band, false);
@@ -32,7 +38,10 @@ namespace KillingMahjong.UI.Effects
             background.rect.sizeDelta = new Vector2(texture.width, texture.height) * PixelScale;
             var canvas = band.GetComponentInParent<Canvas>();
             background.canvasRect = canvas != null ? canvas.rootCanvas.transform as RectTransform : null;
+            // 透明なところは Mask の型にならない（Mask は型の絵を透明度で切る）
+            go.AddComponent<Mask>().showMaskGraphic = true;
             background.LateUpdate();
+            return background.rect;
         }
 
         private void LateUpdate()
