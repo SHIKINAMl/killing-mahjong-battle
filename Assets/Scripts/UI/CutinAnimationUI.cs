@@ -34,6 +34,9 @@ namespace KillingMahjong.UI
         private static readonly Vector2 CharShadowBase = new Vector2(12f, -6f);
         private static readonly Vector2 GlyphShadowBase = new Vector2(8f, -7f);
 
+        /// <summary>「ロ」を叩いた時の立ち絵の明るさ（0＝真っ黒、1＝そのまま）。「ン」で 1 になる。</summary>
+        private const float CharPeekLevel = 0.4f;
+
         /// <summary>
         /// 立ち絵が色づいた瞬間からの赤い影のずれ。真後ろに隠れた所から、行き過ぎて戻るまでをコマ打ちで出す（2026-10-20）。
         /// </summary>
@@ -217,8 +220,8 @@ namespace KillingMahjong.UI
             Vector2 charHome = charRt.anchoredPosition;
             if (charShadow != null) charShadow.gameObject.SetActive(false);
 
-            // 立ち絵は**最初は真っ暗**で、「ロン」が揃った（最後の文字を叩いた）瞬間にパッと色づく（2026-10-20）。
-            // 色を黒にすると、絵の形のまま黒く写る
+            // 立ち絵は**最初は真っ暗**で、「ロ」で少しだけ見え、「ロン」が揃った（最後の文字を叩いた）瞬間に
+            // パッと色づく（2026-10-20）。色を黒にすると、絵の形のまま黒く写る
             charImg.color = Color.black;
             Image faceImg = null;
 
@@ -405,7 +408,15 @@ namespace KillingMahjong.UI
                 // 最後の文字で立ち絵を色づけ、赤い影を後ろからずらして出す。
                 // **音ハメ**：この文字の衝撃音（上の PlayImpactSE）と同じコマ。声の「ン」もここに来る
                 bool pop = g == glyphs.Count - 1;
-                if (pop)
+                if (!pop)
+                {
+                    // 途中の文字では少しだけ見せる。文字が多いときは、叩くたびに一段ずつ明るくする
+                    float level = CharPeekLevel * (g + 1) / (glyphs.Count - 1);
+                    var peek = new Color(level, level, level, 1f);
+                    charImg.color = peek;
+                    if (faceImg != null) faceImg.color = peek;
+                }
+                else
                 {
                     charImg.color = Color.white;
                     if (faceImg != null) faceImg.color = Color.white;
