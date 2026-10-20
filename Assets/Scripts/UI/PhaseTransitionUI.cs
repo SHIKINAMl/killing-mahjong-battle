@@ -538,14 +538,7 @@ namespace KillingMahjong.UI
             bgStripeObj.transform.SetParent(containerRt, false);
             Image stripeImg = bgStripeObj.AddComponent<Image>();
             
-            if (isLocalPlayer)
-            {
-                stripeImg.color = new Color32(10, 80, 200, 255); // 鮮やかな青
-            }
-            else
-            {
-                stripeImg.color = new Color32(180, 10, 10, 255); // 鮮やかな赤
-            }
+            stripeImg.enabled = false; // 単色帯は描かず、共通のドット背景を子に置く。
 
             RectTransform stripeRt = bgStripeObj.GetComponent<RectTransform>();
             // 画面を覆い尽くす長方形から、帯状（バナー）に変更
@@ -557,15 +550,8 @@ namespace KillingMahjong.UI
             Vector2 stripeStart = new Vector2(0, -3000f);
             stripeRt.anchoredPosition = stripeStart;
 
-            // 濃い色の帯が背景に溶けないよう黒で縁取る。
-            // 帯はこのあと動かすので、縁も同じ動きに含める。
-            var stripeEdge = KillingMahjong.Visuals.UIEdgeOutline.AddBehind(stripeRt, 10f);
-            if (stripeEdge != null)
-            {
-                bgElements.Add(stripeEdge);
-                bgStartPos.Add(stripeStart);
-                bgTargetPos.Add(stripeTarget);
-            }
+            // 縁もPNGへ描き込む。背景だけは帯の回転を相殺し、2倍のまま描く。
+            Effects.CutinPixelBackgroundUI.Attach(stripeRt);
 
             bgElements.Add(stripeRt);
             bgStartPos.Add(stripeStart);
@@ -580,7 +566,7 @@ namespace KillingMahjong.UI
                     splatterObj.transform.SetParent(containerRt, false);
                     Image spImg = splatterObj.AddComponent<Image>();
                     spImg.sprite = bloodSplatterSprite;
-                    spImg.color = isLocalPlayer ? new Color32(10, 80, 200, 180) : new Color32(180, 10, 10, 180);
+                    spImg.color = new Color32(78, 27, 44, 180); // 背景の暗赤にそろえる。
                     spImg.preserveAspect = true;
 
                     RectTransform spRt = splatterObj.GetComponent<RectTransform>();

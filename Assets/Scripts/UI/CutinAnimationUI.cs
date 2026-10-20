@@ -117,15 +117,12 @@ namespace KillingMahjong.UI
             stripeRt.localRotation = Quaternion.Euler(0, 0, 0f); // 親が15度傾いているのでこちらは0度
 
             Image stripeImg = stripeObj.AddComponent<Image>();
-            stripeImg.color = new Color(0.85f, 0f, 0.5f, 1f); // 派手なピンク系
-
-            // 濃いピンクが背景に溶けないよう黒で縁取る。
-            // Mask を付ける前に作ること。Mask は自分の子だけを切り抜くので、
-            // 背面の兄弟であるこの縁は影響を受けない。
-            KillingMahjong.Visuals.UIEdgeOutline.AddBehind(stripeRt, 10f);
+            stripeImg.color = Color.white; // 既存の切り抜き形状だけに使用する。
 
             Mask stripeMask = stripeObj.AddComponent<Mask>();
-            stripeMask.showMaskGraphic = true;
+            stripeMask.showMaskGraphic = false;
+            // 最初の子なので、後から挿入する靄・立ち絵より奥になる。
+            Effects.CutinPixelBackgroundUI.Attach(stripeRt);
 
             // 4. キャラクター画像（帯の中でマスクされる）
             GameObject charObj = new GameObject("CharacterImage");
