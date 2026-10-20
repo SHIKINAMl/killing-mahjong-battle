@@ -512,3 +512,39 @@ def test_mulligan_protocol_over_session():
         assert player.wall[5] == offered[4] and player.pending_mulligan is None
 
     asyncio.run(run())
+
+
+# ========== 局の出来事（記録用の round_events） ==========
+
+def test_round_events_record_skills_and_mulligan_choice():
+    engine, player = _mulligan_engine()
+    assert engine.round_events == []  # 人間どうしなので、配牌の時点では何も起きていない
+    target = engine.get_player_by_id("CPU0001")
+    assert engine.execute_skill(player, SkillType.PERSPECTIVE, {"suit": "manzu"}) == 500
+    assert engine.execute_skill(player, SkillType.MULLIGAN, {"target_hand_indexes": [1, 2, 3]}) == 500
+    options = list(player.pending_mulligan["options"])
+    result = engine.resolve_mulligan(player, [3, 0, 5])
+
+    perspective, mulligan, selected = engine.round_events
+    assert perspective["skill"] == "perspective" and perspective["cost"] == 500 and perspective["source"] == "skill"
+    assert perspective["perspective"]["suit"] == "manzu"
+    assert perspective["perspective"]["exposed_tiles"] == [target.wall[i] for i in perspective["perspective"]["exposed_indexes"]]
+    assert mulligan["skill"] == "mulligan" and mulligan["mulligan"] == {"wall_indexes": [1, 2, 3], "options": options}
+    assert selected == {"type": "mulligan_select", "player": "C0001", "choices": [3, 0, 5], "changes": result["changes"]}
+    assert mulligan["health_after"] == 20000 - 1000
+
+    # 次の局の配牌で空になる
+    engine.end_round(is_draw=True)
+    engine.confirm_next_round("C0001")
+    engine.confirm_next_round("CPU0001")
+    assert engine.round_events == []
+
+
+def test_round_events_record_initial_perspective_perk():
+    engine = _engine_with_perks(initial_perspective_count=7)
+    engine.start_game(5)
+    human = engine.get_player_by_id("C0001")
+    (event,) = engine.round_events
+    assert event["player"] == "CPU0001" and event["source"] == "cpu_perk" and event["cost"] == 0
+    assert event["perspective"]["exposed_indexes"] == sorted(human.exposed_hand_indexes)
+    assert event["perspective"]["exposed_tiles"] == [human.wall[i] for i in event["perspective"]["exposed_indexes"]]

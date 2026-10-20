@@ -254,6 +254,14 @@ def test_pvp_match_is_recorded_and_ranked(zero_think_time, caplog):
     assert record.ranked and record.mode == "public" and record.rounds >= 2  # 最大局数は対局が始まってから下げるので、早ければ 3 局目まで進む
     assert {r.player_id for r in record.players} == set(ids)
     assert len(record.round_logs) == record.rounds and len(record.round_logs[0]["players"][0]["wall"]) == 34
+    # 先手・両者の打牌の順番（ボルテージ付き）・局の終わりのボルテージ
+    log = record.round_logs[0]
+    discards = [e for e in log["events"] if e["type"] == "discard"]
+    assert discards and log["first_player"] == discards[0]["player"]
+    assert all(x["player"] != y["player"] for x, y in zip(discards, discards[1:]))  # 交互に捨てる
+    for p in log["players"]:
+        assert [e["tile"] for e in discards if e["player"] == p["client_id"]] == p["discards"]
+        assert set(p["voltage"]) == {"points", "broken", "multiplier"}
     for r in record.players:
         stats = store.players[r.player_id].stats
         assert stats["matches"] == 1 and stats["max_rounds"] == record.rounds
