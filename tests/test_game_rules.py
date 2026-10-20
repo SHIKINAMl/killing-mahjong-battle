@@ -310,3 +310,26 @@ def test_tanki_bonus_applies_to_any_single_kind_wait():
     assert tanki([], 5 | 0b100000, [5])  # ドラの印が付いた牌 ID でも種類で比べる
     assert not tanki([], 5, [5, 8])  # 2 種類の待ち
     assert not tanki([], 8, [5])
+
+
+def test_ryanpeikou_including_four_identical_runs():
+    """二盃口は同じ順子の組が 2 組。123萬×4 も 2 組なので二盃口（前は三暗刻になり、満貫を割っていた）。"""
+    from collections import Counter
+
+    from mahjong_engine.engine.hand_analyzer import HandAnalyzer
+
+    def check(hand14, winning_tile, expected):
+        yaku = HandAnalyzer.enum_yaku(hand14, winning_tile=winning_tile)
+        counter_tuple = tuple(Counter(hand14).get(i, 0) for i in range(29))
+        assert ("二盃口" in yaku) is expected["ryanpeikou"], yaku
+        assert ("一盃口" in yaku) is expected["ipeikou"], yaku
+        # 配牌時の満貫チェック（速い判定）も同じ翻数になる
+        assert HandAnalyzer._max_han_from_counter_tuple(counter_tuple, winning_tile) == HandAnalyzer.calc_yaku(hand14, winning_tile)
+
+    four_runs = [0, 1, 2] * 4 + [13, 13]  # 123萬×4 + 5筒の雀頭
+    check(four_runs, 13, {"ryanpeikou": True, "ipeikou": False})
+    assert HandAnalyzer.calc_yaku(four_runs, 13) >= 4  # 二盃口 3 + 立直 1 で満貫
+    check([0, 1, 2, 0, 1, 2, 12, 13, 14, 12, 13, 14, 24, 24], 24, {"ryanpeikou": True, "ipeikou": False})
+    check([0, 1, 2, 0, 1, 2, 1, 2, 3, 1, 2, 3, 13, 13], 13, {"ryanpeikou": True, "ipeikou": False})
+    check([0, 1, 2, 0, 1, 2, 12, 13, 14, 24, 25, 26, 27, 27], 27, {"ryanpeikou": False, "ipeikou": True})
+    check([0, 1, 2] * 3 + [12, 13, 14, 27, 27], 14, {"ryanpeikou": False, "ipeikou": False})  # 三暗刻の方が高い
