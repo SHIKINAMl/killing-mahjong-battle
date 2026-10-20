@@ -68,6 +68,9 @@ namespace KillingMahjong.UI
             prompt = null;
         }
 
+        /// <summary>この1コマに何か操作があったか。タイトルのランキング（<see cref="TitleRankingBoardUI"/>）も使う。</summary>
+        internal static bool AnyInput() => HasInput();
+
         private static bool HasInput()
         {
             var mouse = Mouse.current;

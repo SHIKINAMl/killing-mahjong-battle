@@ -239,17 +239,7 @@ public class WebSocketGameClientSample : MonoBehaviour
         if (connectGeneration != connectionGeneration) return;
 
         string normalizedUrl = NormalizeServerUrl(serverUrl);
-
-        // 認証トークンはクエリパラメータ ?token= で渡す。
-        // ブラウザ(WebGL)は WebSocket にヘッダーを付けられないが、URL のクエリなら
-        // 全プラットフォーム（エディタ / Windows / WebGL）で送れる。
-        // 本番サーバーは ?token= でのトークン受付に対応済み。
-        string connectUrl = normalizedUrl;
-        if (!string.IsNullOrEmpty(authToken))
-        {
-            string separator = normalizedUrl.Contains("?") ? "&" : "?";
-            connectUrl = $"{normalizedUrl}{separator}token={Uri.EscapeDataString(authToken)}";
-        }
+        string connectUrl = BuildConnectUrl();
 
         webSocket = new WebSocket(connectUrl);
         var connectingSocket = webSocket;
@@ -297,6 +287,25 @@ public class WebSocketGameClientSample : MonoBehaviour
             // Connect() は閉じるまで戻らないので、ここに来た時点で接続は終わっている
             if (connectGeneration == connectionGeneration) isConnecting = false;
         }
+    }
+
+    /// <summary>
+    /// 繋ぐ先の URL（トークン付き）。**ログに出さないこと**（トークンが入る）。
+    ///
+    /// 認証トークンはクエリパラメータ ?token= で渡す。
+    /// ブラウザ(WebGL)は WebSocket にヘッダーを付けられないが、URL のクエリなら
+    /// 全プラットフォーム（エディタ / Windows / WebGL）で送れる。
+    /// 本番サーバーは ?token= でのトークン受付に対応済み。
+    ///
+    /// タイトルのランキング（<see cref="KillingMahjong.Network.RankingFetcher"/>）も、
+    /// Prefab に置いてあるこの設定を読んで同じサーバーへ繋ぐ（実体は作らない）。
+    /// </summary>
+    public string BuildConnectUrl()
+    {
+        string normalizedUrl = NormalizeServerUrl(serverUrl);
+        if (string.IsNullOrEmpty(authToken)) return normalizedUrl;
+        string separator = normalizedUrl.Contains("?") ? "&" : "?";
+        return $"{normalizedUrl}{separator}token={Uri.EscapeDataString(authToken)}";
     }
 
     /// <summary>

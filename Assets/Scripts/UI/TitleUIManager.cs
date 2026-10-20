@@ -41,6 +41,8 @@ namespace KillingMahjong.UI
             }
 
             BuildTitleClickTarget();
+            TitleRankingBoardUI.Ensure(this);
+            SceneFirst.Report(nameof(TitleRankingBoardUI));
             ExhibitionIdleReturn.EnableSession();
 
             // 既存の帰還キーを一度だけ消費し、チュートリアル後は対局メニューへ進む。
@@ -104,6 +106,14 @@ namespace KillingMahjong.UI
 
         private bool isStartingTutorial;
         private GameObject titleClickTarget;
+
+        /// <summary>
+        /// 展示のタイトルで、次の人を待っているところか（「どこを押しても始まる」が出ていて、
+        /// メニューも設定も開いていない）。放置したときのランキングはこの間だけ出す。
+        /// </summary>
+        public bool IsWaitingForVisitor =>
+            titleClickTarget != null && titleClickTarget.activeInHierarchy && !isStartingTutorial
+            && (optionUIPanel == null || !optionUIPanel.activeInHierarchy);
 
         private const string TitleClickTargetName = "TitleClickToTutorial";
         private const string MatchShortcutName = "ルールを知っている方：対局へ";
@@ -196,7 +206,11 @@ namespace KillingMahjong.UI
         {
             BuildTitleClickTarget();
             titleClickTarget = null;
-            return lastBakeReport;
+            string report = lastBakeReport;
+            TitleRankingBoardUI.Ensure(this);
+            string board = SceneFirst.Report(nameof(TitleRankingBoardUI));
+            if (board.Length > 0) report = report.Length > 0 ? report + "、" + board : board;
+            return report;
         }
 
         /// <summary>このシーンが部屋（再生すると部屋の画面から始まる）か。焼き込みが見る。</summary>
