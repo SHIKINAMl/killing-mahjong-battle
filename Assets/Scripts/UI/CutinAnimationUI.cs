@@ -34,6 +34,16 @@ namespace KillingMahjong.UI
         private static readonly Vector2 CharShadowBase = new Vector2(12f, -6f);
         private static readonly Vector2 GlyphShadowBase = new Vector2(8f, -7f);
 
+        /// <summary>
+        /// 立ち絵が色づいた瞬間からの赤い影のずれ。真後ろに隠れた所から、行き過ぎて戻るまでをコマ打ちで出す（2026-10-20）。
+        /// </summary>
+        private static Vector2 CharShadowPop(float since)
+        {
+            if (since < 0.035f) return Vector2.zero;
+            if (since < 0.1f) return CharShadowBase * 2f;
+            return CharShadowBase;
+        }
+
         /// <summary>「ロン」の文字を収める、帯の中の右半分（帯の中心からの距離）。</summary>
         private const float TextAreaRight = 385f;
         private const float TextAreaWidth = 400f;
@@ -205,13 +215,20 @@ namespace KillingMahjong.UI
             Image charShadow = CreateSilhouette(scope, charRt, characterSprite, new Color(0.78f, 0.03f, 0.1f, 0.9f));
             RectTransform charShadowRt = charShadow != null ? charShadow.rectTransform : null;
             Vector2 charHome = charRt.anchoredPosition;
+            if (charShadow != null) charShadow.gameObject.SetActive(false);
+
+            // 立ち絵は**最初は真っ暗**で、「ロン」が揃った（最後の文字を叩いた）瞬間にパッと色づく（2026-10-20）。
+            // 色を黒にすると、絵の形のまま黒く写る
+            charImg.color = Color.black;
+            Image faceImg = null;
 
             // 4.5 顔パーツ画像（身体の上に乗せる）
             if (faceSprite != null)
             {
                 GameObject faceObj = new GameObject("FaceImage");
                 faceObj.transform.SetParent(charRt, false); // 身体の子要素にする
-                Image faceImg = faceObj.AddComponent<Image>();
+                faceImg = faceObj.AddComponent<Image>();
+                faceImg.color = Color.black;
                 faceImg.sprite = faceSprite;
                 faceImg.preserveAspect = true;
                 RectTransform faceRt = faceObj.GetComponent<RectTransform>();
@@ -385,20 +402,39 @@ namespace KillingMahjong.UI
                 }
                 RectTransform glyphRt = glyphs[g].rectTransform;
                 glyphs[g].gameObject.SetActive(true);
-                t = 0f;
-                while (t < slamTime)
+                // 最後の文字で立ち絵を色づけ、赤い影を後ろからずらして出す。
+                // **音ハメ**：この文字の衝撃音（上の PlayImpactSE）と同じコマ。声の「ン」もここに来る
+                bool pop = g == glyphs.Count - 1;
+                if (pop)
                 {
-                    float k = t / slamTime;
-                    glyphRt.localScale = Vector3.one * Mathf.Lerp(slamFrom, 1f, k * k);
-                    if (g == 0 && t > 0.05f) flashImg.color = new Color(0.85f, 0f, 0.1f, 0.5f);
+                    charImg.color = Color.white;
+                    if (faceImg != null) faceImg.color = Color.white;
+                    if (charShadowRt != null)
+                    {
+                        charShadowRt.anchoredPosition = charHome;
+                        charShadowRt.gameObject.SetActive(true);
+                    }
+                }
+                float stop = g == 0 ? stopTime : stopTime * 0.75f;
+                t = 0f;
+                while (t < slamTime + stop)
+                {
+                    if (t < slamTime)
+                    {
+                        float k = t / slamTime;
+                        glyphRt.localScale = Vector3.one * Mathf.Lerp(slamFrom, 1f, k * k);
+                        if (g == 0 && t > 0.05f) flashImg.color = new Color(0.85f, 0f, 0.1f, 0.5f);
+                    }
+                    else
+                    {
+                        // ヒットストップ。**潰れた形のまま止める。** 止めた間に、目が「当たった」と読む
+                        glyphRt.localScale = squash;
+                        if (g == 0) flashImg.color = new Color(0.85f, 0f, 0.1f, 0.4f);
+                    }
+                    if (pop && charShadowRt != null) charShadowRt.anchoredPosition = charHome + CharShadowPop(t);
                     t += Time.deltaTime;
                     yield return null;
                 }
-                // ヒットストップ。**潰れた形のまま止める。** 止めた間に、目が「当たった」と読む
-                glyphRt.localScale = squash;
-                if (g == 0) flashImg.color = new Color(0.85f, 0f, 0.1f, 0.4f);
-                float stop = g == 0 ? stopTime : stopTime * 0.75f;
-                yield return new WaitForSeconds(stop);
                 // 出た文字は形を戻し、影を後ろに出す
                 glyphRt.localScale = Vector3.one;
                 glyphShadows[g].rectTransform.anchoredPosition = glyphHomes[g] + GlyphShadowBase;
