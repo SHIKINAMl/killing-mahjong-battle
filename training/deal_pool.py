@@ -162,10 +162,21 @@ def _load_manifest(out_dir: Path) -> Optional[dict]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _write_manifest(out_dir: Path, manifest: dict) -> None:
+def _write_manifest(out_dir: Path, manifest: dict, attempts: int = 10) -> None:
+    """
+    台帳を書き換える。_replace_dir と同じく、OneDrive が同期中の台帳をつかんでいると差し替えが
+    「アクセス拒否」で一時的に弾かれるので、少し待ってやり直す（2026-10-20 に生成が 77 シャード目で止まった）。
+    """
     temp = out_dir / "manifest.json.tmp"
     temp.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
-    temp.replace(_manifest_path(out_dir))
+    for attempt in range(1, attempts + 1):
+        try:
+            temp.replace(_manifest_path(out_dir))
+            return
+        except PermissionError:
+            if attempt == attempts:
+                raise
+            time.sleep(0.5 * attempt)
 
 
 def generate(out_dir: Path, count: int, seed: int = 1, workers: Optional[int] = None,
