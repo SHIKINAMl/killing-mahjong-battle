@@ -159,8 +159,8 @@ namespace KillingMahjong.UI
                     finally { if (continuedReplay != null) continuedReplay.Close(); }
                     break;
                 case EnemyInfoUI.TutorialRevealEffectId:
-                    rig.character.sprite = Resources.Load<Sprite>("女の子/tutorial_girl_px_body");
-                    rig.face.sprite = Resources.Load<Sprite>("女の子/tutorial_girl_px_face");
+                    rig.character.sprite = Resources.Load<Sprite>("女の子/tutorial_girl_px29_body");
+                    rig.face.sprite = Resources.Load<Sprite>("女の子/tutorial_girl_px29_face");
                     try { yield return rig.enemy.RevealTutorialCharacter(); }
                     finally { if (rig.enemy != null) rig.enemy.RestoreTutorialCharacter(); }
                     break;

@@ -15,34 +15,34 @@ MonoBehaviour:
   characterName: TutorialGirl
   bodySprites:
   - id: "\u901A\u5E38"
-    sprite: {fileID: 21300000, guid: 6f1d7d95ccd1cf14abac453eb4e6c9db, type: 3}
+    sprite: {fileID: 21300000, guid: 4b16dc67cc2f2ce4bbf76d1ebdb098ed, type: 3}
   - id: "\u30D4\u30FC\u30B9"
-    sprite: {fileID: 21300000, guid: 6f1d7d95ccd1cf14abac453eb4e6c9db, type: 3}
+    sprite: {fileID: 21300000, guid: 4b16dc67cc2f2ce4bbf76d1ebdb098ed, type: 3}
   defaultBodyId: "\u901A\u5E38"
   faceSprites:
   - id: "\u901A\u5E38\u9854"
-    sprite: {fileID: 21300000, guid: 0219b571905b37b4297dfc824e3d085d, type: 3}
+    sprite: {fileID: 21300000, guid: 30202e2cba692ee49a310e0c99f11e8e, type: 3}
   - id: "\u30AD\u30E1\u9854"
-    sprite: {fileID: 21300000, guid: 0219b571905b37b4297dfc824e3d085d, type: 3}
+    sprite: {fileID: 21300000, guid: 30202e2cba692ee49a310e0c99f11e8e, type: 3}
   - id: "\u30B3\u30DF\u30AB\u30EB\u9854"
-    sprite: {fileID: 21300000, guid: 0219b571905b37b4297dfc824e3d085d, type: 3}
+    sprite: {fileID: 21300000, guid: 30202e2cba692ee49a310e0c99f11e8e, type: 3}
   - id: "\u7B11\u9854"
-    sprite: {fileID: 21300000, guid: 0219b571905b37b4297dfc824e3d085d, type: 3}
+    sprite: {fileID: 21300000, guid: 30202e2cba692ee49a310e0c99f11e8e, type: 3}
   - id: "\u56F0\u308A\u9854"
-    sprite: {fileID: 21300000, guid: 0219b571905b37b4297dfc824e3d085d, type: 3}
+    sprite: {fileID: 21300000, guid: 30202e2cba692ee49a310e0c99f11e8e, type: 3}
   - id: "\u30AD\u30EC\u7B11\u9854"
-    sprite: {fileID: 21300000, guid: 0219b571905b37b4297dfc824e3d085d, type: 3}
+    sprite: {fileID: 21300000, guid: 30202e2cba692ee49a310e0c99f11e8e, type: 3}
   - id: "\u717D\u308A\u9854"
-    sprite: {fileID: 21300000, guid: 0219b571905b37b4297dfc824e3d085d, type: 3}
+    sprite: {fileID: 21300000, guid: 30202e2cba692ee49a310e0c99f11e8e, type: 3}
   - id: blink
-    sprite: {fileID: 21300000, guid: 0219b571905b37b4297dfc824e3d085d, type: 3}
+    sprite: {fileID: 21300000, guid: 30202e2cba692ee49a310e0c99f11e8e, type: 3}
   defaultFaceId: "\u901A\u5E38\u9854"
   enableBlink: 0
   blinkIntervalMin: 2
   blinkIntervalMax: 5
   blinkFaceId: blink
-  normalSprite: {fileID: 21300000, guid: 6f1d7d95ccd1cf14abac453eb4e6c9db, type: 3}
-  discardSprite: {fileID: 21300000, guid: 6f1d7d95ccd1cf14abac453eb4e6c9db, type: 3}
+  normalSprite: {fileID: 21300000, guid: 4b16dc67cc2f2ce4bbf76d1ebdb098ed, type: 3}
+  discardSprite: {fileID: 21300000, guid: 4b16dc67cc2f2ce4bbf76d1ebdb098ed, type: 3}
   reactions:
   - trigger: 0
     bodyExpressionId: 
