@@ -20,8 +20,8 @@ namespace KillingMahjong.UI
         /// </summary>
         /// <param name="intensity">
         /// 手の大きさ。0 で満貫級、1 で役満級（2026-09-15 に追加）。
-        /// **大きいほど、文字が強く叩きつけられ、寄りが深く、間が長くなる。**
-        /// 同じ絵で大小を表すために、この3つを一緒に動かしている。
+        /// **大きいほど、揺れが強く、溜めと間が長くなる。**
+        /// 同じ絵で大小を表すために、これらを一緒に動かしている。
         /// </param>
         public void PlayCutin(Sprite characterSprite, Sprite faceSprite, TMP_FontAsset font,
                               string cutinText, System.Action onComplete, float intensity = 0f)
@@ -33,6 +33,13 @@ namespace KillingMahjong.UI
         /// <summary>叩いた直後の影の位置（立ち絵・文字からのずれ）。ここからジリジリ動く。</summary>
         private static readonly Vector2 CharShadowBase = new Vector2(12f, -6f);
         private static readonly Vector2 GlyphShadowBase = new Vector2(8f, -7f);
+
+        /// <summary>
+        /// 文字は少し下に出て、すぐ上の正しい位置へ瞬間移動する（2026-10-20、ユーザー指示「五ミリくらい」）。
+        /// 800×600 の画面を普通の大きさで見て、16 単位が 5mm くらい。
+        /// </summary>
+        private const float GlyphHopDown = 16f;
+        private const float GlyphHopDelay = 0.04f;
 
         /// <summary>「ロ」を叩いた時の立ち絵の明るさ（0＝真っ黒、1＝そのまま）。「ン」で 1 になる。</summary>
         private const float CharPeekLevel = 0.4f;
@@ -389,12 +396,12 @@ namespace KillingMahjong.UI
             // 光は白を2コマ、そのあと赤く残して引く
             flashImg.color = new Color(1f, 1f, 1f, 0.9f);
 
-            // 文字を1つずつ叩きつける（バン、バン）。大きい手ほど大きいところから落ちてくる。
+            // 文字を1つずつ出す（パッ、パッ）。**大きさは変えず、その場に一度に出す**（2026-10-20、ユーザー指示）。
+            // 前は手前の大きいところから落ちてきて潰れていたが、作り物っぽく見えるのでやめた。
+            // 出す間合いは前と同じ（音ハメを崩さない）。
             // 2文字目からは音と揺れを足すが、光は1文字目だけ（白が2回だと目が痛い）
-            float slamFrom = Mathf.Lerp(2.6f, 3.4f, intensity);
             float slamTime = 0.07f;
             float stopTime = Mathf.Lerp(0.08f, 0.13f, intensity);
-            Vector3 squash = new Vector3(1.08f, 0.9f, 1f);
             float extraSlams = 0f;
             for (int g = 0; g < glyphs.Count; g++)
             {
@@ -404,6 +411,10 @@ namespace KillingMahjong.UI
                     Effects.ScreenQuake.Play(Mathf.Lerp(14f, 26f, intensity), 0.3f);
                 }
                 RectTransform glyphRt = glyphs[g].rectTransform;
+                // 文字の並びは画面に収めるため縮めてあるので、そのぶん割り戻して 5mm にする
+                glyphRt.anchoredPosition = glyphHomes[g] + new Vector2(0f, -GlyphHopDown / textFit);
+                // 1文字目は白い光（0.05 秒）に隠れるので、光が赤に変わってから跳ぶ
+                float hopAt = g == 0 ? 0.05f + GlyphHopDelay : GlyphHopDelay;
                 glyphs[g].gameObject.SetActive(true);
                 // 最後の文字で立ち絵を色づけ、赤い影を後ろからずらして出す。
                 // **音ハメ**：この文字の衝撃音（上の PlayImpactSE）と同じコマ。声の「ン」もここに来る
@@ -430,24 +441,15 @@ namespace KillingMahjong.UI
                 t = 0f;
                 while (t < slamTime + stop)
                 {
-                    if (t < slamTime)
-                    {
-                        float k = t / slamTime;
-                        glyphRt.localScale = Vector3.one * Mathf.Lerp(slamFrom, 1f, k * k);
-                        if (g == 0 && t > 0.05f) flashImg.color = new Color(0.85f, 0f, 0.1f, 0.5f);
-                    }
-                    else
-                    {
-                        // ヒットストップ。**潰れた形のまま止める。** 止めた間に、目が「当たった」と読む
-                        glyphRt.localScale = squash;
-                        if (g == 0) flashImg.color = new Color(0.85f, 0f, 0.1f, 0.4f);
-                    }
+                    if (t >= hopAt) glyphRt.anchoredPosition = glyphHomes[g];
+                    if (g == 0 && t > 0.05f)
+                        flashImg.color = new Color(0.85f, 0f, 0.1f, t < slamTime ? 0.5f : 0.4f);
                     if (pop && charShadowRt != null) charShadowRt.anchoredPosition = charHome + CharShadowPop(t);
                     t += Time.deltaTime;
                     yield return null;
                 }
-                // 出た文字は形を戻し、影を後ろに出す
-                glyphRt.localScale = Vector3.one;
+                // 出た文字の後ろに影を出す
+                glyphRt.anchoredPosition = glyphHomes[g];
                 glyphShadows[g].rectTransform.anchoredPosition = glyphHomes[g] + GlyphShadowBase;
                 glyphShadows[g].gameObject.SetActive(true);
                 if (g > 0) extraSlams += slamTime + stop;
