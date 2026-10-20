@@ -105,6 +105,14 @@ public class WebSocketGameClientSample : MonoBehaviour
         transform.SetParent(null);
         DontDestroyOnLoad(gameObject);
         UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoaded;
+        KillingMahjong.Core.PlayerProfile.NameChanged += OnLocalNameChanged;
+    }
+
+    /// <summary>名前を変えたとき。名乗り終えた接続があれば、すぐサーバーへ送る（無ければ次に名乗るときに送る）。</summary>
+    private async void OnLocalNameChanged(string name)
+    {
+        if (!IsConnected || !KillingMahjong.Network.PlayerIdentity.IdentifiedOnThisConnection) return;
+        await SendAsync(KillingMahjong.Network.PlayerIdentity.BuildSetNameJson(name));
     }
 
     /// <summary>
@@ -175,6 +183,7 @@ public class WebSocketGameClientSample : MonoBehaviour
 
         Instance = null;
         UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnSceneLoaded;
+        KillingMahjong.Core.PlayerProfile.NameChanged -= OnLocalNameChanged;
         await DisconnectAsync();
     }
 
@@ -369,7 +378,8 @@ public class WebSocketGameClientSample : MonoBehaviour
         try
         {
             await webSocket.SendText(message);
-            Log($"Send: {message}");
+            // identify には秘密の文字列が入る。ログに出さない
+            Log($"Send: {KillingMahjong.Network.PlayerIdentity.Redact(message)}");
         }
         catch (Exception ex)
         {
@@ -383,7 +393,8 @@ public class WebSocketGameClientSample : MonoBehaviour
     /// </summary>
     private async void HandleServerMessage(string raw)
     {
-        Log($"Recv: {raw}");
+        // registered には秘密の文字列が入る。ログに出さない
+        Log($"Recv: {KillingMahjong.Network.PlayerIdentity.Redact(raw)}");
 
         try
         {
@@ -404,6 +415,15 @@ public class WebSocketGameClientSample : MonoBehaviour
                 }
                 Log($"[WebSocket] Connection confirmed! Client ID: {myClientId}");
 
+                // **join より前に名乗る**（2026-10-20、名前・ランキングのデータベース対応）。
+                // 起動して最初の接続は register、2回目からは identify で同じプレイヤーに戻る。
+                // 名乗らなくても遊べる（ランキングに入らないだけ）ので、返事は待たずに join へ進む
+                KillingMahjong.Network.PlayerIdentity.OnConnected();
+                setNameRetries = 0;
+                await SendAsync(KillingMahjong.Network.PlayerIdentity.HasIdentity
+                    ? KillingMahjong.Network.PlayerIdentity.BuildIdentifyJson()
+                    : KillingMahjong.Network.PlayerIdentity.BuildRegisterJson());
+
                 // 野良か、部屋を作るか、合言葉で入るか。タイトル側が MatchJoinRequest に入れておく。
                 // 繋ぎ直し（match_cancelled のあとなど）で二度送らないよう印を立てる
                 if (!hasSentJoin)
@@ -413,6 +433,15 @@ public class WebSocketGameClientSample : MonoBehaviour
                     Log($"[WebSocket] join mode={KillingMahjong.Network.MatchJoinRequest.Mode}");
                     await SendAsync(joinJson);
                 }
+                return;
+            }
+
+            if (KillingMahjong.Network.PlayerIdentity.IsIdentityMessage(msgType))
+            {
+                // 名乗りと名前の返事。対局の UI には流さない
+                string reply = KillingMahjong.Network.PlayerIdentity.Handle(msgType, raw, out bool retryLater);
+                if (!string.IsNullOrEmpty(reply)) await SendAsync(reply);
+                if (retryLater) StartCoroutine(RetrySetNameLater());
                 return;
             }
 
@@ -441,6 +470,17 @@ public class WebSocketGameClientSample : MonoBehaviour
         {
             Debug.LogError($"[WebSocket] Failed to parse message: {ex.Message}");
         }
+    }
+
+    /// <summary>名前をデータベースに書けなかった（unavailable）とき、少し待って3回まで送り直す。</summary>
+    private int setNameRetries;
+    private System.Collections.IEnumerator RetrySetNameLater()
+    {
+        if (++setNameRetries > 3) yield break;
+        yield return new WaitForSecondsRealtime(5f * setNameRetries);
+        string json = KillingMahjong.Network.PlayerIdentity.NameJsonIfAny();
+        if (json != null && IsConnected && KillingMahjong.Network.PlayerIdentity.IdentifiedOnThisConnection)
+            _ = SendAsync(json);
     }
 
     /// <summary>

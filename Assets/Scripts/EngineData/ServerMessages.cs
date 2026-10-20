@@ -24,6 +24,12 @@ namespace KillingMahjong.EngineData
         public string client_id;
         public bool is_cpu;
         public CpuOpponentData cpu;
+
+        /// <summary>
+        /// game_started の名前（2026-10-20）。名前を登録していない人・CPU は空（サーバーは null を送る）。
+        /// 画面に出すときは、空なら「名無し」や CPU の強さなどに置き換える。
+        /// </summary>
+        public string name;
     }
     [Serializable]
     public class CpuOpponentData { public string difficulty; }
