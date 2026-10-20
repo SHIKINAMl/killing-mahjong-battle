@@ -40,11 +40,12 @@ namespace KillingMahjong.UI
 
             normal.text = "";
             // プレイヤー側の席へ既存の先輩素材を置き、力を失って手前へ倒れる様子を出す。
-            var senior = Box("FallenSenior", viewport, new Vector2(600f, 600f),
+            // 先輩はドット絵（74×74、2026-10-20）。8倍の 592 で出してドットを揃える
+            var senior = Box("FallenSenior", viewport, new Vector2(592f, 592f),
                 new Vector2(-150f, -160f), Color.white);
-            senior.GetComponent<Image>().sprite = Resources.Load<Sprite>("女の子/tutorial_girl_body");
+            senior.GetComponent<Image>().sprite = Resources.Load<Sprite>("女の子/tutorial_girl_px_body");
             var face = Box("FallenSeniorFace", senior, senior.sizeDelta, Vector2.zero, Color.white);
-            face.GetComponent<Image>().sprite = Resources.Load<Sprite>("女の子/tutorial_girl_face");
+            face.GetComponent<Image>().sprite = Resources.Load<Sprite>("女の子/tutorial_girl_px_face");
             Vector2 start = senior.anchoredPosition;
             for (float t = 0; t < 1f; t += Time.unscaledDeltaTime / 1.2f)
             {
