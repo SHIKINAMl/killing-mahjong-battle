@@ -538,7 +538,7 @@ namespace KillingMahjong.UI
             bgStripeObj.transform.SetParent(containerRt, false);
             Image stripeImg = bgStripeObj.AddComponent<Image>();
             
-            stripeImg.enabled = false; // 単色帯は描かず、共通のドット背景を子に置く。
+            stripeImg.enabled = false; // 単色帯は描かず、ドットの帯の絵を子に置く。
 
             RectTransform stripeRt = bgStripeObj.GetComponent<RectTransform>();
             // 画面を覆い尽くす長方形から、帯状（バナー）に変更
@@ -551,7 +551,9 @@ namespace KillingMahjong.UI
             stripeRt.anchoredPosition = stripeStart;
 
             // 縁もPNGへ描き込む。背景だけは帯の回転を相殺し、2倍のまま描く。
-            Effects.CutinPixelBackgroundUI.Attach(stripeRt);
+            // **スキルはロンとは別の絵（2026-10-20、ユーザー指示）。** べた塗りに本棚の本と同じディザを入れ、
+            // 外の枠は太い黒線。相手は赤、自分は青（tools/CutinPixelArt/skill.mjs）
+            Effects.CutinPixelBackgroundUI.Attach(stripeRt, isLocalPlayer ? "skill_band_blue" : "skill_band_red");
 
             bgElements.Add(stripeRt);
             bgStartPos.Add(stripeStart);
@@ -566,7 +568,8 @@ namespace KillingMahjong.UI
                     splatterObj.transform.SetParent(containerRt, false);
                     Image spImg = splatterObj.AddComponent<Image>();
                     spImg.sprite = bloodSplatterSprite;
-                    spImg.color = new Color32(78, 27, 44, 180); // 背景の暗赤にそろえる。
+                    // 帯の色を暗くした色。帯の上で沈んで見える
+                    spImg.color = isLocalPlayer ? new Color32(18, 40, 100, 180) : new Color32(100, 14, 20, 180);
                     spImg.preserveAspect = true;
 
                     RectTransform spRt = splatterObj.GetComponent<RectTransform>();

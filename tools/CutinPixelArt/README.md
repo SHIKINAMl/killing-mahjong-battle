@@ -84,3 +84,14 @@ Unity実機のスクリーンショットではなく、ロンの文字・赤い
 本編／チュートリアル／コレクションでの表示、ロン／スキル中の重なり、Unityの再インポート結果は未確認。
 画像と道具だけを変更したため、C#のコンパイルは実行していない。
 commit・push・Webビルドは行っていない。
+
+## スキルのカットインの帯（`skill.mjs`、2026-10-20）
+
+`npm run skill` で `Assets/Resources/UI/Cutin/skill_band_red.png`（相手）と `skill_band_blue.png`（自分）を作る。
+ロンの帯とは別の絵。ユーザー指示「べた塗に本を作った時のドット感」「敵側は赤で、主人公側は青色」「外の枠は太い黒線」。
+
+- 本（`tools/RoomPixelArt` の `RoomBook*`）と同じ作り方。地色に上 1.06 → 下 0.94 の狭い濃淡を付け、
+  黒＋地色の 0.88／1／1.12 倍の4色へ、Image-to-Pixel 3.1.0（box で半分、oklab、bayer4・0.18、縁なし）で減色する。
+- 地色は赤 `#A81C24`、青 `#224EAA`。帯の上下の縁に、1倍で4ドット（2倍表示で8単位）の黒い線。
+- 帯の形（透明なところ）は `gothic_band_before.png` と同じ。立ち絵の切り抜き方を変えないため。実行時に1画素ずつ比べる。
+- 見本は `C:/Unity/km-docs/screenshots/20261020/skill_cutin_bg/` に出す（`SKILL_REVIEW_DIR` で変えられる）。

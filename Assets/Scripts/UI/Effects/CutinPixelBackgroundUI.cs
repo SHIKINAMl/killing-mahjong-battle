@@ -4,7 +4,8 @@ using UnityEngine.UI;
 namespace KillingMahjong.UI.Effects
 {
     /// <summary>
-    /// ロンとスキルで共用する、2倍表示の静止ドット背景。
+    /// カットインの、2倍表示の静止ドット背景。ロンは <c>gothic_band</c>、スキルは <c>skill_band_red</c>／<c>skill_band_blue</c>。
+    /// どの絵も帯の形（透明なところ）は同じ。
     ///
     /// 絵の透明でないところだけを切り抜く Mask も持つ。子に置いた物（ロンの立ち絵など）は、
     /// 背景の絵の外に出ない（2026-10-20、ユーザー指示「女の子はカットインの背景の中だけ写す」）。
@@ -17,12 +18,12 @@ namespace KillingMahjong.UI.Effects
         private RectTransform canvasRect;
 
         /// <summary>帯の最初の子として背景を置き、その RectTransform を返す（中身を切り抜く入れ物にもなる）。</summary>
-        public static RectTransform Attach(RectTransform band)
+        public static RectTransform Attach(RectTransform band, string textureName = "gothic_band")
         {
-            var texture = Resources.Load<Texture2D>("UI/Cutin/gothic_band");
+            var texture = Resources.Load<Texture2D>("UI/Cutin/" + textureName);
             if (texture == null)
             {
-                Debug.LogError("[CutinPixelBackgroundUI] Background texture is missing.");
+                Debug.LogError("[CutinPixelBackgroundUI] Background texture is missing: " + textureName);
                 return null;
             }
             var go = new GameObject("PixelBackground", typeof(RectTransform), typeof(RawImage));

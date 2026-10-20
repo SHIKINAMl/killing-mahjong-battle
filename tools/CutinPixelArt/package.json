@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "generate": "node generate.mjs",
-    "verify": "node verify.mjs"
+    "verify": "node verify.mjs",
+    "skill": "node skill.mjs"
   },
   "dependencies": {
     "image-to-pixel": "3.1.0",
