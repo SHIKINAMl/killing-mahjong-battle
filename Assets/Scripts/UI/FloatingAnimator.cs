@@ -26,12 +26,14 @@ namespace KillingMahjong.UI
         [Tooltip("横に動く幅（ピクセル/ユニット）")]
         [SerializeField] private float floatAmplitudeX = 5f;
         
+#pragma warning disable CS0414 // 回転は今は使っていない。シーンに保存された値を残すために置いている
         [Header("Rotation Settings (Optional)")]
         [Tooltip("ゆらゆら回転するスピード")]
         [SerializeField] private float rotationSpeed = 1f;
         
         [Tooltip("ゆらゆら回転する角度の幅")]
         [SerializeField] private float rotationAmplitude = 2f;
+#pragma warning restore CS0414
 
         [Header("音に合わせる")]
         [Tooltip("曲の拍に合わせて揺らす。曲が鳴っていないときは今までどおり時間で揺れる")]

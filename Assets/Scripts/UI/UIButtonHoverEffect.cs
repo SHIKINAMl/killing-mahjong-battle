@@ -7,8 +7,10 @@ namespace KillingMahjong.UI
     public class UIButtonHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerDownHandler, IPointerUpHandler
     {
         // 旧シーンの設定値は保持。現在の見た目はUIFrameCatalogのIDで管理する。
+#pragma warning disable CS0414 // 読まないが、シーンに保存された値を残すために置いている
         [SerializeField] private float hoverScale = 1.05f, clickScale = .95f, duration = .15f;
         [SerializeField] private DG.Tweening.Ease easeType = DG.Tweening.Ease.OutBack;
+#pragma warning restore CS0414
         private UIInteractionFeedback feedback;
         private void Awake() { feedback = UIInteractionFeedback.Attach(gameObject); }
         private void OnEnable() {

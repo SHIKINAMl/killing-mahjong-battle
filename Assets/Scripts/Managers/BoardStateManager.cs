@@ -172,7 +172,7 @@ namespace KillingMahjong.Managers
         /// A-8 で「血が動く場面すべてで引き、health を返す」よう依頼済み。
         /// 対応が入れば、この定数ごと消して常時サーバー値にしてよい。
         /// </summary>
-        public const bool UseServerHealth = true;
+        public static readonly bool UseServerHealth = true;
 
         // --- 賭け金のルール（サーバーが正） ---
         //

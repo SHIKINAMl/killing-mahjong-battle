@@ -11,7 +11,7 @@ namespace KillingMahjong.UI.Effects
         [SerializeField] private Color surfaceTint = new Color(1, .99f, .60f, .78f);
         [SerializeField] private Color lightTint = new Color(1, .85f, .40f, 1);
         [SerializeField] private float intensity = .22f, pulsePerSecond = .55f, fadeSeconds = .06f;
-        private Image source, face, light;
+        private Image source, face, lightLayer;
         private CanvasGroup gate;
         private Material ownedMaterial;
         private bool highlighted;
@@ -38,11 +38,11 @@ namespace KillingMahjong.UI.Effects
         private void Build()
         {
             gate = GetComponent<CanvasGroup>(); gate.blocksRaycasts = gate.interactable = false;
-            face = Layer("SurfaceTint"); light = Layer("SurfaceLight");
+            face = Layer("SurfaceTint"); lightLayer = Layer("SurfaceLight");
             gate.alpha = 0;
             if (ownedMaterial == null) ownedMaterial = NeonMaterials.CreateAll(lightTint, intensity);
-            if (ownedMaterial != null) { ownedMaterial.name = "TileRoleGlow (runtime)"; light.material = ownedMaterial; }
-            light.enabled = ownedMaterial != null;
+            if (ownedMaterial != null) { ownedMaterial.name = "TileRoleGlow (runtime)"; lightLayer.material = ownedMaterial; }
+            lightLayer.enabled = ownedMaterial != null;
             SyncShape();
         }
         private Image Layer(string name)
@@ -67,12 +67,12 @@ namespace KillingMahjong.UI.Effects
             gate.alpha = Mathf.Clamp01((time - enteredAt) / Mathf.Max(.001f, fadeSeconds));
             face.color = surfaceTint;
             float pulse = .9f + .1f * Mathf.Sin(time * Mathf.PI * 2 * pulsePerSecond);
-            light.color = new Color(1, 1, 1, .8f * pulse * source.color.a);
+            lightLayer.color = new Color(1, 1, 1, .8f * pulse * source.color.a);
         }
         private void SyncShape()
         {
             if (source == null) return;
-            CopyShape(face); CopyShape(light);
+            CopyShape(face); CopyShape(lightLayer);
         }
         private void CopyShape(Image layer)
         {
@@ -87,7 +87,7 @@ namespace KillingMahjong.UI.Effects
         private void DisposeMaterial()
         {
             if (ownedMaterial == null) return;
-            if (light != null) light.material = null;
+            if (lightLayer != null) lightLayer.material = null;
             Destroy(ownedMaterial); ownedMaterial = null;
         }
         private void OnDisable() { SetHighlighted(false); }

@@ -15,7 +15,9 @@ namespace KillingMahjong.UI
         
         [Header("Settings")]
         [SerializeField] private string titleSceneName = "タイトルシーン"; // 遷移先のシーン名
+#pragma warning disable CS0414 // 送るのを止めている（下の ReturnToTitle のコメント）。シーンに保存された値を残すために置いている
         [SerializeField] private string disconnectActionType = "leave"; // サーバーへ送る切断アクションのtype名
+#pragma warning restore CS0414
 
         private void Start()
         {

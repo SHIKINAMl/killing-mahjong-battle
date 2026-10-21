@@ -14,7 +14,6 @@ namespace KillingMahjong.UI
         private float timeLimit;
         private float currentTime;
         private bool isRunning;
-        private bool isTimeout;
 
         private Coroutine flashCoroutine;
         private Color originalTextColor = Color.black; // デフォルトの色
@@ -83,7 +82,6 @@ namespace KillingMahjong.UI
             timeLimit = duration;
             currentTime = duration;
             isRunning = true;
-            isTimeout = false;
             
             if (flashCoroutine != null)
             {
@@ -136,7 +134,6 @@ namespace KillingMahjong.UI
                 {
                     currentTime = 0;
                     isRunning = false;
-                    isTimeout = true;
                     if (timeText != null) timeText.text = "0";
                     
                     // タイムアウト時の点滅を開始

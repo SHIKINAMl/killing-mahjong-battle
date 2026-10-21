@@ -71,7 +71,6 @@ namespace KillingMahjong.UI.Effects
         private Color _color;
         private float _duration;
         private float _peakAlpha;
-        private bool _sceneBreak;
 
         /// <summary>白く一瞬光らせる。</summary>
         public static void Play(float duration = DefaultDuration, float peakAlpha = DefaultPeakAlpha, bool playSound = true)
@@ -110,7 +109,6 @@ namespace KillingMahjong.UI.Effects
             var flash = go.AddComponent<ScreenFlash>();
             flash._color = Color.white;
             flash._peakAlpha = 1f;          // 参考動画の頂点は 253/255。真っ白まで飛んでいる
-            flash._sceneBreak = true;
             flash.Build();
             flash._image.color = new Color(1f, 1f, 1f, 0f);   // 立ち上がりがあるので 0 から始める
 

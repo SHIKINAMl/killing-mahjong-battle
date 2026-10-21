@@ -327,7 +327,7 @@ namespace KillingMahjong.UI
         /// </summary>
         // ボルテージUIと表示領域が重なるため、待ち候補UIは実行時に生成しない。
         // 判定ロジックとUIクラスは残し、再表示が必要になったときはここだけを切り替える。
-        private const bool WaitDeductionUIEnabled = false;
+        private static readonly bool WaitDeductionUIEnabled = false;
         public bool IsWaitDeductionUIEnabled => WaitDeductionUIEnabled;
 
         private WaitDeductionUI _waitDeduction;
