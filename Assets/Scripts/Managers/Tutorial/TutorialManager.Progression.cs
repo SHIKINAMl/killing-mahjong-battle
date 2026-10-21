@@ -84,9 +84,16 @@ namespace KillingMahjong.Managers
             }
         }
 
+        private void SetSeniorIdleBounce(bool on)
+        {
+            if (gameUIManager != null && gameUIManager.EnemyInfoUI != null)
+                gameUIManager.EnemyInfoUI.SetIdleSlimeBounce(on);
+        }
+
         private IEnumerator RunRound(TutorialRoundData data)
         {
             // --- 局の初期化 ---
+            SetSeniorIdleBounce(false); // 前の局を途中で抜けたときに跳ねたまま残さない
             HasClickedAutoMangan = false;
             IsAutoButtonLocked = false;
             _hasRejectedFirstConfirm = false;
@@ -243,8 +250,12 @@ namespace KillingMahjong.Managers
                 if (IsSecondTutorialRound(data))
                     StartCoroutine(RunSecondRoundHandTimerHints(data));
 
+                // 選んでいるあいだ、先輩は手持ち無沙汰なのでスライムのように跳ねる（2026-10-21、ユーザー指示）。
+                // 13枚そろったら（または決定したら）着地して元に戻る
+                SetSeniorIdleBounce(true);
                 yield return new WaitUntil(() =>
                     GetHandTileCount() >= HandSize || !_isWaitingForHandSelectionComplete);
+                SetSeniorIdleBounce(false);
 
                 if (_isWaitingForHandSelectionComplete)
                 {
