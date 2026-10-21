@@ -5,12 +5,17 @@ namespace KillingMahjong.UI
     /// <summary>
     /// 対局の女の子を、曲の拍に合わせて動かす（2026-10-21、ユーザー指示。お試し）。
     ///
-    /// - <see cref="Mode.Flip"/>：2拍ごとに左右を反転する。反転した瞬間に背丈の 1% ほど浮いて（2% 大きく）、
-    ///   0.15 秒で戻る。傾けない（2026-10-21、ユーザーの参考の録画「これぐらいの揺れ」に合わせて小さくした）。
-    /// - <see cref="Mode.Swap"/>：拍ごとに2枚の絵（いまの絵 ⇔ ピースした絵）を交互に出す。
+    /// - <see cref="Mode.Flip"/>：2拍ごとに左右を反転する。
+    /// - <see cref="Mode.Swap"/>：2拍ごとに2枚の絵（いまの絵 ⇔ ピースした絵）を交互に出す。
     ///
+    /// どちらも、切り替えた瞬間に背丈の 1% ほど浮いて（2% 大きく）0.15 秒で戻る。傾けない
+    /// （ユーザーの参考の録画「これぐらいの揺れ」に合わせた）。2枚の切り替えも最初は1拍ごとで弾まなかったが、
+    /// チラついて見えた（「なんか微妙」）ので、反転とそろえた。
+    ///
+    /// **曲のドラムが入るまでは動かない**（ユーザー指示「ドラムが入るまで女の子は揺れないでほしい」）。
+    /// ドラムの入る拍は <see cref="Managers.AudioManager.MusicGrooveStartBeat"/>。
     /// 拍は <see cref="Managers.AudioManager.TryGetMusicBeat"/> から取る。取れないときは、
-    /// 対局の曲（賭けの合図 I）と同じ速さの時計で代わりに刻む。
+    /// 対局の曲（賭けの合図 I）と同じ速さの時計で代わりに刻む（そのときはドラムを待たない）。
     /// 止めると、反転も絵も元に戻す。
     /// </summary>
     public sealed class BeatDanceAnimator : MonoBehaviour
@@ -27,8 +32,8 @@ namespace KillingMahjong.UI
         private int lastBeat = int.MinValue;
         private float fallbackStart;
 
-        // 反転の「ぴょこ」。参考の録画では約1秒ごとに絵が替わり、背丈の約 1% 浮いて 0.1〜0.15 秒で戻っていた
-        private const int FlipEveryBeats = 2;
+        // 切り替えの「ぴょこ」。参考の録画では約1秒ごとに絵が替わり、背丈の約 1% 浮いて 0.1〜0.15 秒で戻っていた
+        private const int ChangeEveryBeats = 2;
         private const float PopScale = 0.02f;
         private const float PopLiftRatio = 0.012f;
         private const float PopSeconds = 0.15f;
@@ -85,28 +90,59 @@ namespace KillingMahjong.UI
 
             double beats;
             var audio = Managers.AudioManager.Instance;
-            if (audio == null || !audio.TryGetMusicBeat(out beats))
+            if (audio != null && audio.TryGetMusicBeat(out beats))
+            {
+                // イントロ（ドラムが入る前）は動かさない
+                if (beats < audio.MusicGrooveStartBeat())
+                {
+                    Hold();
+                    return;
+                }
+            }
+            else
+            {
                 beats = (Time.time - fallbackStart) * FallbackBpm / 60.0;
-            int beat = (int)System.Math.Floor(beats);
-            if (mode == Mode.Flip) beat = (int)System.Math.Floor(beats / FlipEveryBeats);
+            }
+
+            int beat = (int)System.Math.Floor(beats / ChangeEveryBeats);
             if (beat != lastBeat)
             {
-                bool first = lastBeat == int.MinValue;
                 lastBeat = beat;
                 bool odd = (beat & 1) == 1;
-                if (mode == Mode.Flip)
+                bool changed = false;
+                if (mode == Mode.Flip && body.flipX != odd)
                 {
                     body.flipX = odd;
                     if (face != null) face.flipX = odd;
-                    if (!first) popStart = Time.time;
+                    changed = true;
                 }
-                else if (mode == Mode.Swap)
+                else if (mode == Mode.Swap && swapped != odd)
                 {
                     if (odd) ShowSwap();
                     else Unswap();
+                    changed = true;
                 }
+                if (changed) popStart = Time.time;
             }
             ApplyPop();
+        }
+
+        /// <summary>じっとさせる（反転も絵も元のまま、弾ませない）。</summary>
+        private void Hold()
+        {
+            if (body.flipX)
+            {
+                body.flipX = false;
+                if (face != null) face.flipX = false;
+            }
+            Unswap();
+            if (popStart >= 0f)
+            {
+                popStart = -1f;
+                transform.localScale = baseScale;
+                if (liftWritten) SetLift(Vector3.zero);
+            }
+            lastBeat = int.MinValue;
         }
 
         private void ApplyPop()

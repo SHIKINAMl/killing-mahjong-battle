@@ -132,6 +132,8 @@ namespace KillingMahjong.UI
         /// </summary>
         public void SetBeatDance(BeatDanceAnimator.Mode mode)
         {
+            // 拍に合わせて動いているあいだは、まばたきを止める（拍と関係なく目を閉じた絵が混ざって、拍が崩れて見えた）
+            suppressBlink = mode != BeatDanceAnimator.Mode.None;
             BeatDanceAnimator.Set(characterRenderer, faceRenderer, mode);
         }
 

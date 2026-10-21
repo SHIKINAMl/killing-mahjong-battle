@@ -119,11 +119,14 @@ namespace KillingMahjong.UI
             body.position = end;
         }
 
+        /// <summary>まばたきを止めておく（拍に合わせた動きのあいだ。<see cref="SetBeatDance"/>）。</summary>
+        private bool suppressBlink;
+
         private System.Collections.IEnumerator BlinkRoutine()
         {
             while (true)
             {
-                if (characterData == null || !characterData.enableBlink || faceRenderer == null)
+                if (characterData == null || !characterData.enableBlink || faceRenderer == null || suppressBlink)
                 {
                     yield return new WaitForSeconds(1.0f);
                     continue;

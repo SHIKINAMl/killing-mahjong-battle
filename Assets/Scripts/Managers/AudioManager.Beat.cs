@@ -129,6 +129,26 @@ namespace KillingMahjong.Managers
             return true;
         }
 
+        /// <summary>
+        /// 曲のドラムが入る拍（曲の頭から数えた拍）。それより前はイントロで、ドラムが無い（2026-10-21、波形を測った値）。
+        /// 賭けの合図 I は 9.0 秒（20拍目＝6小節目の頭）でキックが入る（7.5〜9 秒は盛り上がりの前振り）。
+        /// 賭けの合図 II は 5.75 秒からハイハット、6.0 秒（13拍目）でキックが入る。
+        /// </summary>
+        private static readonly System.Collections.Generic.Dictionary<string, double> GrooveStartBeats =
+            new System.Collections.Generic.Dictionary<string, double>
+        {
+            { "bgm_kake_1", 20.0 },
+            { "bgm_kake_2", 13.0 },
+        };
+
+        /// <summary>いま鳴っている曲のドラムが入る拍。分からない曲は 0（最初から入っている扱い）。</summary>
+        public double MusicGrooveStartBeat()
+        {
+            var src = BeatClockSource;
+            if (src == null || src.clip == null) return 0;
+            return GrooveStartBeats.TryGetValue(src.clip.name, out double beat) ? beat : 0;
+        }
+
         private int _beatCacheFrame = -1;
         private double _beatCacheValue;
         private bool _beatCacheOk;
