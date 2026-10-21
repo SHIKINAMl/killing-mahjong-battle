@@ -350,7 +350,7 @@ namespace KillingMahjong.UI
             var bodyText = CreateText(bodyRect, "BodyText",
                 "賭けた分だけ持ち点を失う。\n賭けた額も戻らないので、マイナスは2倍。\n\n相手が満貫以上の役を作っていると、\nダメージはさらに増える。",
                 Vector2.zero, new Vector2(510f, 150f), 20f, TextAlignmentOptions.TopLeft);
-            bodyText.enableWordWrapping = false;
+            bodyText.textWrappingMode = TextWrappingModes.NoWrap;
             bodyText.lineSpacing = 5f;
             bodyText.overflowMode = TextOverflowModes.Ellipsis;
 

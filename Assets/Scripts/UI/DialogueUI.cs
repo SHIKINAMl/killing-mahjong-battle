@@ -178,7 +178,7 @@ namespace KillingMahjong.UI
             if (dialogueText != null)
             {
                 // セリフの折り返しを有効化
-                dialogueText.enableWordWrapping = true;
+                dialogueText.textWrappingMode = TextWrappingModes.Normal;
                 // 長すぎる場合は省略記号などを出さずに、単に下にはみ出させる
                 dialogueText.overflowMode = TextOverflowModes.Overflow;
                 

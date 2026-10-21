@@ -62,7 +62,7 @@ namespace KillingMahjong.UI
             rect.sizeDelta = HpTextSize;
 
             hpText.margin = HpTextMargin;
-            hpText.enableWordWrapping = false;
+            hpText.textWrappingMode = TextWrappingModes.NoWrap;
             hpText.alignment = TextAlignmentOptions.Center;
             hpText.fontSize = 11f;
             hpText.enableAutoSizing = true;

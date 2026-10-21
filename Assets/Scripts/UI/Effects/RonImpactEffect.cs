@@ -270,7 +270,7 @@ namespace KillingMahjong.UI.Effects
             text.fontStyle = FontStyles.Bold;
             text.color = new Color32(46, 17, 24, 255);
             text.alignment = TextAlignmentOptions.Center;
-            text.enableWordWrapping = false;
+            text.textWrappingMode = TextWrappingModes.NoWrap;
             text.raycastTarget = false;
             SetRect(text.rectTransform, position, new Vector2(176f, 110f));
             text.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -5f);

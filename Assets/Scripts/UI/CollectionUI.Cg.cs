@@ -329,7 +329,7 @@ namespace KillingMahjong.UI
                 var name = Label(cell.transform, "Name", Arts[i].Label,
                     new Vector2(0f, -CgCellHeight + 13f), new Vector2(CgCellWidth - 6f, 24f),
                     9.5f, TextAlignmentOptions.Center, TextMain);
-                name.enableWordWrapping = true;
+                name.textWrappingMode = TextWrappingModes.Normal;
                 name.overflowMode = TextOverflowModes.Ellipsis;
 
                 cgCells.Add(new CgCell { Thumb = thumb, Path = Arts[i].Path, Top = y });
