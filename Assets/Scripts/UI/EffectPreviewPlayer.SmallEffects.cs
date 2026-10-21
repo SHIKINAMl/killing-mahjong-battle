@@ -147,6 +147,11 @@ namespace KillingMahjong.UI
                 case "character.turn": rig.player.SetTurnGlow(true); rig.enemy.SetTurnGlow(true); break;
                 case "character.breathe": rig.character.gameObject.AddComponent<BreathingAnimator>(); break;
                 case "character.float": rig.character.gameObject.AddComponent<FloatingAnimator>(); break;
+                case "character.beat_dance":
+                    // 本編では、手牌を選ぶあいだが弾むだけ、打牌のあいだが笑顔と交互だった
+                    rig.enemy.SetBeatDance(BeatDanceAnimator.Mode.Bob); yield return new WaitForSeconds(5f);
+                    rig.enemy.SetBeatDance(BeatDanceAnimator.Mode.Swap); yield return new WaitForSeconds(7f);
+                    rig.enemy.SetBeatDance(BeatDanceAnimator.Mode.None); break;
                 case "character.blink":
                     var character = rig.enemy.CurrentCharacterData;
                     var blink = character.faceSprites.Find(item => item.id == character.blinkFaceId);

@@ -51,21 +51,15 @@ namespace KillingMahjong.UI
         }
 
         /// <summary>
-        /// 女の子を曲の拍に合わせて動かす（2026-10-21、ユーザー指示）。
-        /// **いまは CPU 戦の「とくしゅ」だけのお試し。** 気に入られたら、ほかの対局にも広げる。
-        /// 牌を選ぶあいだ（手牌を選ぶ）は拍ごとに弾んで揺れ、打牌のあいだはそれに目を閉じた笑顔を交互に混ぜる。
-        /// ほかのフェイズに移ったら止めて元に戻す。
+        /// 女の子を曲の拍に合わせて動かす演出（2026-10-21、CPU 戦の「とくしゅ」だけのお試しだった）。
+        /// **2026-10-22 に没案にした（ユーザー指示「今は使わない」）。本編では動かさない。**
+        /// 動きは演出コレクションの没案「character.beat_dance」で見られる。
+        /// 戻すときは、手牌を選ぶあいだを Bob、打牌のあいだを Swap にする。
         /// </summary>
         private void UpdateEnemyBeatDance(RoundStatus status)
         {
             if (EnemyInfoUI == null) return;
-            bool trial = !IsTutorialMode
-                && KillingMahjong.Network.MatchJoinRequest.Mode == KillingMahjong.Network.MatchJoinMode.Cpu
-                && KillingMahjong.Network.MatchJoinRequest.Difficulty == KillingMahjong.Network.CpuDifficulty.Special;
-            var mode = BeatDanceAnimator.Mode.None;
-            if (trial && status == RoundStatus.HandSelection) mode = BeatDanceAnimator.Mode.Bob;
-            else if (trial && status == RoundStatus.Discard) mode = BeatDanceAnimator.Mode.Swap;
-            EnemyInfoUI.SetBeatDance(mode);
+            EnemyInfoUI.SetBeatDance(BeatDanceAnimator.Mode.None);
         }
 
         /// <summary>保留キューでの識別名。後勝ちで畳みたいので固定の1本にする。</summary>
