@@ -421,6 +421,8 @@ namespace KillingMahjong.UI
             go.transform.SetParent(transform, false);
             var rt = go.GetComponent<RectTransform>(); rt.sizeDelta = new Vector2(800, 600);
             pixels = go.GetComponent<PixelShapeGraphic>(); pixels.raycastTarget = false;
+            var flightAudio = HandSelectionFeedbackAudio.CreateWaitTransferSource(go, false);
+            var arrivalAudio = HandSelectionFeedbackAudio.CreateWaitTransferSource(go, true);
             var ids = new List<int>(); var nonMangan = new List<int>();
             foreach (var w in waits) { ids.Add(w.tile); if (!w.mangan_or_more) nonMangan.Add(w.tile); }
             bool finished = false;
@@ -433,11 +435,14 @@ namespace KillingMahjong.UI
                 {
                     int count = Mathf.Min(3, waits.Length - page * 3);
                     target.PrepareArrivalPage(page);
+                    if (flightAudio.clip != null) flightAudio.Play();
                     var starts = new Vector2[count]; var ends = new Vector2[count]; var arrived = new bool[count];
                     for (int i = 0; i < count; i++) { starts[i] = Center(cards[page * 3 + i]); ends[i] = Center(target.GetArrivalTileRect(i)); }
                     float duration = .70f + (count - 1) * .055f;
                     for (float t = 0; t < duration + Time.deltaTime && stamp == version; t += Time.deltaTime)
                     {
+                        HandSelectionFeedbackAudio.UpdateWaitTransferVolume(flightAudio);
+                        HandSelectionFeedbackAudio.UpdateWaitTransferVolume(arrivalAudio);
                         pixels.Begin();
                         for (int i = 0; i < count; i++)
                         {
@@ -447,7 +452,14 @@ namespace KillingMahjong.UI
                             groups[index].alpha = 0;
                             if (raw >= 1)
                             {
-                                if (!arrived[i]) { arrived[i] = true; LastArrivalFrame = Time.frameCount; target.RevealArrivalTile(i); ArrivalCount++; }
+                                if (!arrived[i])
+                                {
+                                    arrived[i] = true;
+                                    LastArrivalFrame = Time.frameCount;
+                                    target.RevealArrivalTile(i);
+                                    if (arrivalAudio.clip != null) arrivalAudio.PlayOneShot(arrivalAudio.clip);
+                                    ArrivalCount++;
+                                }
                                 continue;
                             }
                             float u = raw < .5f ? 4 * raw * raw * raw : 1 - Mathf.Pow(-2 * raw + 2, 3) / 2;
@@ -465,7 +477,15 @@ namespace KillingMahjong.UI
             {
                 if (!finished && target != null) target.Hide();
                 IsTransferring = false;
-                ClearFlight();
+                if (finished && pixels != null)
+                {
+                    // 最後の着地音の余韻だけ残す。演出自体の待ち時間は増やさない。
+                    pixels.enabled = false;
+                    go.transform.SetParent(null, false);
+                    Destroy(go, .12f);
+                    pixels = null;
+                }
+                else ClearFlight();
             }
             Hide();
         }

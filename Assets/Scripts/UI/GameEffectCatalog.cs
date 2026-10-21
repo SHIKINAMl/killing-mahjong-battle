@@ -49,7 +49,7 @@ namespace KillingMahjong.UI
             new Entry("phase.enemy_turn", "フェイズ", "後攻の表示", "PhaseTransitionUI.PlayCenterTextAnimRoutine"),
             new Entry("phase.prompt", "フェイズ", "手牌選択の案内", "PhaseTransitionUI.PlayPromptText"),
             new Entry("hand.wait_reveal", "牌・血・ゲージ", "13枚成立：役名・待ち牌と着弾SE", "HandRankCallUI.ShowRank / HandWaitRevealUI.Show / HandSelectionFeedbackAudio.PlayRankImpact"),
-            new Entry("hand.wait_transfer", "牌・血・ゲージ", "手牌決定：光が待ち牌枠へ着地", "HandWaitRevealUI.Transfer / WaitUI.RevealArrivalTile"),
+            new Entry("hand.wait_transfer", "牌・血・ゲージ", "手牌決定：光の移動・着地と効果音", "HandWaitRevealUI.Transfer / WaitUI.RevealArrivalTile / HandSelectionFeedbackAudio"),
             new Entry(HandRoleConditionsUI.EffectId, "牌・血・ゲージ", "役条件：順次登場のシャッ音・ホバー解除", "HandRoleConditionsUI / HandSelectionFeedbackAudio.PlayRoleEntry"),
             new Entry(HandRoleTileSupport.EffectId, "牌・血・ゲージ", "役ホバー：条件を満たす牌本体の発光", "HandRoleTileSupport / TileRoleGlow"),
             new Entry("hand.confirm", "フェイズ", "役名・待ち牌 → 手牌決定 → 光の着地", "GameUIHandSelectionController / HandWaitRevealUI"),
