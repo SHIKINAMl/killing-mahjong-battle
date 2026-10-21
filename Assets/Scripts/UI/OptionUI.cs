@@ -140,6 +140,11 @@ namespace KillingMahjong.UI
 
         private void OnDestroy()
         {
+            // 「タイトルへ戻る」は閉じるアニメーションを始めた直後にシーンを読み替えるので、途中で破棄される。
+            // 残った動きが破棄された相手に触れて DOTween の safe mode が拾っていた（missing target が2件）ので、ここで止める。
+            if (_rectTransform != null) _rectTransform.DOKill();
+            if (_canvasGroup != null) _canvasGroup.DOKill();
+
             // 資料は独立した Overlay Canvas なので、オプションだけが破棄された場合にも残さない。
             if (tutorialArchiveUI != null)
             {
