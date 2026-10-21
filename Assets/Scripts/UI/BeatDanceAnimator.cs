@@ -5,7 +5,8 @@ namespace KillingMahjong.UI
     /// <summary>
     /// 対局の女の子を、曲の拍に合わせて動かす（2026-10-21、ユーザー指示。お試し）。
     ///
-    /// - <see cref="Mode.Flip"/>：拍ごとに左右を反転する。
+    /// - <see cref="Mode.Flip"/>：拍ごとに左右を反転する。反転した瞬間に少し大きく・少し傾いて、
+    ///   0.2 秒で元の大きさ・まっすぐへ戻る（ポンと弾む）。傾きの向きは反転ごとに入れ替わる。
     /// - <see cref="Mode.Swap"/>：拍ごとに2枚の絵（いまの絵 ⇔ ピースした絵）を交互に出す。
     ///
     /// 拍は <see cref="Managers.AudioManager.TryGetMusicBeat"/> から取る。取れないときは、
@@ -25,6 +26,15 @@ namespace KillingMahjong.UI
         private Mode mode;
         private int lastBeat = int.MinValue;
         private float fallbackStart;
+
+        // 反転の「ポン」
+        private const float PopScale = 0.10f;
+        private const float PopTiltDegrees = 7f;
+        private const float PopSeconds = 0.2f;
+        private Vector3 baseScale;
+        private Quaternion baseRotation;
+        private float popStart = -1f;
+        private float popDirection = 1f;
 
         private Sprite swapBody, swapFace;
         private Sprite keptBody, keptFace;
@@ -51,6 +61,11 @@ namespace KillingMahjong.UI
         {
             if (newMode == mode) return;
             Restore();
+            if (mode == Mode.None)
+            {
+                baseScale = transform.localScale;
+                baseRotation = transform.localRotation;
+            }
             mode = newMode;
             lastBeat = int.MinValue;
             fallbackStart = Time.time;
@@ -70,20 +85,34 @@ namespace KillingMahjong.UI
             if (audio == null || !audio.TryGetMusicBeat(out beats))
                 beats = (Time.time - fallbackStart) * FallbackBpm / 60.0;
             int beat = (int)System.Math.Floor(beats);
-            if (beat == lastBeat) return;
-            lastBeat = beat;
-            bool odd = (beat & 1) == 1;
+            if (beat != lastBeat)
+            {
+                bool first = lastBeat == int.MinValue;
+                lastBeat = beat;
+                bool odd = (beat & 1) == 1;
+                if (mode == Mode.Flip)
+                {
+                    body.flipX = odd;
+                    if (face != null) face.flipX = odd;
+                    if (!first) { popStart = Time.time; popDirection = odd ? -1f : 1f; }
+                }
+                else if (mode == Mode.Swap)
+                {
+                    if (odd) ShowSwap();
+                    else Unswap();
+                }
+            }
+            ApplyPop();
+        }
 
-            if (mode == Mode.Flip)
-            {
-                body.flipX = odd;
-                if (face != null) face.flipX = odd;
-            }
-            else if (mode == Mode.Swap)
-            {
-                if (odd) ShowSwap();
-                else Unswap();
-            }
+        private void ApplyPop()
+        {
+            if (popStart < 0f) return;
+            float k = Mathf.Clamp01((Time.time - popStart) / PopSeconds);
+            float left = 1f - k * k * (3f - 2f * k); // 1 → 0 へなめらかに
+            transform.localScale = baseScale * (1f + PopScale * left);
+            transform.localRotation = baseRotation * Quaternion.Euler(0f, 0f, PopTiltDegrees * popDirection * left);
+            if (k >= 1f) popStart = -1f;
         }
 
         private void ShowSwap()
@@ -110,6 +139,12 @@ namespace KillingMahjong.UI
         private void Restore()
         {
             if (body == null) return;
+            if (mode != Mode.None)
+            {
+                transform.localScale = baseScale;
+                transform.localRotation = baseRotation;
+            }
+            popStart = -1f;
             body.flipX = false;
             if (face != null) face.flipX = false;
             Unswap();
