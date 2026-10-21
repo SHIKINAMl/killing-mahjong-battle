@@ -415,12 +415,14 @@ namespace KillingMahjong.Core
         /// タイトルで対局の種類が決まったとき（<see cref="Network.MatchJoinRequest.Changed"/>）。
         /// 「自動」なら、その種類の曲へ当て直す。**このクラスはシーンをまたいで残るので、
         /// 起動時の当て直しだけでは、タイトルで選んだ対局の種類が曲に届かない。**
+        /// **ここでは鳴らし直さない（2026-10-21）。** タイトルの曲が鳴っている最中に対局の曲へ
+        /// 変わっていた。ロードが終わって対局が始まってから、その曲で鳴り始める。
         /// </summary>
         private void OnMatchJoinRequestChanged()
         {
             if (matchBgmSet != (int)MatchBgmSetKind.Auto) return;
             var am = KillingMahjong.Managers.AudioManager.Instance;
-            if (am != null) am.ApplyMatchBgmSet(ResolveMatchBgmSet(matchBgmSet));
+            if (am != null) am.ApplyMatchBgmSet(ResolveMatchBgmSet(matchBgmSet), soundNow: false);
         }
 
         /// <summary>文字送りの速さを変える。次に出るセリフから効く。</summary>

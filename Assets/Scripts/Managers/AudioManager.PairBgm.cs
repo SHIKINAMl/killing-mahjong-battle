@@ -80,8 +80,13 @@ namespace KillingMahjong.Managers
         /// **その場で切り替える。** 次の対局まで変わらないと、選べた実感がない。
         /// 2曲方式をやめたときは、いま鳴っている2本を畳んでから従来の経路へ渡す。
         /// そうしないと2本が鳴り続けたまま、上に従来の曲が重なる。
+        ///
+        /// <paramref name="soundNow"/> が false なら、案を覚えるだけで鳴らし直さない（2026-10-21）。
+        /// タイトルで対局の種類を選んだとき用。タイトルの曲が鳴っているところで対局の曲へ
+        /// 切り替わってしまっていた（ユーザー指摘「タイトル画面ですでにBGMが変わります」）。
+        /// 対局の曲は、対局シーンでフェイズが始まったときに鳴り始める。
         /// </summary>
-        public void ApplyMatchBgmSet(int kind)
+        public void ApplyMatchBgmSet(int kind, bool soundNow = true)
         {
             // 消した案（新2曲・第3案）の番号が来たら、第4案へ読み替える
             kind = Core.SettingsManager.NormalizeMatchBgmSet(kind);
@@ -117,8 +122,8 @@ namespace KillingMahjong.Managers
             // 保存された選択が既定と違うだけで、そこで場のBGMが鳴り出していた
             // （2026-09-26 に実機で確認。PlayerPrefs に 1 が残っていて層が 4/4 で鳴った）。
             // 旗だけ差し替えて、音は次に誰かがフェイズを指定したときに任せる。
-            bool wasPlaying = IsPairBgmRunning || AreLayersRunning || IsProposal3Running
-                              || (bgmSource != null && bgmSource.isPlaying);
+            bool wasPlaying = soundNow && (IsPairBgmRunning || AreLayersRunning || IsProposal3Running
+                              || (bgmSource != null && bgmSource.isPlaying));
 
             // 行きか帰りのどちらかが第3案・第4案か。途中で取り消された切り替えが残っている場合も含む
             bool proposal3Involved = wantP3 || wantP4 || wantRt || Proposal3Owns;
