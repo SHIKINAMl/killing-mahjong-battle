@@ -553,7 +553,7 @@ namespace KillingMahjong.UI
             // 縁もPNGへ描き込む。背景だけは帯の回転を相殺し、2倍のまま描く。
             // **スキルはロンとは別の絵（2026-10-20、ユーザー指示）。** べた塗りに本棚の本と同じディザを入れ、
             // 外の枠は太い黒線。相手は赤、自分は青（tools/CutinPixelArt/skill.mjs）
-            Effects.CutinPixelBackgroundUI.Attach(stripeRt, isLocalPlayer ? "skill_band_blue" : "skill_band_red");
+            RectTransform stripePicture = Effects.CutinPixelBackgroundUI.Attach(stripeRt, isLocalPlayer ? "skill_band_blue" : "skill_band_red");
 
             bgElements.Add(stripeRt);
             bgStartPos.Add(stripeStart);
@@ -689,30 +689,58 @@ namespace KillingMahjong.UI
                     // 帯と同じ形の「切り抜き枠」を重ね、立ち絵をその子にする。帯そのものの子にしないのは、
                     // 帯のすぐ上に血飛沫が描かれるため（子にすると、立ち絵の上に血飛沫が乗る）。
                     // 枠は帯と同じ動きをさせるので、立ち絵は帯に乗ったまま下から突き上がってくる
-                    var maskObj = new GameObject("PortraitMask", typeof(RectTransform), typeof(Image), typeof(Mask));
-                    maskObj.transform.SetParent(containerRt, false);
-                    var maskRt = (RectTransform)maskObj.transform;
-                    maskRt.sizeDelta = stripeRt.sizeDelta;
-                    maskRt.localRotation = stripeRt.localRotation;
-                    maskRt.anchoredPosition = stripeStart;
-                    maskObj.GetComponent<Image>().raycastTarget = false;
-                    maskObj.GetComponent<Mask>().showMaskGraphic = false;   // 枠そのものは描かない
-                    bgElements.Add(maskRt);
-                    bgStartPos.Add(stripeStart);
-                    bgTargetPos.Add(stripeTarget);
-
-                    portraitObj.transform.SetParent(maskRt, false);
-                    portraitRt.anchorMin = new Vector2(0.5f, 0.5f);
-                    portraitRt.anchorMax = new Vector2(0.5f, 0.5f);
-
-                    // 枠は傾いているので、立ち絵は逆へ同じだけ回してまっすぐ立たせる。
-                    // 置く位置も、画面の向きで決めた値を枠の向きへ直す
-                    portraitRt.localRotation = Quaternion.Euler(0f, 0f, -CutinStripeTilt);
+                    //
+                    // **型は帯の絵の形そのもの（2026-10-21、ユーザー指示「カットインの外に体が出ているのでマスクして」）。**
+                    // 以前は帯の四角（6000×600 を傾けたもの）で切っていたが、見えている帯はドット絵（斜めの縁と黒い枠）で、
+                    // 四角より細い。絵の透明な所から体がはみ出していた。帯の絵と同じ絵を型にし、帯の絵に重ね続ける
                     Vector2 onScreen = EnemyCutinPortraitPosition * k;
-                    float rad = CutinStripeTilt * Mathf.Deg2Rad;
-                    Vector2 inBand = new Vector2(
-                        onScreen.x * Mathf.Cos(rad) + onScreen.y * Mathf.Sin(rad),
-                        -onScreen.x * Mathf.Sin(rad) + onScreen.y * Mathf.Cos(rad));
+                    Vector2 inBand;
+                    var pictureImage = stripePicture != null ? stripePicture.GetComponent<RawImage>() : null;
+                    if (pictureImage != null && pictureImage.texture != null)
+                    {
+                        var maskObj = new GameObject("PortraitMask", typeof(RectTransform), typeof(RawImage), typeof(Mask),
+                            typeof(Effects.CutinMaskFollower));
+                        maskObj.transform.SetParent(containerRt, false);
+                        var maskImage = maskObj.GetComponent<RawImage>();
+                        maskImage.texture = pictureImage.texture;
+                        maskImage.raycastTarget = false;
+                        maskObj.GetComponent<Mask>().showMaskGraphic = false;   // 型そのものは描かない
+                        maskObj.GetComponent<Effects.CutinMaskFollower>().Follow(stripePicture);
+
+                        portraitObj.transform.SetParent(maskObj.transform, false);
+                        portraitRt.anchorMin = new Vector2(0.5f, 0.5f);
+                        portraitRt.anchorMax = new Vector2(0.5f, 0.5f);
+                        // 帯の絵は画面に対してまっすぐなので、立ち絵も回さず、画面の向きの位置のまま置く
+                        portraitRt.localRotation = Quaternion.identity;
+                        inBand = onScreen;
+                    }
+                    else
+                    {
+                        // 帯の絵が無いときは、前と同じく帯の四角で切る
+                        var maskObj = new GameObject("PortraitMask", typeof(RectTransform), typeof(Image), typeof(Mask));
+                        maskObj.transform.SetParent(containerRt, false);
+                        var maskRt = (RectTransform)maskObj.transform;
+                        maskRt.sizeDelta = stripeRt.sizeDelta;
+                        maskRt.localRotation = stripeRt.localRotation;
+                        maskRt.anchoredPosition = stripeStart;
+                        maskObj.GetComponent<Image>().raycastTarget = false;
+                        maskObj.GetComponent<Mask>().showMaskGraphic = false;   // 枠そのものは描かない
+                        bgElements.Add(maskRt);
+                        bgStartPos.Add(stripeStart);
+                        bgTargetPos.Add(stripeTarget);
+
+                        portraitObj.transform.SetParent(maskRt, false);
+                        portraitRt.anchorMin = new Vector2(0.5f, 0.5f);
+                        portraitRt.anchorMax = new Vector2(0.5f, 0.5f);
+
+                        // 枠は傾いているので、立ち絵は逆へ同じだけ回してまっすぐ立たせる。
+                        // 置く位置も、画面の向きで決めた値を枠の向きへ直す
+                        portraitRt.localRotation = Quaternion.Euler(0f, 0f, -CutinStripeTilt);
+                        float rad = CutinStripeTilt * Mathf.Deg2Rad;
+                        inBand = new Vector2(
+                            onScreen.x * Mathf.Cos(rad) + onScreen.y * Mathf.Sin(rad),
+                            -onScreen.x * Mathf.Sin(rad) + onScreen.y * Mathf.Cos(rad));
+                    }
 
                     // 帯の中では動かさない（帯ごと出入りする）
                     portraitTargetPos = inBand;
