@@ -103,6 +103,32 @@ namespace KillingMahjong.Managers
             return true;
         }
 
+        /// <summary>
+        /// 1拍目が曲の頭からずれている曲の拍（BPM, 1拍目の秒）。拍の表（Tempos）には載せていない曲
+        /// （「賭けの合図」。測った値は AudioManager.Drums.cs の BeatGrids と同じ）。
+        /// </summary>
+        private static readonly System.Collections.Generic.Dictionary<string, Vector2> OffsetBeatGrids =
+            new System.Collections.Generic.Dictionary<string, Vector2>
+        {
+            { "bgm_kake_1", new Vector2(135.10f, 0.283f) },
+            { "bgm_kake_2", new Vector2(134.25f, 0.152f) },
+        };
+
+        /// <summary>
+        /// いま何拍目か。<see cref="TryGetBeatPosition"/> に加えて、1拍目がずれている曲（賭けの合図）も数える
+        /// （2026-10-21、とくしゅの CPU 戦で女の子を拍に合わせて動かすため）。
+        /// ほかの演出の拍の扱いは変えないよう、別の口にしてある。
+        /// </summary>
+        public bool TryGetMusicBeat(out double beats)
+        {
+            if (TryGetBeatPosition(out beats)) return true;
+            var src = BeatClockSource;
+            if (src == null || src.clip == null) return false;
+            if (!OffsetBeatGrids.TryGetValue(src.clip.name, out Vector2 grid)) return false;
+            beats = (SmoothedTime(src) - grid.y) * grid.x / 60.0;
+            return true;
+        }
+
         private int _beatCacheFrame = -1;
         private double _beatCacheValue;
         private bool _beatCacheOk;

@@ -126,6 +126,15 @@ namespace KillingMahjong.UI
             SlimeBounceAnimator.Set(characterRenderer, on);
         }
 
+        /// <summary>
+        /// 曲の拍に合わせた動き（左右反転・2枚の絵の切り替え）を始める・止める（2026-10-21、お試し）。
+        /// <see cref="BeatDanceAnimator"/>。止めると反転と絵を元に戻す。
+        /// </summary>
+        public void SetBeatDance(BeatDanceAnimator.Mode mode)
+        {
+            BeatDanceAnimator.Set(characterRenderer, faceRenderer, mode);
+        }
+
         public void PlayBounceAnimation(float duration = 0.5f)
         {
             if (characterRenderer == null) return;
