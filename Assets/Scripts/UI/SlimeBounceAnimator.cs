@@ -11,7 +11,8 @@ namespace KillingMahjong.UI
     ///
     /// **位置は足し算で動かす。** 同じ物に喋るときの跳ね（<see cref="TalkBobAnimator"/>）が付いていて、
     /// あちらは毎フレーム位置を決め直す。こちらは LateUpdate で、前に足した分を引いてから足し直す。
-    /// 止めるときは、跳ねの途中なら着地を待ってから元の形へ戻す（<see cref="Play"/> に false）。
+    /// 止めると（<see cref="Play"/> に false）、跳ねの途中でもその瞬間に元の形・位置へ戻す
+    /// （2026-10-21、ユーザー指示「揃った瞬間に戻ってほしい」）。
     /// </summary>
     public sealed class SlimeBounceAnimator : MonoBehaviour
     {
@@ -33,9 +34,7 @@ namespace KillingMahjong.UI
         private Vector3 lastWritten;
         private bool hasWritten;
         private bool playing;
-        private bool stopping;
         private float phase;
-        private float settle; // 止めたあと元の形へ戻る割合（1 = 跳ねている、0 = 元どおり）
 
         public bool IsPlaying => playing;
 
@@ -59,12 +58,10 @@ namespace KillingMahjong.UI
             {
                 if (!playing) { baseScale = transform.localScale; phase = 0f; }
                 playing = true;
-                stopping = false;
-                settle = 1f;
             }
-            else if (playing)
+            else
             {
-                stopping = true;
+                ResetNow();
             }
         }
 
@@ -78,18 +75,8 @@ namespace KillingMahjong.UI
         {
             if (!playing) return;
 
-            float before = phase;
             phase += Time.deltaTime / Mathf.Max(0.1f, cycleSeconds);
-            if (stopping)
-            {
-                // 着地（1回の跳ねの 0.6）を過ぎてから、ぷるんと戻る間に形を戻す
-                bool landed = Frac(before) >= 0.6f || Frac(phase) >= 0.6f || Mathf.Floor(phase) > Mathf.Floor(before);
-                if (landed) settle = Mathf.MoveTowards(settle, 0f, Time.deltaTime / 0.18f);
-            }
-
             Shape(Frac(phase), out float sy, out float lift);
-            sy = Mathf.Lerp(1f, sy, settle);
-            lift *= settle;
             float sx = 1f / Mathf.Max(0.5f, sy); // 体積を保つように横へ広がる
 
             float height = BodyHeight();
@@ -106,26 +93,19 @@ namespace KillingMahjong.UI
             lastOffset = offset;
             lastWritten = transform.localPosition;
             hasWritten = true;
-
-            if (stopping && settle <= 0f)
-            {
-                transform.localScale = baseScale;
-                transform.localPosition = basePos;
-                lastOffset = Vector3.zero;
-                hasWritten = false;
-                playing = false;
-                stopping = false;
-            }
         }
 
-        private void OnDisable()
+        private void OnDisable() { ResetNow(); }
+
+        /// <summary>跳ねを止めて、その場で元の形・位置へ戻す。</summary>
+        private void ResetNow()
         {
             if (!playing) return;
             transform.localScale = baseScale;
             if (hasWritten && transform.localPosition == lastWritten) transform.localPosition -= lastOffset;
+            lastOffset = Vector3.zero;
             hasWritten = false;
             playing = false;
-            stopping = false;
         }
 
         private static float Frac(float v) => v - Mathf.Floor(v);

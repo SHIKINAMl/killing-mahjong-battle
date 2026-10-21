@@ -251,7 +251,7 @@ namespace KillingMahjong.Managers
                     StartCoroutine(RunSecondRoundHandTimerHints(data));
 
                 // 選んでいるあいだ、先輩は手持ち無沙汰なのでスライムのように跳ねる（2026-10-21、ユーザー指示）。
-                // 13枚そろったら（または決定したら）着地して元に戻る
+                // 13枚そろった（または決定した）瞬間に元に戻る
                 SetSeniorIdleBounce(true);
                 yield return new WaitUntil(() =>
                     GetHandTileCount() >= HandSize || !_isWaitingForHandSelectionComplete);

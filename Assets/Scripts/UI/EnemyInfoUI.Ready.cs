@@ -119,7 +119,7 @@ namespace KillingMahjong.UI
 
         /// <summary>
         /// 立ち絵をスライムのように跳ねさせ続ける・止める（2026-10-21）。チュートリアルで牌を選んでいるあいだに使う。
-        /// 止めるときは着地を待ってから元の形へ戻る（<see cref="SlimeBounceAnimator"/>）。
+        /// 止めると、その瞬間に元の形・位置へ戻る（<see cref="SlimeBounceAnimator"/>）。
         /// </summary>
         public void SetIdleSlimeBounce(bool on)
         {
