@@ -127,14 +127,16 @@ namespace KillingMahjong.UI
         }
 
         /// <summary>
-        /// 曲の拍に合わせた動き（左右反転・2枚の絵の切り替え）を始める・止める（2026-10-21、お試し）。
-        /// <see cref="BeatDanceAnimator"/>。止めると反転と絵を元に戻す。
+        /// 曲の拍に合わせた動き（弾み・左右の揺れ・目を閉じた笑顔との切り替え）を始める・止める（2026-10-21、お試し）。
+        /// <see cref="BeatDanceAnimator"/>。止めると位置と顔を元に戻す。
+        /// リアクションの顔を出している間は、笑顔に替えない（気分の違う顔が交互に出て、表情がころころ変わって見えた）。
         /// </summary>
         public void SetBeatDance(BeatDanceAnimator.Mode mode)
         {
             // 拍に合わせて動いているあいだは、まばたきを止める（拍と関係なく目を閉じた絵が混ざって、拍が崩れて見えた）
             suppressBlink = mode != BeatDanceAnimator.Mode.None;
-            BeatDanceAnimator.Set(characterRenderer, faceRenderer, mode);
+            BeatDanceAnimator.Set(characterRenderer, faceRenderer, mode,
+                () => reactionCoroutine == null && faceRenderer != null && faceRenderer.sprite == normalFaceSprite);
         }
 
         public void PlayBounceAnimation(float duration = 0.5f)
