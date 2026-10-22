@@ -38,6 +38,14 @@ namespace KillingMahjong.UI
         private Button tutorialArchiveButton;
         private TutorialArchiveUI tutorialArchiveUI;
 
+        // 展示用の初期化ボタン（2026-10-22）。来場者が間違って押さないよう、左上の隅に置いて2回押しで効かせる
+        private Button exhibitionResetButton;
+        private TMP_Text exhibitionResetLabel;
+        private float exhibitionResetArmedUntil = -1f;
+        private const string ExhibitionResetText = "展示用リセット";
+        private const string ExhibitionResetConfirmText = "もう一度押すと初期化";
+        private const float ExhibitionResetConfirmSeconds = 3f;
+
         // 対局BGMの選択欄。**解像度の選択欄をひな形にして実行時に作る。**
         // シーンに置くと、対局シーンとOpeningSceneの2つを同じように直す必要があり、
         // 片方だけ古いままになる（セリフの影で実際に起きた）。
@@ -113,6 +121,7 @@ namespace KillingMahjong.UI
 
             // タイトルへ戻るクリック処理を登録する前に資料ボタンを複製する。
             CreateTutorialArchiveButton();
+            CreateExhibitionResetButton();
             BuildSettingRows();
 
             // --- スライダーのイベント登録 ---
@@ -552,6 +561,67 @@ namespace KillingMahjong.UI
 
             ArrangeSystemButtons();
             tutorialArchiveButton.onClick.AddListener(OpenTutorialArchive);
+        }
+
+        /// <summary>
+        /// 展示用の初期化ボタンを作る（2026-10-22、ユーザー指示。置き場所は設定画面）。
+        /// 名前・勝敗の記録・チュートリアルの進み具合を消して、ゲームを起動し直す（<see cref="Core.ExhibitionReset"/>）。
+        /// 「タイトルへ」と同じ見た目を、閉じるボタンと反対の左上の隅に小さく置く。
+        /// 1回目の押下では文字が「もう一度押すと初期化」に変わるだけで、3秒以内にもう一度押したときだけ効く
+        /// </summary>
+        private void CreateExhibitionResetButton()
+        {
+            if (exhibitionResetButton != null || returnToTitleButton == null) return;
+
+            GameObject buttonObject = Instantiate(returnToTitleButton.gameObject, returnToTitleButton.transform.parent, false);
+            buttonObject.name = "ExhibitionResetButton";
+            var rect = (RectTransform)buttonObject.transform;
+            rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, 200f);
+            rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, 40f);
+            rect.anchoredPosition = new Vector2(-280f, 255f);
+            exhibitionResetButton = buttonObject.GetComponent<Button>();
+            exhibitionResetButton.onClick.RemoveAllListeners();
+
+            exhibitionResetLabel = buttonObject.GetComponentInChildren<TMP_Text>(true);
+            if (exhibitionResetLabel != null)
+            {
+                exhibitionResetLabel.text = ExhibitionResetText;
+                exhibitionResetLabel.enableAutoSizing = true;
+                exhibitionResetLabel.fontSizeMin = 10f;
+                exhibitionResetLabel.fontSizeMax = 18f;
+            }
+
+            if (buttonObject.GetComponent<UIButtonHoverEffect>() == null)
+            {
+                buttonObject.AddComponent<UIButtonHoverEffect>();
+            }
+
+            exhibitionResetButton.onClick.AddListener(OnExhibitionResetClicked);
+        }
+
+        private void OnExhibitionResetClicked()
+        {
+            if (Core.ExhibitionReset.Running) return;
+            if (Time.realtimeSinceStartup > exhibitionResetArmedUntil)
+            {
+                exhibitionResetArmedUntil = Time.realtimeSinceStartup + ExhibitionResetConfirmSeconds;
+                if (exhibitionResetLabel != null) exhibitionResetLabel.text = ExhibitionResetConfirmText;
+                return;
+            }
+            if (exhibitionResetLabel != null) exhibitionResetLabel.text = "初期化しています…";
+            exhibitionResetButton.interactable = false;
+            Core.ExhibitionReset.Run();
+        }
+
+        private void Update()
+        {
+            // 確かめの文字は、3秒たっても押されなければ元に戻す
+            if (exhibitionResetArmedUntil > 0f && Time.realtimeSinceStartup > exhibitionResetArmedUntil
+                && !Core.ExhibitionReset.Running)
+            {
+                exhibitionResetArmedUntil = -1f;
+                if (exhibitionResetLabel != null) exhibitionResetLabel.text = ExhibitionResetText;
+            }
         }
 
         private void ArrangeSystemButtons()
