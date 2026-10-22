@@ -14,6 +14,10 @@ namespace KillingMahjong.UI
         public float ThudFinishedAt { get; private set; }
         public float CompletedAt { get; private set; }
 
+        // 目の範囲（800×600 の絵の上、左下原点）
+        private static readonly Rect LeftEyePixels = new Rect(358, 393, 24, 13);
+        private static readonly Rect RightEyePixels = new Rect(408, 396, 22, 14);
+
         private RectTransform picture, leftEye, rightEye;
         private EyelidClosureGraphic eyelids;
         private AudioSource sound;
@@ -28,9 +32,11 @@ namespace KillingMahjong.UI
             var existing = FindFirstObjectByType<RedDefeatPrototypeUI>();
             if (existing != null) return existing;
             var closed = Resources.Load<Texture2D>("UnusedEndings/RedDefeat/closed");
-            var open = Resources.Load<Texture2D>("UnusedEndings/RedDefeat/open");
             var background = Resources.Load<Texture2D>("UnusedEndings/RedDefeat/background");
-            if (closed == null || open == null || background == null)
+            // 目は open.png の赤い形ではなく、通常の立ち絵の目の形だけを赤く塗った絵を使う
+            // （2026-10-22 ユーザー指示。open.png の目は下へ垂れた形で、泣いているように見えた）
+            var eyes = Resources.Load<Texture2D>("UnusedEndings/RedDefeat/eyes");
+            if (closed == null || background == null || eyes == null)
             {
                 Debug.LogError("[RedDefeatPrototypeUI] 没案の画像がありません。");
                 return null;
@@ -39,12 +45,12 @@ namespace KillingMahjong.UI
             var sequence = root.AddComponent<RedDefeatPrototypeUI>();
             sequence.onPreviewCompleted = onPreviewCompleted;
             sequence.playAudio = playAudio;
-            sequence.Build(closed, open, background);
+            sequence.Build(closed, eyes, background);
             sequence.StartCoroutine(sequence.Run());
             return sequence;
         }
 
-        private void Build(Texture2D closed, Texture2D open, Texture2D background)
+        private void Build(Texture2D closed, Texture2D eyes, Texture2D background)
         {
             var canvas = gameObject.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
@@ -86,8 +92,10 @@ namespace KillingMahjong.UI
             image.texture = closed;
             image.raycastTarget = false;
             Effects.PixelToneUI.Attach(image, silhouetteOnly: true);
-            leftEye = Eye(open, new Rect(359, 391, 27, 19), "LeftEye");
-            rightEye = Eye(open, new Rect(405, 395, 24, 20), "RightEye");
+            // eyes.png は 通常時身体＋通常顔 をシルエットに重ねて（0.167 倍、左上 (100, 56)）、
+            // 上まつげの線より下の白目と瞳のドットだけを赤く塗ったもの。範囲は目の外接矩形に1ドットの余白
+            leftEye = Eye(eyes, LeftEyePixels, "LeftEye");
+            rightEye = Eye(eyes, RightEyePixels, "RightEye");
             eyelids = new GameObject("Eyelids", typeof(RectTransform)).AddComponent<EyelidClosureGraphic>();
             eyelids.transform.SetParent(transform, false);
             Stretch(eyelids.rectTransform);
@@ -125,8 +133,8 @@ namespace KillingMahjong.UI
             Stage = SequenceStage.EyesOpening;
             yield return Animate(.12f, t => {
                 float opening = 1 - (1 - t) * (1 - t);
-                leftEye.sizeDelta = new Vector2(27, 19 * opening);
-                rightEye.sizeDelta = new Vector2(24, 20 * opening);
+                leftEye.sizeDelta = new Vector2(LeftEyePixels.width, LeftEyePixels.height * opening);
+                rightEye.sizeDelta = new Vector2(RightEyePixels.width, RightEyePixels.height * opening);
             });
             Stage = SequenceStage.Laugh;
             // このパスに録音を置けば、間の代わりに笑い声を再生する。
