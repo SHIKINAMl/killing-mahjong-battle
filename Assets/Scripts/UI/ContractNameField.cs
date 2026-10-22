@@ -9,6 +9,7 @@ namespace KillingMahjong.UI
     ///
     /// 契約書は1枚絵（Assets/Sprites/Tutorial/contract_paper.png、400x300 を 800x600 に2倍で表示）。
     /// 下線は絵の (125〜290, 262) あたり。800x600 では x=250〜580、上から 524 で、真ん中からは (+15, -224)。
+    /// 欄はそこから 4 上げて (+15, -220) に置く（2026-10-22、「私」の字と下端をそろえる。-224 だと名前が「私」より 4 ドット下がっていた）。
     ///
     /// **シーンに置いてある物が正**（<see cref="SceneFirst"/>）。ここの数字は、シーンに無かったときに作るための控え。
     /// Web 版で日本語を打てるように、<see cref="WebImeInput"/> も同じ物に付ける。
@@ -18,7 +19,7 @@ namespace KillingMahjong.UI
     {
         public const string ObjectName = "NameInput";
 
-        private static readonly Vector2 FieldPosition = new Vector2(15f, -224f);
+        private static readonly Vector2 FieldPosition = new Vector2(15f, -220f);
         private static readonly Vector2 FieldSize = new Vector2(320f, 34f);
         private const float FontSize = 22f;
         private static readonly Color InkColor = new Color32(58, 36, 26, 255);

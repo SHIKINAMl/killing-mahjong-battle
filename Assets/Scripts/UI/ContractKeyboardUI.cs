@@ -29,7 +29,7 @@ namespace KillingMahjong.UI
         private const float PanelHeight = 4 * KeyHeight + 3 * Gap + Padding * 2;
         private const float PanelX = -112f;
 
-        /// <summary>出ているあいだ、契約書を持ち上げる量。名前の下線（真ん中から -224）がキーボードの上に出る</summary>
+        /// <summary>出ているあいだ、契約書を持ち上げる量。名前の欄（真ん中から -220）がキーボードの上に出る</summary>
         private const float PaperLift = 140f;
         private const float SlideSeconds = .22f;
 
