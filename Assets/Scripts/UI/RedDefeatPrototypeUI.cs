@@ -18,6 +18,16 @@ namespace KillingMahjong.UI
         private static readonly Rect LeftEyePixels = new Rect(358, 393, 24, 13);
         private static readonly Rect RightEyePixels = new Rect(408, 396, 22, 14);
 
+        // 倒れるときのカット。fall は傾きの進み（ApplyFall）、lids はまぶたの閉じ具合（1 で真っ暗）、hold は開いている秒数。
+        // 後のカットほど傾きが進み、目の開きは狭く、見えている時間は短い
+        private static readonly (float fall, float lids, float hold)[] FallCuts =
+        {
+            (.35f, .30f, .55f),
+            (.75f, .55f, .45f),
+            (1.1f, .80f, .30f),
+        };
+        private const float BlinkDarkSeconds = .15f;
+
         private RectTransform picture, leftEye, rightEye;
         private EyelidClosureGraphic eyelids;
         private AudioSource sound;
@@ -141,17 +151,23 @@ namespace KillingMahjong.UI
             var laugh = Resources.Load<AudioClip>("UnusedEndings/RedDefeat/laugh");
             if (laugh != null) sound.PlayOneShot(laugh);
             yield return new WaitForSecondsRealtime(laugh != null ? laugh.length : 1.6f);
+            // 倒れるところは滑らかに動かさず、まばたきの暗転で区切ったカットでつなぐ
+            // （2026-10-22 ユーザー指示「ぬるっとしすぎ」「一カメ、二カメ、三カメという感じで」）。
+            // 一瞬暗くなるあいだに視点が傾き、目は一瞬で開く。開くたびに目の開きが狭くなる。
+            // 視点が下に落ちるので、雀卓と女の子は画面上方へ流れる。
             Stage = SequenceStage.Tilt;
-            yield return Animate(1.1f, t => {
-                // 視点が下に落ちるので、雀卓と女の子は画面上方へ流れる。
-                ApplyFall(t * t);
-                eyelids.Amount = .45f * Mathf.SmoothStep(0, 1, Mathf.Clamp01((t - .3f) / .7f));
-            });
+            foreach (var cut in FallCuts)
+            {
+                eyelids.Amount = 1f;
+                yield return new WaitForSecondsRealtime(BlinkDarkSeconds);
+                ApplyFall(cut.fall);
+                eyelids.Amount = cut.lids;
+                yield return new WaitForSecondsRealtime(cut.hold);
+            }
+            // 最後は「ばたっ」と同時に暗くする
             Stage = SequenceStage.EyesClosing;
-            yield return Animate(.65f, t => {
-                ApplyFall(1 + .3f * t);
-                eyelids.Amount = .45f + .55f * Mathf.SmoothStep(0, 1, t);
-            });
+            ApplyFall(1.3f);
+            eyelids.Amount = 1f;
             Stage = SequenceStage.Thud;
             sound.PlayOneShot(thud);
             yield return new WaitForSecondsRealtime(thud.length);
