@@ -136,6 +136,40 @@ namespace KillingMahjong.Managers
         /// 演出そのものが出せない場面（UIが無い等）では、**待たずにフェイズだけ進める。**
         /// ここで待つと、盤面が揃っていない入り方をしたときに止まってしまう。
         /// </summary>
+        // ==================== 対局のあいだの曲（2026-10-23） ====================
+        //
+        // ユーザーが採用した対局用の曲（`tut_lesson_battle`、144 BPM）を、チュートリアルで
+        // 実際に対局を進める区間にだけ流す。説明の区間は今までどおり `tut_lesson`（135 BPM）。
+        //
+        //   入る: 「対局開始」の黒帯が画面を覆い切ったところ（フェイズが打牌に切り替わるのと同時）
+        //         DEADEND から対局へ戻ったところ
+        //   戻る: 次の局の頭（手牌選択の説明に戻る）。**対局の曲が鳴っているときだけ。**
+        //         第1局の頭は無音から立ち絵が浮かぶ作りなので、ここで曲を鳴らし始めない。
+        //         続きから（第2局以降を指定して）始めたときは何も鳴っていないので、説明の曲を鳴らす
+        //
+        // 同じ曲を続けて指定しても頭出しはしない（AudioManager.PlayTutorialBgm）。
+        // 台本で断ち切った（「BGM止まる」など）あとは、ここから勝手に鳴らし直さない。
+
+        private const string TutorialLessonBgm = "tut_lesson";
+        private const string TutorialBattleBgm = "tut_lesson_battle";
+
+        private static void PlayTutorialBattleBgm()
+        {
+            if (AudioManager.Instance != null) AudioManager.Instance.PlayTutorialBgm(TutorialBattleBgm);
+        }
+
+        /// <param name="resumedRound">
+        /// 第2局以降の頭か。局を指定して始め直したとき（続きから）は曲が何も鳴っていないので、説明の曲を鳴らす。
+        /// 第1局の頭は台本の1行目の合図で鳴らすので、ここでは鳴らさない
+        /// </param>
+        private static void ReturnToTutorialLessonBgm(bool resumedRound = false)
+        {
+            var audio = AudioManager.Instance;
+            if (audio == null) return;
+            if (audio.IsTutorialBgmPlaying(TutorialBattleBgm) || (resumedRound && !audio.IsBgmPlaying))
+                audio.PlayTutorialBgm(TutorialLessonBgm);
+        }
+
         private IEnumerator RunDiscardEntryTransition()
         {
             var transition = gameUIManager != null ? gameUIManager.PhaseTransitionUI : null;
@@ -144,6 +178,7 @@ namespace KillingMahjong.Managers
             if (transition == null || !transition.isActiveAndEnabled)
             {
                 SetPhase(RoundStatus.Discard);
+                PlayTutorialBattleBgm();
                 yield break;
             }
 
@@ -164,14 +199,14 @@ namespace KillingMahjong.Managers
                 "対局開始",
                 gameUIManager.PlayerInfoUI,
                 info,
-                onMidpoint: () => { SetPhase(RoundStatus.Discard); midpointDone = true; },
+                onMidpoint: () => { SetPhase(RoundStatus.Discard); PlayTutorialBattleBgm(); midpointDone = true; },
                 onComplete: () => finished = true);
 
             // **覆い切るまでは必ず待つ。** ここを待たないと、黒帯が降りている最中に
             // 次の台詞が走り、見えないところで喋ることになる。
             float limit = Time.time + 8f;
             yield return new WaitUntil(() => midpointDone || Time.time > limit);
-            if (!midpointDone) SetPhase(RoundStatus.Discard);
+            if (!midpointDone) { SetPhase(RoundStatus.Discard); PlayTutorialBattleBgm(); }
 
             // 晴れるまでも待つ。上限を置いてあるので、演出が壊れても止まらない
             float limit2 = Time.time + 8f;

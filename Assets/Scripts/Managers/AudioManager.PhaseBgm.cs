@@ -99,6 +99,9 @@ namespace KillingMahjong.Managers
             // ベースは `km-docs/tools/compose.py` の合成音。音の位置は全部拍ちょうど）。
             // **135.00 ちょうど・1拍目がサンプル0・24小節**。実測ではなく設計値。
             { "tut_lesson",       new Tempo(135f, 4) },
+            // チュートリアルの対局のあいだに流す曲（2026-10-23 ユーザー採用、弦を控えめにした v2）。
+            // **144 BPM・4拍子・24小節・40 秒**。設計値。`tut_lesson` とはテンポが違うので重ねない
+            { "tut_lesson_battle", new Tempo(144f, 4) },
 
             // プランナー採用の2曲（2026-09-26）。**AudioManager.PairBgm.cs がここから拍を引く。**
             // 2本は同じ素材から書き出した同尺・同テンポ・同調で、それが重ねられる条件。
@@ -583,6 +586,10 @@ namespace KillingMahjong.Managers
         /// <summary>
         /// 台本の指示でBGMを差し替える。**小節頭を待たず、頭から鳴らす。**
         /// 曲ごとにテンポも長さも違うので、再生位置の引き継ぎはしない。
+        ///
+        /// **同じ曲がもう鳴っていれば何もしない（2026-10-23）。** 説明用と対局用の曲を行き来するので、
+        /// 同じ曲を指定し直すたびに頭出しすると、続いているはずの曲が途中で戻って聞こえる。
+        /// 止まっている（断ち切った後など）ときは頭から鳴らす。
         /// </summary>
         public void PlayTutorialBgm(string name)
         {
@@ -591,6 +598,7 @@ namespace KillingMahjong.Managers
 
             var clip = GetPhaseBgmClip(name);
             if (clip == null) return;
+            if (IsTutorialBgmPlaying(name)) return;
 
             if (bgmSwapCoroutine != null) { StopCoroutine(bgmSwapCoroutine); bgmSwapCoroutine = null; }
             currentPhaseBgmName = name;
@@ -602,6 +610,14 @@ namespace KillingMahjong.Managers
             bgmSource.timeSamples = 0;
             bgmSource.volume = BgmMaster;
             bgmSource.Play();
+        }
+
+        /// <summary>チュートリアルの曲 <paramref name="name"/> がいま鳴っているか。</summary>
+        public bool IsTutorialBgmPlaying(string name)
+        {
+            if (bgmSource == null || string.IsNullOrEmpty(name) || currentPhaseBgmName != name) return false;
+            var clip = GetPhaseBgmClip(name);
+            return clip != null && bgmSource.clip == clip && bgmSource.isPlaying;
         }
 
         /// <summary>

@@ -100,6 +100,8 @@ namespace KillingMahjong.Managers
                     }
                     SetBoardVisible(true);
                     SetPhase(RoundStatus.Discard);
+                    // 対局へ戻るので対局の曲を鳴らし直す（このあと台本の「BGM止まる」でまた断ち切る）
+                    PlayTutorialBattleBgm();
                     if (gameUIManager != null && gameUIManager.VisualController != null)
                         gameUIManager.VisualController.InvalidateRebuildCache();
                     if (board != null) board.FireRebuildEvent();

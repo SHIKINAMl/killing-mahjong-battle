@@ -93,6 +93,8 @@ namespace KillingMahjong.Managers
         private IEnumerator RunRound(TutorialRoundData data)
         {
             // --- 局の初期化 ---
+            // 前の局の対局から説明へ戻るので、曲も説明用へ戻す（対局の曲が鳴っているときだけ。TutorialManager.Board.cs）
+            ReturnToTutorialLessonBgm(resumedRound: !IsFirstTutorialRound(data));
             SetSeniorIdleBounce(false); // 前の局を途中で抜けたときに跳ねたまま残さない
             HasClickedAutoMangan = false;
             IsAutoButtonLocked = false;
