@@ -47,20 +47,28 @@ namespace KillingMahjong.UI
             var face = Box("FallenSeniorFace", senior, senior.sizeDelta, Vector2.zero, Color.white);
             face.GetComponent<Image>().sprite = Resources.Load<Sprite>("女の子/tutorial_girl_px29_face");
             // 倒れながら軽く一声あげる（2026-10-22 のユーザー指示「軽く『ぎゃー』と言わせて」）。
-            // 動画の中の先輩の声は字幕で出す。送り待ちにはせず、倒れ終わって少ししたら消す
-            subtitles.Show("先輩", "ぎゃー");
+            // 字幕ではなく、倒れていく頭のそばに字を出して一緒に動かす（同日「倒れる絵についていく感じで」）。
+            // 字は傾けずに読める向きのまま、倒れ終わったら少しして消す
+            var cry = Label("FallenSeniorCry", viewport, new Vector2(160f, 40f), Vector2.zero, 26f);
+            cry.text = "ぎゃー";
             Vector2 start = senior.anchoredPosition;
             for (float t = 0; t < 1f; t += Time.unscaledDeltaTime / 1.2f)
             {
                 float p = Mathf.Clamp01(t * t);
                 senior.anchoredPosition = start + new Vector2(-90f, -240f) * p;
                 senior.localRotation = Quaternion.Euler(0, 0, 70f * p);
+                FollowHead(cry.rectTransform, senior);
                 yield return null;
             }
             senior.anchoredPosition = start + new Vector2(-90f, -240f);
             senior.localRotation = Quaternion.Euler(0, 0, 70f);
-            yield return new WaitForSecondsRealtime(.6f);
-            subtitles.Hide();
+            FollowHead(cry.rectTransform, senior);
+            for (float t = 0; t < 1f; t += Time.unscaledDeltaTime / .8f)
+            {
+                cry.alpha = 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t * 2f - 1f));
+                yield return null;
+            }
+            Destroy(cry.gameObject);
 
             // その場で変わる赤い面だけを重ね、既存の卓の絵は変更しない。
             var stainRoot = new GameObject("ReplayTableStain", typeof(RectTransform), typeof(PixelShapeGraphic));
@@ -94,6 +102,18 @@ namespace KillingMahjong.UI
                 transform.localScale = Vector3.one * Mathf.SmoothStep(1f, .4f, t);
                 yield return null;
             }
+        }
+
+        /// <summary>
+        /// 倒れていく先輩の頭の右上に字を置く。頭は絵と一緒に回るが、字そのものは傾けない。
+        /// 頭は 29×29 の絵の上から4段目あたり（20倍で中心から (10, 210)）。倒れ切ると頭は画面の外へ出るので、
+        /// 字は動画の枠の内側に留める
+        /// </summary>
+        private static void FollowHead(RectTransform label, RectTransform senior)
+        {
+            Vector2 head = senior.anchoredPosition + (Vector2)(senior.localRotation * new Vector3(10f, 210f, 0f));
+            Vector2 at = head + new Vector2(80f, 40f);
+            label.anchoredPosition = new Vector2(Mathf.Clamp(at.x, -310f, 310f), Mathf.Clamp(at.y, -240f, 270f));
         }
 
         private static void DrawStain(PixelShapeGraphic stain, float amount)
