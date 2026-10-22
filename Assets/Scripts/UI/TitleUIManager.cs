@@ -36,6 +36,20 @@ namespace KillingMahjong.UI
                 // 以前はここで「見本の写し」（SavedRoomPreview）を捨て、RoomScreenUI が作り直していた。
                 // 写しはコードを変えても付いてこないので、置いてある物と再生時の物が食い違っていた。
                 OpenPreservedRoom();
+                // **チュートリアルを終えて来たときは、対局を選ぶ画面まで自動で開く**（2026-10-23 ユーザー指示
+                // 「チュートリアルが終わったらデバッグ部屋にシーンを移して、対局の選ぶところまで自動で開いて」）。
+                // 復活の経路は白い光を通してから開く
+                int returnFromTutorial = PlayerPrefs.GetInt(TutorialReturnToRoomKey, 0);
+                if (returnFromTutorial == TutorialNavigation.RevivalToMatchMenu
+                    || returnFromTutorial == TutorialNavigation.OpenMatchMenuInRoom)
+                {
+                    PlayerPrefs.DeleteKey(TutorialReturnToRoomKey);
+                    PlayerPrefs.Save();
+                    if (returnFromTutorial == TutorialNavigation.RevivalToMatchMenu)
+                        StartCoroutine(OpenMatchMenuAfterRevival());
+                    else
+                        OpenMatchMenu();
+                }
                 FinishSceneLoading();
                 return;
             }

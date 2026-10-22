@@ -40,8 +40,9 @@ namespace KillingMahjong.Managers
             Tutorial.TutorialAudioDirector.ResetVisuals();
 
             if (_aborted) yield break;
-            TutorialNavigation.Complete();
-            SceneManager.LoadScene(_scenario.titleSceneName);
+            // 終わったらタイトルではなくデバッグ部屋へ移し、対局を選ぶ画面を開く（2026-10-23 ユーザー指示）
+            TutorialNavigation.Complete(TutorialNavigation.OpenMatchMenuInRoom);
+            SceneManager.LoadScene(TutorialNavigation.DebugRoomSceneName);
         }
 
         /// <summary>

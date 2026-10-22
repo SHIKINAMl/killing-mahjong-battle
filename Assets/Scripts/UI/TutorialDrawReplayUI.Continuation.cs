@@ -53,17 +53,43 @@ namespace KillingMahjong.UI
             var cry = Label("FallenSeniorCry", viewport, new Vector2(160f, 40f), Vector2.zero, 26f);
             cry.text = "ぎゃー";
             Vector2 start = senior.anchoredPosition;
-            for (float t = 0; t < 1f; t += Time.unscaledDeltaTime / 1.2f)
+            // 少しだけ前へ傾きながら沈む。**大きく回して倒さない**（2026-10-23。立ち絵を 70 度回して倒していたのが
+            // 「滑稽すぎる」とプランナーに言われ、倒れ伏した絵に替えた）
+            for (float t = 0; t < 1f; t += Time.unscaledDeltaTime / .35f)
             {
                 float p = Mathf.Clamp01(t * t);
-                senior.anchoredPosition = start + new Vector2(-90f, -240f) * p;
-                senior.localRotation = Quaternion.Euler(0, 0, 70f * p);
+                senior.anchoredPosition = start + new Vector2(-30f, -60f) * p;
+                senior.localRotation = Quaternion.Euler(0, 0, 16f * p);
                 FollowHead(cry.rectTransform, senior);
                 yield return null;
             }
-            senior.anchoredPosition = start + new Vector2(-90f, -240f);
-            senior.localRotation = Quaternion.Euler(0, 0, 70f);
-            FollowHead(cry.rectTransform, senior);
+            // 倒れ伏した絵へ切り替える。卓の手前の縁へ上半身を投げ出した姿（37×27 のドット絵を 16 倍）。
+            // **この絵だけは画像生成で作った**（2026-10-23 ユーザーが許可。AGENTS.md 第7項の例外）。
+            // 先輩の 29×29 のドット絵と同じ色・同じ粗さに落としてある
+            var fallen = Resources.Load<Sprite>("女の子/tutorial_senior_fallen");
+            if (fallen != null)
+            {
+                face.gameObject.SetActive(false);
+                var image = senior.GetComponent<Image>();
+                image.sprite = fallen;
+                senior.localRotation = Quaternion.identity;
+                senior.sizeDelta = new Vector2(fallen.rect.width, fallen.rect.height) * FallenScale;
+                for (float t = 0; t < 1f; t += Time.unscaledDeltaTime / .14f)
+                {
+                    // 落ちた勢いで一度だけ沈む
+                    senior.anchoredPosition = FallenPosition + new Vector2(0f, 14f * (1f - Mathf.Clamp01(t)));
+                    PlaceCryAtFallenHead(cry.rectTransform, senior);
+                    yield return null;
+                }
+                senior.anchoredPosition = FallenPosition;
+                PlaceCryAtFallenHead(cry.rectTransform, senior);
+            }
+            else
+            {
+                senior.anchoredPosition = start + new Vector2(-90f, -240f);
+                senior.localRotation = Quaternion.Euler(0, 0, 70f);
+                FollowHead(cry.rectTransform, senior);
+            }
             for (float t = 0; t < 1f; t += Time.unscaledDeltaTime / .8f)
             {
                 cry.alpha = 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t * 2f - 1f));
@@ -75,6 +101,8 @@ namespace KillingMahjong.UI
             var stainRoot = new GameObject("ReplayTableStain", typeof(RectTransform), typeof(PixelShapeGraphic));
             stainRoot.transform.SetParent(viewport, false);
             ((RectTransform)stainRoot.transform).sizeDelta = new Vector2(800f, 600f);
+            // 血は倒れた先輩の下から広がる。先輩より奥に描く（手前に描くと先輩まで赤く塗られる）
+            stainRoot.transform.SetSiblingIndex(senior.GetSiblingIndex());
             var stain = stainRoot.GetComponent<PixelShapeGraphic>();
             stain.raycastTarget = false;
             for (float t = 0; t < 1f; t += Time.unscaledDeltaTime / 2f)
@@ -114,6 +142,19 @@ namespace KillingMahjong.UI
         {
             Vector2 head = senior.anchoredPosition + (Vector2)(senior.localRotation * new Vector3(10f, 210f, 0f));
             Vector2 at = head + new Vector2(80f, 40f);
+            label.anchoredPosition = new Vector2(Mathf.Clamp(at.x, -310f, 310f), Mathf.Clamp(at.y, -240f, 270f));
+        }
+
+        /// <summary>倒れ伏した絵の拡大率と置き場所（動画の枠の中、真ん中から）。左下の手前に、頭を左上にして伏せる</summary>
+        private const float FallenScale = 16f;
+        private static readonly Vector2 FallenPosition = new Vector2(-120f, -205f);
+
+        /// <summary>倒れ伏した絵の頭（37×27 の左上寄り、左から 6・上から 7 ドットあたり）の右上に字を置く。</summary>
+        private static void PlaceCryAtFallenHead(RectTransform label, RectTransform senior)
+        {
+            Vector2 size = senior.sizeDelta;
+            Vector2 head = senior.anchoredPosition + new Vector2(-size.x * .5f + 6f * FallenScale, size.y * .5f - 7f * FallenScale);
+            Vector2 at = head + new Vector2(110f, 70f);
             label.anchoredPosition = new Vector2(Mathf.Clamp(at.x, -310f, 310f), Mathf.Clamp(at.y, -240f, 270f));
         }
 
