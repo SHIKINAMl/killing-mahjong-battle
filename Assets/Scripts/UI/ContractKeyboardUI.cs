@@ -142,7 +142,11 @@ namespace KillingMahjong.UI
         {
             input = field;
             paper = contractPaper;
+            if (ime != null) ime.OverlayClicked -= Show;
             ime = field.GetComponent<WebImeInput>();
+            // Web 版では、名前の欄の上に日本語入力用の HTML の欄が重なっていて、押しても下の EventTrigger に届かない。
+            // その欄が押されたことを聞いて出す
+            if (ime != null) ime.OverlayClicked += Show;
             var trigger = field.GetComponent<EventTrigger>();
             if (trigger == null) trigger = field.gameObject.AddComponent<EventTrigger>();
             trigger.triggers.Clear();
@@ -159,10 +163,11 @@ namespace KillingMahjong.UI
             gameObject.SetActive(true);
             transform.SetAsLastSibling();
             // Web 版の日本語入力の欄は、契約書を持ち上げる前の位置に重なっている。
-            // 残すとキーボードの上にかぶって押せなくなるので一度閉じ、持ち上げ終えてから新しい位置で開き直す
-            bool reopenIme = ime != null && ime.IsOpen;
+            // 残すとキーボードの上にかぶって押せなくなるので閉じる。**自動では開き直さない。**
+            // 開き直すとページの入力がそちらへ移り、戻るまでの数回のクリックがゲームに届かなかった
+            // （Web 版で、キーボードの最初の数回の押下が消えた）。日本語で打ちたいときは、もう一度名前の欄を押せば開く
             if (ime != null) ime.CloseOverlay();
-            StartSlide(true, true, reopenIme);
+            StartSlide(true, true, false);
         }
 
         /// <summary>しまう。<paramref name="lowerPaper"/> が false なら契約書は動かさない（契約書ごと下げるとき）。</summary>
@@ -200,8 +205,18 @@ namespace KillingMahjong.UI
             else if (reopenIme && ime != null) ime.Reopen();
         }
 
+        /// <summary>
+        /// Web 版の日本語入力の HTML の欄を、字を変える前に閉じる。開いたままだと、その欄の中身が
+        /// 毎フレーム入力欄へ写されるので、キーで足した字がすぐ元に戻ってしまう（Web 版で、最初の数回の押下が消えていた）。
+        /// </summary>
+        private void ReleaseIme()
+        {
+            if (ime != null && ime.IsOpen) ime.CloseOverlay();
+        }
+
         private void Type(int letterIndex)
         {
+            ReleaseIme();
             if (input == null || !input.interactable) return;
             if (input.characterLimit > 0 && input.text.Length >= input.characterLimit) return;
             char c = (char)('A' + letterIndex);
@@ -211,6 +226,7 @@ namespace KillingMahjong.UI
 
         private void Backspace()
         {
+            ReleaseIme();
             if (input == null || !input.interactable || input.text.Length == 0) return;
             input.text = input.text.Substring(0, input.text.Length - 1);
             input.caretPosition = input.text.Length;

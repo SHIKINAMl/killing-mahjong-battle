@@ -36,6 +36,12 @@ namespace KillingMahjong.UI
         /// <summary>HTML の入力欄を重ねているか。Web 版以外では常に false。</summary>
         public bool IsOpen => _open;
 
+        /// <summary>
+        /// 重ねた HTML の入力欄が押されたとき（Web 版だけ）。そこを押しても Unity の入力欄には届かないので、
+        /// 押されたら知りたい物（名前の欄のキーボード）はこれを聞く。
+        /// </summary>
+        public event System.Action OverlayClicked;
+
         /// <summary>重ねている HTML の入力欄を閉じる（決定はしない）。画面のキーボード（<see cref="ContractKeyboardUI"/>）が使う。</summary>
         public void CloseOverlay() => Close();
 
@@ -76,6 +82,11 @@ namespace KillingMahjong.UI
         private void Update()
         {
             if (!_open) return;
+            if (KmImeInput_ConsumeClick() == 1)
+            {
+                OverlayClicked?.Invoke();
+                if (!_open) return; // 押されたのを受けて閉じられた
+            }
             string text = KmImeInput_GetText();
             if (text != _input.text)
             {
@@ -101,6 +112,9 @@ namespace KillingMahjong.UI
 
         [System.Runtime.InteropServices.DllImport("__Internal")]
         private static extern void KmImeInput_Close();
+
+        [System.Runtime.InteropServices.DllImport("__Internal")]
+        private static extern int KmImeInput_ConsumeClick();
 #endif
     }
 }

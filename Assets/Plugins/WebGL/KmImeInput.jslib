@@ -10,7 +10,8 @@
 // 位置は、Unity の画面の上での割合（左上が 0,0）で受け取り、ページの上の canvas の位置に直す。
 mergeInto(LibraryManager.library, {
   // 0 … 打っている途中、1 … Enter で決めた、2 … 外をクリックするなどして離れた
-  $KmIme: { el: null, state: 0 },
+  // clicked … 重ねた <input> が押されたか。押した所は Unity まで届かないので、ここで覚えて伝える（KmImeInput_ConsumeClick）
+  $KmIme: { el: null, state: 0, clicked: 0 },
 
   KmImeInput_Open__deps: ["$KmIme"],
   KmImeInput_Open: function (x, y, w, h, textPtr, maxLength) {
@@ -42,6 +43,7 @@ mergeInto(LibraryManager.library, {
       });
       el.addEventListener("keyup", function (e) { e.stopPropagation(); });
       el.addEventListener("keypress", function (e) { e.stopPropagation(); });
+      el.addEventListener("pointerdown", function () { KmIme.clicked = 1; });
       el.addEventListener("blur", function () {
         if (KmIme.state === 0) KmIme.state = 2;
       });
@@ -75,6 +77,14 @@ mergeInto(LibraryManager.library, {
   KmImeInput_GetState__deps: ["$KmIme"],
   KmImeInput_GetState: function () {
     return KmIme.state;
+  },
+
+  // 重ねた <input> が押されていたら 1 を返して忘れる（2026-10-22、名前の欄を押すと出るキーボードのため）
+  KmImeInput_ConsumeClick__deps: ["$KmIme"],
+  KmImeInput_ConsumeClick: function () {
+    var c = KmIme.clicked;
+    KmIme.clicked = 0;
+    return c;
   },
 
   KmImeInput_Close__deps: ["$KmIme"],
