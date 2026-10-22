@@ -46,6 +46,9 @@ namespace KillingMahjong.UI
             senior.GetComponent<Image>().sprite = Resources.Load<Sprite>("女の子/tutorial_girl_px29_body");
             var face = Box("FallenSeniorFace", senior, senior.sizeDelta, Vector2.zero, Color.white);
             face.GetComponent<Image>().sprite = Resources.Load<Sprite>("女の子/tutorial_girl_px29_face");
+            // 倒れながら軽く一声あげる（2026-10-22 のユーザー指示「軽く『ぎゃー』と言わせて」）。
+            // 動画の中の先輩の声は字幕で出す。送り待ちにはせず、倒れ終わって少ししたら消す
+            subtitles.Show("先輩", "ぎゃー");
             Vector2 start = senior.anchoredPosition;
             for (float t = 0; t < 1f; t += Time.unscaledDeltaTime / 1.2f)
             {
@@ -56,6 +59,8 @@ namespace KillingMahjong.UI
             }
             senior.anchoredPosition = start + new Vector2(-90f, -240f);
             senior.localRotation = Quaternion.Euler(0, 0, 70f);
+            yield return new WaitForSecondsRealtime(.6f);
+            subtitles.Hide();
 
             // その場で変わる赤い面だけを重ね、既存の卓の絵は変更しない。
             var stainRoot = new GameObject("ReplayTableStain", typeof(RectTransform), typeof(PixelShapeGraphic));
