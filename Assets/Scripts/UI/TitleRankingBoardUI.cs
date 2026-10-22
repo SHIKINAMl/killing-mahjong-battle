@@ -147,14 +147,23 @@ namespace KillingMahjong.UI
             status = Label(panel, "Status", "", new Vector2(0f, -38f), new Vector2(520f, 28f), 20f,
                 new Color32(232, 220, 200, 255), TextAlignmentOptions.Center, font);
             // 動画の層。ランキングの枠と同じ場所に重ね、出すときは枠のほうを隠す。
-            // 画面は 4:3、動画は 16:9 なので、黒地の上に横いっぱいで置く（上下は黒い帯）
-            videoLayer = Box(transform, "Video", new Vector2(800f, 600f), Vector2.zero, Color.black);
+            // 動画はゲームの画面と同じ 4:3（2026-10-22、ユーザーが黒帯なしの 4:3 版に決めた）。
+            // 黒地を画面いっぱいに敷き、その中に 4:3 のまま収める（画面が横長なら左右だけ黒くなる）
+            bool layerMade = transform.Find("Video") == null;
+            videoLayer = Box(transform, "Video", Vector2.zero, Vector2.zero, Color.black);
             videoLayer.GetComponent<Image>().raycastTarget = false;
-            var screen = SceneFirst.Child(videoLayer, "Screen", out bool madeScreen, typeof(RectTransform), typeof(RawImage));
+            if (layerMade)
+            {
+                videoLayer.anchorMin = Vector2.zero;
+                videoLayer.anchorMax = Vector2.one;
+            }
+            var screen = SceneFirst.Child(videoLayer, "Screen", out bool madeScreen, typeof(RectTransform), typeof(RawImage), typeof(AspectRatioFitter));
             videoImage = screen.GetComponent<RawImage>();
             if (madeScreen)
             {
-                ((RectTransform)screen.transform).sizeDelta = new Vector2(800f, 450f);
+                var fit = screen.GetComponent<AspectRatioFitter>();
+                fit.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+                fit.aspectRatio = 4f / 3f;
                 videoImage.raycastTarget = false;
             }
             player = videoLayer.GetComponent<VideoPlayer>();
@@ -313,7 +322,7 @@ namespace KillingMahjong.UI
         {
             if (videoTexture == null)
             {
-                videoTexture = new RenderTexture(1280, 720, 0) { name = "TitleVideo" };
+                videoTexture = new RenderTexture(960, 720, 0) { name = "TitleVideo" };
                 videoTexture.Create();
             }
             videoImage.texture = videoTexture;
