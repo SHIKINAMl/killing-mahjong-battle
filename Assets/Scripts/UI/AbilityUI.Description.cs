@@ -84,6 +84,23 @@ namespace KillingMahjong.UI
             // **`Overflow` にしないこと。** 自動縮小の下限(7px)でも入らない文言を
             // 足したとき、はみ出した行が巻物の枠を突き抜けて盤面に出てしまう。
             // `Truncate` なら最悪でも欄の中で切れて止まる。
+            ApplyDescriptionStyle(text);
+            text.raycastTarget = false;
+
+            _descText = text;
+            return _descText;
+        }
+
+        /// <summary>
+        /// 説明の字の大きさなどを当てる。**出すたびに当て直す**（2026-10-22）。
+        ///
+        /// ユーザーがチュートリアルを遊んでいる最中に見ると、自動縮小の幅が TextMeshPro の既定の 18〜72 に戻っていた。
+        /// 18 より小さくならないので「字が大きすぎて文が入りきらない」（3行目で切れる）状態になっていた。
+        /// 戻した経路は特定できていない（作り直しを非表示のまま行っても再現しなかった）ので、作るときだけでなく、
+        /// 説明を出すたびに（表示した直後に）当て直す。
+        /// </summary>
+        private static void ApplyDescriptionStyle(TMPro.TextMeshProUGUI text)
+        {
             text.margin = Vector4.zero;
             text.color = Color.white;
             text.alignment = TMPro.TextAlignmentOptions.TopLeft;
@@ -92,10 +109,6 @@ namespace KillingMahjong.UI
             text.enableAutoSizing = true;
             text.fontSizeMax = 10f;
             text.fontSizeMin = 7f;
-            text.raycastTarget = false;
-
-            _descText = text;
-            return _descText;
         }
         private void HideLegacyTooltip()
         {

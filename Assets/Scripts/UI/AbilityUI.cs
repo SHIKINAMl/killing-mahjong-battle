@@ -379,6 +379,8 @@ namespace KillingMahjong.UI
             text.text = string.IsNullOrEmpty(description) ? DescPlaceholder : description;
             // 説明が無いときは箱ごと消す。案内文だけの箱が浮いて見えるのを避ける。
             SetDescriptionVisible(!string.IsNullOrEmpty(description));
+            // 表示した直後に当て直す。初めて表示されたときに TextMeshPro が字の大きさを既定へ戻すため
+            ApplyDescriptionStyle(text);
 
             // AbilityUI 全体を最前面化する。中身の表示順が壊れないようルート(this)のみ設定する
             Canvas rootCanvas = this.GetComponent<Canvas>();
@@ -440,6 +442,7 @@ namespace KillingMahjong.UI
                 text.text = hasSelection ? currentSelection.Description : DescPlaceholder;
                 // 選択が無いなら箱ごと消す。対局開始直後はここを通る。
                 SetDescriptionVisible(hasSelection);
+                ApplyDescriptionStyle(text);
             }
 
             Canvas rootCanvas = this.GetComponent<Canvas>();
