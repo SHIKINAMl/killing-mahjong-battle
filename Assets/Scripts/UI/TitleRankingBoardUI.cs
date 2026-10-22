@@ -1,7 +1,9 @@
 using KillingMahjong.Network;
 using TMPro;
+using KillingMahjong.Managers;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Video;
 
 namespace KillingMahjong.UI
 {
@@ -11,6 +13,14 @@ namespace KillingMahjong.UI
     /// 展示のタイトル（どこを押しても始まる画面）で、しばらく操作が無いと全面に出す。
     /// 種類（最大打点・累計獲得点数・最大局数）を順に切り替えて見せ、何か操作したらタイトルへ戻る。
     /// 戻すための操作では、チュートリアルは始めない（いちばん手前で押した物を受け止める）。
+    ///
+    /// **ランキングと紹介動画を交互に出す**（2026-10-22、ユーザー指示「放置していた場合ランキングと動画交互に出てほしい」）。
+    /// ランキングの種類を一巡したら動画、動画が終わったらまたランキング。
+    /// 動画は紹介PV（`StreamingAssets/Video/title_pv.mp4`）。WebGL でも読めるよう、Resources ではなく
+    /// StreamingAssets から URL で流す。流しているあいだはタイトルの曲を止めて動画の音を出す。
+    /// 読めなかったときはランキングだけを回す。
+    ///
+    /// どちらを出している間も、下に「クリックでタイトルへ」をゆっくり点滅させて出しておく（同日のユーザー指示）。
     ///
     /// 中身はサーバーから取る（<see cref="RankingFetcher"/>）。対局の接続とは別に繋ぎ、終わったら切る。
     ///
@@ -31,6 +41,15 @@ namespace KillingMahjong.UI
         /// <summary>前に取ってから何秒たっていたら取り直すか（サーバーも上位の一覧を 30 秒ためている）。</summary>
         [SerializeField] private float refreshSeconds = 60f;
 
+        /// <summary>流す動画。StreamingAssets からの場所。</summary>
+        [SerializeField] private string videoPath = "Video/title_pv.mp4";
+
+        /// <summary>動画の読み込みを何秒待つか。過ぎたら、その回は飛ばしてランキングへ戻る。</summary>
+        [SerializeField] private float videoPrepareTimeout = 8f;
+
+        /// <summary>「クリックでタイトルへ」の点滅の1往復の秒数。ゆっくり（ユーザー指示）。</summary>
+        [SerializeField] private float hintBlinkSeconds = 2.4f;
+
         private static readonly string[] Kinds = { "max_damage", "match_points", "rounds" };
         private static readonly string[] KindTitles = { "最大打点", "累計獲得点数", "最大局数" };
         private static readonly string[] KindNotes =
@@ -44,7 +63,13 @@ namespace KillingMahjong.UI
         private TitleUIManager title;
         private CanvasGroup group;
         private RankingFetcher fetcher;
-        private TMP_Text kindLabel, kindNote, pager, status;
+        private TMP_Text kindLabel, kindNote, pager, status, returnHint;
+        private RectTransform rankingFrame, videoLayer;
+        private RawImage videoImage;
+        private VideoPlayer player;
+        private RenderTexture videoTexture;
+        private bool playingVideo, videoUnavailable;
+        private float videoStartedAt;
         private readonly TMP_Text[,] cells = new TMP_Text[RowCount, 3];
 
         private float lastInput;
@@ -90,6 +115,7 @@ namespace KillingMahjong.UI
 
             // 枠は2枚重ね（くすんだ金の縁の内側に、夜色の板）。2単位ずつ内側へ寄せて、ドットの縁にする
             var frame = Box(transform, "Frame", new Vector2(564f, 484f), Vector2.zero, new Color32(120, 110, 85, 255));
+            rankingFrame = frame;
             var panel = Box(frame, "Panel", new Vector2(556f, 476f), Vector2.zero, new Color32(22, 15, 24, 252));
 
             Label(panel, "Heading", "ランキング", new Vector2(0f, 205f), new Vector2(520f, 40f), 30f,
@@ -120,8 +146,45 @@ namespace KillingMahjong.UI
 
             status = Label(panel, "Status", "", new Vector2(0f, -38f), new Vector2(520f, 28f), 20f,
                 new Color32(232, 220, 200, 255), TextAlignmentOptions.Center, font);
-            Label(panel, "Hint", "画面を押すとタイトルに戻ります", new Vector2(0f, -212f), new Vector2(520f, 26f), 20f,
-                new Color32(170, 156, 140, 255), TextAlignmentOptions.Center, font);
+            // 動画の層。ランキングの枠と同じ場所に重ね、出すときは枠のほうを隠す。
+            // 画面は 4:3、動画は 16:9 なので、黒地の上に横いっぱいで置く（上下は黒い帯）
+            videoLayer = Box(transform, "Video", new Vector2(800f, 600f), Vector2.zero, Color.black);
+            videoLayer.GetComponent<Image>().raycastTarget = false;
+            var screen = SceneFirst.Child(videoLayer, "Screen", out bool madeScreen, typeof(RectTransform), typeof(RawImage));
+            videoImage = screen.GetComponent<RawImage>();
+            if (madeScreen)
+            {
+                ((RectTransform)screen.transform).sizeDelta = new Vector2(800f, 450f);
+                videoImage.raycastTarget = false;
+            }
+            player = videoLayer.GetComponent<VideoPlayer>();
+            if (player == null) player = videoLayer.gameObject.AddComponent<VideoPlayer>();
+            player.playOnAwake = false;
+            videoLayer.gameObject.SetActive(false);
+
+            // 下の「クリックでタイトルへ」。ランキングでも動画でも出しっぱなしにして、ゆっくり点滅させる。
+            // いちばん手前に描くよう、最後の子にしておく。画面の縦横比が変わっても下に出るよう、下端に揃えて置く。
+            // 後ろのタイトル画面の下の文字が透けて重なるので、横いっぱいの暗い帯を敷く
+            bool plateMade = transform.Find("ReturnHintPlate") == null;
+            var plate = Box(transform, "ReturnHintPlate", new Vector2(0f, 44f), Vector2.zero, new Color32(8, 3, 8, 245));
+            plate.GetComponent<Image>().raycastTarget = false;
+            if (plateMade)
+            {
+                plate.anchorMin = new Vector2(0f, 0f);
+                plate.anchorMax = new Vector2(1f, 0f);
+                plate.anchoredPosition = new Vector2(0f, 28f);
+            }
+            plate.SetAsLastSibling();
+            bool hintMade = transform.Find("ReturnHint") == null;
+            returnHint = Label(transform, "ReturnHint", "クリックでタイトルへ", Vector2.zero, new Vector2(400f, 28f), 20f,
+                new Color32(232, 220, 200, 255), TextAlignmentOptions.Center, font);
+            if (hintMade)
+            {
+                var hintRt = returnHint.rectTransform;
+                hintRt.anchorMin = hintRt.anchorMax = new Vector2(0.5f, 0f);
+                hintRt.anchoredPosition = new Vector2(0f, 28f);
+            }
+            returnHint.transform.SetAsLastSibling();
 
             SetVisible(false);
         }
@@ -189,17 +252,45 @@ namespace KillingMahjong.UI
                 return;
             }
 
+            BlinkHint();
+
+            if (playingVideo)
+            {
+                bool ended = player.isPrepared && !player.isPlaying && player.frame > 0;
+                bool stuck = !player.isPrepared && Time.realtimeSinceStartup - videoStartedAt >= videoPrepareTimeout;
+                if (stuck) videoUnavailable = true;
+                if (ended || stuck) ShowRanking();
+                return;
+            }
+
             if (Time.realtimeSinceStartup - pageStartedAt >= pageSeconds)
             {
+                // 種類を一巡したら動画へ
+                if (page == Kinds.Length - 1 && !videoUnavailable) { ShowVideo(); return; }
                 page = (page + 1) % Kinds.Length;
                 pageStartedAt = Time.realtimeSinceStartup;
                 Render();
             }
         }
 
+        /// <summary>ゆっくり点滅させる。消え切らせず、薄いところで止めて読めるようにしておく。</summary>
+        private void BlinkHint()
+        {
+            if (returnHint == null) return;
+            float t = (Time.realtimeSinceStartup % hintBlinkSeconds) / hintBlinkSeconds;
+            returnHint.alpha = Mathf.Lerp(0.2f, 1f, 0.5f + 0.5f * Mathf.Cos(t * Mathf.PI * 2f));
+        }
+
         private void Show()
         {
             showing = true;
+            ShowRanking();
+            SetVisible(true);
+        }
+
+        private void ShowRanking()
+        {
+            StopVideo();
             page = 0;
             pageStartedAt = Time.realtimeSinceStartup;
             failed = false;
@@ -216,13 +307,67 @@ namespace KillingMahjong.UI
                 });
             }
             Render();
-            SetVisible(true);
+        }
+
+        private void ShowVideo()
+        {
+            if (videoTexture == null)
+            {
+                videoTexture = new RenderTexture(1280, 720, 0) { name = "TitleVideo" };
+                videoTexture.Create();
+            }
+            videoImage.texture = videoTexture;
+            player.isLooping = false;
+            player.source = VideoSource.Url;
+            player.url = System.IO.Path.Combine(Application.streamingAssetsPath, videoPath);
+            player.renderMode = VideoRenderMode.RenderTexture;
+            player.targetTexture = videoTexture;
+            player.audioOutputMode = VideoAudioOutputMode.Direct;
+            player.SetDirectAudioVolume(0, AudioManager.Instance != null ? AudioManager.Instance.BgmOutputVolume : 1f);
+            player.errorReceived -= OnVideoError;
+            player.errorReceived += OnVideoError;
+            // 読み込み中に前の回の最後の絵が残らないよう、黒く消してから出す
+            var active = RenderTexture.active;
+            RenderTexture.active = videoTexture;
+            GL.Clear(false, true, Color.black);
+            RenderTexture.active = active;
+
+            if (AudioManager.Instance != null) AudioManager.Instance.FadeOutBgm(0.4f);
+            rankingFrame.gameObject.SetActive(false);
+            videoLayer.gameObject.SetActive(true);
+            playingVideo = true;
+            videoStartedAt = Time.realtimeSinceStartup;
+            player.Play();
+        }
+
+        private void OnVideoError(VideoPlayer source, string message)
+        {
+            Debug.LogWarning("[TitleRankingBoard] 動画を流せませんでした: " + message);
+            videoUnavailable = true;
+            if (playingVideo) ShowRanking();
+        }
+
+        /// <summary>動画を止めてランキングの枠へ戻す。曲は動画のときだけ止めているので、そのときだけ鳴らし直す。</summary>
+        private void StopVideo()
+        {
+            if (rankingFrame != null) rankingFrame.gameObject.SetActive(true);
+            if (!playingVideo) return;
+            playingVideo = false;
+            if (player != null) player.Stop();
+            if (videoLayer != null) videoLayer.gameObject.SetActive(false);
+            if (AudioManager.Instance != null) AudioManager.Instance.PlayTitleBgm();
+        }
+
+        private void OnDestroy()
+        {
+            if (videoTexture != null) { videoTexture.Release(); Destroy(videoTexture); }
         }
 
         private void Hide()
         {
             if (!showing) return;
             showing = false;
+            StopVideo();
             lastInput = Time.realtimeSinceStartup;
             SetVisible(false);
         }
