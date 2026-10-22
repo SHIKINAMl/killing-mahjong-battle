@@ -129,7 +129,11 @@ namespace KillingMahjong.Managers
             // **第2局の台本より前。** 第1局の締めくくりなので、盤面を出してから話す。
             if (IsSecondTutorialRound(data))
             {
-                SetBoardVisible(true);
+                // 局の始まりの演出（暗転 →「第２局」→ 明転）を本編と同じに通し、山牌を配り直す
+                // （2026-10-22 プランナー指摘「二局目の始まりの演出をカットしてる」「牌は配り直してほしい」）。
+                // 第2局の山は台本アセットで第1局と色を変えてある（萬子→筒子→索子→萬子）
+                yield return StartCoroutine(PlaySecondRoundStartRoutine());
+                if (_aborted) yield break;
                 yield return StartCoroutine(RunAfterFirstRoundWrapUp());
                 if (_aborted) yield break;
             }
@@ -492,11 +496,50 @@ namespace KillingMahjong.Managers
         /// 「セリフを送る → スマホを拡大 → 固定額の賭け金UI → 決定ボタンへ誘導」。
         /// GameUIPhaseController 側はチュートリアル時にこの拡大とベット開始をしない。
         /// </summary>
+        /// <summary>
+        /// 第2局の始まり。本編の配牌と同じ暗転（<see cref="KillingMahjong.UI.PhaseTransitionUI.PlayRoundStartDarken"/>）を
+        /// 降ろし、覆っているあいだに盤面を出して、明けたら山牌を1枚ずつ起こす。
+        /// 暗転の部品が無い・戻ってこないときは、止まらずに盤面を出すだけにする。
+        /// </summary>
+        private IEnumerator PlaySecondRoundStartRoutine()
+        {
+            var phase = gameUIManager != null ? gameUIManager.PhaseTransitionUI : null;
+            // チュートリアルでは演出の入れ物が伏せてあることがある。対局開始の演出と同じく起こしてから使う
+            // （伏せたまま呼ぶと暗転のコルーチンが始められずにエラーになる）
+            if (phase != null && !phase.gameObject.activeSelf) phase.gameObject.SetActive(true);
+            if (phase == null || !phase.isActiveAndEnabled)
+            {
+                yield return StartCoroutine(DealTilesRoutine());
+                yield break;
+            }
+
+            bool covered = false;
+            phase.PlayRoundStartDarken("第２局", onReady: () => covered = true);
+            float limit = Time.realtimeSinceStartup + 6f;
+            yield return new WaitUntil(() => covered || _aborted || Time.realtimeSinceStartup >= limit);
+            if (_aborted) yield break;
+
+            bool light = false;
+            phase.PlayRoundStartFadeOut(() => light = true);
+            limit = Time.realtimeSinceStartup + 6f;
+            yield return new WaitUntil(() => light || _aborted || Time.realtimeSinceStartup >= limit);
+            if (!light) phase.CancelTransitions();
+            if (_aborted) yield break;
+
+            yield return StartCoroutine(DealTilesRoutine());
+        }
+
         /// <summary>賭けすぎを止める体力の境目。フロー図の「HP8000以下」。</summary>
         private const int BetWarnHpThreshold = 8000;
 
         /// <summary>止めに入る賭け金。フロー図の「賭け金4000以上」。</summary>
         private const int BetWarnAmount = 4000;
+
+        /// <summary>
+        /// 体力に関係なく止める賭け金（2026-10-22 プランナー指摘「5000以上賭けて窘められる分岐があったはず」）。
+        /// この場面の体力はふつう 16000 前後で、フロー図の「HP8000以下」には届かず、止める分岐が出なかった
+        /// </summary>
+        private const int BetWarnAmountAlways = 5000;
 
         /// <summary>止めたあとに下げてやる額。フロー図の「3000まで減少」。</summary>
         private const int BetWarnReducedAmount = 3000;
@@ -556,7 +599,8 @@ namespace KillingMahjong.Managers
                 yield return new WaitUntil(() => confirmed || _aborted);
                 if (_aborted) yield break;
 
-                bool tooMuch = _playerHp <= BetWarnHpThreshold && _lastConfirmedBet >= BetWarnAmount;
+                bool tooMuch = (_playerHp <= BetWarnHpThreshold && _lastConfirmedBet >= BetWarnAmount)
+                               || _lastConfirmedBet >= BetWarnAmountAlways;
                 if (!tooMuch) break;
 
                 // いったん止めて、下げてから代わりに押す

@@ -147,9 +147,10 @@ namespace KillingMahjong.Managers
         /// <summary>
         /// 同じ能力を何周も試させない上限。フロー図には無いが、
         /// **「はい」を押し続けると無限に回る**ので歯止めを置く。
-        /// 能力は3種類なので、3周すれば全部触れる。
+        /// 能力は3種類。どれも2回ずつ試せる 6 周にする（2026-10-22。3 周のときは上限で
+        /// 「もうさすがに」を言わせていたが、あれは持ち点が 8000 を切ったときだけのセリフ）。
         /// </summary>
-        private const int AbilityShowcaseMaxRounds = 3;
+        private const int AbilityShowcaseMaxRounds = 6;
 
         /// <summary>画面を揺らす。出せない場面（UIが無い等）では黙って素通りする。</summary>
         private void ShakeScreen(float duration, float magnitude, Vector2 axis)
@@ -323,12 +324,16 @@ namespace KillingMahjong.Managers
                 }
 
                 // はい → 残り持ち点が 8000点以上か
-                if (GetLocalScoreForAbilityGate() < AbilityMoreMinScore
-                    || round == AbilityShowcaseMaxRounds - 1)
+                // 「……もうさすがによくない？」は、**持ち点が 8000 を切ったときだけ**（2026-10-22 プランナー指摘
+                // 「役の使いすぎでライフ8000以下になりそうな時に出るやつ」）。以前は周回の上限に達したときにも
+                // 出していて、16000 残っていても言われていた
+                if (GetLocalScoreForAbilityGate() < AbilityMoreMinScore)
                 {
                     yield return StartCoroutine(PlayLines(AbilityTooPoorLines));
                     yield break;
                 }
+                // 周回の上限（フロー図には無い歯止め）に達したら、何も言わずに先（「重要なこと」）へ進む
+                if (round == AbilityShowcaseMaxRounds - 1) yield break;
 
                 yield return StartCoroutine(PlayLines(AbilityEagerLines));
             }
@@ -393,15 +398,24 @@ namespace KillingMahjong.Managers
         /// </summary>
         /// <param name="yesLabel">0 を返すボタンの文字。省略すると「はい」</param>
         /// <param name="noLabel">1 を返すボタンの文字。省略すると「いいえ」</param>
+        /// <param name="asDialogue">
+        /// false なら問いかけをセリフの吹き出しに出さず、選択肢の上に地の文として出す
+        /// （2026-10-23 プランナー指摘「対局動画の続きをみますか？はセリフじゃないほうがいい」）
+        /// </param>
         private IEnumerator AskYesNo(string question, System.Action<int> onAnswered,
-            string yesLabel = null, string noLabel = null)
+            string yesLabel = null, string noLabel = null, bool asDialogue = true)
         {
             int answer = -1;
             TMP_FontAsset font = BorrowJapaneseFont();
             Transform parent = BuildIntroCanvas(dim: false);
             if (parent == null) { onAnswered(1); yield break; }
 
-            if (dialogueUI != null)
+            if (!asDialogue)
+            {
+                if (dialogueUI != null) dialogueUI.HideText();
+                CreateSystemPrompt(parent, font, question, new Vector2(0f, -40f));
+            }
+            else if (dialogueUI != null)
             {
                 dialogueUI.gameObject.SetActive(true);
                 // 問いかけの文にも、フロー図の青い太字（→黄色の太字）を当てる

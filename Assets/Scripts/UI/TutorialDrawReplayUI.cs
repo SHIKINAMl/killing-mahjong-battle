@@ -19,7 +19,8 @@ namespace KillingMahjong.UI
         public bool IsPaused { get; private set; }
         public string NormalText => normal != null ? normal.text : "";
         private RectTransform viewport, progress;
-        private TextMeshProUGUI normal, marker, paused;
+        private TextMeshProUGUI normal, marker, paused, turnCounter;
+        private Material ownedMaterial;
         private Button advance;
         private TutorialSubtitleUI subtitles;
         private PhaseTransitionUI phase;
@@ -94,10 +95,16 @@ namespace KillingMahjong.UI
             foreach(var cv in p.GetComponentsInChildren<Canvas>(true)) { cv.overrideSorting=true; cv.sortingOrder=91; }
             foreach(var g in p.GetComponentsInChildren<Graphic>(true)) g.raycastTarget=false;
             phase.CancelTransitions();
-            normal = Label("ReplayNormalText",viewport,new Vector2(285,92),new Vector2(155,58),15);
-            normal.alignment=TextAlignmentOptions.TopLeft;
+            normal = CloneSceneDialogue();
+            if (normal == null)
+            {
+                normal = Label("ReplayNormalText",viewport,new Vector2(285,92),new Vector2(155,58),15);
+                normal.alignment=TextAlignmentOptions.TopLeft;
+            }
             marker=Label("ReplayNormalMarker",transform,new Vector2(24,24),new Vector2(295,30),20);
-            marker.text="▼"; marker.color=new Color32(224,40,40,255); marker.gameObject.SetActive(false);
+            // ▼は本編のセリフと同じ色（以前は赤で、字幕寄りの見た目になっていた）
+            marker.text="▼"; marker.color=normal.color; marker.gameObject.SetActive(false);
+            CloneSceneTurnCounter();
             var n=new GameObject("ReplayNoise",typeof(RectTransform),typeof(PixelShapeGraphic));
             n.transform.SetParent(viewport,false); ((RectTransform)n.transform).sizeDelta=new Vector2(800,600);
             noise=n.GetComponent<PixelShapeGraphic>(); noise.raycastTarget=false;
@@ -122,6 +129,116 @@ namespace KillingMahjong.UI
             paused=Label("ReplayPaused",pauseLayer.transform,new Vector2(160,70),new Vector2(300,240),24);
             paused.text="Ⅱ\n再生停止"; paused.gameObject.SetActive(false);
         }
+        /// <summary>
+        /// 動画の中の通常セリフは、本編のセリフ欄（<see cref="DialogueUI"/> の吹き出し）を写して使う
+        /// （2026-10-23 プランナー指摘「セリフUIの形式が字幕表示に引っ張られてる」）。
+        /// 以前は自前の白い文字だけで、LOG の印も無く、字幕と見分けがつきにくかった。
+        /// 写すのは見た目だけ。押せる部品と動きは外す。本編の欄が見つからなければ null（自前の文字に戻す）。
+        /// </summary>
+        private TextMeshProUGUI CloneSceneDialogue()
+        {
+            var dialogue = FindFirstObjectByType<DialogueUI>(FindObjectsInactive.Include);
+            var panel = dialogue != null ? dialogue.PanelForCopy : null;
+            var sourceText = dialogue != null ? dialogue.TextForCopy : null;
+            if (panel == null || sourceText == null) return null;
+            int textIndex = IndexPath(panel.transform, sourceText.transform);
+            if (textIndex < 0) return null;
+            var copy = Instantiate(panel, viewport, true);
+            copy.name = "ReplayDialoguePanel";
+            copy.SetActive(true);
+            foreach (var m in copy.GetComponentsInChildren<MonoBehaviour>(true))
+                if (!(m is Graphic) && !(m is BaseMeshEffect) && !(m is LayoutElement) && !(m is TMP_SubMeshUI)) Destroy(m);
+            foreach (var g in copy.GetComponentsInChildren<Graphic>(true)) g.raycastTarget = false;
+            var text = FindByIndexPath(copy.transform, textIndex);
+            var t = text != null ? text.GetComponent<TextMeshProUGUI>() : null;
+            if (t == null) return null;
+            t.text = "";
+            t.maxVisibleCharacters = int.MaxValue;
+            // 本編のセリフと同じ黒い影（DialogueUI.ApplyShadow と同じ値）。写しの元が一度も喋っていないと
+            // 影がまだ付いていないので、ここで付ける。材質は写し専用にして本編へ伝えない
+            var mat = new Material(t.fontSharedMaterial);
+            mat.EnableKeyword("UNDERLAY_ON");
+            mat.SetColor("_UnderlayColor", Color.black);
+            mat.SetFloat("_UnderlayOffsetX", DialogueUI.UnderlayOffsetX);
+            mat.SetFloat("_UnderlayOffsetY", DialogueUI.UnderlayOffsetY);
+            mat.SetFloat("_UnderlayDilate", DialogueUI.UnderlayDilate);
+            mat.SetFloat("_UnderlaySoftness", DialogueUI.UnderlaySoftness);
+            t.fontSharedMaterial = mat;
+            ownedMaterial = mat;
+            t.UpdateMeshPadding();
+            return t;
+        }
+
+        /// <summary>
+        /// 打牌数（「後：十七打目」）を動画の中にも出す（2026-10-23 プランナー指摘「動画空間の時、打牌数をカウントするUIを表示するはず」）。
+        /// 本編の河の打牌数の文字を写す。流局の話なので、両者17打ち終える最後の1打の場面として「十七打目」にする
+        /// </summary>
+        private void CloneSceneTurnCounter()
+        {
+            RectTransform source = null;
+            foreach (var river in FindObjectsByType<RiverUI>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                if (river != null && river.TurnTextRect != null) { source = river.TurnTextRect; break; }
+            if (source == null)
+            {
+                // 河が無い場面（演出コレクションの試写など）では、本編の位置と大きさに合わせた文字で出す
+                turnCounter = Label("ReplayTurnCounter", viewport, new Vector2(300, 48), new Vector2(-240, 170), 32);
+                turnCounter.alignment = TextAlignmentOptions.Left;
+                turnCounter.color = new Color32(240, 232, 214, 255);
+                turnCounter.outlineWidth = .2f;
+                turnCounter.outlineColor = new Color32(30, 18, 14, 255);
+                SetTurnCounter(17);
+                return;
+            }
+            var copy = Instantiate(source.gameObject, viewport, true);
+            copy.name = "ReplayTurnCounter";
+            foreach (var m in copy.GetComponentsInChildren<MonoBehaviour>(true))
+                if (!(m is Graphic) && !(m is BaseMeshEffect) && !(m is TMP_SubMeshUI)) Destroy(m);
+            turnCounter = copy.GetComponent<TextMeshProUGUI>();
+            if (turnCounter == null) { Destroy(copy); return; }
+            turnCounter.raycastTarget = false;
+            SetTurnCounter(17);
+            copy.SetActive(true);
+        }
+
+        /// <summary>動画の中の打牌数を出す。0 なら隠す。</summary>
+        private void SetTurnCounter(int turn)
+        {
+            if (turnCounter == null) return;
+            turnCounter.gameObject.SetActive(turn > 0);
+            if (turn > 0) turnCounter.text = "後：" + KanjiNumber(turn) + "打目";
+        }
+
+        private static string KanjiNumber(int n)
+        {
+            string[] digits = { "", "一", "二", "三", "四", "五", "六", "七", "八", "九" };
+            if (n < 10) return digits[n];
+            return (n / 10 == 1 ? "" : digits[n / 10]) + "十" + digits[n % 10];
+        }
+
+        /// <summary>子をたどる道筋を、兄弟の番号を桁に詰めた数で返す（深さ3まで）。見つからなければ -1。</summary>
+        private static int IndexPath(Transform root, Transform target)
+        {
+            var path = new System.Collections.Generic.List<int>();
+            for (var t = target; t != root; t = t.parent)
+            {
+                if (t == null) return -1;
+                path.Insert(0, t.GetSiblingIndex());
+            }
+            if (path.Count > 3) return -1;
+            int code = 0;
+            foreach (int i in path) code = code * 100 + i + 1;
+            return code;
+        }
+
+        private static Transform FindByIndexPath(Transform root, int code)
+        {
+            var path = new System.Collections.Generic.List<int>();
+            for (; code > 0; code /= 100) path.Insert(0, code % 100 - 1);
+            var t = root;
+            foreach (int i in path) { if (i < 0 || i >= t.childCount) return null; t = t.GetChild(i); }
+            return t;
+        }
+
         private static void Stretch(RectTransform rect)
         {
             rect.anchorMin=Vector2.zero; rect.anchorMax=Vector2.one;
@@ -246,6 +363,7 @@ namespace KillingMahjong.UI
         private void ShowNewWall()
         {
             board.ShowNewWall();
+            SetTurnCounter(0); // 配り直したので、手牌選択のあいだ打牌数は出さない（本編と同じ）
         }
         private IEnumerator BuildHand(Action completed)
         {
@@ -282,6 +400,7 @@ namespace KillingMahjong.UI
             if (girlBody != null) girlBody.rectTransform.anchoredPosition = position;
             if (girlFace != null) girlFace.rectTransform.anchoredPosition = position;
         }
+        private void OnDestroy() { if (ownedMaterial != null) Destroy(ownedMaterial); }
         private void OnDisable() { tauntBobbing = false; SetCharacterPosition(CharacterPosition); StopAllCoroutines(); if(phase!=null) phase.CancelTransitions(); if(subtitles!=null) subtitles.Hide(); }
     }
 }

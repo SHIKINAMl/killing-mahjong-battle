@@ -67,6 +67,9 @@ namespace KillingMahjong.UI
         private Coroutine currentAnimationCoroutine;
         private Coroutine buttonPressCoroutine;
         private System.Collections.Generic.List<AbilityItemUI> instantiatedItems = new System.Collections.Generic.List<AbilityItemUI>();
+
+        /// <summary>隠している能力の種類（<see cref="SetAbilityHidden"/>）。行を作り直すときもこれを見て隠す。</summary>
+        private readonly System.Collections.Generic.HashSet<string> _hiddenSkillTypes = new System.Collections.Generic.HashSet<string>();
         private AbilityItemUI currentSelection;
 
         // Real Data Class matching Python
@@ -215,6 +218,9 @@ namespace KillingMahjong.UI
         /// </summary>
         public void SetAbilityHidden(string skillType, bool hidden)
         {
+            // **覚えておく。** 行は持ち点が変わるたびなどに作り直されるので、その場で隠すだけでは
+            // 作り直しで戻ってしまう（2026-10-22、能力を1つ試したあとの一覧に強襲が出ていた）
+            if (hidden) _hiddenSkillTypes.Add(skillType); else _hiddenSkillTypes.Remove(skillType);
             if (realAbilities == null || instantiatedItems == null) return;
             for (int i = 0; i < realAbilities.Count && i < instantiatedItems.Count; i++)
             {

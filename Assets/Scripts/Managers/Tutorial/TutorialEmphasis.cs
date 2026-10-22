@@ -53,10 +53,18 @@ namespace KillingMahjong.Managers.Tutorial
         private static bool _boldTried;
         private static bool _requestHooked;
 
-        /// <summary>太字のフォントが使えるか。使えなければ「黄色＋1pt 大きく」で出す。確認用にも見せている。</summary>
+        /// <summary>
+        /// 太字の字形を使うか。**いまは使わない（2026-10-23 プランナー指摘「ちょいフォントが見づらいかも」）。**
+        /// 太字の書体（PixelMplus10-Bold）を 15pt で出すと 1.5 倍の中途半端な拡大になり、
+        /// 「牌」「状態」のような画数の多い字が潰れて読めなかった。強調は黄色だけにして、字形はセリフと同じにする。
+        /// 戻すときは true にする（太字のフォントを用意する処理は残してある）
+        /// </summary>
+        private static readonly bool UseBoldGlyphs = false;
+
+        /// <summary>太字のフォントで強調しているか。false なら「黄色」だけで出す。確認用にも見せている。</summary>
         public static bool UsesBoldFont
         {
-            get { EnsureBoldFont(); return _bold != null; }
+            get { if (!UseBoldGlyphs) return false; EnsureBoldFont(); return _bold != null; }
         }
 
         /// <summary>
@@ -134,15 +142,19 @@ namespace KillingMahjong.Managers.Tutorial
         {
             get
             {
-                return UsesBoldFont
-                    ? "<b>" + ColorTag + "<font=\"" + BoldFontName + "\">"
-                    : ColorTag + "<size=+1>";
+                if (UsesBoldFont) return "<b>" + ColorTag + "<font=\"" + BoldFontName + "\">";
+                // 太字を使わないときは色だけ。大きさも変えない（1pt 大きくすると、その語句だけ字形がにじむ）
+                return UseBoldGlyphs ? ColorTag + "<size=+1>" : ColorTag;
             }
         }
 
         private static string CloseTag
         {
-            get { return UsesBoldFont ? "</font></color></b>" : "</size></color>"; }
+            get
+            {
+                if (UsesBoldFont) return "</font></color></b>";
+                return UseBoldGlyphs ? "</size></color>" : "</color>";
+            }
         }
 
         /// <summary>

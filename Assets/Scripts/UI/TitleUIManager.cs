@@ -51,12 +51,10 @@ namespace KillingMahjong.UI
             {
                 PlayerPrefs.DeleteKey(TutorialReturnToRoomKey);
                 PlayerPrefs.Save();
-                if (tutorialReturn == 2)
-                {
-                    SceneManager.LoadScene(RoomSceneName);
-                    return; // 移動先の Start がローディングを閉じる。
-                }
-                else if (tutorialReturn == TutorialNavigation.RevivalToMatchMenu)
+                // 部屋（看板のある画面）から始めたチュートリアルでも、終わったら部屋には戻さず
+                // 対局メニューを開く（2026-10-23 プランナー指示「チュートリアルのあとはもうこの画面飛ばしていい」）。
+                // 以前は tutorialReturn == 2 で部屋シーンへ移していた
+                if (tutorialReturn == TutorialNavigation.RevivalToMatchMenu)
                     StartCoroutine(OpenMatchMenuAfterRevival());
                 else
                     OpenMatchMenu();

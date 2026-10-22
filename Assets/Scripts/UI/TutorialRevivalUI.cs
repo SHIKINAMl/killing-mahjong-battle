@@ -26,8 +26,21 @@ namespace KillingMahjong.UI
         private TextMeshProUGUI text;
         private Image cover, bell, scroll, beruru;
         private Button advance, bellButton, skillButton;
-        private bool clicked, floating, closed;
-        private float floatStartedAt;
+        private bool clicked, floating, closed, brightening;
+        private float floatStartedAt, brighteningSince;
+
+        // 復活の行。対局の巻物の一覧（AbilityUI / AbilityItemUI）と同じ色と、1.5 倍した寸法・位置
+        private static readonly Vector2 SkillRowCenter = new Vector2(10.5f, 89.5f);
+        private static readonly Vector2 SkillRowSize = new Vector2(204f, 60f);
+        private const float SkillRowBorderWidth = 3f;
+        private static readonly Color SkillRowFill = new Color32(0x1B, 0x23, 0x38, 0xFF);
+        private static readonly Color SkillRowBorder = new Color32(0x35, 0x42, 0x70, 0xFF);
+        private static readonly Color SkillRowFillSelected = new Color32(0x2A, 0x3E, 0x6E, 0xFF);
+        private static readonly Color SkillRowBorderSelected = new Color32(0xFF, 0xD3, 0x4D, 0xFF);
+
+        /// <summary>発動から、いちばん明るい灰色になるまでの秒数。ゆっくり（プランナー指摘）</summary>
+        private const float BrightenSeconds = 12f;
+        private static readonly Color BrightenedGray = new Color(.85f, .85f, .85f);
         private readonly List<Material> materials = new List<Material>();
 
         public static TutorialRevivalUI Create(Transform parent)
@@ -109,20 +122,33 @@ namespace KillingMahjong.UI
             }
 
             Stage = SequenceStage.Skill;
-            var skillLabel = stage.AddText("RevivalSkillName", data.skillName, 22f, Color.black);
+            // 能力の行は、対局の巻物の一覧と同じ見た目にする（2026-10-23 プランナー指摘「普通のスキルみたいな感じで」）。
+            // 以前は巻物の真ん中に黒い字で「復活」と書いてあるだけだった。
+            // 巻物は対局の 202x314 を 1.5 倍で出しているので、行（136x40、一覧の1行目）も 1.5 倍の位置・大きさに置く
+            var skill = stage.AddSprite("RevivalSkill", null, SkillRowCenter, SkillRowSize);
+            skill.color = SkillRowBorder;
+            skill.raycastTarget = true;
+            var skillFill = stage.AddSprite("RevivalSkillFill", null, SkillRowCenter,
+                SkillRowSize - Vector2.one * (SkillRowBorderWidth * 2f));
+            skillFill.color = SkillRowFill;
+            skillFill.raycastTarget = false;
+            var skillLabel = stage.AddText("RevivalSkillName", data.skillName, 22f, Color.white);
             if (font != null) skillLabel.font = font;
             skillLabel.outlineWidth = 0f;
-            skillLabel.rectTransform.anchoredPosition = new Vector2(0f, -55f);
-            skillLabel.rectTransform.sizeDelta = new Vector2(180f, 50f);
-            var skill = stage.AddSprite("RevivalSkill", null, new Vector2(0f, -55f), new Vector2(180f, 50f));
-            skill.color = Color.clear;
-            skill.raycastTarget = true;
+            skillLabel.raycastTarget = false;
+            skillLabel.rectTransform.anchoredPosition = SkillRowCenter;
+            skillLabel.rectTransform.sizeDelta = SkillRowSize;
             skillButton = skill.gameObject.AddComponent<Button>();
             skillButton.transition = Selectable.Transition.None;
             skillButton.onClick.AddListener(() => clicked = true);
             clicked = false;
             yield return WaitForInput(automatic);
+            // 押したら、一覧で選んだときと同じ色に光らせてから発動へ
+            skill.color = SkillRowBorderSelected;
+            skillFill.color = SkillRowFillSelected;
+            yield return new WaitForSecondsRealtime(.3f);
             skill.gameObject.SetActive(false);
+            skillFill.gameObject.SetActive(false);
             skillLabel.gameObject.SetActive(false);
 
             Stage = SequenceStage.Revival;
@@ -140,7 +166,10 @@ namespace KillingMahjong.UI
                 activation.alpha = Mathf.Sin(t * Mathf.PI);
             });
             activation.gameObject.SetActive(false);
-            yield return Animate(1.5f, t => cover.color = Color.Lerp(Color.black, new Color(.85f, .85f, .85f), t));
+            // 発動のあとは一気に明るくせず、真っ白になる合図（次のタイトル画面の光）までゆっくり明るくしていく
+            // （2026-10-23 プランナー指摘）。ベルルが縮んでセリフを話しているあいだも続ける
+            brighteningSince = Time.unscaledTime;
+            brightening = true;
 
             // 巻物の人物の中心は(+10.5,+153)。同じ位置で、新しい絵を2倍の整数倍率まで縮める。
             var shrunk = Resources.Load<Sprite>(ShrunkSpritePath);
@@ -154,7 +183,7 @@ namespace KillingMahjong.UI
             Stage = SequenceStage.Beruru;
             floating = true;
             floatStartedAt = Time.unscaledTime;
-            text.color = Color.black;
+            text.color = BrightenTextColor();
             text.rectTransform.anchoredPosition = new Vector2(0f, -100f);
             text.transform.SetAsLastSibling();
             advance.transform.SetAsLastSibling();
@@ -217,8 +246,26 @@ namespace KillingMahjong.UI
             apply(1f);
         }
 
+        /// <summary>明るさの進み具合（0=黒、1=明るい灰色）。発動から <see cref="BrightenSeconds"/> かけて上がる。</summary>
+        private float BrightenAmount()
+        {
+            if (!brightening) return 0f;
+            return Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((Time.unscaledTime - brighteningSince) / BrightenSeconds));
+        }
+
+        /// <summary>地が暗いうちは白い字、明るくなるにつれて黒い字へ。どの明るさでも読めるようにする。</summary>
+        private Color BrightenTextColor()
+        {
+            return Color.Lerp(Color.white, Color.black, Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.3f, .6f, BrightenAmount())));
+        }
+
         private void Update()
         {
+            if (brightening && cover != null)
+            {
+                cover.color = Color.Lerp(Color.black, BrightenedGray, BrightenAmount());
+                if (text != null && Stage == SequenceStage.Beruru) text.color = BrightenTextColor();
+            }
             if (floating && beruru != null)
                 beruru.rectTransform.anchoredPosition = new Vector2(0f,
                     SkillEffectStage.Snap(100f + 6f * Mathf.Sin((Time.unscaledTime - floatStartedAt) * 2f)));

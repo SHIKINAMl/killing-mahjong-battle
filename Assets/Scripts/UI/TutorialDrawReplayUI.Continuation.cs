@@ -21,6 +21,7 @@ namespace KillingMahjong.UI
             progress.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, 764f * progressStart);
             subtitles.Hide();
             SetCharacter("通常時身体", "通常顔");
+            SetTurnCounter(17); // 「人生最後の牌」の場面。両者17打ち終える最後の1打
             transform.localScale = Vector3.one * .4f;
             for (float t = 0; t < 1; t += Time.unscaledDeltaTime)
             {

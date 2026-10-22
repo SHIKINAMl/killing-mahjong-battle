@@ -591,6 +591,33 @@ namespace KillingMahjong.Managers
             return go;
         }
 
+        /// <summary>
+        /// 選択肢の上に置く地の文（だれのセリフでもない問いかけ）。暗い板に白い字で出す。
+        /// </summary>
+        private void CreateSystemPrompt(Transform parent, TMP_FontAsset font, string message, Vector2 position)
+        {
+            var go = new GameObject("SystemPrompt", typeof(RectTransform), typeof(Image));
+            go.transform.SetParent(parent, false);
+            var rect = (RectTransform)go.transform;
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = position;
+            rect.sizeDelta = new Vector2(460f, 44f);
+            var plate = go.GetComponent<Image>();
+            plate.color = new Color32(12, 6, 10, 220);
+            plate.raycastTarget = false;
+
+            var textObject = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
+            textObject.transform.SetParent(go.transform, false);
+            StretchFull((RectTransform)textObject.transform);
+            var text = textObject.GetComponent<TextMeshProUGUI>();
+            if (font != null) text.font = font;
+            text.text = message;
+            text.fontSize = 22f;
+            text.color = new Color32(240, 232, 236, 255);
+            text.alignment = TextAlignmentOptions.Center;
+            text.raycastTarget = false;
+        }
+
         private void CloseIntro()
         {
             if (_introRoot == null) return;

@@ -20,7 +20,8 @@ namespace KillingMahjong.Managers
                 yield return PlayLines(DrawWhoIsGirlLines);
                 if (AudioManager.Instance != null) AudioManager.Instance.CutBgmImmediately();
                 yield return PlayLines(new List<TutorialLine> { new TutorialLine(WatchRestQuestion) });
-                yield return AskYesNo("対局動画の続きを見ますか？", a => _watchRestAnswer = a);
+                // 先輩のセリフではなく、選択肢の地の文として聞く（2026-10-23 プランナー指摘）
+                yield return AskYesNo("対局動画の続きを見ますか？", a => _watchRestAnswer = a, asDialogue: false);
                 if (_aborted) yield break;
                 if (_watchRestAnswer == 0)
                 {

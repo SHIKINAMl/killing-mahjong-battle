@@ -129,8 +129,14 @@ namespace KillingMahjong.UI
                     rt.anchoredPosition3D = new Vector3(0f, -currentY, 0f);
                 }
 
-                currentY += RowHeight + RowSpacing;
                 instantiatedItems.Add(itemObj);
+                // 隠している能力は作り直しても隠したまま。場所も詰める
+                if (_hiddenSkillTypes.Contains(data.skillType))
+                {
+                    itemObj.gameObject.SetActive(false);
+                    continue;
+                }
+                currentY += RowHeight + RowSpacing;
             }
         }
 

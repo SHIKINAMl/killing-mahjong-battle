@@ -106,8 +106,13 @@ namespace KillingMahjong.Managers
                             new TutorialLine("まぁ点と呼んでるけど…賭けの代金は血液だものね"),
                         });
                     }
-                    DiscardForEnemyInSecondBattle(data, TimeLimitTalkEnemyTurn + 1 + asked.Count, seen);
-                    yield return new WaitForSeconds(discardInterval);
+                    // **最後の選択肢のあとは女の子は打たない**（2026-10-22 プランナー指摘）。
+                    // 主人公が最後に出した牌でそのままロンするため
+                    if (asked.Count < RevealQuestions.Length)
+                    {
+                        DiscardForEnemyInSecondBattle(data, TimeLimitTalkEnemyTurn + 1 + asked.Count, seen);
+                        yield return new WaitForSeconds(discardInterval);
+                    }
                 }
                 if (_aborted) yield break;
                 yield return PlayLines(new List<TutorialLine> {

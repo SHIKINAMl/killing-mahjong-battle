@@ -29,16 +29,19 @@ namespace KillingMahjong.UI
             if (bounceCoroutine != null) { StopCoroutine(bounceCoroutine); bounceCoroutine = null; }
             Color bodyColor = characterRenderer != null ? characterRenderer.color : Color.white;
             Color faceColor = faceRenderer != null ? faceRenderer.color : Color.white;
+            // 先輩が消えて女の子が浮かぶまで、合わせて 2.5 秒かける（2026-10-22 プランナー指摘
+            // 「先輩から女の子に変身するときは、結構2-3秒くらいかけてフェードしてもいい」。以前は 1 秒）
+            const float halfSeconds = 1.25f;
             try
             {
-                for (float t = 0; t < 1f; t += Time.unscaledDeltaTime * 2f)
+                for (float t = 0; t < 1f; t += Time.unscaledDeltaTime / halfSeconds)
                 {
                     SetPortraitAlpha(bodyColor, faceColor, 1f - Mathf.SmoothStep(0f, 1f, t));
                     yield return null;
                 }
                 SetPortraitAlpha(bodyColor, faceColor, 0f);
                 ApplyCharacterData(tutorialRevealedCharacter);
-                for (float t = 0; t < 1f; t += Time.unscaledDeltaTime * 2f)
+                for (float t = 0; t < 1f; t += Time.unscaledDeltaTime / halfSeconds)
                 {
                     SetPortraitAlpha(bodyColor, faceColor, Mathf.SmoothStep(0f, 1f, t));
                     yield return null;

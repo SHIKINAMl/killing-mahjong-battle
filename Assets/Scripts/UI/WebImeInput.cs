@@ -40,7 +40,9 @@ namespace KillingMahjong.UI
         /// 重ねた HTML の入力欄が押されたとき（Web 版だけ）。そこを押しても Unity の入力欄には届かないので、
         /// 押されたら知りたい物（名前の欄のキーボード）はこれを聞く。
         /// </summary>
+#pragma warning disable 0067 // 鳴らすのは Web 版のときだけ（エディタと Windows 版では使わない）
         public event System.Action OverlayClicked;
+#pragma warning restore 0067
 
         /// <summary>重ねている HTML の入力欄を閉じる（決定はしない）。画面のキーボード（<see cref="ContractKeyboardUI"/>）が使う。</summary>
         public void CloseOverlay() => Close();

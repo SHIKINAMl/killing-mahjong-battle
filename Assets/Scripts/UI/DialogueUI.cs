@@ -26,6 +26,12 @@ namespace KillingMahjong.UI
 
         public bool IsLogOpen => logPanel != null && logPanel.activeSelf;
 
+        /// <summary>セリフ欄そのもの。チュートリアルの動画（<see cref="TutorialDrawReplayUI"/>）が見た目を写すのに使う。触らないこと。</summary>
+        public GameObject PanelForCopy => dialoguePanel;
+
+        /// <summary>セリフの文字。<see cref="PanelForCopy"/> のどの子が文字かを知るためだけに出している。</summary>
+        public TextMeshProUGUI TextForCopy => dialogueText;
+
         /// <summary>
         /// いま1文字ずつ送っている最中か。**喋っているあいだだけ跳ねさせる**ために出している
         /// （<see cref="TalkBobAnimator"/> が見ている）。
