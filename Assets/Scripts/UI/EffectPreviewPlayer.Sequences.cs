@@ -25,8 +25,14 @@ namespace KillingMahjong.UI
                     yield return rig.phase.PlaySkillCutinAnimationRoutine("牌交換", true, rig.player.CurrentCharacterData);
                     var swap = new MulliganSwapAnimator(rig.tiles);
                     scope.AddCleanup(swap.CancelPresentation);
-                    yield return swap.PlayRoutine(Tile(1), Tile(8), rig.handTiles[1]);
-                    rig.handTiles[1].GetComponent<Image>().sprite = rig.tiles.GetTileSprite(Tile(8)); break;
+                    // 本編と同じく3枚を一度に入れ替える
+                    yield return swap.PlayRoutine(new[] {
+                        new MulliganSwapAnimator.Swap(Tile(1), Tile(8), rig.handTiles[1]),
+                        new MulliganSwapAnimator.Swap(Tile(4), Tile(6), rig.handTiles[4]),
+                        new MulliganSwapAnimator.Swap(Tile(7), Tile(2), rig.handTiles[7]) });
+                    rig.handTiles[1].GetComponent<Image>().sprite = rig.tiles.GetTileSprite(Tile(8));
+                    rig.handTiles[4].GetComponent<Image>().sprite = rig.tiles.GetTileSprite(Tile(6));
+                    rig.handTiles[7].GetComponent<Image>().sprite = rig.tiles.GetTileSprite(Tile(2)); break;
                 case "skill.boost_hand":
                     // 右上の一覧に「清一色+1」を入れて、届くまで伏せておく（本編と同じ段取り）
                     var boostBoard = rig.yakuList;

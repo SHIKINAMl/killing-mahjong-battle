@@ -318,6 +318,9 @@ namespace KillingMahjong.UI
 
             if (!animate || _mulliganSwapAnimator == null) yield break;
 
+            // 替わった牌は**一度に**入れ替える（2026-10-22 ユーザー指示「3枚指定した時、一気に3枚交換してほしい」）。
+            // 以前は1枚ずつ演出を流していた
+            var animated = new List<MulliganSwapAnimator.Swap>();
             foreach (var change in swaps)
             {
                 RectTransform slot;
@@ -325,9 +328,9 @@ namespace KillingMahjong.UI
                 {
                     slot = uiManager.HandUI != null ? uiManager.HandUI.GetTileSlotRectTransform(change.oldTile) : null;
                 }
-                yield return _mulliganSwapAnimator.PlayRoutine(change.oldTile, change.newTile, slot);
-                if (ownedLock != null && !ownedLock.IsActive) yield break;
+                animated.Add(new MulliganSwapAnimator.Swap(change.oldTile, change.newTile, slot));
             }
+            yield return _mulliganSwapAnimator.PlayRoutine(animated);
         }
     }
 }
