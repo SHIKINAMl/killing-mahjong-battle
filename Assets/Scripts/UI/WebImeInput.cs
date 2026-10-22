@@ -33,6 +33,15 @@ namespace KillingMahjong.UI
             Open();
         }
 
+        /// <summary>HTML の入力欄を重ねているか。Web 版以外では常に false。</summary>
+        public bool IsOpen => _open;
+
+        /// <summary>重ねている HTML の入力欄を閉じる（決定はしない）。画面のキーボード（<see cref="ContractKeyboardUI"/>）が使う。</summary>
+        public void CloseOverlay() => Close();
+
+        /// <summary>入力欄のいまの位置に、HTML の入力欄を重ね直す。入力欄が動いたあとに使う。</summary>
+        public void Reopen() => Open();
+
         private void Open()
         {
 #if UNITY_WEBGL && !UNITY_EDITOR
