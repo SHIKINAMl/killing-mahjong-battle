@@ -7,7 +7,11 @@ namespace KillingMahjong.UI
     /// <summary>展示経路だけで離席を検知する。演出や通信受信では操作時間を更新しない。</summary>
     public sealed class ExhibitionIdleReturn : MonoBehaviour
     {
-        [SerializeField] private float idleSeconds = 300f;
+        /// <summary>
+        /// 何秒操作が無ければ「〇秒後に最初からやり直します」を出すか。このあと <see cref="warningSeconds"/> 待ってリセットする。
+        /// 2026-10-23 のユーザー指示で 5 分から 2 分 30 秒へ。シーンには置かず実行時に足す部品なので、ここの値がそのまま効く
+        /// </summary>
+        [SerializeField] private float idleSeconds = 150f;
         [SerializeField] private float warningSeconds = 15f;
         private static bool sessionEnabled;
         private float lastInput;
