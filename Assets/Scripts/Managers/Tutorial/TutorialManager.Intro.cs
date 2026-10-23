@@ -157,11 +157,6 @@ namespace KillingMahjong.Managers
             "画像が届いたら差し替えます",
         };
 
-        /// <summary>
-        /// 山牌を「じゃーん！これが君の山牌ね」の行まで出さずにおくか（2026-09-19 のユーザー指示）。
-        /// 最初から始めたチュートリアルの第1局だけ立つ。立っていれば、その行で1枚ずつ起こす。
-        /// </summary>
-        private bool _wallRevealDeferred;
 
         private GameObject _introRoot;
         private Canvas _introSettingsCanvas;
@@ -262,13 +257,8 @@ namespace KillingMahjong.Managers
             yield return PlayLines(AfterRuleUiLines);
 
             // ここからフロー図の続き（2026-09-19）。山牌を見せて、満貫を作らせるまで。
-            // **「じゃーん！これが君の山牌ね」と同時に山牌を1枚ずつ起こす**（ユーザー指示）。
-            // 待たずに走らせて、セリフの表示と重ねる
-            if (_wallRevealDeferred)
-            {
-                _wallRevealDeferred = false;
-                StartCoroutine(DealTilesRoutine());
-            }
+            // 山牌は局の頭の暗転の間に出してある。以前は「じゃーん！これが君の山牌ね」と同時に1枚ずつ起こしていた
+            // （2026-09-19 のユーザー指示）が、画面に物を生やさない決まりにしたのでやめた（2026-10-24 ユーザー指示「チュートリアルの対局フェイズでUIをニョキって生やすのは止めてくれ。基本的に画面が暗転しているときにUIは全部出すように」）
             yield return PlayLines(ShowWallLines);
 
             // **知らないと答えた人にだけテンパイの説明。** 知っている人はそのまま合流する

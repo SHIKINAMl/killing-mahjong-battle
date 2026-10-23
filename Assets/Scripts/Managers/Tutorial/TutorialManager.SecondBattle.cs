@@ -273,7 +273,7 @@ namespace KillingMahjong.Managers
                 if (isAutoTurn)
                 {
                     _lastAutoDiscardBaseId = -1;
-                    yield return StartCoroutine(AutoDiscardForPlayer());
+                    yield return StartCoroutine(AutoDiscardForPlayer(seen));   // 新規牌を打ってボルテージを切らさない
                     if (_lastAutoDiscardBaseId >= 0) seen.Add(_lastAutoDiscardBaseId);
                 }
                 else

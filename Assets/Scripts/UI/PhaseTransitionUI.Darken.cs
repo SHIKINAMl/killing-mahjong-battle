@@ -187,6 +187,12 @@ namespace KillingMahjong.UI
             // 片付けは配牌後の RoundStartFadeOutRoutine が Hide でやっている。
             // **片付けが先に走っていたら、もう置かない。** 置いても片付ける人がいない
             ShowRoundStartWaitTiles();
+
+            // **1フレーム後に文字の形を渡し直す**（2026-10-24）。チュートリアルの「２局目」が、エディターの外からの
+            // 撮影では暗転の間ずっと写らなかった（文字の形は正しく渡っていて、渡し直すと写る）。本編は直後に
+            // 裏牌の山を置くので描き直しが走るが、チュートリアルは山を置かない。描き直しを自前で一度起こしておく
+            yield return null;
+            if (centerText != null && centerText.gameObject.activeInHierarchy) centerText.ForceMeshUpdate();
         }
 
         /// <summary>局名を出したあとに置く裏牌の高さ。**画面の下端から測る**（待ち画面と同じ）。</summary>

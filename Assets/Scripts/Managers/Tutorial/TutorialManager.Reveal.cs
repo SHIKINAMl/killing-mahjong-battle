@@ -82,7 +82,7 @@ namespace KillingMahjong.Managers
                     // 選択肢のたびにプレイヤーが先に自動打牌する。手動入力の待機は開けない。
                     if (board != null) board.SetLocalTurn(true);
                     _lastAutoDiscardBaseId = -1;
-                    yield return AutoDiscardForPlayer();
+                    yield return AutoDiscardForPlayer(seen);   // 新規牌を打ってボルテージを切らさない
                     if (_lastAutoDiscardBaseId < 0)
                         throw new System.InvalidOperationException("質問に答える前の自動打牌に使える牌がありません。");
                     if (board != null && gameUIManager != null && gameUIManager.RiverUI != null)

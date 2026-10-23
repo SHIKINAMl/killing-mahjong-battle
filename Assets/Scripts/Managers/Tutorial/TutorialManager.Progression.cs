@@ -104,10 +104,12 @@ namespace KillingMahjong.Managers
             _lastPlayerDiscardBaseId = -1;
             _hasMovedTileThisRound = false;
 
-            // ボルテージのゲージは、第2局の説明で先輩が紹介するまで伏せておく（2026-10-08）。
-            // 第1・2局を始め直したときに、前回見せたままにならないようここで下ろす。
-            // 第3局以降は、紹介が済んでいれば出たままでよい
-            if (IsFirstTutorialRound(data) || IsSecondTutorialRound(data)) IsVoltageUiRevealed = false;
+            // ボルテージのゲージは第1局では伏せ、第2局からは出しておく。
+            // 以前（2026-10-08）は第2局の説明の途中で「ボルテージUI表示」としてぱっと出していたが、
+            // 画面に物をぱっと出さない決まりにした（2026-10-24 ユーザー指示「チュートリアルの対局フェイズでUIをニョキって生やすのは止めてくれ。基本的に画面が暗転しているときにUIは全部出すように」）。
+            // 第2局は打牌フェイズに入る暗転（「対局開始」の覆い）の間に出る。説明はそれを指すだけ
+            if (IsFirstTutorialRound(data)) IsVoltageUiRevealed = false;
+            else if (IsSecondTutorialRound(data)) IsVoltageUiRevealed = true;
 
             // 前局の透視マークがプールの牌に残らないようにする
             ClearPerspectiveMarks();
@@ -123,20 +125,22 @@ namespace KillingMahjong.Managers
             if (data.enemyUsesAbility) _abilityBellRevealed = true;
             SetAbilityBellVisible(_abilityBellRevealed);
 
-            // 開幕は女の子とセリフだけ。盤面はイントロの途中で出す。
             SetBoardVisible(false);
             yield return null;
+
+            // **どの局も、暗転 →「N局目」→ 明転 で始め、盤面は暗転している間に出しておく**（2026-10-24 ユーザー指示「チュートリアルの対局フェイズでUIをニョキって生やすのは止めてくれ。基本的に画面が暗転しているときにUIは全部出すように」）。
+            // 以前は女の子とセリフだけで始め、盤面は導入のセリフの途中で出し、山牌は1枚ずつ起こしていた。
+            // 「２局目」の局名は 2026-10-24 のユーザー指示（「２局目入る時は２局目って表示したほうがいい」）。
+            // 第2局の頭の暗転は 2026-10-22 のプランナー指摘（「二局目の始まりの演出をカットしてる」）で入れていたが、
+            // 暗くなりきった次の瞬間に明け始めていて、局名が見えていなかった
+            yield return StartCoroutine(PlayRoundStartRoutine(data));
+            if (_aborted) yield break;
 
             // フロー図シート3の頭。対局フェイズ①が終わって手牌選択フェイズ②へ来たところで、
             // ゲームの流れをまとめ、資料の開き方を実際に開かせて教える。
             // **第2局の台本より前。** 第1局の締めくくりなので、盤面を出してから話す。
             if (IsSecondTutorialRound(data))
             {
-                // 局の始まりの演出（暗転 →「第２局」→ 明転）を本編と同じに通し、山牌を配り直す
-                // （2026-10-22 プランナー指摘「二局目の始まりの演出をカットしてる」「牌は配り直してほしい」）。
-                // 第2局の山は台本アセットで第1局と色を変えてある（萬子→筒子→索子→萬子）
-                yield return StartCoroutine(PlaySecondRoundStartRoutine());
-                if (_aborted) yield break;
                 yield return StartCoroutine(RunAfterFirstRoundWrapUp());
                 if (_aborted) yield break;
             }
@@ -169,22 +173,10 @@ namespace KillingMahjong.Managers
 
             if (reveal >= 0 && reveal < introLines.Count - 1)
             {
+                // 盤面と山牌は局の頭の暗転の間に出してある（PlayRoundStartRoutine）。
+                // 以前はここで盤面を出し、第1局は山牌を1枚ずつ起こしていた（2026-09-12・09-19 の指示）が、
+                // 画面に物を生やさない決まりにしたのでやめた（2026-10-24 ユーザー指示「チュートリアルの対局フェイズでUIをニョキって生やすのは止めてくれ。基本的に画面が暗転しているときにUIは全部出すように」）
                 yield return StartCoroutine(PlayLines(introLines.GetRange(0, reveal + 1)));
-
-                // **第1局だけ、牌を配る演出を挟む**（2026-09-12、フロー図どおり）。
-                // 2局目以降は同じ卓が続いているので、配り直す絵は出さない。
-                bool isFirstRound = _scenario != null && _scenario.rounds != null
-                                    && _scenario.rounds.Count > 0
-                                    && ReferenceEquals(data, _scenario.rounds[0]);
-                if (isFirstRound && _askExperienceAfterIntro)
-                {
-                    // **最初から始めたときは、山牌を「じゃーん！これが君の山牌ね」まで出さない**
-                    // （2026-09-19 のユーザー指示）。起こすのは AskExperienceIfNeeded の中
-                    _wallRevealDeferred = true;
-                }
-                else if (isFirstRound) yield return StartCoroutine(DealTilesRoutine());
-                else SetBoardVisible(true);
-
                 yield return StartCoroutine(PlayLines(
                     introLines.GetRange(reveal + 1, introLines.Count - reveal - 1)));
             }
@@ -200,13 +192,6 @@ namespace KillingMahjong.Managers
             // 頭から始めたときだけ聞く。中身は TutorialManager.Intro.cs。
             yield return StartCoroutine(AskExperienceIfNeeded());
             RestoreIntroSettings();
-
-            // 念のため: 山牌を遅らせたのに「じゃーん」の行を通らなかったら、ここで出す
-            if (_wallRevealDeferred)
-            {
-                _wallRevealDeferred = false;
-                yield return StartCoroutine(DealTilesRoutine());
-            }
 
             // --- 能力の実演と説明（手順⑱〜⑳） ---
             // 能力は手牌フェイズでしか使えない仕様なので、実演もこのフェイズのうちに行う。
@@ -368,7 +353,8 @@ namespace KillingMahjong.Managers
             // **以前は賭け金フェイズの直前で戻していた。** 賭け金がスマホ（体力表示）を
             // 拡大して見せる演出だったころの名残で、伏せたままだと何も出なかったため。
             // いまは賭け金パネルが画面下から出てくる作りなので、伏せたままでも出る。
-            if (hideChrome) SetFirstRoundChromeVisible(true);
+            // **出すのは打牌フェイズへの暗転（「対局開始」の覆い）の間**（2026-10-24 ユーザー指示「チュートリアルの対局フェイズでUIをニョキって生やすのは止めてくれ。基本的に画面が暗転しているときにUIは全部出すように」）。
+            // 以前は賭け金が決まった直後にここで出していて、明るい画面に体力やゲージがぱっと現れていた
 
             // --- 打牌フェイズ ---
             // **黒帯で隠してから入る（2026-09-28 の指示）。**
@@ -380,7 +366,8 @@ namespace KillingMahjong.Managers
             //
             // フェイズの切り替えは、本編と同じく**覆い切った時点（onMidpoint）**で行う。
             // 先に切り替えると、盤面が組み替わる様子が見えてしまう。
-            yield return StartCoroutine(RunDiscardEntryTransition());
+            yield return StartCoroutine(RunDiscardEntryTransition(
+                hideChrome ? () => SetFirstRoundChromeVisible(true) : (System.Action)null));
 
             // GameUIPhaseController は IsTutorialMode のとき HP パネルを出さないので、
             // フェイズを切り替えたあとに毎回こちらで表示し直す（手順⑦の説明に必要）。
@@ -499,27 +486,36 @@ namespace KillingMahjong.Managers
         /// 「セリフを送る → スマホを拡大 → 固定額の賭け金UI → 決定ボタンへ誘導」。
         /// GameUIPhaseController 側はチュートリアル時にこの拡大とベット開始をしない。
         /// </summary>
+        /// <summary>局名を出したまま暗転を保つ秒数。暗くなりきってすぐ明けると、局名が読めない</summary>
+        private const float RoundLabelHoldSeconds = 1.2f;
+
         /// <summary>
-        /// 第2局の始まり。本編の配牌と同じ暗転（<see cref="KillingMahjong.UI.PhaseTransitionUI.PlayRoundStartDarken"/>）を
-        /// 降ろし、覆っているあいだに盤面を出して、明けたら山牌を1枚ずつ起こす。
+        /// 局の始まり。本編の配牌と同じ暗転（<see cref="KillingMahjong.UI.PhaseTransitionUI.PlayRoundStartDarken"/>）を
+        /// 降ろして「N局目」を出し、**覆っているあいだに盤面と山牌を出しきってから**明ける（2026-10-24 ユーザー指示「チュートリアルの対局フェイズでUIをニョキって生やすのは止めてくれ。基本的に画面が暗転しているときにUIは全部出すように」）。
         /// 暗転の部品が無い・戻ってこないときは、止まらずに盤面を出すだけにする。
         /// </summary>
-        private IEnumerator PlaySecondRoundStartRoutine()
+        private IEnumerator PlayRoundStartRoutine(TutorialRoundData data)
         {
+            int number = _scenario != null && _scenario.rounds != null ? _scenario.rounds.IndexOf(data) + 1 : 1;
+            if (number < 1) number = 1;
             var phase = gameUIManager != null ? gameUIManager.PhaseTransitionUI : null;
             // チュートリアルでは演出の入れ物が伏せてあることがある。対局開始の演出と同じく起こしてから使う
             // （伏せたまま呼ぶと暗転のコルーチンが始められずにエラーになる）
             if (phase != null && !phase.gameObject.activeSelf) phase.gameObject.SetActive(true);
             if (phase == null || !phase.isActiveAndEnabled)
             {
-                yield return StartCoroutine(DealTilesRoutine());
+                ShowBoardWhileDark();
                 yield break;
             }
 
             bool covered = false;
-            phase.PlayRoundStartDarken("第２局", onReady: () => covered = true);
+            phase.PlayRoundStartDarken(ToFullWidthDigits(number) + "局目", onReady: () => covered = true);
             float limit = Time.realtimeSinceStartup + 6f;
             yield return new WaitUntil(() => covered || _aborted || Time.realtimeSinceStartup >= limit);
+            if (_aborted) yield break;
+
+            ShowBoardWhileDark();
+            yield return new WaitForSecondsRealtime(RoundLabelHoldSeconds);
             if (_aborted) yield break;
 
             bool light = false;
@@ -527,9 +523,15 @@ namespace KillingMahjong.Managers
             limit = Time.realtimeSinceStartup + 6f;
             yield return new WaitUntil(() => light || _aborted || Time.realtimeSinceStartup >= limit);
             if (!light) phase.CancelTransitions();
-            if (_aborted) yield break;
+        }
 
-            yield return StartCoroutine(DealTilesRoutine());
+        /// <summary>盤面と山牌をいちどに出す。山牌は起こす途中の大きさで残っていても等倍に戻す</summary>
+        private void ShowBoardWhileDark()
+        {
+            SetBoardVisible(true);
+            if (gameUIManager == null || gameUIManager.WallUI == null) return;
+            foreach (var t in gameUIManager.WallUI.GetComponentsInChildren<TileInteraction>(true))
+                if (t != null) t.transform.localScale = Vector3.one;
         }
 
         /// <summary>賭けすぎを止める体力の境目。フロー図の「HP8000以下」。</summary>
@@ -1148,7 +1150,13 @@ namespace KillingMahjong.Managers
         /// チュートリアルの打牌は手牌ではなく山牌から捨てる仕組みなので、
         /// GameUIManager.DiscardSelectedTile のチュートリアル分岐と同じ経路で山から河へ移す。
         /// </summary>
-        private IEnumerator AutoDiscardForPlayer()
+        /// <param name="avoidBases">
+        /// 打たない牌種（両方の河にもう出ている牌種）。渡すと、まだ出ていない牌種＝新規牌を山の頭から探して打つ。
+        /// **ボルテージを切らさないため**（2026-10-24 ユーザー指摘「女の子との選択肢が出るとこでふつーにボルテージが切れてる
+        /// 切れない牌を出すようにして」）。以前は山の頭の牌をそのまま打っていた。全部出ていたら山の頭を打つ。
+        /// 呼び出し側の控えに漏れがあっても切らさないよう、ボルテージ自身の記録（<see cref="VoltageSystem.IsNewTileType"/>）も見る
+        /// </param>
+        private IEnumerator AutoDiscardForPlayer(HashSet<int> avoidBases = null)
         {
             if (gameUIManager == null) yield break;
 
@@ -1159,8 +1167,19 @@ namespace KillingMahjong.Managers
             var slots = wall.GetWallSlots();
             if (slots == null || slots.Count == 0) yield break;
 
-            var interaction = slots[0] != null ? slots[0].GetComponent<TileInteraction>() : null;
-            int tileId = interaction != null ? interaction.TileId : -1;
+            int tileId = -1;
+            foreach (var slot in slots)
+            {
+                var candidate = slot != null ? slot.GetComponent<TileInteraction>() : null;
+                if (candidate == null || candidate.TileId < 0) continue;
+                if (tileId < 0) tileId = candidate.TileId;   // 新規牌が無いときに打つ山の頭
+                if (avoidBases == null) break;
+                if (!avoidBases.Contains(TutorialTiles.BaseOf(candidate.TileId)) && VoltageSystem.IsNewTileType(candidate.TileId))
+                {
+                    tileId = candidate.TileId;
+                    break;
+                }
+            }
             if (tileId < 0) yield break;
 
             // どの牌種を捨てたかを残す。第2局は「まだ川に出ていない牌」を
