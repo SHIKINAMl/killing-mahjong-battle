@@ -182,7 +182,12 @@ namespace KillingMahjong.UI
         /// </summary>
         private static readonly Track[] BgmsReturningTheme = MatchTracks("Bgm/ReturningTheme", "rt_", true,
             new Track("Bgm/ReturningTheme", "rt_bgm_draw_base",  "流局　土台だけ"),
-            new Track("Bgm/ReturningTheme", "rt_bgm_draw_motif", "流局　モチーフだけ"));
+            new Track("Bgm/ReturningTheme", "rt_bgm_draw_motif", "流局　モチーフだけ"),
+            // 場の曲のドラムとベースを合わせた版（2026-10-23 にコレクションへ足した。「すべて入れて」のユーザー指示）
+            new Track("Bgm/ReturningTheme", "rt_bgm_field_1_drums_bass_sync", "場 1　ドラムとベースを合わせた版"),
+            new Track("Bgm/ReturningTheme", "rt_bgm_field_2_drums_bass_sync", "場 2　ドラムとベースを合わせた版"),
+            new Track("Bgm/ReturningTheme", "rt_bgm_field_3_drums_bass_sync", "場 3　ドラムとベースを合わせた版"),
+            new Track("Bgm/ReturningTheme", "rt_bgm_field_4_drums_bass_sync", "場 4　ドラムとベースを合わせた版"));
 
         /// <summary>
         /// 対局BGM「賭けの合図 I / II」（2026-10-10 に対局BGMとして選べるようにした。ユーザーが作った曲）。
@@ -192,6 +197,19 @@ namespace KillingMahjong.UI
         {
             new Track("Bgm", "bgm_kake_1", "賭けの合図 I"),
             new Track("Bgm", "bgm_kake_2", "賭けの合図 II"),
+        };
+
+        /// <summary>
+        /// 対局の曲に重ねるドラム（AudioManager.Drums が Resources/Drums から読む）。
+        /// 2026-10-23 にコレクションへ足した（ユーザー指示「コレクションに入れてないものがないか確認して。すべて入れてほしい」）
+        /// </summary>
+        private static readonly Track[] BgmsDrums =
+        {
+            new Track("Drums", "drum_prepare", "準備"),
+            new Track("Drums", "drum_betting", "賭け金"),
+            new Track("Drums", "drum_discard", "打牌"),
+            new Track("Drums", "drum_ron",     "ロン"),
+            new Track("Drums", "drum_result",  "結果"),
         };
 
         /// <summary>
@@ -225,6 +243,8 @@ namespace KillingMahjong.UI
                              Note = "選んだ1曲を、対局のあいだ通して流す" },
             new MusicGroup { Label = "従来", Path = "対局BGM ＞ 従来", Indent = 1, Tracks = BgmsLegacy,
                              Note = "流局の曲だけ残した。対局では鳴らない" },
+            new MusicGroup { Label = "ドラムの重ね", Path = "対局BGM ＞ ドラムの重ね", Indent = 1, Tracks = BgmsDrums,
+                             Note = "対局の曲に重ねて鳴らすドラム" },
             new MusicGroup { Label = "未使用", Path = "未使用", Tracks = BgmsUnused },
             };
         }
@@ -282,7 +302,9 @@ namespace KillingMahjong.UI
         ///   Inspector で割り当てた音 … ManagerClip("AudioManager のフィールド名", "ファイル名", 名前)
         ///   合成音（ファイル無し）  … SynthSe(名前, 本編と同じ呼び方)
         /// 手牌決定の確認の音（手牌決定！.mp3）は対局シーンの ConfirmationDialogUI に割り当ててあり、
-        /// コレクションのある部屋シーンからは取れないので載せていない。
+        /// コレクションのある部屋シーンからは取れないので、**Resources/Se に写しを置いて載せている**（2026-10-23。
+        /// 元は Assets/Se/。直すときは両方直す）。
+        /// 役と打点の読み上げの声（Resources/Voice）も 2026-10-23 に足した（「すべて入れて」のユーザー指示）。
         /// </summary>
         private static readonly Track[] Stingers =
         {
@@ -291,6 +313,8 @@ namespace KillingMahjong.UI
             new Track("Stingers", "br_fall",       "暗転"),
             new Track("Stingers", "br_riser",      "明転"),
             new Track("Stingers", "br_blackout",   "着弾（局の頭の文字）"),
+            new Track("Stingers", "br_fall_bar",   "暗転（小節の長さの版・未使用）"),
+            new Track("Stingers", "br_riser_bar",  "明転（小節の長さの版・未使用）"),
             ManagerClip("selectTileSE", "決定ボタンを押す32", "牌に触れる"),
             ManagerClip("discardSE",    "牌を置く音",         "牌を捨てる"),
             ManagerClip("hoverSE",      "選択",               "牌にカーソル"),
@@ -331,6 +355,44 @@ namespace KillingMahjong.UI
             new Track("Stingers", "se_click_empty", "何も無い所のクリック"),
             ManagerClip("paperSlideSE", "ページめくり", "紙をめくる（オープニング）"),
             new Track("Stingers", "se_settings", "設定を開く・閉じる"),
+            new Track("Se/HandSelection", "wait_flight",  "待ち牌が飛ぶ"),
+            new Track("Se/HandSelection", "wait_arrival", "待ち牌が届く"),
+            new Track("Se", "手牌決定！", "手牌決定の確認"),
+            ManagerClip("ronVoice", "レコーディング", "ロンの声（レコーディング）"),
+            new Track("Voice/Yaku", "ron", "声　ロン"),
+            new Track("Voice/Yaku", "yaku_riichi", "声　立直"),
+            new Track("Voice/Yaku", "yaku_tanyao", "声　断么九"),
+            new Track("Voice/Yaku", "yaku_pinfu", "声　平和"),
+            new Track("Voice/Yaku", "yaku_iipeikou", "声　一盃口"),
+            new Track("Voice/Yaku", "yaku_ton", "声　東"),
+            new Track("Voice/Yaku", "yaku_shaa", "声　西"),
+            new Track("Voice/Yaku", "yaku_dora", "声　ドラ"),
+            new Track("Voice/Yaku", "yaku_akadora", "声　赤ドラ"),
+            new Track("Voice/Yaku", "yaku_ippatsu", "声　一発"),
+            new Track("Voice/Yaku", "yaku_houtei", "声　河底撈魚"),
+            new Track("Voice/Yaku", "yaku_sanshoku", "声　三色同順"),
+            new Track("Voice/Yaku", "yaku_sanshoku_doukou", "声　三色同刻"),
+            new Track("Voice/Yaku", "yaku_sanankou", "声　三暗刻"),
+            new Track("Voice/Yaku", "yaku_toitoi", "声　対々和"),
+            new Track("Voice/Yaku", "yaku_honroutou", "声　混老頭"),
+            new Track("Voice/Yaku", "yaku_chanta", "声　混全帯么九"),
+            new Track("Voice/Yaku", "yaku_chiitoi", "声　七対子"),
+            new Track("Voice/Yaku", "yaku_ikkitsuukan", "声　一気通貫"),
+            new Track("Voice/Yaku", "yaku_ryanpeikou", "声　二盃口"),
+            new Track("Voice/Yaku", "yaku_honitsu", "声　混一色"),
+            new Track("Voice/Yaku", "yaku_junchan", "声　純全帯么九"),
+            new Track("Voice/Yaku", "yaku_chinitsu", "声　清一色"),
+            new Track("Voice/Yaku", "yaku_chuuren", "声　九蓮宝燈"),
+            new Track("Voice/Yaku", "yaku_ryuuiisou", "声　緑一色"),
+            new Track("Voice/Yaku", "yaku_chinroutou", "声　清老頭"),
+            new Track("Voice/Yaku", "yaku_suuankou", "声　四暗刻"),
+            new Track("Voice/Yaku", "yaku_junsei_chuuren", "声　純正九蓮宝燈"),
+            new Track("Voice/rank", "rank_mangan", "声　満貫"),
+            new Track("Voice/rank", "rank_haneman", "声　跳満"),
+            new Track("Voice/rank", "rank_baiman", "声　倍満"),
+            new Track("Voice/rank", "rank_sanbaiman", "声　三倍満"),
+            new Track("Voice/rank", "rank_yakuman", "声　役満"),
+            new Track("Voice/rank", "rank_double_yakuman", "声　ダブル役満"),
         };
 
         private GameObject root;
