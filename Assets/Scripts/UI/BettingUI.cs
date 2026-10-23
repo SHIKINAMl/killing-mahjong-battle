@@ -473,6 +473,16 @@ namespace KillingMahjong.UI
             ConfirmBet();
         }
 
+        /// <summary>
+        /// パネルを触れなくする（チュートリアルで、代わりに額を下げて決定するあいだ。2026-10-23）。
+        /// 切ったあとの `ForceSetBet` はボタンを灰色のままにし、`PressConfirm` はそのまま押せる
+        /// </summary>
+        public void LockInput()
+        {
+            LockBetButtons();
+            SetPanelInputEnabled(false);
+        }
+
         public void HideBettingPhase(bool immediate = false)
         {
             if (_stakeFx != null) _stakeFx.End();

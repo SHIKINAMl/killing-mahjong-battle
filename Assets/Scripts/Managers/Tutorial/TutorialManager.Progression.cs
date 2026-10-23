@@ -550,6 +550,9 @@ namespace KillingMahjong.Managers
         /// <summary>賭け金が下がっていく様子を見せる時間。一瞬で書き換えると気づけない。</summary>
         private const float BetReduceSeconds = 0.8f;
 
+        /// <summary>もう一度出したスマホで、下げ始める前と、下げ終えて決定する前に置く間。</summary>
+        private const float BetReducePause = 0.4f;
+
         /// <summary>
         /// 自分で賭け金を決めさせる（2026-09-30 のフロー図改訂、シート3）。
         ///
@@ -557,8 +560,8 @@ namespace KillingMahjong.Managers
         /// 決定を押すだけだった。改訂版では**自分で増やして決める**ところまでやらせる。
         ///
         /// **賭けすぎたら止める。** 体力が {BetWarnHpThreshold} 以下なのに
-        /// {BetWarnAmount} 以上を賭けて決定を押したら、いったん押し戻して
-        /// {BetWarnReducedAmount} まで下げ、代わりに決定を押す。
+        /// {BetWarnAmount} 以上を賭けて決定を押したら、いったんスマホを閉じて止め、
+        /// もう一度出して {BetWarnReducedAmount} まで下げ、代わりに決定を押す。
         /// チュートリアルで身を削らせないための歯止めで、フロー図にもそう描いてある。
         /// </summary>
         private IEnumerator RunFreeBettingPhase(TutorialRoundData data)
@@ -606,16 +609,33 @@ namespace KillingMahjong.Managers
                                || _lastConfirmedBet >= BetWarnAmountAlways;
                 if (!tooMuch) break;
 
-                // いったん止めて、下げてから代わりに押す
+                // いったん止めて、下げてから代わりに押す。
+                // **スマホはいったん閉じてからセリフを言う**（2026-10-23 ユーザー指示。出したままだと
+                // 先輩の吹き出しがスマホの後ろに隠れていた）。下げるときにもう一度出し、
+                // 押し返した額から 3000 まで下げて勝手に決定する。閉じるのはループを抜けたあと
                 confirmed = false;
+                int pushedBet = _lastConfirmedBet;
+                betting.HideBettingPhase();
+                yield return betting.WaitForSlideAnimation();
 
                 yield return StartCoroutine(PlayLines(new List<TutorialLine>
                 {
                     new TutorialLine("ちょっとちょっと！　そんなに賭けたら危ないよ！"),
                     new TutorialLine($"気持ちはわかるけどここは{BetWarnReducedAmount}くらいにしとこう？"),
                 }));
+                if (_aborted) yield break;
 
+                // 下げているあいだはスマホを触れなくする（触れると額が変わったまま決定される）
+                betting.ShowFixedBettingPhase(_playerHp, _playerHp, pushedBet, amount =>
+                {
+                    _lastConfirmedBet = amount;
+                    confirmed = true;
+                });
+                yield return betting.WaitForSlideAnimation();
+                betting.LockInput();
+                yield return new WaitForSeconds(BetReducePause);
                 yield return StartCoroutine(SlideBetDownTo(betting, BetWarnReducedAmount));
+                yield return new WaitForSeconds(BetReducePause);
 
                 betting.PressConfirm();
                 yield return null;
