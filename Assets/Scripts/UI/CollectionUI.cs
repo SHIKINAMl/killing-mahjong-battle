@@ -313,8 +313,6 @@ namespace KillingMahjong.UI
             new Track("Stingers", "br_fall",       "暗転"),
             new Track("Stingers", "br_riser",      "明転"),
             new Track("Stingers", "br_blackout",   "着弾（局の頭の文字）"),
-            new Track("Stingers", "br_fall_bar",   "暗転（小節の長さの版・未使用）"),
-            new Track("Stingers", "br_riser_bar",  "明転（小節の長さの版・未使用）"),
             ManagerClip("selectTileSE", "決定ボタンを押す32", "牌に触れる"),
             ManagerClip("discardSE",    "牌を置く音",         "牌を捨てる"),
             ManagerClip("hoverSE",      "選択",               "牌にカーソル"),
