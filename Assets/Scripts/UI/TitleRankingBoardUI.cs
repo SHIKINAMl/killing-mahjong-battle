@@ -54,9 +54,10 @@ namespace KillingMahjong.UI
         internal static readonly string[] KindTitles = { "最大打点", "累計獲得点数", "最大局数" };
         internal static readonly string[] KindNotes =
         {
-            "1回の和了で、相手に与えた損失のいちばん大きいもの",
-            "1つの対局で獲得した点数の合計の、いちばん大きいもの",
-            "1つの対局で打った局の数の、いちばん多いもの",
+            // 文言は 2026-10-23 のユーザー指示
+            "一回のアガリで相手に与えたダメージランキング",
+            "一つの対局で獲得した点数ランキング",
+            "一番長引いた局数ランキング",
         };
         internal static readonly string[] KindUnits = { "点", "点", "局" };
 
