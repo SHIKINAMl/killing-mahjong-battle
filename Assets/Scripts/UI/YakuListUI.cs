@@ -535,7 +535,9 @@ namespace KillingMahjong.UI
 
             if (hasName)
             {
-                nameText.text = combined.Substring(0, plus);
+                // 役名はサーバーから届いたまま（断么九 など）。「么」はフォントに無く □ になるので、
+                // 表示用の名前（断幺九）にして出す（2026-10-24）
+                nameText.text = YakuExamples.DisplayName(combined.Substring(0, plus));
                 if (bonusText != null) bonusText.text = combined.Substring(plus);
             }
             else
