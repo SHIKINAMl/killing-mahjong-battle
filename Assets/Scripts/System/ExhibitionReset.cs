@@ -13,6 +13,7 @@ namespace KillingMahjong.Core
     /// **音量などの設定は残す**（展示のために合わせてある）。
     ///
     /// Web 版はページを読み込み直す。エディタなどでは ID を捨てて最初のシーンから始め直す。
+    /// 最初のシーンは展示のタイトル（ランキングと動画の画面。2026-10-23 からビルドの先頭。前はチュートリアルの OpeningScene だった）。
     /// </summary>
     public static class ExhibitionReset
     {
@@ -43,12 +44,30 @@ namespace KillingMahjong.Core
         {
             if (Running) return;
             Running = true;
-            foreach (var key in Keys) PlayerPrefs.DeleteKey(key);
-            PlayerPrefs.Save();
+            DeleteSaved();
             Debug.Log("[ExhibitionReset] 名前・記録・チュートリアルの進み具合を消して、起動し直します。");
             var runner = new GameObject("ExhibitionReset").AddComponent<Runner>();
             Object.DontDestroyOnLoad(runner.gameObject);
             runner.StartCoroutine(Restart(runner.gameObject));
+        }
+
+        /// <summary>
+        /// 消すだけで、起動し直さない。展示のタイトル（ランキングと動画の画面）で動画が流れ始めたときに呼ぶ
+        /// （2026-10-23 プランナー指示「動画流れ始めたらリセットボタンをオートで押すのもアリ」）。
+        /// そこでは対局の接続を張っていないので、プレイヤー ID は捨てるだけでよい（次に繋いだとき取り直す）。
+        /// 起動し直すと動画が途中で切れるので、ここでは読み込み直さない
+        /// </summary>
+        public static void ClearSaved()
+        {
+            if (Running) return;
+            DeleteSaved();
+            KillingMahjong.Network.PlayerIdentity.Clear();
+        }
+
+        private static void DeleteSaved()
+        {
+            foreach (var key in Keys) PlayerPrefs.DeleteKey(key);
+            PlayerPrefs.Save();
         }
 
         private sealed class Runner : MonoBehaviour { }

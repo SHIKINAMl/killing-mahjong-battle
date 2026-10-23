@@ -8,11 +8,20 @@ using UnityEngine.Video;
 namespace KillingMahjong.UI
 {
     /// <summary>
-    /// タイトルで放置したときに出すランキング（2026-10-21、ユーザー指示「ランキング画面はタイトルで放置している場所に表示する」）。
+    /// 展示のタイトル画面＝ランキングと紹介動画（2026-10-21 にタイトルの放置画面として作り、
+    /// 2026-10-23 にプランナー指示「もう動画とランキング画面がタイトル画面というイメージ」でタイトルそのものにした）。
     ///
-    /// 展示のタイトル（どこを押しても始まる画面）で、しばらく操作が無いと全面に出す。
-    /// 種類（最大打点・累計獲得点数・最大局数）を順に切り替えて見せ、何か操作したらタイトルへ戻る。
-    /// 戻すための操作では、チュートリアルは始めない（いちばん手前で押した物を受け止める）。
+    /// 展示のタイトル（どこを押しても始まる画面）に、最初から全面に出しておく。押せばそのままチュートリアルが始まる
+    /// （クリックはこの板では受けず、手前の全画面クリック受付が受ける。並び順は受付の奥）。
+    /// 受付の上の「ルールを知っている方：対局へ」「デバッグ部屋」のボタンは、この板より手前に見えて押せる。
+    /// 対局を選ぶ画面や設定を開いたら引っ込め、閉じたらまたランキングの最初から出す。
+    /// 以前は 25 秒放置したら出し、何か操作したらタイトルの絵へ戻していた。
+    ///
+    /// **動画が流れ始めたら、展示用リセットと同じ物を消す**（<see cref="Core.ExhibitionReset.ClearSaved"/>。
+    /// 同日のプランナー指示「動画流れ始めたらリセットボタンをオートで押すのもアリ」）。
+    /// ランキングを一巡するあいだ（約 24 秒）誰も触らなかったら、前の人は帰ったとみなす。
+    ///
+    /// 種類（最大打点・累計獲得点数・最大局数）を順に切り替えて見せる。
     ///
     /// **ランキングと紹介動画を交互に出す**（2026-10-22、ユーザー指示「放置していた場合ランキングと動画交互に出てほしい」）。
     /// ランキングの種類を一巡したら動画、動画が終わったらまたランキング。
@@ -20,7 +29,8 @@ namespace KillingMahjong.UI
     /// StreamingAssets から URL で流す。流しているあいだはタイトルの曲を止めて動画の音を出す。
     /// 読めなかったときはランキングだけを回す。
     ///
-    /// どちらを出している間も、下に「クリックでタイトルへ」をゆっくり点滅させて出しておく（同日のユーザー指示）。
+    /// どちらを出している間も、下に「クリックでスタート」をゆっくり点滅させて出しておく
+    /// （2026-10-22 のユーザー指示。そのときは「クリックでタイトルへ」）。
     ///
     /// 中身はサーバーから取る（<see cref="RankingFetcher"/>）。対局の接続とは別に繋ぎ、終わったら切る。
     ///
@@ -31,9 +41,6 @@ namespace KillingMahjong.UI
     {
         public const string RootName = "TitleRankingBoard";
         private const int RowCount = 10;
-
-        /// <summary>何秒放置したら出すか。</summary>
-        [SerializeField] private float idleSeconds = 25f;
 
         /// <summary>1つの種類を見せる秒数。</summary>
         [SerializeField] private float pageSeconds = 8f;
@@ -47,7 +54,7 @@ namespace KillingMahjong.UI
         /// <summary>動画の読み込みを何秒待つか。過ぎたら、その回は飛ばしてランキングへ戻る。</summary>
         [SerializeField] private float videoPrepareTimeout = 8f;
 
-        /// <summary>「クリックでタイトルへ」の点滅の1往復の秒数。ゆっくり（ユーザー指示）。</summary>
+        /// <summary>「クリックでスタート」の点滅の1往復の秒数。ゆっくり（ユーザー指示）。</summary>
         [SerializeField] private float hintBlinkSeconds = 2.4f;
 
         internal static readonly string[] Kinds = { "max_damage", "match_points", "rounds" };
@@ -73,7 +80,6 @@ namespace KillingMahjong.UI
         private float videoStartedAt;
         private readonly TMP_Text[,] cells = new TMP_Text[RowCount, 3];
 
-        private float lastInput;
         private bool showing;
         private int page;
         private float pageStartedAt;
@@ -172,9 +178,10 @@ namespace KillingMahjong.UI
             player.playOnAwake = false;
             videoLayer.gameObject.SetActive(false);
 
-            // 下の「クリックでタイトルへ」。ランキングでも動画でも出しっぱなしにして、ゆっくり点滅させる。
+            // 下の「クリックでスタート」。ランキングでも動画でも出しっぱなしにして、ゆっくり点滅させる。
             // いちばん手前に描くよう、最後の子にしておく。画面の縦横比が変わっても下に出るよう、下端に揃えて置く。
-            // 後ろのタイトル画面の下の文字が透けて重なるので、横いっぱいの暗い帯を敷く
+            // 横いっぱいの暗い帯を敷き、その上に字と、手前の「対局へ」「デバッグ部屋」のボタンを横に並べる
+            // （並びはシーンで決めてある。字は左寄り）
             bool plateMade = transform.Find("ReturnHintPlate") == null;
             var plate = Box(transform, "ReturnHintPlate", new Vector2(0f, 44f), Vector2.zero, new Color32(8, 3, 8, 245));
             plate.GetComponent<Image>().raycastTarget = false;
@@ -186,13 +193,13 @@ namespace KillingMahjong.UI
             }
             plate.SetAsLastSibling();
             bool hintMade = transform.Find("ReturnHint") == null;
-            returnHint = Label(transform, "ReturnHint", "クリックでタイトルへ", Vector2.zero, new Vector2(400f, 28f), 20f,
+            returnHint = Label(transform, "ReturnHint", "クリックでスタート", Vector2.zero, new Vector2(300f, 28f), 20f,
                 new Color32(232, 220, 200, 255), TextAlignmentOptions.Center, font);
             if (hintMade)
             {
                 var hintRt = returnHint.rectTransform;
                 hintRt.anchorMin = hintRt.anchorMax = new Vector2(0.5f, 0f);
-                hintRt.anchoredPosition = new Vector2(0f, 28f);
+                hintRt.anchoredPosition = new Vector2(-210f, 28f);
             }
             returnHint.transform.SetAsLastSibling();
 
@@ -234,41 +241,26 @@ namespace KillingMahjong.UI
             return label;
         }
 
-        private void Start()
-        {
-            var button = GetComponent<Button>();
-            if (button != null)
-            {
-                button.onClick.RemoveAllListeners();
-                button.onClick.AddListener(Hide);
-            }
-            lastInput = Time.realtimeSinceStartup;
-        }
-
         private void Update()
         {
-            if (ExhibitionIdleReturn.AnyInput())
-            {
-                lastInput = Time.realtimeSinceStartup;
-                if (showing) Hide();
-                return;
-            }
-
+            bool waiting = title != null && title.IsWaitingForVisitor;
             if (!showing)
             {
-                bool waiting = title != null && title.IsWaitingForVisitor;
-                if (!waiting) { lastInput = Time.realtimeSinceStartup; return; }
-                if (Time.realtimeSinceStartup - lastInput >= idleSeconds) Show();
+                if (waiting) Show();
                 return;
             }
+            // 対局を選ぶ画面や設定を開いたら引っ込める。チュートリアルなどへ移る暗転のあいだは出したままにする
+            // （引っ込めると、後ろの古いタイトルの絵が一瞬見える）
+            if (!waiting && (title == null || !title.IsLeavingScene)) { Hide(); return; }
 
             BlinkHint();
 
             if (playingVideo)
             {
                 bool ended = player.isPrepared && !player.isPlaying && player.frame > 0;
+                // 読み込めないときは、その回だけ飛ばす。次の一巡でまた試す
+                // （Web 版は、まだ誰も画面を押していないと音つきの動画を流させてもらえないことがある）
                 bool stuck = !player.isPrepared && Time.realtimeSinceStartup - videoStartedAt >= videoPrepareTimeout;
-                if (stuck) videoUnavailable = true;
                 if (ended || stuck) ShowRanking();
                 return;
             }
@@ -321,6 +313,8 @@ namespace KillingMahjong.UI
 
         private void ShowVideo()
         {
+            // ランキングを一巡するあいだ誰も触らなかったので、次の人のために名前・記録・チュートリアルの進み具合を消す
+            Core.ExhibitionReset.ClearSaved();
             if (videoTexture == null)
             {
                 videoTexture = new RenderTexture(960, 720, 0) { name = "TitleVideo" };
@@ -378,16 +372,16 @@ namespace KillingMahjong.UI
             if (!showing) return;
             showing = false;
             StopVideo();
-            lastInput = Time.realtimeSinceStartup;
             SetVisible(false);
         }
 
+        /// <summary>見せるだけで、クリックは受けない（手前の全画面クリック受付へ通す）</summary>
         private void SetVisible(bool visible)
         {
             if (group == null) return;
             group.alpha = visible ? 1f : 0f;
-            group.blocksRaycasts = visible;
-            group.interactable = visible;
+            group.blocksRaycasts = false;
+            group.interactable = false;
         }
 
         private void Render()

@@ -121,11 +121,14 @@ namespace KillingMahjong.UI
 
         /// <summary>
         /// 展示のタイトルで、次の人を待っているところか（「どこを押しても始まる」が出ていて、
-        /// メニューも設定も開いていない）。放置したときのランキングはこの間だけ出す。
+        /// メニューも設定も開いていない）。ランキングと動画の画面はこの間だけ出す。
         /// </summary>
         public bool IsWaitingForVisitor =>
             titleClickTarget != null && titleClickTarget.activeInHierarchy && !isStartingTutorial
             && (optionUIPanel == null || !optionUIPanel.activeInHierarchy);
+
+        /// <summary>チュートリアルや別のシーンへ移り始めたか。暗転のあいだ、ランキングと動画の画面を出したままにするのに使う</summary>
+        public bool IsLeavingScene => isStartingTutorial || isLoadingScene;
 
         private const string TitleClickTargetName = "TitleClickToTutorial";
         private const string MatchShortcutName = "ルールを知っている方：対局へ";

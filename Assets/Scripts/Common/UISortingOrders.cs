@@ -64,8 +64,11 @@ namespace KillingMahjong.Common
         /// <summary>展示用タイトルの全画面クリック受付。ローディングやメニューより奥。</summary>
         public const int TitleStartInput = 10;
 
-        /// <summary>タイトルで放置したときに出るランキング（2026-10-21）。全画面クリック受付の手前、メニューやローディングより奥。</summary>
-        public const int TitleRankingBoard = 12;
+        /// <summary>
+        /// 展示のタイトル画面になったランキングと動画（2026-10-21。2026-10-23 からタイトルそのもの）。
+        /// 全画面クリック受付の**奥**。受付の上の「対局へ」「デバッグ部屋」のボタンを手前に出し、どこを押しても始まるようにする。
+        /// </summary>
+        public const int TitleRankingBoard = 9;
 
         /// <summary>DoraDisplayUI: ドラ表示牌 (WorldSpace Canvas)</summary>
         public const int DoraTile = 10;
