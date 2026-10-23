@@ -114,6 +114,14 @@ namespace KillingMahjong.EditorTools
                     report.Append(" / 待ち牌の登場・移送=").Append(Describe(SceneFirst.Report(nameof(HandWaitRevealUI))));
                     break;
                 }
+                // 合言葉の後ろに敷く暗い板（2026-10-23）
+                foreach (var root in scene.GetRootGameObjects())
+                {
+                    var matchmaking = root.GetComponentInChildren<MatchmakingUI>(true);
+                    if (matchmaking == null) continue;
+                    report.Append(" / 合言葉の板=").Append(Describe(matchmaking.BakeBackdropForEditor()));
+                    break;
+                }
                 EditorSceneManager.MarkSceneDirty(scene);
                 bool saved = EditorSceneManager.SaveScene(scene);
                 report.AppendLine(saved ? " / 保存しました" : " / **保存に失敗しました**");

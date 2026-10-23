@@ -91,6 +91,13 @@ namespace KillingMahjong.Common
         /// 前面に置きっぱなしにすると、賭け金確定後の演出にボタンが被る</summary>
         public const int HandPeekButtonIdle = 17;
 
+        /// <summary>
+        /// MatchmakingUI: 部屋を作って合言葉を見せている間の待ち画面（2026-10-23）。
+        /// 相手の吹き出し(16)より手前に出し、挨拶の吹き出しが合言葉に被らないようにする。
+        /// 待っている間は手牌のボタン(17)は出ていないので同じ段でよい
+        /// </summary>
+        public const int MatchmakingPasscode = 17;
+
         /// <summary>BettingUI: ベット時の背景ディマー（BettingPanel より奥）</summary>
         public const int BettingDimmer = 19;
 

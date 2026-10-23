@@ -16,7 +16,9 @@ namespace KillingMahjong.UI
             Debug.Log("[GameUIPhaseController] ShowMatchmakingWaiting called.");
             if (uiManager != null && uiManager.IsTutorialMode) return; // チュートリアル中は非表示
 
-            if (uiManager.MatchmakingUI != null) uiManager.MatchmakingUI.ShowWaiting(BuildWaitingMessage(data));
+            // 合言葉を見せるときだけ、文字の後ろに暗い板を敷いて吹き出しより手前に出す（MatchmakingUI）
+            bool passcode = data != null && data.mode == "private_host" && !string.IsNullOrEmpty(data.password);
+            if (uiManager.MatchmakingUI != null) uiManager.MatchmakingUI.ShowWaiting(BuildWaitingMessage(data), passcode);
             ShowMatchmakingWaitingBody();
         }
 
@@ -35,10 +37,44 @@ namespace KillingMahjong.UI
 
             if (data.mode == "private_host" && !string.IsNullOrEmpty(data.password))
             {
-                return $"あいことば\n<size=150%>{data.password}</size>\n\nこの5文字を相手に伝えてください";
+                return BuildPasswordMessage(data.password);
             }
 
             return DefaultMessage;
+        }
+
+        /// <summary>
+        /// 部屋を作った側に出す合言葉（2026-10-23 ユーザー指示「部屋を作った時の合言葉がわかりにくいのでわかりやすくして」）。
+        ///
+        /// 以前は 80pt の白い字を卓と立ち絵の上にそのまま重ねていて、見出しは上の点数の帯に隠れ、
+        /// 字体のせいで英大文字が小文字のようにも見え、8 と B、0 と O のような数字と英字も見分けにくかった。
+        ///   ・文字の後ろに暗い板を敷き、相手の吹き出しより手前に出す（<see cref="MatchmakingUI"/>）。
+        ///     文字の飾りの下地（TMP の mark）も試したが、この字体では薄くしか出ず後ろの絵が透けた
+        ///   ・合言葉は1文字ずつ間を空けて同じ幅で並べ、数字だけ金色にする（合言葉は英大文字と数字だけ。サーバーの決まり）
+        ///   ・相手がどこで打つか（「あいことばで入る」）も書く
+        /// </summary>
+        private static string BuildPasswordMessage(string password)
+        {
+            const string Digit = "#F2C14E";
+            var code = new System.Text.StringBuilder();
+            bool hasDigit = false;
+            foreach (char c in password.ToUpperInvariant())
+            {
+                if (code.Length > 0) code.Append(' ');
+                if (char.IsDigit(c)) { hasDigit = true; code.Append("<color=" + Digit + ">").Append(c).Append("</color>"); }
+                else code.Append(c);
+            }
+            var text = new System.Text.StringBuilder();
+            text.Append("<size=40%>あいことば</size>\n");
+            text.Append("<mspace=0.6em>").Append(code).Append("</mspace>\n");
+            text.Append("<size=30%>");
+            if (hasDigit) text.Append("<color=" + Digit + ">金色</color>の文字は数字です\n");
+            text.Append("この5文字を相手に伝えてください\n");
+            text.Append("相手は「あいことばで入る」から打ちます");
+            text.Append("</size>");
+            // 下で牌をかき混ぜている（TileClatterEffect）ので、空の行を足して文字の塊を上へ寄せる（字は上下の真ん中に揃う）
+            text.Append("\n\n");
+            return text.ToString();
         }
 
         /// <summary>待機中に盤面を片付ける。文言だけ差し替えたいときと分けている。</summary>
