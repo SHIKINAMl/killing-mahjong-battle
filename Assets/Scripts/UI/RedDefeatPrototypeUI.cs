@@ -176,9 +176,9 @@ namespace KillingMahjong.UI
             yield return new WaitForSecondsRealtime(2f);
             CompletedAt = Time.unscaledTime;
             Stage = SequenceStage.Completed;
-            Debug.Log($"[RedDefeatPrototypeUI] 終了。着地音の終了から {CompletedAt - ThudFinishedAt:F2} 秒後にタイトルへ戻ります。");
+            Debug.Log($"[RedDefeatPrototypeUI] 終了。着地音の終了から {CompletedAt - ThudFinishedAt:F2} 秒後にデバッグ部屋へ移ります。");
             if (onPreviewCompleted != null) onPreviewCompleted();
-            else SceneManager.LoadScene("タイトルシーン");
+            else SceneManager.LoadScene(TutorialNavigation.DebugRoomSceneName); // タイトルではなく（2026-10-23 ユーザー指示「タイトルへは放置した時だけ行くようにして」）
         }
 
         private IEnumerator Animate(float duration, System.Action<float> apply)

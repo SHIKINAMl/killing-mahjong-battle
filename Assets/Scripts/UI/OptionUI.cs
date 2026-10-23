@@ -31,7 +31,7 @@ namespace KillingMahjong.UI
 
         [Header("Buttons")]
         [SerializeField] private Button closeButton; // 変更を保持して閉じる
-        [SerializeField] private Button returnToTitleButton; // タイトル（または別シーン）に戻る
+        [SerializeField] private Button returnToTitleButton; // デバッグ部屋（returnSceneName のシーン）へ移る。名前は昔の「タイトルへ」のまま
         [SerializeField] private Button quitButton; // ゲーム終了
 
         // 既存のタイトルボタンをひな形にして実行時に追加する。
@@ -69,8 +69,10 @@ namespace KillingMahjong.UI
         [Header("Scene Transition Settings")]
         [Tooltip("このシーンで『戻る』ボタンを表示するかどうか")]
         [SerializeField] private bool showReturnButton = true;
+        // 2026-10-23 のユーザー指示「設定でタイトルではなく、デバッグ部屋に移行するようにして」で
+        // タイトルシーンから部屋シーンへ。ボタンの文字も「Title」から「デバッグ部屋へ」にした（OptionUI.prefab と各シーン）
         [Tooltip("『戻る』ボタンを押したときに遷移するシーン名")]
-        [SerializeField] private string returnSceneName = "タイトルシーン";
+        [SerializeField] private string returnSceneName = "部屋シーン";
 
         private CanvasGroup _canvasGroup;
         private RectTransform _rectTransform;

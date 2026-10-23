@@ -494,7 +494,9 @@ namespace KillingMahjong.UI
                 float x = -370f + slot * (i + 0.5f);
                 var item = CreateMenuItem(bar.transform, it.Name, it.Label, new Vector2(x, -8f), new Vector2(122f, 44f),
                     it.Size, () => it.Act()?.Invoke(), out bool madeItem);
-                if (it.Name == "RoomMenu_Exit")
+                // 「タイトルへ」も押せない（2026-10-23 ユーザー指示「タイトルへは放置した時だけ行くようにして」）。
+                // タイトル（ランキングと動画の画面）へは、放置したときのリセットでしか行かない
+                if (it.Name == "RoomMenu_Exit" || it.Name == "RoomMenu_Title")
                 {
                     // 「やめる」は押せない。灰色にするのは作ったときだけ（置いてある物の色はシーンが正）
                     item.GetComponent<Button>().onClick.RemoveAllListeners();

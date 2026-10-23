@@ -302,8 +302,9 @@ namespace KillingMahjong.Managers
             // ScreenTint は DontDestroyOnLoad なので、抜かないと**次のシーンまで引きずる。**
             Tutorial.TutorialAudioDirector.ResetVisuals();
 
-            string sceneName = _scenario != null ? _scenario.titleSceneName : "タイトルシーン";
-            SceneManager.LoadScene(sceneName);
+            // 抜けたらデバッグ部屋へ。台本の titleSceneName は使わない（2026-10-23 ユーザー指示「タイトルへは放置した時だけ行くようにして」）。
+            // タイトル（ランキングと動画の画面）へは、放置したときのリセットでしか行かない
+            SceneManager.LoadScene(KillingMahjong.UI.TutorialNavigation.DebugRoomSceneName);
         }
 
     }

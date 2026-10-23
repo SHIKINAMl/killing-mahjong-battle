@@ -25,7 +25,7 @@ namespace KillingMahjong.UI
         private Coroutine resultFade;
 
         public void Show(VictoryConfig config, TMP_FontAsset font, Action onReturnToTitle,
-            string returnText = "タイトルへ戻る▼", bool returnOnAnyClick = false)
+            string returnText = "デバッグ部屋へ▼", bool returnOnAnyClick = false)
         {
             if (background == null) Build(font);
             StopResultFade();
@@ -152,7 +152,7 @@ namespace KillingMahjong.UI
             labelRect.anchorMin = Vector2.zero;
             labelRect.anchorMax = Vector2.one;
             labelRect.offsetMin = labelRect.offsetMax = Vector2.zero;
-            returnLabel.text = "タイトルへ戻る▼";
+            returnLabel.text = "デバッグ部屋へ▼";
         }
 
         private RectTransform CreateRect(string name, Vector2 min, Vector2 max)

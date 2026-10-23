@@ -46848,7 +46848,7 @@ PrefabInstance:
       objectReference: {fileID: -7116387803404704443, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
     - target: {fileID: 5474931286746725664, guid: 178497effc5e5394797171d6683e03a3, type: 3}
       propertyPath: returnSceneName
-      value: "\u30BF\u30A4\u30C8\u30EB\u30B7\u30FC\u30F3"
+      value: "\u90E8\u5C4B\u30B7\u30FC\u30F3"
       objectReference: {fileID: 0}
     - target: {fileID: 6085833124463649804, guid: 178497effc5e5394797171d6683e03a3, type: 3}
       propertyPath: m_fontAsset
@@ -51582,7 +51582,7 @@ MonoBehaviour:
   settingsButton: {fileID: 1511955007}
   closeMenuButton: {fileID: 0}
   returnToTitleButton: {fileID: 0}
-  titleSceneName: "\u30BF\u30A4\u30C8\u30EB\u30B7\u30FC\u30F3"
+  titleSceneName: "\u90E8\u5C4B\u30B7\u30FC\u30F3"
   disconnectActionType: leave
 --- !u!1 &2114338489
 GameObject:

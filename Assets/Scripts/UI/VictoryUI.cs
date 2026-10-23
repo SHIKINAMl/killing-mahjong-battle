@@ -130,7 +130,8 @@ namespace KillingMahjong.UI
         private void OnTitleButtonClicked()
         {
             Time.timeScale = 1f;
-            SceneManager.LoadScene("タイトルシーン");
+            // タイトルではなくデバッグ部屋へ（2026-10-23 ユーザー指示「タイトルへは放置した時だけ行くようにして」）
+            SceneManager.LoadScene(TutorialNavigation.DebugRoomSceneName);
         }
     }
 }

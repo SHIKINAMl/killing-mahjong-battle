@@ -11220,7 +11220,7 @@ MonoBehaviour:
     m_PressedTrigger: Pressed
     m_SelectedTrigger: Selected
     m_DisabledTrigger: Disabled
-  m_Interactable: 1
+  m_Interactable: 0
   m_TargetGraphic: {fileID: 877095955}
   m_OnClick:
     m_PersistentCalls:
@@ -18296,7 +18296,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0.8392157, g: 0.15686275, b: 0.24313726, a: 1}
+  m_Color: {r: 0.49019608, g: 0.47058824, b: 0.48235294, a: 1}
   m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -22078,7 +22078,7 @@ MonoBehaviour:
   m_fontColor32:
     serializedVersion: 2
     rgba: 4293716208
-  m_fontColor: {r: 0.9411765, g: 0.9098039, b: 0.9254902, a: 1}
+  m_fontColor: {r: 0.49019608, g: 0.47058824, b: 0.48235294, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -27816,7 +27816,7 @@ PrefabInstance:
       objectReference: {fileID: 11400000, guid: 4a22909d4a9417b43aeaf13b905a3cb0, type: 2}
     - target: {fileID: 5474931286746725664, guid: 178497effc5e5394797171d6683e03a3, type: 3}
       propertyPath: returnSceneName
-      value: "\u30BF\u30A4\u30C8\u30EB\u30B7\u30FC\u30F3"
+      value: "\u90E8\u5C4B\u30B7\u30FC\u30F3"
       objectReference: {fileID: 0}
     - target: {fileID: 6161398653147757975, guid: 178497effc5e5394797171d6683e03a3, type: 3}
       propertyPath: m_AnchorMax.y

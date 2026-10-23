@@ -261,7 +261,7 @@ MonoBehaviour:
   returnToTitleButton: {fileID: 9166685223636238862}
   quitButton: {fileID: 47264401268662596}
   showReturnButton: 1
-  returnSceneName: TitleScene
+  returnSceneName: "\u90E8\u5C4B\u30B7\u30FC\u30F3"
 --- !u!225 &1547131274103323127
 CanvasGroup:
   m_ObjectHideFlags: 0
@@ -7755,7 +7755,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Title
+  m_text: "\u30C7\u30D0\u30C3\u30B0\u90E8\u5C4B\u3078"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
   m_sharedMaterial: {fileID: -7116387803404704443, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}

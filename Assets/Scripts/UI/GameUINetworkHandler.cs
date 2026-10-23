@@ -69,7 +69,7 @@ namespace KillingMahjong.UI
             LoadingManager.Instance?.ForceHide();
             SessionPrompt prompt = null;
             prompt = SessionPrompt.Show("サーバーから応答がありません。\n通信環境を確認し、タイトルからやり直してください。",
-                "タイトルへ戻る", () => prompt.ReturnToTitle());
+                "デバッグ部屋へ", () => prompt.ReturnToTitle());
             // 遅れて成立した対局を、このエラー画面の裏で開始させない。
             var client = WebSocketGameClientSample.Instance;
             if (client != null) _ = client.ResetConnectionAsync();

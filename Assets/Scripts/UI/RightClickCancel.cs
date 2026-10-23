@@ -20,7 +20,7 @@ namespace KillingMahjong.UI
     /// 同じなら、あとに描かれるほう）。設定の上に確認が出ていれば、確認のほうが閉じる。
     ///
     /// **押さないもの**
-    ///   ・タイトルへ戻るボタン … 「1つ戻る」ではなく対局を抜けてしまう
+    ///   ・タイトルへ戻るボタン、設定の「デバッグ部屋へ」 … 「1つ戻る」ではなく対局を抜けてしまう
     ///   ・選びなおすボタン     … 確定した手牌を取り下げる操作で、戻るとは違う
     ///   ・ゲームをやめるボタン … 部屋の「やめる」（RoomMenu_Exit）はゲームを終わらせる。文字は同じでも戻るではない
     ///   ・いま実際には押せないボタン … 画面の外へしまってある物、上に別の画面が被さっている物。
@@ -45,7 +45,8 @@ namespace KillingMahjong.UI
         };
 
         /// <summary>名前か文字に入っていたら、押さない言葉（小文字で比べる）。</summary>
-        private static readonly string[] SkipWords = { "title", "タイトル", "reselect", "選びなお", "選び直", "exit", "quit" };
+        // 「デバッグ部屋」… 設定の「デバッグ部屋へ」（2026-10-23。ボタン名が ReturnButton なので、外さないと右クリックで対局を抜ける）
+        private static readonly string[] SkipWords = { "title", "タイトル", "デバッグ部屋", "reselect", "選びなお", "選び直", "exit", "quit" };
 
         private static RightClickCancel _instance;
         private readonly List<RaycastResult> _hits = new List<RaycastResult>();

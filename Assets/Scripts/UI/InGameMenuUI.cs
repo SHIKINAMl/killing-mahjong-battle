@@ -14,7 +14,7 @@ namespace KillingMahjong.UI
         [SerializeField] private Button returnToTitleButton; // 「タイトルへ戻る」ボタン
         
         [Header("Settings")]
-        [SerializeField] private string titleSceneName = "タイトルシーン"; // 遷移先のシーン名
+        [SerializeField] private string titleSceneName = "部屋シーン"; // 遷移先のシーン名。タイトルではなくデバッグ部屋（2026-10-23 ユーザー指示「タイトルへは放置した時だけ行くようにして」）
 #pragma warning disable CS0414 // 送るのを止めている（下の ReturnToTitle のコメント）。シーンに保存された値を残すために置いている
         [SerializeField] private string disconnectActionType = "leave"; // サーバーへ送る切断アクションのtype名
 #pragma warning restore CS0414
@@ -79,7 +79,7 @@ namespace KillingMahjong.UI
                 }
             }
 
-            // タイトルシーンへ遷移
+            // デバッグ部屋へ遷移（名前は昔のまま titleSceneName）
             SceneManager.LoadScene(titleSceneName);
         }
     }

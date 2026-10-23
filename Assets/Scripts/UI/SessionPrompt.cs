@@ -84,7 +84,8 @@ namespace KillingMahjong.UI
             if (client != null) await Task.WhenAny(client.ResetConnectionAsync(), Task.Delay(2000));
             if (this == null) return;
             LoadingManager.Instance?.ForceHide();
-            SceneManager.LoadScene("タイトルシーン");
+            // タイトルではなくデバッグ部屋へ（2026-10-23 ユーザー指示「タイトルへは放置した時だけ行くようにして」）
+            SceneManager.LoadScene(TutorialNavigation.DebugRoomSceneName);
         }
 
         /// <summary>
