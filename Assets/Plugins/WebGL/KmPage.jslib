@@ -5,5 +5,13 @@
 mergeInto(LibraryManager.library, {
   KmReloadPage: function () {
     window.location.reload();
+  },
+
+  // このページで誰かが一度でも押したか（2026-10-23）。ブラウザは、まだ誰も押していないページに
+  // 音つきの動画を流させない。タイトルの紹介動画は、押されるまでは音を消して流す（TitleRankingBoardUI）。
+  // 調べる手段が無いブラウザでは「押した」とみなして、これまでどおり音つきで流す
+  KmHasUserActivation: function () {
+    var ua = navigator.userActivation;
+    return (ua === undefined || ua.hasBeenActive) ? 1 : 0;
   }
 });

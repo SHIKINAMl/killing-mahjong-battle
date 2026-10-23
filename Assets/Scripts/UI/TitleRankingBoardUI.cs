@@ -258,9 +258,10 @@ namespace KillingMahjong.UI
             if (playingVideo)
             {
                 bool ended = player.isPrepared && !player.isPlaying && player.frame > 0;
-                // 読み込めないときは、その回だけ飛ばす。次の一巡でまた試す
-                // （Web 版は、まだ誰も画面を押していないと音つきの動画を流させてもらえないことがある）
-                bool stuck = !player.isPrepared && Time.realtimeSinceStartup - videoStartedAt >= videoPrepareTimeout;
+                // 読み込めない・流れ始めないときは、その回だけ飛ばす。次の一巡でまた試す。
+                // 読み込めても流れないことがある（Web 版で、ブラウザに再生を断られたとき。真っ黒のまま止まっていた）
+                bool stuck = !(player.isPlaying || player.frame > 0)
+                    && Time.realtimeSinceStartup - videoStartedAt >= videoPrepareTimeout;
                 if (ended || stuck) ShowRanking();
                 return;
             }
@@ -326,7 +327,9 @@ namespace KillingMahjong.UI
             player.url = System.IO.Path.Combine(Application.streamingAssetsPath, videoPath);
             player.renderMode = VideoRenderMode.RenderTexture;
             player.targetTexture = videoTexture;
-            player.audioOutputMode = VideoAudioOutputMode.Direct;
+            // 起動してまだ誰も押していないと、ブラウザは音つきの動画を流させない（真っ黒のまま止まった）。
+            // そのあいだは音を消して流す。誰かが押したあとの回からは音を出す
+            player.audioOutputMode = PageHasUserActivation() ? VideoAudioOutputMode.Direct : VideoAudioOutputMode.None;
             player.SetDirectAudioVolume(0, AudioManager.Instance != null ? AudioManager.Instance.BgmOutputVolume : 1f);
             player.errorReceived -= OnVideoError;
             player.errorReceived += OnVideoError;
@@ -361,6 +364,21 @@ namespace KillingMahjong.UI
             if (videoLayer != null) videoLayer.gameObject.SetActive(false);
             if (AudioManager.Instance != null) AudioManager.Instance.PlayTitleBgm();
         }
+
+        /// <summary>Web 版で、このページを誰かが一度でも押したか。Web 版以外はいつも true</summary>
+        private static bool PageHasUserActivation()
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            return KmHasUserActivation() != 0;
+#else
+            return true;
+#endif
+        }
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+        [System.Runtime.InteropServices.DllImport("__Internal")]
+        private static extern int KmHasUserActivation();
+#endif
 
         private void OnDestroy()
         {
