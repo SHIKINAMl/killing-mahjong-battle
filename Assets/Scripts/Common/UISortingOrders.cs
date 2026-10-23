@@ -240,6 +240,12 @@ namespace KillingMahjong.Common
         public const int TitleMenuOverlay = 81;
 
         /// <summary>
+        /// MatchNamePromptUI: 名前を書かないまま対局へ進もうとしたときの名前の欄（2026-10-23）。
+        /// 対局メニュー(81)を開く前に出し、メニューと同時には出ないので同じ段に置く。部屋の画面(80)より手前
+        /// </summary>
+        public const int MatchNamePrompt = 81;
+
+        /// <summary>
         /// CollectionUI: タイトルの部屋から開くコレクション画面（音楽・CG・役）。
         ///
         /// 部屋の待機画面(80)と対戦メニュー(81)の**手前**に置く。全画面を覆うモーダルで、

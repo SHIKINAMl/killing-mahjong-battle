@@ -30,6 +30,15 @@ namespace KillingMahjong.UI
         /// <summary>契約書（<paramref name="paper"/>）の子にある入力欄を返す。無ければ作る。</summary>
         public static TMP_InputField Ensure(Transform paper, TMP_FontAsset font)
         {
+            return Ensure(paper, font, FieldPosition);
+        }
+
+        /// <summary>
+        /// 置き場所を変えて使う（対局の前に名前を聞く <see cref="MatchNamePromptUI"/>。2026-10-23）。
+        /// <paramref name="position"/> は作るときだけ使う。
+        /// </summary>
+        public static TMP_InputField Ensure(Transform paper, TMP_FontAsset font, Vector2 position)
+        {
             var fieldObj = SceneFirst.Child(paper, ObjectName, out bool made,
                 typeof(RectTransform), typeof(Image), typeof(TMP_InputField), typeof(WebImeInput));
             var input = fieldObj.GetComponent<TMP_InputField>();
@@ -39,7 +48,7 @@ namespace KillingMahjong.UI
             rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
             rt.pivot = new Vector2(0.5f, 0.5f);
             rt.sizeDelta = FieldSize;
-            rt.anchoredPosition = FieldPosition;
+            rt.anchoredPosition = position;
 
             // 下線は絵に描いてあるので、入力欄の背景は透明にする（クリックは受ける）
             fieldObj.GetComponent<Image>().color = new Color(1f, 1f, 1f, 0f);

@@ -222,6 +222,8 @@ namespace KillingMahjong.EditorTools
             }
 
             report.Append(" / 対局メニュー=").Append(BakeMenu(scene));
+            // 対局の前に名前を聞く欄（2026-10-23）。タイトルと部屋の両方から対局メニューを開くので両方に置く
+            report.Append(" / 名前の欄=").Append(Describe(MatchNamePromptUI.BakeForEditor()));
 
             EditorSceneManager.MarkSceneDirty(scene);
             bool saved = EditorSceneManager.SaveScene(scene);

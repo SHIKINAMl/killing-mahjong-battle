@@ -319,6 +319,22 @@ namespace KillingMahjong.UI
 
         private void OpenMatchMenu()
         {
+            // **名前が無ければ、先に名前を書いてもらう**（2026-10-23 ユーザー指示）。名前を書く場所はチュートリアルの
+            // 契約書だけで、タイトルの「対局へ」や部屋から入ると名前なしで対局できていた。ここはタイトルと部屋の共通の入口。
+            // 書いている間は「どこでも押せば開始」を止めておく（ランキングと動画も引っ込む）。「もどる」なら元へ戻す
+            if (!KillingMahjong.Core.PlayerProfile.HasName)
+            {
+                bool targetWasActive = titleClickTarget != null && titleClickTarget.activeSelf;
+                if (titleClickTarget != null) titleClickTarget.SetActive(false);
+                var namePrompt = MatchNamePromptUI.Ensure();
+                SceneFirst.Report(nameof(MatchNamePromptUI));
+                namePrompt.Open(OpenMatchMenu, () =>
+                {
+                    if (titleClickTarget != null && targetWasActive) titleClickTarget.SetActive(true);
+                });
+                return;
+            }
+
             if (titleClickTarget != null) titleClickTarget.SetActive(false);
             var titleMenu = FindSceneObjectIncludingInactive("ボタン達");
             if (titleMenu != null) titleMenu.SetActive(false);
