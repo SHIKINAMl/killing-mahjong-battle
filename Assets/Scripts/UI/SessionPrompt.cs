@@ -86,5 +86,24 @@ namespace KillingMahjong.UI
             LoadingManager.Instance?.ForceHide();
             SceneManager.LoadScene("タイトルシーン");
         }
+
+        /// <summary>
+        /// 離席で戻るとき用。タイトルへ戻すのではなく、設定画面の「展示用リセット」と同じ初期化をかけて
+        /// 起動し直す（<see cref="Core.ExhibitionReset"/>。2026-10-23 ユーザー指示「5分経った時もそのリセット処理を入れて」）。
+        /// 対局中なら先に通信を切る。チュートリアル中でも飛ばす処理は通さない（進み具合ごと消すので）
+        /// </summary>
+        public async void ResetForNextVisitor()
+        {
+            if (returning) return;
+            returning = true;
+            foreach (var button in GetComponentsInChildren<Button>()) button.interactable = false;
+            TutorialNavigation.Cancel();
+            Managers.Tutorial.TutorialAudioDirector.ResetVisuals();
+            var client = WebSocketGameClientSample.Instance;
+            if (client != null) await Task.WhenAny(client.ResetConnectionAsync(), Task.Delay(2000));
+            if (this == null) return;
+            LoadingManager.Instance?.ForceHide();
+            Core.ExhibitionReset.Run();
+        }
     }
 }

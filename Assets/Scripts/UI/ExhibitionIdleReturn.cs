@@ -34,7 +34,10 @@ namespace KillingMahjong.UI
         private static void AttachToScene(Scene scene)
         {
             if (!sessionEnabled) return;
-            if (scene.name != "タイトルシーン" && scene.name != "OpeningScene" && scene.name != "UIテストシーン") return;
+            // 部屋シーンも見張る。チュートリアルを終えると部屋で対局を選ぶ画面が開くので、
+            // そこで立ち去られても戻れるように（2026-10-23 ユーザー指示）
+            if (scene.name != "タイトルシーン" && scene.name != "OpeningScene" && scene.name != "UIテストシーン"
+                && scene.name != TutorialNavigation.DebugRoomSceneName) return;
             if (FindFirstObjectByType<ExhibitionIdleReturn>() == null)
                 new GameObject("ExhibitionIdleReturn").AddComponent<ExhibitionIdleReturn>();
         }
@@ -53,11 +56,12 @@ namespace KillingMahjong.UI
                 prompt = SessionPrompt.Show("", "続ける", ContinueSession);
             float remaining = idleSeconds + warningSeconds - idle;
             prompt.SetMessage("操作がないため、" + Mathf.CeilToInt(Mathf.Max(0f, remaining)) +
-                "秒後にタイトルへ戻ります。\n続ける場合は操作してください。");
+                "秒後に最初からやり直します。\n続ける場合は操作してください。");
             if (remaining <= 0f)
             {
                 enabled = false;
-                prompt.ReturnToTitle();
+                // 次の来場者のために、名前・記録・チュートリアルの進み具合も消して起動し直す
+                prompt.ResetForNextVisitor();
             }
         }
 
