@@ -36,7 +36,14 @@ namespace KillingMahjong.UI
             {
                 var target = buffer[i];
                 if (ShouldAttach(target) && target.GetComponent<UIInteractionFeedback>() == null)
+                {
+                    // ここで付ける枠は、実行時にできたボタン（離席の知らせの「続ける」など）の物で、シーンに置く物ではない。
+                    // 「シーンに無かったので作りました」の知らせに混ぜない（2026-10-23。離席の知らせのあと、
+                    // 次のシーンのタイトルの知らせに枠の名前が出ていた）。シーンにあるボタンの枠は UIInteractionFeedbackBaker で置く
+                    int mark = SceneFirst.CreatedCount;
                     UIInteractionFeedback.Attach(target.gameObject);
+                    SceneFirst.ForgetSince(mark);
+                }
             }
         }
     }
