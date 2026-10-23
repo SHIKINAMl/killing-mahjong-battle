@@ -22,14 +22,12 @@ namespace KillingMahjong.UI
             /// <summary>StreamingAssets からの場所。</summary>
             public readonly string Path;
             public readonly string Label;
-            /// <summary>どこで使っているか。</summary>
-            public readonly string Note;
-            public Clip(string path, string label, string note) { Path = path; Label = label; Note = note; }
+            public Clip(string path, string label) { Path = path; Label = label; }
         }
 
         private static readonly Clip[] Videos =
         {
-            new Clip("Video/title_pv.mp4", "紹介PV", "タイトルで放置すると、ランキングと交互に流れる"),
+            new Clip("Video/title_pv.mp4", "紹介PV"),
         };
 
         private const int VideoTab = 6;
@@ -83,6 +81,7 @@ namespace KillingMahjong.UI
 
             videoTitle = Label(parent, "VideoTitle", "", new Vector2(screenX, 180f), new Vector2(440f, 22f),
                 16f, TextAlignmentOptions.Left, TextMain);
+            // 画面の下の欄は、読み込めなかったときの知らせだけに使う（説明文は出さない。2026-10-23 ユーザー指示）
             videoNote = Label(parent, "VideoNote", "", new Vector2(screenX, -182f), new Vector2(440f, 18f),
                 12f, TextAlignmentOptions.Left, TextDim);
 
@@ -114,7 +113,7 @@ namespace KillingMahjong.UI
             for (int i = 0; i < videoRows.Count; i++)
                 if (videoRows[i] != null) videoRows[i].color = i == index ? RowSelected : new Color(0f, 0f, 0f, 0f);
             videoTitle.text = Videos[index].Label + "　" + System.IO.Path.GetFileName(Videos[index].Path);
-            videoNote.text = Videos[index].Note;
+            videoNote.text = "";
             videoPlayer.url = System.IO.Path.Combine(Application.streamingAssetsPath, Videos[index].Path);
         }
 
