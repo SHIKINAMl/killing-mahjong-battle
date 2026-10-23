@@ -9,27 +9,31 @@ namespace KillingMahjong.UI
     {
         /// <summary>
         /// 何秒操作が無ければ「〇秒後に最初からやり直します」を出すか。このあと <see cref="warningSeconds"/> 待ってリセットする。
-        /// 2026-10-23 のユーザー指示で 5 分から 2 分 30 秒へ。シーンには置かず実行時に足す部品なので、ここの値がそのまま効く
+        /// 2026-10-23 のユーザー指示で 5 分 → 2 分 30 秒 → 「1分30秒にして」。
+        /// 最後に触ってから 1 分 30 秒でリセットされるよう、知らせを出すまでを 75 秒にする（知らせの 15 秒と合わせて 90 秒）。
+        /// シーンには置かず実行時に足す部品なので、ここの値がそのまま効く
         /// </summary>
-        [SerializeField] private float idleSeconds = 150f;
+        [SerializeField] private float idleSeconds = 75f;
         [SerializeField] private float warningSeconds = 15f;
-        private static bool sessionEnabled;
         private float lastInput;
         private SessionPrompt prompt;
 
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetSession() { sessionEnabled = false; }
-
+        /// <summary>
+        /// 起動したときから見張る（2026-10-23。ユーザーから「チュートリアルで放置してもタイトルに戻らない」）。
+        /// 以前はタイトルを一度通ったときだけ見張り始めていたので、チュートリアルのシーンから始めると
+        /// （エディタでそのシーンを再生したときなど）いつまでも戻らなかった
+        /// </summary>
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Install()
         {
             SceneManager.sceneLoaded -= OnSceneLoaded;
             SceneManager.sceneLoaded += OnSceneLoaded;
+            AttachToScene(SceneManager.GetActiveScene());
         }
 
+        /// <summary>タイトルから呼ぶ。いまは起動したときから見張っているので、念のため付け直すだけ</summary>
         public static void EnableSession()
         {
-            sessionEnabled = true;
             AttachToScene(SceneManager.GetActiveScene());
         }
 
@@ -37,7 +41,6 @@ namespace KillingMahjong.UI
 
         private static void AttachToScene(Scene scene)
         {
-            if (!sessionEnabled) return;
             // 部屋シーンも見張る。チュートリアルを終えると部屋で対局を選ぶ画面が開くので、
             // そこで立ち去られても戻れるように（2026-10-23 ユーザー指示）
             if (scene.name != "タイトルシーン" && scene.name != "OpeningScene" && scene.name != "UIテストシーン"
