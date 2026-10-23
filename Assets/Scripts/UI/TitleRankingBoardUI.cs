@@ -50,15 +50,15 @@ namespace KillingMahjong.UI
         /// <summary>「クリックでタイトルへ」の点滅の1往復の秒数。ゆっくり（ユーザー指示）。</summary>
         [SerializeField] private float hintBlinkSeconds = 2.4f;
 
-        private static readonly string[] Kinds = { "max_damage", "match_points", "rounds" };
-        private static readonly string[] KindTitles = { "最大打点", "累計獲得点数", "最大局数" };
-        private static readonly string[] KindNotes =
+        internal static readonly string[] Kinds = { "max_damage", "match_points", "rounds" };
+        internal static readonly string[] KindTitles = { "最大打点", "累計獲得点数", "最大局数" };
+        internal static readonly string[] KindNotes =
         {
             "1回の和了で、相手に与えた損失のいちばん大きいもの",
             "1つの対局で獲得した点数の合計の、いちばん大きいもの",
             "1つの対局で打った局の数の、いちばん多いもの",
         };
-        private static readonly string[] KindUnits = { "点", "点", "局" };
+        internal static readonly string[] KindUnits = { "点", "点", "局" };
 
         private TitleUIManager title;
         private CanvasGroup group;

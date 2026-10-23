@@ -382,6 +382,7 @@ namespace KillingMahjong.UI
             // **CGタブの絵はここで手放す。** 抱えたままだと、開くたびに
             // テクスチャが積もる（2048px のものが混ざっている）
             ReleaseCgThumbs();
+            ReleaseVideo();
 
             if (root != null) root.SetActive(false);
 
@@ -455,6 +456,14 @@ namespace KillingMahjong.UI
             Stretch(effectsPage.GetComponent<RectTransform>());
             BuildEffectsPage(effectsPage.transform);
 
+            videoPage = NewEmpty(panel.transform, "VideoPage");
+            Stretch(videoPage.GetComponent<RectTransform>());
+            BuildVideoPage(videoPage.transform);   // CollectionUI.Video.cs
+
+            rankingPage = NewEmpty(panel.transform, "RankingPage");
+            Stretch(rankingPage.GetComponent<RectTransform>());
+            BuildRankingPage(rankingPage.transform);   // CollectionUI.Ranking.cs
+
             BuildPlayer(panel.transform);
             EnsurePreviewSource();
         }
@@ -467,17 +476,21 @@ namespace KillingMahjong.UI
             //
             // **「没案」タブは一度畳んで、同じ日に戻した**（2026-10-07 の指示）。
             // 演出の一覧に没案が混ざっていたので、没案だけをこちらへ分けて並べる。
-            // 並びを変えたら <see cref="UnusedTab"/>／<see cref="EffectsTab"/> も合わせること。
-            string[] names = { "音楽", "効果音", "CG", "役", "没案", "演出" };
+            // 並びを変えたら <see cref="UnusedTab"/>／<see cref="EffectsTab"/>／<see cref="VideoTab"/>／
+            // <see cref="RankingTab"/> も合わせること。
+            //
+            // 「動画」「ランキング」は 2026-10-23 に足した（ユーザー指示）。8つ並べるため、
+            // 間隔を 92→86、幅を 86→80、字を 17→15 に詰めた（パネルの幅 740 に収める）
+            string[] names = { "音楽", "効果音", "CG", "役", "没案", "演出", "動画", "ランキング" };
             for (int i = 0; i < names.Length; i++)
             {
                 int index = i;
-                float x = -300f + i * 92f;
-                Button(parent, "Tab" + i, names[i], new Vector2(x, 202f), new Vector2(86f, 30f), 17f,
+                float x = -301f + i * 86f;
+                Button(parent, "Tab" + i, names[i], new Vector2(x, 202f), new Vector2(80f, 30f), 15f,
                     () => ShowTab(index));
 
                 var mark = NewImage(parent, "TabMark" + i, Marker);
-                Center(mark.rectTransform, new Vector2(86f, 3f));
+                Center(mark.rectTransform, new Vector2(80f, 3f));
                 mark.rectTransform.anchoredPosition = new Vector2(x, 185f);
                 mark.raycastTarget = false;
                 tabMarks.Add(mark);
@@ -492,6 +505,11 @@ namespace KillingMahjong.UI
             if (yakuPage != null) yakuPage.SetActive(index == 3);
             if (unusedPage != null) unusedPage.SetActive(index == UnusedTab);
             if (effectsPage != null) effectsPage.SetActive(index == EffectsTab);
+            if (videoPage != null) videoPage.SetActive(index == VideoTab);
+            if (rankingPage != null) rankingPage.SetActive(index == RankingTab);
+            // 動画は別のタブへ移ったら止める（音だけ残らないように）
+            if (index != VideoTab) StopVideo();
+            if (index == RankingTab) ShowRankingPage();
 
             // **試聴バーは音のあるタブだけ。** CG や役のタブに「曲を選んでください」が
             // 残っていると、何を選ぶ画面なのか分からなくなる。
@@ -944,6 +962,7 @@ namespace KillingMahjong.UI
         private void Update()
         {
             if (EffectPreviewPlayer.IsOpen) return;
+            if (root != null && root.activeSelf) UpdateVideoPage();
             if (root == null || !root.activeSelf || preview == null) return;
 
             if (preview.clip != null)
