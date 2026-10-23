@@ -32,9 +32,9 @@ namespace KillingMahjong.UI
         private string[] enemyDialogueLines = new string[]
         {
             "ふふっ、そんな麻雀で私に勝てるとでも？",
-            "ん〜？ どーしたのー？ 早く賭けなよぉ♡",
+            "ん～？ どーしたのー？ 早く賭けなよぉ♡",
             "震えてるよ？ 怖いの？",
-            "全額いっちゃう？ いっくわけないかぁ〜雑魚だもんね♡",
+            "全額いっちゃう？ いっくわけないかぁ～雑魚だもんね♡",
             "ざぁこ♡ ざぁこ♡ よわよわ雀士♡"
         };
         private DialogueUI dialogueUI;

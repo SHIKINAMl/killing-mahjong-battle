@@ -174,6 +174,10 @@ namespace KillingMahjong.UI
 
         public void ShowText(string text)
         {
+            // 波ダッシュ「〜」(U+301C) は吹き出しのフォント（PixelMplus10）に無く、□ になる。
+            // 同じ形の全角チルダ「～」(U+FF5E) はあるので差し替える（2026-10-23。CSV や反応ルールに書かれても化けないように）
+            if (!string.IsNullOrEmpty(text)) text = text.Replace('〜', '～');
+
             // **`StopAllCoroutines` で止めた分は `finally` が走らない。** 先に倒しておく。
             // 送りの途中で次のセリフが来たとき、旗が立ちっぱなしになるのを防ぐ。
             IsTalking = false;
