@@ -97,7 +97,7 @@ namespace KillingMahjong.UI
             }
             Destroy(cry.gameObject);
 
-            // その場で変わる赤い面だけを重ね、既存の卓の絵は変更しない。
+            // 血を重ね、既存の卓の絵は変更しない。
             var stainRoot = new GameObject("ReplayTableStain", typeof(RectTransform), typeof(PixelShapeGraphic));
             stainRoot.transform.SetParent(viewport, false);
             ((RectTransform)stainRoot.transform).sizeDelta = new Vector2(800f, 600f);
@@ -105,12 +105,9 @@ namespace KillingMahjong.UI
             stainRoot.transform.SetSiblingIndex(senior.GetSiblingIndex());
             var stain = stainRoot.GetComponent<PixelShapeGraphic>();
             stain.raycastTarget = false;
-            for (float t = 0; t < 1f; t += Time.unscaledDeltaTime / 2f)
-            {
-                DrawStain(stain, Mathf.SmoothStep(0f, 1f, t));
-                yield return null;
-            }
-            DrawStain(stain, 1f);
+            // 流れる様子は別に回し（TutorialDrawReplayUI.Blood.cs）、閉じるボタンを待つ間も流れ続けさせる
+            StartCoroutine(Bleed(stain));
+            yield return new WaitForSecondsRealtime(2.5f);
             progress.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, 764f);
             IsPaused = true;
             paused.text = "再生終了";
@@ -158,18 +155,5 @@ namespace KillingMahjong.UI
             label.anchoredPosition = new Vector2(Mathf.Clamp(at.x, -310f, 310f), Mathf.Clamp(at.y, -240f, 270f));
         }
 
-        private static void DrawStain(PixelShapeGraphic stain, float amount)
-        {
-            stain.Begin();
-            Color red = new Color(.65f, .015f, .035f, .78f * amount);
-            // 卓の手前から奥へ、整数単位の帯で広げる。
-            for (int i = 0; i < 16; i++)
-            {
-                float y = -300f + i * 13f;
-                float width = Mathf.Max(0f, 800f - i * 24f) * amount;
-                stain.Box(-width * .5f, y, width * .5f, y + 13f, red);
-            }
-            stain.End();
-        }
     }
 }
