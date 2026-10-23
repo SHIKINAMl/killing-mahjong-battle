@@ -69,7 +69,16 @@ namespace KillingMahjong.Managers
             {
                 uiManager.EnemyInfoUI.CycleEnemy();
             }
+
+            // **契約書に名前を書くまでは設定のボタンを消す**（2026-10-23 ユーザー指示「名前書く前だけど、オプションボタンを
+            // そこだけ消して」）。設定には「デバッグ部屋へ」があり、名前を書かずに先へ進めてしまう。書いたら戻す（OnContractSigned）
+            _optionButton = uiManager != null && uiManager.OptionButtonRect != null ? uiManager.OptionButtonRect.gameObject : null;
+            if (_optionButton != null && _optionButton.activeSelf) _optionButton.SetActive(false);
+            else _optionButton = null;
         }
+
+        /// <summary>名前を書くまで消している設定のボタン。消していなければ null</summary>
+        private GameObject _optionButton;
 
         private IEnumerator SequenceRoutine()
         {
@@ -203,6 +212,8 @@ namespace KillingMahjong.Managers
                 _nameInput.DeactivateInputField();
                 _nameInput.interactable = false;
             }
+            // 名前を書いたので設定のボタンを戻す
+            if (_optionButton != null) { _optionButton.SetActive(true); _optionButton = null; }
             // キーボードだけしまう。契約書は持ち上げた位置からそのまま下へ滑らせる
             if (_nameKeyboard != null) _nameKeyboard.Hide(false);
             StartCoroutine(SlideOutLargePaperRoutine());
@@ -244,6 +255,8 @@ namespace KillingMahjong.Managers
 
         private void OnDialogClosed()
         {
+            // 契約書が無くて飛ばしたときも、設定のボタンは必ず戻す
+            if (_optionButton != null) { _optionButton.SetActive(true); _optionButton = null; }
             StartCoroutine(ShowEnemyRoutine());
         }
 
