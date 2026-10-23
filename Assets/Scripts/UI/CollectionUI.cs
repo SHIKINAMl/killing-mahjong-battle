@@ -83,12 +83,14 @@ namespace KillingMahjong.UI
         /// 対局の外で鳴る曲。
         ///   bgm_ex_summer / bgm_ex_lofi  AudioManager.PlayTitleBgm / PlayRoomBgm
         ///   tut_lesson                   TutorialAudioDirector の台本（契約書のあと）
+        ///   tut_lesson_battle            チュートリアルの対局のあいだ（TutorialManager.Board。2026-10-23 にコレクションへ足した）
         /// </summary>
         private static readonly Track[] BgmsScenes =
         {
             new Track("Bgm", "bgm_ex_summer",    "タイトル"),
             new Track("Bgm", "bgm_ex_lofi",      "部屋の待機"),
             new Track("Bgm", "tut_lesson",       "チュートリアル"),
+            new Track("Bgm", "tut_lesson_battle", "チュートリアルの対局"),
         };
 
         // 対局BGM「新2曲（切替）」と「第3案」は、2026-10-09 に曲ごと消した
