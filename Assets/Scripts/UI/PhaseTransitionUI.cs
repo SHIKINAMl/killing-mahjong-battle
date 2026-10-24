@@ -174,7 +174,8 @@ namespace KillingMahjong.UI
                 horizontalLineRt.gameObject.SetActive(false);
             }
 
-            if (centerText != null) centerText.gameObject.SetActive(false);
+            // 帯の文字は薄くして消すので、途中で切られると透明のまま残る。次に出すときのために戻す
+            if (centerText != null) { centerText.gameObject.SetActive(false); centerText.alpha = 1f; }
             if (hpBetContainer != null) hpBetContainer.SetActive(false);
         }
 
@@ -218,7 +219,7 @@ namespace KillingMahjong.UI
             _roundStartCleanupDone = false;
             if (fullScreenCheckerImage != null) fullScreenCheckerImage.gameObject.SetActive(false);
             if (horizontalLineRt != null) horizontalLineRt.gameObject.SetActive(false);
-            if (centerText != null) centerText.gameObject.SetActive(false);
+            if (centerText != null) { centerText.gameObject.SetActive(false); centerText.alpha = 1f; }
             if (promptText != null) promptText.gameObject.SetActive(false);
             if (hpBetContainer != null) hpBetContainer.SetActive(false);
             Effects.TileClatterEffect.Hide(transform as RectTransform);

@@ -9,50 +9,16 @@ namespace KillingMahjong.UI
 
         private IEnumerator CenterTextAnimRoutine(string text, float duration, Action onComplete = null)
         {
-            if (horizontalLineRt != null)
-            {
-                PlayTransitionStinger("br_band_open");
-                horizontalLineRt.gameObject.SetActive(true);
-                horizontalLineRt.localScale = new Vector3(0, 2f, 1f);
-            }
+            if (horizontalLineRt != null) PlayTransitionStinger("br_band_open");
+            yield return OpenBand();
+            yield return RevealBandText(text);
 
-            float t = 0;
-            while (t < lineInDuration)
-            {
-                if (horizontalLineRt != null)
-                {
-                    horizontalLineRt.localScale = new Vector3(Mathf.Lerp(0, 10f, t / lineInDuration), 2f, 1f);
-                }
-                t += Time.deltaTime;
-                yield return null;
-            }
-            if (horizontalLineRt != null) horizontalLineRt.localScale = new Vector3(10f, 2f, 1f);
-
-            if (centerText != null)
-            {
-                centerText.text = text;
-                centerText.gameObject.SetActive(true);
-            }
-            
             yield return new WaitForSeconds(duration);
-            
-            if (centerText != null) centerText.gameObject.SetActive(false);
+            yield return HideBandText();
 
             // 閉じる音は打点が終端にあるので、閉じ始めと同時に鳴らして帯が閉じ切る瞬間に合わせる
             PlayTransitionStinger("br_band_close");
-
-            t = 0;
-            while (t < lineInDuration)
-            {
-                if (horizontalLineRt != null)
-                {
-                    horizontalLineRt.localScale = new Vector3(Mathf.Lerp(10f, 0, t / lineInDuration), 2f, 1f);
-                }
-                t += Time.deltaTime;
-                yield return null;
-            }
-            if (horizontalLineRt != null) horizontalLineRt.gameObject.SetActive(false);
-
+            yield return CloseBand();
             onComplete?.Invoke();
         }
     }

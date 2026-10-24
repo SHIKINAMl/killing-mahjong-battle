@@ -13,6 +13,16 @@ namespace KillingMahjong.UI
         /// </summary>
         private const float BattleStartImpactAtFadeRatio = 0.55f;
 
+        /// <summary>局名の下の行（賭け金・残り）が出きるまでの時間。</summary>
+        private const float HpRowFadeDuration = 0.25f;
+
+        /// <summary>賭け金の行・VS・残りの行をずらす間隔。</summary>
+        private const float HpRowStagger = 0.12f;
+
+        private static string BetLine(string label, int amount) => "<size=60%>" + label + "</size> <color=#E0303C>" + amount + "</color>";
+
+        private static string RestLine(int hp) => "<size=60%>残り</size> " + hp;
+
         private IEnumerator SequenceRoutine(string roundName, KillingMahjong.EngineData.BettingCompletedInfo bet, Action onMidpoint, Action onComplete, bool? displayIsLocalTurn)
         {
             ResetVisuals();
@@ -32,25 +42,10 @@ namespace KillingMahjong.UI
                 Debug.Log("PhaseTransition: Step 1 - Line In");
                 // === 1. 一本線が入る + 「対局開始」 ===
                 PlayTransitionStinger("br_band_open");
-                horizontalLineRt.gameObject.SetActive(true);
-                horizontalLineRt.localScale = new Vector3(0, 2f, 1f); // Increased line width
-
-                float t = 0;
-                while (t < lineInDuration)
-                {
-                    // 横幅を10倍(10f)にして確実に画面外まで届かせる
-                    horizontalLineRt.localScale = new Vector3(Mathf.Lerp(0, 10f, t / lineInDuration), 2f, 1f);
-                    t += Time.deltaTime;
-                    yield return null;
-                }
-                horizontalLineRt.localScale = new Vector3(10f, 2f, 1f);
-
-                if (centerText != null)
-                {
-                    centerText.text = "対局開始";
-                    centerText.gameObject.SetActive(true);
-                }
+                yield return OpenBand();
+                yield return RevealBandText("対局開始");
                 yield return new WaitForSeconds(textWaitDuration);
+                float t;
 
                 Debug.Log("PhaseTransition: Step 2 - Line Expand and Checker Fade In");
                 // === 2. 線を中心に、市松模様が上下に広がり画面を埋める ===
@@ -104,24 +99,50 @@ namespace KillingMahjong.UI
                 int targetPlayerHp = bet.LocalHpAfter;
                 int targetEnemyHp = bet.EnemyHpAfter;
 
-                if (enemyBetObj != null) enemyBetObj.text = "Enemy Bet: <color=red>" + bet.EnemyBet + "</color>";
-                if (playerBetObj != null) playerBetObj.text = "Your Bet: <color=red>" + bet.LocalBet + "</color>";
+                // **英語の仮の文言をやめて日本語にする（2026-10-25）。** 見出しは小さく、数字を大きく。
+                // 「Enemy HP: 8480」は欄の幅 200 に収まらず、数字だけが次の行へ落ちていた。
+                if (enemyBetObj != null) enemyBetObj.text = BetLine("相手の賭け金", bet.EnemyBet);
+                if (playerBetObj != null) playerBetObj.text = BetLine("あなたの賭け金", bet.LocalBet);
+                if (enemyHpObj != null) enemyHpObj.text = RestLine(startEnemyHp);
+                if (playerHpObj != null) playerHpObj.text = RestLine(startPlayerHp);
 
+                // 行ごとに時間差で出す（ステッガー）。賭け金の行 → VS → 残りの行の順に目線を下ろす
+                var vsTransform = hpBetContainer.transform.Find("VS");
+                var vsText = vsTransform != null ? vsTransform.GetComponent<TMPro.TextMeshProUGUI>() : null;
+                var rows = new[] { enemyBetObj, playerBetObj, vsText, enemyHpObj, playerHpObj };
+                foreach (var row in rows) if (row != null) row.alpha = 0f;
+                yield return null; // 有効にした次のフレームで形を取る
+                for (int i = 0; i < rows.Length; i++)
+                {
+                    if (rows[i] == null) continue;
+                    rows[i].alpha = 1f;
+                    StartCoroutine(StaggerIn(rows[i], 0f, HpRowFadeDuration, BandTextRise));
+                    if (i == 1 || i == 2) yield return new WaitForSeconds(HpRowStagger);
+                }
+
+                // 残りの数字は、減速しながら目標まで数える（ローリングカウンター）。
+                // 一定の速さだと最後の桁が止まる瞬間が分からない
                 float tHp = 0;
                 while (tHp < hpDeductionDuration)
                 {
-                    int currentPlayerAnimHp = Mathf.RoundToInt(Mathf.Lerp(startPlayerHp, targetPlayerHp, tHp / hpDeductionDuration));
-                    int currentEnemyAnimHp = Mathf.RoundToInt(Mathf.Lerp(startEnemyHp, targetEnemyHp, tHp / hpDeductionDuration));
-                    if (enemyHpObj != null) enemyHpObj.text = "Enemy HP: " + currentEnemyAnimHp;
-                    if (playerHpObj != null) playerHpObj.text = "Your HP: " + currentPlayerAnimHp;
+                    float e = EaseOutCubic(tHp / hpDeductionDuration);
+                    if (enemyHpObj != null) enemyHpObj.text = RestLine(Mathf.RoundToInt(Mathf.Lerp(startEnemyHp, targetEnemyHp, e)));
+                    if (playerHpObj != null) playerHpObj.text = RestLine(Mathf.RoundToInt(Mathf.Lerp(startPlayerHp, targetPlayerHp, e)));
                     tHp += Time.deltaTime;
                     yield return null;
                 }
-                if (enemyHpObj != null) enemyHpObj.text = "Enemy HP: " + targetEnemyHp;
-                if (playerHpObj != null) playerHpObj.text = "Your HP: " + targetPlayerHp;
-                
+                if (enemyHpObj != null) enemyHpObj.text = RestLine(targetEnemyHp);
+                if (playerHpObj != null) playerHpObj.text = RestLine(targetPlayerHp);
+
                 yield return new WaitForSeconds(1.0f);
+                // パッと消さず、薄くして消す
+                for (float tf = 0f; tf < BandTextFadeOut; tf += Time.deltaTime)
+                {
+                    foreach (var row in rows) if (row != null) row.alpha = 1f - tf / BandTextFadeOut;
+                    yield return null;
+                }
                 hpBetContainer.SetActive(false);
+                foreach (var row in rows) if (row != null) row.alpha = 1f;
             }
             else
             {
@@ -130,7 +151,7 @@ namespace KillingMahjong.UI
 
             Debug.Log("PhaseTransition: Step 5 - Checker Fade Out (Skipped if Darkened)");
             // === 5. テキスト消滅、市松模様フェードアウト ===
-            if (centerText != null) centerText.gameObject.SetActive(false);
+            yield return HideBandText();
 
             if (!isDarkened)
             {
@@ -163,38 +184,18 @@ namespace KillingMahjong.UI
 
             // === 6. 線が入り「先行/後攻」 ===
             PlayTransitionStinger("br_band_open");
-            horizontalLineRt.gameObject.SetActive(true);
-            horizontalLineRt.localScale = new Vector3(0, 2f, 1f); 
-            float tTurnLine = 0;
-            while (tTurnLine < lineInDuration)
-            {
-                horizontalLineRt.localScale = new Vector3(Mathf.Lerp(0, 10f, tTurnLine / lineInDuration), 2f, 1f);
-                tTurnLine += Time.deltaTime;
-                yield return null;
-            }
-            horizontalLineRt.localScale = new Vector3(10f, 2f, 1f);
+            yield return OpenBand();
 
-            if (centerText != null)
-            {
-                bool isFirst = displayIsLocalTurn ?? KillingMahjong.Managers.BoardStateManager.Instance.IsLocalTurn;
-                centerText.text = isFirst ? "先攻" : "後攻";
-                centerText.gameObject.SetActive(true);
-            }
-            
+            bool isFirst = displayIsLocalTurn ?? KillingMahjong.Managers.BoardStateManager.Instance.IsLocalTurn;
+            yield return RevealBandText(isFirst ? "先攻" : "後攻");
+
             yield return new WaitForSeconds(textWaitDuration);
-            
+
             Debug.Log("PhaseTransition: Step 7 - Finish");
             // === 7. 線アウト + 完了 ===
-            if (centerText != null) centerText.gameObject.SetActive(false);
+            yield return HideBandText();
             PlayTransitionStinger("br_band_close");
-            float tOut = 0;
-            while (tOut < lineInDuration)
-            {
-                horizontalLineRt.localScale = new Vector3(Mathf.Lerp(10f, 0, tOut / lineInDuration), 2f, 1f);
-                tOut += Time.deltaTime;
-                yield return null;
-            }
-            horizontalLineRt.gameObject.SetActive(false);
+            yield return CloseBand();
 
             Debug.Log("PhaseTransition: Complete Callback invoked");
             onComplete?.Invoke();

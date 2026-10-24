@@ -102,12 +102,12 @@ namespace KillingMahjong.UI
                     yield return PreviewBetStake(EffectId == Effects.BetStakeFx.CardEffectId); break;
                 case "phase.battle_start":
                     bool started = false;
-                    rig.phase.PlayTransition("1 Round", rig.player, new BettingCompletedInfo {
+                    rig.phase.PlayTransition("第1局目", rig.player, new BettingCompletedInfo {
                         LocalBet = 2000, EnemyBet = 2000, LocalHpBefore = 20000, EnemyHpBefore = 20000,
                         LocalHpAfter = 18000, EnemyHpAfter = 18000, HasServerHealth = true
                     }, () => { }, () => started = true, displayIsLocalTurn: true);
                     yield return Until(() => started); break;
-                case "phase.local_turn": yield return rig.phase.PlayCenterTextAnimRoutine("先行"); break;
+                case "phase.local_turn": yield return rig.phase.PlayCenterTextAnimRoutine("先攻"); break;
                 case "phase.enemy_turn": yield return rig.phase.PlayCenterTextAnimRoutine("後攻"); break;
                 case "phase.prompt": rig.phase.PlayPromptText("手牌を選んでください"); yield return new WaitForSeconds(3f); break;
                 case "hand.wait_reveal": case "hand.wait_transfer": case "hand.confirm":

@@ -13,32 +13,14 @@ namespace KillingMahjong.UI
 
             // === 1. 一本線イン + 「流局」テキスト ===
             Debug.Log("[DrawTransition] Step 1 - Line In");
-            if (horizontalLineRt != null)
-            {
-                PlayTransitionStinger("br_band_open");
-                horizontalLineRt.gameObject.SetActive(true);
-                horizontalLineRt.localScale = new Vector3(0, 2f, 1f);
-            }
+            if (horizontalLineRt != null) PlayTransitionStinger("br_band_open");
+            yield return OpenBand();
 
-            float t = 0;
-            while (t < lineInDuration)
-            {
-                if (horizontalLineRt != null)
-                {
-                    horizontalLineRt.localScale = new Vector3(Mathf.Lerp(0, 10f, t / lineInDuration), 2f, 1f);
-                }
-                t += Time.deltaTime;
-                yield return null;
-            }
-            if (horizontalLineRt != null) horizontalLineRt.localScale = new Vector3(10f, 2f, 1f);
-
-            if (centerText != null)
-            {
-                // 流局専用SEは鳴らさず、BGMと黒帯・暗転の短い音だけを残す。
-                centerText.text = "流局";
-                centerText.gameObject.SetActive(true);
-            }
+            // 流局専用SEは鳴らさず、BGMと黒帯・暗転の短い音だけを残す。
+            yield return RevealBandText("流局");
             yield return new WaitForSeconds(textWaitDuration);
+
+            float t;
 
             // === 2. 市松模様フェードイン (暗転) ===
             Debug.Log("[DrawTransition] Step 2 - Checker Fade In");
