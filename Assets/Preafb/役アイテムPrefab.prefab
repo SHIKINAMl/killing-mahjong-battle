@@ -369,7 +369,7 @@ MonoBehaviour:
   descriptionText: {fileID: 0}
   inlineDescriptionSizePercent: 55
   showDescription: 0
-  showTooltipOnHover: 1
+  showTooltipOnHover: 0
 --- !u!1 &7460510861288506577
 GameObject:
   m_ObjectHideFlags: 0
