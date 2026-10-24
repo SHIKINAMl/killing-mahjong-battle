@@ -176,6 +176,18 @@ namespace KillingMahjong.Managers
             return TutorialTiles.EncodeAll(_round.waitBaseIds, _round.doraBaseId);
         }
 
+        /// <summary>
+        /// 13枚そろった瞬間の役名表示（即席満貫以上判定）に使う待ち牌。
+        /// **いまの13枚が台本の満貫手なら、『おまかせ』を押す前でも返す。** GetCurrentWaitTileIds は
+        /// 押すまで空を返すので、自分で満貫を組んでも役名が出なかった（2026-10-24 プランナー指摘
+        /// 「チュートリアルで即席満貫以上判定システムが効いていない」）。満貫手でなければ空＝何も出さない
+        /// </summary>
+        public List<int> GetRankCallWaitTileIds()
+        {
+            if (_round == null || !IsSelfMadeManganHand()) return new List<int>();
+            return TutorialTiles.EncodeAll(_round.waitBaseIds, _round.doraBaseId);
+        }
+
         /// <summary>台本の手牌の役名（聴牌チェックのモック応答用）。</summary>
         public List<string> CurrentHandYaku =>
             _round != null ? _round.manganHandYaku : new List<string>();

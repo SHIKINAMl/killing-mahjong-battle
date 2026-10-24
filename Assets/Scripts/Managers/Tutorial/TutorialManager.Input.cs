@@ -152,6 +152,10 @@ namespace KillingMahjong.Managers
 
             if (gameUIManager != null) gameUIManager.ClearSelection();
 
+            // 本編と同じく、おまかせで13枚がそろったら役名（満貫など）を出す（2026-10-24）
+            if (gameUIManager != null && gameUIManager.HandSelectionController != null)
+                gameUIManager.HandSelectionController.RequestInstantRankCallNow();
+
             // ここで初めて決定ボタンを出す
             SetHandButtonStage(HandButtonStage.AutoAndDecide);
 

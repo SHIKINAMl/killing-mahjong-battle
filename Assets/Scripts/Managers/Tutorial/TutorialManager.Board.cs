@@ -48,6 +48,15 @@ namespace KillingMahjong.Managers
             {
                 // 手牌が空のときは待ち牌も出さない（まだ何も組んでいないため）
                 board.SetLocalState(wall, hand, hand.Count > 0 ? waits : new List<int>());
+
+                // **相手の山は、透視の実演がある第2局だけ伏せて置く**（2026-10-24 プランナー指摘「透視スキルの効果が
+                // わかるようにチュートリアルでも相手の手牌があった方がいいかも」）。以前は相手の牌が画面に1枚も無く、
+                // 透視を押してもめくれた牌が見えなかった。盤面ごと局の頭の暗転の間に出るので、画面に生えない。
+                // 牌は自分の山を借りる（伏せてあるので、めくれた3枚しか見えない）。ほかの局は今までどおり置かない
+                board.OriginalEnemyWallTiles.Clear();
+                board.CurrentEnemyWallTiles.Clear();
+                board.ExposedEnemyHandWallIndexes.Clear();
+                if (IsSecondTutorialRound(data)) board.SetEnemyState(wall, new List<int>());
             }
 
             if (gameUIManager.VisualController != null)

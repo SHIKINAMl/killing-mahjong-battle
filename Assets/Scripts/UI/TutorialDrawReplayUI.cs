@@ -108,8 +108,14 @@ namespace KillingMahjong.UI
             var n=new GameObject("ReplayNoise",typeof(RectTransform),typeof(PixelShapeGraphic));
             n.transform.SetParent(viewport,false); ((RectTransform)n.transform).sizeDelta=new Vector2(800,600);
             noise=n.GetComponent<PixelShapeGraphic>(); noise.raycastTarget=false;
-            Box("SeekTrack",transform,new Vector2(764,3),new Vector2(0,-288),new Color32(72,72,72,255));
-            progress=Box("SeekProgress",transform,new Vector2(1,3),new Vector2(-382,-288),new Color32(224,40,40,255));
+            // シークバーは動画内の暗転（PhaseTransitionUI、91）より上の層に置く。同じ層だと
+            // 流局のあとの「２局目」の暗転で隠れていた（2026-10-24 プランナー指摘）
+            var seekLayer=new GameObject("ReplaySeekLayer",typeof(RectTransform),typeof(Canvas));
+            seekLayer.transform.SetParent(transform,false);
+            var sc=seekLayer.GetComponent<Canvas>(); sc.overrideSorting=true; sc.sortingOrder=92;
+            Stretch((RectTransform)seekLayer.transform);
+            Box("SeekTrack",seekLayer.transform,new Vector2(764,3),new Vector2(0,-288),new Color32(72,72,72,255));
+            progress=Box("SeekProgress",seekLayer.transform,new Vector2(1,3),new Vector2(-382,-288),new Color32(224,40,40,255));
             progress.pivot=new Vector2(0,.5f);
             var catcher=Box("ReplayAdvanceCatcher",transform,new Vector2(800,600),Vector2.zero,new Color(0,0,0,.001f));
             catcher.GetComponent<Image>().raycastTarget=true; advance=catcher.gameObject.AddComponent<Button>();

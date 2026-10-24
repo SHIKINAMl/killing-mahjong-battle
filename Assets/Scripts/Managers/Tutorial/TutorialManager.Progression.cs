@@ -537,14 +537,13 @@ namespace KillingMahjong.Managers
         /// <summary>賭けすぎを止める体力の境目。フロー図の「HP8000以下」。</summary>
         private const int BetWarnHpThreshold = 8000;
 
-        /// <summary>止めに入る賭け金。フロー図の「賭け金4000以上」。</summary>
-        private const int BetWarnAmount = 4000;
-
         /// <summary>
-        /// 体力に関係なく止める賭け金（2026-10-22 プランナー指摘「5000以上賭けて窘められる分岐があったはず」）。
-        /// この場面の体力はふつう 16000 前後で、フロー図の「HP8000以下」には届かず、止める分岐が出なかった
+        /// 止めに入る賭け金。フロー図の「賭け金4000以上」。
+        /// **体力が足りているときは止めない**（2026-10-24 プランナー指摘「HPが低すぎる時（8000以下）に
+        /// 賭けようとすると出る警告だから、HPが足りてる時は警告なし」）。10-22 に足した
+        /// 「体力に関係なく 5000 以上で止める」は外した
         /// </summary>
-        private const int BetWarnAmountAlways = 5000;
+        private const int BetWarnAmount = 4000;
 
         /// <summary>止めたあとに下げてやる額。フロー図の「3000まで減少」。</summary>
         private const int BetWarnReducedAmount = 3000;
@@ -607,8 +606,7 @@ namespace KillingMahjong.Managers
                 yield return new WaitUntil(() => confirmed || _aborted);
                 if (_aborted) yield break;
 
-                bool tooMuch = (_playerHp <= BetWarnHpThreshold && _lastConfirmedBet >= BetWarnAmount)
-                               || _lastConfirmedBet >= BetWarnAmountAlways;
+                bool tooMuch = _playerHp <= BetWarnHpThreshold && _lastConfirmedBet >= BetWarnAmount;
                 if (!tooMuch) break;
 
                 // いったん止めて、下げてから代わりに押す。

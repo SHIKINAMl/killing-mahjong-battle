@@ -128,8 +128,8 @@ namespace KillingMahjong.UI
         /// 手牌の増減後に HandUI.UpdateLayout から呼ばれる。
         /// 本編ではサーバーへ問い合わせ、返ってきた待ちの中で**いちばん上の格**を役名として出す
         /// （2026-09-20 の仕様書「即席満貫以上判定システム」のフロー図）。
-        /// チュートリアルにはサーバーが存在しないため、誤って通信エラーを出さないよう出さない
-        /// （確定時の既存チュートリアル処理は変更しない）。
+        /// チュートリアルにはサーバーが存在しないため問い合わせず、台本の満貫手と同じ13枚かどうかで出す
+        /// （TutorialManager.GetRankCallWaitTileIds。確定時の既存チュートリアル処理は変更しない）。
         /// </summary>
         public void UpdateInstantRankCallForCurrentHand()
         {
@@ -141,7 +141,7 @@ namespace KillingMahjong.UI
                 _rankCallArmed = false;
                 _rankResultIndexes = tutorialIndexes;
                 _rankSignature = CurrentSelectionSignature();
-                _rankWaits = BuildTutorialWaits().waits;
+                _rankWaits = BuildTutorialWaits(forRankCall: true).waits;
                 _hasRankResult = true;
                 ShowRankCall(_rankWaits);
                 return;

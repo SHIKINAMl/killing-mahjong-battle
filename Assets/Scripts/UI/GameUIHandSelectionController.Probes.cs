@@ -84,11 +84,12 @@ namespace KillingMahjong.UI
             return string.Join(",", values) + ";" + string.Join(",", boosts);
         }
 
-        private IsTenpaiData BuildTutorialWaits()
+        /// <param name="forRankCall">13枚そろった瞬間の役名表示用。今の13枚で判定する（おまかせを押したかは見ない）</param>
+        private IsTenpaiData BuildTutorialWaits(bool forRankCall = false)
         {
             var tm = uiManager.TutorialManager;
             var result = new List<WaitData>();
-            if (tm != null) foreach (int id in tm.GetCurrentWaitTileIds())
+            if (tm != null) foreach (int id in forRankCall ? tm.GetRankCallWaitTileIds() : tm.GetCurrentWaitTileIds())
                 result.Add(new WaitData { tile = id, yaku = tm.CurrentHandYaku.ToArray(), han = tm.CurrentHandHan,
                     mangan_or_more = true, multiplier = GameRules.GetMultiplier(tm.CurrentHandHan),
                     multiplier_label = tm.CurrentHandHan >= 26 ? "ダブル役満" : tm.CurrentHandHan >= 13 ? "役満"
