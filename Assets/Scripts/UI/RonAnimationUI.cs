@@ -51,10 +51,17 @@ namespace KillingMahjong.UI
         [SerializeField] private float tileSpacing = 115f;
         [SerializeField] private float tileScale = 1.5f;
 
-        private static readonly Color PanelLine  = new Color32(0x3A, 0x44, 0x68, 0xFF);
-        private static readonly Color PanelBg    = new Color32(0x0F, 0x13, 0x26, 0xF2);
-        private static readonly Color PanelInk   = new Color32(0xE8, 0xE4, 0xF0, 0xFF);
-        private static readonly Color PanelFaint = new Color32(0x97, 0xA0, 0xC0, 0xFF);
+        // **紺の板をやめ、賭け金のスマホと同じ色にそろえる（2026-10-25）。**
+        // 紺(#0F1326)と青灰の文字は、黒・暗赤・くすんだ金の画面から浮いていた。
+        // 色は codex が既存素材から抜いた8色のパレット（km-docs screenshots/20261025/ui_review/codex_phone/README.md）。
+        private static readonly Color PanelLine  = new Color32(0x8F, 0x77, 0x54, 0xFF); // 鈍い金：区切り線
+        private static readonly Color PanelHead  = new Color32(0x6F, 0x26, 0x26, 0xFF); // 暗赤：見出しの帯
+        private static readonly Color PanelBg    = new Color32(0x1A, 0x14, 0x18, 0xF2); // 暗いガラス（枠の絵が無いとき）
+        private static readonly Color PanelInk   = new Color32(0xF5, 0xF5, 0xDC, 0xFF); // 生成り
+        private static readonly Color PanelFaint = new Color32(0xD2, 0xC1, 0x95, 0xFF); // くすんだ金：見出し語
+
+        /// <summary>枠の絵（暗いガラスに金の縁、9スライス）。賭け金のスマホの入力欄と同じ絵。</summary>
+        private const string PanelFrameSprite = "UI/BettingPhone/bet_input_9slice";
         private static readonly Color AccentGold = new Color32(0xFF, 0xD3, 0x4D, 0xFF); // 翻数
         private static readonly Color AccentMine = new Color32(0x57, 0xC7, 0xE8, 0xFF); // 自分
         private static readonly Color AccentThem = new Color32(0xF2, 0x70, 0x5A, 0xFF); // 相手

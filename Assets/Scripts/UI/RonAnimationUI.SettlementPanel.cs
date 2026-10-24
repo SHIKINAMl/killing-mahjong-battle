@@ -18,11 +18,21 @@ namespace KillingMahjong.UI
             out TextMeshProUGUI myDeltaText, out TextMeshProUGUI theirDeltaText,
             out TextMeshProUGUI myHpText, out TextMeshProUGUI theirHpText)
         {
-            // 外枠（線の色）→ 内側（地の色）の2枚重ね。1ドット＝2UI単位なので枠は4
+            // 外枠は 9スライスの絵（暗いガラスに金の縁）。四隅は伸ばさず、辺と中だけを伸ばす（2026-10-25）。
+            // 絵の1ドット＝2UI単位にそろえる（pixelsPerUnitMultiplier 0.5）。縁の金と黒の2ドットが
+            // 内側の余白4にちょうど収まる。絵が読めないときは地の色で塗る
             GameObject root = new GameObject("SettlementPanel");
             root.transform.SetParent(parent, false);
             Image rootImg = root.AddComponent<Image>();
-            rootImg.color = PanelLine;
+            var frame = Resources.Load<Sprite>(PanelFrameSprite);
+            if (frame != null)
+            {
+                rootImg.sprite = frame;
+                rootImg.type = Image.Type.Sliced;
+                rootImg.pixelsPerUnitMultiplier = 0.5f;
+                rootImg.color = Color.white;
+            }
+            else rootImg.color = PanelBg;
 
             RectTransform rootRt = root.GetComponent<RectTransform>();
             rootRt.anchorMin = rootRt.anchorMax = new Vector2(0.5f, 0.5f);
@@ -49,7 +59,7 @@ namespace KillingMahjong.UI
             group.alpha = 0f;
 
             // ---- 見出しの帯：左に「和了」、右にランク ----
-            GameObject head = MakeBox(root.transform, PanelLine, 8, 4);
+            GameObject head = MakeBox(root.transform, PanelHead, 8, 4);
             MakeText(head.transform, "和了", 20f, PanelInk, TextAlignmentOptions.Left, true);
             // 型の答え合わせ（2026-10-15）。相手に和了られたときに「相手は染めだった」と分かれば、
             // 次からその捨て牌の特徴を覚えていける。行を足すと役5行で画面からはみ出すので見出しに入れる
