@@ -18,21 +18,12 @@ namespace KillingMahjong.UI
             out TextMeshProUGUI myDeltaText, out TextMeshProUGUI theirDeltaText,
             out TextMeshProUGUI myHpText, out TextMeshProUGUI theirHpText)
         {
-            // 外枠は 9スライスの絵（暗いガラスに金の縁）。四隅は伸ばさず、辺と中だけを伸ばす（2026-10-25）。
-            // 絵の1ドット＝2UI単位にそろえる（pixelsPerUnitMultiplier 0.5）。縁の金と黒の2ドットが
-            // 内側の余白4にちょうど収まる。絵が読めないときは地の色で塗る
+            // 外枠（鈍い金）→ 内側（暗いガラス）の2枚重ね。1ドット＝2UI単位なので枠は4。
+            // **新しい絵は使わない**（2026-10-25 のユーザー指示「もともとある画像はそのまま使いたい」）
             GameObject root = new GameObject("SettlementPanel");
             root.transform.SetParent(parent, false);
             Image rootImg = root.AddComponent<Image>();
-            var frame = Resources.Load<Sprite>(PanelFrameSprite);
-            if (frame != null)
-            {
-                rootImg.sprite = frame;
-                rootImg.type = Image.Type.Sliced;
-                rootImg.pixelsPerUnitMultiplier = 0.5f;
-                rootImg.color = Color.white;
-            }
-            else rootImg.color = PanelBg;
+            rootImg.color = PanelLine;
 
             RectTransform rootRt = root.GetComponent<RectTransform>();
             rootRt.anchorMin = rootRt.anchorMax = new Vector2(0.5f, 0.5f);

@@ -70,7 +70,9 @@ namespace KillingMahjong.UI
         /// 単純に「枠の高さぶん下げる」と Confirm の裏に回って読めなくなるので、
         /// 実機で合わせたこの値をそのまま持つ。
         /// </summary>
-        private const float RewardOffsetY = 20f;
+        // **2026-10-25 に Hp画面.png のスマホへ組み直したとき 20 → 30。** 入力欄の下の外へ出す
+        //（20 だと入力欄の下半分に重なる）。入力欄の下から確定までは余白を空けてある。
+        private const float RewardOffsetY = 30f;
 
         /// <summary>行の高さ。賭け金と同じ 50 にすると文字が下に寄って Confirm に被る</summary>
         private const float RewardHeight = 20f;
@@ -78,8 +80,11 @@ namespace KillingMahjong.UI
         /// <summary>賭け金より一回り小さく。従属情報だと見た目で分かるように</summary>
         private const float RewardFontScale = 0.7f;
 
-        /// <summary>賭け金の白と区別するための色</summary>
-        private static readonly Color RewardColor = new Color(1f, 0.85f, 0.4f, 1f);
+        /// <summary>
+        /// 賭け金の白と区別するための色。**水色の画面（Hp画面.png）に載るので暗い赤**（2026-10-25）。
+        /// それまでの明るい黄色は、水色の上では字がほとんど読めない。
+        /// </summary>
+        private static readonly Color RewardColor = new Color32(0x8C, 0x1F, 0x2B, 0xFF);
 
         private TextMeshProUGUI _runtimeRewardText;
 
