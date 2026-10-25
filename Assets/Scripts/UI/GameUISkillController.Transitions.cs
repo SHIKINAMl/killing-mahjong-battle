@@ -304,18 +304,18 @@ namespace KillingMahjong.UI
             // 古いサーバーに繋いだときに血が 0 へ飛ぶのを防ぐため。
             {
                 var board = Managers.BoardStateManager.Instance;
-                int localHp = board.LocalPlayerHp;
-                int enemyHp = board.EnemyPlayerHp;
+                int localHp = board.LocalServerHp;
+                int enemyHp = board.EnemyServerHp;
 
                 // 払った血の量は「支払い前」を控えないと出せない。
                 // 反応（Skill_HighCostPaid / Skill_NearDeathByCost）の判定に使う
-                int hpBeforeCast = isLocalPlayer ? localHp : enemyHp;
+                int hpBeforeCast = isLocalPlayer ? board.LocalPlayerHp : board.EnemyPlayerHp;
 
                 // **引き算はしない。** サーバーが払ったあとの血を送ってくる。
                 // 以前は health が無いときに `血 − cost` で自前計算していたが、
                 // クライアントが辻褄を合わせるとサーバー側の誤りが画面に出なくなる。
                 // 届かないときは動かさず、警告だけ出して次の status に任せる
-                if (data.health > 0)
+                if (data.health > 0 || uiManager.IsTutorialMode && data.health == 0)
                 {
                     if (isLocalPlayer) localHp = data.health;
                     else enemyHp = data.health;

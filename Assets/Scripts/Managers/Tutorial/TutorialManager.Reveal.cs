@@ -144,8 +144,8 @@ namespace KillingMahjong.Managers
             int tile = TutorialTiles.Encode(discardedBaseId, discardedBaseId == data.doraBaseId);
             var hand = TutorialTiles.EncodeAll(ronData.enemyRonMeldBaseIds, data.doraBaseId);
             hand.Add(tile);
-            yield return PlayRonAnimation(hand, tile, ronData, false, _playerHp, 0,
-                _enemyHp, _enemyHp, _playerHp, suppressSettlementPanel: true);
+            yield return PlayRonAnimation(hand, tile, ronData, false, PlayerShownHp, 0,
+                EnemyShownHp, EnemyShownHp, PlayerShownHp, suppressSettlementPanel: true);
             _playerHp = 0;
             ApplyHpToUI();
         }

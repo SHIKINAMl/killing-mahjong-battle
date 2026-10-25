@@ -398,8 +398,8 @@ namespace KillingMahjong.Managers
         }
 
         /// <summary>
-        /// 賭け金を積む。確定した時点で両者の血から引く（賭けた分は先に払う）。
-        /// 決着時の増減はこれとは別に GameRules の式で決まる。
+        /// 賭け金を場へ預ける。総体力は動かさず、表示体力だけ預けた分を引く（本編と同じ）。
+        /// 減る表示は対局開始の演出で行い、ここでは表示用台帳だけを合わせる。
         /// チュートリアルでは相手も同額を賭ける。
         /// 残り血より賭け金が大きい場合は、実際に払えた分だけ場に乗る。
         /// </summary>
@@ -407,16 +407,15 @@ namespace KillingMahjong.Managers
         {
             if (amount <= 0) return;
 
-            int playerPaid = Mathf.Min(amount, _playerHp);
-            int enemyPaid = Mathf.Min(amount, _enemyHp);
-
-            _playerHp -= playerPaid;
-            _enemyHp -= enemyPaid;
+            _playerHpBeforeBet = PlayerShownHp;
+            _enemyHpBeforeBet = EnemyShownHp;
+            int playerPaid = Mathf.Min(amount, PlayerShownHp);
+            int enemyPaid = Mathf.Min(amount, EnemyShownHp);
             _playerStake += playerPaid;
             _enemyStake += enemyPaid;
             _stakeRounds++;
 
-            ApplyHpToUI();
+            ApplyHpToUI(updateVitals: false);
             ApplyPotToUI();
         }
 
@@ -429,6 +428,7 @@ namespace KillingMahjong.Managers
             _playerStake = 0;
             _enemyStake = 0;
             _stakeRounds = 0;
+            BoardStateManager.Instance?.ClearStakesOnTable();
             ApplyPotToUI(includeGauge: false);
         }
 
@@ -584,7 +584,7 @@ namespace KillingMahjong.Managers
 
             bool confirmed = false;
             _lastConfirmedBet = data.betAmount;
-            betting.ShowFreeBettingPhase(_playerHp, _playerHp, amount =>
+            betting.ShowFreeBettingPhase(PlayerShownHp, PlayerShownHp, amount =>
             {
                 _lastConfirmedBet = amount;
                 confirmed = true;
@@ -606,7 +606,7 @@ namespace KillingMahjong.Managers
                 yield return new WaitUntil(() => confirmed || _aborted);
                 if (_aborted) yield break;
 
-                bool tooMuch = _playerHp <= BetWarnHpThreshold && _lastConfirmedBet >= BetWarnAmount;
+                bool tooMuch = PlayerShownHp <= BetWarnHpThreshold && _lastConfirmedBet >= BetWarnAmount;
                 if (!tooMuch) break;
 
                 // いったん止めて、下げてから代わりに押す。
@@ -626,7 +626,7 @@ namespace KillingMahjong.Managers
                 if (_aborted) yield break;
 
                 // 下げているあいだはスマホを触れなくする（触れると額が変わったまま決定される）
-                betting.ShowFixedBettingPhase(_playerHp, _playerHp, pushedBet, amount =>
+                betting.ShowFixedBettingPhase(PlayerShownHp, PlayerShownHp, pushedBet, amount =>
                 {
                     _lastConfirmedBet = amount;
                     confirmed = true;
@@ -701,7 +701,7 @@ namespace KillingMahjong.Managers
             // 表示されている額と場に積まれる額が食い違う余地が残る。
             bool confirmed = false;
             _lastConfirmedBet = data.betAmount;
-            betting.ShowFixedBettingPhase(_playerHp, _playerHp, data.betAmount, amount =>
+            betting.ShowFixedBettingPhase(PlayerShownHp, PlayerShownHp, data.betAmount, amount =>
             {
                 _lastConfirmedBet = amount;
                 confirmed = true;

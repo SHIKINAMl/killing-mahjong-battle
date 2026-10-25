@@ -71,6 +71,10 @@ namespace KillingMahjong.Managers
 
         private int _playerHp;
         private int _enemyHp;
+        // 本編のServerHpと同じ総体力。場に預けた分は表示するときだけ除く。
+        private int PlayerShownHp => Mathf.Max(0, _playerHp - _playerStake);
+        private int EnemyShownHp => Mathf.Max(0, _enemyHp - _enemyStake);
+        private int _playerHpBeforeBet, _enemyHpBeforeBet;
 
         // --- 賭け金 ---
         // 賭け金は確定した時点で両者の血から引かれ、場に積まれる（＝賭けた分は先に払う）。

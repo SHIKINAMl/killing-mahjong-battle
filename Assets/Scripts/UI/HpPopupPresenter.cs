@@ -125,7 +125,7 @@ namespace KillingMahjong.UI
 
         private void SpawnPopup(int amount)
         {
-            if (canvasRoot == null) return;
+            if (canvasRoot == null || !canvasRoot.gameObject.activeInHierarchy) return;
 
             GameObject popupObj;
             if (prefab != null)

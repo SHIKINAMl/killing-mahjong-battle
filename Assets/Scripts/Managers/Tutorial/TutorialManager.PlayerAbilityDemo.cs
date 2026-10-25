@@ -45,7 +45,8 @@ namespace KillingMahjong.Managers
             if (_aborted || _round == null || gameUIManager == null || !gameUIManager.IsTutorialMode
                 || gameUIManager.SkillController == null || BoardStateManager.Instance == null) return false;
             if (type != SkillNames.Mulligan && type != SkillNames.Perspective && type != SkillNames.BoostHand) return false;
-            return _playerHp >= GameRules.GetSkillCost(type, 0);
+            int floor = _prevRoundWasDraw ? _playerStake + _lastBetAmount : 0;
+            return _playerHp - GameRules.GetSkillCost(type, 0) >= floor;
         }
 
         // オフラインの紹介だけに使う台本応答。本編の判定・通信には持ち込まない。

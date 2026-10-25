@@ -41,8 +41,8 @@ namespace KillingMahjong.Managers
             }
 
             // 増減は GameRules の式で決まる。得る額と失う額は別計算なので一致しない。
-            int prevEnemyHp = _enemyHp;
-            int prevPlayerHp = _playerHp;
+            int prevEnemyHp = EnemyShownHp;
+            int prevPlayerHp = PlayerShownHp;
 
             int han = GetWinnerHan(data, isPlayerWin: true);
 
@@ -57,12 +57,9 @@ namespace KillingMahjong.Managers
             int loss = GameRules.CalculateLoserLoss(theirBet, han, data.isTankiWin);
             ClearStakes();
 
-            // **賭けた血は賭けた時点で場へ出してある**（Progression の賭けフェイズで引いている）。
-            // 勝った側は場の血が戻って儲けが乗る。負けた側は場の血を取られ、足りない分だけさらに引かれる。
-            // こうすると本編のサーバー（賭けた時点では引かず、精算で ±）と同じ結果になる（2026-10-17）。
-            // 以前は場の血を返していなかったので、勝っても開始時から ±0 になっていた
-            _playerHp = prevPlayerHp + myBet + gain;
-            _enemyHp = Mathf.Max(0, prevEnemyHp + theirBet - loss);
+            // 総体力には清算分だけを反映する。預け分はClearStakesで解放されるため、二重に返さない。
+            _playerHp += gain;
+            _enemyHp = Mathf.Max(0, _enemyHp - loss);
 
             var settlementInfo = BuildSettlementInfo(
                 data, isLocalWin: true, han: han, myBet: myBet, theirBet: theirBet,
@@ -228,7 +225,7 @@ namespace KillingMahjong.Managers
             yield return StartCoroutine(PlayLines(new List<TutorialLine>
             {
                 new TutorialLine("負けると逆に賭け金分持ち点を引かれてしまう"),
-                new TutorialLine("最初に賭けた額も帰ってこないから…マイナス分は2倍！"),
+                new TutorialLine("場に預けた分は戻らないよ。そこに同じ額をもう一度引くわけじゃないからね"),
                 new TutorialLine("例えば…あたしは2000賭けたから…2000のダメージ"),
             }));
             ClearGuide();
@@ -277,8 +274,8 @@ namespace KillingMahjong.Managers
             SetPhase(RoundStatus.Agari);
 
             // 手順⑯: 単騎で上がられると失う額が2倍になる（GameRules.CalculateLoserLoss）
-            int prevPlayerHp = _playerHp;
-            int prevEnemyHp = _enemyHp;
+            int prevPlayerHp = PlayerShownHp;
+            int prevEnemyHp = EnemyShownHp;
 
             int han = GetWinnerHan(data, isPlayerWin: false);
 
@@ -291,9 +288,8 @@ namespace KillingMahjong.Managers
             int loss = GameRules.CalculateLoserLoss(myBet, han, data.isTankiWin);
             ClearStakes();
 
-            // 場の血の扱いは RunPlayerRon と同じ（賭けた血は賭けた時点で引いてある）
-            _playerHp = Mathf.Max(0, prevPlayerHp + myBet - loss);
-            _enemyHp = prevEnemyHp + theirBet + gain;
+            _playerHp = Mathf.Max(0, _playerHp - loss);
+            _enemyHp += gain;
 
             // 演出に出す額は「自分の血がどれだけ動いたか」に合わせる
             int settlement = loss;

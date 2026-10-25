@@ -319,8 +319,8 @@ namespace KillingMahjong.UI
             yield return Step("まぁ正直手牌選択までは普通のゲームと同じかな",true);
             yield return new WaitUntil(()=>handReady);
             bool dark=false; phase.PlayTransition("対局開始",null,new BettingCompletedInfo {
-                LocalBet=2000,EnemyBet=2000,LocalHpBefore=20000,EnemyHpBefore=20000,
-                LocalHpAfter=18000,EnemyHpAfter=18000,HasServerHealth=true
+                LocalBet=2000,EnemyBet=2000,LocalHpBefore=18000,EnemyHpBefore=18000,
+                LocalHpAfter=16000,EnemyHpAfter=16000,HasServerHealth=true
             },()=>dark=true,()=>{},false);
             limit=Time.realtimeSinceStartup+12; yield return new WaitUntil(()=>dark||Time.realtimeSinceStartup>=limit); yield return null;
             // 賭け金が出てくる黒い画面で止める。ここから先は 2026-10-15 のフロー図で足された、

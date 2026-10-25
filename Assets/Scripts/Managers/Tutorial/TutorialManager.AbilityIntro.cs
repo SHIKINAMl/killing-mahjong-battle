@@ -167,9 +167,7 @@ namespace KillingMahjong.Managers
         /// <summary>いまの自分の残り持ち点（= 血）。取れないときは境目より上として扱う。</summary>
         private int GetLocalScoreForAbilityGate()
         {
-            var board = BoardStateManager.Instance;
-            if (board == null) return AbilityMoreMinScore;
-            return board.LocalPlayerHp;
+            return PlayerShownHp;
         }
 
         /// <summary>

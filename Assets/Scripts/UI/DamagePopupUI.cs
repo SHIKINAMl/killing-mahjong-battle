@@ -19,7 +19,11 @@ namespace KillingMahjong.UI
                 tmpText.fontSize = 60;
                 tmpText.alignment = TextAlignmentOptions.Center;
                 tmpText.fontStyle = FontStyles.Bold;
-                tmpText.outlineWidth = 0.2f; // アウトラインで文字を見やすく
+                // フォールバック生成ではTMPの既定フォントが未設定のことがある。
+                // 材質が無いまま縁を付けると、スキル支払いの途中で例外になる。
+                if (tmpText.font == null)
+                    tmpText.font = Resources.Load<TMP_FontAsset>("PixelMplus10_DynamicFixed") ?? TMP_Settings.defaultFontAsset;
+                if (tmpText.isActiveAndEnabled && tmpText.fontSharedMaterial != null) tmpText.outlineWidth = 0.2f;
             }
 
             string prefix = amount > 0 ? "+" : "";

@@ -198,10 +198,11 @@ namespace KillingMahjong.Managers
             {
                 LocalBet = bet,
                 EnemyBet = bet,
-                LocalHpBefore = _playerHp + bet,
-                EnemyHpBefore = _enemyHp + bet,
-                LocalHpAfter = _playerHp,
-                EnemyHpAfter = _enemyHp,
+                LocalHpBefore = _playerHpBeforeBet,
+                EnemyHpBefore = _enemyHpBeforeBet,
+                LocalHpAfter = PlayerShownHp,
+                EnemyHpAfter = EnemyShownHp,
+                HasServerHealth = true,
             };
 
             bool midpointDone = false;
@@ -234,12 +235,17 @@ namespace KillingMahjong.Managers
                 gameUIManager.SetCurrentPhaseStatus(status);
         }
 
-        private void ApplyHpToUI()
+        private void ApplyHpToUI(bool updateVitals = true)
         {
             var board = BoardStateManager.Instance;
-            if (board != null) board.UpdateHp(_playerHp, _enemyHp);
+            if (board != null)
+            {
+                board.ClearStakesOnTable();
+                board.UpdateHp(_playerHp, _enemyHp);
+                board.AddStakesOnTable(_playerStake, _enemyStake);
+            }
 
-            if (gameUIManager == null) return;
+            if (gameUIManager == null || !updateVitals) return;
 
             // 盤面がまだ隠れている段階（女の子とセリフだけの状態）では表示を戻さない
             // 「準備完了」ボックスは次局待ち合わせ用。チュートリアルには待ち合わせがないので常に隠す
@@ -247,7 +253,7 @@ namespace KillingMahjong.Managers
             {
                 gameUIManager.PlayerInfoUI.gameObject.SetActive(_boardVisible);
                 gameUIManager.PlayerInfoUI.SetMaxHP(_scenario.playerStartHp);
-                gameUIManager.PlayerInfoUI.SetHP(_playerHp);
+                gameUIManager.PlayerInfoUI.SetHP(PlayerShownHp);
                 gameUIManager.PlayerInfoUI.ShowReadyBox(false);
             }
             if (gameUIManager.EnemyInfoUI != null)
@@ -264,7 +270,7 @@ namespace KillingMahjong.Managers
                 // 体力を消しているのは中の別の物なので、この症状が出ない。
                 gameUIManager.EnemyInfoUI.SetPanelVisible(_boardVisible && !_firstRoundChromeHidden);
                 gameUIManager.EnemyInfoUI.SetMaxHP(_scenario.enemyStartHp);
-                gameUIManager.EnemyInfoUI.SetHP(_enemyHp);
+                gameUIManager.EnemyInfoUI.SetHP(EnemyShownHp);
                 gameUIManager.EnemyInfoUI.ShowReadyBox(false);
             }
         }
