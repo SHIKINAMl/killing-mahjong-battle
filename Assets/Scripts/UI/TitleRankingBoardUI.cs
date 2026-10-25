@@ -21,10 +21,14 @@ namespace KillingMahjong.UI
     /// 同日のプランナー指示「動画流れ始めたらリセットボタンをオートで押すのもアリ」）。
     /// ランキングを一巡するあいだ（約 24 秒）誰も触らなかったら、前の人は帰ったとみなす。
     ///
-    /// 種類（最大打点・累計獲得点数・最大局数）を順に切り替えて見せる。
+    /// **ランキングは「対人戦スコア」の1つの表**（2026-10-25、プランナー yabazaemon さんの見本の絵）。
+    /// 以前は種類（最大打点・累計獲得点数・最大局数）を1つずつ切り替えて見せていた。
+    /// 1人1行で 名前・トータル点・対局数・最大ダメ を並べ、赤い帯（<see cref="BarSpritePath"/>）に載せる。
+    /// 上位10人を5人ずつ2回に分けて見せる。並べ方とつなぎの事情は <see cref="VersusRanking"/>。
+    /// 見本の通り、暗い板や枠は敷かず、部屋の絵の上にじかに置く。
     ///
     /// **ランキングと紹介動画を交互に出す**（2026-10-22、ユーザー指示「放置していた場合ランキングと動画交互に出てほしい」）。
-    /// ランキングの種類を一巡したら動画、動画が終わったらまたランキング。
+    /// ランキングを一巡したら動画、動画が終わったらまたランキング。
     /// 動画は紹介PV（`StreamingAssets/Video/title_pv.mp4`）。WebGL でも読めるよう、Resources ではなく
     /// StreamingAssets から URL で流す。流しているあいだはタイトルの曲を止めて動画の音を出す。
     /// 読めなかったときはランキングだけを回す。
@@ -40,9 +44,17 @@ namespace KillingMahjong.UI
     public sealed class TitleRankingBoardUI : MonoBehaviour
     {
         public const string RootName = "TitleRankingBoard";
-        private const int RowCount = 10;
 
-        /// <summary>1つの種類を見せる秒数。</summary>
+        /// <summary>載せる人数と、1回に見せる人数（帯の本数）。</summary>
+        private const int RowCount = 10, RowsPerPage = 5;
+
+        /// <summary>帯の絵。見本の絵から測った形を1ドットずつ組んだもの（黒の縁・黄色の線・赤の塗り、両端がとがる）。</summary>
+        public const string BarSpritePath = "UI/Ranking/ranking_bar";
+
+        /// <summary>見出しと表の字。見本の絵の太いドットの字</summary>
+        private const string FontPath = "x8y12pxDenkiChip/x8y12pxDenkiChip_Dynamic";
+
+        /// <summary>1回（5人）を見せる秒数。</summary>
         [SerializeField] private float pageSeconds = 8f;
 
         /// <summary>前に取ってから何秒たっていたら取り直すか（サーバーも上位の一覧を 30 秒ためている）。</summary>
@@ -57,28 +69,26 @@ namespace KillingMahjong.UI
         /// <summary>「クリックでスタート」の点滅の1往復の秒数。ゆっくり（ユーザー指示）。</summary>
         [SerializeField] private float hintBlinkSeconds = 2.4f;
 
-        internal static readonly string[] Kinds = { "max_damage", "match_points", "rounds" };
-        internal static readonly string[] KindTitles = { "最大打点", "累計獲得点数", "最大局数" };
-        internal static readonly string[] KindNotes =
-        {
-            // 文言は 2026-10-23 のユーザー指示
-            "一回のアガリで相手に与えたダメージランキング",
-            "一つの対局で獲得した点数ランキング",
-            "一番長引いた局数ランキング",
-        };
-        internal static readonly string[] KindUnits = { "点", "点", "局" };
+        /// <summary>表の見出し（見本の絵の文言どおり）。列の並びは <see cref="ColumnX"/> と同じ</summary>
+        internal static readonly string[] ColumnTitles = { "NAME", "トータル点", "対局数", "最大ダメ" };
+
+        /// <summary>列の位置（真ん中から）。名前だけは左寄せで、その左端。ほかは字の真ん中</summary>
+        private static readonly float[] ColumnX = { -301f, 6f, 152f, 278f };
+
+        private static readonly string[] ColumnNames = { "Name", "Total", "Games", "Damage" };
 
         private TitleUIManager title;
         private CanvasGroup group;
         private RankingFetcher fetcher;
-        private TMP_Text kindLabel, kindNote, pager, status, returnHint;
+        private TMP_Text status, returnHint;
         private RectTransform rankingFrame, videoLayer;
         private RawImage videoImage;
         private VideoPlayer player;
         private RenderTexture videoTexture;
         private bool playingVideo, videoUnavailable;
         private float videoStartedAt;
-        private readonly TMP_Text[,] cells = new TMP_Text[RowCount, 3];
+        private readonly RectTransform[] bars = new RectTransform[RowsPerPage];
+        private readonly TMP_Text[,] cells = new TMP_Text[RowsPerPage, 5];
 
         private bool showing;
         private int page;
@@ -113,46 +123,68 @@ namespace KillingMahjong.UI
             return board;
         }
 
+        /// <summary>列 <paramref name="column"/> の字の置き場（行の真ん中から）。名前は左寄せなので、左端が <see cref="ColumnX"/> に来るよう幅の半分ずらす</summary>
+        private static Vector2 CellPosition(int column)
+        {
+            return column == 0 ? new Vector2(ColumnX[0] + CellSize(0).x * .5f, 0f) : new Vector2(ColumnX[column], 0f);
+        }
+
+        private static Vector2 CellSize(int column) => column == 0 ? new Vector2(250f, 40f) : new Vector2(130f, 40f);
+
         private void Build()
         {
-            var font = Resources.Load<TMP_FontAsset>("PixelMplus10_DynamicFixed");
+            var bodyFont = Resources.Load<TMP_FontAsset>("PixelMplus10_DynamicFixed");
             group = GetComponent<CanvasGroup>();
             fetcher = GetComponent<RankingFetcher>();
             if (fetcher == null) fetcher = gameObject.AddComponent<RankingFetcher>();
 
-            // 枠は2枚重ね（くすんだ金の縁の内側に、夜色の板）。2単位ずつ内側へ寄せて、ドットの縁にする
-            var frame = Box(transform, "Frame", new Vector2(564f, 484f), Vector2.zero, new Color32(120, 110, 85, 255));
-            rankingFrame = frame;
-            var panel = Box(frame, "Panel", new Vector2(556f, 476f), Vector2.zero, new Color32(22, 15, 24, 252));
+            var font = Resources.Load<TMP_FontAsset>(FontPath) ?? bodyFont;
+            var bar = Resources.Load<Sprite>(BarSpritePath);
+            var white = new Color32(255, 255, 255, 255);
 
-            Label(panel, "Heading", "ランキング", new Vector2(0f, 205f), new Vector2(520f, 40f), 30f,
-                new Color32(200, 40, 58, 255), TextAlignmentOptions.Center, font);
-            kindLabel = Label(panel, "KindLabel", KindTitles[0], new Vector2(0f, 166f), new Vector2(520f, 28f), 20f,
-                new Color32(232, 220, 200, 255), TextAlignmentOptions.Center, font);
-            kindNote = Label(panel, "KindNote", KindNotes[0], new Vector2(0f, 143f), new Vector2(520f, 16f), 10f,
-                new Color32(170, 156, 140, 255), TextAlignmentOptions.Center, font);
-            pager = Label(panel, "Pager", "", new Vector2(0f, 124f), new Vector2(200f, 16f), 10f,
-                new Color32(170, 156, 140, 255), TextAlignmentOptions.Center, font);
+            // 表をまとめる入れ物（動画のあいだはこれごと隠す）。見本どおり、暗い板や枠は敷かない
+            var scores = Box(transform, "Scores", new Vector2(800f, 600f), Vector2.zero, Color.clear);
+            scores.GetComponent<Image>().raycastTarget = false;
+            rankingFrame = scores;
 
-            var rows = Box(panel, "Rows", new Vector2(520f, 280f), new Vector2(0f, -38f), Color.clear);
-            rows.GetComponent<Image>().raycastTarget = false;
-            for (int i = 0; i < RowCount; i++)
+            Label(scores, "Heading", "対人戦スコア", new Vector2(0f, 249f), new Vector2(600f, 56f), 48f,
+                white, TextAlignmentOptions.Center, font);
+            var head = Box(scores, "ColumnHeads", new Vector2(800f, 40f), new Vector2(0f, 163f), Color.clear);
+            head.GetComponent<Image>().raycastTarget = false;
+            for (int c = 0; c < ColumnTitles.Length; c++)
             {
-                var row = Box(rows, "Row" + (i + 1), new Vector2(520f, 26f), new Vector2(0f, 126f - i * 28f),
-                    i % 2 == 0 ? new Color32(36, 22, 32, 255) : new Color32(28, 18, 26, 255));
-                row.GetComponent<Image>().raycastTarget = false;
-                cells[i, 0] = Label(row, "Rank", "", new Vector2(-212f, 0f), new Vector2(80f, 26f), 20f,
-                    new Color32(232, 220, 200, 255), TextAlignmentOptions.Right, font);
-                cells[i, 1] = Label(row, "Name", "", new Vector2(-34f, 0f), new Vector2(240f, 26f), 20f,
-                    new Color32(232, 220, 200, 255), TextAlignmentOptions.Left, font);
-                cells[i, 2] = Label(row, "Value", "", new Vector2(176f, 0f), new Vector2(150f, 26f), 20f,
-                    new Color32(232, 220, 200, 255), TextAlignmentOptions.Right, font);
+                Label(head, "Head" + c, ColumnTitles[c], CellPosition(c), CellSize(c), 24f, white,
+                    c == 0 ? TextAlignmentOptions.Left : TextAlignmentOptions.Center, font);
+            }
+
+            // 帯は 382×32 ドット（1ドット＝2単位）。見本は 78 間隔だが、5本目が下の「クリックでスタート」の帯に
+            // かからないよう 76 間隔にした
+            for (int i = 0; i < RowsPerPage; i++)
+            {
+                bool madeBar = transform.Find("Scores/Row" + (i + 1)) == null;
+                var row = Box(scores, "Row" + (i + 1), new Vector2(764f, 64f), new Vector2(0f, 89f - i * 76f), white);
+                var image = row.GetComponent<Image>();
+                image.raycastTarget = false;
+                if (madeBar && bar != null)
+                {
+                    image.sprite = bar;
+                    image.type = Image.Type.Sliced;
+                }
+                bars[i] = row;
+                // 順位は、帯の左のとがった所と名前のあいだに置く
+                cells[i, 0] = Label(row, "Rank", "", new Vector2(-340f, 0f), new Vector2(40f, 40f), 24f, white,
+                    TextAlignmentOptions.Center, font);
+                for (int c = 0; c < ColumnTitles.Length; c++)
+                {
+                    cells[i, c + 1] = Label(row, ColumnNames[c], "", CellPosition(c), CellSize(c), 24f, white,
+                        c == 0 ? TextAlignmentOptions.Left : TextAlignmentOptions.Center, font);
+                }
                 // 名前に < が入っても、文字の飾りとして読まない
                 cells[i, 1].richText = false;
             }
 
-            status = Label(panel, "Status", "", new Vector2(0f, -38f), new Vector2(520f, 28f), 20f,
-                new Color32(232, 220, 200, 255), TextAlignmentOptions.Center, font);
+            status = Label(scores, "Status", "", new Vector2(0f, -40f), new Vector2(600f, 32f), 24f,
+                white, TextAlignmentOptions.Center, font);
             // 動画の層。ランキングの枠と同じ場所に重ね、出すときは枠のほうを隠す。
             // 動画はゲームの画面と同じ 4:3（2026-10-22、ユーザーが黒帯なしの 4:3 版に決めた）。
             // 黒地を画面いっぱいに敷き、その中に 4:3 のまま収める（画面が横長なら左右だけ黒くなる）
@@ -194,7 +226,7 @@ namespace KillingMahjong.UI
             plate.SetAsLastSibling();
             bool hintMade = transform.Find("ReturnHint") == null;
             returnHint = Label(transform, "ReturnHint", "クリックでスタート", Vector2.zero, new Vector2(300f, 28f), 20f,
-                new Color32(232, 220, 200, 255), TextAlignmentOptions.Center, font);
+                new Color32(232, 220, 200, 255), TextAlignmentOptions.Center, bodyFont);
             if (hintMade)
             {
                 var hintRt = returnHint.rectTransform;
@@ -268,9 +300,10 @@ namespace KillingMahjong.UI
 
             if (Time.realtimeSinceStartup - pageStartedAt >= pageSeconds)
             {
-                // 種類を一巡したら動画へ
-                if (page == Kinds.Length - 1 && !videoUnavailable) { ShowVideo(); return; }
-                page = (page + 1) % Kinds.Length;
+                // 全員を見せ終えたら動画へ
+                int pages = PageCount();
+                if (page >= pages - 1 && !videoUnavailable) { ShowVideo(); return; }
+                page = (page + 1) % pages;
                 pageStartedAt = Time.realtimeSinceStartup;
                 Render();
             }
@@ -301,7 +334,7 @@ namespace KillingMahjong.UI
             if (stale && !fetcher.IsBusy)
             {
                 loading = true;
-                fetcher.Fetch(Kinds, RowCount, ok =>
+                fetcher.Fetch(VersusRanking.Kinds, VersusRanking.FetchLimit, ok =>
                 {
                     if (this == null) return;
                     loading = false;
@@ -402,32 +435,31 @@ namespace KillingMahjong.UI
             group.interactable = false;
         }
 
+        private System.Collections.Generic.List<VersusRankingRow> rows = new System.Collections.Generic.List<VersusRankingRow>();
+
+        /// <summary>何回に分けて見せるか（5人ずつ）。誰もいなくても1回</summary>
+        private int PageCount() => Mathf.Max(1, (rows.Count + RowsPerPage - 1) / RowsPerPage);
+
         private void Render()
         {
-            kindLabel.text = KindTitles[page];
-            kindNote.text = KindNotes[page];
-            var dots = new System.Text.StringBuilder();
-            for (int i = 0; i < Kinds.Length; i++) dots.Append(i == page ? "■" : "□").Append(i < Kinds.Length - 1 ? " " : "");
-            pager.text = dots.ToString();
-
-            RankingFetcher.Latest.TryGetValue(Kinds[page], out RankingData data);
-            int count = data != null && data.entries != null ? Mathf.Min(RowCount, data.entries.Length) : 0;
-            for (int i = 0; i < RowCount; i++)
+            rows = VersusRanking.Assemble(RankingFetcher.Latest, RowCount);
+            page = Mathf.Clamp(page, 0, PageCount() - 1);
+            for (int i = 0; i < RowsPerPage; i++)
             {
-                bool has = i < count;
-                var e = has ? data.entries[i] : null;
-                cells[i, 0].text = has ? e.rank + "位" : "";
-                cells[i, 1].text = has ? (string.IsNullOrEmpty(e.name) ? "名無し" : e.name) : "";
-                cells[i, 2].text = has ? e.value.ToString("N0") + KindUnits[page] : "";
-                Color32 rankColor = !has ? new Color32(232, 220, 200, 255)
-                    : e.rank == 1 ? new Color32(230, 196, 90, 255)
-                    : e.rank == 2 ? new Color32(200, 200, 212, 255)
-                    : e.rank == 3 ? new Color32(198, 132, 82, 255)
-                    : new Color32(232, 220, 200, 255);
-                cells[i, 0].color = rankColor;
+                int index = page * RowsPerPage + i;
+                bool has = index < rows.Count;
+                // 誰もいない帯は出さない（空の帯が並ぶと、壊れて見える）
+                bars[i].gameObject.SetActive(has);
+                if (!has) continue;
+                var r = rows[index];
+                cells[i, 0].text = r.Rank.ToString();
+                cells[i, 1].text = string.IsNullOrEmpty(r.Name) ? "名無し" : r.Name;
+                cells[i, 2].text = r.Total.ToString("N0");
+                cells[i, 3].text = r.HasRounds ? r.Rounds.ToString("N0") : "-";
+                cells[i, 4].text = r.HasMaxDamage ? r.MaxDamage.ToString("N0") : "-";
             }
 
-            if (count > 0) status.text = "";
+            if (rows.Count > 0) status.text = "";
             else if (loading) status.text = "読み込み中…";
             else if (failed) status.text = "ランキングを読み込めませんでした";
             else status.text = "まだ記録がありません";
