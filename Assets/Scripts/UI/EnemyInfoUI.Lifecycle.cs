@@ -238,7 +238,15 @@ namespace KillingMahjong.UI
             CharacterVisualUtil.ResolveDefaultSprites(data, ref normalSprite, ref discardSprite, ref normalFaceSprite);
 
             CharacterVisualUtil.ApplyIfPresent(characterRenderer, normalSprite);
-            CharacterVisualUtil.ApplyIfPresent(faceRenderer, normalFaceSprite);
+
+            // 顔まで1枚に描いてある絵（顔の差分を持たないキャラ）は、顔の層を空にする。
+            // 残すと前のキャラの顔が新しい絵の上に重なる（2026-10-25、先輩の絵を1枚絵に替えたとき）
+            if (data.faceSprites == null || data.faceSprites.Count == 0)
+            {
+                normalFaceSprite = null;
+                if (faceRenderer != null) faceRenderer.sprite = null;
+            }
+            else CharacterVisualUtil.ApplyIfPresent(faceRenderer, normalFaceSprite);
         }
     }
 }

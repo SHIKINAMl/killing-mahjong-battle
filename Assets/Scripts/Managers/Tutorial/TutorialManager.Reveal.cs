@@ -35,9 +35,11 @@ namespace KillingMahjong.Managers
         private IEnumerator RunWatchRestContinuation(TutorialRoundData data)
         {
             if (dialogueUI != null) { dialogueUI.HideText(); dialogueUI.HideAdvanceOnAnyClick(); }
+            // 動画を見せるあいだは、スマホを差し出す絵にする
+            SetSeniorPose(SeniorPhonePose);
             var replay = TutorialDrawReplayUI.Create(transform);
             try { yield return replay.PlayContinuation(); }
-            finally { if (replay != null) replay.Close(); }
+            finally { if (replay != null) replay.Close(); SetSeniorPose(SeniorNormalPose); }
             if (_aborted) yield break;
 
             yield return PlaySceneBreakAndWait();

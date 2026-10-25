@@ -165,8 +165,9 @@ namespace KillingMahjong.UI
                     finally { if (continuedReplay != null) continuedReplay.Close(); }
                     break;
                 case EnemyInfoUI.TutorialRevealEffectId:
-                    rig.character.sprite = Resources.Load<Sprite>("女の子/tutorial_girl_px29_body");
-                    rig.face.sprite = Resources.Load<Sprite>("女の子/tutorial_girl_px29_face");
+                    // 先輩の絵は顔まで1枚（2026-10-25）。顔の層は空にする
+                    rig.character.sprite = Resources.Load<Sprite>("女の子/tutorialexe");
+                    rig.face.sprite = null;
                     try { yield return rig.enemy.RevealTutorialCharacter(); }
                     finally { if (rig.enemy != null) rig.enemy.RestoreTutorialCharacter(); }
                     break;

@@ -18,13 +18,24 @@ namespace KillingMahjong.Managers
             yield return PlaySceneBreakAndWait();
             yield return PlayLines(new List<TutorialLine> {
                 new TutorialLine("んで…流局が起こるとどうなるかというと……"),
+            });
+            // 動画を見せるあいだは、スマホを差し出す絵にする（2026-10-25 プランナー支給）
+            SetSeniorPose(SeniorPhonePose);
+            yield return PlayLines(new List<TutorialLine> {
                 new TutorialLine("ちょっと長いし、アタシの昔の対戦動画があるからこれで見よっか"),
             });
-            // 差し出すポーズの専用素材は未受領のため、現在の立ち絵を保持する。
             ClearGuide();
             var replay=TutorialDrawReplayUI.Create(transform);
             try { yield return replay.Play(); }
-            finally { if(replay!=null) replay.Close(); }
+            finally { if(replay!=null) replay.Close(); SetSeniorPose(SeniorNormalPose); }
+        }
+
+        /// <summary>先輩の立ち絵の差分（チュートリアル女の子.asset の bodySprites の id）。</summary>
+        private const string SeniorNormalPose = "通常", SeniorPhonePose = "スマホ";
+
+        private void SetSeniorPose(string poseId)
+        {
+            if (gameUIManager != null && gameUIManager.EnemyInfoUI != null) gameUIManager.EnemyInfoUI.SetBodyPose(poseId);
         }
 
         // ---- 動画のあと（2026-10-15 のフロー図で足された） ----

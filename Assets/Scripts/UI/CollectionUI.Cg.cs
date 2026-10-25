@@ -73,11 +73,13 @@ namespace KillingMahjong.UI
 
         private static readonly Art[] Arts =
         {
-            // --- 女の子（18枚） ---
+            // --- 女の子（20枚） ---
             new Art("女の子/tutorial_girl_body", "tutorial_girl_body", "女の子"),
             new Art("女の子/tutorial_girl_face", "tutorial_girl_face", "女の子"),
             new Art("女の子/tutorial_girl_px29_body", "tutorial_girl_px29_body", "女の子"),
             new Art("女の子/tutorial_girl_px29_face", "tutorial_girl_px29_face", "女の子"),
+            new Art("女の子/tutorialexe", "tutorialexe", "女の子"),
+            new Art("女の子/tutorialexe_smartphone", "tutorialexe_smartphone", "女の子"),
             new Art("女の子/tutorial_senior_fallen", "tutorial_senior_fallen", "女の子"),
             new Art("女の子/どや顔", "どや顔", "女の子"),
             new Art("女の子/コミカル", "コミカル", "女の子"),

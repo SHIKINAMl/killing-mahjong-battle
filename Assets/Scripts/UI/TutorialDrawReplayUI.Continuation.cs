@@ -41,12 +41,11 @@ namespace KillingMahjong.UI
 
             normal.text = "";
             // プレイヤー側の席へ既存の先輩素材を置き、力を失って手前へ倒れる様子を出す。
-            // 先輩はドット絵（29×29、2026-10-20）。20倍の 580 で出してドットを揃える
-            var senior = Box("FallenSenior", viewport, new Vector2(580f, 580f),
-                new Vector2(-150f, -160f), Color.white);
-            senior.GetComponent<Image>().sprite = Resources.Load<Sprite>("女の子/tutorial_girl_px29_body");
-            var face = Box("FallenSeniorFace", senior, senior.sizeDelta, Vector2.zero, Color.white);
-            face.GetComponent<Image>().sprite = Resources.Load<Sprite>("女の子/tutorial_girl_px29_face");
+            // 先輩は立ち絵と同じ 155×190 のドット絵（2026-10-25 プランナー支給。顔まで1枚）。
+            // 以前の 29×29 を 20 倍したときと人物の大きさ・位置がほぼそろう、2 倍で出す
+            var senior = Box("FallenSenior", viewport, new Vector2(155f, 190f) * SeniorScale,
+                SeniorPosition, Color.white);
+            senior.GetComponent<Image>().sprite = Resources.Load<Sprite>("女の子/tutorialexe");
             // 倒れながらの「ぎゃー」は出さない（2026-10-22 に足し、2026-10-24 ユーザー指示「『ぎゃー』っていう先輩はいらない」で外した）
             Vector2 start = senior.anchoredPosition;
             // 少しだけ前へ傾きながら沈む。**大きく回して倒さない**（2026-10-23。立ち絵を 70 度回して倒していたのが
@@ -60,11 +59,10 @@ namespace KillingMahjong.UI
             }
             // 倒れ伏した絵へ切り替える。卓の手前の縁へ上半身を投げ出した姿（37×27 のドット絵を 16 倍）。
             // **この絵だけは画像生成で作った**（2026-10-23 ユーザーが許可。AGENTS.md 第7項の例外）。
-            // 先輩の 29×29 のドット絵と同じ色・同じ粗さに落としてある
+            // 以前の先輩の 29×29 のドット絵と同じ色・同じ粗さに落としてある
             var fallen = Resources.Load<Sprite>("女の子/tutorial_senior_fallen");
             if (fallen != null)
             {
-                face.gameObject.SetActive(false);
                 var image = senior.GetComponent<Image>();
                 image.sprite = fallen;
                 senior.localRotation = Quaternion.identity;
@@ -120,6 +118,10 @@ namespace KillingMahjong.UI
 
         /// <summary>倒れ伏した絵の拡大率と置き場所（動画の枠の中、真ん中から）。左下の手前に、頭を左上にして伏せる</summary>
         private const float FallenScale = 16f;
+
+        /// <summary>倒れる前の先輩（155×190）の拡大率と置き場所。人物の中心が以前の 29×29 版と同じ (-180, -80) に来る</summary>
+        private const float SeniorScale = 2f;
+        private static readonly Vector2 SeniorPosition = new Vector2(-171f, -75f);
         private static readonly Vector2 FallenPosition = new Vector2(-120f, -205f);
     }
 }
