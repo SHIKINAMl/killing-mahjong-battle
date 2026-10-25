@@ -288,18 +288,18 @@ namespace KillingMahjong.UI
             {
                 if (change == null || change.oldTile == change.newTile) continue;   // 元のままの所
 
-                // サーバーが入れ替えた「位置」を正として山を合わせる（牌IDは山に複数あるので、IDでは探さない）
+                // サーバーが入れ替えた「位置」を正として山を合わせる（牌IDは山に複数あるので、IDでは探さない）。
+                // 手牌に入っている位置なら、手牌の側もそこで持ち替わる。
+                // **ここで手牌を値で探して持ち替えてはいけない。** 山の牌を出したのに、手牌の同じ牌まで替わる
                 if (!state.ReplaceWallTileAt(change.wallIndex, change.newTile))
                 {
                     int wallIdx = state.CurrentWallTiles.IndexOf(change.oldTile);
                     if (wallIdx >= 0) state.CurrentWallTiles[wallIdx] = change.newTile;
-                }
-                // 出した牌が手牌に入っていたら、手牌も持ち替える
-                if (state.CurrentHandTiles.Contains(change.oldTile))
-                {
-                    state.CurrentHandTiles.Remove(change.oldTile);
-                    state.CurrentHandTiles.Add(change.newTile);
-                    state.SortTileIds(state.CurrentHandTiles);
+                    else if (state.CurrentHandTiles.Remove(change.oldTile))
+                    {
+                        state.CurrentHandTiles.Add(change.newTile);
+                        state.SortTileIds(state.CurrentHandTiles);
+                    }
                 }
                 swaps.Add(change);
             }
@@ -323,14 +323,46 @@ namespace KillingMahjong.UI
             var animated = new List<MulliganSwapAnimator.Swap>();
             foreach (var change in swaps)
             {
-                RectTransform slot;
-                if (!_mulliganSentSlots.TryGetValue(change.wallIndex, out slot) || slot == null)
+                // 置き場は**いまの盤面から山の位置で探す。** 送ったときに覚えた置き場は、
+                // その後に盤面が作り直されていると別の牌に使い回されていて、そこを書き換えると
+                // 位置と値の合わない牌（触れない牌）ができる
+                RectTransform slot = FindSlotByWallIndex(change.wallIndex);
+                if (slot == null)
                 {
-                    slot = uiManager.HandUI != null ? uiManager.HandUI.GetTileSlotRectTransform(change.oldTile) : null;
+                    RectTransform sent;
+                    if (_mulliganSentSlots.TryGetValue(change.wallIndex, out sent) && sent != null
+                        && SlotWallIndex(sent) == change.wallIndex) slot = sent;
                 }
                 animated.Add(new MulliganSwapAnimator.Swap(change.oldTile, change.newTile, slot));
             }
             yield return _mulliganSwapAnimator.PlayRoutine(animated);
+        }
+
+        /// <summary>山の位置 <paramref name="wallIndex"/> の牌を、いま山か手牌に並んでいる置き場から探す。</summary>
+        private RectTransform FindSlotByWallIndex(int wallIndex)
+        {
+            if (wallIndex < 0) return null;
+            if (uiManager.WallUI != null)
+            {
+                foreach (var slot in uiManager.WallUI.GetWallSlots())
+                {
+                    if (slot != null && SlotWallIndex(slot) == wallIndex) return slot;
+                }
+            }
+            if (uiManager.HandUI != null)
+            {
+                foreach (var slot in uiManager.HandUI.GetHandSlots())
+                {
+                    if (slot != null && SlotWallIndex(slot) == wallIndex) return slot;
+                }
+            }
+            return null;
+        }
+
+        private static int SlotWallIndex(RectTransform slot)
+        {
+            var tile = slot != null ? slot.GetComponent<TileInteraction>() : null;
+            return tile != null ? tile.WallIndex : -1;
         }
     }
 }

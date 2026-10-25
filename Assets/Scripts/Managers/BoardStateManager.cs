@@ -498,10 +498,20 @@ namespace KillingMahjong.Managers
 
             int old = OriginalWallTiles[wallIndex];
             OriginalWallTiles[wallIndex] = newTileId;
+            if (old == newTileId || DiscardedWallIndexes.Contains(wallIndex)) return true;
 
-            // 表示用の現在の山からも、同じ1枚だけを差し替える
-            int cur = CurrentWallTiles.IndexOf(old);
-            if (cur >= 0) CurrentWallTiles[cur] = newTileId;
+            // **その位置の牌が今どちらにあるかを、位置で決めて片方だけ持ち替える。**
+            // 以前は山を値で探して書き換え、手牌も呼び出し側が値で探して書き換えていた。
+            // 同じ牌が手牌と山の両方にあると、手牌の牌を出したのに山の同じ牌まで（逆も）書き換わり、
+            // 位置と値が合わない牌ができて、触れない・交換できない牌になっていた
+            // （2026-10-25 のユーザー指摘「手牌に触れないし、交換できない牌ができる」）
+            var list = LocalHandIndexes.Contains(wallIndex) ? CurrentHandTiles : CurrentWallTiles;
+            int cur = list.IndexOf(old);
+            if (cur >= 0)
+            {
+                list[cur] = newTileId;
+                if (list == CurrentHandTiles) SortTileIds(CurrentHandTiles);
+            }
 
             return true;
         }
