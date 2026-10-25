@@ -335,6 +335,9 @@ namespace KillingMahjong.UI
         /// <param name="onComplete">演出完了コールバック</param>
         [Header("Effects Settings")]
         [SerializeField] private Sprite bloodSplatterSprite;
+
+        /// <summary>カットインの血飛沫の絵。和了の点数表も同じ絵で模様を付ける（RonAnimationUI）。</summary>
+        public Sprite BloodSplatterSprite => bloodSplatterSprite;
         [SerializeField] private Color dimmerColor = new Color(0, 0, 0, 0.7f);
         /// <summary>
         /// 自分のスキルで出す専用の絵。画面の何割まで使ってよいか。

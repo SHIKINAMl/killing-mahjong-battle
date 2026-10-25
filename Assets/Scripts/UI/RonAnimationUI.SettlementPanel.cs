@@ -60,6 +60,8 @@ namespace KillingMahjong.UI
             CanvasGroup group = root.AddComponent<CanvasGroup>();
             group.alpha = 0f;
 
+            AddSettlementSplatter(root.transform, blue);
+
             // ---- 見出しの帯：左に「和了」、右にランク ----
             GameObject head = MakeBox(root.transform, headSprite != null ? Color.clear : PanelHead, 8, 4);
             if (headSprite != null)
@@ -178,6 +180,60 @@ namespace KillingMahjong.UI
 
             return group;
         }
+
+        /// <summary>
+        /// 表の地に血飛沫の模様を付ける（2026-10-25 のユーザー指示「能力発動のカットインの背景を作った時のような感じの模様のつけ方」）。
+        ///
+        /// カットインと同じ付け方: 既存の血飛沫の絵（Textures/UI/blood_splatter.png。PhaseTransitionUI が持っている）を、
+        /// 地の色を暗くした色に染めて、大きさと向きを変えて数枚散らす。地の上で沈んで見え、主張しない。
+        /// **字の後ろを避けて角と端に寄せる**（真ん中に置くと役の名前や数字が読みにくくなる）。
+        /// 表からはみ出した部分は切る（RectMask2D）。並び（VerticalLayoutGroup）には加わらない。
+        /// </summary>
+        private void AddSettlementSplatter(Transform root, bool blue)
+        {
+            if (settlementSplatterSprite == null)
+            {
+                var phase = FindFirstObjectByType<PhaseTransitionUI>(FindObjectsInactive.Include);
+                settlementSplatterSprite = phase != null ? phase.BloodSplatterSprite : null;
+            }
+            if (settlementSplatterSprite == null) return;
+
+            var layer = new GameObject("SplatterPattern", typeof(RectTransform), typeof(RectMask2D), typeof(LayoutElement));
+            layer.transform.SetParent(root, false);
+            layer.GetComponent<LayoutElement>().ignoreLayout = true;
+            var lr = (RectTransform)layer.transform;
+            lr.anchorMin = Vector2.zero; lr.anchorMax = Vector2.one;
+            lr.offsetMin = new Vector2(4f, 4f); lr.offsetMax = new Vector2(-4f, -4f);
+
+            // 自分（青）は夜の紺を、相手（赤）は血色を一段暗くした色。地に沈む濃さにとどめる
+            Color tint = blue ? new Color32(8, 16, 38, 150) : new Color32(30, 6, 12, 150);
+            // 置き場所は表の角と端（錨の位置、錨からのずれ、大きさ）。役の名前（左）と数字（右）の列の外側に寄せる
+            var spots = new[]
+            {
+                (anchor: new Vector2(1f, 1f), offset: new Vector2(-40f, -70f), size: 220f),
+                (anchor: new Vector2(0f, 0f), offset: new Vector2(30f, 20f), size: 190f),
+                (anchor: new Vector2(1f, 0f), offset: new Vector2(-120f, 10f), size: 120f),
+            };
+            var rng = new System.Random();
+            foreach (var spot in spots)
+            {
+                var go = new GameObject("Splatter", typeof(RectTransform), typeof(Image));
+                go.transform.SetParent(lr, false);
+                var r = (RectTransform)go.transform;
+                r.anchorMin = r.anchorMax = spot.anchor;
+                float size = spot.size * (0.85f + 0.3f * (float)rng.NextDouble());
+                r.sizeDelta = new Vector2(size, size);
+                r.anchoredPosition = spot.offset;
+                r.localRotation = Quaternion.Euler(0f, 0f, (float)rng.NextDouble() * 360f);
+                var img = go.GetComponent<Image>();
+                img.sprite = settlementSplatterSprite;
+                img.color = tint;
+                img.preserveAspect = true;
+                img.raycastTarget = false;
+            }
+        }
+
+        private Sprite settlementSplatterSprite;
 
         private static IEnumerable<string> RowNames(RonSettlementInfo s)
         {
