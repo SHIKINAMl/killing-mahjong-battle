@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using KillingMahjong.Core;
 using TMPro;
 using UnityEngine;
@@ -15,8 +14,8 @@ namespace KillingMahjong.UI
     /// 対局を選ぶ画面を開く入口（<see cref="TitleUIManager"/> の OpenMatchMenu。タイトルと部屋で同じ）で、
     /// 名前が無ければこれを先に出す。
     ///
-    /// 入力欄とクリックで打てるキーボードは契約書と同じ物（<see cref="ContractNameField"/>・<see cref="ContractKeyboardUI"/>）。
-    /// 開くとキーボードも出す（展示はマウスだけで遊ぶ）。「決定」は名前が書いてあるときだけ押せる。
+    /// 入力欄は契約書と同じ物（<see cref="ContractNameField"/>）。名前はパソコンのキーボードで打つ
+    /// （画面に出していたキーボードは雰囲気に合わないので 2026-10-25 に消した）。「決定」は名前が書いてあるときだけ押せる。
     /// 「もどる」で、対局を選ぶ画面へは進まずに元の画面へ戻る。
     ///
     /// **画面の部品はシーンに置く**（<see cref="SceneFirst"/>。タイトルシーンと部屋シーンの両方に焼き込む）。
@@ -34,17 +33,12 @@ namespace KillingMahjong.UI
         private static readonly Color OkColor = new Color32(150, 40, 48, 255);
         private static readonly Color ButtonInkColor = new Color32(250, 240, 228, 255);
 
-        /// <summary>閉じるとき、キーボードが下がり切るのを待ってから隠す秒数</summary>
-        private const float CloseSeconds = .25f;
-
         private RectTransform frame;
         private TMP_InputField input;
-        private ContractKeyboardUI keyboard;
         private Button okButton;
         private Action onDone, onCancel;
-        private Coroutine closing;
 
-        public bool IsOpen => gameObject.activeSelf && closing == null;
+        public bool IsOpen => gameObject.activeSelf;
 
         /// <summary>シーンの物を探して（無ければ作って）つなぐ。</summary>
         public static MatchNamePromptUI Ensure()
@@ -80,7 +74,7 @@ namespace KillingMahjong.UI
         {
             var font = Resources.Load<TMP_FontAsset>("PixelMplus10_DynamicFixed");
 
-            // 契約書の紙の色の板に、インクの色の縁。キーボードが出ると、この板ごと持ち上がる
+            // 契約書の紙の色の板に、インクの色の縁
             frame = Box(transform, "Frame", PanelSize + new Vector2(8f, 8f), Vector2.zero, InkColor);
             var panel = Box(frame, "Panel", PanelSize, Vector2.zero, PaperColor);
 
@@ -100,9 +94,6 @@ namespace KillingMahjong.UI
             input.onValueChanged.AddListener(_ => UpdateOk());
             input.onSubmit.RemoveAllListeners();
             input.onSubmit.AddListener(_ => Confirm());
-
-            keyboard = ContractKeyboardUI.Ensure(frame, font);
-            keyboard.Bind(input, frame);
         }
 
         /// <summary>
@@ -112,13 +103,11 @@ namespace KillingMahjong.UI
         {
             onDone = done;
             onCancel = cancel;
-            if (closing != null) { StopCoroutine(closing); closing = null; }
             gameObject.SetActive(true);
             input.interactable = true;
             input.text = "";
             UpdateOk();
-            input.ActivateInputField();
-            keyboard.Show();
+            WebImeInput.Focus(input);
         }
 
         private void UpdateOk()
@@ -143,20 +132,11 @@ namespace KillingMahjong.UI
             cancel?.Invoke();
         }
 
-        /// <summary>キーボードを下げ（板も元の高さへ戻し）、下がり切ってから隠す</summary>
         private void Close()
         {
             onDone = onCancel = null;
             input.DeactivateInputField();
             input.interactable = false;
-            keyboard.Hide(true);
-            closing = StartCoroutine(HideAfterSlide());
-        }
-
-        private IEnumerator HideAfterSlide()
-        {
-            yield return new WaitForSecondsRealtime(CloseSeconds);
-            closing = null;
             gameObject.SetActive(false);
         }
 

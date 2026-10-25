@@ -140,9 +140,7 @@ namespace KillingMahjong.Managers
                 _nameInput.onValueChanged.AddListener(_ => UpdateNextButton());
                 _nameInput.onSubmit.RemoveAllListeners();
                 _nameInput.onSubmit.AddListener(_ => { if (largePaperNextButton.interactable) OnContractSigned(); });
-                // 名前の欄を押すと下から出る、クリックで打てるキーボード（2026-10-22）
-                _nameKeyboard = ContractKeyboardUI.Ensure((RectTransform)largePaperUI.transform, label != null ? label.font : null);
-                _nameKeyboard.Bind(_nameInput, (RectTransform)largePaperUI.transform);
+                // 名前はパソコンのキーボードで打つ。画面に出していたキーボードは雰囲気に合わないので消した（2026-10-25）
 
                 StartCoroutine(SlideInLargePaperRoutine());
             }
@@ -187,11 +185,10 @@ namespace KillingMahjong.Managers
 
             _paperShown = true;
             UpdateNextButton();
-            if (_nameInput != null) _nameInput.ActivateInputField();
+            if (_nameInput != null) KillingMahjong.UI.WebImeInput.Focus(_nameInput);
         }
 
         private TMPro.TMP_InputField _nameInput;
-        private ContractKeyboardUI _nameKeyboard;
         private bool _paperShown;
 
         /// <summary>「次へ」は、契約書が出きって、名前が書いてあるときだけ押せる。</summary>
@@ -214,8 +211,6 @@ namespace KillingMahjong.Managers
             }
             // 名前を書いたので設定のボタンを戻す
             if (_optionButton != null) { _optionButton.SetActive(true); _optionButton = null; }
-            // キーボードだけしまう。契約書は持ち上げた位置からそのまま下へ滑らせる
-            if (_nameKeyboard != null) _nameKeyboard.Hide(false);
             StartCoroutine(SlideOutLargePaperRoutine());
         }
 

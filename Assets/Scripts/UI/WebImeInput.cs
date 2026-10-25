@@ -27,28 +27,25 @@ namespace KillingMahjong.UI
 #endif
         }
 
+        /// <summary>
+        /// 入力欄を選んで、すぐパソコンのキーボードで打てるようにする（2026-10-25、画面のキーボードを消したとき）。
+        /// `ActivateInputField` だけでは選ばれた扱いにならず、Web 版では日本語の欄が重ならないので、
+        /// 欄を一度押すまで日本語が打てなかった。
+        /// </summary>
+        public static void Focus(TMP_InputField input)
+        {
+            if (input == null) return;
+            input.ActivateInputField();
+            var events = EventSystem.current;
+            if (events != null && events.currentSelectedGameObject != input.gameObject)
+                events.SetSelectedGameObject(input.gameObject);
+        }
+
         public void OnPointerDown(PointerEventData eventData)
         {
             // もう開いていても開き直す（HTML の欄から離れて閉じたのと、同じフレームで押されることがある）
             Open();
         }
-
-        /// <summary>HTML の入力欄を重ねているか。Web 版以外では常に false。</summary>
-        public bool IsOpen => _open;
-
-        /// <summary>
-        /// 重ねた HTML の入力欄が押されたとき（Web 版だけ）。そこを押しても Unity の入力欄には届かないので、
-        /// 押されたら知りたい物（名前の欄のキーボード）はこれを聞く。
-        /// </summary>
-#pragma warning disable 0067 // 鳴らすのは Web 版のときだけ（エディタと Windows 版では使わない）
-        public event System.Action OverlayClicked;
-#pragma warning restore 0067
-
-        /// <summary>重ねている HTML の入力欄を閉じる（決定はしない）。画面のキーボード（<see cref="ContractKeyboardUI"/>）が使う。</summary>
-        public void CloseOverlay() => Close();
-
-        /// <summary>入力欄のいまの位置に、HTML の入力欄を重ね直す。入力欄が動いたあとに使う。</summary>
-        public void Reopen() => Open();
 
         private void Open()
         {
@@ -84,11 +81,6 @@ namespace KillingMahjong.UI
         private void Update()
         {
             if (!_open) return;
-            if (KmImeInput_ConsumeClick() == 1)
-            {
-                OverlayClicked?.Invoke();
-                if (!_open) return; // 押されたのを受けて閉じられた
-            }
             string text = KmImeInput_GetText();
             if (text != _input.text)
             {
@@ -114,9 +106,6 @@ namespace KillingMahjong.UI
 
         [System.Runtime.InteropServices.DllImport("__Internal")]
         private static extern void KmImeInput_Close();
-
-        [System.Runtime.InteropServices.DllImport("__Internal")]
-        private static extern int KmImeInput_ConsumeClick();
 #endif
     }
 }
