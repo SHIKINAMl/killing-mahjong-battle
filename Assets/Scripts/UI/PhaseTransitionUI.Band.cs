@@ -27,17 +27,30 @@ namespace KillingMahjong.UI
         /// <summary>帯の高さの倍率（シーンの HorizontalLine は高さ 120）。</summary>
         private const float BandScaleY = 2f;
 
-        /// <summary>1字ずつずらす時間。</summary>
-        private const float BandTextCharDelay = 0.04f;
+        /// <summary>
+        /// **動きはコマ打ちにする（2026-10-25 のユーザー指示「動きがヌルっとしすぎてAIっぽい。少しドットっぽく動いて」）。**
+        /// 毎フレームなめらかに動かさず、1秒に 12 コマだけ絵を変えて、その間は止める。
+        /// 文字の浮き上がりは 2 単位（1ドット）ずつ、透明度で溶かさず 1字ずつ「ポン」と出す。
+        /// </summary>
+        internal const float PixelFps = 12f;
 
-        /// <summary>1字が出きるまでの時間。</summary>
-        private const float BandTextCharDuration = 0.22f;
+        /// <summary>時間をコマの頭にそろえる。</summary>
+        internal static float StepTime(float t) => Mathf.Floor(t * PixelFps) / PixelFps;
 
-        /// <summary>1字が浮き上がる距離。ドットが粗く見えないよう小さく。</summary>
-        private const float BandTextRise = 8f;
+        /// <summary>位置を 2 単位（1ドット）にそろえる。</summary>
+        private static float SnapDot(float v) => Mathf.Round(v / 2f) * 2f;
 
-        /// <summary>文字を消すときの時間。</summary>
-        private const float BandTextFadeOut = 0.15f;
+        /// <summary>1字ずつずらす時間。1コマ。</summary>
+        private const float BandTextCharDelay = 1f / PixelFps;
+
+        /// <summary>1字が落ち着くまでの時間。2コマ（浮いた位置 → 元の位置）。</summary>
+        private const float BandTextCharDuration = 2f / PixelFps;
+
+        /// <summary>1字が浮き上がる距離。4単位（2ドット）。</summary>
+        private const float BandTextRise = 4f;
+
+        /// <summary>文字を消すときの時間。3コマ（濃い → 2/3 → 1/3 → 消える）。</summary>
+        private const float BandTextFadeOut = 3f / PixelFps;
 
         private static float EaseOutCubic(float t) { t = Mathf.Clamp01(t); float u = 1f - t; return 1f - u * u * u; }
         private static float EaseInCubic(float t) { t = Mathf.Clamp01(t); return t * t * t; }
@@ -49,7 +62,7 @@ namespace KillingMahjong.UI
             horizontalLineRt.gameObject.SetActive(true);
             for (float t = 0f; t < lineInDuration; t += Time.deltaTime)
             {
-                horizontalLineRt.localScale = new Vector3(BandFullScaleX * EaseOutCubic(t / lineInDuration), BandScaleY, 1f);
+                horizontalLineRt.localScale = new Vector3(BandFullScaleX * EaseOutCubic(StepTime(t) / lineInDuration), BandScaleY, 1f);
                 yield return null;
             }
             horizontalLineRt.localScale = new Vector3(BandFullScaleX, BandScaleY, 1f);
@@ -61,7 +74,7 @@ namespace KillingMahjong.UI
             if (horizontalLineRt == null) yield break;
             for (float t = 0f; t < lineInDuration; t += Time.deltaTime)
             {
-                horizontalLineRt.localScale = new Vector3(BandFullScaleX * (1f - EaseInCubic(t / lineInDuration)), BandScaleY, 1f);
+                horizontalLineRt.localScale = new Vector3(BandFullScaleX * (1f - EaseInCubic(StepTime(t) / lineInDuration)), BandScaleY, 1f);
                 yield return null;
             }
             horizontalLineRt.localScale = new Vector3(0f, BandScaleY, 1f);
@@ -109,20 +122,23 @@ namespace KillingMahjong.UI
             {
                 if (tmp == null) yield break;
                 bool last = t >= total;
+                float ts = StepTime(t);
                 for (int i = 0; i < count; i++)
                 {
                     var ch = info.characterInfo[i];
                     if (!ch.isVisible) continue;
-                    float p = last ? 1f : Mathf.Clamp01((t - i * charDelay) / charDuration);
-                    float rise01 = 1f - EaseOutCubic(p);
-                    float alpha = Mathf.Clamp01(p * 1.6f);
+                    // コマ打ち: 出る前は見えない、出たら濃さはそのまま、浮いた位置から1ドットずつ下りる
+                    float local = ts - i * charDelay;
+                    float p = last ? 1f : (charDuration <= 0f ? (local >= 0f ? 1f : 0f) : Mathf.Clamp01(local / charDuration));
+                    float rise01 = local < 0f && !last ? 1f : 1f - p;
+                    float alpha = last || local >= 0f ? 1f : 0f;
                     int m = ch.materialReferenceIndex;
                     int v = ch.vertexIndex;
                     var dstV = info.meshInfo[m].vertices;
                     var srcV = source[m].vertices;
                     var dstC = info.meshInfo[m].colors32;
                     var srcC = source[m].colors32;
-                    var offset = new Vector3(0f, -rise * rise01, 0f);
+                    var offset = new Vector3(0f, -SnapDot(rise * rise01), 0f);
                     for (int k = 0; k < 4; k++)
                     {
                         dstV[v + k] = srcV[v + k] + offset;
@@ -144,7 +160,7 @@ namespace KillingMahjong.UI
             for (float t = 0f; t < duration; t += Time.deltaTime)
             {
                 if (tmp == null) yield break;
-                tmp.alpha = Mathf.Lerp(from, to, t / duration);
+                tmp.alpha = Mathf.Lerp(from, to, StepTime(t) / duration);
                 yield return null;
             }
             if (tmp != null) tmp.alpha = to;
