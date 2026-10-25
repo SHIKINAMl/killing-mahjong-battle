@@ -199,8 +199,8 @@ namespace KillingMahjong.UI
             if (centerText != null && centerText.gameObject.activeInHierarchy)
             {
                 centerText.ForceMeshUpdate();
+                // その場でぱっと出す（2026-10-26 のユーザー指示。以前は1字ずつ浮かせていた）
                 centerText.alpha = 1f;
-                yield return StaggerIn(centerText, BandTextCharDelay, BandTextCharDuration, BandTextRise);
             }
         }
 

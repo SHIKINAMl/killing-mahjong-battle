@@ -13,9 +13,6 @@ namespace KillingMahjong.UI
         /// </summary>
         private const float BattleStartImpactAtFadeRatio = 0.55f;
 
-        /// <summary>局名の下の行（賭け金・残り）が出きるまでの時間。</summary>
-        private const float HpRowFadeDuration = 2f / PixelFps; // コマ打ち（2026-10-25）
-
         /// <summary>賭け金の行・VS・残りの行をずらす間隔。</summary>
         private const float HpRowStagger = 2f / PixelFps;
 
@@ -112,7 +109,8 @@ namespace KillingMahjong.UI
                 if (enemyHpObj != null) enemyHpObj.text = RestLine(startEnemyHp);
                 if (playerHpObj != null) playerHpObj.text = RestLine(startPlayerHp);
 
-                // 行ごとに時間差で出す（ステッガー）。賭け金の行 → VS → 残りの行の順に目線を下ろす
+                // 行ごとに時間差で出す。賭け金の行 → VS → 残りの行の順に目線を下ろす。
+                // 各行は動かさず、その場でぱっと出す（2026-10-26 のユーザー指示。以前は下から浮かせていた）
                 var vsTransform = hpBetContainer.transform.Find("VS");
                 var vsText = vsTransform != null ? vsTransform.GetComponent<TMPro.TextMeshProUGUI>() : null;
                 var rows = new[] { enemyBetObj, playerBetObj, vsText, enemyHpObj, playerHpObj };
@@ -122,7 +120,6 @@ namespace KillingMahjong.UI
                 {
                     if (rows[i] == null) continue;
                     rows[i].alpha = 1f;
-                    StartCoroutine(StaggerIn(rows[i], 0f, HpRowFadeDuration, BandTextRise));
                     if (i == 1 || i == 2) yield return new WaitForSeconds(HpRowStagger);
                 }
 
