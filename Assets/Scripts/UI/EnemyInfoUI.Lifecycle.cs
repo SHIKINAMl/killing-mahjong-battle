@@ -8,6 +8,9 @@ namespace KillingMahjong.UI
         public const string TutorialRevealEffectId = "tutorial.character_reveal";
         private CharacterData tutorialOriginalCharacter, tutorialRevealedCharacter;
 
+        /// <summary>赤い服の女の子の文字送りの音の高さ。通常顔.asset の値とそろえる。</summary>
+        private const float RedGirlTextBlipStartHz = 392f, RedGirlTextBlipEndHz = 392f;
+
         /// <summary>チュートリアルで先輩から本来の姿へ切り替える。共有アセットには書き込まない。</summary>
         public System.Collections.IEnumerator RevealTutorialCharacter()
         {
@@ -19,6 +22,9 @@ namespace KillingMahjong.UI
             tutorialOriginalCharacter = characterData;
             tutorialRevealedCharacter = ScriptableObject.CreateInstance<CharacterData>();
             tutorialRevealedCharacter.characterName = "ヴァンちゃん";
+            // 文字送りの音は、本編の赤い服の女の子（通常顔.asset）と同じ高さ
+            tutorialRevealedCharacter.textBlipStartHz = RedGirlTextBlipStartHz;
+            tutorialRevealedCharacter.textBlipEndHz = RedGirlTextBlipEndHz;
             tutorialRevealedCharacter.normalSprite = body;
             tutorialRevealedCharacter.discardSprite = body;
             tutorialRevealedCharacter.bodySprites.Add(new NamedSprite { id = "normal", sprite = body });

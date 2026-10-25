@@ -24,6 +24,9 @@ namespace KillingMahjong.UI
         private bool followLatestLog = true;
         private bool hasOpenedLog;
 
+        /// <summary>文字送りの音の高さを決めるために見る、画面の相手キャラ。</summary>
+        private EnemyInfoUI enemyInfo;
+
         public bool IsLogOpen => logPanel != null && logPanel.activeSelf;
 
         /// <summary>セリフ欄そのもの。チュートリアルの動画（<see cref="TutorialDrawReplayUI"/>）が見た目を写すのに使う。触らないこと。</summary>
@@ -227,6 +230,12 @@ namespace KillingMahjong.UI
             float nextSoundTime = 0f;
             int visibleCharacterCount = dialogueText.textInfo.characterCount;
 
+            // 音の高さは、いま画面にいる相手キャラで決める（2026-10-25）。金髪の先輩は低め、赤い服の女の子は高め
+            if (enemyInfo == null) enemyInfo = FindFirstObjectByType<EnemyInfoUI>();
+            var speaker = enemyInfo != null ? enemyInfo.CurrentCharacterData : null;
+            float blipStartHz = speaker != null ? speaker.TextBlipStart : CharacterData.DefaultTextBlipHz;
+            float blipEndHz = speaker != null ? speaker.TextBlipEnd : CharacterData.DefaultTextBlipHz;
+
             for (int i = 0; i < visibleCharacterCount; i++)
             {
                 dialogueText.maxVisibleCharacters = i + 1;
@@ -246,7 +255,7 @@ namespace KillingMahjong.UI
                         //
                         // **1 を超えてよい。** AudioSource.PlayOneShot の volumeScale は
                         // 頭打ちにならない。実測で vol=3 がちょうど3.2倍、vol=10 が9.6倍になった。
-                        KillingMahjong.Managers.AudioManager.Instance.PlaySynthSound(KillingMahjong.Managers.SynthWaveType.Triangle, 330f, 330f, 0.03f, 5.0f);
+                        KillingMahjong.Managers.AudioManager.Instance.PlaySynthSound(KillingMahjong.Managers.SynthWaveType.Triangle, blipStartHz, blipEndHz, 0.03f, 5.0f);
                     }
                     nextSoundTime = Time.time + 0.06f;
                 }
