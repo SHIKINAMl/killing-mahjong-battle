@@ -98,7 +98,8 @@ namespace KillingMahjong.UI
                 GameObject r = MakeBox(body.transform, Color.clear, 0, 1);
                 MakeText(r.transform, row.Name, 22f, PanelInk, TextAlignmentOptions.Left, true);
                 // 強化ぶんは黄色で独立させる。`断幺九+1` と地の文に埋めない
-                MakeText(r.transform, row.Boost > 0 ? "+" + row.Boost : "", 18f, AccentGold, TextAlignmentOptions.Right, false, 70f);
+                // 強化は翻ではなく精算の段階（満貫→跳満…）を上げるので「段」と書く（2026-10-25）
+                MakeText(r.transform, row.Boost > 0 ? "+" + row.Boost + "段" : "", 18f, AccentGold, TextAlignmentOptions.Right, false, 70f);
                 hanTexts.Add(MakeText(r.transform, "", 22f, PanelInk, TextAlignmentOptions.Right, false, 90f));
             }
 

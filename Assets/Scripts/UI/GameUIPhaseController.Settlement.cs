@@ -103,7 +103,12 @@ namespace KillingMahjong.UI
                 int baseHan = KillingMahjong.GameRules.GetBaseHan(e.BaseName);
                 if (baseHan < 0) allKnown = false;
 
-                int rowHan = (Mathf.Max(baseHan, 0) + e.Boost) * e.Count;
+                // **役強化は翻を足さない。** サーバーでは強化は翻数ではなく精算の段階を上げる
+                // （mahjong_engine/engine/game_engine.py の _calc_agari_han / promoted_tier）。
+                // 強化ぶんを翻に足していたため合計がサーバーの han と合わず、強化した役があると
+                // 役ごとの翻がすべて伏せられていた（2026-10-25 のユーザー指摘「清算の時、役の翻が表示されないときがある」）。
+                // 強化は「+1」の列に別に出す
+                int rowHan = Mathf.Max(baseHan, 0) * e.Count;
                 rowSum += rowHan;
 
                 // 最後の枠は「他N役」に使うので、あふれると分かった時点で畳む
