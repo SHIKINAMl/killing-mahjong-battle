@@ -18,23 +18,15 @@ namespace KillingMahjong.UI
             out TextMeshProUGUI myDeltaText, out TextMeshProUGUI theirDeltaText,
             out TextMeshProUGUI myHpText, out TextMeshProUGUI theirHpText)
         {
-            // 背景はドット絵（2026-10-25 のユーザー指示「表の背景をドットっぽく。codexに今までのドットの作り方で作らせて。
-            // 自分が上がるときは青で、敵が上がるときは赤にして」）。codex が1ドットずつ描いた絵（km-docs
-            // screenshots/20261025/settlement_pixel/ の v2）。**Tiled（繰り返し）で使う。** 伸ばすとディザの網目が崩れる。
-            // 絵は 1ドット＝2UI単位（Pixels Per Unit 50）。絵が読めないときは前の色の四角に戻る
+            // 自分が上がったときは青、相手が上がったときは赤（2026-10-25 のユーザー指示）。
+            // **枠は付けない。** 単色の地に、血飛沫の模様（AddSettlementSplatter）を重ねるだけ。
+            // codex のドット絵の枠を3通り試したが、ユーザーから「表の枠が微妙」「端っこの枠みたいなもんはいらない」。
+            // 色は codex の2回目の絵の地と帯の色（km-docs screenshots/20261025/settlement_pixel/README.md）
             bool blue = s.LocalWon;
             GameObject root = new GameObject("SettlementPanel");
             root.transform.SetParent(parent, false);
             Image rootImg = root.AddComponent<Image>();
-            var panelSprite = Resources.Load<Sprite>(blue ? PanelSpriteBlue : PanelSpriteRed);
-            var headSprite = Resources.Load<Sprite>(blue ? HeadSpriteBlue : HeadSpriteRed);
-            if (panelSprite != null)
-            {
-                rootImg.sprite = panelSprite;
-                rootImg.type = Image.Type.Tiled;
-                rootImg.color = Color.white;
-            }
-            else rootImg.color = PanelLine;
+            rootImg.color = blue ? GroundBlue : GroundRed;
 
             RectTransform rootRt = root.GetComponent<RectTransform>();
             rootRt.anchorMin = rootRt.anchorMax = new Vector2(0.5f, 0.5f);
@@ -50,7 +42,7 @@ namespace KillingMahjong.UI
             rootFit.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
             var rootLayout = root.AddComponent<VerticalLayoutGroup>();
-            rootLayout.padding = new RectOffset(4, 4, 4, 4);
+            rootLayout.padding = new RectOffset(0, 0, 0, 0);
             rootLayout.spacing = 0;
             rootLayout.childControlWidth = true;
             rootLayout.childControlHeight = true;
@@ -63,17 +55,8 @@ namespace KillingMahjong.UI
             AddSettlementSplatter(root.transform, blue);
 
             // ---- 見出しの帯：左に「和了」、右にランク ----
-            GameObject head = MakeBox(root.transform, headSprite != null ? Color.clear : PanelHead, 8, 4);
-            if (headSprite != null)
-            {
-                // 帯も絵（552x40 に繰り返し）。高さは絵に合わせて 40 で固定
-                var headImg = head.AddComponent<Image>();
-                headImg.sprite = headSprite;
-                headImg.type = Image.Type.Tiled;
-                headImg.color = Color.white;
-                var headLe = head.AddComponent<LayoutElement>();
-                headLe.minHeight = headLe.preferredHeight = 40f;
-            }
+            // 帯は地より一段明るい同じ系統の色。端まで塗り、縁や飾りは付けない
+            GameObject head = MakeBox(root.transform, blue ? HeadBlue : HeadRed, 16, 6);
             MakeText(head.transform, "和了", 20f, PanelInk, TextAlignmentOptions.Left, true);
             // 型の答え合わせ（2026-10-15）。相手に和了られたときに「相手は染めだった」と分かれば、
             // 次からその捨て牌の特徴を覚えていける。行を足すと役5行で画面からはみ出すので見出しに入れる
@@ -90,12 +73,9 @@ namespace KillingMahjong.UI
             // ---- 中身（地の色） ----
             GameObject body = new GameObject("Body");
             body.transform.SetParent(root.transform, false);
-            // 地は背景の絵が持つので、絵があるときは塗らない（塗ると絵の色が隠れる）
-            if (panelSprite == null) body.AddComponent<Image>().color = PanelBg;
+            // 地は表（root）の色をそのまま見せる
             var bodyLayout = body.AddComponent<VerticalLayoutGroup>();
-            // 絵の帯の下にはディザの網目が 12 単位ある（表の上から 44〜56）。字はその下から書き始める。
-            // 下端も網目と角があるので、表の下から 16 は空ける（外の余白 4 と合わせて）
-            bodyLayout.padding = panelSprite != null ? new RectOffset(12, 12, 12, 12) : new RectOffset(12, 12, 6, 6);
+            bodyLayout.padding = new RectOffset(16, 16, 8, 10);
             bodyLayout.spacing = 1;
             bodyLayout.childControlWidth = true;
             bodyLayout.childControlHeight = true;
