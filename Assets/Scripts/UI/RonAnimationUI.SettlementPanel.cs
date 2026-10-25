@@ -164,52 +164,65 @@ namespace KillingMahjong.UI
         /// <summary>
         /// 表の地に血飛沫の模様を付ける（2026-10-25 のユーザー指示「能力発動のカットインの背景を作った時のような感じの模様のつけ方」）。
         ///
-        /// カットインと同じ付け方: 既存の血飛沫の絵（Textures/UI/blood_splatter.png。PhaseTransitionUI が持っている）を、
-        /// 地の色を暗くした色に染めて、大きさと向きを変えて数枚散らす。地の上で沈んで見え、主張しない。
-        /// **字の後ろを避けて角と端に寄せる**（真ん中に置くと役の名前や数字が読みにくくなる）。
-        /// 表からはみ出した部分は切る（RectMask2D）。並び（VerticalLayoutGroup）には加わらない。
+        /// カットインと同じ付け方で、既存の血飛沫の絵（Textures/UI/blood_splatter.png）を地より暗い色で数枚散らす。
+        /// **絵は Image-to-Pixel（Tezumie, MIT）と同じ手順でドット絵にした物**（同日のユーザー指示「これの作り方で作ってみてほしい」）:
+        /// 72x72 に縮め、形は Bayer 4x4、濃淡は地より暗い3色に Floyd–Steinberg で置き換えた（km-docs tools/pixelate_splatter.py）。
+        /// ドットを崩さないため、回転させず等倍（1ドット＝2UI単位）で置き、左右・上下の反転だけで変化を付ける。
+        /// ドット絵が読めないときは、元の絵を染めて回して置く（カットインと同じ）。
+        /// **字の後ろを避けて角と端に寄せる**。表からはみ出した部分は切る（RectMask2D）。並び（VerticalLayoutGroup）には加わらない。
         /// </summary>
         private void AddSettlementSplatter(Transform root, bool blue)
         {
-            if (settlementSplatterSprite == null)
+            var pixelSprite = Resources.Load<Sprite>(blue ? SplatterPixelBlue : SplatterPixelRed);
+            if (pixelSprite == null && settlementSplatterSprite == null)
             {
                 var phase = FindFirstObjectByType<PhaseTransitionUI>(FindObjectsInactive.Include);
                 settlementSplatterSprite = phase != null ? phase.BloodSplatterSprite : null;
             }
-            if (settlementSplatterSprite == null) return;
+            if (pixelSprite == null && settlementSplatterSprite == null) return;
 
             var layer = new GameObject("SplatterPattern", typeof(RectTransform), typeof(RectMask2D), typeof(LayoutElement));
             layer.transform.SetParent(root, false);
             layer.GetComponent<LayoutElement>().ignoreLayout = true;
             var lr = (RectTransform)layer.transform;
             lr.anchorMin = Vector2.zero; lr.anchorMax = Vector2.one;
-            lr.offsetMin = new Vector2(4f, 4f); lr.offsetMax = new Vector2(-4f, -4f);
+            lr.offsetMin = lr.offsetMax = Vector2.zero;
 
-            // 自分（青）は夜の紺を、相手（赤）は血色を一段暗くした色。地に沈む濃さにとどめる
-            Color tint = blue ? new Color32(8, 16, 38, 150) : new Color32(30, 6, 12, 150);
-            // 置き場所は表の角と端（錨の位置、錨からのずれ、大きさ）。役の名前（左）と数字（右）の列の外側に寄せる
+            // 置き場所は表の角と端（錨の位置、錨からのずれ）。役の名前（左）と数字（右）の列の外側に寄せる
             var spots = new[]
             {
-                (anchor: new Vector2(1f, 1f), offset: new Vector2(-40f, -70f), size: 220f),
-                (anchor: new Vector2(0f, 0f), offset: new Vector2(30f, 20f), size: 190f),
-                (anchor: new Vector2(1f, 0f), offset: new Vector2(-120f, 10f), size: 120f),
+                (anchor: new Vector2(1f, 1f), offset: new Vector2(-50f, -80f)),
+                (anchor: new Vector2(0f, 0f), offset: new Vector2(40f, 30f)),
+                (anchor: new Vector2(1f, 0f), offset: new Vector2(-150f, 20f)),
             };
             var rng = new System.Random();
+            // 元の絵を使うときの色（地の色を一段暗くした色）。ドット絵は絵の色そのまま
+            Color tint = blue ? new Color32(8, 16, 38, 150) : new Color32(30, 6, 12, 150);
             foreach (var spot in spots)
             {
                 var go = new GameObject("Splatter", typeof(RectTransform), typeof(Image));
                 go.transform.SetParent(lr, false);
                 var r = (RectTransform)go.transform;
                 r.anchorMin = r.anchorMax = spot.anchor;
-                float size = spot.size * (0.85f + 0.3f * (float)rng.NextDouble());
-                r.sizeDelta = new Vector2(size, size);
                 r.anchoredPosition = spot.offset;
-                r.localRotation = Quaternion.Euler(0f, 0f, (float)rng.NextDouble() * 360f);
                 var img = go.GetComponent<Image>();
-                img.sprite = settlementSplatterSprite;
-                img.color = tint;
-                img.preserveAspect = true;
                 img.raycastTarget = false;
+                if (pixelSprite != null)
+                {
+                    img.sprite = pixelSprite;
+                    img.color = Color.white;
+                    r.sizeDelta = pixelSprite.rect.size * 2f; // 1ドット＝2UI単位
+                    r.localScale = new Vector3(rng.Next(2) == 0 ? 1f : -1f, rng.Next(2) == 0 ? 1f : -1f, 1f);
+                }
+                else
+                {
+                    img.sprite = settlementSplatterSprite;
+                    img.color = tint;
+                    img.preserveAspect = true;
+                    float size = 190f * (0.85f + 0.3f * (float)rng.NextDouble());
+                    r.sizeDelta = new Vector2(size, size);
+                    r.localRotation = Quaternion.Euler(0f, 0f, (float)rng.NextDouble() * 360f);
+                }
             }
         }
 
