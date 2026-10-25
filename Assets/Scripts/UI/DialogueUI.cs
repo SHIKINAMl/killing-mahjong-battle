@@ -288,11 +288,89 @@ namespace KillingMahjong.UI
         {
             if (string.IsNullOrEmpty(skillType)) return;
             string text = (isLocalPlayer ? "自分" : "敵") + "：" + Common.SkillNames.GetDisplayName(skillType);
-            AddToLog(text, isLocalPlayer ? new Color32(63, 158, 239, 255) : new Color32(237, 72, 88, 255), isLocalPlayer);
+            var row = AddToLog(text, isLocalPlayer ? new Color32(63, 158, 239, 255) : new Color32(237, 72, 88, 255), isLocalPlayer);
+
+            // 役強化は、何を強化したかも書く（2026-10-25 のユーザー指示「ログで役強化した時、何を強化したのかというのもログに表示してほしい」）。
+            // skill_casted には役の名前が入っていないので、強化の一覧（BoardStateManager の LocalBoostHandBonus /
+            // EnemyBoostHandBonus。サーバーの状態の知らせで更新される）が増えたところで書き足す
+            if (skillType == Common.SkillNames.BoostHand && row != null)
+            {
+                // 状態の知らせが先に届いていたら、そのとき増えた役（少しだけ取っておいてある）を使う
+                var early = isLocalPlayer ? unclaimedLocalBoosts : unclaimedEnemyBoosts;
+                if (early.names.Count > 0 && Time.realtimeSinceStartup - early.at <= UnclaimedBoostSeconds)
+                {
+                    WriteBoostTargets(row, text, early.names);
+                    early.names.Clear();
+                }
+                else
+                {
+                    early.names.Clear();
+                    pendingBoostLogs.Add((isLocalPlayer, row, text));
+                }
+            }
         }
 
-        private void AddToLog(string text, Color? skillColor = null, bool isLocalPlayer = false)
+        // ---- 役強化のログに対象の役を書き足す ----
+        private readonly List<(bool local, TextMeshProUGUI row, string baseText)> pendingBoostLogs = new List<(bool, TextMeshProUGUI, string)>();
+        private Dictionary<string, int> seenLocalBoosts = new Dictionary<string, int>();
+        private Dictionary<string, int> seenEnemyBoosts = new Dictionary<string, int>();
+
+        /// <summary>
+        /// 強化の一覧が届いたら呼ぶ。前に見た一覧から増えた役を、書き足し待ちの役強化の行へ足す。
+        /// 書き足し待ちが無ければ、見た一覧を覚え直すだけ（局の初めに配られる強化はログに出さない）。
+        /// </summary>
+        public void ResolveBoostLog(Dictionary<string, int> local, Dictionary<string, int> enemy, bool openingBoosts = false)
         {
+            foreach (bool isLocal in new[] { true, false })
+            {
+                var added = BoostIncrease(isLocal ? local : enemy, isLocal ? seenLocalBoosts : seenEnemyBoosts);
+                if (added.Count == 0 || openingBoosts) continue;
+                int i = pendingBoostLogs.FindIndex(p => p.local == isLocal);
+                if (i >= 0)
+                {
+                    var (_, row, baseText) = pendingBoostLogs[i];
+                    WriteBoostTargets(row, baseText, added);
+                    pendingBoostLogs.RemoveAt(i);
+                }
+                else
+                {
+                    // 役強化の行より先に状態の知らせが来た。行が来るまで少しだけ取っておく
+                    var early = isLocal ? unclaimedLocalBoosts : unclaimedEnemyBoosts;
+                    early.names.Clear(); early.names.AddRange(added); early.at = Time.realtimeSinceStartup;
+                }
+            }
+            seenLocalBoosts = local != null ? new Dictionary<string, int>(local) : new Dictionary<string, int>();
+            seenEnemyBoosts = enemy != null ? new Dictionary<string, int>(enemy) : new Dictionary<string, int>();
+        }
+
+        /// <summary>状態の知らせと skill_casted は続けて届くので、この秒数より前に増えた役は別物とみなす。</summary>
+        private const float UnclaimedBoostSeconds = 3f;
+
+        private sealed class UnclaimedBoosts { public readonly List<string> names = new List<string>(); public float at; }
+        private readonly UnclaimedBoosts unclaimedLocalBoosts = new UnclaimedBoosts();
+        private readonly UnclaimedBoosts unclaimedEnemyBoosts = new UnclaimedBoosts();
+
+        private static List<string> BoostIncrease(Dictionary<string, int> now, Dictionary<string, int> seen)
+        {
+            var added = new List<string>();
+            if (now != null)
+                foreach (var kv in now)
+                    if (kv.Value > 0 && (!seen.TryGetValue(kv.Key, out int before) || kv.Value > before)) added.Add(kv.Key);
+            added.Sort(System.StringComparer.Ordinal);
+            return added;
+        }
+
+        private void WriteBoostTargets(TextMeshProUGUI row, string baseText, List<string> names)
+        {
+            string full = baseText + "（" + string.Join("・", names) + "）";
+            if (row != null) row.text = full;
+            int h = dialogueHistory.LastIndexOf(baseText);
+            if (h >= 0) dialogueHistory[h] = full;
+        }
+
+        private TextMeshProUGUI AddToLog(string text, Color? skillColor = null, bool isLocalPlayer = false)
+        {
+            TextMeshProUGUI created = null;
             dialogueHistory.Add(text);
             
             if (logContainer != null && logItemPrefab != null)
@@ -311,6 +389,7 @@ namespace KillingMahjong.UI
                 {
                     tmp.text = text;
                 }
+                created = tmp;
                 if (skillColor.HasValue)
                 {
                     var color = skillColor.Value;
@@ -328,6 +407,7 @@ namespace KillingMahjong.UI
 
                 if (visible) ScheduleLogScroll(scroll, position);
             }
+            return created;
         }
 
         private static bool IsNearLatestLog(ScrollRect scroll)

@@ -16,6 +16,8 @@ namespace KillingMahjong.UI
             {
                 yakuListUI.UpdateBoostData(BoardStateManager.Instance.LocalBoostHandBonus, BoardStateManager.Instance.EnemyBoostHandBonus);
             }
+            // 役強化のログに、強化した役を書き足す（2026-10-25）
+            DialogueUI?.ResolveBoostLog(BoardStateManager.Instance.LocalBoostHandBonus, BoardStateManager.Instance.EnemyBoostHandBonus);
         }
 
         private void HandleOpeningBoostAssigned()
@@ -24,6 +26,8 @@ namespace KillingMahjong.UI
             {
                 yakuListUI.UpdateBoostData(BoardStateManager.Instance.LocalBoostHandBonus, BoardStateManager.Instance.EnemyBoostHandBonus);
             }
+            // 局の初めに配られる強化はログに出さない。見た一覧として覚えておくだけ
+            DialogueUI?.ResolveBoostLog(BoardStateManager.Instance.LocalBoostHandBonus, BoardStateManager.Instance.EnemyBoostHandBonus, openingBoosts: true);
         }
 
         private bool _isAgariPending = false;
