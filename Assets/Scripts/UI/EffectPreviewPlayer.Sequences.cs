@@ -121,9 +121,7 @@ namespace KillingMahjong.UI
                     bool drawn = false; rig.phase.PlayDrawTransition(() => { }, () => drawn = true);
                     yield return Until(() => drawn); break;
                 case TutorialDrawReplayUI.EffectId:
-                    var replay = TutorialDrawReplayUI.Create(transform);
-                    try { yield return replay.Play(true); }
-                    finally { if (replay != null) replay.Close(); }
+                    yield return PreviewTutorialPhoneVideo(false);
                     break;
                 case "ron.chance":
                     RonChanceEffect.Show(rig.handTiles[6]); yield return new WaitForSeconds(3f); break;
@@ -160,9 +158,7 @@ namespace KillingMahjong.UI
                     finally { if (revival != null) revival.Close(); }
                     break;
                 case TutorialDrawReplayUI.ContinuationEffectId:
-                    var continuedReplay = TutorialDrawReplayUI.Create(transform);
-                    try { yield return continuedReplay.PlayContinuation(true); }
-                    finally { if (continuedReplay != null) continuedReplay.Close(); }
+                    yield return PreviewTutorialPhoneVideo(true);
                     break;
                 case EnemyInfoUI.TutorialRevealEffectId:
                     // 先輩の絵は顔まで1枚（2026-10-25）。顔の層は空にする
@@ -182,6 +178,26 @@ namespace KillingMahjong.UI
                 default: yield return PlaySmallEffect(); break;
             }
             yield return new WaitForSeconds(.6f);
+        }
+
+        private IEnumerator PreviewTutorialPhoneVideo(bool continuation)
+        {
+            var body = rig.character.sprite;
+            var face = rig.face.sprite;
+            rig.character.sprite = Resources.Load<Sprite>("女の子/tutorialexe_smartphone");
+            rig.face.sprite = null;
+            var replay = TutorialDrawReplayUI.Create(transform, rig.enemy);
+            try
+            {
+                if (continuation) yield return replay.PlayContinuation(true);
+                else yield return replay.Play(true);
+            }
+            finally
+            {
+                if (replay != null) replay.Close();
+                rig.character.sprite = body;
+                rig.face.sprite = face;
+            }
         }
 
         /// <summary>

@@ -22,13 +22,7 @@ namespace KillingMahjong.UI
             subtitles.Hide();
             SetCharacter("通常時身体", "通常顔");
             SetTurnCounter(17); // 「人生最後の牌」の場面。両者17打ち終える最後の1打
-            transform.localScale = Vector3.one * .4f;
-            for (float t = 0; t < 1; t += Time.unscaledDeltaTime)
-            {
-                transform.localScale = Vector3.one * Mathf.SmoothStep(.4f, 1f, t);
-                yield return null;
-            }
-            transform.localScale = Vector3.one;
+            yield return OpenFromPhone();
             foreach (var canvas in phase.GetComponentsInChildren<Canvas>(true))
             {
                 canvas.enabled = true; canvas.overrideSorting = true; canvas.sortingOrder = 91;
@@ -109,11 +103,7 @@ namespace KillingMahjong.UI
             else yield return new WaitUntil(() => advanced);
             advance.gameObject.SetActive(false);
             close.gameObject.SetActive(false);
-            for (float t = 0; t < 1; t += Time.unscaledDeltaTime * 2.5f)
-            {
-                transform.localScale = Vector3.one * Mathf.SmoothStep(1f, .4f, t);
-                yield return null;
-            }
+            yield return ReturnToPhone();
         }
 
         /// <summary>倒れ伏した絵の拡大率と置き場所（動画の枠の中、真ん中から）。左下の手前に、頭を左上にして伏せる</summary>

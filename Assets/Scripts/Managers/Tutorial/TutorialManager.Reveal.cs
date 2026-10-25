@@ -37,7 +37,7 @@ namespace KillingMahjong.Managers
             if (dialogueUI != null) { dialogueUI.HideText(); dialogueUI.HideAdvanceOnAnyClick(); }
             // 動画を見せるあいだは、スマホを差し出す絵にする
             SetSeniorPose(SeniorPhonePose);
-            var replay = TutorialDrawReplayUI.Create(transform);
+            var replay = TutorialDrawReplayUI.Create(transform, gameUIManager != null ? gameUIManager.EnemyInfoUI : null);
             try { yield return replay.PlayContinuation(); }
             finally { if (replay != null) replay.Close(); SetSeniorPose(SeniorNormalPose); }
             if (_aborted) yield break;

@@ -25,7 +25,7 @@ namespace KillingMahjong.Managers
                 new TutorialLine("ちょっと長いし、アタシの昔の対戦動画があるからこれで見よっか"),
             });
             ClearGuide();
-            var replay=TutorialDrawReplayUI.Create(transform);
+            var replay=TutorialDrawReplayUI.Create(transform, gameUIManager != null ? gameUIManager.EnemyInfoUI : null);
             try { yield return replay.Play(); }
             finally { if(replay!=null) replay.Close(); SetSeniorPose(SeniorNormalPose); }
         }

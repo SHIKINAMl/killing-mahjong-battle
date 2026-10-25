@@ -34,12 +34,14 @@ namespace KillingMahjong.UI
         private float tauntStarted;
         private static readonly Vector2 CharacterPosition = new Vector2(0, 15);
 
-        public static TutorialDrawReplayUI Create(Transform owner = null)
+        public static TutorialDrawReplayUI Create(Transform owner = null, EnemyInfoUI phoneOwner = null)
         {
             var go = new GameObject("TutorialDrawReplay", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler),
                 typeof(GraphicRaycaster), typeof(TutorialDrawReplayUI));
             if (owner != null) go.transform.SetParent(owner, false);
-            var ui = go.GetComponent<TutorialDrawReplayUI>(); ui.Build(); return ui;
+            var ui = go.GetComponent<TutorialDrawReplayUI>();
+            ui.phoneCharacter = phoneOwner != null ? phoneOwner.CharacterRenderer : null;
+            ui.Build(); return ui;
         }
 
         private RectTransform Box(string name, Transform parent, Vector2 size, Vector2 pos, Color color)
@@ -134,6 +136,7 @@ namespace KillingMahjong.UI
             pauseRect.offsetMin=Vector2.zero; pauseRect.offsetMax=Vector2.zero; pauseRect.localScale=Vector3.one;
             paused=Label("ReplayPaused",pauseLayer.transform,new Vector2(160,70),new Vector2(300,240),24);
             paused.text="Ⅱ\n再生停止"; paused.gameObject.SetActive(false);
+            BuildPhonePresentation();
         }
         /// <summary>
         /// 動画の中の通常セリフは、本編のセリフ欄（<see cref="DialogueUI"/> の吹き出し）を写して使う
@@ -279,10 +282,9 @@ namespace KillingMahjong.UI
             tauntBobbing = false;
             SetCharacter("通常時身体", "通常顔");
             SetCharacterPosition(CharacterPosition);
-            automatic=autoAdvance; IsPaused=false; StepIndex=0; transform.localScale=Vector3.one*.4f;
+            automatic=autoAdvance; IsPaused=false; StepIndex=0;
             stepCount=StepCount; progressStart=0f; progressEnd=.5f;
-            for(float t=0;t<1;t+=Time.unscaledDeltaTime) { transform.localScale=Vector3.one*Mathf.SmoothStep(.4f,1,t); yield return null; }
-            transform.localScale=Vector3.one;
+            yield return OpenFromPhone();
             // PhaseTransitionUI.Start が通常対局の層へ戻すので、初期化後に動画内の層を適用する。
             foreach(var cv in phase.GetComponentsInChildren<Canvas>(true)) {
                 cv.enabled=true; cv.overrideSorting=true; cv.sortingOrder=91;
@@ -340,7 +342,7 @@ namespace KillingMahjong.UI
             yield return Step("まぁ誰かがロンして流局を止めれば次からはまた自由に賭けれるから",true);
             yield return Step("そんな合計が元々賭けた額の何倍にも積みあがったりはしないけど",true);
             // スマホを引っ込めて動画空間終了（シークバーは半分残したまま）
-            for(float t=0;t<1;t+=Time.unscaledDeltaTime*2.5f) { transform.localScale=Vector3.one*Mathf.SmoothStep(1,.4f,t); yield return null; }
+            yield return ReturnToPhone();
         }
 
         /// <summary>動画で先輩が賭けている額。上の BettingCompletedInfo と同じ値。</summary>
