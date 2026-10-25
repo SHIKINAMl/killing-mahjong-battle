@@ -59,6 +59,12 @@ namespace KillingMahjong.UI
         private static readonly Color PanelBg    = new Color32(0x1A, 0x14, 0x18, 0xF2); // 暗いガラス：地
         private static readonly Color PanelInk   = new Color32(0xF5, 0xF5, 0xDC, 0xFF); // 生成り
         private static readonly Color PanelFaint = new Color32(0xD2, 0xC1, 0x95, 0xFF); // くすんだ金：見出し語
+
+        // 点数表の背景のドット絵。自分の和了＝青、相手の和了＝赤（2026-10-25）
+        private const string PanelSpriteBlue = "UI/Settlement/settlement_blue_panel";
+        private const string PanelSpriteRed = "UI/Settlement/settlement_red_panel";
+        private const string HeadSpriteBlue = "UI/Settlement/settlement_blue_header";
+        private const string HeadSpriteRed = "UI/Settlement/settlement_red_header";
         private static readonly Color AccentGold = new Color32(0xFF, 0xD3, 0x4D, 0xFF); // 翻数
         private static readonly Color AccentMine = new Color32(0x57, 0xC7, 0xE8, 0xFF); // 自分
         private static readonly Color AccentThem = new Color32(0xF2, 0x70, 0x5A, 0xFF); // 相手
