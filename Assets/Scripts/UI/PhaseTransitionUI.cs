@@ -313,10 +313,18 @@ namespace KillingMahjong.UI
 
         public void ChangeDarkenText(string text)
         {
-            if (isDarkened && centerText != null)
+            if (isDarkened && centerText != null && centerText.text != text)
             {
-                centerText.text = text;
+                // 暗転中の文字の差し替えも、薄くして消してから1字ずつ出す（2026-10-25）
+                if (isActiveAndEnabled) StartCoroutine(SwapDarkenText(text));
+                else centerText.text = text;
             }
+        }
+
+        private System.Collections.IEnumerator SwapDarkenText(string text)
+        {
+            yield return HideBandText();
+            yield return RevealBandText(text);
         }
 
 

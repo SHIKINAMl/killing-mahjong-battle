@@ -295,6 +295,13 @@ namespace KillingMahjong.UI
             new Art("UI/RonHands/ron_hand_01", "ron_hand_01", "UI・背景"),
             new Art("UI/RonHands/ron_hand_02", "ron_hand_02", "UI・背景"),
             new Art("UI/RonHands/ron_hand_03", "ron_hand_03", "UI・背景"),
+            // 和了の点数表（2026-10-25）。地と帯はデバッグ部屋の本と同じ作り、血飛沫は blood_splatter.png をドット絵にした物
+            new Art("UI/Settlement/settlement_ground_blue", "settlement_ground_blue", "UI・背景"),
+            new Art("UI/Settlement/settlement_ground_red", "settlement_ground_red", "UI・背景"),
+            new Art("UI/Settlement/settlement_head_blue", "settlement_head_blue", "UI・背景"),
+            new Art("UI/Settlement/settlement_head_red", "settlement_head_red", "UI・背景"),
+            new Art("UI/Settlement/settlement_splatter_blue", "settlement_splatter_blue", "UI・背景"),
+            new Art("UI/Settlement/settlement_splatter_red", "settlement_splatter_red", "UI・背景"),
             new Art("UI_Anim1", "UI_Anim1", "UI・背景"),
             new Art("UI_Anim10", "UI_Anim10", "UI・背景"),
             new Art("UI_Anim2", "UI_Anim2", "UI・背景"),

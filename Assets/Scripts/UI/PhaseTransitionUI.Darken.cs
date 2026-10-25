@@ -163,8 +163,10 @@ namespace KillingMahjong.UI
             {
                 PlayTransitionStinger("br_blackout");
                 centerText.text = text;
-                centerText.gameObject.SetActive(true);
                 centerText.color = Color.white;
+                // 字は下で1字ずつ出すので、それまでは透明にしておく
+                centerText.alpha = 0f;
+                centerText.gameObject.SetActive(true);
             }
 
             // 盤面リセットと黒幕の準備を終えてから、進行管理へ反映可能を通知する。
@@ -175,9 +177,11 @@ namespace KillingMahjong.UI
 
             if (centerText != null)
             {
-                // **局名は、中央にぱっと出すだけ（2026-10-11 のユーザー指示）。**
+                // **局名は、中央に置いて大きさは変えない（2026-10-11 のユーザー指示）。**
                 // それまでは3倍の大きさから 0.4 秒で縮めて着弾させ、画面を揺らしていた。
-                // 手前から中央へ文字が飛んでくるように見えるので、やめた。着弾が無いので揺れも外した
+                // 手前から中央へ文字が飛んでくるように見えるので、やめた。着弾が無いので揺れも外した。
+                // 出し方は帯の文字と同じく、1字ずつ時間差で少し浮かせて出す（2026-10-25 のユーザー指示
+                // 「一局目などの遷移の演出を作っていたのですが、それが適応されていなかった」）。下の 1 フレーム後に始める
                 centerText.transform.localScale = Vector3.one;
             }
 
@@ -192,7 +196,12 @@ namespace KillingMahjong.UI
             // 撮影では暗転の間ずっと写らなかった（文字の形は正しく渡っていて、渡し直すと写る）。本編は直後に
             // 裏牌の山を置くので描き直しが走るが、チュートリアルは山を置かない。描き直しを自前で一度起こしておく
             yield return null;
-            if (centerText != null && centerText.gameObject.activeInHierarchy) centerText.ForceMeshUpdate();
+            if (centerText != null && centerText.gameObject.activeInHierarchy)
+            {
+                centerText.ForceMeshUpdate();
+                centerText.alpha = 1f;
+                yield return StaggerIn(centerText, BandTextCharDelay, BandTextCharDuration, BandTextRise);
+            }
         }
 
         /// <summary>局名を出したあとに置く裏牌の高さ。**画面の下端から測る**（待ち画面と同じ）。</summary>
@@ -240,8 +249,8 @@ namespace KillingMahjong.UI
             // 直接呼ばれても困らないようにここでも通しておく。
             MarkRoundStartCleanupDone();
 
-            // テキストを隠す
-            if (centerText != null) centerText.gameObject.SetActive(false);
+            // テキストを隠す。パッと消さず、薄くして消す（2026-10-25）
+            yield return HideBandText();
             if (horizontalLineRt != null) horizontalLineRt.gameObject.SetActive(false);
 
             // 市松模様フェードアウト (晴れる)。上がり切ったところでキックが着地する

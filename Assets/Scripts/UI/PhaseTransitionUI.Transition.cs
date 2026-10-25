@@ -79,8 +79,14 @@ namespace KillingMahjong.UI
             onMidpoint?.Invoke();
 
             Debug.Log("PhaseTransition: Step 3 - Round Text");
-            // === 3. 「対局開始」が消えて「1 Round」になる ===
-            if (centerText != null) centerText.text = roundName; // e.g. "1 Round"
+            // === 3. 「対局開始」が消えて「第N局目」になる ===
+            // パッと差し替えず、薄くして消してから1字ずつ出す（2026-10-25 のユーザー指示
+            // 「一局目などの遷移の演出を作っていたのですが、それが適応されていなかった」）
+            if (centerText != null && !(centerText.gameObject.activeSelf && centerText.text == roundName))
+            {
+                yield return HideBandText();
+                yield return RevealBandText(roundName);
+            }
             
             Debug.Log("PhaseTransition: Step 4 - HP Deduction");
             // === 4. 賭け金とHP増減表示 ===

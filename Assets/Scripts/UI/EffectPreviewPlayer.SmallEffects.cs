@@ -165,6 +165,17 @@ namespace KillingMahjong.UI
                 case "dialogue.typewriter":
                     rig.dialogue.gameObject.SetActive(true);
                     rig.dialogue.ShowText("これは演出の再生見本です。文字送りとキャラクターの動きを確認できます。"); break;
+                case "dialogue.log":
+                    // ログに数行ためてから開く（2026-10-25 に、部屋に浮かぶ過去の吹き出しにした）
+                    rig.dialogue.gameObject.SetActive(true);
+                    foreach (var logLine in new[] { "「おっ後輩ちゃんじゃーん」", "「先輩を助けに来たんだな？えらいぞー」", "「まっ長くなっちゃったから早速ルール説明するわ」" })
+                    {
+                        rig.dialogue.ShowText(logLine);
+                        yield return new WaitForSeconds(1.2f);
+                    }
+                    rig.dialogue.OpenLog();
+                    yield return new WaitForSeconds(3f);
+                    rig.dialogue.CloseLog(); break;
                 case "camera.zoom":
                     var zoom = rig.viewCamera.gameObject.AddComponent<CameraZoomController>();
                     yield return zoom.ZoomToTargetRoutine(rig.character.transform); yield return new WaitForSeconds(1f);
