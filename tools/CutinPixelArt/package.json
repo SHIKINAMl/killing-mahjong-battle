@@ -5,7 +5,8 @@
   "scripts": {
     "generate": "node generate.mjs",
     "verify": "node verify.mjs",
-    "skill": "node skill.mjs"
+    "skill": "node skill.mjs",
+    "settlement": "node settlement.mjs"
   },
   "dependencies": {
     "image-to-pixel": "3.1.0",

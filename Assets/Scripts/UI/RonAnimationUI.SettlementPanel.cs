@@ -55,8 +55,18 @@ namespace KillingMahjong.UI
             AddSettlementSplatter(root.transform, blue);
 
             // ---- 見出しの帯：左に「和了」、右にランク ----
-            // 帯は地より一段明るい同じ系統の色。端まで塗り、縁や飾りは付けない
-            GameObject head = MakeBox(root.transform, blue ? HeadBlue : HeadRed, 16, 6);
+            // 帯は地より一段明るい同じ系統の色。端まで塗り、縁や飾りは付けない。
+            // 絵（デバッグ部屋の本と同じ作りのドット絵、280x20 ドット＝560x40 単位）があれば、それを等倍で貼る
+            var headSprite = Resources.Load<Sprite>(blue ? HeadPixelBlue : HeadPixelRed);
+            GameObject head = MakeBox(root.transform, headSprite != null ? Color.clear : (blue ? HeadBlue : HeadRed), 16, 6);
+            if (headSprite != null)
+            {
+                var headImg = head.AddComponent<Image>();
+                headImg.sprite = headSprite;
+                headImg.color = Color.white;
+                var headLe = head.AddComponent<LayoutElement>();
+                headLe.minHeight = headLe.preferredHeight = headSprite.rect.height * 2f;
+            }
             MakeText(head.transform, "和了", 20f, PanelInk, TextAlignmentOptions.Left, true);
             // 型の答え合わせ（2026-10-15）。相手に和了られたときに「相手は染めだった」と分かれば、
             // 次からその捨て牌の特徴を覚えていける。行を足すと役5行で画面からはみ出すので見出しに入れる
@@ -179,7 +189,7 @@ namespace KillingMahjong.UI
                 var phase = FindFirstObjectByType<PhaseTransitionUI>(FindObjectsInactive.Include);
                 settlementSplatterSprite = phase != null ? phase.BloodSplatterSprite : null;
             }
-            if (pixelSprite == null && settlementSplatterSprite == null) return;
+            bool hasSplatter = pixelSprite != null || settlementSplatterSprite != null;
 
             var layer = new GameObject("SplatterPattern", typeof(RectTransform), typeof(RectMask2D), typeof(LayoutElement));
             layer.transform.SetParent(root, false);
@@ -187,6 +197,25 @@ namespace KillingMahjong.UI
             var lr = (RectTransform)layer.transform;
             lr.anchorMin = Vector2.zero; lr.anchorMax = Vector2.one;
             lr.offsetMin = lr.offsetMax = Vector2.zero;
+
+            // 地の模様（2026-10-25 のユーザー指示「血だけではなく背景も。デバッグ部屋にある本の模様を参考に」）。
+            // 本と同じ作り（上→下の狭い濃淡を4色・bayer4 で減色。tools/CutinPixelArt/settlement.mjs）。
+            // 表の高さは役の数で変わるので、一番高いとき（340）の大きさで作ってあり、表の上にそろえて下を切る。
+            // 伸ばすとドットが崩れるので、いつも等倍（1ドット＝2UI単位）で置く
+            var groundSprite = Resources.Load<Sprite>(blue ? GroundPixelBlue : GroundPixelRed);
+            if (groundSprite != null)
+            {
+                var g = new GameObject("GroundPattern", typeof(RectTransform), typeof(Image));
+                g.transform.SetParent(lr, false);
+                var gr = (RectTransform)g.transform;
+                gr.anchorMin = gr.anchorMax = gr.pivot = new Vector2(0.5f, 1f);
+                gr.anchoredPosition = Vector2.zero;
+                gr.sizeDelta = groundSprite.rect.size * 2f;
+                var gi = g.GetComponent<Image>();
+                gi.sprite = groundSprite;
+                gi.color = Color.white;
+                gi.raycastTarget = false;
+            }
 
             // 置き場所は表の角と端（錨の位置、錨からのずれ）。役の名前（左）と数字（右）の列の外側に寄せる
             var spots = new[]
@@ -200,6 +229,7 @@ namespace KillingMahjong.UI
             Color tint = blue ? new Color32(8, 16, 38, 150) : new Color32(30, 6, 12, 150);
             foreach (var spot in spots)
             {
+                if (!hasSplatter) break;
                 var go = new GameObject("Splatter", typeof(RectTransform), typeof(Image));
                 go.transform.SetParent(lr, false);
                 var r = (RectTransform)go.transform;

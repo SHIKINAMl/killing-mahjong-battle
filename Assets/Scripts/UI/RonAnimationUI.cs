@@ -67,6 +67,11 @@ namespace KillingMahjong.UI
         // 点数表の血飛沫のドット絵（既存の blood_splatter.png を Image-to-Pixel と同じ手順でドット絵にした物）
         private const string SplatterPixelBlue = "UI/Settlement/settlement_splatter_blue";
         private const string SplatterPixelRed = "UI/Settlement/settlement_splatter_red";
+        // 点数表の地と帯のドット絵（デバッグ部屋の本と同じ作り。tools/CutinPixelArt/settlement.mjs）
+        private const string GroundPixelBlue = "UI/Settlement/settlement_ground_blue";
+        private const string GroundPixelRed = "UI/Settlement/settlement_ground_red";
+        private const string HeadPixelBlue = "UI/Settlement/settlement_head_blue";
+        private const string HeadPixelRed = "UI/Settlement/settlement_head_red";
         private static readonly Color AccentGold = new Color32(0xFF, 0xD3, 0x4D, 0xFF); // 翻数
         private static readonly Color AccentMine = new Color32(0x57, 0xC7, 0xE8, 0xFF); // 自分
         private static readonly Color AccentThem = new Color32(0xF2, 0x70, 0x5A, 0xFF); // 相手
