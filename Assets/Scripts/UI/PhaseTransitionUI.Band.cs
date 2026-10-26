@@ -15,8 +15,7 @@ namespace KillingMahjong.UI
     ///   ゆっくり動き出して速く閉じる。止まった・閉じたが一定速度より分かりやすい。
     ///   短所: 付けすぎると軽く見えるので、行き過ぎ（バック）は帯には使わない。
     ///
-    /// **文字は、その場でぱっと出す（2026-10-26 のユーザー指示「移動するのはあれなので、その場でぱっとでる感じにしてほしい」）。**
-    /// 以前は1字ずつ時間差で、下から浮かせながら出していた（ステッガー）。消すときのコマ打ちの薄れはそのまま。
+    /// 文字は移動させず、その場で短くフェードする。帯は12コマ、文字は24コマで出し入れする。
     /// </summary>
     public partial class PhaseTransitionUI
     {
@@ -35,7 +34,13 @@ namespace KillingMahjong.UI
         /// <summary>時間をコマの頭にそろえる。</summary>
         internal static float StepTime(float t) => Mathf.Floor(t * PixelFps) / PixelFps;
 
-        /// <summary>文字を消すときの時間。3コマ（濃い → 2/3 → 1/3 → 消える）。</summary>
+        /// <summary>文字だけ更新を細かくし、黒帯のコマ打ちは保つ。</summary>
+        internal const float TextFps = 24f;
+        internal static float StepTextTime(float t) => Mathf.Floor(t * TextFps) / TextFps;
+
+        private const float BandTextFadeIn = .10f;
+
+        /// <summary>文字を消す時間は従来の0.25秒を維持する。</summary>
         private const float BandTextFadeOut = 3f / PixelFps;
 
         private static float EaseOutCubic(float t) { t = Mathf.Clamp01(t); float u = 1f - t; return 1f - u * u * u; }
@@ -67,16 +72,17 @@ namespace KillingMahjong.UI
             horizontalLineRt.gameObject.SetActive(false);
         }
 
-        /// <summary>帯の文字を、その場でぱっと出す（動かさない）。</summary>
+        /// <summary>帯の文字を、位置を動かさず短くフェードして出す。</summary>
         private IEnumerator RevealBandText(string text)
         {
             if (centerText == null) yield break;
             centerText.text = text;
-            centerText.alpha = 1f;
+            centerText.alpha = 0f;
             centerText.gameObject.SetActive(true);
             // 有効にした次のフレームで形を渡し直す（無効のまま渡した字は形がまだ無いことがある。Darken の 2026-10-24 の注記と同じ）
             yield return null;
             if (centerText != null && centerText.gameObject.activeInHierarchy) centerText.ForceMeshUpdate();
+            yield return FadeText(centerText, 0f, 1f, BandTextFadeIn);
         }
 
         /// <summary>帯の文字を薄くして消す。</summary>
@@ -95,7 +101,7 @@ namespace KillingMahjong.UI
             for (float t = 0f; t < duration; t += Time.deltaTime)
             {
                 if (tmp == null) yield break;
-                tmp.alpha = Mathf.Lerp(from, to, StepTime(t) / duration);
+                tmp.alpha = Mathf.Lerp(from, to, StepTextTime(t) / duration);
                 yield return null;
             }
             if (tmp != null) tmp.alpha = to;

@@ -128,7 +128,7 @@ namespace KillingMahjong.UI
                 float tHp = 0;
                 while (tHp < hpDeductionDuration)
                 {
-                    float e = EaseOutCubic(StepTime(tHp) / hpDeductionDuration); // 数字もコマ打ちで刻む
+                    float e = EaseOutCubic(StepTextTime(tHp) / hpDeductionDuration);
                     if (enemyHpObj != null) enemyHpObj.text = RestLine(Mathf.RoundToInt(Mathf.Lerp(startEnemyHp, targetEnemyHp, e)));
                     if (playerHpObj != null) playerHpObj.text = RestLine(Mathf.RoundToInt(Mathf.Lerp(startPlayerHp, targetPlayerHp, e)));
                     tHp += Time.deltaTime;
@@ -141,7 +141,7 @@ namespace KillingMahjong.UI
                 // パッと消さず、薄くして消す
                 for (float tf = 0f; tf < BandTextFadeOut; tf += Time.deltaTime)
                 {
-                    foreach (var row in rows) if (row != null) row.alpha = 1f - StepTime(tf) / BandTextFadeOut;
+                    foreach (var row in rows) if (row != null) row.alpha = 1f - StepTextTime(tf) / BandTextFadeOut;
                     yield return null;
                 }
                 hpBetContainer.SetActive(false);
