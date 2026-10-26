@@ -26,6 +26,34 @@ namespace KillingMahjong.EditorTools
             finally { PrefabUtility.UnloadPrefabContents(root); }
         }
 
+        public static void BakeTutorialChoiceButton()
+        {
+            var root = new GameObject("TutorialChoiceButton", typeof(RectTransform), typeof(Image), typeof(Button));
+            try
+            {
+                var rect = (RectTransform)root.transform;
+                rect.sizeDelta = new Vector2(200f, 56f);
+                Paint(root.GetComponent<Image>(), new Color32(83, 24, 34, 255));
+                Frame(rect, new Color32(167, 129, 128, 255));
+                var label = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
+                label.transform.SetParent(root.transform, false);
+                var textRect = (RectTransform)label.transform;
+                textRect.anchorMin = Vector2.zero;
+                textRect.anchorMax = Vector2.one;
+                textRect.offsetMin = new Vector2(16f, 6f);
+                textRect.offsetMax = new Vector2(-16f, -6f);
+                var text = label.GetComponent<TextMeshProUGUI>();
+                ConfigureText(text);
+                text.fontSize = 22f;
+                text.alignment = TextAlignmentOptions.Center;
+                text.raycastTarget = false;
+                text.text = "選択肢";
+                UIInteractionFeedback.Attach(root);
+                PrefabUtility.SaveAsPrefabAsset(root, "Assets/Resources/UI/TutorialChoiceButton.prefab");
+            }
+            finally { Object.DestroyImmediate(root); }
+        }
+
         public static int ApplyToLoadedScene()
         {
             int count = 0;

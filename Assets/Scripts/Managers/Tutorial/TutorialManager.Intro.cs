@@ -567,8 +567,9 @@ namespace KillingMahjong.Managers
         private GameObject CreateButton(Transform parent, TMP_FontAsset font, string label,
                                         Vector2 position, Action onClick)
         {
-            var go = new GameObject("Button_" + label, typeof(RectTransform), typeof(Image), typeof(Button));
-            go.transform.SetParent(parent, false);
+            var prefab = Resources.Load<GameObject>("UI/TutorialChoiceButton");
+            var go = Instantiate(prefab, parent, false);
+            go.name = "Button_" + label;
 
             var rect = (RectTransform)go.transform;
             rect.anchorMin = new Vector2(0.5f, 0.5f);
@@ -576,19 +577,9 @@ namespace KillingMahjong.Managers
             rect.anchoredPosition = position;
             rect.sizeDelta = new Vector2(200f, 56f);
 
-            go.GetComponent<Image>().color = new Color32(120, 24, 32, 255);
-
-            var textObject = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
-            textObject.transform.SetParent(go.transform, false);
-            StretchFull((RectTransform)textObject.transform);
-
-            var text = textObject.GetComponent<TextMeshProUGUI>();
+            var text = go.GetComponentInChildren<TextMeshProUGUI>();
             if (font != null) text.font = font;
             text.text = label;
-            text.fontSize = 22f;
-            text.color = new Color32(240, 232, 236, 255);
-            text.alignment = TextAlignmentOptions.Center;
-            text.raycastTarget = false;
 
             go.GetComponent<Button>().onClick.AddListener(() => onClick?.Invoke());
             return go;

@@ -76,7 +76,7 @@ namespace KillingMahjong.UI
                 MakeText(head.transform, s.LocalWon ? "自分の型" : "相手の型", 16f,
                     s.LocalWon ? AccentMine : AccentThem, TextAlignmentOptions.Right, false, 120f);
                 // 型は角丸の文字の札で出す（役一覧・手牌選択と同じ札）
-                HandTypeBadge.Create(head.transform, "TypeBadge", 18f, customFont, false).Show(archetype);
+                HandTypeBadge.Create(head.transform, "TypeBadge", 18f, GameUiTypography.Body, false).Show(archetype);
             }
             MakeText(head.transform, s.RankName, 30f, AccentGold, TextAlignmentOptions.Right, false, 200f);
 
@@ -107,8 +107,8 @@ namespace KillingMahjong.UI
             MakeRule(body.transform);
             GameObject sum = MakeBox(body.transform, Color.clear, 0, 2);
             MakeText(sum.transform, "合計", 22f, PanelFaint, TextAlignmentOptions.Left, true);
-            totalHanText = MakeText(sum.transform, "", 24f, AccentGold, TextAlignmentOptions.Right, false, 90f);
-            multiplierText = MakeText(sum.transform, "", 24f, AccentGold, TextAlignmentOptions.Right, false, 70f);
+            totalHanText = MakeNumber(sum.transform, 24f, AccentGold, 90f);
+            multiplierText = MakeNumber(sum.transform, 24f, AccentGold, 70f);
 
             // ---- 自分と相手の内訳 ----
             MakeRule(body.transform);
@@ -122,13 +122,13 @@ namespace KillingMahjong.UI
             string betLabel = s.CarryRounds > 1 ? $"素点（持ち越し{s.CarryRounds}局ぶん）" : "素点";
             GameObject betRow = MakeBox(body.transform, Color.clear, 0, 1);
             MakeText(betRow.transform, betLabel, 18f, PanelFaint, TextAlignmentOptions.Left, true);
-            myBetText = MakeText(betRow.transform, "", 21f, PanelInk, TextAlignmentOptions.Right, false, ValueColumn);
-            theirBetText = MakeText(betRow.transform, "", 21f, PanelInk, TextAlignmentOptions.Right, false, ValueColumn);
+            myBetText = MakeNumber(betRow.transform, 21f, PanelInk, ValueColumn);
+            theirBetText = MakeNumber(betRow.transform, 21f, PanelInk, ValueColumn);
 
             GameObject multRow = MakeBox(body.transform, Color.clear, 0, 1);
             MakeText(multRow.transform, "倍率", 18f, PanelFaint, TextAlignmentOptions.Left, true);
-            myMultText = MakeText(multRow.transform, "", 21f, PanelInk, TextAlignmentOptions.Right, false, ValueColumn);
-            theirMultText = MakeText(multRow.transform, "", 21f, PanelInk, TextAlignmentOptions.Right, false, ValueColumn);
+            myMultText = MakeNumber(multRow.transform, 21f, PanelInk, ValueColumn);
+            theirMultText = MakeNumber(multRow.transform, 21f, PanelInk, ValueColumn);
 
             tankiMine = null;
             tankiTheirs = null;
@@ -155,11 +155,13 @@ namespace KillingMahjong.UI
             MakeText(deltaRow.transform, "血", 22f, PanelInk, TextAlignmentOptions.Left, true);
             myDeltaText = MakeText(deltaRow.transform, "", 30f, AccentMine, TextAlignmentOptions.Right, false, ValueColumn);
             theirDeltaText = MakeText(deltaRow.transform, "", 30f, AccentThem, TextAlignmentOptions.Right, false, ValueColumn);
+            HpNumberStyle.Apply(myDeltaText, s.MyDelta);
+            HpNumberStyle.Apply(theirDeltaText, s.TheirDelta);
 
             GameObject hpRow = MakeBox(body.transform, Color.clear, 0, 1);
             MakeText(hpRow.transform, "", 18f, PanelFaint, TextAlignmentOptions.Left, true);
-            myHpText = MakeText(hpRow.transform, "", 18f, PanelFaint, TextAlignmentOptions.Right, false, ValueColumn);
-            theirHpText = MakeText(hpRow.transform, "", 18f, PanelFaint, TextAlignmentOptions.Right, false, ValueColumn);
+            myHpText = MakeNumber(hpRow.transform, 18f, PanelFaint, ValueColumn);
+            theirHpText = MakeNumber(hpRow.transform, 18f, PanelFaint, ValueColumn);
 
             // **血とHPの2行は伏せておく。**（2026-08-29）
             // 血の増減はこのあとの「飛ぶ数字」が答えとして出すもので、パネルに先に書くと山が消える。
@@ -296,6 +298,13 @@ namespace KillingMahjong.UI
             le.preferredHeight = 2f;
         }
 
+        private TextMeshProUGUI MakeNumber(Transform parent, float size, Color color, float width)
+        {
+            var text = MakeText(parent, "", size, color, TextAlignmentOptions.Right, false, width);
+            text.font = GameUiTypography.Display;
+            return text;
+        }
+
         /// <param name="flexible">true なら残りの幅を全部取る（左の見出し用）</param>
         /// <param name="width">flexible が false のときの固定幅</param>
         private TextMeshProUGUI MakeText(Transform parent, string content, float size, Color color,
@@ -305,7 +314,7 @@ namespace KillingMahjong.UI
             go.transform.SetParent(parent, false);
 
             var tmp = go.AddComponent<TextMeshProUGUI>();
-            if (customFont != null) tmp.font = customFont;
+            tmp.font = GameUiTypography.Body;
             tmp.text = content;
             tmp.fontSize = size;
             tmp.color = color;

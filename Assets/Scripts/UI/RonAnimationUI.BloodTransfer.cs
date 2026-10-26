@@ -32,7 +32,7 @@ namespace KillingMahjong.UI
             TextMeshProUGUI source = flyMine ? myBetText : theirBetText;
             int fromValue = flyMine ? s.MyBet : s.TheirBet;
             int toValue = flyMine ? s.MyDelta : s.TheirDelta;
-            Color tint = flyMine ? AccentMine : AccentThem;
+            Color tint = HpNumberStyle.ColorForDelta(toValue);
 
             RectTransform target = null;
             if (flyMine) { if (playerInfo != null) target = playerInfo.HpAnchor; }
@@ -88,11 +88,10 @@ namespace KillingMahjong.UI
             GameObject flyObj = new GameObject("BloodValue");
             flyObj.transform.SetParent(stageRt, false);
             TextMeshProUGUI fly = flyObj.AddComponent<TextMeshProUGUI>();
-            fly.text = fromValue.ToString();
-            fly.color = tint;
+            HpNumberStyle.Apply(fly, toValue);
+            fly.text = fromValue.ToString("N0");
             fly.fontSize = BloodPeakFontSize;
             fly.alignment = TextAlignmentOptions.Center;
-            fly.fontStyle = FontStyles.Bold;
             fly.textWrappingMode = TextWrappingModes.NoWrap;
             // 盤面（赤い壁・緑の卓）の上を通るので、縁取りが無いと途中で読めなくなる
             fly.outlineWidth = 0.2f;
@@ -107,11 +106,12 @@ namespace KillingMahjong.UI
             GameObject noteObj = new GameObject("BloodNote");
             noteObj.transform.SetParent(flyRt, false);
             TextMeshProUGUI note = noteObj.AddComponent<TextMeshProUGUI>();
+            note.font = GameUiTypography.Body;
             note.text = BuildMultiplierNote(s, toValue);
             note.color = AccentGold;
             note.fontSize = 34f;
             note.alignment = TextAlignmentOptions.Center;
-            note.fontStyle = FontStyles.Bold;
+            note.fontStyle = FontStyles.Normal;
             note.textWrappingMode = TextWrappingModes.NoWrap;
             note.outlineWidth = 0.2f;
             note.outlineColor = new Color32(0, 0, 0, 255);
@@ -231,8 +231,8 @@ namespace KillingMahjong.UI
             // ④ 着弾。**両方のHPの隣に増減が出て、両方のメーターが同時に動き出す**
             // 横に出す増減は「画面の血が動く量」。賭けた血は先に場へ出しているので、
             // サーバーの増減とは違う（RonSettlementInfo.MyShownDelta）。動かない側（満貫で負けた側など）は出さない
-            if (playerInfo != null && s.MyShownDelta != 0) SpawnHpDeltaLabel(stageRt, playerInfo.HpAnchor, s.MyShownDelta, AccentMine);
-            if (enemyInfo != null && s.TheirShownDelta != 0) SpawnHpDeltaLabel(stageRt, enemyInfo.HpAnchor, s.TheirShownDelta, AccentThem);
+            if (playerInfo != null && s.MyShownDelta != 0) SpawnHpDeltaLabel(stageRt, playerInfo.HpAnchor, s.MyShownDelta);
+            if (enemyInfo != null && s.TheirShownDelta != 0) SpawnHpDeltaLabel(stageRt, enemyInfo.HpAnchor, s.TheirShownDelta);
 
             PlayBloodSE(isLocalSide: true, delta: s.MyShownDelta, newHp: newLocalHp,
                         maxHp: playerInfo != null ? playerInfo.MaxHp : 0);

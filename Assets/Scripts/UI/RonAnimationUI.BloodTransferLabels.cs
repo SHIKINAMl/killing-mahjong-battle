@@ -50,7 +50,7 @@ namespace KillingMahjong.UI
         /// <summary>数字の箱の高さ（Canvas の単位）。位置の計算にも使う。</summary>
         private const float HpDeltaBoxHeight = 44f;
 
-        private TextMeshProUGUI SpawnHpDeltaLabel(RectTransform parent, RectTransform anchor, int delta, Color tint)
+        private TextMeshProUGUI SpawnHpDeltaLabel(RectTransform parent, RectTransform anchor, int delta)
         {
             if (anchor == null) return null;
 
@@ -58,9 +58,8 @@ namespace KillingMahjong.UI
             go.transform.SetParent(parent, false);
             TextMeshProUGUI text = go.AddComponent<TextMeshProUGUI>();
             text.text = FormatDelta(delta);
-            text.color = tint;
+            HpNumberStyle.Apply(text, delta);
             text.fontSize = 30f;
-            text.fontStyle = FontStyles.Bold;
             text.textWrappingMode = TextWrappingModes.NoWrap;
             text.alignment = TextAlignmentOptions.Center;
             text.outlineWidth = 0.2f;

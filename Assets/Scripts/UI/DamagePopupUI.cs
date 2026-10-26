@@ -1,7 +1,6 @@
 using UnityEngine;
 using TMPro;
 using System.Collections;
-using System.Globalization;
 
 namespace KillingMahjong.UI
 {
@@ -33,16 +32,14 @@ namespace KillingMahjong.UI
             visual = new GameObject("HpNumberVisual", typeof(RectTransform));
             visual.transform.SetParent(transform, false);
             var font = GameUiTypography.Display;
-            string sign = amount > 0 ? "+" : "-";
-            string digits = System.Math.Abs((long)amount).ToString("N0", CultureInfo.InvariantCulture);
-            string plain = sign + digits;
+            string plain = HpNumberStyle.FormatDelta(amount);
             var ink = new Color32(29, 13, 22, 255);
             CreateNumber("Shadow", font, plain, new Vector2(3f, -3f), ink);
             CreateNumber("EdgeLeft", font, plain, new Vector2(-2f, 0f), ink);
             CreateNumber("EdgeRight", font, plain, new Vector2(2f, 0f), ink);
             CreateNumber("EdgeTop", font, plain, new Vector2(0f, 2f), ink);
             CreateNumber("EdgeBottom", font, plain, new Vector2(0f, -2f), ink);
-            string face = amount > 0 ? "65ADFF" : "FF5C5C";
+            string face = ColorUtility.ToHtmlStringRGB(HpNumberStyle.ColorForDelta(amount));
             var number = CreateNumber("Number", font,
                 "<color=#" + face + ">" + plain + "</color>",
                 Vector2.zero, Color.white);

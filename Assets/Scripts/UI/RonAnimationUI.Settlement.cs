@@ -231,7 +231,7 @@ namespace KillingMahjong.UI
             canvas.overrideSorting = true;
             canvas.sortingOrder = UISortingOrders.RonAnimation;
 
-            SpawnHpDeltaLabel(stageRt, enemyInfo.HpAnchor, -damage, AccentThem);
+            SpawnHpDeltaLabel(stageRt, enemyInfo.HpAnchor, -damage);
             StartCoroutine(FinishTutorialDamagePreview(scope, stage));
         }
 
@@ -453,7 +453,7 @@ namespace KillingMahjong.UI
 
         private static string FormatDelta(int v)
         {
-            return v > 0 ? "+" + v : v.ToString(); // 負号は int の表記がそのまま使える
+            return HpNumberStyle.FormatDelta(v);
         }
     }
 }
