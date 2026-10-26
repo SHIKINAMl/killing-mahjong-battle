@@ -7,6 +7,14 @@ namespace KillingMahjong.UI
         private bool controlLayoutCaptured;
         private Vector2 originalTextPosition, originalLogPosition;
         private float originalTextHeight;
+        private bool readabilityBackdropDirty;
+
+        private void LateUpdate()
+        {
+            if (!readabilityBackdropDirty) return;
+            readabilityBackdropDirty = false;
+            UpdateDialogueTextBackdrop();
+        }
 
         // 操作欄は3行分の余白を確保した位置に固定する。
         // さらに長いセリフは文字欄を上へ広げ、ボタンは動かさない。
@@ -30,7 +38,27 @@ namespace KillingMahjong.UI
                 + Vector2.up * ((height - originalTextHeight) * textRect.pivot.y);
             buttonRect.anchoredPosition = originalLogPosition - Vector2.up * 12f;
             dialogueText.ForceMeshUpdate();
+            UpdateDialogueTextBackdrop();
             UpdateAdvanceMarkerPosition();
+        }
+
+        private void UpdateDialogueTextBackdrop()
+        {
+            if (!Application.isPlaying || textReadabilityBackdrop == null || dialogueText == null) return;
+            var settings = KillingMahjong.Core.SettingsManager.Instance;
+            bool showBubble = settings != null && settings.ShowDialogueBubble;
+            textReadabilityBackdrop.gameObject.SetActive(!showBubble && !string.IsNullOrEmpty(dialogueText.text));
+            if (showBubble) return;
+
+            var textRect = dialogueText.rectTransform;
+            var backdropRect = textReadabilityBackdrop.rectTransform;
+            backdropRect.anchorMin = textRect.anchorMin;
+            backdropRect.anchorMax = textRect.anchorMax;
+            backdropRect.pivot = textRect.pivot;
+            backdropRect.anchoredPosition = textRect.anchoredPosition;
+            backdropRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, textRect.rect.width + 12f);
+            backdropRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical,
+                Mathf.Min(textRect.rect.height, dialogueText.preferredHeight) + 8f);
         }
 
         private void UpdateAdvanceMarkerPosition()

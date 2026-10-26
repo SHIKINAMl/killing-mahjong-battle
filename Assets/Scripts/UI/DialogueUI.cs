@@ -10,6 +10,7 @@ namespace KillingMahjong.UI
         [Header("Main Dialogue")]
         [SerializeField] private TextMeshProUGUI dialogueText;
         [SerializeField] private GameObject dialoguePanel;
+        [SerializeField] private Image textReadabilityBackdrop;
 
         [Header("Log")]
         [SerializeField] private GameObject logPanel;
@@ -128,6 +129,7 @@ namespace KillingMahjong.UI
             // 文字のまわりに薄い四角が浮いて見える
             var shadow = dialoguePanel.GetComponent<Shadow>();
             if (shadow != null) shadow.enabled = show;
+            readabilityBackdropDirty = true;
         }
 
         // セリフの影の設定。対局シーンが2つ（UIテストシーン / OpeningScene）あるので
