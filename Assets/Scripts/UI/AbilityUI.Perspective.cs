@@ -54,6 +54,16 @@ namespace KillingMahjong.UI
                 suit = PerspectiveSuitKeys[choice];
             else return;
 
+            if (uiMgr.IsTutorialMode)
+            {
+                if (TutorialActivationHandler != null && TutorialActivationHandler(SkillNames.Perspective, suit))
+                {
+                    DeselectAll();
+                    CloseWindow(false);
+                }
+                return;
+            }
+
             // 決定前には何も送らない。HPや公開牌もサーバーの返事が来るまで変更しない。
             var payload = new ActionPayload { skill_type = SkillNames.Perspective, suit = suit };
             DeselectAll();

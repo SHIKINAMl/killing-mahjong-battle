@@ -548,6 +548,9 @@ namespace KillingMahjong.Managers
         /// <summary>止めたあとに下げてやる額。フロー図の「3000まで減少」。</summary>
         private const int BetWarnReducedAmount = 3000;
 
+        private static bool ShouldReduceTutorialBet(int shownHp, int amount) =>
+            shownHp <= BetWarnHpThreshold && amount >= BetWarnAmount;
+
         /// <summary>賭け金が下がっていく様子を見せる時間。一瞬で書き換えると気づけない。</summary>
         private const float BetReduceSeconds = 0.8f;
 
@@ -606,7 +609,7 @@ namespace KillingMahjong.Managers
                 yield return new WaitUntil(() => confirmed || _aborted);
                 if (_aborted) yield break;
 
-                bool tooMuch = PlayerShownHp <= BetWarnHpThreshold && _lastConfirmedBet >= BetWarnAmount;
+                bool tooMuch = ShouldReduceTutorialBet(PlayerShownHp, _lastConfirmedBet);
                 if (!tooMuch) break;
 
                 // いったん止めて、下げてから代わりに押す。

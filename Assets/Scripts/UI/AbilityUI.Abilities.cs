@@ -56,6 +56,9 @@ namespace KillingMahjong.UI
         /// </summary>
         private string GetUnusableReason(string skillType)
         {
+            var ui = TutorialUnusableReason != null ? FindFirstObjectByType<GameUIManager>() : null;
+            if (ui != null && ui.IsTutorialMode && TutorialUnusableReason != null)
+                return TutorialUnusableReason(skillType);
             if (skillType != SkillNames.Assault) return null;
 
             var board = KillingMahjong.Managers.BoardStateManager.Instance;

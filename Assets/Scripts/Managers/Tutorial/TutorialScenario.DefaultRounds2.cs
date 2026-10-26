@@ -26,7 +26,7 @@ namespace KillingMahjong.Managers
                 rejectFirstConfirm = false,
                 requireAutoManganToConfirm = true,
 
-                // 相手は直前に能力コスト12700を払っていて血が薄い。
+                // 相手は直前に能力コストを払っている。
                 // 賭け金の支払いで相手が死ぬと第5局が成立しないので小さめにする。
                 betAmount = 1000,
 
@@ -38,7 +38,7 @@ namespace KillingMahjong.Managers
                 playerWinningTileBaseId = abilityWinningTile,
 
                 // 対々和(2飜) + 混一色(門前3飜) = 5飜 満貫 = 1倍。
-                // 敵は直前に能力コスト12700を払っているので、ここで大きく削ると
+                // 敵は直前に能力コストを払っているので、ここで大きく削ると
                 // 第5局（決着）が成立しなくなる。満貫の等倍がちょうどいい。
                 yakuList = new List<string> { "対々和", "混一色" },
                 formulaText = "5飜",
@@ -77,7 +77,7 @@ namespace KillingMahjong.Managers
 
                     new TutorialAbilityShowcase(
                         SkillNames.BoostHand,
-                        new TutorialLine("最後は『役強化』。決めた役の翻数を+1するの。"),
+                        new TutorialLine("最後は『役強化』。選んだ役を含むアガリの倍率を1段上げるの。"),
                         new TutorialLine("『清一色』を選んだわ。同じ手でも打点が跳ね上がる。"))
                     {
                         boostYakuName = "清一色",

@@ -19,9 +19,10 @@ namespace KillingMahjong.UI
     //
     // 2〜4 は1つの演出として順番待ち（Effects.EffectQueue）に入れる。カットイン（skill_casted）と重ならない。
     //
-    // **チュートリアルはこの流れを通らない。** 通信の代役が1枚の形のままなので、今までの流れのまま。
+    // チュートリアルも同じ選択UIを使い、通信部分だけ台本側の応答へ渡す。
     public partial class GameUISkillController
     {
+        internal System.Action<List<int>> TutorialMulliganPicked { get; set; }
         private class MulliganPick
         {
             public int TileId;
@@ -50,10 +51,11 @@ namespace KillingMahjong.UI
         /// <summary>
         /// 出す牌を1枚選ぶ／外す。3枚そろったら送る。
         /// </summary>
-        /// <returns>ここで受け持ったら true。チュートリアルは false（今までの1枚の流れへ）</returns>
+        /// <returns>ここで3枚の選択を受け持ったら true。</returns>
         private bool TryPickForMulligan(int tileId, RectTransform slotRt)
         {
-            if (uiManager == null || uiManager.IsTutorialMode) return false;
+            if (uiManager == null) return false;
+            if (uiManager.IsTutorialMode && TutorialMulliganPicked == null) return true;
 
             var wallTiles = BoardStateManager.Instance != null ? BoardStateManager.Instance.OriginalWallTiles : null;
             if (wallTiles == null) return true;
@@ -105,10 +107,6 @@ namespace KillingMahjong.UI
             IsMulliganSelection = false;
             HideMulliganUI();
 
-            // 返事が来るまで盤面を作り直させない（今までの1枚の流れと同じ）
-            CancelPendingSkillRequest();
-            pendingMulligan = uiManager.BeginTransition("mulligan-request");
-
             var indexes = new List<int>();
             _mulliganSentSlots.Clear();
             foreach (var pick in _mulliganPicks)
@@ -118,8 +116,32 @@ namespace KillingMahjong.UI
             }
             ClearMulliganPicks();
 
+            if (uiManager.IsTutorialMode)
+            {
+                TutorialMulliganPicked?.Invoke(indexes);
+                return;
+            }
+            CancelPendingSkillRequest();
+            pendingMulligan = uiManager.BeginTransition("mulligan-request");
             uiManager.SendActionToServer("skill", new ActionPayload { skill_type = "mulligan", target_hand_indexes = indexes });
         }
+
+        internal IEnumerator ApplyTutorialMulliganChoice(MulliganSelectedData result)
+        {
+            if (uiManager == null || !uiManager.IsTutorialMode) yield break;
+            var ownedLock = uiManager.BeginTransition("skill:mulligan-choice");
+            skillTransitions.Add(ownedLock);
+            try { yield return ApplyMulliganSelected(result, ownedLock, animate: true); }
+            finally
+            {
+                _mulliganSentSlots.Clear();
+                skillTransitions.Remove(ownedLock);
+                ownedLock.Dispose();
+            }
+            uiManager.RefreshBoardAfterTransition();
+        }
+
+        internal static List<int> ArrangeTutorialMulliganChoices(List<int> choices) => ArrangeMulliganChoices(choices);
 
         /// <summary>選びかけを捨てる。色も戻す。</summary>
         private void ClearMulliganPicks()

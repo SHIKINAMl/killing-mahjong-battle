@@ -84,17 +84,17 @@ namespace KillingMahjong.Managers
             new Dictionary<string, string[]>
             {
                 { SkillNames.Mulligan, new[] {
-                    "牌交換はいらない牌を配られてない牌の一つと交換する能力",
+                    "牌交換は3枚出して、その3枚と新しい3枚の中から残す3枚を選ぶ能力",
                     "あと1枚で強い役が作れるのにって時に使うといいよ" } },
                 { SkillNames.Perspective, new[] {
-                    "透視は相手の山牌を３枚だけ透かしてみれるよ",
+                    "透視は種別を選ぶかランダムで、相手の山牌を最大3枚透かして見れるよ",
                     "透視した牌は手牌に組み込まれると手牌も透けて見えるから",
                     "うっかりロンされにくくなったりするよ" } },
                 // **役強化の2行目以降は 2026-09-30 の改訂で差し替えた。**
                 // 旧「よく出る役に使ってより高い手を目指すのが定石かな」は
                 // 使いどころの話だったが、改訂版は**値段の話**に寄せている。
                 { SkillNames.BoostHand, new[] {
-                    "役強化は指定の役の点を上げる能力",
+                    "役強化は選んだ役を含むアガリの倍率を1段上げる能力。同じ役は1回までだよ",
                     "簡単に強い役を作れるようになるけど…ちょっとお高いね",
                     "最初に使ってもいいし儲けた分を回すのもいいかもね" } },
             };
@@ -144,14 +144,6 @@ namespace KillingMahjong.Managers
         /// </summary>
         private const int AbilityMoreMinScore = 8000;
 
-        /// <summary>
-        /// 同じ能力を何周も試させない上限。フロー図には無いが、
-        /// **「はい」を押し続けると無限に回る**ので歯止めを置く。
-        /// 能力は3種類。どれも2回ずつ試せる 6 周にする（2026-10-22。3 周のときは上限で
-        /// 「もうさすがに」を言わせていたが、あれは持ち点が 8000 を切ったときだけのセリフ）。
-        /// </summary>
-        private const int AbilityShowcaseMaxRounds = 6;
-
         /// <summary>画面を揺らす。出せない場面（UIが無い等）では黙って素通りする。</summary>
         private void ShakeScreen(float duration, float magnitude, Vector2 axis)
         {
@@ -170,6 +162,8 @@ namespace KillingMahjong.Managers
             return PlayerShownHp;
         }
 
+        private bool CanRepeatAbilityIntroduction() => GetLocalScoreForAbilityGate() >= AbilityMoreMinScore;
+
         /// <summary>
         /// 能力の紹介ひとまとまり。フロー図シート3の後半。
         ///
@@ -180,6 +174,9 @@ namespace KillingMahjong.Managers
         private IEnumerator RunAbilityIntroduction()
         {
             var restoreBoard = CaptureIntroDemoBoard();
+            _introPerspectiveUses = 0;
+            if (gameUIManager != null && gameUIManager.AbilityUI != null)
+                gameUIManager.AbilityUI.TutorialUnusableReason = IntroSkillUnusableReason;
             try
             {
                 yield return StartCoroutine(PlayLines(AbilityOpeningLines));
@@ -213,9 +210,13 @@ namespace KillingMahjong.Managers
             }
             finally
             {
+                ClearIntroSkillSelection();
                 restoreBoard();
                 if (gameUIManager != null && gameUIManager.AbilityUI != null)
+                {
                     gameUIManager.AbilityUI.TutorialActivationHandler = null;
+                    gameUIManager.AbilityUI.TutorialUnusableReason = null;
+                }
             }
         }
 
@@ -296,12 +297,16 @@ namespace KillingMahjong.Managers
         {
             var ability = gameUIManager != null ? gameUIManager.AbilityUI : null;
 
-            for (int round = 0; round < AbilityShowcaseMaxRounds; round++)
+            if (ability == null) yield break;
+
+            while (!_aborted)
             {
                 yield return StartCoroutine(PlayLines(AbilityPickLines));
 
                 string picked = null;
                 yield return StartCoroutine(RunOneAbilityShowcase(v => picked = v));
+                if (_aborted) yield break;
+                if (picked == null) continue; // 対象選択のキャンセルは発動にも説明済みにもしない。
 
                 // 説明。フロー図では能力ごとに文面が違う
                 if (picked != null && AbilityExplainLines.ContainsKey(picked))
@@ -325,13 +330,11 @@ namespace KillingMahjong.Managers
                 // 「……もうさすがによくない？」は、**持ち点が 8000 を切ったときだけ**（2026-10-22 プランナー指摘
                 // 「役の使いすぎでライフ8000以下になりそうな時に出るやつ」）。以前は周回の上限に達したときにも
                 // 出していて、16000 残っていても言われていた
-                if (GetLocalScoreForAbilityGate() < AbilityMoreMinScore)
+                if (!CanRepeatAbilityIntroduction())
                 {
                     yield return StartCoroutine(PlayLines(AbilityTooPoorLines));
                     yield break;
                 }
-                // 周回の上限（フロー図には無い歯止め）に達したら、何も言わずに先（「重要なこと」）へ進む
-                if (round == AbilityShowcaseMaxRounds - 1) yield break;
 
                 yield return StartCoroutine(PlayLines(AbilityEagerLines));
             }
@@ -350,10 +353,13 @@ namespace KillingMahjong.Managers
             yield return null;
 
             string picked = null;
-            System.Func<string, bool> activation = type =>
+            string suit = null;
+            bool applied = false;
+            System.Func<string, string, bool> activation = (type, selectedSuit) =>
             {
                 if (this == null || !isActiveAndEnabled || picked != null || !CanActivateIntroSkill(type)) return false;
                 picked = type;
+                suit = selectedSuit;
                 return true;
             };
             ability.TutorialActivationHandler = activation;
@@ -362,7 +368,7 @@ namespace KillingMahjong.Managers
                 string highlighted = null;
                 GuideTo(ability.AbilityListRect, false, null, UI.TutorialHighlightUI.Style.Frame);
                 // 選んだ行の再クリックが現在の発動操作。選択解除・Xでは実演済みにしない。
-                while (picked == null)
+                while (picked == null && !_aborted)
                 {
                     if (!ability.IsWindowOpen) { ability.OpenWindow(); highlighted = null; }
                     string selected = ability.SelectedSkillType;
@@ -376,7 +382,7 @@ namespace KillingMahjong.Managers
                     yield return null;
                 }
                 ClearGuide();
-                yield return PlayIntroSkillEffect(picked);
+                if (!_aborted) yield return PlayIntroSkillEffect(picked, suit, done => applied = done);
             }
             finally
             {
@@ -387,7 +393,7 @@ namespace KillingMahjong.Managers
 
             // 効果発動の余韻
             yield return new WaitForSeconds(0.4f);
-            onPicked(picked);
+            onPicked(applied ? picked : null);
         }
 
         /// <summary>

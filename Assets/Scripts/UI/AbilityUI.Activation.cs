@@ -6,7 +6,8 @@ namespace KillingMahjong.UI
     public partial class AbilityUI
     {
         // 紹介中だけ台本側へ渡す。通常対局の通信経路には入れない。
-        internal System.Func<string, bool> TutorialActivationHandler { get; set; }
+        internal System.Func<string, string, bool> TutorialActivationHandler { get; set; }
+        internal System.Func<string, string> TutorialUnusableReason { get; set; }
         private void OnActivateClicked()
         {
             if (IsDisplayOnly || !isWindowVisible) return;
@@ -27,12 +28,17 @@ namespace KillingMahjong.UI
                     if (uiMgr != null)
                     {
                         // チュートリアルはサーバーに接続しないため、発動要求を送っても無反応になる。
-                        // 制約「チュートリアル中はプレイヤーの能力使用は不可」に合わせて明示的に弾く。
+                        // 紹介中は対象選択を含むオフライン実演へ渡す。それ以外は今までどおり送らない。
                         if (uiMgr.IsTutorialMode)
                         {
                             if (TutorialActivationHandler != null)
                             {
-                                if (TutorialActivationHandler(data.skillType))
+                                if (data.skillType == SkillNames.Perspective)
+                                {
+                                    ActivatePerspectiveChoice(uiMgr, currentSelection.AbilityIndex);
+                                    return;
+                                }
+                                if (TutorialActivationHandler(data.skillType, null))
                                 {
                                     DeselectAll();
                                     ToggleAbilityWindow(false);
