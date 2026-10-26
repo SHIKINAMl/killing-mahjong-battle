@@ -5,7 +5,7 @@ using TMPro;
 
 namespace KillingMahjong.UI
 {
-    public class DialogueUI : MonoBehaviour
+    public partial class DialogueUI : MonoBehaviour
     {
         [Header("Main Dialogue")]
         [SerializeField] private TextMeshProUGUI dialogueText;
@@ -210,6 +210,7 @@ namespace KillingMahjong.UI
             dialogueText.maxVisibleCharacters = 0;
             yield return null; // ShowText() が DialoguePanel を有効化した次フレームに解析する
             dialogueText.ForceMeshUpdate();
+            UpdateDialogueControlLayout();
 
             // **黒幕が降りているあいだは1文字ずつ送らない（2026-09-27 のユーザー指示）。**
             // 「第1局進行中...」で画面が真っ暗な裏でセリフ送りが走っていて、
@@ -564,7 +565,7 @@ namespace KillingMahjong.UI
         /// 画面のどこをクリックしてもセリフが進むようにする（要望15）。
         /// 小さな OK ボタンを探して押させるより、読み終わったら適当に押すほうが速い。
         ///
-        /// 透明な全画面ボタンを最前面に置くので、**待っている間は他のUIが押せなくなる。**
+        /// 透明な全画面ボタンを最前面に置くので、ログ以外のUIは待っている間押せなくなる。
         /// 「役一覧を開かせる」のようにプレイヤーへ操作させたい場面では、
         /// セリフを送り終えてから（＝ここを閉じてから）誘導すること。
         /// </summary>
@@ -589,6 +590,9 @@ namespace KillingMahjong.UI
                 // 見えないが押せる板。alpha 0 だと Raycast に当たらないので極小の値を入れる
                 var img = advanceCatcherObj.AddComponent<Image>();
                 img.color = new Color(0f, 0f, 0f, 0.001f);
+                var filter = advanceCatcherObj.AddComponent<DialogueAdvanceRaycastFilter>();
+                filter.Owner = this;
+                filter.LogButton = toggleLogButton;
 
                 var btn = advanceCatcherObj.AddComponent<Button>();
                 btn.transition = Selectable.Transition.None;
@@ -642,6 +646,7 @@ namespace KillingMahjong.UI
 
             advanceMarkerObj.transform.SetAsLastSibling();
             advanceMarkerObj.SetActive(true);
+            UpdateAdvanceMarkerPosition();
         }
     }
 
