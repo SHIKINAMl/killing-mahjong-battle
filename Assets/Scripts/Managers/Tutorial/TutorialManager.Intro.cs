@@ -629,20 +629,11 @@ namespace KillingMahjong.Managers
         }
 
         /// <summary>
-        /// 画面にある文字から日本語の使えるフォントを借りる。
-        /// `PixelMplus10_DynamicFixed` は同名のアセットが複数あって直接引くと当たりが不定なため、
-        /// RoomScreenUI と同じやり方に揃えている。
+        /// 説明と選択肢には、対局の案内と共通の本文用フォントを使う。
         /// </summary>
         private static TMP_FontAsset BorrowJapaneseFont()
         {
-            var labels = FindObjectsByType<TextMeshProUGUI>(FindObjectsInactive.Include,
-                FindObjectsSortMode.None);
-            foreach (var label in labels)
-            {
-                if (label != null && label.font != null) return label.font;
-            }
-
-            return TMP_Settings.defaultFontAsset;
+            return KillingMahjong.UI.GameUiTypography.Body;
         }
 
         private static void StretchFull(RectTransform rect)

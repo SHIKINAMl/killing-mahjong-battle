@@ -211,11 +211,11 @@ namespace KillingMahjong.UI
             // 翻数と倍率の表。値はサーバーの精算（game_engine.py の _get_liquidation_multiplier）と同じ
             var tableRule = NewImage(parent, "YakuTableRule", PanelEdge);
             Center(tableRule.rectTransform, new Vector2(YakuDetailWidth, 1f));
-            tableRule.rectTransform.anchoredPosition = new Vector2(YakuDetailCenterX, -150f);
+            tableRule.rectTransform.anchoredPosition = new Vector2(YakuDetailCenterX, -112f);
             tableRule.raycastTarget = false;
 
-            Label(parent, "YakuTableHead", "翻数の合計と倍率", new Vector2(YakuDetailCenterX, -166f),
-                new Vector2(YakuDetailWidth, 20f), 13f, TextAlignmentOptions.Left, Marker);
+            Label(parent, "YakuTableHead", "翻数の合計と倍率", new Vector2(YakuDetailCenterX, -128f),
+                new Vector2(YakuDetailWidth, 20f), 14f, TextAlignmentOptions.Left, Marker);
 
             string[] ranks = { "満貫", "跳満", "倍満", "三倍満", "役満", "ダブル役満" };
             int[] hans = { 4, 6, 8, 11, 13, 26 };
@@ -223,12 +223,12 @@ namespace KillingMahjong.UI
             for (int i = 0; i < ranks.Length; i++)
             {
                 float x = left + cell * (i + 0.5f);
-                Label(parent, "YakuRank_" + i, ranks[i], new Vector2(x, -190f), new Vector2(cell, 20f),
-                    13f, TextAlignmentOptions.Center, TextMain);
-                Label(parent, "YakuRankHan_" + i, hans[i] + "翻から", new Vector2(x, -208f), new Vector2(cell, 18f),
-                    12f, TextAlignmentOptions.Center, TextDim);
+                Label(parent, "YakuRank_" + i, ranks[i], new Vector2(x, -152f), new Vector2(cell, 20f),
+                    14f, TextAlignmentOptions.Center, TextMain);
+                Label(parent, "YakuRankHan_" + i, hans[i] + "翻から", new Vector2(x, -174f), new Vector2(cell, 20f),
+                    14f, TextAlignmentOptions.Center, TextDim);
                 Label(parent, "YakuRankRate_" + i, "×" + GameRules.GetMultiplier(hans[i]).ToString("0.#"),
-                    new Vector2(x, -226f), new Vector2(cell, 18f), 12f, TextAlignmentOptions.Center, TextDim);
+                    new Vector2(x, -196f), new Vector2(cell, 20f), 14f, TextAlignmentOptions.Center, TextDim);
             }
 
         }

@@ -13,7 +13,7 @@ namespace KillingMahjong.UI
         {
             if (!readabilityBackdropDirty) return;
             readabilityBackdropDirty = false;
-            UpdateDialogueTextBackdrop();
+            UpdateDialogueControlLayout();
         }
 
         // 操作欄は3行分の余白を確保した位置に固定する。
@@ -34,7 +34,10 @@ namespace KillingMahjong.UI
             float height = dialogueText.textInfo.lineCount >= 3
                 ? Mathf.Max(originalTextHeight, dialogueText.preferredHeight) : originalTextHeight;
             textRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, height);
-            textRect.anchoredPosition = originalTextPosition
+            var settings = KillingMahjong.Core.SettingsManager.Instance;
+            bool framed = settings != null && settings.ShowDialogueBubble;
+            // 枠を出さないときも、文字が相手の顔へかからない位置で読む。
+            textRect.anchoredPosition = originalTextPosition + Vector2.right * (framed ? 0f : 48f)
                 + Vector2.up * ((height - originalTextHeight) * textRect.pivot.y);
             buttonRect.anchoredPosition = originalLogPosition - Vector2.up * 12f;
             dialogueText.ForceMeshUpdate();
@@ -65,7 +68,9 @@ namespace KillingMahjong.UI
         {
             if (advanceMarkerObj == null || !controlLayoutCaptured || toggleLogButton == null) return;
             float shift = ((RectTransform)toggleLogButton.transform).anchoredPosition.y - originalLogPosition.y;
-            ((RectTransform)advanceMarkerObj.transform).anchoredPosition = new Vector2(-14f, 10f + shift);
+            var settings = KillingMahjong.Core.SettingsManager.Instance;
+            float textShift = settings != null && settings.ShowDialogueBubble ? 0f : 48f;
+            ((RectTransform)advanceMarkerObj.transform).anchoredPosition = new Vector2(-14f + textShift, 10f + shift);
         }
     }
 }

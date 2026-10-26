@@ -55,9 +55,7 @@ namespace KillingMahjong.UI
             rect.sizeDelta = size;
             rect.anchoredPosition = position;
             var text = obj.GetComponent<TextMeshProUGUI>();
-            TMP_FontAsset font = null;
-            foreach (var existing in FindObjectsByType<TMP_Text>(FindObjectsInactive.Include, FindObjectsSortMode.None))
-                if (existing != text && existing.font != null) { font = existing.font; break; }
+            TMP_FontAsset font = GameUiTypography.Body;
             if (font != null) text.font = font;
             text.text = value;
             text.fontSize = 24f;

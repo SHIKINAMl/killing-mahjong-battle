@@ -318,12 +318,7 @@ namespace KillingMahjong.UI
 
         private static TMP_FontAsset BorrowJapaneseFont()
         {
-            var labels = FindObjectsByType<TextMeshProUGUI>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-            foreach (var label in labels)
-            {
-                if (label != null && label.font != null) return label.font;
-            }
-            return TMP_Settings.defaultFontAsset;
+            return GameUiTypography.Body;
         }
     }
 }

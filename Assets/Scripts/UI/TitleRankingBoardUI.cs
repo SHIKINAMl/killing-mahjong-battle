@@ -323,6 +323,7 @@ namespace KillingMahjong.UI
         private void Show()
         {
             showing = true;
+            HideUnderlyingStartLabel();
             ShowRanking();
             SetVisible(true);
         }
@@ -426,6 +427,7 @@ namespace KillingMahjong.UI
         private void OnDestroy()
         {
             CancelRankingMotion();
+            RestoreUnderlyingStartLabel();
             if (videoTexture != null) { videoTexture.Release(); Destroy(videoTexture); }
         }
 
@@ -433,6 +435,7 @@ namespace KillingMahjong.UI
         {
             if (!showing) return;
             showing = false;
+            RestoreUnderlyingStartLabel();
             CancelRankingMotion();
             StopVideo();
             SetVisible(false);

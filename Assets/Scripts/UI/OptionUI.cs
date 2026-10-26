@@ -582,6 +582,7 @@ namespace KillingMahjong.UI
             rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, 40f);
             rect.anchoredPosition = new Vector2(-280f, 255f);
             exhibitionResetButton = buttonObject.GetComponent<Button>();
+            exhibitionResetButton.image.color = new Color32(104, 39, 48, 255);
             exhibitionResetButton.onClick.RemoveAllListeners();
 
             exhibitionResetLabel = buttonObject.GetComponentInChildren<TMP_Text>(true);

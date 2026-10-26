@@ -19,7 +19,7 @@ namespace KillingMahjong.UI
         // シーン側には (31, 69) が入っているが、ここで上書きするので画面には出ない。
         // **動かすときはシーンではなくこの値を変えること**（シーンが2つあるため。AGENTS.md §2）。
         private static readonly Vector2 HpTextAnchoredPosition = new Vector2(52f, 37f);
-        private static readonly Vector2 HpTextSize = new Vector2(72f, 18f);
+        private static readonly Vector2 HpTextSize = new Vector2(72f, 22f);
         private static readonly Vector4 HpTextMargin = new Vector4(2f, 0f, 2f, 0f);
 
         /// <summary>
@@ -64,10 +64,10 @@ namespace KillingMahjong.UI
             hpText.margin = HpTextMargin;
             hpText.textWrappingMode = TextWrappingModes.NoWrap;
             hpText.alignment = TextAlignmentOptions.Center;
-            hpText.fontSize = 11f;
+            hpText.fontSize = 16f;
             hpText.enableAutoSizing = true;
-            hpText.fontSizeMin = 9f;
-            hpText.fontSizeMax = 11f;
+            hpText.fontSizeMin = 14f;
+            hpText.fontSizeMax = 16f;
         }
 
         /// <summary>黒い横線3本の覆いを見えなくする。</summary>

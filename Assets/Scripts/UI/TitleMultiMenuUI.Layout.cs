@@ -331,19 +331,11 @@ namespace KillingMahjong.UI
         }
 
         /// <summary>
-        /// 画面にある文字からフォントを借りる。
-        /// `PixelMplus10_DynamicFixed` という名前のアセットが複数あるため、
-        /// パス決め打ちで拾うと別物を掴むことがある。
+        /// 選択肢や案内文には、読みやすい本文用のフォントを使う。
         /// </summary>
         private static TMP_FontAsset BorrowJapaneseFont()
         {
-            var texts = FindObjectsByType<TMP_Text>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-            foreach (var t in texts)
-            {
-                if (t != null && t.font != null) return t.font;
-            }
-            Debug.LogWarning("[TitleMultiMenuUI] 借りられるフォントが見つかりませんでした。日本語が豆腐になります");
-            return null;
+            return GameUiTypography.Body;
         }
 
         private static void Stretch(RectTransform rt)

@@ -32,8 +32,7 @@ namespace KillingMahjong.UI
 
             visual = new GameObject("HpNumberVisual", typeof(RectTransform));
             visual.transform.SetParent(transform, false);
-            var font = Resources.Load<TMP_FontAsset>("x8y12pxDenkiChip/x8y12pxDenkiChip_Dynamic")
-                ?? Resources.Load<TMP_FontAsset>("PixelMplus10_DynamicFixed") ?? TMP_Settings.defaultFontAsset;
+            var font = GameUiTypography.Display;
             string sign = amount > 0 ? "+" : "-";
             string digits = System.Math.Abs((long)amount).ToString("N0", CultureInfo.InvariantCulture);
             string plain = sign + digits;

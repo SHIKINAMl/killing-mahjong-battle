@@ -828,17 +828,11 @@ namespace KillingMahjong.UI
         }
 
         /// <summary>
-        /// シーンに既にある日本語フォントを借りる（コレクションと同じ手口）。
-        /// 専用のフォントアセットを持たせると、差し替えたときにここだけ取り残される。
+        /// 役の説明や操作は、コレクションと共通の本文フォントで読む。
         /// </summary>
         private static TMP_FontAsset BorrowJapaneseFont()
         {
-            var labels = FindObjectsByType<TextMeshProUGUI>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-            foreach (var label in labels)
-            {
-                if (label != null && label.font != null) return label.font;
-            }
-            return TMP_Settings.defaultFontAsset;
+            return GameUiTypography.Body;
         }
     }
 }
