@@ -94,8 +94,9 @@ namespace KillingMahjong.UI
                     if (anchor == null) anchor = zoomTarget as RectTransform;
                     if (anchor == null && enemyPanel != null) anchor = enemyPanel.transform as RectTransform;
 
+                    // 上昇しても残りHPの見出しに重ならないよう、血袋寄りに出す。
                     hpPopup = new HpPopupPresenter(this, transform as RectTransform, anchor,
-                                                   damagePopupPrefab, new Vector2(0, 60f), isLocalPlayer: false);
+                                                   damagePopupPrefab, new Vector2(0, 36f), isLocalPlayer: false);
                 }
                 return hpPopup;
             }
