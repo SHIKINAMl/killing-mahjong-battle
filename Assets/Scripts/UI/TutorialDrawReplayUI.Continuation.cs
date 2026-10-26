@@ -51,10 +51,8 @@ namespace KillingMahjong.UI
                 senior.localRotation = Quaternion.Euler(0, 0, 16f * p);
                 yield return null;
             }
-            // 倒れ伏した絵へ切り替える。卓の手前の縁へ上半身を投げ出した姿（37×27 のドット絵を 16 倍）。
-            // **この絵だけは画像生成で作った**（2026-10-23 ユーザーが許可。AGENTS.md 第7項の例外）。
-            // 以前の先輩の 29×29 のドット絵と同じ色・同じ粗さに落としてある
-            var fallen = Resources.Load<Sprite>("女の子/tutorial_senior_fallen");
+            // 支給された倒れ伏す先輩へ切り替える。元画像の解像度と縦横比を保つ。
+            var fallen = Resources.Load<Sprite>("女の子/tutorial_girl_falldown");
             if (fallen != null)
             {
                 var image = senior.GetComponent<Image>();
@@ -106,12 +104,12 @@ namespace KillingMahjong.UI
             yield return ReturnToPhone();
         }
 
-        /// <summary>倒れ伏した絵の拡大率と置き場所（動画の枠の中、真ん中から）。左下の手前に、頭を左上にして伏せる</summary>
-        private const float FallenScale = 16f;
+        /// <summary>1000×747の支給画像を等倍で表示。透明な余白を含むので、人物の足元が枠の下端に来る位置に置く。</summary>
+        private const float FallenScale = 1f;
 
         /// <summary>倒れる前の先輩（155×190）の拡大率と置き場所。人物の中心が以前の 29×29 版と同じ (-180, -80) に来る</summary>
         private const float SeniorScale = 2f;
         private static readonly Vector2 SeniorPosition = new Vector2(-171f, -75f);
-        private static readonly Vector2 FallenPosition = new Vector2(-120f, -205f);
+        private static readonly Vector2 FallenPosition = new Vector2(-120f, -50f);
     }
 }
