@@ -339,14 +339,26 @@ namespace KillingMahjong.Managers
                 var imageRect = (RectTransform)image.transform;
                 imageRect.anchorMin = new Vector2(0.5f, 0.5f);
                 imageRect.anchorMax = new Vector2(0.5f, 0.5f);
-                imageRect.anchoredPosition = new Vector2(0f, 30f);
-                // 元画像の縦横比のまま、画面に収まる大きさへ。
-                // 幅は 760 まで取る。まとめ④（722x418）を流局説明に流用したとき、700 だと等倍から少し縮んで
-                // ドットが不揃いになった。400x300 の絵は高さで決まるので、この幅では変わらない。
-                float scale = Mathf.Min(760f / board.rect.width, 450f / board.rect.height);
-                // 等倍に近い絵は等倍のまま（1.05倍などに引き伸ばすと、やはりドットが不揃いになる）
-                if (scale > 1f && scale < 1.25f) scale = 1f;
-                imageRect.sizeDelta = new Vector2(board.rect.width * scale, board.rect.height * scale);
+                imageRect.anchoredPosition = new Vector2(0f, 20f);
+                // 透明な余白ではなく、絵の範囲をまとめと同じ幅へ合わせる。
+                var contentSize = board.rect.size;
+                var contentOffset = Vector2.zero;
+                var vertices = board.vertices;
+                if (vertices.Length > 0)
+                {
+                    var bounds = new Bounds(vertices[0], Vector3.zero);
+                    foreach (var vertex in vertices) bounds.Encapsulate(vertex);
+                    contentSize = (Vector2)bounds.size * board.pixelsPerUnit;
+                    contentOffset = (Vector2)bounds.center * board.pixelsPerUnit + board.pivot - board.rect.size * .5f;
+                }
+                float scale = Mathf.Min(722f / contentSize.x, 470f / contentSize.y);
+                // ほぼ整数倍なら整数倍にして、元のドットをそろえる。
+                float integerScale = Mathf.Round(scale);
+                if (integerScale >= 1f && Mathf.Abs(scale - integerScale) < .05f
+                    && contentSize.x * integerScale <= 760f && contentSize.y * integerScale <= 470f)
+                    scale = integerScale;
+                imageRect.sizeDelta = board.rect.size * scale;
+                imageRect.anchoredPosition -= contentOffset * scale;
 
                 var boardImage = image.GetComponent<Image>();
                 boardImage.sprite = board;
@@ -451,6 +463,7 @@ namespace KillingMahjong.Managers
             cardRect.anchorMax = new Vector2(0.5f, 0.5f);
             cardRect.anchoredPosition = new Vector2(0f, 30f);
             cardRect.sizeDelta = new Vector2(620f, 380f);
+            cardRect.localScale = Vector3.one * (722f / 620f);
             card.GetComponent<Image>().color = new Color32(28, 16, 20, 245);
 
             if (!string.IsNullOrEmpty(title))

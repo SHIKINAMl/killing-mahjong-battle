@@ -329,6 +329,7 @@ namespace KillingMahjong.UI
             panel.transform.SetParent(transform, false);
             var panelRect = (RectTransform)panel.transform;
             Center(panelRect, new Vector2(650f, 380f));
+            panelRect.localScale = Vector3.one * (722f / 650f);
             panel.GetComponent<Image>().color = new Color(0.08f, 0.06f, 0.12f, 0.98f);
             var panelOutline = panel.GetComponent<Outline>();
             panelOutline.effectColor = new Color32(214, 40, 62, 220);
