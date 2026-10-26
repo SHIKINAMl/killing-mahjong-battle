@@ -65,6 +65,7 @@ namespace KillingMahjong.UI
             }
 
             ApplyBubbleSetting();
+            UpdateDialogueControlLayout();
         }
 
         /// <summary>

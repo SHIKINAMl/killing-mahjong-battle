@@ -8,8 +8,8 @@ namespace KillingMahjong.UI
         private Vector2 originalTextPosition, originalLogPosition;
         private float originalTextHeight;
 
-        // 全文を解析してから、3行以上の場合だけ操作欄を下へ逃がす。
-        // 短いセリフへ戻ったら、シーンに保存された配置へ戻す。
+        // 操作欄は3行分の余白を確保した位置に固定する。
+        // さらに長いセリフは文字欄を上へ広げ、ボタンは動かさない。
         private void UpdateDialogueControlLayout()
         {
             if (dialogueText == null || toggleLogButton == null) return;
@@ -27,17 +27,8 @@ namespace KillingMahjong.UI
                 ? Mathf.Max(originalTextHeight, dialogueText.preferredHeight) : originalTextHeight;
             textRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, height);
             textRect.anchoredPosition = originalTextPosition
-                - Vector2.up * ((height - originalTextHeight) * (1f - textRect.pivot.y));
-            buttonRect.anchoredPosition = originalLogPosition;
-            if (dialogueText.textInfo.lineCount >= 3)
-            {
-                var textBottom = buttonRect.parent.InverseTransformPoint(
-                    textRect.TransformPoint(new Vector3(0f, textRect.rect.yMin, 0f)));
-                var buttonTop = buttonRect.parent.InverseTransformPoint(
-                    buttonRect.TransformPoint(new Vector3(0f, buttonRect.rect.yMax, 0f)));
-                float shift = Mathf.Min(0f, textBottom.y - 8f - buttonTop.y);
-                buttonRect.anchoredPosition += Vector2.up * Mathf.Floor(shift);
-            }
+                + Vector2.up * ((height - originalTextHeight) * textRect.pivot.y);
+            buttonRect.anchoredPosition = originalLogPosition - Vector2.up * 12f;
             dialogueText.ForceMeshUpdate();
             UpdateAdvanceMarkerPosition();
         }
