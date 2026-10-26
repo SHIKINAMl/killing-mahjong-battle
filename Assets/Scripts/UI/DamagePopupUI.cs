@@ -43,10 +43,9 @@ namespace KillingMahjong.UI
             CreateNumber("EdgeRight", font, plain, new Vector2(2f, 0f), ink);
             CreateNumber("EdgeTop", font, plain, new Vector2(0f, 2f), ink);
             CreateNumber("EdgeBottom", font, plain, new Vector2(0f, -2f), ink);
-            string accent = amount > 0 ? "72DFC0" : "F26F7C";
-            string face = amount > 0 ? "D9FFF3" : "FFE4DF";
+            string face = amount > 0 ? "65ADFF" : "FF5C5C";
             var number = CreateNumber("Number", font,
-                "<color=#" + accent + ">" + sign + "</color><color=#" + face + ">" + digits + "</color>",
+                "<color=#" + face + ">" + plain + "</color>",
                 Vector2.zero, Color.white);
             var size = number.GetPreferredValues(plain) + new Vector2(16f, 10f);
             ((RectTransform)transform).sizeDelta = size;
