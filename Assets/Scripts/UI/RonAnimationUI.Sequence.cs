@@ -200,9 +200,10 @@ namespace KillingMahjong.UI
                 }
             }
 
-            // 役名は清算表で一度だけ確認する。読み上げも表の翻数表示へ合わせる。
-            // チュートリアル第1局は、台本の説明に続く ShowTutorialSettlement で同じ表を出す。
-            if (settlement == null)
+            yield return ShowYakuRibbon(containerRt, yakuList, settlement);
+
+            // チュートリアル第1局は、台本の説明に続く ShowTutorialSettlement で精算を確認する。
+            if (suppressSettlementPanel || settlement == null)
             {
                 // **HPだけは必ず最終値に合わせる。** ここで抜けて放置すると
                 // サーバーの結果と画面がずれたまま次の局へ進む。

@@ -10,7 +10,6 @@ namespace KillingMahjong.UI
     public partial class RonAnimationUI
     {
         private CanvasGroup BuildSettlementPanel(RectTransform parent, RonSettlementInfo s,
-            List<TextMeshProUGUI> hanTexts,
             out TextMeshProUGUI totalHanText, out TextMeshProUGUI multiplierText,
             out TextMeshProUGUI myBetText, out TextMeshProUGUI theirBetText,
             out TextMeshProUGUI myMultText, out TextMeshProUGUI theirMultText,
@@ -30,10 +29,9 @@ namespace KillingMahjong.UI
 
             RectTransform rootRt = root.GetComponent<RectTransform>();
             rootRt.anchorMin = rootRt.anchorMax = new Vector2(0.5f, 0.5f);
-            // **下端を固定して上へ伸ばす。** 役が増えても下（手牌）を押さない。
+            // 下端を固定して上へ伸ばし、精算の項目が増えても下の手牌を押さない。
             // 基準 800x600 で手牌の上端は中心から -146 なので、その少し上に置く。
-            // 上へ使えるのは中心から +300 まで。役5行でちょうど収まる寸法にしてある
-            // （実機で -105 に置いたら見出しの帯が画面外に出た）。
+            // 表は合計と精算の内訳だけにし、顔と手牌の間へ収める。
             rootRt.pivot = new Vector2(0.5f, 0f);
             rootRt.anchoredPosition = new Vector2(0f, -140f);
             rootRt.sizeDelta = new Vector2(PanelWidth, 0f);
@@ -69,7 +67,7 @@ namespace KillingMahjong.UI
             }
             MakeText(head.transform, "和了", 20f, PanelInk, TextAlignmentOptions.Left, true);
             // 型の答え合わせ（2026-10-15）。相手に和了られたときに「相手は染めだった」と分かれば、
-            // 次からその捨て牌の特徴を覚えていける。行を足すと役5行で画面からはみ出すので見出しに入れる
+            // 次からその捨て牌の特徴を覚えていけるよう、型だけは見出しで確認できる。
             var archetype = HandArchetype.Classify(RowNames(s));
             if (archetype != null)
             {
@@ -92,19 +90,8 @@ namespace KillingMahjong.UI
             bodyLayout.childForceExpandWidth = true;
             bodyLayout.childForceExpandHeight = false;
 
-            // ---- 役の行 ----
-            foreach (var row in s.Rows)
-            {
-                GameObject r = MakeBox(body.transform, Color.clear, 0, 1);
-                MakeText(r.transform, row.Name, 22f, PanelInk, TextAlignmentOptions.Left, true);
-                // 強化ぶんは黄色で独立させる。`断幺九+1` と地の文に埋めない
-                // 強化は翻ではなく精算の段階（満貫→跳満…）を上げるので「段」と書く（2026-10-25）
-                MakeText(r.transform, row.Boost > 0 ? "+" + row.Boost + "段" : "", 18f, AccentGold, TextAlignmentOptions.Right, false, 70f);
-                hanTexts.Add(MakeText(r.transform, "", 22f, PanelInk, TextAlignmentOptions.Right, false, 90f));
-            }
-
+            // 役ごとの名前・翻数・強化は直前の斜め帯で紹介済み。表では精算に必要な合計から見せる。
             // ---- 合計 → 倍率 ----
-            MakeRule(body.transform);
             GameObject sum = MakeBox(body.transform, Color.clear, 0, 2);
             MakeText(sum.transform, "合計", 22f, PanelFaint, TextAlignmentOptions.Left, true);
             totalHanText = MakeNumber(sum.transform, 24f, AccentGold, 90f);
@@ -203,7 +190,7 @@ namespace KillingMahjong.UI
 
             // 地の模様（2026-10-25 のユーザー指示「血だけではなく背景も。デバッグ部屋にある本の模様を参考に」）。
             // 本と同じ作り（上→下の狭い濃淡を4色・bayer4 で減色。tools/CutinPixelArt/settlement.mjs）。
-            // 表の高さは役の数で変わるので、一番高いとき（340）の大きさで作ってあり、表の上にそろえて下を切る。
+            // 表の高さは精算項目の数で変わる。模様を上にそろえ、下の余りを切る。
             // 伸ばすとドットが崩れるので、いつも等倍（1ドット＝2UI単位）で置く
             var groundSprite = Resources.Load<Sprite>(blue ? GroundPixelBlue : GroundPixelRed);
             if (groundSprite != null)

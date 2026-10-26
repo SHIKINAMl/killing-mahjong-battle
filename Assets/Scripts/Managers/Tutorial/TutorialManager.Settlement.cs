@@ -86,7 +86,7 @@ namespace KillingMahjong.Managers
                 prevEnemyHp: prevEnemyHp, newEnemyHp: _enemyHp,
                 displayScore: settlement,
                 scoreFormula: BuildScoreFormula(myBet, han),
-                settlement: isFirstTutorialRound ? null : settlementInfo,
+                settlement: settlementInfo,
                 suppressSettlementPanel: isFirstTutorialRound,
                 deferHpUpdate: isFirstTutorialRound));
 

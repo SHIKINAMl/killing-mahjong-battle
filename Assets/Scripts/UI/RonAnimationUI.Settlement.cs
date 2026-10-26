@@ -29,17 +29,13 @@ namespace KillingMahjong.UI
         //  **速さを変えるときはここだけ触ればよい。** 以前はコードの中に
         //  0.12f や 0.8f が直接書いてあり、どれがどの間なのか分からなかった。
         //
-        //  とくに効くのは次の2つ:
-        //    - RowInterval … 役が1行ずつ入る間隔。ここが詰まると表が一瞬で埋まる
+        //  とくに効くのは最後の静止時間:
         //    - ReadHold    … 最後の静止。**パネルはこの直後に消える**ので、
         //                    表を読める最後の時間がここ
         // ------------------------------------------------------------
 
         /// <summary>枠がフェードインする時間。0.30 → 0.45</summary>
         private const float PanelFadeIn = 0.45f;
-
-        /// <summary>役の行が1行ずつ入る間隔。0.12 → 0.22</summary>
-        private const float RowInterval = 0.22f;
 
         /// <summary>合計翻数を出したあとの間。0.25 → 0.45</summary>
         private const float AfterTotalHan = 0.45f;
@@ -106,19 +102,18 @@ namespace KillingMahjong.UI
             scaler.referenceResolution = new Vector2(800f, 600f);
             scaler.matchWidthOrHeight = 0f;
 
-            var hanTexts = new List<TextMeshProUGUI>();
             TextMeshProUGUI totalHanText, multiplierText;
             TextMeshProUGUI myBetText, theirBetText, myMultText, theirMultText;
             TextMeshProUGUI tankiMine, tankiTheirs;
             TextMeshProUGUI myDeltaText, theirDeltaText, myHpText, theirHpText;
 
             CanvasGroup panelGroup = BuildSettlementPanel(containerRt, settlement,
-                hanTexts, out totalHanText, out multiplierText,
+                out totalHanText, out multiplierText,
                 out myBetText, out theirBetText, out myMultText, out theirMultText,
                 out tankiMine, out tankiTheirs,
                 out myDeltaText, out theirDeltaText, out myHpText, out theirHpText);
 
-            FillTutorialSettlementValues(settlement, hanTexts, totalHanText, multiplierText,
+            FillTutorialSettlementValues(settlement, totalHanText, multiplierText,
                 myBetText, theirBetText, myMultText, theirMultText, tankiMine, tankiTheirs);
             panelGroup.alpha = 1f;
 
@@ -157,7 +152,7 @@ namespace KillingMahjong.UI
         {
             if (_tutorialSettlementPanel == null) return;
 
-            // 役の行数で高さが変わるので、寸法は確定させてから読む。
+            // 単騎待ちや強襲の有無で高さが変わるので、寸法は確定させてから読む。
             LayoutRebuilder.ForceRebuildLayoutImmediate(_tutorialSettlementPanel);
             float w = _tutorialSettlementPanel.rect.width;
             float h = _tutorialSettlementPanel.rect.height;
@@ -246,15 +241,12 @@ namespace KillingMahjong.UI
             if (stage != null) Destroy(stage);
         }
 
-        private void FillTutorialSettlementValues(RonSettlementInfo settlement, List<TextMeshProUGUI> hanTexts,
+        private void FillTutorialSettlementValues(RonSettlementInfo settlement,
             TextMeshProUGUI totalHanText, TextMeshProUGUI multiplierText,
             TextMeshProUGUI myBetText, TextMeshProUGUI theirBetText,
             TextMeshProUGUI myMultText, TextMeshProUGUI theirMultText,
             TextMeshProUGUI tankiMine, TextMeshProUGUI tankiTheirs)
         {
-            for (int i = 0; i < hanTexts.Count && i < settlement.Rows.Count; i++)
-                hanTexts[i].text = settlement.ShowPerRowHan ? $"{settlement.Rows[i].Han}翻" : "";
-
             string multiplier = "×" + settlement.Multiplier.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
             if (totalHanText != null) totalHanText.text = $"{settlement.TotalHan}翻";
             if (multiplierText != null) multiplierText.text = multiplier;
@@ -321,16 +313,14 @@ namespace KillingMahjong.UI
         private IEnumerator SettlementRoutine(RectTransform containerRt, GameObject container, RonSettlementInfo s,
             PlayerInfoUI playerInfo, EnemyInfoUI enemyInfo, int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp)
         {
-            // 役の帯は役目を終えている。パネルが同じ役名を翻数つきで出し直すので、
-            // 情報を落とさずに場所を空けられる。**宣言そのもの（1つずつ出る所）は上でやり終えている。**
-            var hanTexts = new List<TextMeshProUGUI>();
+            // 役の紹介は斜め帯で完了している。表は合計翻数と血の精算へ進む。
             TextMeshProUGUI totalHanText, multiplierText;
             TextMeshProUGUI myBetText, theirBetText, myMultText, theirMultText;
             TextMeshProUGUI tankiMine, tankiTheirs;
             TextMeshProUGUI myDeltaText, theirDeltaText, myHpText, theirHpText;
 
             CanvasGroup panelGroup = BuildSettlementPanel(containerRt, s,
-                hanTexts, out totalHanText, out multiplierText,
+                out totalHanText, out multiplierText,
                 out myBetText, out theirBetText, out myMultText, out theirMultText,
                 out tankiMine, out tankiTheirs,
                 out myDeltaText, out theirDeltaText, out myHpText, out theirHpText);
@@ -345,18 +335,7 @@ namespace KillingMahjong.UI
             }
             panelGroup.alpha = 1f;
 
-            // ① 役ごとの翻数が上から入る
-            for (int i = 0; i < hanTexts.Count && i < s.Rows.Count; i++)
-            {
-                // **`飜`(U+98BB) は PixelMplus に入っていない。** 使うと □ になる。
-                // ゲームの他の表示テキスト（AbilityUI・チュートリアル）は `翻`(U+7FFB) を使っているので揃える。
-                // コード中のコメントや Tooltip には `飜` が残っているが、あれは画面に出ない。
-                hanTexts[i].text = s.ShowPerRowHan ? $"{s.Rows[i].Han}翻" : "";
-                KillingMahjong.Managers.AudioManager.Instance?.PlayYakuVoice(s.Rows[i].Name);
-                yield return new WaitForSeconds(RowInterval);
-            }
-
-            // ② 合計と倍率
+            // ① 合計と倍率。役の紹介は直前の斜め帯で終えている。
             totalHanText.text = $"{s.TotalHan}翻";
             yield return new WaitForSeconds(AfterTotalHan);
             multiplierText.text = "×" + s.Multiplier.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
