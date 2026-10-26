@@ -164,42 +164,7 @@ namespace KillingMahjong.UI
             dimmerRt.anchorMax = Vector2.one;
             dimmerRt.sizeDelta = Vector2.zero;
 
-            // 3. 役と飜数を示すリボン（帯）
-            GameObject ribbonObj = new GameObject("YakuRibbon");
-            ribbonObj.transform.SetParent(containerRt, false);
-            Image ribbonImg = ribbonObj.AddComponent<Image>();
-            ribbonImg.color = new Color(0.05f, 0.05f, 0.05f, 0.95f); // 黒い帯
-            
-            // 少し斜めにするスタイリッシュな表現
-            ribbonObj.transform.localRotation = Quaternion.Euler(0, 0, 2f);
-
-            RectTransform ribbonRt = ribbonObj.GetComponent<RectTransform>();
-            ribbonRt.anchorMin = new Vector2(0, 0.40f);
-            ribbonRt.anchorMax = new Vector2(1, 0.40f);
-            ribbonRt.sizeDelta = new Vector2(200, 100); // 画面幅＋余白、高さ100
-            ribbonRt.anchoredPosition = Vector2.zero;
-
-            GameObject yakuTextObj = new GameObject("YakuText");
-            yakuTextObj.transform.SetParent(ribbonObj.transform, false);
-            TextMeshProUGUI yakuText = yakuTextObj.AddComponent<TextMeshProUGUI>();
-            if (customFont != null) yakuText.font = customFont;
-            
-            // 役テキストは後で1つずつ表示するため最初は空にする
-            yakuText.text = "";
-            yakuText.color = new Color(1f, 1f, 1f); 
-            yakuText.enableAutoSizing = true;
-            yakuText.fontSizeMin = KillingMahjong.Common.UITypography.BodySmall;
-            yakuText.fontSizeMax = KillingMahjong.Common.UITypography.BodyLarge;
-            yakuText.alignment = TextAlignmentOptions.Center;
-            yakuText.textWrappingMode = TextWrappingModes.NoWrap;
-            
-            RectTransform yakuTextRt = yakuTextObj.GetComponent<RectTransform>();
-            yakuTextRt.anchorMin = Vector2.zero;
-            yakuTextRt.anchorMax = Vector2.one;
-            yakuTextRt.sizeDelta = new Vector2(-100, 0); // 左右に50pxずつの余白を設ける
-            yakuTextRt.anchoredPosition = Vector2.zero;
-
-            // 4. 手牌の生成と配置（帯の下）
+            // 3. 和了した手牌を清算表の下へ並べる。
             GameObject handContainer = new GameObject("HandContainer");
             handContainer.transform.SetParent(containerRt, false);
             RectTransform handContainerRt = handContainer.AddComponent<RectTransform>();
@@ -235,39 +200,8 @@ namespace KillingMahjong.UI
                 }
             }
 
-            // --- 役を1つずつ表示する演出 ---
-            string currentYakuStr = "";
-            foreach (var yaku in yakuList)
-            {
-                if (!string.IsNullOrEmpty(currentYakuStr)) currentYakuStr += "・";
-                currentYakuStr += yaku;
-                yakuText.text = currentYakuStr;
-                
-                // 役名ボイスを再生（「タンヤオ」「ピンフ」等）
-                if (KillingMahjong.Managers.AudioManager.Instance != null)
-                {
-                    KillingMahjong.Managers.AudioManager.Instance.PlayYakuVoice(yaku);
-                }
-
-                // 役を1つ表示するごとの間隔（ボイスの長さに合わせて少し延長）
-                yield return new WaitForSeconds(0.6f);
-            }
-            
-            // --- ここから先が「点数の説明」 ---
-            //
-            // **役の宣言（上のカットインと帯）はそのまま残す。** 置き換えたのはこの後ろだけ。
-            //
-            // **内訳（settlement）を持たない経路はもう無い。** 本編は
-            // `GameUIPhaseController` がサーバーの liquidation から、チュートリアルは
-            // `TutorialManager` が台本から、どちらも必ず組んで渡す（2026-08-29）。
-            // ここへ null で来るのは **liquidation が欠けた異常時だけ**なので、
-            // 旧来の「式 → ランク → 巨大な数字」は丸ごと消した。
-            //
-            // **一緒に消したもの**: FormulaText / RankText / 巨大スコア / 血しぶき /
-            // キラキラ星（PlayWinnerSparkleEffect）/ 赤フラッシュ（PlayLoserDamageEffect）/
-            // 中央から勝者へ吸い込むパーティクル（SpawnAbsorbParticles）。
-            // **キラキラと赤フラッシュは 2026-08-20 の演出削減バッチ1で既に呼び出しが
-            // コメントアウトされており、以後一度も画面に出ていない。**
+            // 役名は清算表で一度だけ確認する。読み上げも表の翻数表示へ合わせる。
+            // チュートリアル第1局は、台本の説明に続く ShowTutorialSettlement で同じ表を出す。
             if (settlement == null)
             {
                 // **HPだけは必ず最終値に合わせる。** ここで抜けて放置すると

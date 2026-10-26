@@ -66,8 +66,8 @@ namespace KillingMahjong.UI
             new Entry("ron.impact", "ロン・清算", "ロン入力：手振り・吹き出し", "RonImpactEffect.Play"),
             new Entry(Effects.RonAuraUI.LocalEffectId, "ロン・清算", "自分のロン：吹き出し背面の青いオーラ", "RonImpactEffect.Play / RonAuraUI.BehindCallout"),
             new Entry(Effects.RonAuraUI.EnemyEffectId, "ロン・清算", "相手のロン：立ち絵背面の赤いオーラ", "CutinAnimationUI.PlayCutin / RonAuraUI.BehindCharacter"),
-            new Entry("ron.local", "ロン・清算", "自分のロン：カットイン・点数表（青）・相手の全身から血が霧散", "RonAnimationUI.PlayRonSequence"),
-            new Entry("ron.enemy", "ロン・清算", "相手のロン：カットイン・点数表（赤）・自分の全身から血が霧散", "RonAnimationUI.PlayRonSequence"),
+            new Entry("ron.local", "ロン・清算", "自分のロン：カットイン → 役・翻数の清算表（青） → 相手の血が霧散", "RonAnimationUI.PlayRonSequence / SettlementRoutine"),
+            new Entry("ron.enemy", "ロン・清算", "相手のロン：カットイン → 役・翻数の清算表（赤） → 自分の血が霧散", "RonAnimationUI.PlayRonSequence / SettlementRoutine"),
             // 2026-10-19 に本編が霧（全身から血が霧散）になったので、それまでのホースを通る筋を没案に置く
             new Entry("ron.stream_local", "ロン・清算", "自分のロン：卓の血だまりからホースで血が流れ込む", "RonAnimationUI.PreviewStreamDrain", unused: true),
             new Entry("ron.stream_enemy", "ロン・清算", "相手のロン：卓の血だまりからホースで血が流れ込む", "RonAnimationUI.PreviewStreamDrain", unused: true),

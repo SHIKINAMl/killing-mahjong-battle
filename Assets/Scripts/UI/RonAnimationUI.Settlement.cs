@@ -323,14 +323,6 @@ namespace KillingMahjong.UI
         {
             // 役の帯は役目を終えている。パネルが同じ役名を翻数つきで出し直すので、
             // 情報を落とさずに場所を空けられる。**宣言そのもの（1つずつ出る所）は上でやり終えている。**
-            var ribbon = containerRt.Find("YakuRibbon");
-            CanvasGroup ribbonGroup = null;
-            if (ribbon != null)
-            {
-                ribbonGroup = ribbon.gameObject.GetComponent<CanvasGroup>();
-                if (ribbonGroup == null) ribbonGroup = ribbon.gameObject.AddComponent<CanvasGroup>();
-            }
-
             var hanTexts = new List<TextMeshProUGUI>();
             TextMeshProUGUI totalHanText, multiplierText;
             TextMeshProUGUI myBetText, theirBetText, myMultText, theirMultText;
@@ -349,11 +341,9 @@ namespace KillingMahjong.UI
             {
                 float p = t / fadeIn;
                 panelGroup.alpha = p;
-                if (ribbonGroup != null) ribbonGroup.alpha = 1f - p;
                 yield return null;
             }
             panelGroup.alpha = 1f;
-            if (ribbonGroup != null) ribbonGroup.alpha = 0f;
 
             // ① 役ごとの翻数が上から入る
             for (int i = 0; i < hanTexts.Count && i < s.Rows.Count; i++)
@@ -362,6 +352,7 @@ namespace KillingMahjong.UI
                 // ゲームの他の表示テキスト（AbilityUI・チュートリアル）は `翻`(U+7FFB) を使っているので揃える。
                 // コード中のコメントや Tooltip には `飜` が残っているが、あれは画面に出ない。
                 hanTexts[i].text = s.ShowPerRowHan ? $"{s.Rows[i].Han}翻" : "";
+                KillingMahjong.Managers.AudioManager.Instance?.PlayYakuVoice(s.Rows[i].Name);
                 yield return new WaitForSeconds(RowInterval);
             }
 
