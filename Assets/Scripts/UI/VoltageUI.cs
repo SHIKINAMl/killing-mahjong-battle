@@ -311,14 +311,12 @@ namespace KillingMahjong.UI
 
         private void OnEnable()
         {
-            feedbackReady = false;
             VoltageSystem.Changed += Refresh;
             Refresh();
         }
 
         private void OnDisable()
         {
-            CancelFeedback();
             VoltageSystem.Changed -= Refresh;
         }
 
@@ -333,12 +331,6 @@ namespace KillingMahjong.UI
             int points = VoltageSystem.GetPoints(_isEnemy);
             int from = VoltageSystem.GetPointsAtCurrentLevel(_isEnemy);
             int to = VoltageSystem.GetPointsForNextLevel(_isEnemy);
-            if (feedbackReady && (points > feedbackPoints || (broken && !feedbackBroken && feedbackPoints > 0)))
-                PlayFeedback(broken, level > feedbackLevel);
-            feedbackReady = true;
-            feedbackPoints = points;
-            feedbackLevel = level;
-            feedbackBroken = broken;
             RenderFeedbackState(level, broken, points, from, to, VoltageSystem.GetMultiplier(_isEnemy));
         }
 

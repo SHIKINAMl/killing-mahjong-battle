@@ -104,6 +104,7 @@ namespace KillingMahjong.UI
         /// </summary>
         public System.Collections.IEnumerator PlayDeathRoutine()
         {
+            CancelDiscardAttention();
             if (blinkCoroutine != null) { StopCoroutine(blinkCoroutine); blinkCoroutine = null; }
             if (reactionCoroutine != null) { StopCoroutine(reactionCoroutine); reactionCoroutine = null; }
             if (bounceCoroutine != null) { StopCoroutine(bounceCoroutine); bounceCoroutine = null; }

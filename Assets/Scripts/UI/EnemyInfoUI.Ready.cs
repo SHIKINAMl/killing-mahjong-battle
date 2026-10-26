@@ -82,12 +82,14 @@ namespace KillingMahjong.UI
 
         public void SetCharacterSprite(Sprite sprite)
         {
+            CancelDiscardAttention();
             // SetBodyPoseかSetFaceExpressionを本来は推奨するが、旧互換として残す
             CharacterVisualUtil.ApplyIfPresent(characterRenderer, sprite);
         }
 
         public void SetBodyPose(string poseId)
         {
+            CancelDiscardAttention();
             if (characterData == null || characterRenderer == null) return;
             if (CharacterVisualUtil.TryFindBodySprite(characterData, poseId, out var sprite))
             {
@@ -124,6 +126,7 @@ namespace KillingMahjong.UI
         /// </summary>
         public void SetIdleSlimeBounce(bool on)
         {
+            CancelDiscardAttention();
             SlimeBounceAnimator.Set(characterRenderer, on);
         }
 
@@ -135,6 +138,7 @@ namespace KillingMahjong.UI
         /// </summary>
         public void SetBeatDance(BeatDanceAnimator.Mode mode)
         {
+            CancelDiscardAttention();
             // 拍に合わせて動いているあいだは、まばたきを止める（拍と関係なく目を閉じた絵が混ざって、拍が崩れて見えた）
             suppressBlink = mode != BeatDanceAnimator.Mode.None;
             BeatDanceAnimator.Set(characterRenderer, faceRenderer, mode,
@@ -143,6 +147,7 @@ namespace KillingMahjong.UI
 
         public void PlayBounceAnimation(float duration = 0.5f)
         {
+            CancelDiscardAttention();
             if (characterRenderer == null) return;
             if (bounceCoroutine != null) StopCoroutine(bounceCoroutine);
             // 引数で渡されたduration（例: 5秒）に関わらず、インスペクターで設定した時間で一瞬跳ねる

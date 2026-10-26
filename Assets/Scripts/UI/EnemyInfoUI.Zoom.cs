@@ -107,6 +107,7 @@ namespace KillingMahjong.UI
         // --- ズーム演出（指定したオブジェクトを巨大化し、少し手前・上に浮かせる） ---
         public System.Collections.IEnumerator ZoomInRoutine(float duration = 0.4f, float targetScaleMulti = 2.5f)
         {
+            CancelDiscardAttention();
             if (zoomCoroutine != null) StopCoroutine(zoomCoroutine);
 
             Transform targetObj = zoomTarget != null ? zoomTarget : transform;

@@ -90,7 +90,7 @@ namespace KillingMahjong.UI
             new Entry("blood.burst", "牌・血・ゲージ", "ドットの血しぶき", "PixelBloodEffect.Play", unused: true),
             new Entry("blood.transfer", "牌・血・ゲージ", "血が相手から自分へ移る", "BloodTransferEffect.Play", unused: true),
             new Entry("blood.glow", "牌・血・ゲージ", "血のメーターの発光", "BloodGlowUI.Attach", unused: true),
-            new Entry(DiscardFeedbackDirector.EffectId, "牌・血・ゲージ", "一打の反応：表情・ボルテージ・終盤の静けさ", "RiverUI / DiscardFeedbackDirector / VoltageUI.PlayFeedback"),
+            new Entry(DiscardFeedbackDirector.EffectId, "牌・血・ゲージ", "一打の反応：立ち絵の小反応・終盤の静けさ", "RiverUI / DiscardFeedbackDirector / EnemyInfoUI.PlayDiscardAttention"),
             new Entry("hp.damage", "牌・血・ゲージ", "ダメージ：メーター・増減の数値", "PlayerInfoUI.SetHP / EnemyInfoUI.SetHP / DamagePopupUI"),
             new Entry("hp.heal", "牌・血・ゲージ", "回復：メーター・増減の数値", "PlayerInfoUI.SetHP / DamagePopupUI"),
             new Entry("hp.heartbeat", "牌・血・ゲージ", "瀕死：心音・暗い縁", "HeartbeatEffect.UpdateHeartbeat"),
