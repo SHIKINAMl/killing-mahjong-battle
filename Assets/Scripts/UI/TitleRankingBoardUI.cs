@@ -41,7 +41,7 @@ namespace KillingMahjong.UI
     /// **画面の部品はシーンに置く**（<see cref="SceneFirst"/>）。<see cref="Ensure"/> は「探して、無ければ作る」。
     /// 位置や色はシーンのほうが正で、ここの数字はシーンに無かったときの控え。
     /// </summary>
-    public sealed class TitleRankingBoardUI : MonoBehaviour
+    public sealed partial class TitleRankingBoardUI : MonoBehaviour
     {
         public const string RootName = "TitleRankingBoard";
 
@@ -183,6 +183,10 @@ namespace KillingMahjong.UI
                 cells[i, 1].richText = false;
             }
 
+            rankingMotion = scores.GetComponent<RankingRowsTransition>();
+            if (rankingMotion == null) rankingMotion = scores.gameObject.AddComponent<RankingRowsTransition>();
+            rankingMotion.Initialize(bars, cells);
+
             status = Label(scores, "Status", "", new Vector2(0f, -40f), new Vector2(600f, 32f), 24f,
                 white, TextAlignmentOptions.Center, font);
             // 動画の層。ランキングの枠と同じ場所に重ね、出すときは枠のほうを隠す。
@@ -298,14 +302,13 @@ namespace KillingMahjong.UI
                 return;
             }
 
+            if (rankingInTransition) return;
             if (Time.realtimeSinceStartup - pageStartedAt >= pageSeconds)
             {
                 // 全員を見せ終えたら動画へ
                 int pages = PageCount();
-                if (page >= pages - 1 && !videoUnavailable) { ShowVideo(); return; }
-                page = (page + 1) % pages;
-                pageStartedAt = Time.realtimeSinceStartup;
-                Render();
+                if (page >= pages - 1 && !videoUnavailable) { StartVideoTransition(); return; }
+                ChangeRankingPage((page + 1) % pages);
             }
         }
 
@@ -326,6 +329,7 @@ namespace KillingMahjong.UI
 
         private void ShowRanking()
         {
+            CancelRankingMotion();
             StopVideo();
             page = 0;
             pageStartedAt = Time.realtimeSinceStartup;
@@ -339,10 +343,16 @@ namespace KillingMahjong.UI
                     if (this == null) return;
                     loading = false;
                     failed = !ok && RankingFetcher.Latest.Count == 0;
-                    if (showing) Render();
+                    if (showing)
+                    {
+                        if (!playingVideo) CancelRankingMotion();
+                        Render();
+                        if (!playingVideo) StartRankingEntrance();
+                    }
                 });
             }
             Render();
+            StartRankingEntrance();
         }
 
         private void ShowVideo()
@@ -415,6 +425,7 @@ namespace KillingMahjong.UI
 
         private void OnDestroy()
         {
+            CancelRankingMotion();
             if (videoTexture != null) { videoTexture.Release(); Destroy(videoTexture); }
         }
 
@@ -422,6 +433,7 @@ namespace KillingMahjong.UI
         {
             if (!showing) return;
             showing = false;
+            CancelRankingMotion();
             StopVideo();
             SetVisible(false);
         }

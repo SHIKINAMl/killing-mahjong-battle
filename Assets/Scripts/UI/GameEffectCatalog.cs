@@ -31,6 +31,7 @@ namespace KillingMahjong.UI
         public const string UnusedGroup = "没案・旧演出";
 
         private static readonly Entry[] entries = {
+            new Entry("title.ranking_rows", "画面効果", "ランキング：上から点灯・ページ切替", "RankingRowsTransition / TitleRankingBoardUI"),
             new Entry("skill.perspective", "スキル", "透視：集中 → 3枚公開 → 解除", "ExposedTileEffectPlayer.PlayReveal"),
             new Entry("skill.mulligan", "スキル", "牌交換：OUT / IN", "MulliganSwapAnimator.PlayRoutine"),
             new Entry("skill.boost_hand", "スキル", "役強化：暗転 → ベルルを呼ぶ → 力を借りて翻数が上がる → 右上の一覧へ積む", "BoostHandSkillEffect.Play"),

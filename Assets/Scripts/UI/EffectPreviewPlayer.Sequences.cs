@@ -16,6 +16,7 @@ namespace KillingMahjong.UI
         {
             switch (EffectId)
             {
+                case RankingRowsTransition.EffectId: yield return PreviewRankingRows(); break;
                 case "skill.perspective":
                     yield return rig.phase.PlaySkillCutinAnimationRoutine("透視", true, rig.player.CurrentCharacterData);
                     yield return ExposedTileEffectPlayer.PlayReveal(scope, rig.enemyTiles, new List<int> { 3, 12, 25 },
