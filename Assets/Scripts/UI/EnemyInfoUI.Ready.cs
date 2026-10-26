@@ -97,6 +97,7 @@ namespace KillingMahjong.UI
 
         public void SetFaceExpression(string expressionId)
         {
+            CancelDiscardAttention();
             if (characterData == null || faceRenderer == null) return;
             if (CharacterVisualUtil.TryFindFaceSprite(characterData, expressionId, out var sprite))
             {

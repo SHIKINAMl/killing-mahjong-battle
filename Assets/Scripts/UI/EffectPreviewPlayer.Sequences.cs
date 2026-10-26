@@ -14,6 +14,11 @@ namespace KillingMahjong.UI
     {
         private IEnumerator PlayEffect()
         {
+            if (EffectId == DiscardFeedbackDirector.EffectId)
+            {
+                yield return PreviewDiscardFeedback();
+                yield break;
+            }
             switch (EffectId)
             {
                 case RankingRowsTransition.EffectId: yield return PreviewRankingRows(); break;

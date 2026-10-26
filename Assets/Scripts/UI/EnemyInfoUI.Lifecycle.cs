@@ -87,6 +87,7 @@ namespace KillingMahjong.UI
 
         private void OnDisable()
         {
+            CancelDiscardAttention();
             if (blinkCoroutine != null)
             {
                 StopCoroutine(blinkCoroutine);
@@ -144,20 +145,20 @@ namespace KillingMahjong.UI
                 float waitTime = Random.Range(characterData.blinkIntervalMin, characterData.blinkIntervalMax);
                 yield return new WaitForSeconds(waitTime);
 
-                if (reactionCoroutine != null || faceRenderer.sprite != normalFaceSprite)
+                if (reactionCoroutine != null || discardAttention != null || faceRenderer.sprite != normalFaceSprite)
                     continue;
 
                 Sprite fullBlink = characterData.faceSprites?.Find(x => x.id == characterData.blinkFaceId)?.sprite;
 
                 if (fullBlink != null)
                 {
-                    if (faceRenderer.sprite == normalFaceSprite && reactionCoroutine == null)
+                    if (faceRenderer.sprite == normalFaceSprite && reactionCoroutine == null && discardAttention == null)
                     {
                         faceRenderer.sprite = fullBlink;
                         yield return new WaitForSeconds(0.12f);
                     }
 
-                    if (faceRenderer.sprite == fullBlink && reactionCoroutine == null)
+                    if (faceRenderer.sprite == fullBlink && reactionCoroutine == null && discardAttention == null)
                     {
                         faceRenderer.sprite = normalFaceSprite;
                     }

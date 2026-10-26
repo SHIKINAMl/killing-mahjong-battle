@@ -42,13 +42,15 @@ namespace KillingMahjong.EditorTools
         /// <param name="height">Output height in pixels. Must be positive and even.</param>
         /// <param name="frameRate">Constant output frame rate.</param>
         /// <param name="durationSeconds">Optional duration in seconds. Zero means manual stop.</param>
+        /// <param name="captureAudio">Include game audio when recording sound-related previews.</param>
         /// <returns>A STARTED or ERROR message that includes the output path or failure reason.</returns>
         public static string StartRecording(
             string outputMp4Path,
             int width = GameWidth,
             int height = GameHeight,
             int frameRate = 60,
-            float durationSeconds = 0f)
+            float durationSeconds = 0f,
+            bool captureAudio = false)
         {
             if (IsRecording())
             {
@@ -89,6 +91,7 @@ namespace KillingMahjong.EditorTools
                 s_MovieRecorderSettings = ScriptableObject.CreateInstance<MovieRecorderSettings>();
                 s_MovieRecorderSettings.name = "Video Capture MP4 Recorder";
                 s_MovieRecorderSettings.Enabled = true;
+                s_MovieRecorderSettings.AudioInputSettings.PreserveAudio = captureAudio;
                 s_MovieRecorderSettings.EncoderSettings = new CoreEncoderSettings
                 {
                     Codec = CoreEncoderSettings.OutputCodec.MP4,

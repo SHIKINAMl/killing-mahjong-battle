@@ -16,7 +16,7 @@ namespace KillingMahjong.UI
     /// OpeningScene）あり、河も自分・相手で2つずつあるので、シーンに持たせると
     /// 4か所を直すことになる（AGENTS.md §2、RiverUI の MaxPerRow と同じ理由）。
     /// </summary>
-    public class VoltageUI : MonoBehaviour
+    public partial class VoltageUI : MonoBehaviour
     {
         // ---- 調整値（シーンではなくここを触る）----
 
@@ -311,12 +311,14 @@ namespace KillingMahjong.UI
 
         private void OnEnable()
         {
+            feedbackReady = false;
             VoltageSystem.Changed += Refresh;
             Refresh();
         }
 
         private void OnDisable()
         {
+            CancelFeedback();
             VoltageSystem.Changed -= Refresh;
         }
 
@@ -331,6 +333,17 @@ namespace KillingMahjong.UI
             int points = VoltageSystem.GetPoints(_isEnemy);
             int from = VoltageSystem.GetPointsAtCurrentLevel(_isEnemy);
             int to = VoltageSystem.GetPointsForNextLevel(_isEnemy);
+            if (feedbackReady && (points > feedbackPoints || (broken && !feedbackBroken && feedbackPoints > 0)))
+                PlayFeedback(broken, level > feedbackLevel);
+            feedbackReady = true;
+            feedbackPoints = points;
+            feedbackLevel = level;
+            feedbackBroken = broken;
+            RenderFeedbackState(level, broken, points, from, to, VoltageSystem.GetMultiplier(_isEnemy));
+        }
+
+        private void RenderFeedbackState(int level, bool broken, int points, int from, int to, float multiplier)
+        {
             // progress は下段の区画の数で見せるので、ここでは使わない
 
             for (int i = 0; i < _pips.Length; i++)
@@ -361,7 +374,7 @@ namespace KillingMahjong.UI
             // **0段でも出す（2026-09-13、参考画像どおり）。**
             // 以前は等倍のとき空にしていたが、参考画像は倍率を常に見せる作りで、
             // 帯と文字が揃っているほうが「ここが何の表示か」が分かる。
-            _multiplierText.text = "×" + VoltageSystem.GetMultiplier(_isEnemy).ToString("0.0");
+            _multiplierText.text = "×" + multiplier.ToString("0.0");
             _multiplierText.color = broken ? TextBroken : TextOn;
         }
 

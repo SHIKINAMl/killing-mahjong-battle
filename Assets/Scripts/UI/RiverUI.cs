@@ -34,6 +34,7 @@ namespace KillingMahjong.UI
         private const int MaxPerRow = 9;
 
         private List<Transform> discardedTiles = new List<Transform>();
+        private bool rebuildingRiver;
 
         /// <summary>
         /// いちばん最後に置いた牌。**ロン演出で「その牌だけ光らせる」ために使う**（2026-10-04）。
@@ -236,6 +237,7 @@ namespace KillingMahjong.UI
             UpdateSiblingOrder();
 
             PlayPlacedHeartbeat();
+            if (!rebuildingRiver) DiscardFeedbackDirector.Notify(this, isEnemyRiver, discardedTiles.Count);
             if (willFly) FinishVoltage(rt);
         }
 
@@ -272,6 +274,7 @@ namespace KillingMahjong.UI
             UpdateSiblingOrder();
 
             PlayPlacedHeartbeat();
+            if (!rebuildingRiver) DiscardFeedbackDirector.Notify(this, isEnemyRiver, discardedTiles.Count);
             if (willFly) FinishVoltage(rt);
         }
 
@@ -319,7 +322,9 @@ namespace KillingMahjong.UI
         {
             if (!KillingMahjong.Managers.VoltageSystem.IsNewTileType(tileId))
             {
+                int previous = KillingMahjong.Managers.VoltageSystem.GetPoints(isEnemyRiver);
                 KillingMahjong.Managers.VoltageSystem.NotifyDiscard(isEnemyRiver, tileId);
+                if (!rebuildingRiver && previous > 0) KillingMahjong.Managers.AudioManager.Instance?.PlayVoltageBreakSE();
                 return false;
             }
 
@@ -366,7 +371,7 @@ namespace KillingMahjong.UI
             if (afterPoints <= beforePoints) return;
 
             var audio = KillingMahjong.Managers.AudioManager.Instance;
-            if (audio != null) audio.PlayVoltageHeartbeat(afterLevel > beforeLevel);
+            if (audio != null) audio.PlayVoltageHeartbeat(afterLevel > beforeLevel, afterLevel);
         }
 
         private void ApplyRiverLayout(RectTransform rt)
@@ -487,6 +492,7 @@ namespace KillingMahjong.UI
 
         public void Clear()
         {
+            DiscardFeedbackDirector.ResetForScene(gameObject.scene);
             // 局が切り替わって河が空になるので、ボルテージも履歴ごと捨てる。
             // 自分・相手の河は続けて Clear されるが、二度呼んでも害はない。
             KillingMahjong.Managers.VoltageSystem.ResetAll();
@@ -523,6 +529,7 @@ namespace KillingMahjong.UI
                     else Destroy(tile.gameObject);
                 }
                 UpdateTurnText();
+                DiscardFeedbackDirector.ResetForScene(gameObject.scene);
             };
         }
 
@@ -531,10 +538,9 @@ namespace KillingMahjong.UI
             Clear();
             if (tileIds != null)
             {
-                foreach(int tileId in tileIds)
-                {
-                    AddTile(tileId);
-                }
+                rebuildingRiver = true;
+                try { foreach(int tileId in tileIds) AddTile(tileId); }
+                finally { rebuildingRiver = false; }
             }
             UpdateTurnText();
         }
