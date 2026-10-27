@@ -86,6 +86,7 @@ namespace KillingMahjong.UI
 
         private void Start()
         {
+            PrepareLogScrollbar();
             if (toggleLogButton != null) toggleLogButton.onClick.AddListener(ToggleLog);
             if (closeLogBackgroundButton != null) closeLogBackgroundButton.onClick.AddListener(CloseLog);
             logPanel.SetActive(false);
@@ -465,6 +466,7 @@ namespace KillingMahjong.UI
         public void OpenLog()
         {
             logPanel.SetActive(true);
+            PrepareLogScrollbar();
             // 会話本体のCanvasは盤面用なので、ログだけを独立した描画順へ上げる。
             var canvas = logPanel.GetComponent<Canvas>();
             if (canvas == null) canvas = logPanel.AddComponent<Canvas>();
@@ -477,6 +479,35 @@ namespace KillingMahjong.UI
             if (!hasOpenedLog) followLatestLog = true;
             hasOpenedLog = true;
             if (scroll != null && scroll.content != null) ScheduleLogScroll(scroll, scroll.content.anchoredPosition);
+        }
+
+        private void PrepareLogScrollbar()
+        {
+            var scroll = logContainer != null ? logContainer.GetComponentInParent<ScrollRect>(true) : null;
+            if (scroll == null) return;
+            var bar = scroll.verticalScrollbar;
+            if (bar == null) bar = scroll.GetComponentInChildren<Scrollbar>(true);
+            if (bar == null || bar.handleRect == null) return;
+            var rect = (RectTransform)bar.transform;
+            rect.anchorMin = new Vector2(1, 0);
+            rect.anchorMax = Vector2.one;
+            rect.pivot = new Vector2(1, .5f);
+            rect.sizeDelta = new Vector2(12, 0);
+            rect.anchoredPosition = Vector2.zero;
+            var area = bar.handleRect.parent as RectTransform;
+            if (area != null && area != rect)
+            {
+                area.anchorMin = Vector2.zero; area.anchorMax = Vector2.one;
+                area.offsetMin = area.offsetMax = Vector2.zero;
+            }
+            bar.handleRect.sizeDelta = Vector2.zero;
+            bar.direction = Scrollbar.Direction.BottomToTop;
+            scroll.verticalScrollbar = bar;
+            scroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
+            // AutoHideAndExpandViewportで枠が動かないよう、読む領域の幅は固定する。
+            if (scroll.viewport != null && scroll.viewport != scroll.transform)
+                scroll.viewport.offsetMax = new Vector2(-18, scroll.viewport.offsetMax.y);
+            PixelScrollBar.Attach(bar);
         }
 
         public void CloseLog()

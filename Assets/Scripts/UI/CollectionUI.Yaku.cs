@@ -133,7 +133,7 @@ namespace KillingMahjong.UI
             if (content.sizeDelta.y > height)
             {
                 var track = NewImage(parent, "YakuBar", new Color32(40, 24, 34, 255));
-                Center(track.rectTransform, new Vector2(4f, height));
+                Center(track.rectTransform, new Vector2(12f, height));
                 track.rectTransform.anchoredPosition = new Vector2(YakuListCenterX + YakuListWidth * 0.5f + 4f, centerY);
                 var area = NewEmpty(track.transform, "SlidingArea");
                 Stretch(area.GetComponent<RectTransform>());
@@ -145,6 +145,7 @@ namespace KillingMahjong.UI
                 bar.handleRect = handle.rectTransform;
                 bar.targetGraphic = handle;
                 bar.direction = Scrollbar.Direction.BottomToTop;
+                PixelScrollBar.Attach(bar);
                 scroll.verticalScrollbar = bar;
                 scroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
             }

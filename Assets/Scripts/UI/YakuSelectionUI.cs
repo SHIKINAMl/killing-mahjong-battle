@@ -417,7 +417,7 @@ namespace KillingMahjong.UI
             if (madeBar)
             {
                 var track = (RectTransform)trackGo.transform;
-                Center(track, new Vector2(4f, height));
+                Center(track, new Vector2(12f, height));
                 track.anchoredPosition = new Vector2(ListCenterX + ListWidth * 0.5f + 4f, centerY);
                 trackGo.GetComponent<Image>().color = new Color32(40, 24, 34, 255);
 
@@ -441,6 +441,12 @@ namespace KillingMahjong.UI
                 _scroll.verticalScrollbar = bar;
                 _scroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
             }
+
+            // 既存のシーン側のバーにも同じ外観を当てる。
+            var listBar = trackGo.GetComponent<Scrollbar>();
+            var listBarRect = (RectTransform)trackGo.transform;
+            listBarRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, 12f);
+            PixelScrollBar.Attach(listBar);
 
             // 一覧と説明を分ける細い線
             Img(parent, "ListDivider", PanelEdge,
