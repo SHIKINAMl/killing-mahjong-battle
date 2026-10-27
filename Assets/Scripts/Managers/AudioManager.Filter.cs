@@ -65,7 +65,7 @@ namespace KillingMahjong.Managers
         /// **BGM の音量を決める所は、必ずこれを使う。** `bgmVolume * masterVolume` を直に書くと、
         /// 沈んでいるあいだに鳴り始めた曲だけが大きいままになる。
         /// </summary>
-        private float BgmMaster { get { return bgmVolume * masterVolume * _bgmSink * discardTensionGain; } }
+        private float BgmMaster { get { return bgmVolume * masterVolume * _bgmSink * discardTensionGain * ReadingFocusGain; } }
 
         /// <summary>BGM と同じ大きさで鳴らしたい外の音（タイトルで流す動画の音など）に使う音量。</summary>
         public float BgmOutputVolume { get { return BgmMaster; } }

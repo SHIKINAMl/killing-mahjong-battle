@@ -202,6 +202,7 @@ namespace KillingMahjong.Managers
         private void OnDisable()
         {
             _aborted = true;
+            CloseIntro();
             ClearIntroSkillSelection();
             if (gameUIManager != null && gameUIManager.AbilityUI != null)
             {

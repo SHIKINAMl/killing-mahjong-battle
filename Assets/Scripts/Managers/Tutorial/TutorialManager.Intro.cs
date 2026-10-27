@@ -317,7 +317,7 @@ namespace KillingMahjong.Managers
                 yield break;
             }
 
-            Transform parent = BuildIntroCanvas();
+            Transform parent = BuildIntroCanvas(dim: false);
             if (parent == null) yield break;
 
             if (board != null)
@@ -359,8 +359,10 @@ namespace KillingMahjong.Managers
 
             bool done = false;
             CreateButton(parent, font, GuideStartLabel, new Vector2(0f, -250f), () => done = true);
-            yield return new WaitUntil(() => done);
-
+            var reading = UI.TutorialReadingPresentation.Prepare(parent);
+            yield return reading.Enter();
+            yield return new WaitUntil(() => done || _aborted || reading == null);
+            if (!_aborted && reading != null) yield return reading.Exit();
             CloseIntro();
         }
 
@@ -385,7 +387,7 @@ namespace KillingMahjong.Managers
             }
 
             CloseIntro();
-            Transform parent = BuildIntroCanvas();
+            Transform parent = BuildIntroCanvas(dim: false);
             if (parent == null) yield break;
 
             var image = new GameObject("RuleBoard", typeof(RectTransform), typeof(Image));
@@ -419,7 +421,8 @@ namespace KillingMahjong.Managers
             var close = CreateButton(parent, font, GuideStartLabel, new Vector2(220f, -250f), () => done = true);
 
             int shown = -1;
-            while (!done)
+            UI.TutorialReadingPresentation reading = null;
+            while (!done && !_aborted && parent != null)
             {
                 index = Mathf.Clamp(index, 0, pages.Count - 1);
                 if (index != shown)
@@ -434,10 +437,16 @@ namespace KillingMahjong.Managers
                     previous.SetActive(index > 0);
                     next.SetActive(index < pages.Count - 1);
                     close.SetActive(index == pages.Count - 1);
+                    if (reading == null)
+                    {
+                        reading = UI.TutorialReadingPresentation.Prepare(parent);
+                        yield return reading.Enter();
+                    }
                 }
                 yield return null;
             }
 
+            if (!_aborted && reading != null) yield return reading.Exit();
             CloseIntro();
         }
 
@@ -603,6 +612,8 @@ namespace KillingMahjong.Managers
         private void CloseIntro()
         {
             if (_introRoot == null) return;
+            var reading = _introRoot.GetComponent<UI.TutorialReadingPresentation>();
+            if (reading != null) reading.Cancel();
             Destroy(_introRoot);
             _introRoot = null;
         }

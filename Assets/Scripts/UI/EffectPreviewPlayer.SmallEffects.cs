@@ -216,6 +216,9 @@ namespace KillingMahjong.UI
                     rig.character.gameObject.SetActive(false); if (rig.face != null) rig.face.gameObject.SetActive(false);
                     RoomAmbience.Attach(rig.surface, girl.rectTransform, null, null, null, null, null, rig.font); break;
                 case "tutorial.highlight": TutorialHighlightUI.Show(rig.handTiles[6], TutorialHighlightUI.Style.Frame); break;
+                case TutorialReadingPresentation.EffectId:
+                    yield return PreviewReadingBoard();
+                    yield break;
                 case "tutorial.arrow":
                     var arrow = new GameObject("Arrow", typeof(RectTransform), typeof(Image));
                     arrow.transform.SetParent(rig.surface, false);
@@ -231,6 +234,32 @@ namespace KillingMahjong.UI
                 default: throw new ArgumentException("再生方法が未登録です: " + EffectId);
             }
             yield return new WaitForSeconds(4f);
+        }
+
+        private IEnumerator PreviewReadingBoard()
+        {
+            var root = new GameObject("ReadingPreview", typeof(RectTransform));
+            root.transform.SetParent(rig.surface, false);
+            var rootRect = root.GetComponent<RectTransform>();
+            rootRect.anchorMin = Vector2.zero; rootRect.anchorMax = Vector2.one;
+            rootRect.offsetMin = rootRect.offsetMax = Vector2.zero;
+            var scrim = new GameObject("Scrim", typeof(RectTransform), typeof(Image));
+            scrim.transform.SetParent(root.transform, false);
+            var scrimRect = scrim.GetComponent<RectTransform>();
+            scrimRect.anchorMin = Vector2.zero; scrimRect.anchorMax = Vector2.one;
+            scrimRect.offsetMin = scrimRect.offsetMax = Vector2.zero;
+            var board = new GameObject("RuleBoard", typeof(RectTransform), typeof(Image)).GetComponent<Image>();
+            board.transform.SetParent(root.transform, false);
+            board.sprite = Resources.Load<Sprite>("Tutorial/案内板_満貫");
+            board.preserveAspect = true;
+            board.raycastTarget = false;
+            board.rectTransform.sizeDelta = new Vector2(722, 470);
+            board.rectTransform.anchoredPosition = new Vector2(0, 20);
+            var reading = TutorialReadingPresentation.Prepare(root.transform);
+            scope.AddCleanup(() => { if (reading != null) reading.Cancel(); if (root != null) Destroy(root); });
+            yield return reading.Enter();
+            yield return new WaitForSecondsRealtime(2.5f);
+            yield return reading.Exit();
         }
     }
 }

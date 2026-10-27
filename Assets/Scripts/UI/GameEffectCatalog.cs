@@ -124,6 +124,7 @@ namespace KillingMahjong.UI
             new Entry("tutorial.arrow", "チュートリアル", "操作する場所の矢印", "TutorialArrowUI.ShowAt"),
             new Entry("tutorial.mask", "チュートリアル", "注目する場所だけを明るく", "TutorialMaskUI.Show"),
             new Entry("tutorial.button_intro", "チュートリアル", "ボタンを初めて見せる", "TutorialButtonIntroUI.Show"),
+            new Entry(TutorialReadingPresentation.EffectId, "チュートリアル", "資料：暗転とBGMの静まり → ボードを置く → 読了して戻る", "TutorialReadingPresentation.Enter / Exit"),
             new Entry("tile.sort", "牌・血・ゲージ", "手牌が並び替わる", "TileMoveAnimator.AnimatePositions"),
             new Entry("ron.cutin", "ロン・清算", "ロンのカットイン：満貫級", "CutinAnimationUI.PlayCutin"),
             new Entry("ron.cutin_max", "ロン・清算", "ロンのカットイン：役満級", "CutinAnimationUI.PlayCutin"),
