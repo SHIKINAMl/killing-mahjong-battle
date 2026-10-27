@@ -7,8 +7,9 @@ namespace KillingMahjong.Tests
 {
     public class SeniorBounceAnimationTests
     {
-        [Test]
-        public void TwentyFourFpsBounceHasSmallSilhouetteStepsAndSeamlessLoop()
+        [TestCase(24f, 30)]
+        [TestCase(60f, 75)]
+        public void BounceHasSmallSilhouetteStepsAndSeamlessLoop(float fps, int expectedFrames)
         {
             var type = Type.GetType("KillingMahjong.UI.SlimeBounceAnimator, Assembly-CSharp", true);
             const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
@@ -18,8 +19,8 @@ namespace KillingMahjong.Tests
                 var anim = go.AddComponent(type);
                 var shape = type.GetMethod("Shape", flags);
                 float cycle = (float)type.GetField("cycleSeconds", flags).GetValue(anim);
-                int frames = Mathf.RoundToInt(cycle * 24f);
-                Assert.That(frames, Is.EqualTo(30));
+                int frames = Mathf.RoundToInt(cycle * fps);
+                Assert.That(frames, Is.EqualTo(expectedFrames));
                 Vector2? previous = null;
                 Vector2 first = Vector2.zero;
                 for (int frame = 0; frame <= frames; frame++)
@@ -61,7 +62,8 @@ namespace KillingMahjong.Tests
                     float cycle = (float)type.GetField("cycleSeconds", flags).GetValue(anim);
                     float phase = (float)type.GetField("phase", flags).GetValue(anim);
                     type.GetField("presentationFrame", flags).SetValue(anim,
-                        Mathf.FloorToInt((phase + Time.deltaTime / cycle) * cycle * 24f));
+                        Mathf.FloorToInt((phase + Time.deltaTime / cycle) * cycle
+                            * (float)type.GetField("BounceFps").GetRawConstantValue()));
                     type.GetMethod("LateUpdate", flags).Invoke(anim, null);
                     Assert.That(go.transform.localScale.y, Is.EqualTo(.8f).Within(.0001f));
                     if (i == 0)

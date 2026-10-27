@@ -108,7 +108,7 @@ namespace KillingMahjong.UI
             // 2026-10-22 に本編から外した（とくしゅの CPU 戦だけのお試しだった）
             new Entry("character.beat_dance", "キャラクター・背景", "曲の拍に乗って弾む・揺れる・笑顔と交互", "BeatDanceAnimator / EnemyInfoUI.SetBeatDance", unused: true),
             new Entry("character.blink", "キャラクター・背景", "キャラクターのまばたき", "EnemyInfoUI.SetFaceExpression"),
-            new Entry("character.senior_bounce", "キャラクター・背景", "先輩の待機中の跳ね：24fps", "TutorialManager.SetSeniorIdleBounce / SlimeBounceAnimator"),
+            new Entry("character.senior_bounce", "キャラクター・背景", "先輩の待機中の跳ね：60fps", "TutorialManager.SetSeniorIdleBounce / SlimeBounceAnimator"),
             new Entry("character.talk", "キャラクター・背景", "喋るときの上下の動き", "TalkBobAnimator / DialogueUI.ShowText"),
             new Entry("camera.zoom", "キャラクター・背景", "カメラが寄って戻る", "CameraZoomController.ZoomToTargetRoutine", unused: true),
             new Entry("character.hair", "キャラクター・背景", "髪のネオン", "HairNeonGlow.Attach", unused: true),

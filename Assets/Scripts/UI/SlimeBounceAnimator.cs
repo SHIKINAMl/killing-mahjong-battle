@@ -28,8 +28,8 @@ namespace KillingMahjong.UI
         [Tooltip("絵の上の端から足もとまでの割合。ドット絵の先輩は体の下の端が 0.65 あたり")]
         [SerializeField] private float feetFromTop = 0.65f;
 
-        /// <summary>先輩の待機中の跳ねだけは、ほかの演出より少ないコマ数で出す。</summary>
-        public const float BounceFps = 24f;
+        /// <summary>先輩の待機中の跳ねも60fpsで出す。軌道と周期は更新頻度から独立させる。</summary>
+        public const float BounceFps = 60f;
 
         private SpriteRenderer sprite;
         private Vector3 baseScale;
@@ -124,7 +124,7 @@ namespace KillingMahjong.UI
         /// <summary>1回の跳ねの中の位置 t（0〜1）での、縦の伸び縮みと浮いている高さ（背丈に対する割合）。</summary>
         private void Shape(float t, out float sy, out float lift)
         {
-            // 30コマで一周。区間の両端で速度が0になる山を重ね、離陸・着地で急に方向を変えない。
+            // 1.25秒で一周。区間の両端で速度が0になる山を重ね、離陸・着地で急に方向を変えない。
             // 一瞬の大きな潰れを避け、小さい上下動と控えめな伸縮で跳ねを読ませる。
             float crouch = Pulse(t / .36f);
             float stretch = Pulse((t - .28f) / .44f);
