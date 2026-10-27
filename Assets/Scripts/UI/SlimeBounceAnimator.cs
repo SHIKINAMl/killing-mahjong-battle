@@ -28,6 +28,9 @@ namespace KillingMahjong.UI
         [Tooltip("絵の上の端から足もとまでの割合。ドット絵の先輩は体の下の端が 0.65 あたり")]
         [SerializeField] private float feetFromTop = 0.65f;
 
+        /// <summary>先輩の待機中の跳ねだけは、ほかの演出より少ないコマ数で出す。</summary>
+        public const float BounceFps = 24f;
+
         private SpriteRenderer sprite;
         private Vector3 baseScale;
         private Vector3 lastOffset;
@@ -56,7 +59,7 @@ namespace KillingMahjong.UI
         {
             if (on)
             {
-                if (!playing) { baseScale = transform.localScale; phase = 0f; }
+                if (!playing) { baseScale = transform.localScale; phase = 0f; presentationFrame = -1; }
                 playing = true;
             }
             else
@@ -78,7 +81,7 @@ namespace KillingMahjong.UI
             if (!playing) return;
 
             phase += Time.deltaTime / Mathf.Max(0.1f, cycleSeconds);
-            if (!PresentationTiming.IsNewFrame(ref presentationFrame, Time.time)) return;
+            if (!PresentationTiming.IsNewFrame(ref presentationFrame, Time.time, BounceFps)) return;
             Shape(Frac(phase), out float sy, out float lift);
             float sx = 1f / Mathf.Max(0.5f, sy); // 体積を保つように横へ広がる
 

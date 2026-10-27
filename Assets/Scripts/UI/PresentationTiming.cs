@@ -13,9 +13,9 @@ namespace KillingMahjong.UI
             return Mathf.Floor(seconds * fps + .00001f) / fps;
         }
 
-        public static bool IsNewFrame(ref int previousFrame, float seconds)
+        public static bool IsNewFrame(ref int previousFrame, float seconds, float fps = MotionFps)
         {
-            int frame = Mathf.FloorToInt(seconds * MotionFps);
+            int frame = Mathf.FloorToInt(seconds * fps);
             if (frame == previousFrame) return false;
             previousFrame = frame;
             return true;
