@@ -106,6 +106,10 @@ namespace KillingMahjong.UI
             
             _rectTransform = GetComponent<RectTransform>();
 
+            PixelSettingsSlider.Attach(bgmSlider);
+            PixelSettingsSlider.Attach(seSlider);
+            PixelSettingsSlider.Attach(voiceSlider);
+
             // 配下のすべてのボタンにホバーエフェクトを自動追加
             Button[] allButtons = GetComponentsInChildren<Button>(true);
             foreach (var btn in allButtons)
