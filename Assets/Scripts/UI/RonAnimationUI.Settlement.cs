@@ -249,11 +249,11 @@ namespace KillingMahjong.UI
         {
             string multiplier = "×" + settlement.Multiplier.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
             if (totalHanText != null) totalHanText.text = $"{settlement.TotalHan}翻";
-            if (multiplierText != null) multiplierText.text = multiplier;
-            if (myBetText != null) myBetText.text = settlement.MyBet.ToString();
-            if (theirBetText != null) theirBetText.text = settlement.TheirBet.ToString();
-            if (myMultText != null) myMultText.text = multiplier;
-            if (theirMultText != null) theirMultText.text = multiplier;
+            if (multiplierText != null) multiplierText.text = settlement.ShowHpBalances ? "" : multiplier;
+            if (myBetText != null) myBetText.text = (settlement.ShowHpBalances ? settlement.MyHpBefore : settlement.MyBet).ToString();
+            if (theirBetText != null) theirBetText.text = (settlement.ShowHpBalances ? settlement.TheirHpBefore : settlement.TheirBet).ToString();
+            if (myMultText != null) myMultText.text = settlement.ShowHpBalances ? settlement.MyHpAfter.ToString() : multiplier;
+            if (theirMultText != null) theirMultText.text = settlement.ShowHpBalances ? settlement.TheirHpAfter.ToString() : multiplier;
 
             if (settlement.IsTankiWait && tankiMine != null && tankiTheirs != null)
             {
@@ -338,16 +338,16 @@ namespace KillingMahjong.UI
             // ① 合計と倍率。役の紹介は直前の斜め帯で終えている。
             totalHanText.text = $"{s.TotalHan}翻";
             yield return new WaitForSeconds(AfterTotalHan);
-            multiplierText.text = "×" + s.Multiplier.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+            multiplierText.text = s.ShowHpBalances ? "" : "×" + s.Multiplier.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
             yield return new WaitForSeconds(AfterMultiplier);
 
             // ③ 素点と倍率が左右に入る
             string multLabel = "×" + s.Multiplier.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
-            myBetText.text = s.MyBet.ToString();
-            theirBetText.text = s.TheirBet.ToString();
+            myBetText.text = (s.ShowHpBalances ? s.MyHpBefore : s.MyBet).ToString();
+            theirBetText.text = (s.ShowHpBalances ? s.TheirHpBefore : s.TheirBet).ToString();
             yield return new WaitForSeconds(AfterSideValue);
-            myMultText.text = multLabel;
-            theirMultText.text = multLabel;
+            myMultText.text = s.ShowHpBalances ? s.MyHpAfter.ToString() : multLabel;
+            theirMultText.text = s.ShowHpBalances ? s.TheirHpAfter.ToString() : multLabel;
             yield return new WaitForSeconds(AfterSideValue);
 
             // 単騎で倍になるのは負けた側だけ。**今まで画面のどこにも出ていなかった行。**

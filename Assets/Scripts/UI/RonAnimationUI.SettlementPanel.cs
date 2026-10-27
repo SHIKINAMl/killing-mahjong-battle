@@ -106,14 +106,14 @@ namespace KillingMahjong.UI
             MakeText(colHead.transform, "相手", 18f, AccentThem, TextAlignmentOptions.Right, false, ValueColumn);
 
             // 持ち越しがあると素点が膨らむ。**その理由が今までどこにも出ていなかった**
-            string betLabel = s.CarryRounds > 1 ? $"素点（持ち越し{s.CarryRounds}局ぶん）" : "素点";
+            string betLabel = s.ShowHpBalances ? "精算前" : s.CarryRounds > 1 ? $"素点（持ち越し{s.CarryRounds}局ぶん）" : "素点";
             GameObject betRow = MakeBox(body.transform, Color.clear, 0, 1);
             MakeText(betRow.transform, betLabel, 18f, PanelFaint, TextAlignmentOptions.Left, true);
             myBetText = MakeNumber(betRow.transform, 21f, PanelInk, ValueColumn);
             theirBetText = MakeNumber(betRow.transform, 21f, PanelInk, ValueColumn);
 
             GameObject multRow = MakeBox(body.transform, Color.clear, 0, 1);
-            MakeText(multRow.transform, "倍率", 18f, PanelFaint, TextAlignmentOptions.Left, true);
+            MakeText(multRow.transform, s.ShowHpBalances ? "精算後" : "倍率", 18f, PanelFaint, TextAlignmentOptions.Left, true);
             myMultText = MakeNumber(multRow.transform, 21f, PanelInk, ValueColumn);
             theirMultText = MakeNumber(multRow.transform, 21f, PanelInk, ValueColumn);
 
@@ -168,7 +168,12 @@ namespace KillingMahjong.UI
             // 行そのものを消さずに非アクティブにしているのは、
             // **out で返す4本の参照を維持したまま**（＝リフレクション経由の検証手順を壊さずに）
             // 見せ方だけ戻せるようにするため。戻すなら SetActive(true) の1行でよい。
-            deltaRow.SetActive(false);
+            if (s.ShowHpBalances)
+            {
+                myDeltaText.text = FormatDelta(s.MyShownDelta);
+                theirDeltaText.text = FormatDelta(s.TheirShownDelta);
+            }
+            deltaRow.SetActive(s.ShowHpBalances);
             hpRow.SetActive(false);
 
             return group;

@@ -18,6 +18,7 @@ namespace KillingMahjong.UI
         /// </summary>
         private static string BuildMultiplierNote(RonSettlementInfo s, int flownDelta)
         {
+            if (s.ShowHpBalances) return "";
             string note = "×" + s.Multiplier.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
             bool flownIsLoser = flownDelta < 0;
             if (!flownIsLoser && s.VoltageMultiplier > 0f)

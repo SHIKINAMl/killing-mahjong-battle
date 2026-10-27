@@ -44,6 +44,8 @@ namespace KillingMahjong.UI
 
         /// <summary>サーバー確定の勝者用ボルテージ倍率。0 は未受信／対象外。</summary>
         public float VoltageMultiplier;
+        /// <summary>台本で確定した決着では、倍率式の代わりに精算前後の持ち点を表示する。</summary>
+        public bool ShowHpBalances;
         public string RankName;
 
         /// <summary>流局の持ち越しを含めた局数。1 なら持ち越し無し。</summary>

@@ -144,10 +144,34 @@ namespace KillingMahjong.Managers
             int tile = TutorialTiles.Encode(discardedBaseId, discardedBaseId == data.doraBaseId);
             var hand = TutorialTiles.EncodeAll(ronData.meldBaseIds, data.doraBaseId);
             hand.Add(tile);
-            yield return PlayRonAnimation(hand, tile, ronData.ToPresentation(), false, PlayerShownHp, 0,
-                EnemyShownHp, EnemyShownHp, PlayerShownHp, suppressSettlementPanel: true);
+            int previousPlayerHp = PlayerShownHp;
+            int previousEnemyHp = EnemyShownHp;
+            var settlement = BuildScriptedDefeatSettlement(ronData, previousPlayerHp, previousEnemyHp);
+            ClearStakes();
             _playerHp = 0;
+            _enemyHp = previousEnemyHp;
+            yield return PlayRonAnimation(hand, tile, ronData.ToPresentation(), false, previousPlayerHp, 0,
+                previousEnemyHp, previousEnemyHp, previousPlayerHp, settlement: settlement);
             ApplyHpToUI();
+            if (gameUIManager != null) gameUIManager.ScoreGauge.SetStakes(0, 0);
+        }
+
+        private static RonSettlementInfo BuildScriptedDefeatSettlement(TutorialDefeatRonData data,
+            int previousPlayerHp, int previousEnemyHp)
+        {
+            int han = 0;
+            foreach (string yaku in data.yakuList) han += GameRules.GetBaseHan(yaku);
+            var settlement = new RonSettlementInfo
+            {
+                RankName = data.rankText, TotalHan = han, Multiplier = GameRules.GetMultiplier(han),
+                LocalWon = false, ShowHpBalances = true,
+                MyBet = previousPlayerHp, TheirBet = previousEnemyHp,
+                MyDelta = -previousPlayerHp, TheirDelta = 0,
+                MyHpBefore = previousPlayerHp, MyHpAfter = 0,
+                TheirHpBefore = previousEnemyHp, TheirHpAfter = previousEnemyHp,
+            };
+            GameUIPhaseController.FillYakuRows(settlement, Common.YakuNameUtil.Summarize(data.yakuList), han);
+            return settlement;
         }
     }
 }
