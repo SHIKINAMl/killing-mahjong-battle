@@ -132,9 +132,19 @@ MonoBehaviour:
     freeHandBuilding: 1
     rejectFirstConfirm: 0
     requireAutoManganToConfirm: 0
-    betAmount: 600
+    betAmount: 3000
     betPromptText: ""
     inheritedBetLines: []
+    onLowBetLines:
+    - speaker: 0
+      text: "えー、ちょっとビビりすぎじゃない？"
+    - speaker: 0
+      text: "あげるね！"
+    onHighBetLines:
+    - speaker: 0
+      text: "ちょっとちょっと！　そんなに賭けたら危ないよ！"
+    - speaker: 0
+      text: "気持ちはわかるけどここは3000くらいにしとこう？"
     enemyDiscardBaseIds: 12000000130000001400000015000000160000001700000018000000190000001a0000000000000001000000020000000300000004000000050000000600000007000000
     autoDiscardTurns: 15
     lockedTileBaseId: -1

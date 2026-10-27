@@ -142,6 +142,10 @@ namespace KillingMahjong.Managers
         [Tooltip("前局が流局で賭け金が持ち越されたときのセリフ。{0}=持ち越し額 {1}=場の総額。" +
                  "空なら会話を挟まない。流局の次の局は賭け金を指示してはいけない（自動で同額が賭けられる仕様）。")]
         public List<TutorialLine> inheritedBetLines = new List<TutorialLine>();
+        [Tooltip("第2局で3000未満を選んだとき。セリフのあとに3000まで増やして確定する。")]
+        public List<TutorialLine> onLowBetLines = new List<TutorialLine>();
+        [Tooltip("第2局で3000を超えたとき。セリフのあとに3000まで減らして確定する。")]
+        public List<TutorialLine> onHighBetLines = new List<TutorialLine>();
 
         [Header("■ 状況を変える ─ 打牌フェイズの進み方")]
         [Tooltip("敵が順番に捨てる牌（牌種）。要素数がそのまま手数になる。")]

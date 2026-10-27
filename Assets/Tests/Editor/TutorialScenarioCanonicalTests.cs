@@ -12,6 +12,25 @@ namespace KillingMahjong.Tests
         private ScriptableObject Canonical => (ScriptableObject)Resources.Load("Tutorial/TutorialScenario", ScenarioType);
 
         [Test]
+        public void SecondRoundLowBetLinesAreIncludedInCanonicalScriptExport()
+        {
+            var source = Canonical;
+            var round = ((IList)ScenarioType.GetField("rounds").GetValue(source))[1];
+            var lines = (IList)round.GetType().GetField("onLowBetLines").GetValue(round);
+            Assert.That(lines.Count, Is.EqualTo(2));
+            Assert.That(lines[0].GetType().GetField("text").GetValue(lines[0]), Is.EqualTo("えー、ちょっとビビりすぎじゃない？"));
+            Assert.That(lines[1].GetType().GetField("text").GetValue(lines[1]), Is.EqualTo("あげるね！"));
+            Assert.That(round.GetType().GetField("betAmount").GetValue(round), Is.EqualTo(3000));
+            var table = Type.GetType("KillingMahjong.Managers.Tutorial.TutorialLineTable, Assembly-CSharp", true);
+            var rows = (IList)table.GetMethod("Dump", BindingFlags.Static | BindingFlags.Public)
+                .Invoke(null, new object[] { source });
+            int exported = 0;
+            foreach (var row in rows)
+                if (((string)row.GetType().GetField("id").GetValue(row)).StartsWith("r1.onLowBetLines[")) exported++;
+            Assert.That(exported, Is.EqualTo(2));
+        }
+
+        [Test]
         public void FirstRoundManganExampleIncludesHonorsAndMatchesDisplayedFiveHan()
         {
             var rounds = (IList)ScenarioType.GetField("rounds").GetValue(Canonical);

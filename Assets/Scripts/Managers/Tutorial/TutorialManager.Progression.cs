@@ -508,28 +508,14 @@ namespace KillingMahjong.Managers
                 if (t != null) t.transform.localScale = Vector3.one;
         }
 
-        /// <summary>賭けすぎを止める体力の境目。フロー図の「HP8000以下」。</summary>
-        private const int BetWarnHpThreshold = 8000;
+        /// <summary>第2局は一度自由に決めさせたあと、この額へそろえて確定する。</summary>
+        private const int TutorialTargetBet = 3000;
 
-        /// <summary>
-        /// 止めに入る賭け金。フロー図の「賭け金4000以上」。
-        /// **体力が足りているときは止めない**（2026-10-24 プランナー指摘「HPが低すぎる時（8000以下）に
-        /// 賭けようとすると出る警告だから、HPが足りてる時は警告なし」）。10-22 に足した
-        /// 「体力に関係なく 5000 以上で止める」は外した
-        /// </summary>
-        private const int BetWarnAmount = 4000;
+        /// <summary>賭け金の増減を見せる時間。一瞬で書き換えると気づけない。</summary>
+        private const float BetAdjustSeconds = 0.8f;
 
-        /// <summary>止めたあとに下げてやる額。フロー図の「3000まで減少」。</summary>
-        private const int BetWarnReducedAmount = 3000;
-
-        private static bool ShouldReduceTutorialBet(int shownHp, int amount) =>
-            shownHp <= BetWarnHpThreshold && amount >= BetWarnAmount;
-
-        /// <summary>賭け金が下がっていく様子を見せる時間。一瞬で書き換えると気づけない。</summary>
-        private const float BetReduceSeconds = 0.8f;
-
-        /// <summary>もう一度出したスマホで、下げ始める前と、下げ終えて決定する前に置く間。</summary>
-        private const float BetReducePause = 0.4f;
+        /// <summary>もう一度出したスマホで、増減の前と自動決定の前に置く間。</summary>
+        private const float BetAdjustPause = 0.4f;
 
         /// <summary>
         /// 自分で賭け金を決めさせる（2026-09-30 のフロー図改訂、シート3）。
@@ -537,10 +523,8 @@ namespace KillingMahjong.Managers
         /// これまでチュートリアルの賭けは `ShowFixedBettingPhase` の固定額で、
         /// 決定を押すだけだった。改訂版では**自分で増やして決める**ところまでやらせる。
         ///
-        /// **賭けすぎたら止める。** 体力が {BetWarnHpThreshold} 以下なのに
-        /// {BetWarnAmount} 以上を賭けて決定を押したら、いったんスマホを閉じて止め、
-        /// もう一度出して {BetWarnReducedAmount} まで下げ、代わりに決定を押す。
-        /// チュートリアルで身を削らせないための歯止めで、フロー図にもそう描いてある。
+        /// 最初の決定額が3000未満なら引き上げ、超えていれば引き下げる。
+        /// セリフを読ませてからスマホを再表示し、数値とゲージを動かして代わりに確定する。
         /// </summary>
         private IEnumerator RunFreeBettingPhase(TutorialRoundData data)
         {
@@ -555,7 +539,7 @@ namespace KillingMahjong.Managers
             if (betting == null)
             {
                 Debug.LogWarning("[TutorialManager] BettingUI が未設定のため賭け金フェイズをスキップします。");
-                _lastConfirmedBet = data.betAmount;
+                _lastConfirmedBet = TutorialTargetBet;
                 yield break;
             }
 
@@ -583,26 +567,22 @@ namespace KillingMahjong.Managers
                 yield return new WaitUntil(() => confirmed || _aborted);
                 if (_aborted) yield break;
 
-                bool tooMuch = ShouldReduceTutorialBet(PlayerShownHp, _lastConfirmedBet);
-                if (!tooMuch) break;
+                if (_lastConfirmedBet == TutorialTargetBet) break;
 
-                // いったん止めて、下げてから代わりに押す。
+                // いったんスマホを閉じ、セリフのあとに額をそろえて代わりに押す。
                 // **スマホはいったん閉じてからセリフを言う**（2026-10-23 ユーザー指示。出したままだと
-                // 先輩の吹き出しがスマホの後ろに隠れていた）。下げるときにもう一度出し、
-                // 押し返した額から 3000 まで下げて勝手に決定する。閉じるのはループを抜けたあと
+                // 先輩の吹き出しがスマホの後ろに隠れていた）。増減するときにもう一度出し、
+                // 押し返した額から3000まで増減して確定する。閉じるのはループを抜けたあと。
                 confirmed = false;
                 int pushedBet = _lastConfirmedBet;
                 betting.HideBettingPhase();
                 yield return betting.WaitForSlideAnimation();
 
-                yield return StartCoroutine(PlayLines(new List<TutorialLine>
-                {
-                    new TutorialLine("ちょっとちょっと！　そんなに賭けたら危ないよ！"),
-                    new TutorialLine($"気持ちはわかるけどここは{BetWarnReducedAmount}くらいにしとこう？"),
-                }));
+                yield return StartCoroutine(PlayLines(pushedBet < TutorialTargetBet
+                    ? data.onLowBetLines : data.onHighBetLines));
                 if (_aborted) yield break;
 
-                // 下げているあいだはスマホを触れなくする（触れると額が変わったまま決定される）
+                // 自動で増減しているあいだは、プレイヤーの操作で額が変わらないようにする。
                 betting.ShowFixedBettingPhase(PlayerShownHp, PlayerShownHp, pushedBet, amount =>
                 {
                     _lastConfirmedBet = amount;
@@ -610,9 +590,9 @@ namespace KillingMahjong.Managers
                 });
                 yield return betting.WaitForSlideAnimation();
                 betting.LockInput();
-                yield return new WaitForSeconds(BetReducePause);
-                yield return StartCoroutine(SlideBetDownTo(betting, BetWarnReducedAmount));
-                yield return new WaitForSeconds(BetReducePause);
+                yield return new WaitForSeconds(BetAdjustPause);
+                yield return StartCoroutine(SlideTutorialBetTo(betting, TutorialTargetBet));
+                yield return new WaitForSeconds(BetAdjustPause);
 
                 betting.PressConfirm();
                 yield return null;
@@ -630,21 +610,21 @@ namespace KillingMahjong.Managers
             yield return new WaitForSeconds(phaseSettleTime);
         }
 
-        /// <summary>賭け金を目当ての額まで滑らかに下げる。「減少する演出」の実体。</summary>
-        private IEnumerator SlideBetDownTo(UI.BettingUI betting, int target)
+        /// <summary>賭け金の数値と背景ゲージを、現在額から目当ての額まで増減する。</summary>
+        private IEnumerator SlideTutorialBetTo(UI.BettingUI betting, int target)
         {
             int from = betting.CurrentBet;
-            if (from <= target)
+            if (from == target)
             {
                 betting.ForceSetBet(target);
                 yield break;
             }
 
             float t = 0f;
-            while (t < BetReduceSeconds)
+            while (t < BetAdjustSeconds)
             {
                 t += Time.deltaTime;
-                float u = Mathf.Clamp01(t / BetReduceSeconds);
+                float u = Mathf.Clamp01(t / BetAdjustSeconds);
                 betting.ForceSetBet(Mathf.RoundToInt(Mathf.Lerp(from, target, u)));
                 yield return null;
             }
