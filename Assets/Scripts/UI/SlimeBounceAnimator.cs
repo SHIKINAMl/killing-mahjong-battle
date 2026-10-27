@@ -38,6 +38,7 @@ namespace KillingMahjong.UI
         private bool hasWritten;
         private bool playing;
         private float phase;
+        private float poseScaleY = 1f, poseLift;
 
         public bool IsPlaying => playing;
 
@@ -59,7 +60,7 @@ namespace KillingMahjong.UI
         {
             if (on)
             {
-                if (!playing) { baseScale = transform.localScale; phase = 0f; presentationFrame = -1; }
+                if (!playing) { baseScale = transform.localScale; phase = 0f; presentationFrame = -1; poseScaleY = 1f; poseLift = 0f; }
                 playing = true;
             }
             else
@@ -81,8 +82,10 @@ namespace KillingMahjong.UI
             if (!playing) return;
 
             phase += Time.deltaTime / Mathf.Max(0.1f, cycleSeconds);
-            if (!PresentationTiming.IsNewFrame(ref presentationFrame, Time.time, BounceFps)) return;
-            Shape(Frac(phase), out float sy, out float lift);
+            if (PresentationTiming.IsNewFrame(ref presentationFrame, Time.time, BounceFps))
+                Shape(Frac(phase), out poseScaleY, out poseLift);
+            // 姿勢の更新だけを間引く。会話・浮遊が位置を戻すフレームにも、保持中の跳ねを合成し直す。
+            float sy = poseScaleY, lift = poseLift;
             float sx = 1f / Mathf.Max(0.5f, sy); // 体積を保つように横へ広がる
 
             float height = BodyHeight();

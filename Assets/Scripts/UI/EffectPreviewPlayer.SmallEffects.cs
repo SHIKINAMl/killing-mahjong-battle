@@ -160,6 +160,10 @@ namespace KillingMahjong.UI
                     for (int i = 0; i < 3; i++) { rig.enemy.SetFaceExpression(character.blinkFaceId); yield return new WaitForSeconds(.12f); rig.face.sprite = before; yield return new WaitForSeconds(.8f); }
                     break;
                 case "character.senior_bounce":
+                    rig.enemy.SetCharacterSprite(Resources.Load<Sprite>("女の子/tutorialexe"));
+                    if (rig.face != null) rig.face.enabled = false;
+                    if (rig.character.GetComponent<TalkBobAnimator>() == null)
+                        rig.character.gameObject.AddComponent<TalkBobAnimator>();
                     rig.enemy.SetIdleSlimeBounce(true);
                     scope.AddCleanup(() => { if (rig != null && rig.enemy != null) rig.enemy.SetIdleSlimeBounce(false); });
                     yield return new WaitForSeconds(4f);
