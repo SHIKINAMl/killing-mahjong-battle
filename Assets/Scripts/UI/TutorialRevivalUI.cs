@@ -161,10 +161,14 @@ namespace KillingMahjong.UI
             var activation = stage.AddText("RevivalActivation", data.skillName, 32f, BelleFigure.Yellow);
             if (font != null) activation.font = font;
             activation.rectTransform.anchoredPosition = new Vector2(0f, -45f);
-            yield return Animate(1.2f, t => {
-                activation.rectTransform.localScale = Vector3.one * (1f + .2f * Mathf.Sin(t * Mathf.PI));
-                activation.alpha = Mathf.Sin(t * Mathf.PI);
-            });
+            // 能力名を定位置で読ませる。一度だけ白く点灯して金色へ落ち着かせ、膨張や往復を付けない。
+            activation.rectTransform.localScale = Vector3.one;
+            activation.color = Color.white;
+            activation.alpha = 0f;
+            yield return Animate(.08f, t => activation.alpha = t);
+            yield return Animate(.08f, t => activation.color = Color.Lerp(Color.white, BelleFigure.Yellow, t));
+            yield return new WaitForSecondsRealtime(.8f);
+            yield return Animate(.24f, t => activation.alpha = 1f - t);
             activation.gameObject.SetActive(false);
             // 発動のあとは一気に明るくせず、真っ白になる合図（次のタイトル画面の光）までゆっくり明るくしていく
             // （2026-10-23 プランナー指摘）。ベルルが縮んでセリフを話しているあいだも続ける

@@ -154,7 +154,9 @@ namespace KillingMahjong.UI
                     finally { if (tutorialEnding != null) tutorialEnding.Close(); }
                     break;
                 case TutorialRevivalUI.EffectId:
-                    var revival = TutorialRevivalUI.Create(transform);
+                    // 操作用Canvasの子にすると復活の画面が100x100へ縮むため、本編と同じ独立Canvasにする。
+                    var revival = TutorialRevivalUI.Create(null);
+                    UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(revival.gameObject, previewScene);
                     scope.AddCleanup(() => { if (revival != null) revival.Close(); });
                     try
                     {
