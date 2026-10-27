@@ -668,7 +668,8 @@ namespace KillingMahjong.UI
         {
             // 血の演出（説明ではなく体で見せる方）。額を変えるたびに重さを渡す
             var fx = EnsureStakeFx();
-            if (fx != null && _outcomePreviewAllowed) fx.SetStake(currentBet, currentMoney);
+            // 予想報酬の札を隠すチュートリアルでも、額と背景の血量は連動させる。
+            if (fx != null) fx.SetStake(currentBet, currentMoney);
 
             if (_outcomePreview == null) _outcomePreview = BetOutcomePreviewUI.Ensure(PreviewParent(transform));
             if (_outcomePreview == null) return;
