@@ -97,6 +97,8 @@ MonoBehaviour:
       text: "\u3053\u308C\u306F \u304A\u307E\u304B\u305B\u30DC\u30BF\u30F3"
     - speaker: 0
       text: "\u81EA\u52D5\u3067\u5C71\u724C\u306E\u4E2D\u304B\u3089\u6E80\u8CAB\u4EE5\u4E0A\u306E\u5F62\u3092\u4F5C\u3063\u3066\u304F\u308C\u308B\u3088"
+    - speaker: 0
+      text: "君はまだできないみたいだからこれを押して"
     onSelfManganLines:
     - speaker: 0
       text: "\u304A\u3063\u304D\u3063\u3061\u308A\u3067\u304D\u305F\u306D"
