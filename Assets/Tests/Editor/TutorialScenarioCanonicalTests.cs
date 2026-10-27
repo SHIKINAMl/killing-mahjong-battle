@@ -12,6 +12,33 @@ namespace KillingMahjong.Tests
         private ScriptableObject Canonical => (ScriptableObject)Resources.Load("Tutorial/TutorialScenario", ScenarioType);
 
         [Test]
+        public void FirstRoundManganExampleIncludesHonorsAndMatchesDisplayedFiveHan()
+        {
+            var rounds = (IList)ScenarioType.GetField("rounds").GetValue(Canonical);
+            var round = rounds[0];
+            var type = round.GetType();
+            var hand = (IList)type.GetField("manganHandBaseIds").GetValue(round);
+            bool hasHonor = false;
+            foreach (int tile in hand) hasHonor |= tile >= 27;
+            Assert.That(hand.Count, Is.EqualTo(13));
+            Assert.That(hasHonor, Is.True, "混一色の例を清一色・九蓮宝燈の牌姿に戻さない");
+
+            var yaku = (IList)type.GetField("manganHandYaku").GetValue(round);
+            var winYaku = (IList)type.GetField("yakuList").GetValue(round);
+            CollectionAssert.AreEquivalent(yaku, winYaku);
+            var rules = Type.GetType("KillingMahjong.GameRules, Assembly-CSharp", true);
+            int han = 0;
+            foreach (string name in yaku)
+                han += (int)rules.GetMethod("GetBaseHan").Invoke(null, new object[] { name });
+            Assert.That(han, Is.EqualTo(5));
+            Assert.That(type.GetField("manganHandHan").GetValue(round), Is.EqualTo(han));
+            Assert.That(type.GetField("rankText").GetValue(round), Is.EqualTo("満貫"));
+            int bet = (int)type.GetField("betAmount").GetValue(round);
+            Assert.That(rules.GetMethod("CalculateWinnerGain", new[] { typeof(int), typeof(int) })
+                .Invoke(null, new object[] { bet, han }), Is.EqualTo(2000));
+        }
+
+        [Test]
         public void MissingSceneReferenceUsesIndependentCopyOfCanonicalScript()
         {
             var source = Canonical;
