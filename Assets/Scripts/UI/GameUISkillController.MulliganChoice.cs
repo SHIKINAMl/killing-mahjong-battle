@@ -23,6 +23,32 @@ namespace KillingMahjong.UI
     public partial class GameUISkillController
     {
         internal System.Action<List<int>> TutorialMulliganPicked { get; set; }
+        internal System.Func<int, bool> TutorialMulliganCanPick { get; set; }
+        private readonly Dictionary<Image, Color> _tutorialMulliganColors = new Dictionary<Image, Color>();
+
+        private void ShowTutorialMulliganTargets()
+        {
+            if (uiManager == null || !uiManager.IsTutorialMode || TutorialMulliganCanPick == null) return;
+            var slots = new List<RectTransform>();
+            if (uiManager.WallUI != null) slots.AddRange(uiManager.WallUI.GetWallSlots());
+            if (uiManager.HandUI != null) slots.AddRange(uiManager.HandUI.GetHandSlots());
+            foreach (var slot in slots)
+            {
+                if (slot == null || TutorialMulliganCanPick(SlotWallIndex(slot))) continue;
+                foreach (var image in slot.GetComponentsInChildren<Image>(true))
+                {
+                    if (!_tutorialMulliganColors.ContainsKey(image)) _tutorialMulliganColors.Add(image, image.color);
+                    image.color = new Color(0.35f, 0.35f, 0.35f, image.color.a);
+                }
+            }
+        }
+
+        private void RestoreTutorialMulliganTargets()
+        {
+            foreach (var item in _tutorialMulliganColors)
+                if (item.Key != null) item.Key.color = item.Value;
+            _tutorialMulliganColors.Clear();
+        }
         private class MulliganPick
         {
             public int TileId;
@@ -93,6 +119,9 @@ namespace KillingMahjong.UI
                 Debug.LogWarning("[Mulligan] 選んだ牌が山に見つかりません: " + tileId);
                 return true;
             }
+
+            if (uiManager.IsTutorialMode && TutorialMulliganCanPick != null
+                && !TutorialMulliganCanPick(wallIndex)) return true;
 
             _mulliganPicks.Add(new MulliganPick { TileId = tileId, WallIndex = wallIndex, Slot = slotRt });
             TintSlot(slotRt, MulliganPickTint);

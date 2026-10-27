@@ -98,6 +98,8 @@ namespace KillingMahjong.Managers
         [Header("■ 牌を変える ─ 配られる牌・手牌・ドラ")]
         [Tooltip("この局で配られる34枚（牌種 0〜28）。重複あり。")]
         [TilePicker] public List<int> wallBaseIds = new List<int>();
+        [Tooltip("牌交換で追加する固定候補3枚。満貫手には使わない牌を指定する。")]
+        [TilePicker] public List<int> mulliganReplacementBaseIds = new List<int>();
 
         [Tooltip("オート満貫ボタンで組まれる13枚（牌種 0〜28）。wallBaseIds の部分集合であること。")]
         [TilePicker] public List<int> manganHandBaseIds = new List<int>();
@@ -271,6 +273,7 @@ namespace KillingMahjong.Managers
                 string tag = $"rounds[{i}] ({r.label})";
                 ok &= TutorialTiles.Validate(r.wallBaseIds, $"{tag}.wallBaseIds");
                 ok &= TutorialTiles.Validate(r.manganHandBaseIds, $"{tag}.manganHandBaseIds");
+                ok &= TutorialTiles.Validate(r.mulliganReplacementBaseIds, $"{tag}.mulliganReplacementBaseIds");
                 ok &= TutorialTiles.Validate(r.waitBaseIds, $"{tag}.waitBaseIds");
                 ok &= TutorialTiles.Validate(r.enemyDiscardBaseIds, $"{tag}.enemyDiscardBaseIds");
                 ok &= TutorialTiles.Validate(r.enemyRonMeldBaseIds, $"{tag}.enemyRonMeldBaseIds");

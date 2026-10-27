@@ -50,6 +50,7 @@ namespace KillingMahjong.Managers
                 || gameUIManager.SkillController == null || BoardStateManager.Instance == null) return false;
             if (type != SkillNames.Mulligan && type != SkillNames.Perspective && type != SkillNames.BoostHand) return false;
             if (type == SkillNames.Perspective && _introPerspectiveUses >= 5) return false;
+            if (type == SkillNames.Mulligan && GetIntroMulliganReplacements() == null) return false;
             int floor = _prevRoundWasDraw ? _playerStake + _lastBetAmount : 0;
             return _playerHp - GameRules.GetSkillCost(type, 0) >= floor;
         }
@@ -68,6 +69,7 @@ namespace KillingMahjong.Managers
                 var controller = gameUIManager.SkillController;
                 System.Action<List<int>> picked = indexes => outgoing = new List<int>(indexes);
                 controller.TutorialMulliganPicked = picked;
+                controller.TutorialMulliganCanPick = CanPickIntroMulliganWallIndex;
                 try
                 {
                     controller.StartMulliganSelection();
@@ -76,7 +78,10 @@ namespace KillingMahjong.Managers
                 finally
                 {
                     if (controller != null && controller.TutorialMulliganPicked == picked)
+                    {
                         controller.TutorialMulliganPicked = null;
+                        controller.TutorialMulliganCanPick = null;
+                    }
                     controller?.CancelSkillSelection();
                 }
                 if (_aborted || outgoing == null || outgoing.Count != MulliganChoiceUI.KeepCount) yield break;
@@ -89,8 +94,9 @@ namespace KillingMahjong.Managers
                     if (index < 0 || index >= board.OriginalWallTiles.Count) yield break;
                     mulliganOptions.Add(board.OriginalWallTiles[index]);
                 }
-                var reserve = TutorialSkillStock.Remaining(board.OriginalWallTiles, board.OriginalEnemyWallTiles, _round.doraBaseId);
-                mulliganOptions.AddRange(TutorialSkillStock.Draw(reserve, MulliganChoiceUI.KeepCount, _introSkillRandom));
+                var replacements = GetIntroMulliganReplacements();
+                if (replacements == null) yield break;
+                mulliganOptions.AddRange(replacements);
             }
             else if (type == SkillNames.BoostHand)
             {
@@ -173,7 +179,12 @@ namespace KillingMahjong.Managers
         private void ClearIntroSkillSelection()
         {
             var controller = gameUIManager != null ? gameUIManager.SkillController : null;
-            if (controller != null) { controller.TutorialMulliganPicked = null; controller.CancelSkillSelection(); }
+            if (controller != null)
+            {
+                controller.TutorialMulliganPicked = null;
+                controller.TutorialMulliganCanPick = null;
+                controller.CancelSkillSelection();
+            }
             if (_introChoiceOpen) FindFirstObjectByType<MulliganChoiceUI>(FindObjectsInactive.Include)?.Hide();
             if (_introYakuOpen) FindFirstObjectByType<YakuSelectionUI>(FindObjectsInactive.Include)?.Hide();
             _introChoiceOpen = _introYakuOpen = false;
@@ -181,6 +192,8 @@ namespace KillingMahjong.Managers
 
         private string IntroSkillUnusableReason(string type)
         {
+            if (type == SkillNames.Mulligan && GetIntroMulliganReplacements() == null)
+                return "交換できる予備牌がありません。";
             if (type == SkillNames.Perspective && _introPerspectiveUses >= 5)
                 return "透視は1局に5回までです。";
             return CanActivateIntroSkill(type) ? null : "持ち点が足りません。";

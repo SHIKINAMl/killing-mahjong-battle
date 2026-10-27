@@ -52,6 +52,7 @@ namespace KillingMahjong.UI
             IsMulliganSelection = true;
             ClearMulliganPicks();
             ShowMulliganUI();
+            ShowTutorialMulliganTargets();
         }
 
         private RectTransform _lastMulliganOutSlotRt;
@@ -159,6 +160,7 @@ namespace KillingMahjong.UI
 
         private void HideMulliganUI()
         {
+            RestoreTutorialMulliganTargets();
             if (mulliganCanvas != null) mulliganCanvas.SetActive(false);
             if (uiManager != null)
             {

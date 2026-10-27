@@ -59,6 +59,8 @@ namespace KillingMahjong.Managers
                 if (IsSecondTutorialRound(data))
                 {
                     var stock = TutorialSkillStock.Remaining(wall, null, data.doraBaseId);
+                    foreach (int tile in TutorialTiles.EncodeAll(data.mulliganReplacementBaseIds, data.doraBaseId))
+                        stock.Remove(tile);
                     board.SetEnemyState(TutorialSkillStock.Draw(stock, wall.Count, _introSkillRandom), new List<int>());
                 }
             }
