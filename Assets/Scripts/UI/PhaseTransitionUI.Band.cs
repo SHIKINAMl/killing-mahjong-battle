@@ -15,7 +15,7 @@ namespace KillingMahjong.UI
     ///   ゆっくり動き出して速く閉じる。止まった・閉じたが一定速度より分かりやすい。
     ///   短所: 付けすぎると軽く見えるので、行き過ぎ（バック）は帯には使わない。
     ///
-    /// 文字は移動させず、その場で短くフェードする。帯は12コマ、文字は24コマで出し入れする。
+    /// 文字は移動させず、その場で短くフェードする。帯と文字はどちらも60fps基準で出し入れする。
     /// </summary>
     public partial class PhaseTransitionUI
     {
@@ -26,22 +26,21 @@ namespace KillingMahjong.UI
         private const float BandScaleY = 2f;
 
         /// <summary>
-        /// **動きはコマ打ちにする（2026-10-25 のユーザー指示「動きがヌルっとしすぎてAIっぽい。少しドットっぽく動いて」）。**
-        /// 毎フレームなめらかに動かさず、1秒に 12 コマだけ絵を変えて、その間は止める。
+        /// 帯も文字も共通の60fps基準へ合わせる。
         /// </summary>
         internal const float PixelFps = PresentationTiming.MotionFps;
 
         /// <summary>時間をコマの頭にそろえる。</summary>
         internal static float StepTime(float t) => PresentationTiming.Sample(t);
 
-        /// <summary>文字だけ更新を細かくし、黒帯のコマ打ちは保つ。</summary>
+        /// <summary>文字も帯と同じ更新頻度にする。</summary>
         internal const float TextFps = PresentationTiming.TextFps;
         internal static float StepTextTime(float t) => PresentationTiming.Sample(t, TextFps);
 
         private const float BandTextFadeIn = .10f;
 
         /// <summary>文字を消す時間は従来の0.25秒を維持する。</summary>
-        private const float BandTextFadeOut = 3f / PixelFps;
+        private const float BandTextFadeOut = .25f;
 
         private static float EaseOutCubic(float t) { t = Mathf.Clamp01(t); float u = 1f - t; return 1f - u * u * u; }
         private static float EaseInCubic(float t) { t = Mathf.Clamp01(t); return t * t * t; }

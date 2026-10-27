@@ -7,20 +7,20 @@ namespace KillingMahjong.Tests
     public class PresentationTimingTests
     {
         private static Type Timing => Type.GetType("KillingMahjong.UI.PresentationTiming, Assembly-CSharp", true);
-        private static float Sample(float seconds, float fps = 12f) =>
+        private static float Sample(float seconds, float fps = 60f) =>
             (float)Timing.GetMethod("Sample").Invoke(null, new object[] { seconds, fps });
 
         [TestCase(30)]
         [TestCase(60)]
         [TestCase(120)]
-        public void DisplayHasTwelvePosesPerSecondRegardlessOfRenderRate(int renderFps)
+        public void DisplayUsesSixtyPosesPerSecondWithinRenderRate(int renderFps)
         {
             var poses = new HashSet<float>();
             for (int frame = 0; frame < renderFps; frame++) poses.Add(Sample(frame / (float)renderFps));
-            Assert.That(poses.Count, Is.EqualTo(12));
-            Assert.That(Sample(.01f), Is.EqualTo(Sample(.07f)));
-            Assert.That(Sample(.09f), Is.GreaterThan(Sample(.07f)));
-            Assert.That(Sample(.05f, 24f), Is.GreaterThan(Sample(.05f)), "文字は黒帯より細かく更新する");
+            Assert.That(poses.Count, Is.EqualTo(Math.Min(renderFps, 60)));
+            Assert.That(Sample(.001f), Is.EqualTo(Sample(.015f)));
+            Assert.That(Sample(.02f), Is.GreaterThan(Sample(.015f)));
+            Assert.That((float)Timing.GetField("TextFps").GetRawConstantValue(), Is.EqualTo(60f));
         }
 
         [TestCase(.04f)]
@@ -29,9 +29,9 @@ namespace KillingMahjong.Tests
         public void ProgressReachesExactEndEvenForShortOrNonFrameAlignedDuration(float duration)
         {
             var progress = Timing.GetMethod("Progress");
-            Assert.That(progress.Invoke(null, new object[] { duration, duration, 12f }), Is.EqualTo(1f));
-            Assert.That(progress.Invoke(null, new object[] { duration + .01f, duration, 12f }), Is.EqualTo(1f));
-            Assert.That(progress.Invoke(null, new object[] { -.01f, duration, 12f }), Is.EqualTo(0f));
+            Assert.That(progress.Invoke(null, new object[] { duration, duration, 60f }), Is.EqualTo(1f));
+            Assert.That(progress.Invoke(null, new object[] { duration + .01f, duration, 60f }), Is.EqualTo(1f));
+            Assert.That(progress.Invoke(null, new object[] { -.01f, duration, 60f }), Is.EqualTo(0f));
         }
     }
 }

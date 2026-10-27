@@ -45,7 +45,7 @@ namespace KillingMahjong.UI
             new Entry("phase.betting", "フェイズ", "掛け金パネル：入る → 出る", "BettingUI.ShowFixedBettingPhase / HideBettingPhase"),
             new Entry(Effects.BetStakeFx.EffectId, "フェイズ", "掛け金の重さ：枠に血が溜まる・心音・赤い縁・揺れ", "BettingUI / BetStakeFx"),
             new Entry(Effects.BetStakeFx.CardEffectId, "フェイズ", "賭けたあとの血：勝ち・負け・単騎の札", "BettingUI / BetOutcomePreviewUI", unused: true),
-            new Entry("phase.battle_start", "フェイズ", "対局開始：黒帯は12コマ・文字は24コマのフェードと数値表示", "PhaseTransitionUI.PlayTransition"),
+            new Entry("phase.battle_start", "フェイズ", "対局開始：黒帯と文字は60fps基準のフェードと数値表示", "PhaseTransitionUI.PlayTransition"),
             new Entry("phase.local_turn", "フェイズ", "先行の表示", "PhaseTransitionUI.PlayCenterTextAnimRoutine"),
             new Entry("phase.enemy_turn", "フェイズ", "後攻の表示", "PhaseTransitionUI.PlayCenterTextAnimRoutine"),
             new Entry("phase.prompt", "フェイズ", "手牌選択の案内", "PhaseTransitionUI.PlayPromptText"),

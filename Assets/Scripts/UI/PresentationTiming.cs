@@ -2,11 +2,11 @@ using UnityEngine;
 
 namespace KillingMahjong.UI
 {
-    /// <summary>演出の描画だけをコマ打ちする。実時間・音・入力・完了判定は刻まない。</summary>
+    /// <summary>演出の描画を60fps基準で更新する。実時間・音・入力・完了判定は刻まない。</summary>
     public static class PresentationTiming
     {
-        public const float MotionFps = 12f;
-        public const float TextFps = 24f;
+        public const float MotionFps = 60f;
+        public const float TextFps = 60f;
 
         public static float Sample(float seconds, float fps = MotionFps)
         {

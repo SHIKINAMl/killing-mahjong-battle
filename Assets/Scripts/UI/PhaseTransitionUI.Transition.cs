@@ -14,7 +14,7 @@ namespace KillingMahjong.UI
         private const float BattleStartImpactAtFadeRatio = 0.55f;
 
         /// <summary>賭け金の行・VS・残りの行をずらす間隔。</summary>
-        private const float HpRowStagger = 2f / PixelFps;
+        private const float HpRowStagger = 1f / 6f;
 
         private static string BetLine(string label, int amount) => "<size=60%>" + label + "</size> <color=#E0303C>" + amount + "</color>";
 
