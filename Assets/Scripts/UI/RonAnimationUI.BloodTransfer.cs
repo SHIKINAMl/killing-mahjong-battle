@@ -136,7 +136,7 @@ namespace KillingMahjong.UI
             const float riseTime = 0.35f;
             for (float t = 0; t < riseTime; t += Time.deltaTime)
             {
-                float p = Mathf.Clamp01(t / riseTime);
+                float p = Mathf.Clamp01(PresentationTiming.Sample(t) / riseTime);
                 float eased = 1f - Mathf.Pow(1f - p, 3f);
                 flyRt.position = Vector3.Lerp(startPos, centerPos, eased);
                 flyRt.localScale = Vector3.one * Mathf.Lerp(startScale, 1f, eased);
@@ -165,7 +165,7 @@ namespace KillingMahjong.UI
             const float popTime = 0.25f;
             for (float t = 0; t < popTime; t += Time.deltaTime)
             {
-                float p = Mathf.Clamp01(t / popTime);
+                float p = Mathf.Clamp01(PresentationTiming.Sample(t) / popTime);
                 if (p < 0.5f)
                 {
                     float q = p / 0.5f;
@@ -216,7 +216,7 @@ namespace KillingMahjong.UI
             const float diveTime = 0.30f;
             for (float t = 0; t < diveTime; t += Time.deltaTime)
             {
-                float p = Mathf.Clamp01(t / diveTime);
+                float p = Mathf.Clamp01(PresentationTiming.Sample(t) / diveTime);
                 float eased = p * p; // 落ちるほど速く
                 flyRt.position = Vector3.Lerp(centerPos, endPos, eased);
                 flyRt.localScale = Vector3.one * Mathf.Lerp(1f, landScale, eased);
@@ -241,7 +241,7 @@ namespace KillingMahjong.UI
             bool enemySePlayed = false;
             for (float t = 0; t < hpTime; t += Time.deltaTime)
             {
-                float eased = 1f - Mathf.Pow(1f - Mathf.Clamp01(t / hpTime), 3f);
+                float eased = 1f - Mathf.Pow(1f - Mathf.Clamp01(PresentationTiming.Sample(t) / hpTime), 3f);
                 if (playerInfo != null) playerInfo.SetHP(Mathf.RoundToInt(Mathf.Lerp(prevLocalHp, newLocalHp, eased)));
                 if (enemyInfo != null) enemyInfo.SetHP(Mathf.RoundToInt(Mathf.Lerp(prevEnemyHp, newEnemyHp, eased)));
 
@@ -434,13 +434,13 @@ namespace KillingMahjong.UI
                 for (float t = 0f; t < 0.5f; t += Time.deltaTime)
                 {
                     if (body == null) yield break;
-                    body.color = Color.Lerp(red, pale, t / 0.5f);
+                    body.color = Color.Lerp(red, pale, PresentationTiming.Sample(t) / 0.5f);
                     yield return null;
                 }
                 for (float t = 0f; t < 0.6f; t += Time.deltaTime)
                 {
                     if (body == null) yield break;
-                    body.color = Color.Lerp(pale, original, t / 0.6f);
+                    body.color = Color.Lerp(pale, original, PresentationTiming.Sample(t) / 0.6f);
                     yield return null;
                 }
             }

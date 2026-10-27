@@ -82,7 +82,7 @@ namespace KillingMahjong.UI
             yield return new WaitForSecondsRealtime(.18f);
             for (float elapsed = 0f; elapsed < PhoneZoomSeconds; elapsed += Time.unscaledDeltaTime)
             {
-                SetPhoneZoom(elapsed / PhoneZoomSeconds);
+                SetPhoneZoom(PresentationTiming.Sample(elapsed) / PhoneZoomSeconds);
                 yield return null;
             }
             SetPhoneZoom(1f);
@@ -96,7 +96,7 @@ namespace KillingMahjong.UI
             presentationGroup.blocksRaycasts = false;
             for (float elapsed = 0f; elapsed < .4f; elapsed += Time.unscaledDeltaTime)
             {
-                SetPhoneZoom(1f - elapsed / .4f);
+                SetPhoneZoom(1f - PresentationTiming.Sample(elapsed) / .4f);
                 yield return null;
             }
             SetPhoneZoom(0f);

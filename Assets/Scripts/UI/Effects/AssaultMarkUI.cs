@@ -109,7 +109,7 @@ namespace KillingMahjong.UI.Effects
                 Vector2 at = MarkPosition(_stage, _target, _attachToLeft);
 
                 // 脈。1.2 秒に1回、輪が広がりながら薄くなる
-                float beat = Mathf.Repeat(_clock, 1.2f) / 1.2f;
+                float beat = Mathf.Repeat(PresentationTiming.Sample(_clock), 1.2f) / 1.2f;
                 Color ring = Blood;
                 ring.a = (1f - beat) * 0.7f;
                 _shapes.Ring(at, Radius + 5f + beat * 9f, 2f, ring);

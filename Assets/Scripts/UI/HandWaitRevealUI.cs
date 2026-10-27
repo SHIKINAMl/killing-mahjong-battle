@@ -349,7 +349,7 @@ namespace KillingMahjong.UI
                 info.alpha = Mathf.Clamp01(elapsed / .2f);
                 for (int i = 0; i < cards.Count; i++)
                 {
-                    float u = Mathf.Clamp01((elapsed - i * .085f) / .2f);
+                    float u = Mathf.Clamp01(PresentationTiming.Sample(elapsed - i * .085f) / .2f);
                     float ease = 1 - Mathf.Pow(1 - u, 3);
                     cards[i].anchoredPosition = positions[i] + new Vector2(42, -8) * (1 - ease);
                     groups[i].alpha = Mathf.Min(1, u * 3);
@@ -462,7 +462,8 @@ namespace KillingMahjong.UI
                                 }
                                 continue;
                             }
-                            float u = raw < .5f ? 4 * raw * raw * raw : 1 - Mathf.Pow(-2 * raw + 2, 3) / 2;
+                            float visual = PresentationTiming.Progress(t - i * .055f, .70f);
+                            float u = visual < .5f ? 4 * visual * visual * visual : 1 - Mathf.Pow(-2 * visual + 2, 3) / 2;
                             DrawFlight(index, starts[i], ends[i], u);
                         }
                         pixels.End();

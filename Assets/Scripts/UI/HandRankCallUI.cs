@@ -244,7 +244,7 @@ namespace KillingMahjong.UI
             while (t < SlamSeconds)
             {
                 t += Step();
-                float u = Mathf.Clamp01(t / SlamSeconds);
+                float u = Mathf.Clamp01(PresentationTiming.Sample(t) / SlamSeconds);
                 // 最後で強く減速させて、止まった感じを出す
                 float e = 1f - Mathf.Pow(1f - u, 4f);
                 float scale = Mathf.Lerp(SlamStartScale, 1f, e);
@@ -294,7 +294,7 @@ namespace KillingMahjong.UI
             while (t < FlashFadeSeconds)
             {
                 t += Step();
-                float u = Mathf.Clamp01(t / FlashFadeSeconds);
+                float u = Mathf.Clamp01(PresentationTiming.Sample(t) / FlashFadeSeconds);
                 if (_flash == null) yield break;
                 _flash.color = new Color(1f, 1f, 1f, FlashPeakAlpha * (1f - u));
                 yield return null;
@@ -323,7 +323,7 @@ namespace KillingMahjong.UI
 
             for (float t = 0f; t < seconds; t += Step())
             {
-                _group.alpha = Mathf.Lerp(from, target, t / seconds);
+                _group.alpha = Mathf.Lerp(from, target, PresentationTiming.Sample(t) / seconds);
                 yield return null;
             }
             _group.alpha = target;

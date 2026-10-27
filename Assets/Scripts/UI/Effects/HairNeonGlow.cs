@@ -56,6 +56,7 @@ namespace KillingMahjong.UI.Effects
         private SpriteRenderer _source;
         private SpriteRenderer _neon;
         private float _phase;
+        private int presentationFrame = -1;
 
         /// <summary>
         /// <paramref name="source"/> の髪を光らせる。二重に呼んでも増えない。
@@ -103,6 +104,7 @@ namespace KillingMahjong.UI.Effects
             SyncShape();
 
             _phase += Time.deltaTime * PulsePerSecond * Mathf.PI * 2f;
+            if (!PresentationTiming.IsNewFrame(ref presentationFrame, Time.time)) return;
             float t = (Mathf.Sin(_phase) + 1f) * 0.5f;
             ApplyPower(Mathf.Lerp(PowerMin, PowerMax, t));
         }

@@ -372,7 +372,7 @@ namespace KillingMahjong.UI
             float t = 0f;
             while (t < holdIn)
             {
-                float k = t / holdIn;
+                float k = PresentationTiming.Sample(t) / holdIn;
                 // 早めに暗くして、暗いまま黙って待たせる。そこが溜めになる
                 bgImg.color = new Color(0, 0, 0, Mathf.Lerp(0f, DimPeak, 1f - (1f - k) * (1f - k)));
                 lines.Progress = Mathf.Lerp(0f, 0.55f, k);
@@ -465,9 +465,9 @@ namespace KillingMahjong.UI
             t = 0f;
             while (t < lingerTime)
             {
-                float k = Mathf.Clamp01(t / lingerTime);
+                float k = Mathf.Clamp01(PresentationTiming.Sample(t) / lingerTime);
                 // 赤は短く引く。長く残すと顔が赤く塗りつぶされて、誰が叩いたのか見えない
-                flashImg.color = new Color(0.85f, 0f, 0.1f, Mathf.Lerp(flashFrom, 0f, Mathf.Clamp01(t / 0.16f)));
+                flashImg.color = new Color(0.85f, 0f, 0.1f, Mathf.Lerp(flashFrom, 0f, Mathf.Clamp01(PresentationTiming.Sample(t) / 0.16f)));
                 lines.Progress = Mathf.Lerp(1f, 0.45f, k);
 
                 // 影はコマ打ちで、2単位ずつ動かす（なめらかに動かすと、ジリジリ感が出ない）
@@ -491,7 +491,7 @@ namespace KillingMahjong.UI
             float outDuration = 0.15f;
             while (t < outDuration)
             {
-                float progress = t / outDuration;
+                float progress = PresentationTiming.Sample(t) / outDuration;
                 canvasGroup.alpha = 1f - progress;
                 t += Time.deltaTime;
                 yield return null;

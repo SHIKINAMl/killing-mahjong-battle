@@ -52,10 +52,12 @@ namespace KillingMahjong.UI
             }
             screenShakeOrigin = transform.localPosition;
             screenShakeActive = true;
+            int shakeFrame = -1;
             try
             {
                 while (Time.time < screenShakeUntil)
                 {
+                    if (!PresentationTiming.IsNewFrame(ref shakeFrame, Time.time)) { yield return null; continue; }
                     float x = UnityEngine.Random.Range(-1f, 1f) * screenShakeMagnitude * screenShakeAxis.x;
                     float y = UnityEngine.Random.Range(-1f, 1f) * screenShakeMagnitude * screenShakeAxis.y;
                     transform.localPosition = screenShakeOrigin + new Vector3(x, y, 0f);
@@ -93,7 +95,7 @@ namespace KillingMahjong.UI
             float t = 0;
             while (t < 0.3f)
             {
-                dimmerImage.color = Color.Lerp(new Color(0, 0, 0, 0), dimmerColor, t / 0.3f);
+                dimmerImage.color = Color.Lerp(new Color(0, 0, 0, 0), dimmerColor, PresentationTiming.Sample(t) / 0.3f);
                 t += Time.deltaTime;
                 yield return null;
             }
@@ -121,7 +123,7 @@ namespace KillingMahjong.UI
                 
                 while (t < duration)
                 {
-                    float progress = t / duration;
+                    float progress = PresentationTiming.Sample(t) / duration;
                     // EaseInCubic または Overshoot っぽい動き
                     float scaleProgress = 1f - Mathf.Pow(1f - progress, 4f); 
                     centerText.transform.localScale = Vector3.LerpUnclamped(initialScale, targetScale, scaleProgress);
@@ -203,7 +205,7 @@ namespace KillingMahjong.UI
                 t = 0;
                 while (t < hpDeductionDuration)
                 {
-                    float progress = t / hpDeductionDuration;
+                    float progress = PresentationTiming.Sample(t) / hpDeductionDuration;
                     float eased = 1f - Mathf.Pow(1f - progress, 3f);
 
                     int currentPlayerAnimHp = Mathf.RoundToInt(Mathf.Lerp(prevLocalHp, newLocalHp, eased));
@@ -240,7 +242,7 @@ namespace KillingMahjong.UI
             t = 0;
             while (t < 0.3f)
             {
-                dimmerImage.color = Color.Lerp(dimmerColor, new Color(0, 0, 0, 0), t / 0.3f);
+                dimmerImage.color = Color.Lerp(dimmerColor, new Color(0, 0, 0, 0), PresentationTiming.Sample(t) / 0.3f);
                 t += Time.deltaTime;
                 yield return null;
             }

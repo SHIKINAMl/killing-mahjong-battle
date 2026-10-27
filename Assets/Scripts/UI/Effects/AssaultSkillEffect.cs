@@ -100,7 +100,7 @@ namespace KillingMahjong.UI.Effects
             // ---- ① 暗転 ----
             for (float t = 0f; t < DimSeconds; t += Time.deltaTime)
             {
-                float p = Mathf.Sin(Mathf.Clamp01(t / DimSeconds) * Mathf.PI * 0.5f);
+                float p = Mathf.Sin(Mathf.Clamp01(PresentationTiming.Sample(t) / DimSeconds) * Mathf.PI * 0.5f);
                 SetStage(dim, casterCopy, casterColor, targetCopy, targetColor, p);
                 yield return null;
             }
@@ -110,7 +110,7 @@ namespace KillingMahjong.UI.Effects
             if (audio != null) audio.PlayHeartbeat(HeartbeatStrength.Strong, HeartbeatSpacing.Compact);
             for (float t = 0f; t < ChargeSeconds; t += Time.deltaTime)
             {
-                float p = Mathf.Clamp01(t / ChargeSeconds);
+                float p = Mathf.Clamp01(PresentationTiming.Sample(t) / ChargeSeconds);
                 // 前の8割でふくらみ、残りで縮む（引き金を引く溜め）
                 float r = p < 0.8f
                     ? Mathf.Lerp(0f, ChargeRadius, Mathf.Sin(p / 0.8f * Mathf.PI * 0.5f))
@@ -137,7 +137,7 @@ namespace KillingMahjong.UI.Effects
             ScreenQuake.Play(5f, 0.1f);                       // 撃った反動
             for (float t = 0f; t < ShotSeconds; t += Time.deltaTime)
             {
-                float p = Mathf.Clamp01(t / ShotSeconds);
+                float p = Mathf.Clamp01(PresentationTiming.Sample(t) / ShotSeconds);
                 shapes.Begin();
                 DrawStreak(shapes, muzzle, to, p, ShotRadius, ShotRadius * 0.8f, 1f);
                 shapes.End();
@@ -155,8 +155,8 @@ namespace KillingMahjong.UI.Effects
             // 印（AssaultMarkUI）は暗転より奥に居て、白く光るまで見えない。そのあいだはここで同じ札を描く
             for (float t = 0f; t < HoldBeforeFlash; t += Time.deltaTime)
             {
-                float p = Mathf.Clamp01(t / 0.32f);
-                float slam = Mathf.Clamp01(t / SlamSeconds);
+                float p = Mathf.Clamp01(PresentationTiming.Sample(t) / 0.32f);
+                float slam = Mathf.Clamp01(PresentationTiming.Sample(t) / SlamSeconds);
 
                 shapes.Begin();
                 for (int k = 0; k < 2; k++)

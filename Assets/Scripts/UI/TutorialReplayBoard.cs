@@ -95,7 +95,7 @@ namespace KillingMahjong.UI
             wallUI.LayoutWallTiles(wall, wallIds, null, true);
             for (float t = 0; t < 1; t += Time.unscaledDeltaTime * 2)
             {
-                tile.position = Vector3.Lerp(from, to, Mathf.SmoothStep(0, 1, t)); yield return null;
+                tile.position = Vector3.Lerp(from, to, Mathf.SmoothStep(0, 1, PresentationTiming.Progress(t * .5f, .5f))); yield return null;
             }
             tile.position = to;
         }

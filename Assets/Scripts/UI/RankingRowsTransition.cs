@@ -81,7 +81,7 @@ namespace KillingMahjong.UI
         {
             for (float t = 0f; t < LeaveSeconds && stamp == version; t += Time.unscaledDeltaTime)
             {
-                float u = Mathf.SmoothStep(0f, 1f, t / LeaveSeconds);
+                float u = Mathf.SmoothStep(0f, 1f, PresentationTiming.Sample(t) / LeaveSeconds);
                 for (int r = 0; r < rows.Length; r++) SetRow(r, Mathf.Lerp(1f, .28f, u), 1f - u);
                 yield return null;
             }
@@ -105,16 +105,16 @@ namespace KillingMahjong.UI
             {
                 for (int r = 0; r < rows.Length; r++)
                 {
-                    float local = t - LeadSeconds - r * RowStep;
+                    float local = PresentationTiming.Sample(t) - LeadSeconds - r * RowStep;
                     float band = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(local / .08f));
                     float text = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((local - .04f) / RevealSeconds));
                     SetRow(r, Mathf.Lerp(.28f, 1f, band), text);
                 }
-                float travel = Mathf.Clamp01((t - LeadSeconds) / ((count - 1) * RowStep + RevealSeconds));
+                float travel = Mathf.Clamp01((PresentationTiming.Sample(t) - LeadSeconds) / ((count - 1) * RowStep + RevealSeconds));
                 scan.gameObject.SetActive(t >= LeadSeconds && t < duration - .04f);
                 scan.rectTransform.anchoredPosition = new Vector2(rows[0].anchoredPosition.x, Mathf.Round(Mathf.Lerp(top, bottom, travel)));
                 scan.color = new Color(1f, 1f, 1f, .65f * Mathf.Min(
-                    Mathf.Clamp01((t - LeadSeconds) / .04f), Mathf.Clamp01((duration - .04f - t) / .08f)));
+                    Mathf.Clamp01((PresentationTiming.Sample(t) - LeadSeconds) / .04f), Mathf.Clamp01((duration - .04f - PresentationTiming.Sample(t)) / .08f)));
                 yield return null;
             }
         }

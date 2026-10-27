@@ -329,7 +329,7 @@ namespace KillingMahjong.UI
             const float fadeIn = PanelFadeIn;
             for (float t = 0; t < fadeIn; t += Time.deltaTime)
             {
-                float p = t / fadeIn;
+                float p = PresentationTiming.Sample(t) / fadeIn;
                 panelGroup.alpha = p;
                 yield return null;
             }

@@ -43,7 +43,7 @@ namespace KillingMahjong.UI
             for (float t = 0; t < duration; t += Time.unscaledDeltaTime)
             {
                 if (DialogueUI.IsTalking || reactionCoroutine != null) break;
-                float p = Mathf.Clamp01(t / duration);
+                float p = Mathf.Clamp01(PresentationTiming.Sample(t) / duration);
                 float weight = Mathf.Sin(p * Mathf.PI);
                 weight *= weight;
                 var body = characterRenderer.transform;

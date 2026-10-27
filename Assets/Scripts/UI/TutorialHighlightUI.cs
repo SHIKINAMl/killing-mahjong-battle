@@ -234,7 +234,7 @@ namespace KillingMahjong.UI
             float baseAlpha = BandAlpha;
             // 0.5 を中心に振らせず、**基準の明るさを上限**にする。
             // 上へ振らせると帯が濃くなりすぎて下の数字が読めなくなる。
-            float t = (Mathf.Sin(Time.unscaledTime * PulseSpeed) + 1f) * 0.5f;
+            float t = (Mathf.Sin(PresentationTiming.Sample(Time.unscaledTime) * PulseSpeed) + 1f) * 0.5f;
             float alpha = baseAlpha * (1f - PulseDepth * t);
 
             Color c = Gold;

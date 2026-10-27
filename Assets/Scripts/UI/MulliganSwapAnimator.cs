@@ -146,7 +146,7 @@ namespace KillingMahjong.UI
             while (t < 0.3f)
             {
                 t += Time.deltaTime;
-                float progress = Mathf.Sin(Mathf.Clamp01(t / 0.3f) * Mathf.PI * 0.5f);
+                float progress = Mathf.Sin(Mathf.Clamp01(PresentationTiming.Sample(t) / 0.3f) * Mathf.PI * 0.5f);
                 foreach (var p in pairs)
                 {
                     p.OutRt.anchoredPosition = Vector2.Lerp(p.StartPos, p.OutCenter, progress);
@@ -163,7 +163,7 @@ namespace KillingMahjong.UI
             while (t < 0.3f)
             {
                 t += Time.deltaTime;
-                float progress = Mathf.Sin(Mathf.Clamp01(t / 0.3f) * Mathf.PI * 0.5f);
+                float progress = Mathf.Sin(Mathf.Clamp01(PresentationTiming.Sample(t) / 0.3f) * Mathf.PI * 0.5f);
                 foreach (var p in pairs)
                 {
                     p.InRt.anchoredPosition = Vector2.Lerp(p.InCenter + new Vector2(0, 800), p.InCenter, progress);
@@ -182,7 +182,7 @@ namespace KillingMahjong.UI
             while (t < 0.4f)
             {
                 t += Time.deltaTime;
-                float progress = Mathf.Sin(Mathf.Clamp01(t / 0.4f) * Mathf.PI * 0.5f);
+                float progress = Mathf.Sin(Mathf.Clamp01(PresentationTiming.Sample(t) / 0.4f) * Mathf.PI * 0.5f);
                 foreach (var p in pairs)
                 {
                     // OUT退場
@@ -203,7 +203,7 @@ namespace KillingMahjong.UI
             while (t < 0.2f)
             {
                 t += Time.deltaTime;
-                canvasGroup.alpha = Mathf.Lerp(1, 0, t / 0.2f);
+                canvasGroup.alpha = Mathf.Lerp(1, 0, PresentationTiming.Sample(t) / 0.2f);
                 yield return null;
             }
 

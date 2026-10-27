@@ -64,9 +64,9 @@ namespace KillingMahjong.UI.Effects
             if (!highlighted || source == null || !source.enabled || !source.gameObject.activeInHierarchy)
             { if (gate != null) gate.alpha = 0; return; }
             SyncShape();
-            gate.alpha = Mathf.Clamp01((time - enteredAt) / Mathf.Max(.001f, fadeSeconds));
+            gate.alpha = PresentationTiming.Progress(time - enteredAt, Mathf.Max(.001f, fadeSeconds));
             face.color = surfaceTint;
-            float pulse = .9f + .1f * Mathf.Sin(time * Mathf.PI * 2 * pulsePerSecond);
+            float pulse = .9f + .1f * Mathf.Sin(PresentationTiming.Sample(time) * Mathf.PI * 2 * pulsePerSecond);
             lightLayer.color = new Color(1, 1, 1, .8f * pulse * source.color.a);
         }
         private void SyncShape()

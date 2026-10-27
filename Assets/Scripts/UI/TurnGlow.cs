@@ -138,7 +138,7 @@ namespace KillingMahjong.UI
         {
             if (_images == null) return;
 
-            float t = (Mathf.Sin(Time.time * PulseSpeed) + 1f) * 0.5f;
+            float t = (Mathf.Sin(PresentationTiming.Sample(Time.time) * PulseSpeed) + 1f) * 0.5f;
             var c = Color.Lerp(DarkColor, _tint, t);
             for (int i = 0; i < _images.Length; i++)
             {

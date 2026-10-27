@@ -132,7 +132,7 @@ namespace KillingMahjong.UI
             while (t < PopInSeconds)
             {
                 t += Step();
-                float u = Mathf.Clamp01(t / PopInSeconds);
+                float u = Mathf.Clamp01(PresentationTiming.Sample(t) / PopInSeconds);
                 if (_copy == null) yield break;
                 // 0.55 倍から 1.12 倍まで行き過ぎて、等倍へ戻る
                 float overshoot = 0.55f + (1.12f - 0.55f) * Mathf.Sin(u * Mathf.PI * 0.5f);
@@ -168,7 +168,7 @@ namespace KillingMahjong.UI
             while (t < MoveSeconds)
             {
                 t += Step();
-                float u = Mathf.Clamp01(t / MoveSeconds);
+                float u = Mathf.Clamp01(PresentationTiming.Sample(t) / MoveSeconds);
                 if (_copy == null) yield break;
                 float e = u * u * (3f - 2f * u);   // 緩やかに出て緩やかに止まる
                 _copy.position = Vector3.Lerp(from, to, e);

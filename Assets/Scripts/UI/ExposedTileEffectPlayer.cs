@@ -136,7 +136,7 @@ namespace KillingMahjong.UI
             for (float t = 0f; t < PopDuration; t += Time.deltaTime)
             {
                 if (rt == null) yield break;
-                float s = Mathf.Lerp(1f, 1.3f, Mathf.PingPong(t * (1f / (PopDuration / 2f)), 1f));
+                float s = Mathf.Lerp(1f, 1.3f, Mathf.PingPong(PresentationTiming.Sample(t) * (1f / (PopDuration / 2f)), 1f));
                 rt.localScale = origScale * s;
                 yield return null;
             }
@@ -161,7 +161,7 @@ namespace KillingMahjong.UI
 
             for (float t = 0f; t < GlowAppealDuration; t += Time.deltaTime)
             {
-                Color current = Color.Lerp(originalColor, glowColor, Mathf.PingPong(t * 3f, 1f));
+                Color current = Color.Lerp(originalColor, glowColor, Mathf.PingPong(PresentationTiming.Sample(t) * 3f, 1f));
                 foreach (var img in images)
                 {
                     if (img != null) img.color = current;

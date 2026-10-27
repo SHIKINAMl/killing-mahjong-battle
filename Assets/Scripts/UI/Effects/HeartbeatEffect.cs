@@ -154,7 +154,7 @@ namespace KillingMahjong.UI.Effects
             while (t < fadeDuration)
             {
                 t += Time.deltaTime;
-                float progress = Mathf.Clamp01(t / fadeDuration);
+                float progress = Mathf.Clamp01(PresentationTiming.Sample(t) / fadeDuration);
 
                 // SmoothStep でじんわり立ち上げる
                 float eased = progress * progress * (3f - 2f * progress);

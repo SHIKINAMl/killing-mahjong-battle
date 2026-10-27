@@ -225,7 +225,7 @@ namespace KillingMahjong.UI
             while (elapsed < duration)
             {
                 elapsed += Time.deltaTime;
-                float t = Mathf.Clamp01(elapsed / duration);
+                float t = Mathf.Clamp01(PresentationTiming.Sample(elapsed) / duration);
                 t = 1f - Mathf.Pow(1f - t, 3f);
 
                 foreach (var slot in targetPositions.Keys)

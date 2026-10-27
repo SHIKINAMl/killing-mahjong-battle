@@ -71,11 +71,14 @@ namespace KillingMahjong.UI
             baseScale = transform.localScale;
         }
 
+        private int presentationFrame = -1;
+
         private void LateUpdate()
         {
             if (!playing) return;
 
             phase += Time.deltaTime / Mathf.Max(0.1f, cycleSeconds);
+            if (!PresentationTiming.IsNewFrame(ref presentationFrame, Time.time)) return;
             Shape(Frac(phase), out float sy, out float lift);
             float sx = 1f / Mathf.Max(0.5f, sy); // 体積を保つように横へ広がる
 

@@ -132,7 +132,7 @@ namespace KillingMahjong.UI.Effects
             {
                 t += Time.unscaledDeltaTime;
                 if (_image == null) yield break;
-                _image.color = new Color(1f, 1f, 1f, Mathf.Clamp01(t / SceneBreakRise));
+                _image.color = new Color(1f, 1f, 1f, Mathf.Clamp01(PresentationTiming.Sample(t) / SceneBreakRise));
                 yield return null;
             }
 
@@ -151,7 +151,7 @@ namespace KillingMahjong.UI.Effects
             {
                 t += Time.unscaledDeltaTime;
                 if (_image == null) yield break;
-                float u = Mathf.Clamp01(t / SceneBreakFade);
+                float u = Mathf.Clamp01(PresentationTiming.Sample(t) / SceneBreakFade);
                 _image.color = new Color(1f, 1f, 1f, Mathf.Pow(1f - u, fadeGamma));
                 yield return null;
             }
@@ -199,7 +199,7 @@ namespace KillingMahjong.UI.Effects
             while (fadeElapsed < fadeDuration)
             {
                 fadeElapsed += Time.unscaledDeltaTime;
-                float t = Mathf.Clamp01(fadeElapsed / fadeDuration);
+                float t = Mathf.Clamp01(PresentationTiming.Sample(fadeElapsed) / fadeDuration);
                 float alpha = _peakAlpha * Mathf.Pow(1f - t, 3f);
                 if (_image == null) break;
                 _image.color = new Color(_color.r, _color.g, _color.b, alpha);

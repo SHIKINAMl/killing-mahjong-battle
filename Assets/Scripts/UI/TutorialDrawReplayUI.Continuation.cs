@@ -46,7 +46,8 @@ namespace KillingMahjong.UI
             // 「滑稽すぎる」とプランナーに言われ、倒れ伏した絵に替えた）
             for (float t = 0; t < 1f; t += Time.unscaledDeltaTime / .35f)
             {
-                float p = Mathf.Clamp01(t * t);
+                float pose = PresentationTiming.Sample(t * .35f) / .35f;
+                float p = Mathf.Clamp01(pose * pose);
                 senior.anchoredPosition = start + new Vector2(-30f, -60f) * p;
                 senior.localRotation = Quaternion.Euler(0, 0, 16f * p);
                 yield return null;
@@ -62,7 +63,7 @@ namespace KillingMahjong.UI
                 for (float t = 0; t < 1f; t += Time.unscaledDeltaTime / .14f)
                 {
                     // 落ちた勢いで一度だけ沈む
-                    senior.anchoredPosition = FallenPosition + new Vector2(0f, 14f * (1f - Mathf.Clamp01(t)));
+                    senior.anchoredPosition = FallenPosition + new Vector2(0f, 14f * (1f - PresentationTiming.Progress(t * .14f, .14f)));
                     yield return null;
                 }
                 senior.anchoredPosition = FallenPosition;

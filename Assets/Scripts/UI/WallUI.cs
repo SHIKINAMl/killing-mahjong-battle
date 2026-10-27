@@ -188,7 +188,7 @@ namespace KillingMahjong.UI
             for (float t = 0f; t < QuietFadeSeconds; t += Time.unscaledDeltaTime)
             {
                 if (quietGroup == null) yield break;
-                quietGroup.alpha = Mathf.Lerp(from, to, t / QuietFadeSeconds);
+                quietGroup.alpha = Mathf.Lerp(from, to, PresentationTiming.Sample(t) / QuietFadeSeconds);
                 yield return null;
             }
             if (quietGroup != null) quietGroup.alpha = to;

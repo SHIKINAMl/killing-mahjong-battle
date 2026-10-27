@@ -460,7 +460,7 @@ namespace KillingMahjong.UI
 
             while (elapsed < duration && obj != null && rt != null)
             {
-                float progress = elapsed / duration;
+                float progress = PresentationTiming.Sample(elapsed) / duration;
                 float x = Mathf.Lerp(startX, endX, progress);
                 rt.anchoredPosition = new Vector2(x, rt.anchoredPosition.y);
 

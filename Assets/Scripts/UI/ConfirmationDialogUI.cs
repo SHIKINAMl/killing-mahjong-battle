@@ -445,7 +445,7 @@ namespace KillingMahjong.UI
             while (elapsed < duration)
             {
                 elapsed += Time.unscaledDeltaTime;
-                float alpha = Mathf.Lerp(1f, 0f, elapsed / duration);
+                float alpha = Mathf.Lerp(1f, 0f, PresentationTiming.Sample(elapsed) / duration);
                 flashImg.color = new Color(1f, 1f, 1f, alpha);
                 yield return null;
             }

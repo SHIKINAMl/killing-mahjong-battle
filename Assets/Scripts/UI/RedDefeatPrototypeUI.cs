@@ -187,7 +187,7 @@ namespace KillingMahjong.UI
             while (elapsed < duration)
             {
                 elapsed += Time.unscaledDeltaTime;
-                apply(Mathf.Clamp01(elapsed / duration));
+                apply(Mathf.Clamp01(PresentationTiming.Sample(elapsed) / duration));
                 yield return null;
             }
             apply(1);

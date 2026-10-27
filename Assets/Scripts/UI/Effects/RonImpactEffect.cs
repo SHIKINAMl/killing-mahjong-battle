@@ -132,7 +132,7 @@ namespace KillingMahjong.UI.Effects
             float t = 0f;
             while (t < SlamSeconds)
             {
-                float k = t / SlamSeconds;
+                float k = PresentationTiming.Sample(t) / SlamSeconds;
                 callout.localScale = Vector3.one * Mathf.Lerp(SlamFromScale, 1f, k * k);
                 t += Time.deltaTime;
                 yield return null;
@@ -148,13 +148,13 @@ namespace KillingMahjong.UI.Effects
             t = 0f;
             while (t < rest && callout != null)
             {
-                float k = Mathf.Clamp01(t / rest);
+                float k = Mathf.Clamp01(PresentationTiming.Sample(t) / rest);
                 // 少し行き過ぎてから戻る
-                float settle = Mathf.Clamp01(t / 0.16f);
+                float settle = Mathf.Clamp01(PresentationTiming.Sample(t) / 0.16f);
                 float over = Mathf.Sin(settle * Mathf.PI) * 0.08f;
                 callout.localScale = Vector3.Lerp(new Vector3(1.12f, 0.86f, 1f), Vector3.one, settle) + Vector3.one * over;
-                if (inner != null) inner.color = Color.Lerp(Color.white, innerColor, Mathf.Clamp01(t / 0.12f));
-                if (lines != null) lines.Progress = Mathf.Lerp(1f, 0f, Mathf.Clamp01(t / 0.5f));
+                if (inner != null) inner.color = Color.Lerp(Color.white, innerColor, Mathf.Clamp01(PresentationTiming.Sample(t) / 0.12f));
+                if (lines != null) lines.Progress = Mathf.Lerp(1f, 0f, Mathf.Clamp01(PresentationTiming.Sample(t) / 0.5f));
 
                 // 震えはコマ打ち（毎秒15回）
                 if (t >= nextJitter)
@@ -195,7 +195,7 @@ namespace KillingMahjong.UI.Effects
             hand.anchoredPosition = new Vector2(0, start);
             for (float elapsed = 0; elapsed < HandFrameSeconds; elapsed += Time.deltaTime)
             {
-                float progress = Mathf.Clamp01(elapsed / HandRiseSeconds);
+                float progress = Mathf.Clamp01(PresentationTiming.Sample(elapsed) / HandRiseSeconds);
                 float eased = 1 - Mathf.Pow(1 - progress, 3);
                 hand.anchoredPosition = new Vector2(0, Mathf.Round(Mathf.Lerp(start, 0, eased)));
                 yield return null;
@@ -357,7 +357,7 @@ namespace KillingMahjong.UI.Effects
             while (elapsed < HpShakeSeconds && target != null)
             {
                 elapsed += Time.deltaTime;
-                float progress = Mathf.Clamp01(elapsed / HpShakeSeconds);
+                float progress = Mathf.Clamp01(PresentationTiming.Sample(elapsed) / HpShakeSeconds);
                 float decay = 1f - progress;
                 float offset = Mathf.Sin(progress * Mathf.PI * 8f) * amplitude * decay;
                 var shake = new Vector2(offset, -offset * 0.35f);

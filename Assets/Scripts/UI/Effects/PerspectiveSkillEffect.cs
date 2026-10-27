@@ -115,7 +115,7 @@ namespace KillingMahjong.UI.Effects
             while (t < EnterDuration)
             {
                 t += Time.deltaTime;
-                float u = Mathf.Clamp01(t / EnterDuration);
+                float u = Mathf.Clamp01(PresentationTiming.Sample(t) / EnterDuration);
 
                 // 端をなめらかに。パッと出すと「絵が差し替わった」ように見える
                 float eased = u * u * (3f - 2f * u);

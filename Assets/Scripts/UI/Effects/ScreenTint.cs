@@ -118,7 +118,7 @@ namespace KillingMahjong.UI.Effects
             while (t < seconds)
             {
                 t += Time.unscaledDeltaTime;
-                float u = Mathf.Clamp01(t / seconds);
+                float u = Mathf.Clamp01(PresentationTiming.Sample(t) / seconds);
                 u = u * u * (3f - 2f * u);
                 _current = Color.Lerp(from, target, u);
                 if (_image != null) _image.color = _current;

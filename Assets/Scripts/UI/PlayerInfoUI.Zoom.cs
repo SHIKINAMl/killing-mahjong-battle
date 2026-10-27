@@ -83,7 +83,7 @@ namespace KillingMahjong.UI
             float t = 0;
             while (t < duration)
             {
-                float progress = t / duration;
+                float progress = PresentationTiming.Sample(t) / duration;
                 float eased = progress * progress * (3f - 2f * progress); // 滑らかに
 
                 targetObj.localPosition = Vector3.Lerp(originalLocalPos, targetPos, eased);
@@ -133,7 +133,7 @@ namespace KillingMahjong.UI
             float t = 0;
             while (t < duration)
             {
-                float progress = t / duration;
+                float progress = PresentationTiming.Sample(t) / duration;
                 float eased = progress * progress * (3f - 2f * progress);
 
                 targetObj.localPosition = Vector3.Lerp(startPos, originalLocalPos, eased);

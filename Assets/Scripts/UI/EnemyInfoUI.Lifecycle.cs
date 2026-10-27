@@ -122,7 +122,7 @@ namespace KillingMahjong.UI
             while (elapsed < duration)
             {
                 elapsed += Time.deltaTime;
-                float p = Mathf.Clamp01(elapsed / duration);
+                float p = Mathf.Clamp01(PresentationTiming.Sample(elapsed) / duration);
                 // 落下は加速させる（等速だと「沈んでいく」ように見えて力が抜ける）
                 body.position = Vector3.Lerp(start, end, p * p);
                 yield return null;

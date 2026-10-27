@@ -59,6 +59,7 @@ namespace KillingMahjong.UI
         private Quaternion initialRotation;
         private Vector3 initialScale; // 追加：初期スケール
         private float randomOffset;
+        private int presentationFrame = -1;
 
         private void Start()
         {
@@ -79,6 +80,7 @@ namespace KillingMahjong.UI
                 return;
             }
 
+            if (!PresentationTiming.IsNewFrame(ref presentationFrame, Time.time)) return;
             float phaseY, phaseX;
             if (!TryGetMusicPhase(out phaseY, out phaseX))
             {

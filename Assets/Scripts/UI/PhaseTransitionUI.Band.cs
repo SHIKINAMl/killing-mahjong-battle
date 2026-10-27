@@ -29,14 +29,14 @@ namespace KillingMahjong.UI
         /// **動きはコマ打ちにする（2026-10-25 のユーザー指示「動きがヌルっとしすぎてAIっぽい。少しドットっぽく動いて」）。**
         /// 毎フレームなめらかに動かさず、1秒に 12 コマだけ絵を変えて、その間は止める。
         /// </summary>
-        internal const float PixelFps = 12f;
+        internal const float PixelFps = PresentationTiming.MotionFps;
 
         /// <summary>時間をコマの頭にそろえる。</summary>
-        internal static float StepTime(float t) => Mathf.Floor(t * PixelFps) / PixelFps;
+        internal static float StepTime(float t) => PresentationTiming.Sample(t);
 
         /// <summary>文字だけ更新を細かくし、黒帯のコマ打ちは保つ。</summary>
-        internal const float TextFps = 24f;
-        internal static float StepTextTime(float t) => Mathf.Floor(t * TextFps) / TextFps;
+        internal const float TextFps = PresentationTiming.TextFps;
+        internal static float StepTextTime(float t) => PresentationTiming.Sample(t, TextFps);
 
         private const float BandTextFadeIn = .10f;
 

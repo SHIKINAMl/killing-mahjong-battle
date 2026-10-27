@@ -899,7 +899,7 @@ namespace KillingMahjong.UI
 
             while (t < impactDuration)
             {
-                float progress = t / impactDuration;
+                float progress = PresentationTiming.Sample(t) / impactDuration;
                 // 「下からばっ！と突き上げる」ので、最初に速く動いて着地で減速するイーズアウトを使う。
                 // ここを Pow(progress, 3f) のイーズインにすると、移動距離が 3000px あるぶん
                 // 序盤は画面外でほとんど動いて見えず、最後の3割で一気に飛び込む。
@@ -946,7 +946,7 @@ namespace KillingMahjong.UI
             float outDuration = 0.2f;
             while (t < outDuration)
             {
-                float progress = t / outDuration;
+                float progress = PresentationTiming.Sample(t) / outDuration;
                 float easeIn = progress * progress * progress;
 
                 dimmerImg.color = new Color(0, 0, 0, 0.85f * (1f - progress));

@@ -101,9 +101,12 @@ namespace KillingMahjong.UI
             }
         }
 
+        private int presentationFrame = -1;
+
         private void ApplyVisuals()
         {
-            float time = Time.unscaledTime;
+            if (!PresentationTiming.IsNewFrame(ref presentationFrame, Time.unscaledTime)) return;
+            float time = PresentationTiming.Sample(Time.unscaledTime);
             float bobAmplitude = State == WalkerState.Walk ? 4f : 1.8f;
             float bobSpeed = State == WalkerState.Walk ? 8f : 2.5f;
             Vector2 visualPosition = basePosition + Vector2.up * Mathf.Sin(time * bobSpeed) * bobAmplitude;

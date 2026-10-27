@@ -80,7 +80,7 @@ namespace KillingMahjong.UI
             {
                 if (target == null) yield break;
 
-                float progress = Mathf.Clamp01(elapsed / OpponentTurnTransitionSeconds);
+                float progress = Mathf.Clamp01(PresentationTiming.Sample(elapsed) / OpponentTurnTransitionSeconds);
                 float eased = progress * progress * (3f - 2f * progress);
                 target.localScale = Vector3.Lerp(startScale, targetScale, eased);
                 yield return null;
@@ -136,7 +136,7 @@ namespace KillingMahjong.UI
             float t = 0;
             while (t < duration)
             {
-                float progress = t / duration;
+                float progress = PresentationTiming.Sample(t) / duration;
                 float eased = progress * progress * (3f - 2f * progress);
 
                 targetObj.localPosition = Vector3.Lerp(originalLocalPos, targetPos, eased);
@@ -162,7 +162,7 @@ namespace KillingMahjong.UI
             float t = 0;
             while (t < duration)
             {
-                float progress = t / duration;
+                float progress = PresentationTiming.Sample(t) / duration;
                 float eased = progress * progress * (3f - 2f * progress);
 
                 targetObj.localPosition = Vector3.Lerp(startPos, originalLocalPos, eased);

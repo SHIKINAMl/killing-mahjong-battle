@@ -193,6 +193,7 @@ namespace KillingMahjong.UI.Effects
             elapsed += dt;
 
             // 筋の先頭と尻尾（経路上の位置 0〜1）
+            elapsed = PresentationTiming.Sample(elapsed);
             float head = Mathf.Clamp01(elapsed / TravelSeconds);
             float tail = Mathf.Clamp01((elapsed - pourSeconds) / TravelSeconds);
             head = 1f - (1f - head) * (1f - head);   // 出だしは勢いよく

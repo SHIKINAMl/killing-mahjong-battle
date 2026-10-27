@@ -151,11 +151,11 @@ namespace KillingMahjong.UI
         {
             _flashText.text = msg;
             float t = 0f;
-            while (t < 0.15f) { t += Time.deltaTime; SetFlashAlpha(t / 0.15f); yield return null; }
+            while (t < 0.15f) { t += Time.deltaTime; SetFlashAlpha(PresentationTiming.Sample(t) / 0.15f); yield return null; }
             SetFlashAlpha(1f);
             yield return new WaitForSeconds(1.4f);
             t = 0f;
-            while (t < 0.5f) { t += Time.deltaTime; SetFlashAlpha(1f - t / 0.5f); yield return null; }
+            while (t < 0.5f) { t += Time.deltaTime; SetFlashAlpha(1f - PresentationTiming.Sample(t) / 0.5f); yield return null; }
             SetFlashAlpha(0f);
             _flashRoutine = null;
         }

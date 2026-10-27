@@ -35,7 +35,7 @@ namespace KillingMahjong.UI
             t = 0;
             while (t < checkerFadeDuration)
             {
-                if (checkerMaterial != null) checkerMaterial.SetFloat("_Progress", t / checkerFadeDuration);
+                if (checkerMaterial != null) checkerMaterial.SetFloat("_Progress", PresentationTiming.Sample(t) / checkerFadeDuration);
                 t += Time.deltaTime;
                 yield return null;
             }

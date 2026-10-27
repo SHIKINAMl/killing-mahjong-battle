@@ -69,7 +69,7 @@ namespace KillingMahjong.UI
             var radii = new float[BloodLobes.Length];
             for (float t = 0f; stain != null; t += Time.unscaledDeltaTime)
             {
-                DrawBlood(stain, grid, radii, t);
+                DrawBlood(stain, grid, radii, PresentationTiming.Sample(t));
                 yield return null;
             }
         }

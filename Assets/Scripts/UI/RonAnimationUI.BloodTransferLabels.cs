@@ -128,7 +128,7 @@ namespace KillingMahjong.UI
             for (float t = 0; t < appear; t += Time.deltaTime)
             {
                 if (rt == null) yield break;
-                float p = Mathf.Clamp01(t / appear);
+                float p = Mathf.Clamp01(PresentationTiming.Sample(t) / appear);
                 text.alpha = p;
                 rt.localScale = Vector3.one * Mathf.Lerp(1.4f, 1f, 1f - Mathf.Pow(1f - p, 3f));
                 rt.position = basePos + new Vector3(0f, Mathf.Lerp(-10f, 0f, p), 0f);

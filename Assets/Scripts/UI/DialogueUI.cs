@@ -665,7 +665,7 @@ namespace KillingMahjong.UI
         {
             if (target == null) return;
             var c = target.color;
-            c.a = Mathf.Lerp(0.25f, 1f, (Mathf.Sin(Time.unscaledTime / cycle * Mathf.PI * 2f) + 1f) * 0.5f);
+            c.a = Mathf.Lerp(0.25f, 1f, (Mathf.Sin(PresentationTiming.Sample(Time.unscaledTime) / cycle * Mathf.PI * 2f) + 1f) * 0.5f);
             target.color = c;
         }
     }

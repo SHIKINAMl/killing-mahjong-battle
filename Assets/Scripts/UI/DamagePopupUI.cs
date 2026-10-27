@@ -93,10 +93,10 @@ namespace KillingMahjong.UI
             while (timer < Duration)
             {
                 timer += Time.unscaledDeltaTime;
-                float enter = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(timer / .10f));
-                float rise = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((timer - .45f) / .70f));
+                float enter = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(PresentationTiming.Sample(timer) / .10f));
+                float rise = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((PresentationTiming.Sample(timer) - .45f) / .70f));
                 rt.anchoredPosition = startPos + Vector2.up * Mathf.Round(-6f * (1f - enter) + Rise * rise);
-                group.alpha = 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((timer - .80f) / .35f));
+                group.alpha = 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((PresentationTiming.Sample(timer) - .80f) / .35f));
                 yield return null;
             }
             Destroy(gameObject);

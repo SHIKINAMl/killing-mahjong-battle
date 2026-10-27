@@ -246,7 +246,7 @@ namespace KillingMahjong.UI.Effects
             // ---- ① 暗転しながら、役名が横から滑り込む（牌交換の OUT の文字と同じ動き）----
             for (float t = 0f; t < SlideSeconds; t += Time.deltaTime)
             {
-                float p = Mathf.Sin(Mathf.Clamp01(t / SlideSeconds) * Mathf.PI * 0.5f);
+                float p = Mathf.Sin(Mathf.Clamp01(PresentationTiming.Sample(t) / SlideSeconds) * Mathf.PI * 0.5f);
                 dim.color = new Color(0f, 0f, 0f, DimAlpha * p);
                 nameText.rectTransform.anchoredPosition = Vector2.Lerp(namePos + new Vector2(-50f, 0f), namePos, p);
                 nameText.alpha = p;
@@ -287,11 +287,11 @@ namespace KillingMahjong.UI.Effects
                 for (float t = 0f; t < 0.3f; t += Time.deltaTime)
                 {
                     // ベルルと板の文字が一度ふくらむ。目の光が輪になって広がる
-                    float pop = t < PopSeconds ? Mathf.PingPong(t * (1f / (PopSeconds / 2f)), 1f) : 0f;
+                    float pop = t < PopSeconds ? Mathf.PingPong(PresentationTiming.Sample(t) * (1f / (PopSeconds / 2f)), 1f) : 0f;
                     if (figure == powered) figure.rectTransform.localScale = Vector3.one * Mathf.Lerp(1f, 1.12f, pop);
                     plusText.rectTransform.localScale = Vector3.one * Mathf.Lerp(1f, 1.3f, pop);
 
-                    float q = Mathf.Clamp01(t / 0.3f);
+                    float q = Mathf.Clamp01(PresentationTiming.Sample(t) / 0.3f);
                     Color ring = DemonYellow;
                     ring.a = (1f - q) * 0.9f;
                     sparks.Begin();
@@ -311,7 +311,7 @@ namespace KillingMahjong.UI.Effects
                 float grow = newText.fontSize / plusText.fontSize;
                 for (float t = 0f; t < GrantSeconds; t += Time.deltaTime)
                 {
-                    float p = Mathf.Clamp01(t / GrantSeconds);
+                    float p = Mathf.Clamp01(PresentationTiming.Sample(t) / GrantSeconds);
                     float eased = p * p;                       // 出だしはゆっくり、落ちるように速く
                     plusText.rectTransform.anchoredPosition = Vector2.Lerp(signPos, newPos, eased);
                     plusText.rectTransform.localScale = Vector3.one * Mathf.Lerp(1f, grow, eased);
@@ -342,10 +342,10 @@ namespace KillingMahjong.UI.Effects
                 // 着いた所から輪が広がり、新しい翻数が一度ふくらむ
                 for (float t = 0f; t < 0.25f; t += Time.deltaTime)
                 {
-                    float pop = t < PopSeconds ? Mathf.PingPong(t * (1f / (PopSeconds / 2f)), 1f) : 0f;
+                    float pop = t < PopSeconds ? Mathf.PingPong(PresentationTiming.Sample(t) * (1f / (PopSeconds / 2f)), 1f) : 0f;
                     newText.rectTransform.localScale = Vector3.one * Mathf.Lerp(1f, 1.3f, pop);
 
-                    float q = Mathf.Clamp01(t / 0.25f);
+                    float q = Mathf.Clamp01(PresentationTiming.Sample(t) / 0.25f);
                     Color ring = DemonYellow;
                     ring.a = (1f - q) * 0.9f;
                     sparks.Begin();
@@ -363,7 +363,7 @@ namespace KillingMahjong.UI.Effects
                 if (audio != null) audio.PlayBoostSE(1.12f, 0.6f);
                 for (float t = 0f; t < DropSeconds; t += Time.deltaTime)
                 {
-                    float p = Mathf.Sin(Mathf.Clamp01(t / DropSeconds) * Mathf.PI * 0.5f);
+                    float p = Mathf.Sin(Mathf.Clamp01(PresentationTiming.Sample(t) / DropSeconds) * Mathf.PI * 0.5f);
                     newText.rectTransform.anchoredPosition = Vector2.Lerp(newPos + new Vector2(0f, 420f), newPos, p);
                     newText.alpha = p;
                     arrowText.alpha = p;
@@ -377,7 +377,7 @@ namespace KillingMahjong.UI.Effects
                 // 降りきったら一度ふくらむ（透視で牌を返した瞬間と同じ）
                 for (float t = 0f; t < PopSeconds; t += Time.deltaTime)
                 {
-                    float s = Mathf.Lerp(1f, 1.3f, Mathf.PingPong(t * (1f / (PopSeconds / 2f)), 1f));
+                    float s = Mathf.Lerp(1f, 1.3f, Mathf.PingPong(PresentationTiming.Sample(t) * (1f / (PopSeconds / 2f)), 1f));
                     newText.rectTransform.localScale = Vector3.one * s;
                     yield return null;
                 }
@@ -402,7 +402,7 @@ namespace KillingMahjong.UI.Effects
 
                 for (float t = 0f; t < FlySeconds; t += Time.deltaTime)
                 {
-                    float p = Mathf.Clamp01(t / FlySeconds);
+                    float p = Mathf.Clamp01(PresentationTiming.Sample(t) / FlySeconds);
                     float eased = p * p;                       // 出だしはゆっくり、吸い込まれるように速く
                     nameText.rectTransform.anchoredPosition = Vector2.Lerp(namePos, nameTo, eased);
                     nameText.rectTransform.localScale = Vector3.one * Mathf.Lerp(1f, nameShrink, eased);
@@ -436,13 +436,13 @@ namespace KillingMahjong.UI.Effects
 
                     // 枠が一度ふくらむ（透視で牌を返した瞬間と同じ）。
                     // 白い光が引いてからでないと見えないので、少し遅らせる
-                    float popAt = t - ChipPopDelay;
+                    float popAt = PresentationTiming.Sample(t) - ChipPopDelay;
                     float pop = popAt >= 0f && popAt < ChipPopSeconds ? Mathf.PingPong(popAt * (1f / (ChipPopSeconds / 2f)), 1f) : 0f;
                     chip.localScale = _chipScale * Mathf.Lerp(1f, 1.4f, pop);
 
                     // 黄色く明滅する（透視の「見えた牌の明滅」と同じ色・同じ速さ）
                     Rect at = SkillEffectStage.Expand(_stage.LocalRectOf(chip), 2f);
-                    float blink = Mathf.PingPong(t * 3f, 1f);
+                    float blink = Mathf.PingPong(PresentationTiming.Sample(t) * 3f, 1f);
                     Color edge = GlowColor;
                     Color face = GlowColor;
                     face.a = 0.45f * blink;
@@ -472,15 +472,15 @@ namespace KillingMahjong.UI.Effects
             // 何が強まったかを、戻った画面の上でもう一度見せる（透視の「見えた牌の明滅」と同じ）
             for (float t = 0f; t < GlowSeconds; t += Time.deltaTime)
             {
-                Color c = Color.Lerp(Color.white, GlowColor, Mathf.PingPong(t * 3f, 1f));
+                Color c = Color.Lerp(Color.white, GlowColor, Mathf.PingPong(PresentationTiming.Sample(t) * 3f, 1f));
                 nameText.color = c;
-                newText.color = Color.Lerp(InColor, GlowColor, Mathf.PingPong(t * 3f, 1f));
+                newText.color = Color.Lerp(InColor, GlowColor, Mathf.PingPong(PresentationTiming.Sample(t) * 3f, 1f));
                 yield return null;
             }
 
             for (float t = 0f; t < 0.25f; t += Time.deltaTime)
             {
-                float a = 1f - Mathf.Clamp01(t / 0.25f);
+                float a = 1f - Mathf.Clamp01(PresentationTiming.Sample(t) / 0.25f);
                 nameText.alpha = a;
                 newText.alpha = a;
                 arrowText.alpha = a;

@@ -26,7 +26,7 @@ namespace KillingMahjong.UI
             while(t < 0.3f)
             {
                 t += Time.deltaTime;
-                float progress = t / 0.3f;
+                float progress = PresentationTiming.Sample(t) / 0.3f;
                 promptText.color = new Color(1, 1, 1, progress);
                 tmpRt.localScale = Vector3.Lerp(new Vector3(1.5f, 1.5f, 1f), Vector3.one, progress);
                 yield return null;
@@ -42,7 +42,7 @@ namespace KillingMahjong.UI
             while(t < 0.3f)
             {
                 t += Time.deltaTime;
-                float progress = t / 0.3f;
+                float progress = PresentationTiming.Sample(t) / 0.3f;
                 promptText.color = new Color(1, 1, 1, 1f - progress);
                 yield return null;
             }

@@ -240,7 +240,7 @@ namespace KillingMahjong.UI
         {
             for (float t = 0f; t < seconds; t += Time.unscaledDeltaTime)
             {
-                apply(Mathf.Clamp01(t / seconds));
+                apply(Mathf.Clamp01(PresentationTiming.Sample(t) / seconds));
                 yield return null;
             }
             apply(1f);
@@ -250,7 +250,7 @@ namespace KillingMahjong.UI
         private float BrightenAmount()
         {
             if (!brightening) return 0f;
-            return Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((Time.unscaledTime - brighteningSince) / BrightenSeconds));
+            return Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(PresentationTiming.Sample(Time.unscaledTime - brighteningSince) / BrightenSeconds));
         }
 
         /// <summary>地が暗いうちは白い字、明るくなるにつれて黒い字へ。どの明るさでも読めるようにする。</summary>
@@ -268,7 +268,7 @@ namespace KillingMahjong.UI
             }
             if (floating && beruru != null)
                 beruru.rectTransform.anchoredPosition = new Vector2(0f,
-                    SkillEffectStage.Snap(100f + 6f * Mathf.Sin((Time.unscaledTime - floatStartedAt) * 2f)));
+                    SkillEffectStage.Snap(100f + 6f * Mathf.Sin(PresentationTiming.Sample(Time.unscaledTime - floatStartedAt) * 2f)));
         }
 
         public void Close()

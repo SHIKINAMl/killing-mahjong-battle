@@ -302,7 +302,7 @@ namespace KillingMahjong.UI
 
             while (elapsed < duration)
             {
-                float progress = duration <= 0f ? 1f : elapsed / duration;
+                float progress = duration <= 0f ? 1f : PresentationTiming.Sample(elapsed) / duration;
                 float eased = progress * progress * (3f - 2f * progress);
                 hpBarPanel.anchoredPosition = Vector2.Lerp(startPos, targetPos, eased);
                 elapsed += Time.deltaTime;

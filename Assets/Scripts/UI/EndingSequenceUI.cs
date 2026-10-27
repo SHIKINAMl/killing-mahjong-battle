@@ -80,7 +80,7 @@ namespace KillingMahjong.UI
                 yield return null;
                 // 読み込みなどで1フレーム止まっても、一瞬で表示完了に飛ばさない。
                 elapsed += Mathf.Min(Time.unscaledDeltaTime, 1f / 30f);
-                SetResultTitleAlpha(Mathf.SmoothStep(0f, 1f, elapsed / ResultFadeDuration));
+                SetResultTitleAlpha(Mathf.SmoothStep(0f, 1f, PresentationTiming.Sample(elapsed) / ResultFadeDuration));
             }
             SetResultTitleAlpha(1f);
             resultFade = null;

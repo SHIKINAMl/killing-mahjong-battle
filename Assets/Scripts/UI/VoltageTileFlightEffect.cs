@@ -241,7 +241,7 @@ namespace KillingMahjong.UI
 
             foreach (var particle in _particles)
             {
-                float normalizedTime = (_elapsed - particle.Delay) / FlightDuration;
+                float normalizedTime = PresentationTiming.Sample(_elapsed - particle.Delay) / FlightDuration;
                 if (normalizedTime <= 0f)
                 {
                     particle.Image.color = new Color(1f, 0.78f, 0.20f, 0f);
@@ -272,7 +272,7 @@ namespace KillingMahjong.UI
         {
             if (_arrivalSpark == null) return;
 
-            float normalizedTime = Mathf.Clamp01((_elapsed - _arrivalTime + 0.12f) / 0.22f);
+            float normalizedTime = Mathf.Clamp01(PresentationTiming.Sample(_elapsed - _arrivalTime + 0.12f) / 0.22f);
             float alpha = normalizedTime <= 0f ? 0f : (1f - normalizedTime) * 0.95f;
             float size = Mathf.Lerp(16f, 72f, normalizedTime);
 

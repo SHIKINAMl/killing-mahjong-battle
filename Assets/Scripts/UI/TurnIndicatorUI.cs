@@ -93,7 +93,7 @@ namespace KillingMahjong.UI
             if (!isInitialized || textMesh == null) return;
 
             // ネオンのように明滅させるアニメーション（サイン波）
-            float t = (Mathf.Sin(Time.time * blinkSpeed) + 1f) / 2f; // 0.0 ~ 1.0
+            float t = (Mathf.Sin(PresentationTiming.Sample(Time.time) * blinkSpeed) + 1f) / 2f; // 0.0 ~ 1.0
             float currentAlpha = Mathf.Lerp(minAlpha, maxAlpha, t);
 
             Color targetColor = isLocalTurn ? localTurnColor : enemyTurnColor;

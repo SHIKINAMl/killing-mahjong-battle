@@ -68,7 +68,7 @@ namespace KillingMahjong.UI
             while (elapsed < duration)
             {
                 elapsed += Time.deltaTime;
-                float yOffset = Mathf.Abs(Mathf.Sin(elapsed * bounceSpeed)) * bounceHeight;
+                float yOffset = Mathf.Abs(Mathf.Sin(PresentationTiming.Sample(elapsed) * bounceSpeed)) * bounceHeight;
                 characterRenderer.transform.localPosition = originalPosition + new Vector3(0, yOffset, 0);
                 yield return null;
             }

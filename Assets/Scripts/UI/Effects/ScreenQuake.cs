@@ -154,12 +154,12 @@ namespace KillingMahjong.UI.Effects
 
                 // **終わりに向かって細くする。** 同じ幅で揺れ続けると、
                 // 止まった瞬間が不自然になる
-                float fade = 1f - Mathf.Clamp01(elapsed / seconds);
+                float fade = 1f - PresentationTiming.Progress(elapsed, seconds);
                 float amount = power * fade * fade;
 
                 // 正弦で揺らす。乱数だけだと荒れて安っぽく見えるので、
                 // 横は正弦、縦はその倍の速さにして「跳ねる」感じを出す
-                float phase = elapsed * Frequency;
+                float phase = PresentationTiming.Sample(elapsed) * Frequency;
                 float x = Mathf.Sin(phase) * amount;
                 float y = Mathf.Sin(phase * 2.1f) * amount * 0.6f;
 

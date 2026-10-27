@@ -560,7 +560,7 @@ namespace KillingMahjong.UI
             while (t < absorbDuration)
             {
                 t += Time.deltaTime;
-                float p = Mathf.Clamp01(t / absorbDuration);
+                float p = Mathf.Clamp01(PresentationTiming.Sample(t) / absorbDuration);
                 float e = p * p; // 吸い寄せられるので終わりにかけて加速させる
                 for (int i = 0; i < labels.Length; i++)
                 {
@@ -632,7 +632,7 @@ namespace KillingMahjong.UI
             while (t < dur)
             {
                 t += Time.deltaTime;
-                float p = Mathf.Clamp01(t / dur);
+                float p = Mathf.Clamp01(PresentationTiming.Sample(t) / dur);
                 p = 1f - Mathf.Pow(1f - p, 3f); // 勢いよく伸びて着地で緩める
                 fill.sizeDelta = new Vector2(Mathf.Lerp(from, target, p), fill.sizeDelta.y);
                 yield return null;

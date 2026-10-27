@@ -300,7 +300,7 @@ namespace KillingMahjong.UI
             Vector2 from = girlBody.rectTransform.anchoredPosition;
             for (float t = 0; t < 1; t += Time.unscaledDeltaTime * 5)
             {
-                SetCharacterPosition(Vector2.Lerp(from, CharacterPosition, Mathf.SmoothStep(0, 1, t)));
+                SetCharacterPosition(Vector2.Lerp(from, CharacterPosition, Mathf.SmoothStep(0, 1, PresentationTiming.Progress(t * .2f, .2f))));
                 yield return null;
             }
             SetCharacterPosition(CharacterPosition);
@@ -383,7 +383,7 @@ namespace KillingMahjong.UI
             {
                 float elapsed = Time.unscaledTime - tauntStarted;
                 // 3秒かけて一度だけ上がり、元の位置へ戻る。セリフ待ちが長くても繰り返さない。
-                float progress = Mathf.Clamp01(elapsed / 3f);
+                float progress = PresentationTiming.Progress(elapsed, 3f);
                 float offset = 6f * Mathf.Sin(Mathf.PI * Mathf.SmoothStep(0f, 1f, progress));
                 SetCharacterPosition(CharacterPosition + Vector2.up * Mathf.Round(offset));
                 if (progress >= 1f) { tauntBobbing = false; SetCharacterPosition(CharacterPosition); }

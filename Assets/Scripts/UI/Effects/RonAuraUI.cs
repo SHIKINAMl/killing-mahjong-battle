@@ -58,9 +58,9 @@ namespace KillingMahjong.UI.Effects
         private void Update()
         {
             elapsed += Time.deltaTime;
-            SetFrame(Mathf.FloorToInt(elapsed / .065f) % FrameCount);
+            SetFrame(Mathf.FloorToInt(PresentationTiming.Sample(elapsed) / .065f) % FrameCount);
             // 親のカットインや吹き出しと同時に終わる。独自の待機時間は増やさない。
-            image.color = new Color(1f, 1f, 1f, Mathf.Clamp01(elapsed / .10f));
+            image.color = new Color(1f, 1f, 1f, Mathf.Clamp01(PresentationTiming.Sample(elapsed) / .10f));
         }
 
         private void SetFrame(int frame)

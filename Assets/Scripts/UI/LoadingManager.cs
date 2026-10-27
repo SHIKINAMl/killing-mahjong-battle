@@ -189,7 +189,7 @@ namespace KillingMahjong.UI
             while (elapsed < duration)
             {
                 elapsed += Time.unscaledDeltaTime;
-                c.a = Mathf.Lerp(startAlpha, endAlpha, elapsed / duration);
+                c.a = Mathf.Lerp(startAlpha, endAlpha, PresentationTiming.Sample(elapsed) / duration);
                 fadeBgImage.color = c;
                 yield return null;
             }

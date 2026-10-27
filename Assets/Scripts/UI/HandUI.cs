@@ -191,7 +191,7 @@ namespace KillingMahjong.UI
             for (float t = 0f; t < QuietFadeSeconds; t += Time.unscaledDeltaTime)
             {
                 if (quietGroup == null) yield break;
-                quietGroup.alpha = Mathf.Lerp(from, to, t / QuietFadeSeconds);
+                quietGroup.alpha = Mathf.Lerp(from, to, PresentationTiming.Sample(t) / QuietFadeSeconds);
                 yield return null;
             }
             if (quietGroup != null) quietGroup.alpha = to;
@@ -240,7 +240,7 @@ namespace KillingMahjong.UI
             while (elapsed < BattleStartRiseDuration)
             {
                 elapsed += Time.deltaTime;
-                float progress = Mathf.Clamp01(elapsed / BattleStartRiseDuration);
+                float progress = Mathf.Clamp01(PresentationTiming.Sample(elapsed) / BattleStartRiseDuration);
                 // 終点で減速させ、着弾の揺れのあとに手牌だけが跳ねないようにする。
                 progress = 1f - (1f - progress) * (1f - progress);
                 if (target != null)

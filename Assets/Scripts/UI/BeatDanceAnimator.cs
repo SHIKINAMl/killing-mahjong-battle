@@ -128,6 +128,7 @@ namespace KillingMahjong.UI
                 // 拍の途中から動き出したときは弾ませない（拍の頭でないところで跳ねて見える）
                 if (!first) popStart = Time.time;
             }
+            if (!PresentationTiming.IsNewFrame(ref presentationFrame, Time.time)) return;
             ApplyPop();
             ApplyOffset(beats);
         }
@@ -146,6 +147,8 @@ namespace KillingMahjong.UI
             lastBeat = int.MinValue;
             swayStartBeat = double.NaN;
         }
+
+        private int presentationFrame = -1;
 
         private void ApplyPop()
         {

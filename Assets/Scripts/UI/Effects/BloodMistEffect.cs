@@ -149,11 +149,14 @@ namespace KillingMahjong.UI.Effects
             return new Vector2(Mathf.Round(p.x / g) * g, Mathf.Round(p.y / g) * g);
         }
 
+        private int presentationFrame = -1;
+
         private void Update()
         {
             if (!running) return;
             float dt = Time.deltaTime;
             elapsed += dt;
+            bool render = PresentationTiming.IsNewFrame(ref presentationFrame, elapsed);
             int alive = 0;
             int frame = Mathf.FloorToInt(elapsed * BlinkRate);
 
@@ -189,7 +192,7 @@ namespace KillingMahjong.UI.Effects
                 // 消えぎわは点滅させながら消す（半透明にはしない）
                 bool shown = f < BlinkFrom || ((frame + m.Phase) & 1) == 0;
                 if (m.Img.gameObject.activeSelf != shown) m.Img.gameObject.SetActive(shown);
-                if (shown)
+                if (shown && render)
                 {
                     float px = m.Sparkle ? 3f * Grid : m.Size * Grid;
                     m.Img.rectTransform.sizeDelta = new Vector2(px, px);
