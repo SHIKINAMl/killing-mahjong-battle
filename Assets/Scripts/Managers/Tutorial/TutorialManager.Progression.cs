@@ -30,11 +30,6 @@ namespace KillingMahjong.Managers
                 PlayerPrefs.Save();
             }
 
-            // 相手の血が尽きているなら、倒れる演出を挟んでから締めのセリフへ
-            yield return StartCoroutine(RunEnemyDeath());
-
-            yield return StartCoroutine(PlayLines(_scenario.endingLines));
-
             // 幕切れで灰をかけているので、必ず抜いてから移る（2026-09-12）。
             // ScreenTint は DontDestroyOnLoad で生き残るため、抜かないとタイトルが灰色のままになる。
             Tutorial.TutorialAudioDirector.ResetVisuals();
@@ -43,29 +38,6 @@ namespace KillingMahjong.Managers
             // 終わったらタイトルではなくデバッグ部屋へ移し、対局を選ぶ画面を開く（2026-10-23 ユーザー指示）
             TutorialNavigation.Complete(TutorialNavigation.OpenMatchMenuInRoom);
             SceneManager.LoadScene(TutorialNavigation.DebugRoomSceneName);
-        }
-
-        /// <summary>
-        /// 決着したあと、相手が倒れるところを見せる。
-        ///
-        /// 盤面（手牌・山牌・河・HPパネル）を先に片付けて立ち絵とセリフだけにする。
-        /// 牌が残ったまま立ち絵が落ちると何が起きたのか分からない。
-        /// </summary>
-        private IEnumerator RunEnemyDeath()
-        {
-            if (_enemyHp > 0) yield break;
-
-            var enemy = gameUIManager != null ? gameUIManager.EnemyInfoUI : null;
-            if (enemy == null) yield break;
-
-            ClearGuide();
-            SetBoardVisible(false);
-            yield return new WaitForSeconds(phaseSettleTime);
-
-            yield return StartCoroutine(enemy.PlayDeathRoutine());
-
-            // 倒れ切ってから沈黙（endingLines の「…………」）を出す
-            yield return new WaitForSeconds(0.4f);
         }
 
         private const string ProgressKey = "Tutorial_LastCompletedRound";
@@ -137,7 +109,7 @@ namespace KillingMahjong.Managers
             if (_aborted) yield break;
 
             // フロー図シート3の頭。対局フェイズ①が終わって手牌選択フェイズ②へ来たところで、
-            // ゲームの流れをまとめ、資料の開き方を実際に開かせて教える。
+            // ゲームの流れをまとめ、資料への入口を画像で案内する。
             // **第2局の台本より前。** 第1局の締めくくりなので、盤面を出してから話す。
             if (IsSecondTutorialRound(data))
             {
@@ -454,7 +426,7 @@ namespace KillingMahjong.Managers
         }
 
         /// <summary>
-        /// 賭け金が持ち越されたことを伝えるセリフ。台本が空なら既定文を使う。
+        /// 台本に設定された持ち越し説明の数値を展開する。空なら会話を挟まない。
         /// </summary>
         private List<TutorialLine> ResolveInheritedBetLines(TutorialRoundData data, int inherited)
         {
@@ -470,10 +442,7 @@ namespace KillingMahjong.Managers
                 return resolved;
             }
 
-            return new List<TutorialLine>
-            {
-                new TutorialLine($"前の局は流局だったから、賭け金は{inherited}円のまま持ち越しよ。改めて賭ける必要はないわ。"),
-            };
+            return new List<TutorialLine>();
         }
 
 

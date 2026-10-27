@@ -140,11 +140,11 @@ namespace KillingMahjong.Managers
             if (discardedBaseId < 0)
                 throw new System.InvalidOperationException("チュートリアルの決着前に打牌されていません。");
             SetPhase(RoundStatus.Agari);
-            var ronData = _scenario.rounds.Count > 2 ? _scenario.rounds[2] : data;
+            var ronData = _scenario.defeatRon;
             int tile = TutorialTiles.Encode(discardedBaseId, discardedBaseId == data.doraBaseId);
-            var hand = TutorialTiles.EncodeAll(ronData.enemyRonMeldBaseIds, data.doraBaseId);
+            var hand = TutorialTiles.EncodeAll(ronData.meldBaseIds, data.doraBaseId);
             hand.Add(tile);
-            yield return PlayRonAnimation(hand, tile, ronData, false, PlayerShownHp, 0,
+            yield return PlayRonAnimation(hand, tile, ronData.ToPresentation(), false, PlayerShownHp, 0,
                 EnemyShownHp, EnemyShownHp, PlayerShownHp, suppressSettlementPanel: true);
             _playerHp = 0;
             ApplyHpToUI();

@@ -130,7 +130,7 @@ namespace KillingMahjong.UI
             {
                 resumeButton.onClick.RemoveAllListeners();
                 // 保存値は「完了した局数」なので、次の局を開始する。全局完走済みの場合は最終局から。
-                int roundIndex = Mathf.Clamp(savedProgress, 0, 4);
+                int roundIndex = KillingMahjong.Managers.TutorialScenario.ClampStartRound(savedProgress);
                 resumeButton.onClick.AddListener(() =>
                 {
                     tutorialModal.SetActive(false);

@@ -104,25 +104,14 @@ namespace KillingMahjong.Managers
             return remaining.Count == 0;
         }
 
-        private static readonly List<TutorialLine> DefaultSelfManganLines = new List<TutorialLine>
-        {
-            new TutorialLine("おっきっちりできたね"),
-            new TutorialLine("さすがは後輩ちゃん 飲み込み早いねー"),
-            new TutorialLine("じゃあまぁいらないと思うけど"),
-        };
-
         private static List<TutorialLine> ResolveSelfManganLines(TutorialRoundData data)
         {
-            return (data.onSelfManganLines != null && data.onSelfManganLines.Count > 0)
-                ? data.onSelfManganLines
-                : DefaultSelfManganLines;
+            return data.onSelfManganLines;
         }
 
         private static List<TutorialLine> ResolveHandFilledLines(TutorialRoundData data)
         {
-            return (data.onHandFilledLines != null && data.onHandFilledLines.Count > 0)
-                ? data.onHandFilledLines
-                : DefaultHandFilledLines;
+            return data.onHandFilledLines;
         }
 
         /// <summary>ボタンの開放段階を変えて、HandUI に即座に反映させる。</summary>

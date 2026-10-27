@@ -13,11 +13,7 @@ namespace KillingMahjong.EditorTools
     /// OpeningScene の `OpeningManager` にある `TutorialManager.scenario` にこの asset が
     /// 割り当たっていて、実際に画面へ出るセリフはここが正。
     ///
-    /// **`Tools/チュートリアル/台本のセリフを TSV で編集` は現状どこにも効いていない。**
-    /// あちらの書き込み先 `Resources/TutorialLines.asset` は存在せず、仮に作っても
-    /// 適用されるのは `TutorialScenario.BuildDefault()` の中だけ。
-    /// `scenario` が asset に設定されている限り `BuildDefault()` は呼ばれない。
-    /// 混乱の元なので、このウィンドウから触る分にはあちらを気にしなくてよい。
+    /// TSV 編集も同じアセットを更新する。コード内の既定台本や別のセリフ表は使わない。
     ///
     /// **なぜ Inspector で済ませないのか。**
     /// 1局あたり `List&lt;TutorialLine&gt;` が12本＋能力実演の入れ子まであり、
@@ -181,7 +177,7 @@ namespace KillingMahjong.EditorTools
         }
 
         private TutorialScenario _asset;
-        private int _roundIndex;                 // -1 = 全局終了後（endingLines）
+        private int _roundIndex;                 // -1 = 敗北から復活の会話
         private Vector2 _leftScroll;
         private Vector2 _rightScroll;
         private readonly HashSet<string> _collapsed = new HashSet<string>();

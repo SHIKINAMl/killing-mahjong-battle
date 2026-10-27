@@ -154,12 +154,6 @@ namespace KillingMahjong.Managers
             _handButtonStage == HandButtonStage.AutoAndDecide ||
             _handButtonStage == HandButtonStage.DecideOnly;
 
-        /// <summary>既定のセリフ。台本側の onHandFilledLines が空のときに使う。</summary>
-        private static readonly List<TutorialLine> DefaultHandFilledLines = new List<TutorialLine>
-        {
-            new TutorialLine("今回は自動で選んであげるわ。"),
-        };
-
         /// <summary>
         /// 現在の局で打牌が禁止されている牌種（-1 でなし）。
         /// HandUI 側でグレーアウト表示するために公開している。
@@ -289,7 +283,8 @@ namespace KillingMahjong.Managers
                 gameUIManager.EnemyInfoUI.RestoreTutorialCharacter();
             RestoreIntroSettings();
             if (_askExperienceAfterIntro) RaiseIntroSettings();
-            _scenarioRoutine = StartCoroutine(ScenarioRoutine(Mathf.Max(0, roundIndex)));
+            _scenarioRoutine = StartCoroutine(ScenarioRoutine(
+                Mathf.Clamp(roundIndex, 0, Mathf.Max(0, _scenario.rounds.Count - 1))));
         }
 
         /// <summary>チュートリアルを打ち切ってタイトルへ戻す（スキップボタン用）。</summary>
@@ -318,7 +313,7 @@ namespace KillingMahjong.Managers
             // ScreenTint は DontDestroyOnLoad なので、抜かないと**次のシーンまで引きずる。**
             Tutorial.TutorialAudioDirector.ResetVisuals();
 
-            // 抜けたらデバッグ部屋へ。台本の titleSceneName は使わない（2026-10-23 ユーザー指示「タイトルへは放置した時だけ行くようにして」）。
+            // 抜けたらデバッグ部屋へ。台本には移動先を持たせない（2026-10-23 ユーザー指示「タイトルへは放置した時だけ行くようにして」）。
             // タイトル（ランキングと動画の画面）へは、放置したときのリセットでしか行かない
             SceneManager.LoadScene(KillingMahjong.UI.TutorialNavigation.DebugRoomSceneName);
         }

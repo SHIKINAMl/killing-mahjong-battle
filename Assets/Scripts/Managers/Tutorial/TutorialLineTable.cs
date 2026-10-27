@@ -5,33 +5,9 @@ using UnityEngine;
 
 namespace KillingMahjong.Managers.Tutorial
 {
-    /// <summary>
-    /// チュートリアル台本の**セリフだけ**を差し替える表。
-    ///
-    /// 台本の構造（何局あるか、どこで能力を実演するか、どのボタンを開放するか）は
-    /// <see cref="TutorialScenario.BuildDefault"/> のコードが持ったままで、
-    /// **文字列だけをここから上書きする。**
-    ///
-    /// **セリフごと ScriptableObject に移さないのはなぜか。**
-    /// 台本アセットを作って全部そちらへ移すと、`BuildDefault()` と二重管理になる。
-    /// スキルのコスト表で同じことをして実際にズレた（`SERVER_REQUESTS_20260801.md` A-7）。
-    /// 構造はコード、文字はこの表、と持ち場を分ければ食い違いようがない。
-    ///
-    /// **ID は手で振らない。** 121行に手でラベルを付けると、行を1つ増やしただけで
-    /// ずれるか、付け忘れて無言になる。リスト名と添字から機械的に作る:
-    ///
-    ///     r0.introLines[2]                     … 第1局の導入3行目
-    ///     r3.abilityShowcases[1].afterLines[0] … 第4局の2つ目の能力実演のあと
-    ///     ending[0]                            … 全局終了後
-    ///
-    /// 表に無い ID はコードの文字列がそのまま使われる。
-    /// **消えて無言になることはない**ので、途中まで書いた TSV でも安全に読める。
-    /// </summary>
+    /// <summary>正本の TutorialScenario.asset と TSV の間でセリフを変換する。実行時の別台本は持たない。</summary>
     public class TutorialLineTable : ScriptableObject
     {
-        /// <summary>`Resources.Load` で引く場所。Editor の取り込みツールが同じ名前で書く。</summary>
-        public const string ResourcePath = "TutorialLines";
-
         [Serializable]
         public class Row
         {
@@ -138,7 +114,6 @@ namespace KillingMahjong.Managers.Tutorial
                 }
             }
 
-            VisitList("ending", scenario.endingLines, visit);
             if (scenario.revival != null)
             {
                 VisitList("revival.enemyLines", scenario.revival.enemyLines, visit);

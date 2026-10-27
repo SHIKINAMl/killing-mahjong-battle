@@ -8,19 +8,7 @@ using KillingMahjong.Common;
 
 namespace KillingMahjong.Managers
 {
-    /// <summary>
-    /// チュートリアルを始める前の問いかけ。ユーザーの指示（2026-09-07）。
-    ///
-    /// 「あなた、麻雀は打てるの？」を先に聞き、
-    /// **経験あり → そのまま開始 / 初めて → 短い説明会話と案内板の後に開始** とする。
-    ///
-    /// **シーンには置かず実行時に組み立てる。** 対局シーンが2つ（UIテストシーン /
-    /// OpeningScene）あるので、シーンに置くと片方だけ直る事故が起きる（AGENTS.md §2）。
-    ///
-    /// **`StartTutorialFrom` には入れない。** あちらは局を指定して直接始める入口で、
-    /// 自動でチュートリアルを通す仕掛け（AGENTS.md §14）が毎フレーム叩いている。
-    /// ここで待ちを挟むと自動走行が止まる。問いかけるのは `StartTutorial()` だけ。
-    /// </summary>
+    /// <summary>冒頭の経験分岐・ルール資料・最初の手牌選択への案内。経験者も17歩ルールを確認する。</summary>
     public partial class TutorialManager
     {
         /// <summary>

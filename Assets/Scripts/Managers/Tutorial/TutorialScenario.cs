@@ -135,10 +135,10 @@ namespace KillingMahjong.Managers
         public int betAmount = 1000;
 
         [Tooltip("賭け金を促すセリフ。{0} に betAmount が入る。")]
-        [TextArea(1, 2)] public string betPromptText = "{0}円賭けてちょうだい。";
+        [TextArea(1, 2)] public string betPromptText = "";
 
         [Tooltip("前局が流局で賭け金が持ち越されたときのセリフ。{0}=持ち越し額 {1}=場の総額。" +
-                 "空なら既定文が使われる。流局の次の局は賭け金を指示してはいけない（自動で同額が賭けられる仕様）。")]
+                 "空なら会話を挟まない。流局の次の局は賭け金を指示してはいけない（自動で同額が賭けられる仕様）。")]
         public List<TutorialLine> inheritedBetLines = new List<TutorialLine>();
 
         [Header("■ 状況を変える ─ 打牌フェイズの進み方")]
@@ -151,7 +151,7 @@ namespace KillingMahjong.Managers
         [Tooltip("プレイヤーが打てない牌（牌種）。-1 でなし。手順⑭の嘘の待ち牌。")]
         [TilePicker(allowNone: true)] public int lockedTileBaseId = -1;
 
-        [TextArea(1, 2)] public string lockedTileMessage = "その牌は出しちゃダメって言ったでしょ！";
+        [TextArea(1, 2)] public string lockedTileMessage = "";
 
         [Tooltip("敵が能力を使う演出を挟むか（手順⑱）")]
         public bool enemyUsesAbility = false;
@@ -208,10 +208,10 @@ namespace KillingMahjong.Managers
         [Tooltip("イントロの何行目のあとに盤面（山牌・手牌・ドラ・HP）を出すか。0始まり。" +
                  "-1 ならイントロを全て流し終えたあと。それまでは女の子とセリフだけが見える。")]
         public int revealBoardAfterLineIndex = -1;
-        [Tooltip("13枚そろったあと、『自動』ボタンを開放する直前のセリフ。空なら既定文が使われる。")]
+        [Tooltip("13枚そろったあと、『自動』ボタンを開放する直前のセリフ。空なら会話を挟まない。")]
         public List<TutorialLine> onHandFilledLines = new List<TutorialLine>();
 
-        [Tooltip("プレイヤーが自力で満貫手を組めたときのセリフ。『おまかせ』を短く紹介してから決定へ進ませる。空なら既定文。")]
+        [Tooltip("プレイヤーが自力で満貫手を組めたときのセリフ。『おまかせ』を短く紹介してから決定へ進ませる。空なら会話を挟まない。")]
         public List<TutorialLine> onSelfManganLines = new List<TutorialLine>();
 
         [Tooltip("手牌決定後・賭け金フェイズ前")]
@@ -223,6 +223,21 @@ namespace KillingMahjong.Managers
         public List<TutorialLine> beforeManualDiscardLines = new List<TutorialLine>();
         [Tooltip("結末演出のあと")]
         public List<TutorialLine> outroLines = new List<TutorialLine>();
+    }
+
+    /// <summary>台本の局とは独立した、敗北時のロン演出用データ。会話や進行は持たない。</summary>
+    [Serializable]
+    public sealed class TutorialDefeatRonData
+    {
+        public List<int> meldBaseIds = new List<int>();
+        public List<string> yakuList = new List<string>();
+        public string formulaText;
+        public string rankText;
+
+        public TutorialRoundData ToPresentation() => new TutorialRoundData
+        {
+            yakuList = new List<string>(yakuList), formulaText = formulaText, rankText = rankText,
+        };
     }
 
     /// <summary>
@@ -237,26 +252,12 @@ namespace KillingMahjong.Managers
 
         public List<TutorialRoundData> rounds = new List<TutorialRoundData>();
 
-        [Header("● セリフを変える ─ 全局終了後")]
-        public List<TutorialLine> endingLines = new List<TutorialLine>();
-        public string titleSceneName = "タイトルシーン";
+        [Header("敗北分岐のロン演出（会話なし）")]
+        public TutorialDefeatRonData defeatRon = new TutorialDefeatRonData();
 
         [Header("● セリフを変える ─ マルチモード導入・復活")]
         public TutorialRevivalData revival = new TutorialRevivalData();
 
-
-        /// <summary>
-        /// `Resources/TutorialLines` があればセリフを差し替える。無ければ何もしない。
-        /// </summary>
-        private static void ApplyLineTable(TutorialScenario s)
-        {
-            var table = Resources.Load<Tutorial.TutorialLineTable>(
-                Tutorial.TutorialLineTable.ResourcePath);
-            if (table == null) return;
-
-            table.ApplyTo(s);
-            Debug.Log($"[TutorialScenario] セリフ表を適用しました（{table.rows.Count} 行）。");
-        }
 
         /// <summary>
         /// 台本中の牌IDがすべて牌種の範囲（0〜28）に収まっているか検証する。

@@ -176,19 +176,6 @@ namespace KillingMahjong.Managers
         private const float VoltageChargeWaitSeconds = 1.8f;
 
         /// <summary>
-        /// 制限時間の話のあと、自動で流し始める前の一言。
-        ///
-        /// **フロー図に無い。** 図が打牌数UIのハイライトで途切れているので、
-        /// その先はこれまでの第2局をそのまま続けている。このセリフも旧台本の
-        /// 対局開始時のもの（口調が前の人格のまま）で、黙って操作を取り上げないために
-        /// 残してある。続きが描かれたら、ここから先を差し替えること。
-        /// </summary>
-        private static readonly List<TutorialLine> SecondBattleResumeLines = new List<TutorialLine>
-        {
-            new TutorialLine("しばらく黙って見ていなさい。勝手に進めるわ。"),
-        };
-
-        /// <summary>
         /// 第2局の対局をこの専用の運びで進めるか。
         ///
         /// **流局で終わる局のときだけ。** ロンで決着する台本に差し替えられた場合、
