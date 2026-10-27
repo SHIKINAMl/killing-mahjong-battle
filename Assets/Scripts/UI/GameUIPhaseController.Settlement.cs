@@ -49,6 +49,7 @@ namespace KillingMahjong.UI
                 RankName = rankName,
                 TotalHan = liq.han,
                 Multiplier = liq.multiplier,
+                VoltageMultiplier = liq.voltage_multiplier,
                 CarryRounds = liq.carry_over_draw_count + 1,
                 IsTankiWait = liq.is_tanki_wait,
                 AssaultApplied = liq.assault_applied,
@@ -194,7 +195,10 @@ namespace KillingMahjong.UI
             string mult = liq.multiplier.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
 
             // 答えもサーバーの winner_gain をそのまま置く。掛け算し直さない
-            return $"{liq.winner_bet} × {mult} = {liq.winner_gain}";
+            string voltage = liq.voltage_multiplier > 0f
+                ? " × " + liq.voltage_multiplier.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)
+                : "";
+            return $"{liq.winner_bet} × {mult}{voltage} = {liq.winner_gain}";
         }
     }
 }

@@ -117,6 +117,19 @@ namespace KillingMahjong.UI
             myMultText = MakeNumber(multRow.transform, 21f, PanelInk, ValueColumn);
             theirMultText = MakeNumber(multRow.transform, 21f, PanelInk, ValueColumn);
 
+            // ボルテージは勝者の獲得だけに適用。値が届かない旧データや台本では伏せる。
+            if (s.VoltageMultiplier > 0f)
+            {
+                GameObject voltageRow = MakeBox(body.transform, Color.clear, 0, 1);
+                voltageRow.name = "VoltageRow";
+                MakeText(voltageRow.transform, "ボルテージ", 18f, PanelFaint, TextAlignmentOptions.Left, true);
+                string voltage = "×" + s.VoltageMultiplier.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+                MakeText(voltageRow.transform, s.LocalWon ? voltage : "-", 21f,
+                    s.LocalWon ? AccentGold : PanelFaint, TextAlignmentOptions.Right, false, ValueColumn);
+                MakeText(voltageRow.transform, s.LocalWon ? "-" : voltage, 21f,
+                    s.LocalWon ? PanelFaint : AccentGold, TextAlignmentOptions.Right, false, ValueColumn);
+            }
+
             tankiMine = null;
             tankiTheirs = null;
             if (s.IsTankiWait)

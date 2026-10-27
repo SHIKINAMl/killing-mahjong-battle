@@ -41,6 +41,9 @@ namespace KillingMahjong.UI
 
         public int TotalHan;
         public float Multiplier;
+
+        /// <summary>サーバー確定の勝者用ボルテージ倍率。0 は未受信／対象外。</summary>
+        public float VoltageMultiplier;
         public string RankName;
 
         /// <summary>流局の持ち越しを含めた局数。1 なら持ち越し無し。</summary>

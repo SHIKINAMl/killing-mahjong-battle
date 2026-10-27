@@ -258,18 +258,18 @@ namespace KillingMahjong.UI
             var hand = new List<int>();
             foreach (int id in new[] {0,0,0,0,1,2,3,4,5,6,8,27,27}) hand.Add(Tile(id));
             var settlement = new RonSettlementInfo {
-                TotalHan = 5, Multiplier = 1, RankName = "満貫", MyBet = 2000, TheirBet = 2000,
-                LocalWon = won, MyDelta = won ? 2000 : -2000, TheirDelta = won ? -2000 : 2000,
+                TotalHan = 5, Multiplier = 1, VoltageMultiplier = 1.3f, RankName = "満貫", MyBet = 2000, TheirBet = 2000,
+                LocalWon = won, MyDelta = won ? 2600 : -2000, TheirDelta = won ? -2000 : 2600,
                 MyHpBefore = 20000, TheirHpBefore = 20000,
-                MyHpAfter = won ? 22000 : 18000, TheirHpAfter = won ? 18000 : 22000,
+                MyHpAfter = won ? 22600 : 18000, TheirHpAfter = won ? 18000 : 22600,
                 ShowPerRowHan = true, Rows = new List<RonSettlementInfo.YakuRow> {
                     new RonSettlementInfo.YakuRow { Name = "混一色", Han = 3 },
                     new RonSettlementInfo.YakuRow { Name = "一気通貫", Han = 2 } }
             };
             rig.ron.PlayRonSequence(hand, Tile(7), new List<string> { "混一色", "一気通貫" },
-                "2000 × 1", "満貫", 2000, won, rig.player, rig.enemy, 20000,
+                "2000 × 1 × 1.3 = 2600", "満貫", 2600, won, rig.player, rig.enemy, 20000,
                 settlement.MyHpAfter, 20000, settlement.TheirHpAfter, () => done = true,
-                "2000 × 1", settlement);
+                "2000 × 1 × 1.3 = 2600", settlement);
             yield return Until(() => done);
         }
         private static int Tile(int baseId) => KillingMahjong.Managers.TutorialTiles.Encode(baseId, false);

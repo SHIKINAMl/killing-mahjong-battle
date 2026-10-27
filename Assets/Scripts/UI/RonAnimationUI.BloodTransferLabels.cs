@@ -20,6 +20,8 @@ namespace KillingMahjong.UI
         {
             string note = "×" + s.Multiplier.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
             bool flownIsLoser = flownDelta < 0;
+            if (!flownIsLoser && s.VoltageMultiplier > 0f)
+                note += " ×" + s.VoltageMultiplier.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
             if (s.IsTankiWait && flownIsLoser) note += " ×2";
             if (s.AssaultApplied && flownIsLoser) note += " +強襲";
             return note;
