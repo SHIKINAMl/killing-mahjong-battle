@@ -221,6 +221,11 @@ namespace KillingMahjong.Managers
                     GetHandTileCount() >= HandSize || !_isWaitingForHandSelectionComplete);
                 SetSeniorIdleBounce(false);
 
+                // 13枚目のレイアウト更新で始まる役名表示を、次の案内より先に見せる。
+                yield return null;
+                yield return WaitForInstantRankCall();
+                if (_aborted) yield break;
+
                 if (_isWaitingForHandSelectionComplete)
                 {
                     selfMadeMangan = IsSelfMadeManganHand();

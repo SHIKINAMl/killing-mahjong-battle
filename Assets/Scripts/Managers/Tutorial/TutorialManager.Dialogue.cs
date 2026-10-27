@@ -14,6 +14,15 @@ namespace KillingMahjong.Managers
 
         // ==================== セリフ表示 ====================
 
+        private bool IsInstantRankCallPlaying => gameUIManager != null
+            && gameUIManager.HandSelectionController != null
+            && gameUIManager.HandSelectionController.IsInstantRankCallPlaying;
+
+        private IEnumerator WaitForInstantRankCall()
+        {
+            while (!_aborted && IsInstantRankCallPlaying) yield return null;
+        }
+
         /// <summary>
         /// 台本のセリフを1行ずつ送る。シナリオ用コルーチンからのみ呼ばれるため、
         /// 同時に複数走ることはない（旧実装の多重起動によるコルーチン残留を防いでいる）。
@@ -25,6 +34,9 @@ namespace KillingMahjong.Managers
             foreach (var line in lines)
             {
                 if (line == null || string.IsNullOrEmpty(line.text)) continue;
+
+                yield return WaitForInstantRankCall();
+                if (_aborted) yield break;
 
                 // 音は台詞に合わせて動く（2026-09-11）。**文字を出す直前に当てる。**
                 // 表に無い台詞では何も起きず、直前の音がそのまま続く。

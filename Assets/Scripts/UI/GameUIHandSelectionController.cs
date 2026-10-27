@@ -30,6 +30,9 @@ namespace KillingMahjong.UI
         private int _rankRequestGeneration;
         private HandRankCallUI _rankCallUI;
 
+        /// <summary>即席の役名が消えきるまで。チュートリアルの会話と操作の再開に使う。</summary>
+        public bool IsInstantRankCallPlaying => _rankCallUI != null && _rankCallUI.IsShowing;
+
         /// <summary>
         /// 役名表示を出してよいか。**自分の手で13枚目を入れたときだけ立つ**（2026-10-11 のユーザー指示）。
         ///
