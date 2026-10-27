@@ -16,7 +16,6 @@ namespace KillingMahjong.UI
         private static readonly Color32 Recess = new Color32(47, 29, 40, 255);
         private static readonly Color32 Edge = new Color32(112, 79, 84, 255);
         private static readonly Color32 Blood = new Color32(163, 49, 58, 255);
-        private static readonly Color32 BloodLight = new Color32(212, 103, 91, 255);
         private static readonly Color32 Ivory = new Color32(239, 238, 216, 255);
         private static readonly Color32 Gold = new Color32(255, 211, 77, 255);
         private readonly Dictionary<Image, bool> nativeImages = new Dictionary<Image, bool>();
@@ -104,12 +103,6 @@ namespace KillingMahjong.UI
         private static float Snap(float value) => Mathf.Round(value / Pixel) * Pixel;
         private Color Shade(Color color, bool available) => available ? color : Color.Lerp(color, Recess, .65f);
 
-        private void SteppedBox(float left, float bottom, float right, float top, Color color)
-        {
-            art.Box(left + Pixel, bottom, right - Pixel, top, color);
-            art.Box(left, bottom + Pixel, right, top - Pixel, color);
-        }
-
         public void Refresh()
         {
             if (slider == null || art == null || !isActiveAndEnabled) return;
@@ -125,25 +118,16 @@ namespace KillingMahjong.UI
             float center = Snap(rect.center.y);
             // 標準Sliderのつまみと同じ範囲。描画だけ格子へ寄せ、音量値は丸めない。
             float knob = Snap(Mathf.Lerp(left, right, value));
-            SteppedBox(left - 2, center - 8, right + 2, center + 8, Ink);
-            art.Box(left, center - 6, right, center + 6, Recess);
-            art.Box(left + 2, center + 4, right - 2, center + 6, Shade(Edge, available));
-            for (float x = left + 2; x < right; x += 10f)
-            {
-                float end = Mathf.Min(x + 8f, knob);
-                if (end <= x) continue;
-                art.Box(x, center - 4, end, center + 4, Shade(Blood, available));
-                art.Box(x, center + 2, end, center + 4, Shade(BloodLight, available));
-            }
-            float y = center - (pressed && available ? Pixel : 0);
-            SteppedBox(knob - 10, y - 14, knob + 10, y + 14, Ink);
-            SteppedBox(knob - 8, y - 12, knob + 8, y + 12, Shade(Edge, available));
+            // 細い一本のレール。量は連続した赤い線で示す。
+            art.Box(left - 2, center - 4, right + 2, center + 4, Ink);
+            art.Box(left, center - 2, right, center + 2, Recess);
+            art.Box(left, center - 2, knob, center + 2, Shade(Blood, available));
+            // つまみは平たい角形。押しても位置をずらさず、目盛り位置を読み取りやすくする。
+            art.Box(knob - 8, center - 10, knob + 8, center + 10, Ink);
             Color face = pressed && available ? new Color32(206, 184, 149, 255)
                 : hovered && available ? Gold : Ivory;
-            art.Box(knob - 6, y - 8, knob + 6, y + 10, Shade(face, available));
-            art.Box(knob - 6, y - 10, knob + 6, y - 8, Shade(new Color32(157, 132, 106, 255), available));
-            art.Box(knob - 2, y - 4, knob, y + 6, Ink);
-            art.Box(knob + 2, y - 4, knob + 4, y + 6, Ink);
+            art.Box(knob - 6, center - 8, knob + 6, center + 8, Shade(face, available));
+            art.Box(knob - 6, center - 8, knob + 6, center - 6, Shade(Edge, available));
             art.End();
         }
     }
