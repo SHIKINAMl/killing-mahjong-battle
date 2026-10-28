@@ -11,6 +11,19 @@ namespace KillingMahjong.UI
     /// </summary>
     public class OptionUI : MonoBehaviour
     {
+        private static readonly System.Collections.Generic.HashSet<OptionUI> instances =
+            new System.Collections.Generic.HashSet<OptionUI>();
+
+        /// <summary>資料を含む設定操作中は、背面の会話送りに入力を渡さない。</summary>
+        public static bool AnyOpen
+        {
+            get
+            {
+                foreach (var option in instances)
+                    if (option != null && option.IsOpen) return true;
+                return false;
+            }
+        }
         [Header("Audio Settings (Sliders)")]
         [SerializeField] private Slider bgmSlider;
         [SerializeField] private Slider seSlider;
@@ -101,6 +114,7 @@ namespace KillingMahjong.UI
 
         private void Awake()
         {
+            instances.Add(this);
             _canvasGroup = GetComponent<CanvasGroup>();
             if (_canvasGroup == null) _canvasGroup = gameObject.AddComponent<CanvasGroup>();
             
@@ -155,6 +169,7 @@ namespace KillingMahjong.UI
 
         private void OnDestroy()
         {
+            instances.Remove(this);
             // 「タイトルへ戻る」は閉じるアニメーションを始めた直後にシーンを読み替えるので、途中で破棄される。
             // 残った動きが破棄された相手に触れて DOTween の safe mode が拾っていた（missing target が2件）ので、ここで止める。
             if (_rectTransform != null) _rectTransform.DOKill();
@@ -180,6 +195,13 @@ namespace KillingMahjong.UI
             Debug.Log("[OptionUI] Open() が呼ばれました。");
             _isOpen = true;
             gameObject.SetActive(true);
+
+            // 設定だけを独立した描画順へ上げる。会話送りの透明な膜や誘導マスクに操作を奪わせない。
+            var canvas = GetComponent<Canvas>();
+            if (canvas == null) canvas = gameObject.AddComponent<Canvas>();
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = KillingMahjong.Common.UISortingOrders.TutorialSettings;
+            if (GetComponent<GraphicRaycaster>() == null) gameObject.AddComponent<GraphicRaycaster>();
             
             if (_canvasGroup == null) 
             {

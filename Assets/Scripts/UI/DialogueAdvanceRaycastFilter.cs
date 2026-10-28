@@ -11,6 +11,7 @@ namespace KillingMahjong.UI
 
         public bool IsRaycastLocationValid(Vector2 screenPoint, Camera eventCamera)
         {
+            if (OptionUI.AnyOpen) return false;
             if (Owner != null && Owner.IsLogOpen) return false;
             if (LogButton == null || !LogButton.isActiveAndEnabled || !LogButton.IsInteractable()) return true;
             var canvas = LogButton.GetComponentInParent<Canvas>();

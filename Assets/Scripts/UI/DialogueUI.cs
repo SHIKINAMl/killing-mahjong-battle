@@ -632,6 +632,7 @@ namespace KillingMahjong.UI
                 btn.transition = Selectable.Transition.None;
                 btn.onClick.AddListener(() =>
                 {
+                    if (OptionUI.AnyOpen) return;
                     HideAdvanceOnAnyClick();
                     var action = onAdvanceClicked;
                     onAdvanceClicked = null;
