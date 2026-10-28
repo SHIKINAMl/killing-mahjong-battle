@@ -115,6 +115,9 @@ namespace KillingMahjong.Managers
             {
                 yield return StartCoroutine(RunAfterFirstRoundWrapUp());
                 if (_aborted) yield break;
+                // ふつうは能力の紹介の頭（「それじゃあ第二局目だね」のあと）で出してある。出ていなければここで出す
+                if (!_boardVisible) yield return StartCoroutine(PlayRoundLabelRoutine(2));
+                if (_aborted) yield break;
             }
 
             // **立ち絵が出きってから台詞を出す（2026-09-27 の指示）。**
@@ -491,7 +494,9 @@ namespace KillingMahjong.Managers
             // **第1局は、頭では暗転も盤面も出さない**（2026-10-29 ユーザー指示「契約書を書くといきなり『第一局』表示が出るので困惑した」
             // 「一局目の演出が出てから自分の牌が出るようにして」）。まだ先輩も出てきておらず、何の1局目なのか分からない。
             // 「１局目」の暗転は「アタシと実践してみよっかー」のあとに出し、その暗いあいだに牌を出す（<see cref="PlayRoundLabelRoutine"/>）
-            if (number == 1) yield break;
+            // **第2局も、局名と盤面は「それじゃあ第二局目だね」のあとに出す**（2026-10-29 ユーザー指示
+            // 「それじゃ第二局ね というセリフの後黒帯の演出出てほしい」）。頭で出すと、第1局のまとめの会話の前に「２局目」が出ていた
+            if (number == 1 || IsSecondTutorialRound(data)) yield break;
             yield return PlayRoundDarkenRoutine(phase, RoundLabel(number), RoundLabelHoldSeconds);
         }
 

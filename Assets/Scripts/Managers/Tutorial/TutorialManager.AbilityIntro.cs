@@ -180,6 +180,8 @@ namespace KillingMahjong.Managers
             try
             {
                 yield return StartCoroutine(PlayLines(AbilityOpeningLines));
+                // 「それじゃあ第二局目だね」のあとに「２局目」の暗転を出し、暗いあいだに盤面を出す（2026-10-29 ユーザー指示）
+                if (!_boardVisible) yield return StartCoroutine(PlayRoundLabelRoutine(2));
 
                 FlashScreen();
                 yield return new WaitForSeconds(0.35f);
