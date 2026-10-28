@@ -185,7 +185,13 @@ namespace KillingMahjong.UI.Effects
         public Rect LocalVisibleRectOf(RectTransform target)
         {
             if (target == null) return new Rect();
+            return LocalRectOf(target, VisibleRectOf(target));
+        }
 
+        /// <summary>座標変換前の、対象ローカル空間での絵の範囲。</summary>
+        internal static Rect VisibleRectOf(RectTransform target)
+        {
+            if (target == null) return new Rect();
             Rect r = target.rect;
             var image = target.GetComponent<Image>();
             if (image != null && image.sprite != null && !image.preserveAspect &&
@@ -211,7 +217,7 @@ namespace KillingMahjong.UI.Effects
                     // アトラスに詰めたスプライトは範囲を教えてくれない。そのときは枠の四角のまま使う
                 }
             }
-            return LocalRectOf(target, r);
+            return r;
         }
 
         private Rect LocalRectOf(RectTransform target, Rect inTarget)

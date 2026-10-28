@@ -20,10 +20,10 @@ namespace KillingMahjong.UI.Effects
     /// 出すのは <see cref="AssaultSkillEffect"/> が血を撃ち込んだ瞬間。消すのは局の頭
     /// （<see cref="Clear"/>。BoardStateManager.ClearAllBoardData が呼ぶ）。シーンをまたぐと自分で消える。
     ///
-    /// 印は対象を毎コマ追いかける。血の表示が隠れているあいだ（決着の演出など）は一緒に隠れる。
+    /// 印は血袋のメーターの子。移動・拡縮・非表示を親から引き継ぎ、座標の追いかけ計算はしない。
     ///
     /// **ほかの画面や演出の上には出ない（2026-10-11 のユーザー指摘）。**
-    /// 印は自前の Canvas に描いているので、設定画面やフェイズの演出が出ても、その上に残っていた。
+    /// 以前は印を自前のCanvasに描いていたため、設定画面やフェイズ演出の上に残っていた。
     /// 次のどちらかのあいだは描かない（<see cref="IsCovered"/>）:
     ///   ・画面を覆う演出が流れている（配牌・対局開始・ロンなど。GameUIManager.IsCoveredByPhaseEffect）
     ///   ・印の場所に、別の画面の見える部品が被さっている（設定・確認・役を選ぶ画面など）
@@ -40,10 +40,8 @@ namespace KillingMahjong.UI.Effects
 
         private static readonly List<AssaultMarkUI> ActiveMarks = new List<AssaultMarkUI>();
 
-        private SkillEffectStage _stage;
         private PixelShapeGraphic _shapes;
         private RectTransform _target;
-        private bool _attachToLeft;
         private float _clock;
 
         /// <summary>対象の血の表示に印を出す。同じ対象には重ねず、両者の札は独立して残す。</summary>
@@ -54,15 +52,25 @@ namespace KillingMahjong.UI.Effects
             var mark = ActiveMarks.Find(m => m != null && m._target == target);
             if (mark == null)
             {
-                var go = new GameObject("AssaultMarkUI");
+                var go = new GameObject("AssaultMarkUI", typeof(RectTransform), typeof(CanvasRenderer), typeof(PixelShapeGraphic));
                 mark = go.AddComponent<AssaultMarkUI>();
-                mark._stage = new SkillEffectStage("Stage", UISortingOrders.AssaultMark, go.transform);
-                mark._shapes = mark._stage.AddShapes("Mark");
+                mark._shapes = go.GetComponent<PixelShapeGraphic>();
+                mark._shapes.raycastTarget = false;
                 ActiveMarks.Add(mark);
             }
 
             mark._target = target;
-            mark._attachToLeft = attachToLeft;
+            // 血の絵と袋の枠をまとめて動かすメーターへ固定する。独立したCanvasは作らない。
+            var parent = target.parent as RectTransform ?? target;
+            var rect = (RectTransform)mark.transform;
+            rect.SetParent(parent, false);
+            rect.anchorMin = rect.anchorMax = new Vector2(.5f, .5f);
+            rect.pivot = new Vector2(.5f, .5f);
+            rect.sizeDelta = new Vector2(64, 64);
+            var visible = SkillEffectStage.VisibleRectOf(target);
+            Vector3 corner = new Vector3(attachToLeft ? visible.xMin - 2f : visible.xMax + 2f, visible.yMax - 2f, 0);
+            rect.localPosition = parent.InverseTransformPoint(target.TransformPoint(corner));
+            rect.SetAsLastSibling();
             mark._clock = 0f;
             mark._coverCheckedFrame = -100;
             mark.Redraw();
@@ -106,7 +114,7 @@ namespace KillingMahjong.UI.Effects
             // 対象が消えた・隠れたあいだは描かない（印だけ宙に浮いて見えるのを防ぐ）
             if (_target != null && _target.gameObject.activeInHierarchy && !IsCovered())
             {
-                Vector2 at = MarkPosition(_stage, _target, _attachToLeft);
+                Vector2 at = Vector2.zero;
 
                 // 脈。1.2 秒に1回、輪が広がりながら薄くなる
                 float beat = Mathf.Repeat(PresentationTiming.Sample(_clock), 1.2f) / 1.2f;
@@ -159,7 +167,7 @@ namespace KillingMahjong.UI.Effects
                 var canvas = hit.gameObject.GetComponentInParent<Canvas>();
                 if (canvas == null) continue;
                 // 自分の札そのものに当たっただけ。被さりではない
-                if (_stage != null && canvas.rootCanvas == _stage.Canvas.rootCanvas) continue;
+                if (hit.gameObject.transform.IsChildOf(transform)) continue;
                 // **血の表示より手前に描かれる Canvas だけを「被さり」と数える。**
                 // 同じ段や奥の Canvas にも、この場所に当たる部品がある（盤面の枠など。試して分かった）
                 Canvas hitRoot = canvas.rootCanvas;

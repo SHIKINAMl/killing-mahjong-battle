@@ -47,6 +47,12 @@ namespace KillingMahjong.UI
 
             HideCoverBars(meter);
             MoveBagBehindBlood(meter);
+            // 数値も袋本体の子にする。現在の見た目を保ち、以後の移動・拡縮は親から継承する。
+            if (hpText != null)
+            {
+                if (hpText.transform.parent != meter) hpText.transform.SetParent(meter, true);
+                hpText.transform.SetAsLastSibling();
+            }
         }
 
         /// <summary>体力の数値を、袋上部の黒い表示欄の内側へ固定する。</summary>
@@ -58,7 +64,9 @@ namespace KillingMahjong.UI
             rect.anchorMin = new Vector2(0.5f, 0.5f);
             rect.anchorMax = new Vector2(0.5f, 0.5f);
             rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = HpTextAnchoredPosition;
+            // 初回だけ従来のHPPanel座標を使う。組み替え後に呼び直しても位置を二重補正しない。
+            bool attached = hpFillImage != null && rect.parent == hpFillImage.transform.parent;
+            if (!attached) rect.anchoredPosition = HpTextAnchoredPosition;
             rect.sizeDelta = HpTextSize;
 
             hpText.margin = HpTextMargin;
