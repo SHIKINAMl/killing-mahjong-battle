@@ -34,47 +34,26 @@ namespace KillingMahjong.UI
             yield return Step("さぁ……\n人生最後の牌をどうぞ？", false);
 
             normal.text = "";
-            // プレイヤー側の席へ既存の先輩素材を置き、力を失って手前へ倒れる様子を出す。
-            // 先輩は立ち絵と同じ 155×190 のドット絵（2026-10-25 プランナー支給。顔まで1枚）。
-            // 以前の 29×29 を 20 倍したときと人物の大きさ・位置がほぼそろう、2 倍で出す
-            var senior = Box("FallenSenior", viewport, new Vector2(155f, 190f) * SeniorScale,
-                SeniorPosition, Color.white);
-            senior.GetComponent<Image>().sprite = Resources.Load<Sprite>("女の子/tutorialexe");
-            // 倒れながらの「ぎゃー」は出さない（2026-10-22 に足し、2026-10-24 ユーザー指示「『ぎゃー』っていう先輩はいらない」で外した）
-            Vector2 start = senior.anchoredPosition;
-            // 少しだけ前へ傾きながら沈む。**大きく回して倒さない**（2026-10-23。立ち絵を 70 度回して倒していたのが
-            // 「滑稽すぎる」とプランナーに言われ、倒れ伏した絵に替えた）
-            for (float t = 0; t < 1f; t += Time.unscaledDeltaTime / .35f)
+            // **いきなり倒れ伏した先輩の絵をフェードで出し、そのあと血を流す**（2026-10-28 要望
+            // 「いきなりこの絵でいい。①先輩の倒れる立ち絵がフェードで出る ②血の出るアニメーションが流れる」）。
+            // 以前は座った先輩（tutorialexe）を出して前へ傾け沈めてから、この絵へ切り替えていた。
+            // 支給された絵は元の解像度と縦横比のまま出す。
+            var fallen = Resources.Load<Sprite>("女の子/tutorial_girl_falldown");
+            var senior = Box("FallenSenior", viewport,
+                fallen != null ? new Vector2(fallen.rect.width, fallen.rect.height) * FallenScale : new Vector2(155f, 190f) * SeniorScale,
+                fallen != null ? FallenPosition : SeniorPosition, Color.white);
+            var seniorImage = senior.GetComponent<Image>();
+            seniorImage.sprite = fallen != null ? fallen : Resources.Load<Sprite>("女の子/tutorialexe");
+            // ドット絵なので、透明度も 1 秒 12 コマで段々に上げる（毎フレームなめらかにしない）
+            for (float t = 0f; t < FallenFadeSeconds; t += Time.unscaledDeltaTime)
             {
-                float pose = PresentationTiming.Sample(t * .35f) / .35f;
-                float p = Mathf.Clamp01(pose * pose);
-                senior.anchoredPosition = start + new Vector2(-30f, -60f) * p;
-                senior.localRotation = Quaternion.Euler(0, 0, 16f * p);
+                float stepped = Mathf.Floor(t * 12f) / 12f;
+                seniorImage.color = new Color(1f, 1f, 1f, Mathf.Clamp01(stepped / FallenFadeSeconds));
                 yield return null;
             }
-            // 支給された倒れ伏す先輩へ切り替える。元画像の解像度と縦横比を保つ。
-            var fallen = Resources.Load<Sprite>("女の子/tutorial_girl_falldown");
-            if (fallen != null)
-            {
-                var image = senior.GetComponent<Image>();
-                image.sprite = fallen;
-                senior.localRotation = Quaternion.identity;
-                senior.sizeDelta = new Vector2(fallen.rect.width, fallen.rect.height) * FallenScale;
-                for (float t = 0; t < 1f; t += Time.unscaledDeltaTime / .14f)
-                {
-                    // 落ちた勢いで一度だけ沈む
-                    senior.anchoredPosition = FallenPosition + new Vector2(0f, 14f * (1f - PresentationTiming.Progress(t * .14f, .14f)));
-                    yield return null;
-                }
-                senior.anchoredPosition = FallenPosition;
-            }
-            else
-            {
-                senior.anchoredPosition = start + new Vector2(-90f, -240f);
-                senior.localRotation = Quaternion.Euler(0, 0, 70f);
-            }
-            // 倒れ終わってから血が流れ出すまでの間（以前は「ぎゃー」が消えるまでの時間だった。間合いは変えない）
-            yield return new WaitForSecondsRealtime(.8f);
+            seniorImage.color = Color.white;
+            // 出きってから血が流れ出すまでの、ひと呼吸
+            yield return new WaitForSecondsRealtime(.4f);
 
             // 血を重ね、既存の卓の絵は変更しない。
             var stainRoot = new GameObject("ReplayTableStain", typeof(RectTransform), typeof(PixelShapeGraphic));
@@ -108,7 +87,10 @@ namespace KillingMahjong.UI
         /// <summary>1000×747の支給画像を等倍で表示。透明な余白を含むので、人物の足元が枠の下端に来る位置に置く。</summary>
         private const float FallenScale = 1f;
 
-        /// <summary>倒れる前の先輩（155×190）の拡大率と置き場所。人物の中心が以前の 29×29 版と同じ (-180, -80) に来る</summary>
+        /// <summary>倒れ伏した先輩が出きるまでの時間[秒]</summary>
+        private const float FallenFadeSeconds = .6f;
+
+        /// <summary>倒れ伏した絵が読めなかったときの控え（座った先輩 155×190）の拡大率と置き場所</summary>
         private const float SeniorScale = 2f;
         private static readonly Vector2 SeniorPosition = new Vector2(-171f, -75f);
         private static readonly Vector2 FallenPosition = new Vector2(-120f, -50f);

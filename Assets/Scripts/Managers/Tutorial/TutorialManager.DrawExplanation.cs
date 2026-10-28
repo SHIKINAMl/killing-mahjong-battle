@@ -27,7 +27,13 @@ namespace KillingMahjong.Managers
             ClearGuide();
             var replay=TutorialDrawReplayUI.Create(transform, gameUIManager != null ? gameUIManager.EnemyInfoUI : null);
             try { yield return replay.Play(); }
-            finally { if(replay!=null) replay.Close(); SetSeniorPose(SeniorNormalPose); }
+            finally
+            {
+                if(replay!=null) replay.Close();
+                // 動画が終わってもスマホを差し出したまま（2026-10-28 要望「動画が終わった後の立ち絵はスマホを差し出している先輩の画像で」）。
+                // 「わかったかな？」の受け答えまで続け、RunAfterDrawVideo で戻す。途中で抜けたときだけここで戻す
+                if (_aborted) SetSeniorPose(SeniorNormalPose);
+            }
         }
 
         /// <summary>先輩の立ち絵の差分（チュートリアル女の子.asset の bodySprites の id）。</summary>
@@ -127,6 +133,8 @@ namespace KillingMahjong.Managers
             int understood = -1;
             yield return AskYesNo(DrawUnderstoodQuestion, a => understood = a, DrawUnderstoodLabel, DrawDifficultLabel);
             yield return PlayLines(understood == 0 ? DrawUnderstoodLines : DrawDifficultLines);
+            // 動画のあとから続けていたスマホの絵を、まとめに入るところで戻す
+            SetSeniorPose(SeniorNormalPose);
             yield return PlayLines(DrawSummaryLeadLines);
 
             // 流局説明用UI表示 → プレイヤーが閉じる

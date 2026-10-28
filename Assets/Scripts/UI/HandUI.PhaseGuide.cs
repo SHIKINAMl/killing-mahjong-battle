@@ -64,9 +64,12 @@ namespace KillingMahjong.UI
             bool localTurn = Managers.BoardStateManager.Instance != null &&
                              Managers.BoardStateManager.Instance.IsLocalTurn;
 
-            bool wanted = !tutorial &&
-                (phaseStatus == RoundStatus.HandSelection ||
-                 (phaseStatus == RoundStatus.Discard && localTurn));
+            // **チュートリアルでも手牌選択の枚数だけは出す**（2026-10-28 要望「通常の対局のように、残り13牌の表示がいるかも」）。
+            // ただし盤面を伏せている間（会話・黒帯）は山牌ごと隠れているので出さない
+            bool wanted = tutorial
+                ? phaseStatus == RoundStatus.HandSelection && IsWallShown()
+                : (phaseStatus == RoundStatus.HandSelection ||
+                   (phaseStatus == RoundStatus.Discard && localTurn));
 
             if (!wanted)
             {
@@ -116,11 +119,7 @@ namespace KillingMahjong.UI
         /// </summary>
         private void PlaceGuideAboveWall(TMPro.TextMeshProUGUI guide)
         {
-            if (_wallRect == null)
-            {
-                var go = GameObject.Find("WallContainer");
-                if (go != null) _wallRect = go.transform as RectTransform;
-            }
+            FindWallRect();
             if (_wallRect == null) return;
 
             var canvas = guide.canvas;
@@ -138,6 +137,32 @@ namespace KillingMahjong.UI
             {
                 rt.anchoredPosition = new Vector2(0f, y);
             }
+        }
+
+        /// <summary>山牌の器を探す（GameObject.Find は表示中の物しか見つけないので、見つかった物を覚えておく）</summary>
+        private void FindWallRect()
+        {
+            if (_wallRect != null) return;
+            var go = GameObject.Find("WallContainer");
+            if (go != null) _wallRect = go.transform as RectTransform;
+        }
+
+        /// <summary>山牌がいま画面に出ているか</summary>
+        private bool IsWallShown()
+        {
+            FindWallRect();
+            return _wallRect != null && _wallRect.gameObject.activeInHierarchy;
+        }
+
+        /// <summary>
+        /// 手牌ごと伏せられたら案内も消す。案内は手牌の外（一番上の Canvas）に置いてあり、
+        /// 手牌が止まると Update も止まって、出したまま残ってしまう（チュートリアルの盤面隠し）
+        /// </summary>
+        private void OnDisable()
+        {
+            if (_phaseGuide != null) _phaseGuide.gameObject.SetActive(false);
+            _lastGuidePhase = (RoundStatus)(-1);
+            _lastGuideHandCount = -1;
         }
     }
 }
