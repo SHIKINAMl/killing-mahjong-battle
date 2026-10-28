@@ -335,7 +335,7 @@ namespace KillingMahjong.Managers
         /// （ロンできる牌だけは、そのときも避ける）。ボルテージの説明は5打目なので、
         /// そこまでに尽きることは無い。
         /// </summary>
-        private int PickEnemyDiscardForSecondBattle(TutorialRoundData data, int turn, HashSet<int> seen)
+        private static int PickEnemyDiscardForSecondBattle(TutorialRoundData data, int turn, HashSet<int> seen)
         {
             var waits = data.waitBaseIds ?? new List<int>();
 
@@ -344,6 +344,8 @@ namespace KillingMahjong.Managers
             {
                 if (seen.Contains(candidate)) continue;
                 if (waits.Contains(candidate)) continue;
+                // 正体判明後は seen が組み直される。河の共通履歴も必ず確認する。
+                if (!VoltageSystem.IsNewTileType(TutorialTiles.Encode(candidate, false))) continue;
                 return candidate;
             }
 
@@ -352,6 +354,7 @@ namespace KillingMahjong.Managers
             {
                 if (seen.Contains(candidate)) continue;
                 if (waits.Contains(candidate)) continue;
+                if (!VoltageSystem.IsNewTileType(TutorialTiles.Encode(candidate, false))) continue;
                 return candidate;
             }
 
