@@ -130,21 +130,26 @@ namespace KillingMahjong.UI
         private bool _broken;
         private float _fieldOffset;
         private float _ignitionProgress = 1f;
+        private bool _ignitionFromBelow;
 
         internal void BeginIgnition()
         {
             _ignitionProgress = 0f;
+            _ignitionFromBelow = true;
             if (_level > 0 && !_broken)
             {
                 Reseed();
                 for (int i = 0; i < _particles.Length; i++) _particles[i].Age = 0f;
             }
+            ApplyVisibility();
             SetVerticesDirty();
         }
 
         internal void SetIgnitionProgress(float progress)
         {
             _ignitionProgress = Mathf.Clamp01(progress);
+            if (_ignitionProgress >= 1f) _ignitionFromBelow = false;
+            ApplyVisibility();
             SetVerticesDirty();
         }
 
@@ -250,7 +255,7 @@ namespace KillingMahjong.UI
         {
             // **破棄された段では燃やさない。** あそこは灰色で「落ちた」ことを示す場なので、
             // 炎が残っていると勢いがあるように見える。
-            bool show = _level > 0 && !_broken;
+            bool show = _level > 0 && !_broken && _ignitionProgress > 0f;
             if (gameObject.activeSelf != show) gameObject.SetActive(show);
         }
 
@@ -289,7 +294,13 @@ namespace KillingMahjong.UI
             float s = Random.value * perimeter;
 
             float x, y;
-            if (s < r.width)                      // 下辺
+            if (_ignitionFromBelow)
+            {
+                // 登場時だけは対象ブロックの下端から湧かせる。燃え始めた後は通常の外周へ戻す。
+                x = Random.Range(-hw, hw);
+                y = -hh - 2f;
+            }
+            else if (s < r.width)                      // 下辺
             {
                 x = -hw + s; y = -hh;
             }
@@ -354,6 +365,7 @@ namespace KillingMahjong.UI
                 // 上ほど速く、外へ広がる。炎は上で開く
                 float up = _particles[i].Age / _particles[i].Life;
                 v.y += t.Rise * (0.6f + 0.8f * up);
+                if (_ignitionFromBelow && up < .4f) v.y = Mathf.Max(v.y, t.Rise * .6f);
                 v.x *= 0.7f + 1.1f * up;
 
                 _particles[i].Pos += v * dt;

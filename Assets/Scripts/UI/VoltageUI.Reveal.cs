@@ -6,8 +6,10 @@ namespace KillingMahjong.UI
     public partial class VoltageUI
     {
         public const string RevealEffectId = "voltage.reveal";
-        private const float IgnitionStart = .42f;
-        private const float RevealSeconds = 1.65f;
+        private const float BlocksReadyAt = .36f;
+        private const float IgnitionSoundAt = BlocksReadyAt + .3f;
+        private const float FlamesStartAt = IgnitionSoundAt + .1f;
+        private const float RevealSeconds = 2.05f;
         private CanvasGroup[] _revealPips, _revealHearts;
         private CanvasGroup _revealCharge, _revealMultiplier;
         private bool _revealActive;
@@ -48,7 +50,7 @@ namespace KillingMahjong.UI
 
         private void ApplyReveal(float elapsed)
         {
-            float fire = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((elapsed - IgnitionStart) / .95f));
+            float fire = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((elapsed - FlamesStartAt) / .95f));
             for (int i = 0; i < PipCount; i++)
             {
                 if (_revealPips[i] != null)
@@ -56,7 +58,7 @@ namespace KillingMahjong.UI
                 if (_revealHearts[i] != null) _revealHearts[i].alpha = fire;
                 if (_flames[i] != null) _flames[i].SetIgnitionProgress(fire);
             }
-            float body = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / .36f));
+            float body = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / BlocksReadyAt));
             if (_revealCharge != null) _revealCharge.alpha = body;
             if (_revealMultiplier != null) _revealMultiplier.alpha = body;
         }
@@ -89,8 +91,9 @@ namespace KillingMahjong.UI
 
         internal IEnumerator RevealPresentation()
         {
+            // 呼び出したフレームで炎を隠す。最初のyieldまで既存の炎を見せない。
             PrepareReveal();
-            yield return AnimateReveal(new[] { this });
+            return AnimateReveal(new[] { this });
         }
 
         private static IEnumerator AnimateReveal(VoltageUI[] views)
@@ -110,12 +113,13 @@ namespace KillingMahjong.UI
                         view.ApplyReveal(elapsed);
                     }
                     if (!visible) yield break;
-                    if (!playedSound && elapsed >= IgnitionStart)
+                    if (!playedSound && elapsed >= IgnitionSoundAt)
                     {
                         playedSound = true;
                         audio?.PlayVoltageIgnitionSE();
                     }
-                    elapsed += Time.unscaledDeltaTime;
+                    // 重い開始フレームでも、ブロックだけの時間と点火前の間を飛ばさない。
+                    elapsed += Mathf.Min(Time.unscaledDeltaTime, 1f / 30f);
                     yield return null;
                 }
             }
