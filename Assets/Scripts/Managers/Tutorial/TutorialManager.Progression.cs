@@ -155,7 +155,8 @@ namespace KillingMahjong.Managers
             else
             {
                 yield return StartCoroutine(PlayLines(introLines));
-                SetBoardVisible(true);
+                // 第1局の盤面は「１局目」の暗転の間に出す（下）。ここで出すと牌が生えて見える
+                if (!IsFirstRound(data)) SetBoardVisible(true);
             }
 
             // **経験を聞くのはここ（2026-09-12 に位置を移した）。**
@@ -164,6 +165,10 @@ namespace KillingMahjong.Managers
             // 頭から始めたときだけ聞く。中身は TutorialManager.Intro.cs。
             yield return StartCoroutine(AskExperienceIfNeeded());
             RestoreIntroSettings();
+            // 第1局の「１局目」と盤面は、ふつうは経験を聞く流れの中（「アタシと実践してみよっかー」のあと）で出す。
+            // 局を指定して始めたなどで聞かなかったときは、まだ出ていないのでここで出す
+            if (IsFirstRound(data) && !_boardVisible) yield return StartCoroutine(PlayRoundLabelRoutine(1));
+            if (_aborted) yield break;
 
             // --- 能力の実演と説明（手順⑱〜⑳） ---
             // 能力は手牌フェイズでしか使えない仕様なので、実演もこのフェイズのうちに行う。
@@ -188,8 +193,7 @@ namespace KillingMahjong.Managers
             bool selfMadeMangan = false;
 
             // 第1局の牌選択中だけ、牌以外を伏せる。賭け金フェイズの直前で戻す
-            bool hideChrome = _scenario != null && _scenario.rounds != null
-                              && _scenario.rounds.Count > 0 && _scenario.rounds[0] == data;
+            bool hideChrome = IsFirstRound(data);
             if (hideChrome) SetFirstRoundChromeVisible(false);
 
             // **自由に組ませる局は、13枚そろう前から『おまかせ』を出す。**
@@ -484,17 +488,44 @@ namespace KillingMahjong.Managers
                 yield break;
             }
 
-            // **第1局は局名を出さない**（2026-10-29 ユーザー指示「契約書を書くといきなり『第一局』表示が出るので困惑した」）。
-            // まだ先輩も出てきておらず、何の1局目なのか分からない。盤面を暗いうちに出すための暗転だけ残す
-            bool showLabel = number > 1;
+            // **第1局は、頭では暗転も盤面も出さない**（2026-10-29 ユーザー指示「契約書を書くといきなり『第一局』表示が出るので困惑した」
+            // 「一局目の演出が出てから自分の牌が出るようにして」）。まだ先輩も出てきておらず、何の1局目なのか分からない。
+            // 「１局目」の暗転は「アタシと実践してみよっかー」のあとに出し、その暗いあいだに牌を出す（<see cref="PlayRoundLabelRoutine"/>）
+            if (number == 1) yield break;
+            yield return PlayRoundDarkenRoutine(phase, RoundLabel(number), RoundLabelHoldSeconds);
+        }
+
+        private static string RoundLabel(int number) => ToFullWidthDigits(number) + "局目";
+
+        private bool IsFirstRound(TutorialRoundData data) => _scenario != null && _scenario.rounds != null
+            && _scenario.rounds.Count > 0 && _scenario.rounds[0] == data;
+
+        /// <summary>
+        /// 「N局目」の暗転を出し、暗いあいだに盤面（自分の牌）を出す。第1局の「アタシと実践してみよっかー」のあと
+        /// （2026-10-29 ユーザー指示「このセリフの後 １局目の演出を出して」「一局目の演出が出てから自分の牌が出るようにして」）。
+        /// 暗転の部品が無いときは、盤面だけ出す。
+        /// </summary>
+        private IEnumerator PlayRoundLabelRoutine(int number)
+        {
+            var phase = gameUIManager != null ? gameUIManager.PhaseTransitionUI : null;
+            if (phase != null && !phase.gameObject.activeSelf) phase.gameObject.SetActive(true);
+            if (phase == null || !phase.isActiveAndEnabled) { ShowBoardWhileDark(); yield break; }
+            // 前のセリフを暗転の上に残さない
+            if (dialogueUI != null) dialogueUI.HideText();
+            yield return PlayRoundDarkenRoutine(phase, RoundLabel(number), RoundLabelHoldSeconds);
+        }
+
+        /// <summary>暗転して <paramref name="label"/> を出し、覆っているあいだに盤面を出しきって、<paramref name="hold"/> 秒おいて明ける</summary>
+        private IEnumerator PlayRoundDarkenRoutine(KillingMahjong.UI.PhaseTransitionUI phase, string label, float hold)
+        {
             bool covered = false;
-            phase.PlayRoundStartDarken(showLabel ? ToFullWidthDigits(number) + "局目" : "", onReady: () => covered = true);
+            phase.PlayRoundStartDarken(label, onReady: () => covered = true);
             float limit = Time.realtimeSinceStartup + 6f;
             yield return new WaitUntil(() => covered || _aborted || Time.realtimeSinceStartup >= limit);
             if (_aborted) yield break;
 
             ShowBoardWhileDark();
-            yield return new WaitForSecondsRealtime(showLabel ? RoundLabelHoldSeconds : 0.3f);
+            yield return new WaitForSecondsRealtime(hold);
             if (_aborted) yield break;
 
             bool light = false;
