@@ -14,7 +14,20 @@ namespace KillingMahjong.Managers
 
         // ==================== 盤面セットアップ ====================
 
-        private void SetupBoard(TutorialRoundData data, List<int> handBaseIds)
+        private TutorialRoundData _pendingRoundBoard;
+
+        private void InitializeRoundBoard(TutorialRoundData data, bool preserveRoundCover = false)
+        {
+            if (IsFirstTutorialRound(data)) IsVoltageUiRevealed = false;
+            else if (IsSecondTutorialRound(data)) IsVoltageUiRevealed = true;
+            ClearPerspectiveMarks();
+            SetHandButtonStage(HandButtonStage.Hidden);
+            SetupBoard(data, null, preserveRoundCover);
+            if (data.enemyUsesAbility) _abilityBellRevealed = true;
+            SetAbilityBellVisible(_abilityBellRevealed);
+        }
+
+        private void SetupBoard(TutorialRoundData data, List<int> handBaseIds, bool preserveRoundCover = false)
         {
             _tutorialEnemyAssaultActive = false;
             if (gameUIManager == null || gameUIManager.HandUI == null || gameUIManager.WallUI == null) return;
@@ -22,7 +35,7 @@ namespace KillingMahjong.Managers
             gameUIManager.IsTutorialMode = true;
             gameUIManager.TutorialManager = this;
 
-            if (gameUIManager.PhaseTransitionUI != null)
+            if (!preserveRoundCover && gameUIManager.PhaseTransitionUI != null)
                 gameUIManager.PhaseTransitionUI.gameObject.SetActive(false);
 
             gameUIManager.ClearAllTiles();

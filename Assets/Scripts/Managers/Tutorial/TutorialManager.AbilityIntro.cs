@@ -173,7 +173,7 @@ namespace KillingMahjong.Managers
         /// </summary>
         private IEnumerator RunAbilityIntroduction()
         {
-            var restoreBoard = CaptureIntroDemoBoard();
+            System.Action restoreBoard = null;
             _introPerspectiveUses = 0;
             if (gameUIManager != null && gameUIManager.AbilityUI != null)
                 gameUIManager.AbilityUI.TutorialUnusableReason = IntroSkillUnusableReason;
@@ -181,7 +181,9 @@ namespace KillingMahjong.Managers
             {
                 yield return StartCoroutine(PlayLines(AbilityOpeningLines));
                 // 「それじゃあ第二局目だね」のあとに「２局目」の暗転を出し、暗いあいだに盤面を出す（2026-10-29 ユーザー指示）
-                if (!_boardVisible) yield return StartCoroutine(PlayRoundLabelRoutine(2));
+                if (_pendingRoundBoard != null || !_boardVisible) yield return StartCoroutine(PlayRoundLabelRoutine(2));
+                // 第2局の配牌が済んでから、能力実演の復帰先を保存する。
+                restoreBoard = CaptureIntroDemoBoard();
 
                 FlashScreen();
                 yield return new WaitForSeconds(0.35f);
@@ -213,7 +215,7 @@ namespace KillingMahjong.Managers
             finally
             {
                 ClearIntroSkillSelection();
-                restoreBoard();
+                restoreBoard?.Invoke();
                 if (gameUIManager != null && gameUIManager.AbilityUI != null)
                 {
                     gameUIManager.AbilityUI.TutorialActivationHandler = null;

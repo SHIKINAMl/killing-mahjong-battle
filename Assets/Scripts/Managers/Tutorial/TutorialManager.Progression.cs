@@ -80,25 +80,14 @@ namespace KillingMahjong.Managers
             // 以前（2026-10-08）は第2局の説明の途中で「ボルテージUI表示」としてぱっと出していたが、
             // 画面に物をぱっと出さない決まりにした（2026-10-24 ユーザー指示「チュートリアルの対局フェイズでUIをニョキって生やすのは止めてくれ。基本的に画面が暗転しているときにUIは全部出すように」）。
             // 第2局は打牌フェイズに入る暗転（「対局開始」の覆い）の間に出る。説明はそれを指すだけ
-            if (IsFirstTutorialRound(data)) IsVoltageUiRevealed = false;
-            else if (IsSecondTutorialRound(data)) IsVoltageUiRevealed = true;
-
-            // 前局の透視マークがプールの牌に残らないようにする
-            ClearPerspectiveMarks();
-
-            // 13枚そろうまでは『自動』も『決定』も出さない
-            SetHandButtonStage(HandButtonStage.Hidden);
-
-            // 手牌は空の状態で開始する（プレイヤーが山牌から選ぶ）
-            SetupBoard(data, null);
-
-            // 能力ベルはフロー図で「初期非表示UI」。能力の話に入る局まで伏せておき、
-            // 一度出したらそれ以降は出したままにする。
-            if (data.enemyUsesAbility) _abilityBellRevealed = true;
-            SetAbilityBellVisible(_abilityBellRevealed);
-
-            SetBoardVisible(false);
-            yield return null;
+            // 第2局のまとめ中は前局の牌・UIを残す。配り直しと表示切替は黒幕の内側で行う。
+            _pendingRoundBoard = IsSecondTutorialRound(data) ? data : null;
+            if (_pendingRoundBoard == null)
+            {
+                InitializeRoundBoard(data);
+                SetBoardVisible(false);
+                yield return null;
+            }
 
             // **どの局も、暗転 →「N局目」→ 明転 で始め、盤面は暗転している間に出しておく**（2026-10-24 ユーザー指示「チュートリアルの対局フェイズでUIをニョキって生やすのは止めてくれ。基本的に画面が暗転しているときにUIは全部出すように」）。
             // 以前は女の子とセリフだけで始め、盤面は導入のセリフの途中で出し、山牌は1枚ずつ起こしていた。
@@ -116,7 +105,7 @@ namespace KillingMahjong.Managers
                 yield return StartCoroutine(RunAfterFirstRoundWrapUp());
                 if (_aborted) yield break;
                 // ふつうは能力の紹介の頭（「それじゃあ第二局目だね」のあと）で出してある。出ていなければここで出す
-                if (!_boardVisible) yield return StartCoroutine(PlayRoundLabelRoutine(2));
+                if (_pendingRoundBoard != null || !_boardVisible) yield return StartCoroutine(PlayRoundLabelRoutine(2));
                 if (_aborted) yield break;
             }
 
@@ -515,8 +504,6 @@ namespace KillingMahjong.Managers
             var phase = gameUIManager != null ? gameUIManager.PhaseTransitionUI : null;
             if (phase != null && !phase.gameObject.activeSelf) phase.gameObject.SetActive(true);
             if (phase == null || !phase.isActiveAndEnabled) { ShowBoardWhileDark(); yield break; }
-            // 前のセリフを暗転の上に残さない
-            if (dialogueUI != null) dialogueUI.HideText();
             yield return PlayRoundDarkenRoutine(phase, RoundLabel(number), RoundLabelHoldSeconds);
         }
 
@@ -529,6 +516,8 @@ namespace KillingMahjong.Managers
             yield return new WaitUntil(() => covered || _aborted || Time.realtimeSinceStartup >= limit);
             if (_aborted) yield break;
 
+            // セリフも黒幕が覆ってから隠す。暗転前にUIだけ消さない。
+            if (dialogueUI != null) dialogueUI.HideText();
             ShowBoardWhileDark();
             yield return new WaitForSecondsRealtime(hold);
             if (_aborted) yield break;
@@ -543,6 +532,12 @@ namespace KillingMahjong.Managers
         /// <summary>盤面と山牌をいちどに出す。山牌は起こす途中の大きさで残っていても等倍に戻す</summary>
         private void ShowBoardWhileDark()
         {
+            if (_pendingRoundBoard != null)
+            {
+                var nextRound = _pendingRoundBoard;
+                InitializeRoundBoard(nextRound, preserveRoundCover: true);
+                _pendingRoundBoard = null;
+            }
             SetBoardVisible(true);
             if (gameUIManager == null || gameUIManager.WallUI == null) return;
             foreach (var t in gameUIManager.WallUI.GetComponentsInChildren<TileInteraction>(true))
