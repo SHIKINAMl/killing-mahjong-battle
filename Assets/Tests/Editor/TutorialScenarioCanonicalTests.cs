@@ -16,31 +16,37 @@ namespace KillingMahjong.Tests
         {
             var source = Canonical;
             var round = ((IList)ScenarioType.GetField("rounds").GetValue(source))[1];
-            Assert.That(round.GetType().GetField("onLowBetLines"), Is.Null);
+            Assert.That(round.GetType().GetField("onLowBetLines"), Is.Not.Null);
             var table = Type.GetType("KillingMahjong.Managers.Tutorial.TutorialLineTable, Assembly-CSharp", true);
             var rows = (IList)table.GetMethod("Dump", BindingFlags.Static | BindingFlags.Public)
                 .Invoke(null, new object[] { source });
-            int explanations = 0, intro = 0;
+            int explanations = 0, intro = 0, lowBet = 0;
             foreach (var row in rows)
             {
                 string id = (string)row.GetType().GetField("id").GetValue(row);
                 string text = (string)row.GetType().GetField("text").GetValue(row);
                 if (id.StartsWith("defeatRon.assaultExplainLines[")) explanations++;
                 if (id.StartsWith("r1.beforeEnemyAssaultLines[")) intro++;
+                if (id == "r1.onLowBetLines[0]")
+                {
+                    lowBet++;
+                    Assert.That(text, Is.EqualTo("ちょ\nビビり過ぎ"));
+                }
                 Assert.That(text, Does.Not.Contain("あげるね！"));
                 Assert.That(text, Does.Not.Contain("ここは3000くらい"));
             }
             Assert.That(explanations, Is.EqualTo(3));
             Assert.That(intro, Is.EqualTo(2));
+            Assert.That(lowBet, Is.EqualTo(1));
         }
 
-        [TestCase(200, 0)]
-        [TestCase(999, 0)]
+        [TestCase(200, 1)]
+        [TestCase(999, 1)]
         [TestCase(1000, 1)]
         [TestCase(3999, 1)]
         [TestCase(4000, 1)]
         [TestCase(5000, 1)]
-        public void BetReactionsFollowChartWithoutALowBetBranch(int amount, int count)
+        public void BetReactionsFollowAllThreeChartBranches(int amount, int count)
         {
             var round = ((IList)ScenarioType.GetField("rounds").GetValue(Canonical))[1];
             var manager = Type.GetType("KillingMahjong.Managers.TutorialManager, Assembly-CSharp", true);
@@ -49,7 +55,8 @@ namespace KillingMahjong.Tests
             Assert.That(lines.Count, Is.EqualTo(count));
             if (count > 0)
                 Assert.That(lines[0].GetType().GetField("text").GetValue(lines[0]),
-                    Is.EqualTo(amount >= 4000 ? "うわーギャンブラーだねー" : "手堅いねー"));
+                    Is.EqualTo(amount >= 4000 ? "うわーギャンブラーだねー"
+                        : amount >= 1000 ? "手堅いねー" : "ちょ\nビビり過ぎ"));
         }
         [Test]
         public void FirstRoundManganExampleIncludesHonorsAndMatchesDisplayedFiveHan()

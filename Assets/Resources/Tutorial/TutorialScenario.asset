@@ -142,6 +142,9 @@ MonoBehaviour:
     onMiddleBetLines:
     - speaker: 0
       text: "手堅いねー"
+    onLowBetLines:
+    - speaker: 0
+      text: "ちょ\nビビり過ぎ"
     afterFreeBetLines:
     - speaker: 0
       text: "よし自分で賭けられたね"

@@ -146,8 +146,10 @@ namespace KillingMahjong.Managers
         public List<TutorialLine> inheritedBetLines = new List<TutorialLine>();
         [Tooltip("第2局で4000以上を選んだときの反応。選んだ額は変更しない。")]
         public List<TutorialLine> onHighBetLines = new List<TutorialLine>();
-        [Tooltip("第2局で1000以上4000未満を選んだときの反応。低額の分岐は設けない。")]
+        [Tooltip("第2局で1000以上4000未満を選んだときの反応。")]
         public List<TutorialLine> onMiddleBetLines = new List<TutorialLine>();
+        [Tooltip("第2局で1000未満を選んだときの反応。選んだ額は変更しない。")]
+        public List<TutorialLine> onLowBetLines = new List<TutorialLine>();
         public List<TutorialLine> afterFreeBetLines = new List<TutorialLine>();
         public List<TutorialLine> beforeEnemyAssaultLines = new List<TutorialLine>();
 

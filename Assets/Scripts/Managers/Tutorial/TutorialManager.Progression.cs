@@ -567,7 +567,7 @@ namespace KillingMahjong.Managers
             if (_aborted) yield break;
             betting.HideBettingPhase();
             yield return betting.WaitForSlideAnimation();
-            // 低額の分岐はユーザー指示で廃止。額の引き上げ・引き下げ・代理確定はしない。
+            // 額に応じてセリフだけ分岐し、選んだ掛け金は変更しない。
             yield return PlayLines(FreeBetReaction(data, _lastConfirmedBet));
             yield return PlayLines(data.afterFreeBetLines);
         }
@@ -576,7 +576,7 @@ namespace KillingMahjong.Managers
         {
             if (amount >= 4000) return data.onHighBetLines;
             if (amount >= 1000) return data.onMiddleBetLines;
-            return new List<TutorialLine>();
+            return data.onLowBetLines;
         }
         private IEnumerator RunBettingPhase(TutorialRoundData data)
         {
