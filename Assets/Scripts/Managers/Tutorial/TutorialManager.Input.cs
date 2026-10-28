@@ -149,7 +149,15 @@ namespace KillingMahjong.Managers
 
             HasClickedAutoMangan = true;
 
-            SetupBoard(_round, _round.manganHandBaseIds);
+            // 配り直すと能力紹介で確定した牌交換まで消える。現在の山から手牌だけを選ぶ。
+            var board = BoardStateManager.Instance;
+            if (board != null)
+            {
+                board.SetLocalState(new List<int>(board.OriginalWallTiles),
+                    TutorialTiles.EncodeAll(_round.manganHandBaseIds, _round.doraBaseId),
+                    TutorialTiles.EncodeAll(_round.waitBaseIds, _round.doraBaseId));
+                if (gameUIManager != null) gameUIManager.RefreshBoardAfterTransition();
+            }
 
             if (gameUIManager != null) gameUIManager.ClearSelection();
 

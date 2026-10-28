@@ -16,7 +16,6 @@ namespace KillingMahjong.Managers
         {
             var board = BoardStateManager.Instance;
             if (board == null) return () => { };
-            var wall = new List<int>(board.OriginalWallTiles);
             var hand = new List<int>(board.CurrentHandTiles);
             var waits = new List<int>(board.CurrentWaitTiles);
             var enemyWall = new List<int>(board.OriginalEnemyWallTiles);
@@ -27,8 +26,8 @@ namespace KillingMahjong.Managers
             return () =>
             {
                 if (board == null) return;
-                // 消費した持ち点は残し、実演の牌・公開・強化だけを元に戻す。
-                board.SetLocalState(wall, hand, waits);
+                // 確定した牌交換と消費した持ち点は残す。公開・強化と手牌の実演だけを戻す。
+                board.SetLocalState(new List<int>(board.OriginalWallTiles), hand, waits);
                 // SetEnemyStateは空のwallを「既存の山を維持」と扱うので、未配牌へ戻す場合も先に除く。
                 board.OriginalEnemyWallTiles.Clear();
                 board.CurrentEnemyWallTiles.Clear();

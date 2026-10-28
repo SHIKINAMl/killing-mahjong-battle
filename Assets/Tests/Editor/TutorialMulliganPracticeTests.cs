@@ -9,6 +9,52 @@ namespace KillingMahjong.Tests
 {
     public class TutorialMulliganPracticeTests
     {
+        [Test]
+        public void ConfirmedExchangeSurvivesIntroCleanupAndAutoMangan()
+        {
+            var boardType = Type.GetType("KillingMahjong.Managers.BoardStateManager, Assembly-CSharp", true);
+            var managerType = Type.GetType("KillingMahjong.Managers.TutorialManager, Assembly-CSharp", true);
+            var scenarioType = Type.GetType("KillingMahjong.Managers.TutorialScenario, Assembly-CSharp", true);
+            var scenario = Resources.Load("Tutorial/TutorialScenario", scenarioType);
+            var round = ((IList)scenarioType.GetField("rounds").GetValue(scenario))[1];
+            var flags = BindingFlags.Instance | BindingFlags.NonPublic;
+            var instance = boardType.GetProperty("Instance");
+            object previous = instance.GetValue(null);
+            var boardObject = new GameObject("Mulligan board test");
+            var managerObject = new GameObject("Mulligan tutorial test");
+            try
+            {
+                var board = boardObject.AddComponent(boardType);
+                instance.SetValue(null, board);
+                var manager = managerObject.AddComponent(managerType);
+                managerType.GetField("_round", flags).SetValue(manager, round);
+                var wall = new List<int>((List<int>)round.GetType().GetField("wallBaseIds").GetValue(round));
+                boardType.GetMethod("SetLocalState").Invoke(board, new object[] { wall, new List<int>(), new List<int>(), null });
+                var cleanup = (Action)managerType.GetMethod("CaptureIntroDemoBoard", flags).Invoke(manager, null);
+                var reserved = (HashSet<int>)managerType.GetMethod("GetManganReservedWallIndexes",
+                    BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, new[] { round });
+                int index = 0;
+                while (reserved.Contains(index)) index++;
+                int replacement = 19;
+                Assert.That(wall[index], Is.Not.EqualTo(replacement));
+                boardType.GetMethod("ReplaceWallTileAt").Invoke(board, new object[] { index, replacement });
+                cleanup();
+                Assert.That(((List<int>)boardType.GetProperty("OriginalWallTiles").GetValue(board))[index], Is.EqualTo(replacement),
+                    "能力紹介の終了で確定した交換が取り消されている");
+                managerType.GetMethod("ApplyMockAutoMangan").Invoke(manager, null);
+                Assert.That(((List<int>)boardType.GetProperty("OriginalWallTiles").GetValue(board))[index], Is.EqualTo(replacement),
+                    "おまかせで配牌し直し、交換が取り消されている");
+                Assert.That(((List<int>)boardType.GetProperty("CurrentHandTiles").GetValue(board)).Count, Is.EqualTo(13));
+                Assert.That(((List<int>)boardType.GetProperty("CurrentWallTiles").GetValue(board)).Count, Is.EqualTo(21));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(managerObject);
+                UnityEngine.Object.DestroyImmediate(boardObject);
+                instance.SetValue(null, previous);
+            }
+        }
+
         [TestCase(0)]
         [TestCase(1)]
         public void EveryChoiceKeepsTheManganExampleAvailable(int roundIndex)
