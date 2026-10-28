@@ -203,7 +203,7 @@ namespace KillingMahjong.Managers
             var info = new EngineData.BettingCompletedInfo
             {
                 LocalBet = bet,
-                EnemyBet = bet,
+                EnemyBet = _enemyStake,
                 LocalHpBefore = _playerHpBeforeBet,
                 EnemyHpBefore = _enemyHpBeforeBet,
                 LocalHpAfter = PlayerShownHp,
