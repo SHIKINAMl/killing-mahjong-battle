@@ -76,10 +76,7 @@ namespace KillingMahjong.Managers
             _lastPlayerDiscardBaseId = -1;
             _hasMovedTileThisRound = false;
 
-            // ボルテージのゲージは第1局では伏せ、第2局からは出しておく。
-            // 以前（2026-10-08）は第2局の説明の途中で「ボルテージUI表示」としてぱっと出していたが、
-            // 画面に物をぱっと出さない決まりにした（2026-10-24 ユーザー指示「チュートリアルの対局フェイズでUIをニョキって生やすのは止めてくれ。基本的に画面が暗転しているときにUIは全部出すように」）。
-            // 第2局は打牌フェイズに入る暗転（「対局開始」の覆い）の間に出る。説明はそれを指すだけ
+            // ボルテージは第2局の「新規牌」の説明を終えてから、専用の登場演出で見せる。
             // 第2局のまとめ中は前局の牌・UIを残す。配り直しと表示切替は黒幕の内側で行う。
             _pendingRoundBoard = IsSecondTutorialRound(data) ? data : null;
             if (_pendingRoundBoard == null)

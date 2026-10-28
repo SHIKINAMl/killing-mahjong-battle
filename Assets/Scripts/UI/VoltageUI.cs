@@ -318,6 +318,7 @@ namespace KillingMahjong.UI
         private void OnDisable()
         {
             VoltageSystem.Changed -= Refresh;
+            CancelRevealPresentation();
         }
 
         private void Refresh()

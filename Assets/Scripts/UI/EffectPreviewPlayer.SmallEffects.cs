@@ -135,6 +135,13 @@ namespace KillingMahjong.UI
                     yield return new WaitForSeconds(1.2f);
                     gauge.AbsorbStakesIntoGauge(true, 3000);
                     yield return new WaitForSeconds(1.8f); break;   // 吸い込み 0.45 秒 + ゲージが伸びる 0.6 秒
+                case VoltageUI.RevealEffectId:
+                    var voltage = VoltageUI.CreatePresentation(rig.surface);
+                    scope.AddCleanup(() => { if (voltage != null) voltage.CancelRevealPresentation(); });
+                    voltage.PresentFeedback(2, false, 5, 5, 9, 1.3f);
+                    yield return voltage.RevealPresentation();
+                    yield return new WaitForSecondsRealtime(.8f);
+                    break;
                 case "voltage.flight":
                     var target = new GameObject("VoltageUI_Self", typeof(RectTransform), typeof(Image)).GetComponent<Image>();
                     target.transform.SetParent(rig.surface, false); target.color = new Color32(110, 240, 220, 255);

@@ -129,6 +129,24 @@ namespace KillingMahjong.UI
         private int _level;
         private bool _broken;
         private float _fieldOffset;
+        private float _ignitionProgress = 1f;
+
+        internal void BeginIgnition()
+        {
+            _ignitionProgress = 0f;
+            if (_level > 0 && !_broken)
+            {
+                Reseed();
+                for (int i = 0; i < _particles.Length; i++) _particles[i].Age = 0f;
+            }
+            SetVerticesDirty();
+        }
+
+        internal void SetIgnitionProgress(float progress)
+        {
+            _ignitionProgress = Mathf.Clamp01(progress);
+            SetVerticesDirty();
+        }
 
         /// <summary>燃えている四角。**外周から粒を湧かせる**ので、大きさを毎回ここから読む。</summary>
         private RectTransform _pip;
@@ -313,7 +331,7 @@ namespace KillingMahjong.UI
 
         private void Update()
         {
-            if (_level <= 0 || _broken) return;
+            if (_level <= 0 || _broken || _ignitionProgress <= 0f) return;
 
             Tuning t = ByLevel[_level];
             if (_particles == null || _particles.Length != t.Count) Reseed();
@@ -363,6 +381,7 @@ namespace KillingMahjong.UI
 
                 // 最後の2割で消す。ふっと無くなるより、薄れて終わるほうが炎に見える
                 if (up > 0.8f) c.a *= 1f - (up - 0.8f) / 0.2f;
+                c.a *= _ignitionProgress;
                 if (c.a <= 0.01f) continue;
 
                 // **座標も大きさも整数に丸める。** ドット絵の中で半端な位置に置くと、

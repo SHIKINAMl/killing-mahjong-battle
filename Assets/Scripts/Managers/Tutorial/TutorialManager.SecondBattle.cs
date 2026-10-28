@@ -373,11 +373,9 @@ namespace KillingMahjong.Managers
         /// ボルテージのゲージを出す。図の「ボルテージUI表示」。
         /// 以後、打牌フェイズのあいだは出たままになる（<see cref="IsVoltageUiRevealed"/>）。
         /// </summary>
-        private void RevealVoltageUi()
+        private IEnumerator RevealVoltageUi()
         {
-            IsVoltageUiRevealed = true;
-            UI.VoltageUI.EnsureCreated();
-            UI.VoltageUI.SetCanvasVisible(true);
+            yield return UI.VoltageUI.RevealRoutine(() => IsVoltageUiRevealed = true);
         }
 
         /// <summary>
@@ -410,8 +408,7 @@ namespace KillingMahjong.Managers
             ClearGuide();
 
             // ボルテージUI表示 →「これはボルテージ」
-            RevealVoltageUi();
-            yield return new WaitForSeconds(0.4f);
+            yield return RevealVoltageUi();
             yield return StartCoroutine(PlayLines(VoltageIntroNameLines));
 
             // ボルテージUIハイライト。**自分のと相手のと、両方を囲む。**

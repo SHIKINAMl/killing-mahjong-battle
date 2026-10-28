@@ -19,7 +19,7 @@ namespace KillingMahjong.Managers
         private void InitializeRoundBoard(TutorialRoundData data, bool preserveRoundCover = false)
         {
             if (IsFirstTutorialRound(data)) IsVoltageUiRevealed = false;
-            else if (IsSecondTutorialRound(data)) IsVoltageUiRevealed = true;
+            else if (IsSecondTutorialRound(data)) IsVoltageUiRevealed = false;
             ClearPerspectiveMarks();
             SetHandButtonStage(HandButtonStage.Hidden);
             SetupBoard(data, null, preserveRoundCover);

@@ -100,6 +100,7 @@ namespace KillingMahjong.UI
             new Entry("tile.dora", "牌・血・ゲージ", "ドラ牌の発光", "TileVisual.SetTile / DoraShine"),
             new Entry("gauge.absorb", "牌・血・ゲージ", "掛け金の吸収・獲得ゲージ", "ScoreGaugeUI.AbsorbStakesIntoGauge"),
             new Entry("voltage.flight", "牌・血・ゲージ", "牌がボルテージへ吸い込まれる", "VoltageTileFlightEffect.TryPlay"),
+            new Entry(VoltageUI.RevealEffectId, "牌・血・ゲージ", "ボルテージ登場：ブロック → 炎の点火", "VoltageUI.RevealRoutine / TutorialManager.RunVoltageIntroduction"),
             new Entry("character.death", "キャラクター・背景", "相手が倒れる", "EnemyInfoUI.PlayDeathRoutine"),
             new Entry("character.bounce", "キャラクター・背景", "立ち絵のバウンド", "EnemyInfoUI.PlayBounceAnimation"),
             new Entry("character.turn", "キャラクター・背景", "手番の発光", "EnemyInfoUI.SetTurnGlow / PlayerInfoUI.SetTurnGlow", unused: true),
