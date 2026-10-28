@@ -158,8 +158,9 @@ namespace KillingMahjong.UI
             additionalCallbacks?.Invoke();
             IsDarkenTransitioning = false;
 
-            // ドン！とテキスト表示。画面揺れと同じ「着弾」なので打撃音を当てる
-            if (centerText != null)
+            // ドン！とテキスト表示。画面揺れと同じ「着弾」なので打撃音を当てる。
+            // 字が空なら、暗転だけにして字も音も出さない（チュートリアルの第1局。2026-10-29）
+            if (centerText != null && !string.IsNullOrEmpty(text))
             {
                 PlayTransitionStinger("br_blackout");
                 centerText.text = text;

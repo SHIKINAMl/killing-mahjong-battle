@@ -484,14 +484,17 @@ namespace KillingMahjong.Managers
                 yield break;
             }
 
+            // **第1局は局名を出さない**（2026-10-29 ユーザー指示「契約書を書くといきなり『第一局』表示が出るので困惑した」）。
+            // まだ先輩も出てきておらず、何の1局目なのか分からない。盤面を暗いうちに出すための暗転だけ残す
+            bool showLabel = number > 1;
             bool covered = false;
-            phase.PlayRoundStartDarken(ToFullWidthDigits(number) + "局目", onReady: () => covered = true);
+            phase.PlayRoundStartDarken(showLabel ? ToFullWidthDigits(number) + "局目" : "", onReady: () => covered = true);
             float limit = Time.realtimeSinceStartup + 6f;
             yield return new WaitUntil(() => covered || _aborted || Time.realtimeSinceStartup >= limit);
             if (_aborted) yield break;
 
             ShowBoardWhileDark();
-            yield return new WaitForSecondsRealtime(RoundLabelHoldSeconds);
+            yield return new WaitForSecondsRealtime(showLabel ? RoundLabelHoldSeconds : 0.3f);
             if (_aborted) yield break;
 
             bool light = false;
