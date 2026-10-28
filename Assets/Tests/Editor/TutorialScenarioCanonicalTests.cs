@@ -12,24 +12,45 @@ namespace KillingMahjong.Tests
         private ScriptableObject Canonical => (ScriptableObject)Resources.Load("Tutorial/TutorialScenario", ScenarioType);
 
         [Test]
-        public void SecondRoundLowBetLinesAreIncludedInCanonicalScriptExport()
+        public void AssaultExplanationIsExportedAndObsoleteBetAdjustmentLinesAreAbsent()
         {
             var source = Canonical;
             var round = ((IList)ScenarioType.GetField("rounds").GetValue(source))[1];
-            var lines = (IList)round.GetType().GetField("onLowBetLines").GetValue(round);
-            Assert.That(lines.Count, Is.EqualTo(2));
-            Assert.That(lines[0].GetType().GetField("text").GetValue(lines[0]), Is.EqualTo("えー、ちょっとビビりすぎじゃない？"));
-            Assert.That(lines[1].GetType().GetField("text").GetValue(lines[1]), Is.EqualTo("あげるね！"));
-            Assert.That(round.GetType().GetField("betAmount").GetValue(round), Is.EqualTo(3000));
+            Assert.That(round.GetType().GetField("onLowBetLines"), Is.Null);
             var table = Type.GetType("KillingMahjong.Managers.Tutorial.TutorialLineTable, Assembly-CSharp", true);
             var rows = (IList)table.GetMethod("Dump", BindingFlags.Static | BindingFlags.Public)
                 .Invoke(null, new object[] { source });
-            int exported = 0;
+            int explanations = 0, intro = 0;
             foreach (var row in rows)
-                if (((string)row.GetType().GetField("id").GetValue(row)).StartsWith("r1.onLowBetLines[")) exported++;
-            Assert.That(exported, Is.EqualTo(2));
+            {
+                string id = (string)row.GetType().GetField("id").GetValue(row);
+                string text = (string)row.GetType().GetField("text").GetValue(row);
+                if (id.StartsWith("defeatRon.assaultExplainLines[")) explanations++;
+                if (id.StartsWith("r1.beforeEnemyAssaultLines[")) intro++;
+                Assert.That(text, Does.Not.Contain("あげるね！"));
+                Assert.That(text, Does.Not.Contain("ここは3000くらい"));
+            }
+            Assert.That(explanations, Is.EqualTo(3));
+            Assert.That(intro, Is.EqualTo(2));
         }
 
+        [TestCase(200, 0)]
+        [TestCase(999, 0)]
+        [TestCase(1000, 1)]
+        [TestCase(3999, 1)]
+        [TestCase(4000, 1)]
+        [TestCase(5000, 1)]
+        public void BetReactionsFollowChartWithoutALowBetBranch(int amount, int count)
+        {
+            var round = ((IList)ScenarioType.GetField("rounds").GetValue(Canonical))[1];
+            var manager = Type.GetType("KillingMahjong.Managers.TutorialManager, Assembly-CSharp", true);
+            var lines = (IList)manager.GetMethod("FreeBetReaction", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { round, amount });
+            Assert.That(lines.Count, Is.EqualTo(count));
+            if (count > 0)
+                Assert.That(lines[0].GetType().GetField("text").GetValue(lines[0]),
+                    Is.EqualTo(amount >= 4000 ? "うわーギャンブラーだねー" : "手堅いねー"));
+        }
         [Test]
         public void FirstRoundManganExampleIncludesHonorsAndMatchesDisplayedFiveHan()
         {
@@ -94,7 +115,7 @@ namespace KillingMahjong.Tests
             foreach (var row in rows)
             {
                 string id = (string)row.GetType().GetField("id").GetValue(row);
-                Assert.That(id.StartsWith("r0.") || id.StartsWith("r1.") || id.StartsWith("revival."),
+                Assert.That(id.StartsWith("r0.") || id.StartsWith("r1.") || id.StartsWith("revival.") || id.StartsWith("defeatRon."),
                     Is.True, "未使用の旧会話がTSVへ混ざっている: " + id);
             }
 

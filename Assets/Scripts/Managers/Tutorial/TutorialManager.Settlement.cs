@@ -348,7 +348,7 @@ namespace KillingMahjong.Managers
         /// 役の行は本編と同じ <c>GameUIPhaseController.FillYakuRows</c> に任せる。
         /// 台本の役名と翻数が噛み合っていなければ、あちらが行ごとの翻数を伏せて合計だけ出す。
         ///
-        /// **強襲はチュートリアルに出てこない**ので常に無し。
+        /// 第2局の強襲による決着は BuildScriptedDefeatSettlement が組み立てる。この汎用経路には乗せない。
         /// </summary>
         private static UI.RonSettlementInfo BuildSettlementInfo(
             TutorialRoundData data, bool isLocalWin, int han, int myBet, int theirBet, int carryRounds,

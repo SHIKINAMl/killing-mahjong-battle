@@ -145,7 +145,7 @@ namespace KillingMahjong.UI
             {
                 GameObject assaultRow = MakeBox(body.transform, Color.clear, 0, 1);
                 MakeText(assaultRow.transform, "強襲", 18f, PanelFaint, TextAlignmentOptions.Left, true);
-                MakeText(assaultRow.transform, s.LocalWon ? "獲得なし" : "", 20f, AccentGold, TextAlignmentOptions.Right, false, ValueColumn);
+                MakeText(assaultRow.transform, s.LocalWon ? "獲得なし" : "+" + s.AssaultBonusDamage, 20f, AccentGold, TextAlignmentOptions.Right, false, ValueColumn);
                 MakeText(assaultRow.transform, s.LocalWon ? "+" + s.AssaultBonusDamage : "獲得なし", 20f, AccentGold, TextAlignmentOptions.Right, false, ValueColumn);
             }
 

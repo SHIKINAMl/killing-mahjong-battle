@@ -135,6 +135,8 @@ namespace KillingMahjong.Managers
                  "※ここを変えると以降の全局のHPが変わり、途中で誰かが死ぬと進行不能になります。\n" +
                  "　 変更する場合は TutorialScenario.cs 冒頭の収支表を必ず確認してください。")]
         public int betAmount = 1000;
+        [Tooltip("相手の掛け金。0ならプレイヤーと同額。第2局は自由額と相手の台本設定を分ける。")]
+        public int enemyBetAmount;
 
         [Tooltip("賭け金を促すセリフ。{0} に betAmount が入る。")]
         [TextArea(1, 2)] public string betPromptText = "";
@@ -142,10 +144,12 @@ namespace KillingMahjong.Managers
         [Tooltip("前局が流局で賭け金が持ち越されたときのセリフ。{0}=持ち越し額 {1}=場の総額。" +
                  "空なら会話を挟まない。流局の次の局は賭け金を指示してはいけない（自動で同額が賭けられる仕様）。")]
         public List<TutorialLine> inheritedBetLines = new List<TutorialLine>();
-        [Tooltip("第2局で3000未満を選んだとき。セリフのあとに3000まで増やして確定する。")]
-        public List<TutorialLine> onLowBetLines = new List<TutorialLine>();
-        [Tooltip("第2局で3000を超えたとき。セリフのあとに3000まで減らして確定する。")]
+        [Tooltip("第2局で4000以上を選んだときの反応。選んだ額は変更しない。")]
         public List<TutorialLine> onHighBetLines = new List<TutorialLine>();
+        [Tooltip("第2局で1000以上4000未満を選んだときの反応。低額の分岐は設けない。")]
+        public List<TutorialLine> onMiddleBetLines = new List<TutorialLine>();
+        public List<TutorialLine> afterFreeBetLines = new List<TutorialLine>();
+        public List<TutorialLine> beforeEnemyAssaultLines = new List<TutorialLine>();
 
         [Header("■ 状況を変える ─ 打牌フェイズの進み方")]
         [Tooltip("敵が順番に捨てる牌（牌種）。要素数がそのまま手数になる。")]
@@ -231,7 +235,7 @@ namespace KillingMahjong.Managers
         public List<TutorialLine> outroLines = new List<TutorialLine>();
     }
 
-    /// <summary>台本の局とは独立した、敗北時のロン演出用データ。会話や進行は持たない。</summary>
+    /// <summary>台本の局とは独立した、敗北時のロン演出と強襲説明のデータ。進行処理は持たない。</summary>
     [Serializable]
     public sealed class TutorialDefeatRonData
     {
@@ -239,6 +243,11 @@ namespace KillingMahjong.Managers
         public List<string> yakuList = new List<string>();
         public string formulaText;
         public string rankText;
+        public List<TutorialLine> deadEndRonLines = new List<TutorialLine>();
+        public List<TutorialLine> revealRonLines = new List<TutorialLine>();
+        public List<TutorialLine> assaultExplainLines = new List<TutorialLine>();
+        public List<TutorialLine> deadEndAssaultFinalLines = new List<TutorialLine>();
+        public List<TutorialLine> revealAssaultFinalLines = new List<TutorialLine>();
 
         public TutorialRoundData ToPresentation() => new TutorialRoundData
         {
@@ -258,7 +267,7 @@ namespace KillingMahjong.Managers
 
         public List<TutorialRoundData> rounds = new List<TutorialRoundData>();
 
-        [Header("敗北分岐のロン演出（会話なし）")]
+        [Header("敗北分岐のロン演出と強襲の説明")]
         public TutorialDefeatRonData defeatRon = new TutorialDefeatRonData();
 
         [Header("● セリフを変える ─ マルチモード導入・復活")]

@@ -38,6 +38,8 @@ namespace KillingMahjong.Managers
         {
             var board = BoardStateManager.Instance;
             int hpBefore = _playerHp;
+            int enemyHpBefore = _enemyHp;
+            int playerStakeBefore = _playerStake, enemyStakeBefore = _enemyStake, stakeRoundsBefore = _stakeRounds;
             var wall = board != null ? new List<int>(board.CurrentWallTiles) : null;
             var discarded = board != null ? new HashSet<int>(board.DiscardedWallIndexes) : null;
             var hidden = board != null ? new HashSet<int>(board.HiddenTiles) : null;
@@ -60,11 +62,7 @@ namespace KillingMahjong.Managers
                 yield return new WaitForSeconds(discardInterval);
                 if (board != null) board.SetLocalTurn(false);
 
-                yield return PlayScriptedTutorialDefeat(data, _lastPlayerDiscardBaseId);
-                yield return PlayLines(new List<TutorialLine> {
-                    new TutorialLine("そ・れ・ローン"),
-                    new TutorialLine("単騎ボーナスとボルテージの合わせで死亡ってとこかな"),
-                });
+                yield return PlayScriptedTutorialDefeat(data, _lastPlayerDiscardBaseId, deadEnd: true);
                 ClearGuide();
                 SetBoardVisible(false);
                 yield return PlayLines(new List<TutorialLine> {
@@ -87,6 +85,10 @@ namespace KillingMahjong.Managers
                 if (!_aborted)
                 {
                     _playerHp = hpBefore;
+                    _enemyHp = enemyHpBefore;
+                    _playerStake = playerStakeBefore;
+                    _enemyStake = enemyStakeBefore;
+                    _stakeRounds = stakeRoundsBefore;
                     restoreRiver?.Invoke();
                     restoreVoltage();
                     if (board != null)
@@ -106,6 +108,8 @@ namespace KillingMahjong.Managers
                         gameUIManager.VisualController.InvalidateRebuildCache();
                     if (board != null) board.FireRebuildEvent();
                     ApplyPotToUI();
+                    if (_tutorialEnemyAssaultActive && gameUIManager != null && gameUIManager.PlayerInfoUI != null)
+                        UI.Effects.AssaultMarkUI.Show(gameUIManager.PlayerInfoUI.HpGaugeAnchor, attachToLeft: true);
                 }
             }
         }

@@ -121,9 +121,6 @@ namespace KillingMahjong.Managers
                     new TutorialLine("さて……\nもう心残りはないかしらね"),
                 });
                 yield return PlayScriptedTutorialDefeat(data, _lastAutoDiscardBaseId);
-                yield return PlayLines(new List<TutorialLine> {
-                    new TutorialLine("たかだか他人の死に熱くなりすぎなのよね"),
-                });
                 yield return RunRevivalFinale();
             }
             finally
@@ -134,8 +131,8 @@ namespace KillingMahjong.Managers
             }
         }
 
-        /// <summary>図でHP0が指定されたチュートリアル専用の決着。勝敗式を追加しない。</summary>
-        private IEnumerator PlayScriptedTutorialDefeat(TutorialRoundData data, int discardedBaseId)
+        /// <summary>図でHP0が指定されたチュートリアル専用の決着。本編の判定・通信には混ぜない。</summary>
+        private IEnumerator PlayScriptedTutorialDefeat(TutorialRoundData data, int discardedBaseId, bool deadEnd = false)
         {
             if (discardedBaseId < 0)
                 throw new System.InvalidOperationException("チュートリアルの決着前に打牌されていません。");
@@ -146,29 +143,51 @@ namespace KillingMahjong.Managers
             hand.Add(tile);
             int previousPlayerHp = PlayerShownHp;
             int previousEnemyHp = EnemyShownHp;
-            var settlement = BuildScriptedDefeatSettlement(ronData, previousPlayerHp, previousEnemyHp);
+            var settlement = BuildScriptedDefeatSettlement(ronData, previousPlayerHp, previousEnemyHp,
+                _playerStake, _enemyStake, VoltageSystem.GetMultiplier(isEnemy: true));
+            // 役の斜め表示までを先に見せる。説明を終えるまではHPも精算表も進めない。
+            yield return PlayRonAnimation(hand, tile, ronData.ToPresentation(), false, previousPlayerHp, settlement.MyHpAfter,
+                previousEnemyHp, settlement.TheirHpAfter, -settlement.MyDelta, settlement: settlement,
+                suppressSettlementPanel: true, deferHpUpdate: true);
+            yield return ExplainTutorialAssault(ronData, deadEnd, settlement.AssaultBonusDamage);
+            if (_aborted) yield break;
+            var ronUI = gameUIManager != null ? gameUIManager.RonAnimationUI : null;
+            if (ronUI != null)
+            {
+                ronUI.ShowTutorialSettlement(settlement);
+                yield return new WaitForSeconds(2f);
+                if (_aborted) { ronUI.HideTutorialSettlement(); yield break; }
+            }
             ClearStakes();
-            _playerHp = 0;
-            _enemyHp = previousEnemyHp;
-            yield return PlayRonAnimation(hand, tile, ronData.ToPresentation(), false, previousPlayerHp, 0,
-                previousEnemyHp, previousEnemyHp, previousPlayerHp, settlement: settlement);
+            _playerHp = settlement.MyHpAfter;
+            _enemyHp = settlement.TheirHpAfter;
+            if (ronUI != null)
+                yield return ronUI.PlayTutorialSettlementTransfer(settlement,
+                    gameUIManager.PlayerInfoUI, gameUIManager.EnemyInfoUI,
+                    previousPlayerHp, settlement.MyHpAfter, previousEnemyHp, settlement.TheirHpAfter);
             ApplyHpToUI();
+            UI.Effects.AssaultMarkUI.Clear();
             if (gameUIManager != null) gameUIManager.ScoreGauge.SetStakes(0, 0);
         }
 
         private static RonSettlementInfo BuildScriptedDefeatSettlement(TutorialDefeatRonData data,
-            int previousPlayerHp, int previousEnemyHp)
+            int previousPlayerHp, int previousEnemyHp, int playerBet, int enemyBet, float voltage)
         {
             int han = 0;
             foreach (string yaku in data.yakuList) han += GameRules.GetBaseHan(yaku);
+            int bonus = Mathf.RoundToInt(GameRules.CalculateWinnerGain(enemyBet, han) * voltage);
+            int loss = GameRules.CalculateLoserLoss(playerBet, han, winnerWonWithTanki: true) + bonus;
             var settlement = new RonSettlementInfo
             {
                 RankName = data.rankText, TotalHan = han, Multiplier = GameRules.GetMultiplier(han),
-                LocalWon = false, ShowHpBalances = true,
-                MyBet = previousPlayerHp, TheirBet = previousEnemyHp,
-                MyDelta = -previousPlayerHp, TheirDelta = 0,
-                MyHpBefore = previousPlayerHp, MyHpAfter = 0,
-                TheirHpBefore = previousEnemyHp, TheirHpAfter = previousEnemyHp,
+                LocalWon = false, VoltageMultiplier = voltage, IsTankiWait = true,
+                // チュートリアルだけの計算。本編の確定値・サーバー処理には持ち込まない。
+                AssaultApplied = true, AssaultBonusDamage = bonus,
+                MyBet = playerBet, TheirBet = enemyBet,
+                MyDelta = -loss, TheirDelta = 0,
+                MyHpBefore = previousPlayerHp, MyHpAfter = Mathf.Max(0, previousPlayerHp - loss),
+                // 強襲で放棄するのは儲けだけ。場に預けた相手自身の掛け金は返る。
+                TheirHpBefore = previousEnemyHp, TheirHpAfter = previousEnemyHp + enemyBet,
             };
             GameUIPhaseController.FillYakuRows(settlement, Common.YakuNameUtil.Summarize(data.yakuList), han);
             return settlement;

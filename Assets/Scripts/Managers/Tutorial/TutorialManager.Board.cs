@@ -16,6 +16,7 @@ namespace KillingMahjong.Managers
 
         private void SetupBoard(TutorialRoundData data, List<int> handBaseIds)
         {
+            _tutorialEnemyAssaultActive = false;
             if (gameUIManager == null || gameUIManager.HandUI == null || gameUIManager.WallUI == null) return;
 
             gameUIManager.IsTutorialMode = true;

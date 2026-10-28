@@ -114,6 +114,10 @@ namespace KillingMahjong.Managers.Tutorial
                 }
             }
 
+            if (scenario.defeatRon != null)
+                foreach (var field in LineListFields(scenario.defeatRon.GetType()))
+                    VisitList("defeatRon." + field.Name, field.GetValue(scenario.defeatRon) as List<TutorialLine>, visit);
+
             if (scenario.revival != null)
             {
                 VisitList("revival.enemyLines", scenario.revival.enemyLines, visit);

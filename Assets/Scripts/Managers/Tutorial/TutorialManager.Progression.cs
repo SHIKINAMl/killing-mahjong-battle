@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.SceneManagement;
 using System.Collections;
 using System.Collections.Generic;
@@ -320,7 +320,9 @@ namespace KillingMahjong.Managers
                 // 実際に確定した額で積む（UIの表示額と場の額を必ず一致させる）
                 int bet = _lastConfirmedBet > 0 ? _lastConfirmedBet : data.betAmount;
                 _lastBetAmount = bet;
-                PlaceBet(bet);
+                PlaceBet(bet, data.enemyBetAmount);
+                if (IsSecondTutorialRound(data))
+                    yield return RunEnemyAssaultIntroduction(data);
             }
 
             // **牌以外を戻すのはここ（2026-09-12 の指示）。**
@@ -377,17 +379,17 @@ namespace KillingMahjong.Managers
         /// <summary>
         /// 賭け金を場へ預ける。総体力は動かさず、表示体力だけ預けた分を引く（本編と同じ）。
         /// 減る表示は対局開始の演出で行い、ここでは表示用台帳だけを合わせる。
-        /// チュートリアルでは相手も同額を賭ける。
+        /// 相手の額は台本で指定がなければ同額にする。
         /// 残り血より賭け金が大きい場合は、実際に払えた分だけ場に乗る。
         /// </summary>
-        private void PlaceBet(int amount)
+        private void PlaceBet(int amount, int enemyAmount = 0)
         {
             if (amount <= 0) return;
 
             _playerHpBeforeBet = PlayerShownHp;
             _enemyHpBeforeBet = EnemyShownHp;
             int playerPaid = Mathf.Min(amount, PlayerShownHp);
-            int enemyPaid = Mathf.Min(amount, EnemyShownHp);
+            int enemyPaid = Mathf.Min(enemyAmount > 0 ? enemyAmount : amount, EnemyShownHp);
             _playerStake += playerPaid;
             _enemyStake += enemyPaid;
             _stakeRounds++;
@@ -508,129 +510,43 @@ namespace KillingMahjong.Managers
                 if (t != null) t.transform.localScale = Vector3.one;
         }
 
-        /// <summary>第2局は一度自由に決めさせたあと、この額へそろえて確定する。</summary>
-        private const int TutorialTargetBet = 3000;
-
-        /// <summary>賭け金の増減を見せる時間。一瞬で書き換えると気づけない。</summary>
-        private const float BetAdjustSeconds = 0.8f;
-
-        /// <summary>もう一度出したスマホで、増減の前と自動決定の前に置く間。</summary>
-        private const float BetAdjustPause = 0.4f;
-
-        /// <summary>
-        /// 自分で賭け金を決めさせる（2026-09-30 のフロー図改訂、シート3）。
-        ///
-        /// これまでチュートリアルの賭けは `ShowFixedBettingPhase` の固定額で、
-        /// 決定を押すだけだった。改訂版では**自分で増やして決める**ところまでやらせる。
-        ///
-        /// 最初の決定額が3000未満なら引き上げ、超えていれば引き下げる。
-        /// セリフを読ませてからスマホを再表示し、数値とゲージを動かして代わりに確定する。
-        /// </summary>
+        /// <summary>第2局の自由な賭け。選んだ額を変更せず、確定後に強襲の導入へ進む。</summary>
         private IEnumerator RunFreeBettingPhase(TutorialRoundData data)
         {
             SetPhase(RoundStatus.Betting);
-
-            yield return StartCoroutine(PlayLines(new List<TutorialLine>
-            {
+            yield return PlayLines(new List<TutorialLine> {
                 new TutorialLine("じゃあこんどは自分で賭け金を決めてみようか"),
-            }));
-
+            });
             var betting = gameUIManager != null ? gameUIManager.BettingUI : null;
             if (betting == null)
-            {
-                Debug.LogWarning("[TutorialManager] BettingUI が未設定のため賭け金フェイズをスキップします。");
-                _lastConfirmedBet = TutorialTargetBet;
-                yield break;
-            }
-
+                throw new System.InvalidOperationException("第2局の自由な賭けにはBettingUIが必要です。");
             bool confirmed = false;
             _lastConfirmedBet = data.betAmount;
-            betting.ShowFreeBettingPhase(PlayerShownHp, PlayerShownHp, amount =>
-            {
+            betting.ShowFreeBettingPhase(PlayerShownHp, PlayerShownHp, amount => {
                 _lastConfirmedBet = amount;
                 confirmed = true;
             });
-
             yield return betting.WaitForSlideAnimation();
-
-            // 増やし方を指してから、決め方を言う
             GuideTo(betting.IncreaseButtonRect, useMask: false);
-            yield return StartCoroutine(PlayLines(new List<TutorialLine>
-            {
+            yield return PlayLines(new List<TutorialLine> {
                 new TutorialLine("賭け金が決まったら決定ボタンを押してね"),
-            }));
+            });
             ClearGuide();
-
-            // **押し戻しがあるので、決定を1回で終わりにしない。**
-            while (true)
-            {
-                yield return new WaitUntil(() => confirmed || _aborted);
-                if (_aborted) yield break;
-
-                if (_lastConfirmedBet == TutorialTargetBet) break;
-
-                // いったんスマホを閉じ、セリフのあとに額をそろえて代わりに押す。
-                // **スマホはいったん閉じてからセリフを言う**（2026-10-23 ユーザー指示。出したままだと
-                // 先輩の吹き出しがスマホの後ろに隠れていた）。増減するときにもう一度出し、
-                // 押し返した額から3000まで増減して確定する。閉じるのはループを抜けたあと。
-                confirmed = false;
-                int pushedBet = _lastConfirmedBet;
-                betting.HideBettingPhase();
-                yield return betting.WaitForSlideAnimation();
-
-                yield return StartCoroutine(PlayLines(pushedBet < TutorialTargetBet
-                    ? data.onLowBetLines : data.onHighBetLines));
-                if (_aborted) yield break;
-
-                // 自動で増減しているあいだは、プレイヤーの操作で額が変わらないようにする。
-                betting.ShowFixedBettingPhase(PlayerShownHp, PlayerShownHp, pushedBet, amount =>
-                {
-                    _lastConfirmedBet = amount;
-                    confirmed = true;
-                });
-                yield return betting.WaitForSlideAnimation();
-                betting.LockInput();
-                yield return new WaitForSeconds(BetAdjustPause);
-                yield return StartCoroutine(SlideTutorialBetTo(betting, TutorialTargetBet));
-                yield return new WaitForSeconds(BetAdjustPause);
-
-                betting.PressConfirm();
-                yield return null;
-            }
-
-            ClearGuide();
+            yield return new WaitUntil(() => confirmed || _aborted);
+            if (_aborted) yield break;
             betting.HideBettingPhase();
             yield return betting.WaitForSlideAnimation();
-
-            yield return StartCoroutine(PlayLines(new List<TutorialLine>
-            {
-                new TutorialLine("まっ気軽にはじめよっか"),
-            }));
-
-            yield return new WaitForSeconds(phaseSettleTime);
+            // 低額の分岐はユーザー指示で廃止。額の引き上げ・引き下げ・代理確定はしない。
+            yield return PlayLines(FreeBetReaction(data, _lastConfirmedBet));
+            yield return PlayLines(data.afterFreeBetLines);
         }
 
-        /// <summary>賭け金の数値と背景ゲージを、現在額から目当ての額まで増減する。</summary>
-        private IEnumerator SlideTutorialBetTo(UI.BettingUI betting, int target)
+        private static List<TutorialLine> FreeBetReaction(TutorialRoundData data, int amount)
         {
-            int from = betting.CurrentBet;
-            if (from == target)
-            {
-                betting.ForceSetBet(target);
-                yield break;
-            }
-
-            float t = 0f;
-            while (t < BetAdjustSeconds)
-            {
-                t += Time.deltaTime;
-                float u = Mathf.Clamp01(t / BetAdjustSeconds);
-                betting.ForceSetBet(Mathf.RoundToInt(Mathf.Lerp(from, target, u)));
-                yield return null;
-            }
-            betting.ForceSetBet(target);
+            if (amount >= 4000) return data.onHighBetLines;
+            if (amount >= 1000) return data.onMiddleBetLines;
+            return new List<TutorialLine>();
         }
-
         private IEnumerator RunBettingPhase(TutorialRoundData data)
         {
             SetPhase(RoundStatus.Betting);

@@ -133,18 +133,23 @@ MonoBehaviour:
     rejectFirstConfirm: 0
     requireAutoManganToConfirm: 0
     betAmount: 3000
+    enemyBetAmount: 5000
     betPromptText: ""
     inheritedBetLines: []
-    onLowBetLines:
-    - speaker: 0
-      text: "えー、ちょっとビビりすぎじゃない？"
-    - speaker: 0
-      text: "あげるね！"
     onHighBetLines:
     - speaker: 0
-      text: "ちょっとちょっと！　そんなに賭けたら危ないよ！"
+      text: "うわーギャンブラーだねー"
+    onMiddleBetLines:
     - speaker: 0
-      text: "気持ちはわかるけどここは3000くらいにしとこう？"
+      text: "手堅いねー"
+    afterFreeBetLines:
+    - speaker: 0
+      text: "よし自分で賭けられたね"
+    beforeEnemyAssaultLines:
+    - speaker: 0
+      text: "あっ！アタシも能力使うの忘れてた"
+    - speaker: 0
+      text: "ホントはダメだけど…今アタシ教えてるから\nいいよねっ？"
     enemyDiscardBaseIds: 12000000130000001400000015000000160000001700000018000000190000001a0000000000000001000000020000000300000004000000050000000600000007000000
     autoDiscardTurns: 15
     lockedTileBaseId: -1
@@ -197,6 +202,25 @@ MonoBehaviour:
     - "四暗刻"
     formulaText: "役満"
     rankText: "役満"
+    deadEndRonLines:
+    - speaker: 0
+      text: "そ・れ・ローン"
+    revealRonLines:
+    - speaker: 0
+      text: "アナタ絶望的に先輩には甘いわよね？"
+    assaultExplainLines:
+    - speaker: 0
+      text: "アタシが対局前に使った能力……強襲"
+    - speaker: 0
+      text: "それは相手を狩るための力"
+    - speaker: 0
+      text: "本来アタシがロンして得るはずの点数をそのまま相手へのダメージに変換する"
+    deadEndAssaultFinalLines:
+    - speaker: 0
+      text: "アタシの獲得点数{0}をそのまま食らってもらうよ！"
+    revealAssaultFinalLines:
+    - speaker: 0
+      text: "さよならねおバカさん？"
   revival:
     enemyLines:
     - speaker: 0
