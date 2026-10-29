@@ -207,7 +207,45 @@ namespace KillingMahjong.Managers
             {
                 gameUIManager.AbilityUI.TutorialActivationHandler = null;
                 gameUIManager.AbilityUI.TutorialUnusableReason = null;
+                gameUIManager.AbilityUI.TutorialUnusableClicked = null;
             }
+            UI.YakuSelectionUI.TutorialBoostedYakuPressed = null;
+        }
+
+        // ---- 押せないものを押したときの先輩の一言（2026-10-29 要望）。**文面は仮。** 企画から届いたら差し替える ----
+
+        /// <summary>使えない能力の行を押したとき。セリフ欄で言う</summary>
+        private void SayIntroSkillUnusable(string type)
+        {
+            string line;
+            if (type == SkillNames.Mulligan && GetIntroMulliganReplacements() == null)
+                line = "牌交換はもう交換できる牌がないみたいだねー";
+            else if (type == SkillNames.Perspective && _introPerspectiveUses >= 5)
+                line = "透視は1局に5回までだよー";
+            else if (type != null && !CanActivateIntroSkill(type))
+                line = "あー それは点が足りないねー";
+            else
+                line = "それは今は使えないよー";
+            ShowInterruptMessage(line);
+        }
+
+        /// <summary>強化済みの役で「この役を強化する」を押したとき。役を選ぶ画面がセリフ欄を覆うので字幕で言う</summary>
+        private void SayYakuAlreadyBoosted(string yaku)
+        {
+            if (_boostedSubtitleRoutine != null) StopCoroutine(_boostedSubtitleRoutine);
+            _boostedSubtitleRoutine = StartCoroutine(ShowBoostedSubtitle());
+        }
+
+        private Coroutine _boostedSubtitleRoutine;
+
+        private IEnumerator ShowBoostedSubtitle()
+        {
+            var subtitle = UI.TutorialSubtitleUI.Create();
+            if (subtitle == null) yield break;
+            subtitle.Show("先輩", "その役はもう強化してあるよー　1つの役は1回だけね");
+            yield return new WaitForSecondsRealtime(2.5f);
+            if (subtitle != null) subtitle.Hide();
+            _boostedSubtitleRoutine = null;
         }
     }
 }

@@ -8,6 +8,12 @@ namespace KillingMahjong.UI
         // 紹介中だけ台本側へ渡す。通常対局の通信経路には入れない。
         internal System.Func<string, string, bool> TutorialActivationHandler { get; set; }
         internal System.Func<string, string> TutorialUnusableReason { get; set; }
+
+        /// <summary>
+        /// チュートリアルで、使えない能力の行が押されたとき（2026-10-29 要望「選べない能力をクリックした時にセリフをしゃべらせたい」）。
+        /// 引数は押された能力の種類。行は選ばない
+        /// </summary>
+        internal System.Action<string> TutorialUnusableClicked { get; set; }
         private void OnActivateClicked()
         {
             if (IsDisplayOnly || !isWindowVisible) return;

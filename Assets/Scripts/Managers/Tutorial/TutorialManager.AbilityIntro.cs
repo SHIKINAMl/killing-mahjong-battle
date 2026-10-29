@@ -176,7 +176,11 @@ namespace KillingMahjong.Managers
             System.Action restoreBoard = null;
             _introPerspectiveUses = 0;
             if (gameUIManager != null && gameUIManager.AbilityUI != null)
+            {
                 gameUIManager.AbilityUI.TutorialUnusableReason = IntroSkillUnusableReason;
+                gameUIManager.AbilityUI.TutorialUnusableClicked = SayIntroSkillUnusable;
+            }
+            UI.YakuSelectionUI.TutorialBoostedYakuPressed = SayYakuAlreadyBoosted;
             try
             {
                 yield return StartCoroutine(PlayLines(AbilityOpeningLines));
@@ -224,7 +228,9 @@ namespace KillingMahjong.Managers
                 {
                     gameUIManager.AbilityUI.TutorialActivationHandler = null;
                     gameUIManager.AbilityUI.TutorialUnusableReason = null;
+                    gameUIManager.AbilityUI.TutorialUnusableClicked = null;
                 }
+                UI.YakuSelectionUI.TutorialBoostedYakuPressed = null;
             }
         }
 

@@ -119,6 +119,12 @@ namespace KillingMahjong.UI
         private bool _built;
         private int _selected;
 
+        /// <summary>
+        /// 強化済みの役で「この役を強化する」が押されたとき。引数は役。チュートリアルの間だけ入れる
+        /// （2026-10-29 要望「強化できない役を強化しようとした時にセリフを字幕でしゃべらせたい」）
+        /// </summary>
+        public static System.Action<string> TutorialBoostedYakuPressed;
+
         private TileResourceManager _tiles;
         private IDictionary<string, int> _boosts;
         private Action<string> _onSelected;
@@ -639,6 +645,14 @@ namespace KillingMahjong.UI
                 Hide();
                 if (_onSelected != null) _onSelected(Yakus[_selected]);
             });
+
+            // 強化済みの役で押されたとき（ボタンは押せない）。チュートリアルが先輩に字幕で言わせる
+            var relay = _confirm.GetComponent<DisabledButtonClickRelay>();
+            if (relay == null) relay = _confirm.gameObject.AddComponent<DisabledButtonClickRelay>();
+            relay.OnDisabledClick = () =>
+            {
+                if (_selected >= 0 && _selected < Yakus.Length) TutorialBoostedYakuPressed?.Invoke(Yakus[_selected]);
+            };
         }
 
         // ------------------------------------------------------------

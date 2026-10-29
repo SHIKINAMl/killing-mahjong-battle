@@ -325,6 +325,20 @@ namespace KillingMahjong.UI
         {
             if (IsDisplayOnly || !isWindowVisible || item == null || !instantiatedItems.Contains(item)) return;
 
+            // チュートリアルで使えない行を押したら、先輩に理由を言わせる。行は選ばない
+            if (!item.IsUsable && TutorialUnusableClicked != null)
+            {
+                var uiMgr = FindFirstObjectByType<GameUIManager>();
+                if (uiMgr != null && uiMgr.IsTutorialMode)
+                {
+                    int index = instantiatedItems.IndexOf(item);
+                    string type = _perspectiveMenu != PerspectiveMenu.None ? SkillNames.Perspective
+                        : index >= 0 && index < realAbilities.Count ? realAbilities[index].skillType : null;
+                    TutorialUnusableClicked(type);
+                    return;
+                }
+            }
+
             if (currentSelection == item)
             {
                 // すでに選択されているものをもう一度クリックしたら発動とする
