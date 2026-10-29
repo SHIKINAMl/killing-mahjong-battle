@@ -476,6 +476,8 @@ namespace KillingMahjong.UI
             if (logPanel.GetComponent<GraphicRaycaster>() == null)
                 logPanel.AddComponent<GraphicRaycaster>();
             var scroll = logContainer != null ? logContainer.GetComponentInParent<ScrollRect>(true) : null;
+            // 遡って読んでいるときに出す「最新へ戻る」▼（2026-10-29 要望）。シーンに置いてある物を使う
+            EnsureLogLatestButton();
             if (!hasOpenedLog) followLatestLog = true;
             hasOpenedLog = true;
             if (scroll != null && scroll.content != null) ScheduleLogScroll(scroll, scroll.content.anchoredPosition);
@@ -508,6 +510,26 @@ namespace KillingMahjong.UI
             if (scroll.viewport != null && scroll.viewport != scroll.transform)
                 scroll.viewport.offsetMax = new Vector2(-18, scroll.viewport.offsetMax.y);
             PixelScrollBar.Attach(bar);
+        }
+
+        /// <summary>「最新へ戻る」▼をログの枠に置く。エディタでシーンへ焼き込むとき（LogLatestButtonBaker）にも使う。</summary>
+        public LogLatestButtonUI EnsureLogLatestButton()
+        {
+            var scroll = logContainer != null ? logContainer.GetComponentInParent<ScrollRect>(true) : null;
+            return scroll != null && logPanel != null ? LogLatestButtonUI.Ensure(logPanel.transform, scroll, this) : null;
+        }
+
+        /// <summary>ログを一番下（最新の行）まで戻し、以後は新しい行を追いかける。</summary>
+        public void JumpToLatestLog()
+        {
+            var scroll = logContainer != null ? logContainer.GetComponentInParent<ScrollRect>(true) : null;
+            if (scroll == null) return;
+            if (logScrollRoutine != null) StopCoroutine(logScrollRoutine);
+            logScrollRoutine = null;
+            Canvas.ForceUpdateCanvases();
+            scroll.StopMovement();
+            scroll.verticalNormalizedPosition = 0f;
+            followLatestLog = true;
         }
 
         public void CloseLog()
