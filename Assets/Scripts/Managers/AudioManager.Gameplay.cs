@@ -39,6 +39,12 @@ namespace KillingMahjong.Managers
         }
 
         /// <summary>ロンの「ドン」。8bit の大砲と爆発を重ねた音。</summary>
+        /// <summary>
+        /// 動画の続きで、先輩が倒れる絵がフェードで出る直前の「ドン」（2026-10-29 要望「ドンっていう鈍いSEかな」）。
+        /// 手持ちの素材でいちばん低い音が多い se_impact（ロンの衝撃）を、低く鈍く鳴らす。素材を差し替えるならここ
+        /// </summary>
+        public void PlaySeniorCollapseSE() => PlayStingerPitched("se_impact", .7f, PitchJitter.None);
+
         public void PlayImpactSE()
         {
             PlayStinger("se_impact", PitchJitter.VerySmall);

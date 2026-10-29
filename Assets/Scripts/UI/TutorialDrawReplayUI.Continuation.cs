@@ -44,6 +44,10 @@ namespace KillingMahjong.UI
                 fallen != null ? FallenPosition : SeniorPosition, Color.white);
             var seniorImage = senior.GetComponent<Image>();
             seniorImage.sprite = fallen != null ? fallen : Resources.Load<Sprite>("女の子/tutorialexe");
+            // 出る前に鈍い「ドン」を鳴らし、ひと呼吸おいてから出す（2026-10-29 要望「先輩が倒れる前（フェードイン前）にSEがほしいかも」）
+            seniorImage.color = new Color(1f, 1f, 1f, 0f);
+            if (KillingMahjong.Managers.AudioManager.Instance != null) KillingMahjong.Managers.AudioManager.Instance.PlaySeniorCollapseSE();
+            yield return new WaitForSecondsRealtime(.25f);
             // ドット絵なので、透明度も 1 秒 12 コマで段々に上げる（毎フレームなめらかにしない）
             for (float t = 0f; t < FallenFadeSeconds; t += Time.unscaledDeltaTime)
             {
