@@ -107,11 +107,14 @@ namespace KillingMahjong.UI
             localRiver.gameObject.SetActive(false); enemyRiver.gameObject.SetActive(false);
             foreach (int id in TutorialTiles.EncodeAll(example.wallBaseIds, example.doraBaseId)) { wallIds.Add(id); wall.Add(Tile(id)); }
             wallUI.LayoutWallTiles(wall, wallIds, null, false);
-            // 手牌選択中の敵側も、34枚の山牌ではなく13枚の伏せた手牌を見せる。
-            enemyWallUI.gameObject.SetActive(false);
+            // 流局で配り直したので、敵側も本編の手牌選択と同じく、伏せた山牌を2段で見せる
+            // （2026-10-29 バグ報告「ここは流局しているから、相手の牌は2段のはず」。以前は13枚の伏せた手牌を1段で見せていた）
             enemyHandUI.ClearHand();
-            ShowEnemyHand(false);
-            PositionEnemyHand(false);
+            enemyHandUI.gameObject.SetActive(false);
+            var enemyIds = new List<int>();
+            for (int i = 0; i < 34; i++) { enemyWall.Add(Tile(-1)); enemyIds.Add(-1); }
+            enemyWallUI.gameObject.SetActive(true);
+            enemyWallUI.LayoutEnemyWallTiles(enemyWall, enemyIds, false);
         }
 
         private void ShowEnemyHand(bool discardPhase)

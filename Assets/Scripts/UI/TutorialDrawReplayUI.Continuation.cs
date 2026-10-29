@@ -18,7 +18,7 @@ namespace KillingMahjong.UI
             stepCount = 5;
             progressStart = 2f / 3f;
             progressEnd = 1f;
-            progress.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, 764f * progressStart);
+            SetSeekProgress(progressStart);
             subtitles.Hide();
             SetCharacter("通常時身体", "通常顔");
             SetTurnCounter(17); // 「人生最後の牌」の場面。両者17打ち終える最後の1打
@@ -66,7 +66,7 @@ namespace KillingMahjong.UI
             // 流れる様子は別に回し（TutorialDrawReplayUI.Blood.cs）、閉じるボタンを待つ間も流れ続けさせる
             StartCoroutine(Bleed(stain));
             yield return new WaitForSecondsRealtime(2.5f);
-            progress.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, 764f);
+            SetSeekProgress(1f);
             IsPaused = true;
             paused.text = "再生終了";
             paused.gameObject.SetActive(true);

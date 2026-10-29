@@ -18,7 +18,7 @@ namespace KillingMahjong.UI
         public int StepIndex { get; private set; }
         public bool IsPaused { get; private set; }
         public string NormalText => normal != null ? normal.text : "";
-        private RectTransform viewport, progress;
+        private RectTransform viewport, progress, seekKnob;
         private TextMeshProUGUI normal, marker, paused, turnCounter;
         private Material ownedMaterial;
         private Button advance;
@@ -119,6 +119,13 @@ namespace KillingMahjong.UI
             Box("SeekTrack",seekLayer.transform,new Vector2(764,3),new Vector2(0,-288),new Color32(72,72,72,255));
             progress=Box("SeekProgress",seekLayer.transform,new Vector2(1,3),new Vector2(-382,-288),new Color32(224,40,40,255));
             progress.pivot=new Vector2(0,.5f);
+            // 進んだ先に丸いつまみ（2026-10-29 バグ報告「シークバーはYOUtubeみたいな丸表示がほしいかも」）。ドットの丸で描く
+            var knob=new GameObject("SeekKnob",typeof(RectTransform),typeof(PixelShapeGraphic));
+            knob.transform.SetParent(seekLayer.transform,false);
+            seekKnob=(RectTransform)knob.transform; seekKnob.sizeDelta=new Vector2(16,16);
+            var knobShape=knob.GetComponent<PixelShapeGraphic>(); knobShape.raycastTarget=false;
+            knobShape.Begin(); knobShape.Disc(Vector2.zero,6f,new Color32(224,40,40,255)); knobShape.End();
+            SetSeekProgress(0f);
             var catcher=Box("ReplayAdvanceCatcher",transform,new Vector2(800,600),Vector2.zero,new Color(0,0,0,.001f));
             catcher.GetComponent<Image>().raycastTarget=true; advance=catcher.gameObject.AddComponent<Button>();
             advance.transition=Selectable.Transition.None; advance.onClick.AddListener(()=>advanced=true); catcher.gameObject.SetActive(false);
@@ -259,10 +266,19 @@ namespace KillingMahjong.UI
         private const int StepCount = 18;
         private int stepCount = StepCount;
         private float progressStart, progressEnd = .5f;
+        /// <summary>シークバーを全体の <paramref name="fraction"/>（0〜1）まで進め、丸いつまみをその先に置く。</summary>
+        private void SetSeekProgress(float fraction)
+        {
+            float width=764f*Mathf.Clamp01(fraction);
+            progress.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal,Mathf.Max(1f,width));
+            if(seekKnob!=null) seekKnob.anchoredPosition=new Vector2(-382f+Mathf.Round(width/2f)*2f,-288f);
+        }
         private IEnumerator Step(string text,bool subtitle,bool loud=false)
         {
-            StepIndex++; progress.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal,
-                764f * Mathf.Lerp(progressStart, progressEnd, Mathf.Min(StepIndex, stepCount) / (float)stepCount)); advanced=false;
+            StepIndex++;
+            // 「再生停止」のあいだはシークバーを進めない（2026-10-29 バグ報告「再生停止表示が出ているのにシークバーが動いている」）
+            if(!IsPaused) SetSeekProgress(Mathf.Lerp(progressStart, progressEnd, Mathf.Min(StepIndex, stepCount) / (float)stepCount));
+            advanced=false;
             if(subtitle) { marker.gameObject.SetActive(false); advance.gameObject.SetActive(false); subtitles.Show("先輩",text,()=>advanced=true); }
             else {
                 string formatted=TutorialEmphasis.Apply(text);
