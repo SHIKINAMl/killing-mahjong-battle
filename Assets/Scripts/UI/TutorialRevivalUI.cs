@@ -24,6 +24,12 @@ namespace KillingMahjong.UI
         public static readonly Vector2 ShrunkSize = new Vector2(132f, 102f);
         private SkillEffectStage stage;
         private TextMeshProUGUI text;
+
+        /// <summary>
+        /// 送れるときに文の右下へ出す ▼（2026-10-29 要望「セリフUi同様に表示しきったら▼マークが出てほしいかも」）。
+        /// 色は文と同じにする（明るくなる場面では文と一緒に黒へ変わる）
+        /// </summary>
+        private TextMeshProUGUI advanceMarker;
         private Image cover, bell, scroll, beruru;
         private Button advance, bellButton, skillButton;
         private bool clicked, floating, closed, brightening;
@@ -88,6 +94,11 @@ namespace KillingMahjong.UI
             advance.transition = Selectable.Transition.None;
             advance.onClick.AddListener(() => clicked = true);
             advance.gameObject.SetActive(false);
+            advanceMarker = stage.AddText("RevivalAdvanceMarker", "▼", 16f, Color.white);
+            if (font != null) advanceMarker.font = font;
+            advanceMarker.rectTransform.sizeDelta = new Vector2(24f, 24f);
+            advanceMarker.raycastTarget = false;
+            advanceMarker.gameObject.SetActive(false);
 
             Stage = SequenceStage.Monologue;
             yield return Lines(data.monologueLines, automatic);
@@ -229,9 +240,31 @@ namespace KillingMahjong.UI
                 text.text = TutorialEmphasis.Apply(lines[i].text);
                 clicked = false;
                 advance.gameObject.SetActive(true);
+                ShowAdvanceMarker();
                 yield return WaitForInput(automatic);
                 advance.gameObject.SetActive(false);
+                if (advanceMarker != null) advanceMarker.gameObject.SetActive(false);
             }
+        }
+
+        /// <summary>▼を、いま出ている文の最後の行の右に置いて出す</summary>
+        private void ShowAdvanceMarker()
+        {
+            if (advanceMarker == null || text == null) return;
+            text.ForceMeshUpdate();
+            var info = text.textInfo;
+            Vector2 at = new Vector2(0f, -24f);
+            if (info != null && info.characterCount > 0)
+            {
+                var last = info.characterInfo[info.characterCount - 1];
+                var line = info.lineInfo[last.lineNumber];
+                // 文の中の座標を、文の枠の中心からの位置に直す（文も▼も同じ親の中心に置いてある）
+                Vector2 offset = text.rectTransform.anchoredPosition;
+                at = offset + new Vector2(line.lineExtents.max.x + 14f, (line.ascender + line.descender) * .5f);
+            }
+            advanceMarker.rectTransform.anchoredPosition = new Vector2(SkillEffectStage.Snap(at.x), SkillEffectStage.Snap(at.y));
+            advanceMarker.color = text.color;
+            advanceMarker.gameObject.SetActive(true);
         }
 
         private IEnumerator WaitForInput(bool automatic)
@@ -269,6 +302,7 @@ namespace KillingMahjong.UI
             {
                 cover.color = Color.Lerp(Color.black, BrightenedGray, BrightenAmount());
                 if (text != null && Stage == SequenceStage.Beruru) text.color = BrightenTextColor();
+                if (advanceMarker != null && text != null) advanceMarker.color = text.color;
             }
             if (floating && beruru != null)
                 beruru.rectTransform.anchoredPosition = new Vector2(0f,
