@@ -43,9 +43,10 @@ namespace KillingMahjong.Managers
         /// 動画の続きで、先輩が倒れる絵がフェードで出る直前の音。
         /// 2026-10-29 の要望は「ドンっていう鈍いSE」で se_impact を低くしていたが、聞いたプランナーから
         /// 「ちょっと鈍すぎるかも」「さーって血の気が引くような高音のものがいいかも」。
-        /// 手持ちで高いところから下がっていく br_fall_bar（遷移の帯の落ちる音）を仮に使う。素材を差し替えるならここ
+        /// 候補 A（br_fall_bar）・B（br_riser）は「論外」と言われたので、残った C の br_blackout（暗転の音）を仮に使う。
+        /// 素材を差し替えるならここ
         /// </summary>
-        public void PlaySeniorCollapseSE() => PlayStinger("br_fall_bar", PitchJitter.None);
+        public void PlaySeniorCollapseSE() => PlayStinger("br_blackout", PitchJitter.None);
 
         public void PlayImpactSE()
         {
