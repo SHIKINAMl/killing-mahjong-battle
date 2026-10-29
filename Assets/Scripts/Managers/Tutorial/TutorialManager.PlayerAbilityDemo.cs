@@ -22,11 +22,12 @@ namespace KillingMahjong.Managers
             var enemyHand = new List<int>(board.CurrentEnemyHandTiles);
             var enemyWaits = new List<int>(board.CurrentEnemyWaitTiles);
             var exposed = new HashSet<int>(board.ExposedEnemyHandWallIndexes);
-            var bonus = board.LocalBoostHandBonus == null ? null : new Dictionary<string, int>(board.LocalBoostHandBonus);
             return () =>
             {
                 if (board == null) return;
-                // 確定した牌交換と消費した持ち点は残す。公開・強化と手牌の実演だけを戻す。
+                // 確定した牌交換・役強化と、消費した持ち点は残す。公開と手牌の実演だけを戻す。
+                // **役強化も残す**（2026-10-29 バグ報告「役強化がチュートリアル画面に反映されていない」）。
+                // 以前は実演前の強化に戻していて、点を払ったのに役一覧から +1 が消えていた
                 board.SetLocalState(new List<int>(board.OriginalWallTiles), hand, waits);
                 // SetEnemyStateは空のwallを「既存の山を維持」と扱うので、未配牌へ戻す場合も先に除く。
                 board.OriginalEnemyWallTiles.Clear();
@@ -34,10 +35,9 @@ namespace KillingMahjong.Managers
                 board.SetEnemyState(enemyWall, enemyHand, enemyWaits);
                 board.ExposedEnemyHandWallIndexes.Clear();
                 board.ExposedEnemyHandWallIndexes.UnionWith(exposed);
-                board.LocalBoostHandBonus = bonus;
                 if (gameUIManager != null)
                 {
-                    gameUIManager.YakuListUI?.UpdateBoostData(bonus, board.EnemyBoostHandBonus);
+                    gameUIManager.YakuListUI?.UpdateBoostData(board.LocalBoostHandBonus, board.EnemyBoostHandBonus);
                     gameUIManager.RefreshBoardAfterTransition();
                 }
             };
