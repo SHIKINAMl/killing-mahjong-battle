@@ -145,10 +145,13 @@ namespace KillingMahjong.Managers
         private const int AbilityMoreMinScore = 8000;
 
         /// <summary>画面を揺らす。出せない場面（UIが無い等）では黙って素通りする。</summary>
+        /// <summary>
+        /// 画面ぜんたいを揺らす。以前は PhaseTransitionUI 自身を揺らしていて、黒帯が出ていない場面では
+        /// 何も動いて見えなかった（2026-10-30 プランナー「どこが揺れとるんや」）
+        /// </summary>
         private void ShakeScreen(float duration, float magnitude, Vector2 axis)
         {
-            var pt = gameUIManager != null ? gameUIManager.PhaseTransitionUI : null;
-            if (pt != null) StartCoroutine(pt.PlayScreenShakeRoutine(duration, magnitude, axis));
+            UI.Effects.WholeScreenShake.Play(duration, magnitude, axis);
         }
 
         private void FlashScreen()
