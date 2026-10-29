@@ -263,6 +263,10 @@ namespace KillingMahjong.UI
             }
         }
 
+        /// <summary>いま選んでいる行。透視の種別選びのように、同じ能力の中で行が替わる場面でも選んだ行そのものを返す。</summary>
+        public RectTransform SelectedItemRect =>
+            currentSelection != null ? currentSelection.transform as RectTransform : null;
+
         public RectTransform GetAbilityItemRect(string skillType)
         {
             if (realAbilities == null) return null;
