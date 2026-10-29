@@ -86,10 +86,22 @@ namespace KillingMahjong.UI
                              Managers.BoardStateManager.Instance.CurrentHandTiles != null)
                             ? Managers.BoardStateManager.Instance.CurrentHandTiles.Count : 0;
 
+            // **牌交換で選んでいる間は、選んだ枚数を出す**（2026-10-29 要望「1/３とか何枚選べるかを示した方がいいかも」）。
+            // 手牌の枚数とは別の数なので、負の数にして「変わったか」の目印を分ける
+            var skills = gameUIManager != null ? gameUIManager.SkillController : null;
+            bool mulligan = skills != null && gameUIManager.IsMulliganSelection;
+            if (mulligan) handCount = -1 - skills.MulliganPickedCount;
+
             // 毎フレーム text を代入するとそのたびに文字が組み直されるので、変わったときだけ
             if (phaseStatus != _lastGuidePhase || handCount != _lastGuideHandCount)
             {
-                if (phaseStatus == RoundStatus.HandSelection)
+                if (mulligan)
+                {
+                    int picked = skills.MulliganPickedCount, limit = skills.MulliganPickLimit;
+                    string color = picked == limit ? "#7CE07C" : "#FFD24A";
+                    guide.text = $"交換する牌をえらぶ　<color={color}>{picked} / {limit}</color>";
+                }
+                else if (phaseStatus == RoundStatus.HandSelection)
                 {
                     string count = (handCount == HandSize)
                         ? $"<color=#7CE07C>{handCount} / {HandSize}</color>"

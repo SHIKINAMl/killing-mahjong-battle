@@ -59,6 +59,10 @@ namespace KillingMahjong.UI
         /// <summary>出す牌の枚数。サーバーは「3つちょうど・重複なし」しか受け付けない。</summary>
         private const int MulliganGiveCount = 3;
 
+        /// <summary>牌交換でいま選んでいる枚数と、選ぶ枚数（手牌の上の案内「交換する牌をえらぶ 1 / 3」に使う）。</summary>
+        public int MulliganPickedCount => _mulliganPicks.Count;
+        public int MulliganPickLimit => MulliganGiveCount;
+
         /// <summary>出すと決めた牌に掛ける色。</summary>
         private static readonly Color MulliganPickTint = new Color(1f, 0.55f, 0.55f, 1f);
 
