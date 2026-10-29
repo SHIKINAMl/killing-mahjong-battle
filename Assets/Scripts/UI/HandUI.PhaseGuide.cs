@@ -66,10 +66,13 @@ namespace KillingMahjong.UI
 
             // **チュートリアルでも手牌選択の枚数だけは出す**（2026-10-28 要望「通常の対局のように、残り13牌の表示がいるかも」）。
             // ただし盤面を伏せている間（会話・黒帯）は山牌ごと隠れているので出さない
+            // **打牌フェイズの「山牌から1枚切る」は出さない**（2026-10-29 要望「対局フェイズ開始時に　山牌から一枚切るの表示が出ている」）。
+            // 牌交換を選んでいる間の「交換する牌をえらぶ」は打牌フェイズでも出す
+            bool mulliganPicking = gameUIManager != null && gameUIManager.IsMulliganSelection;
             bool wanted = tutorial
                 ? phaseStatus == RoundStatus.HandSelection && IsWallShown()
                 : (phaseStatus == RoundStatus.HandSelection ||
-                   (phaseStatus == RoundStatus.Discard && localTurn));
+                   (phaseStatus == RoundStatus.Discard && localTurn && mulliganPicking));
 
             if (!wanted)
             {
