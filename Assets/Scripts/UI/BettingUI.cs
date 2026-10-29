@@ -427,6 +427,11 @@ namespace KillingMahjong.UI
         {
             ShowBettingPhase(initialHp, currentHp, 0, onConfirm);
 
+            // **チュートリアルでは持ち点を全部は賭けさせない**（2026-10-29 バグ報告「HPが5000の時に5000賭けられてしまう」）。
+            // 上限を「持ち点 − 1単位」に下げる。本編はサーバーの決まり（持ち点ちょうどまで賭けられる）のまま
+            int belowAll = (currentHp - 1) / bettingUnit * bettingUnit;
+            if (belowAll >= bettingUnit) maxBet = Mathf.Min(maxBet, belowAll);
+
             if (autoDialogueCoroutine != null)
             {
                 StopCoroutine(autoDialogueCoroutine);
