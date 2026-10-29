@@ -43,10 +43,10 @@ namespace KillingMahjong.Managers
         /// 動画の続きで、先輩が倒れる絵がフェードで出る直前の音。
         /// 2026-10-29 の要望は「ドンっていう鈍いSE」で se_impact を低くしていたが、聞いたプランナーから
         /// 「ちょっと鈍すぎるかも」「さーって血の気が引くような高音のものがいいかも」。
-        /// 候補 A（br_fall_bar）・B（br_riser）は「論外」と言われたので、残った C の br_blackout（暗転の音）を仮に使う。
-        /// 素材を差し替えるならここ
+        /// 手持ちの素材では合わず、Freesound の CC0 素材から聞き比べを作り、2026-10-30 に4番（重い体が地面に落ちる「ドサッ」）に決まった。
+        /// 素材と加工の記録はリポジトリの外（Music の効果音メモ）に置いてある
         /// </summary>
-        public void PlaySeniorCollapseSE() => PlayStinger("br_blackout", PitchJitter.None);
+        public void PlaySeniorCollapseSE() => PlayStinger("se_senpai_collapse", PitchJitter.None);
 
         public void PlayImpactSE()
         {

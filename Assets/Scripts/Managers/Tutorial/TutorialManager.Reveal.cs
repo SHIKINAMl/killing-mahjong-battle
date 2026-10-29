@@ -31,6 +31,12 @@ namespace KillingMahjong.Managers
             },
         };
 
+        /// <summary>
+        /// 正体を明かしたあとの怖い曲（Resources/Bgm）。codex がコードで合成したオリジナル曲の聞き比べ候補 A / C。
+        /// 2026-10-30 プランナー「AとCの実装例を見せてください」。決まったら残す方だけにする
+        /// </summary>
+        internal static string TutorialScaryBgm = "tut_scary_A";
+
         /// <summary>2026-10-18の図。「はい」から動画後半、3つの質問、指定された決着まで。</summary>
         private IEnumerator RunWatchRestContinuation(TutorialRoundData data)
         {
@@ -47,6 +53,10 @@ namespace KillingMahjong.Managers
                 yield return gameUIManager.EnemyInfoUI.RevealTutorialCharacter();
             yield return PlayLines(new List<TutorialLine> {
                 new TutorialLine("ふふふ……\n先輩死んじゃったね？"),
+            });
+            // 「先輩死んじゃったね？」のあとから怖い曲を流す（2026-10-29 要望「できればここ怖げなBGMほしいかも」）
+            if (AudioManager.Instance != null) AudioManager.Instance.PlayTutorialBgm(TutorialScaryBgm);
+            yield return PlayLines(new List<TutorialLine> {
                 new TutorialLine("困ってる？困惑しているわよね？"),
                 new TutorialLine("お前はだれ？とか先輩はどこ？とかこのゲームはなんだ？とか"),
                 new TutorialLine("牌を打ったらワタシが教えてあげるわ"),
