@@ -32,10 +32,10 @@ namespace KillingMahjong.Managers
         };
 
         /// <summary>
-        /// 正体を明かしたあとの怖い曲（Resources/Bgm）。codex がコードで合成したオリジナル曲の聞き比べ候補 A / C。
-        /// 2026-10-30 プランナー「AとCの実装例を見せてください」。決まったら残す方だけにする
+        /// 正体を明かしたあとの怖い曲（Resources/Bgm）。codex がコードで合成したオリジナル曲。
+        /// 聞き比べ A / C の実装例を見せて、2026-10-30 にプランナーが A に決めた
         /// </summary>
-        internal static string TutorialScaryBgm = "tut_scary_A";
+        private const string TutorialScaryBgm = "tut_scary_A";
 
         /// <summary>2026-10-18の図。「はい」から動画後半、3つの質問、指定された決着まで。</summary>
         private IEnumerator RunWatchRestContinuation(TutorialRoundData data)
