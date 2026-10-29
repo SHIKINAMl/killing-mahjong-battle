@@ -68,6 +68,26 @@ namespace KillingMahjong.UI
             UpdateInstantRankCallForCurrentHand();
         }
 
+        /// <summary>前回見た役強化の並び。変わったら役の予想を問い合わせ直す（<see cref="RefreshRankCallAfterBoost"/>）</summary>
+        private string _lastBoostKey;
+
+        /// <summary>
+        /// 役強化が届いたときに呼ぶ（2026-10-29 バグ報告「役予想の反映が遅い　手牌が完成した後に役強化を押しても予想の手が強化されていない」）。
+        /// 13枚そろっていれば、強化を入れた役の予想をその場で問い合わせ直す。
+        /// 以前は「自分の手で13枚目を入れたときだけ」問い合わせていたので、牌を入れ替えるまで強化前の予想のままだった
+        /// </summary>
+        public void RefreshRankCallAfterBoost()
+        {
+            string signature = CurrentSelectionSignature();
+            int split = signature.IndexOf(';');
+            string boostKey = split >= 0 ? signature.Substring(split + 1) : "";
+            bool changed = _lastBoostKey != null && boostKey != _lastBoostKey;
+            _lastBoostKey = boostKey;
+            if (!changed || uiManager == null || uiManager.IsTutorialMode || _confirming) return;
+            if (uiManager.CurrentPhaseStatus != RoundStatus.HandSelection || !CanShowInstantRankCall()) return;
+            RequestInstantRankCallNow();
+        }
+
         /// <summary>入れようとした牌が入らなかったときに呼ぶ。</summary>
         public void DisarmInstantRankCall()
         {

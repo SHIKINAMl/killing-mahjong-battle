@@ -18,6 +18,8 @@ namespace KillingMahjong.UI
             }
             // 役強化のログに、強化した役を書き足す（2026-10-25）
             DialogueUI?.ResolveBoostLog(BoardStateManager.Instance.LocalBoostHandBonus, BoardStateManager.Instance.EnemyBoostHandBonus);
+            // 強化が変わっていたら、13枚の役の予想を問い合わせ直す（2026-10-29）
+            HandSelectionController?.RefreshRankCallAfterBoost();
         }
 
         private void HandleOpeningBoostAssigned()
