@@ -248,7 +248,7 @@ MonoBehaviour:
     skillName: "\u5FA9\u6D3B"
     beruruLines:
     - speaker: 0
-      text: "\u3053\u308C\u3067\u5951\u7D04\u3092\u679C\u305F\u3057\u305F"
+      text: "\u3053\u308C\u3067\u5951\u7D04\u306F\u679C\u305F\u3057\u305F"
     - speaker: 0
       text: "\u3042\u3068\u306F\u5F8C\u8F29\u3061\u3083\u3093\u304C\u52D9\u3081\u3092\u679C\u305F\u305B"
     - speaker: 0

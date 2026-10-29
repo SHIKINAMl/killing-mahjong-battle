@@ -225,7 +225,7 @@ namespace KillingMahjong.Managers
             yield return StartCoroutine(PlayLines(new List<TutorialLine>
             {
                 new TutorialLine("負けると逆に賭け金分持ち点を引かれてしまう"),
-                new TutorialLine("場に預けた分は戻らないよ。そこに同じ額をもう一度引くわけじゃないからね"),
+                new TutorialLine("最初に賭けた額も帰ってこないから…マイナス分は2倍！"),
                 new TutorialLine("例えば…あたしは2000賭けたから…2000のダメージ"),
             }));
             ClearGuide();

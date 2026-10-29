@@ -872,7 +872,7 @@ namespace KillingMahjong.Managers
             GuideTo(GetWallGuideTarget(), false, new Vector2(0f, 10f));
             yield return StartCoroutine(PlayLines(new List<TutorialLine>
             {
-                new TutorialLine("よっし　対局だね"),
+                new TutorialLine("よし！じゃあ対局だね"),
                 new TutorialLine($"対局では交互に牌をこの{HighlightOpen}山牌{HighlightClose}から打ってくよ"),
                 new TutorialLine("試しに適当に打ってみな"),
             }));
@@ -901,8 +901,7 @@ namespace KillingMahjong.Managers
 
             yield return StartCoroutine(PlayLines(new List<TutorialLine>
             {
-                new TutorialLine("じゃ　再開しようか"),
-                new TutorialLine("とりま打牌よろしくー"),
+                new TutorialLine("じゃ　再開しようかとりま打牌よろしくー"),
             }));
         }
 
@@ -943,19 +942,19 @@ namespace KillingMahjong.Managers
                 case 1:
                     return new List<TutorialLine>
                     {
-                        new TutorialLine($"うーん{tileName}ね"),
+                        new TutorialLine($"おっ{tileName}かぁ"),
                         new TutorialLine("くぅーおしいっ！"),
                     };
                 case 2:
                     return new List<TutorialLine>
                     {
-                        new TutorialLine($"はぁ{tileName}…？"),
+                        new TutorialLine($"おっ{tileName}かぁ"),
                         new TutorialLine("ぜんぜんロンできんなぁ"),
                     };
                 default:
                     return new List<TutorialLine>
                     {
-                        new TutorialLine($"へぇ{tileName}？"),
+                        new TutorialLine($"おっ{tileName}かぁ"),
                         new TutorialLine("あたしも同じの打と"),
                     };
             }
