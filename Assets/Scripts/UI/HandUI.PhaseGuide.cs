@@ -66,13 +66,15 @@ namespace KillingMahjong.UI
 
             // **チュートリアルでも手牌選択の枚数だけは出す**（2026-10-28 要望「通常の対局のように、残り13牌の表示がいるかも」）。
             // ただし盤面を伏せている間（会話・黒帯）は山牌ごと隠れているので出さない
-            // **打牌フェイズの「山牌から1枚切る」は出さない**（2026-10-29 要望「対局フェイズ開始時に　山牌から一枚切るの表示が出ている」）。
-            // 牌交換を選んでいる間の「交換する牌をえらぶ」は打牌フェイズでも出す
-            bool mulliganPicking = gameUIManager != null && gameUIManager.IsMulliganSelection;
-            bool wanted = tutorial
+            // **黒帯・市松模様が出ている間は出さない**（2026-10-29 要望「対局フェイズ開始時の黒帯が出るときに、
+            // 『山牌から1枚切る』って表示が出ているねん」）。覆いの途中でフェイズが打牌へ切り替わるので、
+            // 帯の上に案内だけが浮いていた
+            var transition = gameUIManager != null ? gameUIManager.PhaseTransitionUI : null;
+            bool covered = transition != null && transition.isActiveAndEnabled && transition.IsCoveringScreen;
+            bool wanted = !covered && (tutorial
                 ? phaseStatus == RoundStatus.HandSelection && IsWallShown()
                 : (phaseStatus == RoundStatus.HandSelection ||
-                   (phaseStatus == RoundStatus.Discard && localTurn && mulliganPicking));
+                   (phaseStatus == RoundStatus.Discard && localTurn)));
 
             if (!wanted)
             {

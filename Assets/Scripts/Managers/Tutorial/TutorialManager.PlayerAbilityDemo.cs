@@ -212,16 +212,17 @@ namespace KillingMahjong.Managers
             UI.YakuSelectionUI.TutorialBoostedYakuPressed = null;
         }
 
-        // ---- 押せないものを押したときの先輩の一言（2026-10-29 要望）。**文面は仮。** 企画から届いたら差し替える ----
+        // ---- 押せないものを押したときの先輩の一言（2026-10-29 要望）----
+        // 牌交換・透視の文面は 2026-10-30 にプランナーから届いたもの。点が足りない／その他と、役強化の字幕は**まだ仮**
 
         /// <summary>使えない能力の行を押したとき。セリフ欄で言う</summary>
         private void SayIntroSkillUnusable(string type)
         {
             string line;
             if (type == SkillNames.Mulligan && GetIntroMulliganReplacements() == null)
-                line = "牌交換はもう交換できる牌がないみたいだねー";
+                line = "あんまやると手が作れなくなるよ？";
             else if (type == SkillNames.Perspective && _introPerspectiveUses >= 5)
-                line = "透視は1局に5回までだよー";
+                line = "もぅ……見すぎじゃない？スケベなんだから";
             else if (type != null && !CanActivateIntroSkill(type))
                 line = "あー それは点が足りないねー";
             else

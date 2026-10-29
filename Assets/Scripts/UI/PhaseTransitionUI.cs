@@ -181,6 +181,14 @@ namespace KillingMahjong.UI
 
         private PlayerInfoUI targetPlayerInfoUI;
 
+        /// <summary>
+        /// 黒帯（一本線）か市松模様の覆いが、いま画面に出ているか。
+        /// 手牌の上の案内（HandUI.PhaseGuide）が、覆いの上に出ないようにするのに使う
+        /// </summary>
+        public bool IsCoveringScreen =>
+            (fullScreenCheckerImage != null && fullScreenCheckerImage.gameObject.activeInHierarchy)
+            || (horizontalLineRt != null && horizontalLineRt.gameObject.activeInHierarchy);
+
         public void PlayTransition(string roundName, PlayerInfoUI playerInfoUI, KillingMahjong.EngineData.BettingCompletedInfo bet, Action onMidpoint, Action onComplete, bool? displayIsLocalTurn = null)
         {
             this.targetPlayerInfoUI = playerInfoUI;
