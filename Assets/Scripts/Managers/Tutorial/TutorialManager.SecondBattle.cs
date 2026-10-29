@@ -265,6 +265,7 @@ namespace KillingMahjong.Managers
                 }
                 else
                 {
+                    ShowPlayerTurnPrompt();
                     _isWaitingForDiscard = true;
                     _lastPlayerDiscardBaseId = -1;
 

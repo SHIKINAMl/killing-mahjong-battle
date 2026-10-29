@@ -666,6 +666,9 @@ namespace KillingMahjong.Managers
                     if (isFirstTutorialRound && (turn == 1 || turn == 2))
                         GuideTo(GetWallGuideTarget(), true, new Vector2(0f, 10f));
 
+                    // 1巡目は「打牌よろしくー」の直後なので言わない
+                    if (turn > 1) ShowPlayerTurnPrompt();
+
                     _isWaitingForDiscard = true;
                     _lastPlayerDiscardBaseId = -1;
 

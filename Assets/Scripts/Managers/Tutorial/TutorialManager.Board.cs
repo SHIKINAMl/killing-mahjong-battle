@@ -188,6 +188,11 @@ namespace KillingMahjong.Managers
         /// <param name="whileCovered">覆いきった間に一緒に出す物（第1局の体力・ゲージなど）。画面に物をぱっと出さないため（2026-10-24 ユーザー指示「チュートリアルの対局フェイズでUIをニョキって生やすのは止めてくれ。基本的に画面が暗転しているときにUIは全部出すように」）</param>
         private IEnumerator RunDiscardEntryTransition(System.Action whileCovered = null)
         {
+            // **黒帯に入る前にセリフ欄を空にする**（2026-10-29 バグ報告「第二局開始時に前のセリフが残っている」
+            // 「開始時は一旦セリフを空にして、始まった時にしゃべらせたい」）。
+            // 賭け金の話のセリフが、明けたあとの対局の頭まで残っていた。次のセリフは明けてから出る
+            if (dialogueUI != null) dialogueUI.HideText();
+
             var transition = gameUIManager != null ? gameUIManager.PhaseTransitionUI : null;
             if (transition != null && !transition.gameObject.activeSelf) transition.gameObject.SetActive(true);
             // 親ごと消えていると演出が始まらない。来ない合図を待たずに進める
