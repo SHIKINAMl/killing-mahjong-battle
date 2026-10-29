@@ -187,7 +187,11 @@ namespace KillingMahjong.Managers
 
                 FlashScreen();
                 yield return new WaitForSeconds(0.35f);
-                yield return StartCoroutine(PlayLines(AbilityRichLines));
+                // 「ほいっ……と！」が出るのと同時に、画面を少し縦に揺らす
+                // （2026-10-29 要望「『ほいっと』のときに画面がすこし縦揺れする演出がほしいかも」）
+                yield return StartCoroutine(PlayLines(AbilityRichLines.GetRange(0, AbilityRichLines.Count - 1)));
+                ShakeScreen(0.22f, 8f, new Vector2(0f, 1f));
+                yield return StartCoroutine(PlayLines(AbilityRichLines.GetRange(AbilityRichLines.Count - 1, 1)));
 
                 // 縦揺れ＆フラッシュ → 上から能力ベルが落ちてくる
                 ShakeScreen(0.25f, 18f, new Vector2(0f, 1f));
@@ -239,16 +243,27 @@ namespace KillingMahjong.Managers
                 yield break;
             }
 
+            // **位置が取れるまでの1フレームは、ベルの絵を描かない**（2026-10-29 バグ報告
+            // 「呼び鈴を出すときに一瞬だけ呼び鈴がちらつく」）。以前は着地点に1フレームだけ出てから上へ飛んでいた
             SetAbilityBellVisible(true);
             _abilityBellRevealed = true;
+            RectTransform bell = ability.BellRect;
+            var hidden = new List<UnityEngine.UI.Graphic>();
+            if (bell != null)
+                foreach (var g in bell.GetComponentsInChildren<UnityEngine.UI.Graphic>())
+                    if (g.enabled) { g.enabled = false; hidden.Add(g); }
             yield return null;   // 出した次のフレームまで待たないと位置が取れない
 
-            RectTransform bell = ability.BellRect;
-            if (bell == null) yield break;
+            bell = ability.BellRect;
+            if (bell == null) { foreach (var g in hidden) if (g != null) g.enabled = true; yield break; }
 
             Vector2 goal = bell.anchoredPosition;
             float rise = 420f;                    // 画面の外まで持ち上げる高さ
             const float fall = 0.45f;
+
+            // 画面の外へ持ち上げてから描き始める
+            bell.anchoredPosition = goal + new Vector2(0f, rise);
+            foreach (var g in hidden) if (g != null) g.enabled = true;
 
             float t = 0f;
             while (t < fall)
