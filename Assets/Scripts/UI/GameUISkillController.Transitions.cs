@@ -363,7 +363,8 @@ namespace KillingMahjong.UI
                     if (uiManager.VisualController != null)
                     {
                         // 演出を見せるため、アニメーション完了を待つ
-                        yield return StartCoroutine(uiManager.VisualController.PlayPerspectiveAnimation(newlyExposed));
+                        // チュートリアルは明滅を待たずに先輩のセリフへ進む（本編は今までどおり待つ）
+                        yield return StartCoroutine(uiManager.VisualController.PlayPerspectiveAnimation(newlyExposed, uiManager.IsTutorialMode));
                         if (!ownedLock.IsActive) yield break;
 
                     }

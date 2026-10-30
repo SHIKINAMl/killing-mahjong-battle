@@ -45,13 +45,17 @@ namespace KillingMahjong.UI
         }
 
         /// <param name="newlyExposed">今回新たに公開された敵山のインデックス一覧</param>
-        public IEnumerator PlayPerspectiveAnimation(List<int> newlyExposed)
+        /// <param name="appealInBackground">
+        /// 最後の黄色い明滅を待たずに返す（明滅は裏で続ける）。チュートリアルで、透視のあとの先輩のセリフを
+        /// すぐ始めるため（2026-10-30 バグ報告「チュートリアルで透視をつかってからセリフが流れるまでラグがある」）
+        /// </param>
+        public IEnumerator PlayPerspectiveAnimation(List<int> newlyExposed, bool appealInBackground = false)
         {
             using (var scope = presentations.Begin())
-                yield return scope.Run(PlayPerspectiveVisuals(scope, newlyExposed));
+                yield return scope.Run(PlayPerspectiveVisuals(scope, newlyExposed, appealInBackground));
         }
 
-        private IEnumerator PlayPerspectiveVisuals(PresentationScope scope, List<int> newlyExposed)
+        private IEnumerator PlayPerspectiveVisuals(PresentationScope scope, List<int> newlyExposed, bool appealInBackground)
         {
             if (uiManager.EnemyWallUI == null) yield break;
 
@@ -65,15 +69,16 @@ namespace KillingMahjong.UI
                 var boardState = Managers.BoardStateManager.Instance;
                 if (boardState != null && index < boardState.OriginalEnemyWallTiles.Count)
                     visualController.InitializeTileComponent(rt, boardState.OriginalEnemyWallTiles[index], false);
-            });
+            }, appealInBackground ? uiManager : null);
 
             if (uiManager.PhaseController != null)
                 uiManager.PhaseController.HandlePhaseVisibility(uiManager.CurrentPhaseStatus);
         }
 
         /// <summary>本編とコレクション共通。公開する値は呼び出し元が渡し、ここでは判定しない。</summary>
+        /// <param name="appealRunner">渡すと、最後の黄色い明滅をこれの上で裏で回し、待たずに返す</param>
         public static IEnumerator PlayReveal(PresentationScope scope, List<RectTransform> slots,
-            List<int> newlyExposed, System.Action<int, RectTransform> reveal)
+            List<int> newlyExposed, System.Action<int, RectTransform> reveal, MonoBehaviour appealRunner = null)
         {
 
             // ---- ① 発動 ----
@@ -123,7 +128,8 @@ namespace KillingMahjong.UI
             }
 
             // 透視できた牌がどれだったかを、戻ったあとにもう一度見せる
-            yield return GlowAppeal(scope, glowingImages);
+            if (appealRunner != null) appealRunner.StartCoroutine(GlowAppeal(null, glowingImages));
+            else yield return GlowAppeal(scope, glowingImages);
 
         }
 
@@ -153,7 +159,7 @@ namespace KillingMahjong.UI
                 if (image == null) continue;
                 var ownedImage = image;
                 Color before = image.color;
-                scope.AddCleanup(() => { if (ownedImage != null) ownedImage.color = before; });
+                scope?.AddCleanup(() => { if (ownedImage != null) ownedImage.color = before; });
             }
 
             Color originalColor = Color.white;

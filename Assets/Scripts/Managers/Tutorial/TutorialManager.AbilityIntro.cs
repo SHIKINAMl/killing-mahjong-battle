@@ -414,6 +414,8 @@ namespace KillingMahjong.Managers
                     yield return null;
                 }
                 ClearGuide();
+                // 「じゃ好きなの適当に押してみてよ」を、発動の演出のあいだ残さない（止まって見えるため。2026-10-30）
+                if (dialogueUI != null) dialogueUI.HideText();
                 if (!_aborted) yield return PlayIntroSkillEffect(picked, suit, done => applied = done);
             }
             finally
@@ -423,8 +425,8 @@ namespace KillingMahjong.Managers
                 ClearGuide();
             }
 
-            // 効果発動の余韻
-            yield return new WaitForSeconds(0.4f);
+            // 効果発動の余韻。透視は牌の明滅が裏で続いているので待たない（2026-10-30 バグ報告「透視をつかってからセリフが流れるまでラグがある」）
+            if (picked != SkillNames.Perspective) yield return new WaitForSeconds(0.4f);
             onPicked(applied ? picked : null);
         }
 

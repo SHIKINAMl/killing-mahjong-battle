@@ -181,9 +181,9 @@ namespace KillingMahjong.UI
             _moveAnimator.HandleTileMovedToWall(tileId);
         }
 
-        public System.Collections.IEnumerator PlayPerspectiveAnimation(List<int> newlyExposed)
+        public System.Collections.IEnumerator PlayPerspectiveAnimation(List<int> newlyExposed, bool appealInBackground = false)
         {
-            return _exposedEffectPlayer.PlayPerspectiveAnimation(newlyExposed);
+            return _exposedEffectPlayer.PlayPerspectiveAnimation(newlyExposed, appealInBackground);
         }
     }
 }
