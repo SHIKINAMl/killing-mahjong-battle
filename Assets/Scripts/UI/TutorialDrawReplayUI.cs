@@ -41,6 +41,9 @@ namespace KillingMahjong.UI
             if (owner != null) go.transform.SetParent(owner, false);
             var ui = go.GetComponent<TutorialDrawReplayUI>();
             ui.phoneCharacter = phoneOwner != null ? phoneOwner.CharacterRenderer : null;
+            // 動画の中に、いまの自分の体力が少ないときの赤い縁取りと鼓動を出さない（2026-10-30 バグ報告）
+            Effects.HeartbeatEffect.SetHiddenForReplay(true);
+            ui.hidHeartbeat = true;
             ui.Build(); return ui;
         }
 
@@ -424,7 +427,13 @@ namespace KillingMahjong.UI
             if (girlBody != null) girlBody.rectTransform.anchoredPosition = position;
             if (girlFace != null) girlFace.rectTransform.anchoredPosition = position;
         }
-        private void OnDestroy() { if (ownedMaterial != null) Destroy(ownedMaterial); }
+        private bool hidHeartbeat;
+
+        private void OnDestroy()
+        {
+            if (ownedMaterial != null) Destroy(ownedMaterial);
+            if (hidHeartbeat) { hidHeartbeat = false; Effects.HeartbeatEffect.SetHiddenForReplay(false); }
+        }
         private void OnDisable() { tauntBobbing = false; SetCharacterPosition(CharacterPosition); StopAllCoroutines(); if(phase!=null) phase.CancelTransitions(); if(subtitles!=null) subtitles.Hide(); }
     }
 }
