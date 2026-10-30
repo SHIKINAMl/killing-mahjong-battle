@@ -9,19 +9,54 @@ namespace KillingMahjong.UI.Effects
     public partial class BoostHandSkillEffect
     {
         private Image confirmationGlow;
+        private GameObject confirmationCard;
 
-        /// <summary>通常対局のカットイン直後は、強化対象の枠だけを短く強調する。</summary>
+        /// <summary>強化した役名を短く見せ、同じ名前が右上の強化枠へ収まる。</summary>
         public IEnumerator PlayAfterCutin(string yakuName, YakuListUI board)
         {
             _heldBoard = board;
             try
             {
                 if (board == null) yield break;
-                board.ReleaseLocalBoostChip();
-                _heldBoard = null;
-                board.SpotlightLocalBoost(yakuName, 1.1f);
+                board.HoldLocalBoostChip(yakuName);
+                board.SpotlightLocalBoost(yakuName, 2f);
                 var chip = board.LocalBoostChipOf(yakuName);
                 if (chip == null) yield break;
+
+                _stage = new SkillEffectStage("RoleConfirmationStage", UISortingOrders.SkillEffectContent, transform);
+                string shown = string.IsNullOrEmpty(yakuName) ? "役強化"
+                    : YakuNameUtil.ToDisplayText(new YakuNameUtil.Entry { BaseName = yakuName, Boost = 0, Count = 1 });
+                confirmationCard = new GameObject("BoostRoleCard", typeof(RectTransform), typeof(Image));
+                var card = confirmationCard.GetComponent<RectTransform>();
+                card.SetParent(_stage.Rect, false);
+                card.anchorMin = card.anchorMax = new Vector2(.5f, .5f);
+                card.sizeDelta = new Vector2(Mathf.Clamp(shown.Length * 40f + 32f, 180f, 320f), 88f);
+                var backing = confirmationCard.GetComponent<Image>();
+                backing.color = new Color(.12f, .08f, .09f, .96f);
+                backing.raycastTarget = false;
+                var name = _stage.AddText("BoostRoleName", shown, Mathf.Min(40f, 280f / Mathf.Max(1, shown.Length)), Color.white);
+                name.rectTransform.SetParent(card, false);
+                name.rectTransform.anchoredPosition = new Vector2(0f, 13f);
+                var amount = _stage.AddText("BoostRoleAmount", "+1段", 24f, new Color(1f, .85f, .45f));
+                amount.rectTransform.SetParent(card, false);
+                amount.rectTransform.anchoredPosition = new Vector2(0f, -23f);
+                Vector2 destination = _stage.LocalRectOf(chip).center;
+                Vector2 from = destination + new Vector2(-150f, -85f);
+                from.x = Mathf.Clamp(from.x, -388f + card.sizeDelta.x * .5f, 388f - card.sizeDelta.x * .5f);
+                from.y = Mathf.Clamp(from.y, -244f, 244f);
+                card.anchoredPosition = from;
+                yield return new WaitForSeconds(.55f);
+                for (float t = 0f; t < .28f; t += Time.deltaTime)
+                {
+                    float p = Mathf.Clamp01(PresentationTiming.Sample(t) / .28f);
+                    card.anchoredPosition = Vector2.Lerp(from, destination, p * p);
+                    card.localScale = Vector3.one * Mathf.Lerp(1f, .25f, p);
+                    yield return null;
+                }
+                Destroy(confirmationCard);
+                confirmationCard = null;
+                board.ReleaseLocalBoostChip();
+                _heldBoard = null;
                 _poppedChip = chip;
                 _chipScale = chip.localScale;
 
@@ -61,6 +96,8 @@ namespace KillingMahjong.UI.Effects
         {
             if (confirmationGlow != null) Destroy(confirmationGlow.gameObject);
             confirmationGlow = null;
+            if (confirmationCard != null) Destroy(confirmationCard);
+            confirmationCard = null;
         }
     }
 }

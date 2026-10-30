@@ -34,7 +34,7 @@ namespace KillingMahjong.UI
             new Entry("title.ranking_rows", "画面効果", "ランキング：上から点灯・ページ切替", "RankingRowsTransition / TitleRankingBoardUI"),
             new Entry("skill.perspective", "スキル", "透視：集中 → 3枚公開 → 解除", "ExposedTileEffectPlayer.PlayReveal"),
             new Entry("skill.mulligan", "スキル", "牌交換：OUT / IN", "MulliganSwapAnimator.PlayRoutine"),
-            new Entry("skill.boost_hand", "スキル", "役強化：カットイン → 右上の強化枠を短く強調", "GameUISkillController / BoostHandSkillEffect.PlayAfterCutin"),
+            new Entry("skill.boost_hand", "スキル", "役強化：強化した役名を見せて右上の枠へ収める", "GameUISkillController / BoostHandSkillEffect.PlayAfterCutin"),
             new Entry("skill.boost_hand.tutorial", "スキル", "役強化：チュートリアル用・ベルルを呼んで力を借りる", "GameUISkillController (Tutorial) / BoostHandSkillEffect.Play"),
             new Entry("skill.assault", "スキル", "強襲：自分の血を溜める → 相手へ撃ち込む → 札が貼り付く", "AssaultSkillEffect.Play"),
             new Entry("skill.assault_received_mark", "スキル", "強襲を受けた自分HPの札", "GameUISkillController.HandleSkillCasted / AssaultMarkUI.Show"),
