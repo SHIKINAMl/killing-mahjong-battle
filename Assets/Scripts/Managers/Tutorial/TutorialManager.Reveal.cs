@@ -180,10 +180,19 @@ namespace KillingMahjong.Managers
             ClearStakes();
             _playerHp = settlement.MyHpAfter;
             _enemyHp = settlement.TheirHpAfter;
+            // 相手の掛け金は清算の前に黙って戻す（増減の数字を出さない）。清算では相手の血は動かない
+            var enemyInfo = gameUIManager != null ? gameUIManager.EnemyInfoUI : null;
+            if (enemyInfo != null)
+            {
+                bool suppressed = enemyInfo.SuppressHpPopup;
+                enemyInfo.SuppressHpPopup = true;
+                enemyInfo.SetHP(settlement.TheirHpBefore);
+                enemyInfo.SuppressHpPopup = suppressed;
+            }
             if (ronUI != null)
                 yield return ronUI.PlayTutorialSettlementTransfer(settlement,
                     gameUIManager.PlayerInfoUI, gameUIManager.EnemyInfoUI,
-                    previousPlayerHp, settlement.MyHpAfter, previousEnemyHp, settlement.TheirHpAfter);
+                    previousPlayerHp, settlement.MyHpAfter, settlement.TheirHpBefore, settlement.TheirHpAfter);
             ApplyHpToUI();
             UI.Effects.AssaultMarkUI.Clear();
             if (gameUIManager != null) gameUIManager.ScoreGauge.SetStakes(0, 0);
@@ -206,7 +215,10 @@ namespace KillingMahjong.Managers
                 MyDelta = -loss, TheirDelta = 0,
                 MyHpBefore = previousPlayerHp, MyHpAfter = Mathf.Max(0, previousPlayerHp - loss),
                 // 強襲で放棄するのは儲けだけ。場に預けた相手自身の掛け金は返る。
-                TheirHpBefore = previousEnemyHp, TheirHpAfter = previousEnemyHp + enemyBet,
+                // **返った掛け金は「得た点」に見せない**（2026-10-30 バグ報告「強襲を使ったのに相手が点を得ている」）。
+                // 本編のサーバーは賭けた時点で血を引かないので、強襲の勝者の血は清算で 1 点も動かない。
+                // チュートリアルは賭けた時点で引いているので、清算の前に黙って戻し、清算では増減 0 に見せる
+                TheirHpBefore = previousEnemyHp + enemyBet, TheirHpAfter = previousEnemyHp + enemyBet,
             };
             GameUIPhaseController.FillYakuRows(settlement, Common.YakuNameUtil.Summarize(data.yakuList), han);
             return settlement;
