@@ -81,21 +81,11 @@ namespace KillingMahjong.Managers
         /// 操作を弾いたときの一言。送りボタンを使わないので PlayLines と競合しない。
         /// 連打されても直前のものを止めるだけで、コルーチンは残らない。
         /// </summary>
-        /// <summary>プレイヤーの番になったことを知らせる一言。プランナーの言葉（2026-10-29「後輩ちゃんの番だよ」的なもの）</summary>
-        private const string PlayerTurnPromptLine = "後輩ちゃんの番だよ";
-
         /// <summary>
-        /// プレイヤーが打つ番になったら、前のセリフを消して「後輩ちゃんの番だよ」を出す
-        /// （2026-10-29 バグ報告「打牌した時にセリフの▼が消えている」「セリフに『後輩ちゃんの番だよ』的なものがあったはず？」）。
-        /// 以前は先輩の反応の最後の行が▼なしで残り、送れないセリフが出たまま止まって見えた。
-        /// **クリック待ちにはしない**（▼を出さない）。打牌がそのまま返事になる
+        /// プレイヤーの番を知らせる一言。フロー図で第1局の打牌ループにある言葉（TutorialManager.Progression）。
+        /// 第2局でも自分で打つ番に同じ言葉を使う（2026-10-29 バグ報告「セリフに『後輩ちゃんの番だよ』的なものがあったはず？」）
         /// </summary>
-        private void ShowPlayerTurnPrompt()
-        {
-            if (dialogueUI == null) return;
-            dialogueUI.gameObject.SetActive(true);
-            dialogueUI.ShowText($"「{PlayerTurnPromptLine}」");
-        }
+        private const string PlayerTurnLine = "次は後輩ちゃんねー";
 
         private void ShowInterruptMessage(string text)
         {

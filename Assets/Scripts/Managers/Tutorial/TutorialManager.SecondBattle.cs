@@ -265,7 +265,14 @@ namespace KillingMahjong.Managers
                 }
                 else
                 {
-                    ShowPlayerTurnPrompt();
+                    // 自分の番になったことを、第1局と同じフロー図の一言で知らせる（▼つきで送る）。
+                    // 2026-10-29 は送りなしの「後輩ちゃんの番だよ」を出していたが、第1局では「次は後輩ちゃんねー」の直後に重なり、
+                    // ▼も無いので「悪化しとる」と言われた（2026-10-30）
+                    yield return StartCoroutine(PlayLines(new List<TutorialLine>
+                    {
+                        new TutorialLine(PlayerTurnLine),
+                    }));
+                    if (_aborted) yield break;
                     _isWaitingForDiscard = true;
                     _lastPlayerDiscardBaseId = -1;
 
