@@ -61,6 +61,9 @@ namespace KillingMahjong.UI
         private float randomOffset;
         private int presentationFrame = -1;
 
+        // 画面の端で切れている向き。最初の揺れの前に一度だけ測る（UpdateInitialPosition で測り直す）
+        private bool edgesMeasured, cutLeft, cutRight, cutBottom, cutTop;
+
         private void Start()
         {
             // スクリプトがアタッチされたオブジェクトの初期座標と回転を記憶
@@ -93,7 +96,21 @@ namespace KillingMahjong.UI
             // Sin波とCos波を使って滑らかな浮遊オフセットを計算
             float offsetY = Mathf.Sin(phaseY) * floatAmplitudeY;
             float offsetX = Mathf.Cos(phaseX) * floatAmplitudeX;
-            
+
+            // **画面の端で切れている絵は、その端から内側へは動かさない**（2026-10-31 ユーザー指摘「右のプレイヤー体力ですが、
+            // 揺れているうちに絵が描写されていないところが見えてしまいます」）。切れ目のある側には、波を折り返して外側へだけ振る。
+            // どの端で切れているかは、元の位置で測る（揺れた位置で測ると、揺れの分だけずれて読み違える）
+            if (!edgesMeasured)
+            {
+                edgesMeasured = true;
+                Vector3 now = transform.localPosition;
+                transform.localPosition = initialPosition;
+                Effects.ScreenShakeBounds.EdgeCuts(transform, out cutLeft, out cutRight, out cutBottom, out cutTop);
+                transform.localPosition = now;
+            }
+            if (cutRight || cutLeft) offsetX = Mathf.Abs(offsetX) * (cutRight ? 1f : -1f);
+            if (cutTop || cutBottom) offsetY = Mathf.Abs(offsetY) * (cutTop ? 1f : -1f);
+
             // 初期座標に対してオフセットを足す（回転処理のみジャギー防止のため無効化）
             transform.localPosition = initialPosition + new Vector3(offsetX, offsetY, 0);
         }
@@ -134,6 +151,7 @@ namespace KillingMahjong.UI
         public void UpdateInitialPosition()
         {
             initialPosition = transform.localPosition;
+            edgesMeasured = false;
         }
     }
 }
