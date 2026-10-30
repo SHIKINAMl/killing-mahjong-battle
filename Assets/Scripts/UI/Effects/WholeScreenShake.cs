@@ -16,6 +16,7 @@ namespace KillingMahjong.UI.Effects
     {
         private static WholeScreenShake host;
         private readonly Dictionary<Transform, Vector3> origins = new Dictionary<Transform, Vector3>();
+        private readonly HashSet<Transform> keepRightCovered = new HashSet<Transform>();
         private float until, magnitude;
         private Vector2 axis;
         private Coroutine running;
@@ -45,6 +46,7 @@ namespace KillingMahjong.UI.Effects
         private IEnumerator Shake()
         {
             origins.Clear();
+            keepRightCovered.Clear();
             foreach (var canvas in FindObjectsByType<Canvas>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
             {
                 if (!canvas.isRootCanvas) continue;
@@ -52,6 +54,7 @@ namespace KillingMahjong.UI.Effects
                 {
                     var child = canvas.transform.GetChild(i);
                     if (!origins.ContainsKey(child)) origins[child] = child.localPosition;
+                    if (ScreenShakeBounds.KeepRightEdgeCovered(child)) keepRightCovered.Add(child);
                 }
             }
             int frame = -1;
@@ -66,7 +69,8 @@ namespace KillingMahjong.UI.Effects
                         float sign = (frame & 1) == 0 ? 1f : -1f;
                         float fade = Mathf.Clamp01((until - Time.unscaledTime) / .2f);
                         var offset = new Vector3(axis.x, axis.y, 0f) * Mathf.Round(sign * magnitude * Mathf.Max(.4f, fade) / 2f) * 2f;
-                        foreach (var pair in origins) if (pair.Key != null) pair.Key.localPosition = pair.Value + offset;
+                        foreach (var pair in origins) if (pair.Key != null)
+                            pair.Key.localPosition = pair.Value + ScreenShakeBounds.Constrain(offset, keepRightCovered.Contains(pair.Key));
                     }
                     yield return null;
                 }
@@ -75,6 +79,7 @@ namespace KillingMahjong.UI.Effects
             {
                 foreach (var pair in origins) if (pair.Key != null) pair.Key.localPosition = pair.Value;
                 origins.Clear();
+                keepRightCovered.Clear();
                 running = null;
             }
         }

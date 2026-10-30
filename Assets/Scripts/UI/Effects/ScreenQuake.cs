@@ -34,6 +34,7 @@ namespace KillingMahjong.UI.Effects
         // `localPosition` なら、どちらの種類でも同じように動かせる。
         private readonly List<Transform> _targets = new List<Transform>();
         private readonly List<Vector3> _origins = new List<Vector3>();
+        private readonly List<bool> _keepRightCovered = new List<bool>();
         private Coroutine _routine;
         private float _runningPower;
 
@@ -93,6 +94,7 @@ namespace KillingMahjong.UI.Effects
         {
             _targets.Clear();
             _origins.Clear();
+            _keepRightCovered.Clear();
 
             // **`Canvas.isRootCanvas` で拾う（2026-09-13 に2度直した）。**
             //
@@ -123,6 +125,7 @@ namespace KillingMahjong.UI.Effects
                     if (child == null) continue;
                     _targets.Add(child);
                     _origins.Add(child.localPosition);
+                    _keepRightCovered.Add(ScreenShakeBounds.KeepRightEdgeCovered(child));
                 }
             }
         }
@@ -135,6 +138,7 @@ namespace KillingMahjong.UI.Effects
             }
             _targets.Clear();
             _origins.Clear();
+            _keepRightCovered.Clear();
         }
 
         private IEnumerator Run(float power, float seconds)
@@ -166,7 +170,8 @@ namespace KillingMahjong.UI.Effects
                 for (int i = 0; i < _targets.Count; i++)
                 {
                     if (_targets[i] == null) continue;
-                    _targets[i].localPosition = _origins[i] + new Vector3(x, y, 0f);
+                    _targets[i].localPosition = _origins[i]
+                        + ScreenShakeBounds.Constrain(new Vector3(x, y, 0f), _keepRightCovered[i]);
                 }
                 yield return null;
             }

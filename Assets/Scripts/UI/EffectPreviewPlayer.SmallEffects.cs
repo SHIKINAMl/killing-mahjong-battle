@@ -93,7 +93,11 @@ namespace KillingMahjong.UI
                 case "skill.mulligan_choice":
                 {
                     // 出した3枚と山札の3枚。押している間だけ盤面を見せる「場を見る」も、押したことにして見せる
-                    var choice = MulliganChoiceUI.FindOrCreate();
+                    // 本編の画面は試写中にCanvasが隠れる。試写舞台に独立した画面を作る。
+                    var choiceRoot = scope.Own(new GameObject("MulliganChoicePreview", typeof(RectTransform), typeof(MulliganChoiceUI)));
+                    choiceRoot.transform.SetParent(rig.transform, false);
+                    var choice = choiceRoot.GetComponent<MulliganChoiceUI>();
+                    scope.AddCleanup(choice.Hide);
                     choice.Show(new System.Collections.Generic.List<int> { 0, 4, 8, 40, 44, 48 }, rig.tiles, picked => { });
                     yield return new WaitForSeconds(1.8f);
                     var peekHold = choice.GetComponentInChildren<PressHoldRelay>(true);
