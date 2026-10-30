@@ -48,6 +48,7 @@ namespace KillingMahjong.UI
         private bool _built;
         private TMP_FontAsset _font;
         private GameObject _body;
+        private GameObject _scrim, _panel;
         private TextMeshProUGUI _countText;
         private Button _confirm;
         private readonly List<Button> _tileButtons = new List<Button>();
@@ -96,7 +97,18 @@ namespace KillingMahjong.UI
 
         public void Hide()
         {
+            SetPeek(false);
             if (_body != null) _body.SetActive(false);
+        }
+
+        /// <summary>
+        /// 「場を見る」を押している間だけ、暗い覆いと選ぶ画面を消して盤面を見せる（2026-10-30 要望
+        /// 「場を見るボタンがあってもいいかも」「押している間だけ消すタイプで」「選んだ後の残す牌を決めるとこや」）
+        /// </summary>
+        private void SetPeek(bool on)
+        {
+            if (_scrim != null) _scrim.SetActive(!on);
+            if (_panel != null) _panel.SetActive(!on);
         }
 
         /// <summary>
@@ -182,8 +194,10 @@ namespace KillingMahjong.UI
                 img.color = new Color(0f, 0f, 0f, 0.8f);
                 img.raycastTarget = true;
             }
+            _scrim = scrim;
 
             Image panel = Img(_body.transform, "Panel", PanelBg, Vector2.zero, PanelSize);
+            _panel = panel.gameObject;
             Transform p = panel.transform;
 
             Txt(p, "Title", "残す3枚を選んでください", new Vector2(0f, 148f), new Vector2(600f, 28f),
@@ -238,6 +252,13 @@ namespace KillingMahjong.UI
                 Hide();
                 if (_onDecided != null) _onDecided(result);
             });
+
+            // 「場を見る」。選ぶ画面の下に置き、押している間だけ盤面を見せる（覆いと選ぶ画面の外に置くので、消えない）
+            var peek = Btn(_body.transform, "PeekButton", "場を見る", new Vector2(0f, -218f), new Vector2(150f, 34f), 16f, Marker);
+            peek.onClick.RemoveAllListeners();
+            var hold = peek.GetComponent<PressHoldRelay>();
+            if (hold == null) hold = peek.gameObject.AddComponent<PressHoldRelay>();
+            hold.OnHoldChanged = SetPeek;
 
             return SceneFirst.Report("MulliganChoiceUI");
         }
