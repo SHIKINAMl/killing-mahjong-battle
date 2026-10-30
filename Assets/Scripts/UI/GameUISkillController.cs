@@ -130,9 +130,49 @@ namespace KillingMahjong.UI
             else CancelPendingSkillRequest();
         }
 
+        // ---- 「場を見る」（2026-10-30 要望「押している間だけ消すタイプで」）----
+        private readonly System.Collections.Generic.List<GameObject> _peekHiddenChildren = new System.Collections.Generic.List<GameObject>();
+        private bool _peeking;
+
+        /// <summary>牌交換の画面に「場を見る」ボタンを置く（シーンに置いてある物を使う）。エディタで焼き込むときにも呼ぶ</summary>
+        public MulliganPeekButtonUI EnsureMulliganPeekButton(GameUIManager manager)
+        {
+            if (mulliganCanvas == null || manager == null || manager.HandUI == null) return null;
+            var decide = manager.HandUI.DecideButtonRect != null ? manager.HandUI.DecideButtonRect.GetComponent<Button>() : null;
+            return MulliganPeekButtonUI.Ensure(mulliganCanvas.transform, decide, this);
+        }
+
+        /// <summary>
+        /// 押している間だけ、牌交換の案内を消して、伏せていた相手・体力・役一覧を出す。離したら元に戻す
+        /// </summary>
+        public void SetMulliganPeek(bool on)
+        {
+            if (on == _peeking) return;
+            if (on && (!IsMulliganSelection || mulliganCanvas == null || !mulliganCanvas.activeInHierarchy)) return;
+            _peeking = on;
+            if (on)
+            {
+                _peekHiddenChildren.Clear();
+                foreach (Transform child in mulliganCanvas.transform)
+                {
+                    if (child.name == MulliganPeekButtonUI.ObjectName || !child.gameObject.activeSelf) continue;
+                    _peekHiddenChildren.Add(child.gameObject);
+                    child.gameObject.SetActive(false);
+                }
+                foreach (var go in hiddenUIs) if (go != null) go.SetActive(true);
+            }
+            else
+            {
+                foreach (var go in _peekHiddenChildren) if (go != null) go.SetActive(true);
+                _peekHiddenChildren.Clear();
+                if (IsMulliganSelection) foreach (var go in hiddenUIs) if (go != null) go.SetActive(false);
+            }
+        }
+
         private void ShowMulliganUI()
         {
             if (mulliganCanvas != null) mulliganCanvas.SetActive(true);
+            EnsureMulliganPeekButton(uiManager);
             
             _sortingScope.BringToFront(uiManager.HandUI?.gameObject, UISortingOrders.MulliganFocusTiles);
             _sortingScope.BringToFront(uiManager.WallUI?.gameObject, UISortingOrders.MulliganFocusTiles);
@@ -160,6 +200,13 @@ namespace KillingMahjong.UI
 
         private void HideMulliganUI()
         {
+            if (_peeking)
+            {
+                // 押したまま牌交換が終わったとき。案内の文字は戻しておく（伏せていた物は下で戻す）
+                foreach (var go in _peekHiddenChildren) if (go != null) go.SetActive(true);
+                _peekHiddenChildren.Clear();
+                _peeking = false;
+            }
             RestoreTutorialMulliganTargets();
             if (mulliganCanvas != null) mulliganCanvas.SetActive(false);
             if (uiManager != null)
