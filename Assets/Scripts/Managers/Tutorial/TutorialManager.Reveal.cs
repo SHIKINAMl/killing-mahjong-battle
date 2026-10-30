@@ -43,6 +43,9 @@ namespace KillingMahjong.Managers
         /// </summary>
         private const string TutorialRevivalBgm = "tut_scary_C";
 
+        /// <summary>A を消す秒数（赤い縁が閉じて真っ黒になるまでと同じ 2.0＋1.5 秒）と、C を上げる秒数</summary>
+        private const float RevivalBgmFadeOutSeconds = 3.5f, RevivalBgmFadeInSeconds = 3f;
+
         /// <summary>2026-10-18の図。「はい」から動画後半、3つの質問、指定された決着まで。</summary>
         private IEnumerator RunWatchRestContinuation(TutorialRoundData data)
         {

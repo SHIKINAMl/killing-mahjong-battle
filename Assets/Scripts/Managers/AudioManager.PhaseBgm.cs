@@ -612,6 +612,45 @@ namespace KillingMahjong.Managers
             bgmSource.Play();
         }
 
+        /// <summary>
+        /// チュートリアルの曲を**ゆっくり**入れ替える。いまの曲を <paramref name="fadeOutSeconds"/> かけて消し、
+        /// 次の曲を頭から <paramref name="fadeInSeconds"/> かけて上げる（2026-10-30 プランナー「ゆっくり遷移VERを見せて」）。
+        /// 同じ曲がもう鳴っていれば何もしない
+        /// </summary>
+        public void PlayTutorialBgmSlow(string name, float fadeOutSeconds, float fadeInSeconds)
+        {
+            if (!CanPlay) return;
+            if (bgmSource == null || string.IsNullOrEmpty(name)) return;
+            var clip = GetPhaseBgmClip(name);
+            if (clip == null || IsTutorialBgmPlaying(name)) return;
+            if (bgmSwapCoroutine != null) StopCoroutine(bgmSwapCoroutine);
+            bgmSwapCoroutine = StartCoroutine(SlowTutorialBgmSwap(name, clip, fadeOutSeconds, fadeInSeconds));
+        }
+
+        private IEnumerator SlowTutorialBgmSwap(string name, AudioClip clip, float fadeOutSeconds, float fadeInSeconds)
+        {
+            float from = bgmSource.isPlaying ? bgmSource.volume : 0f;
+            for (float t = 0f; t < fadeOutSeconds && from > 0f; t += Time.unscaledDeltaTime)
+            {
+                bgmSource.volume = Mathf.Lerp(from, 0f, t / fadeOutSeconds);
+                yield return null;
+            }
+            currentPhaseBgmName = name;
+            StopProposal3();
+            bgmSource.clip = clip;
+            bgmSource.loop = true;
+            bgmSource.timeSamples = 0;
+            bgmSource.volume = 0f;
+            bgmSource.Play();
+            for (float t = 0f; t < fadeInSeconds; t += Time.unscaledDeltaTime)
+            {
+                bgmSource.volume = Mathf.Lerp(0f, BgmMaster, t / fadeInSeconds);
+                yield return null;
+            }
+            bgmSource.volume = BgmMaster;
+            bgmSwapCoroutine = null;
+        }
+
         /// <summary>チュートリアルの曲 <paramref name="name"/> がいま鳴っているか。</summary>
         public bool IsTutorialBgmPlaying(string name)
         {
