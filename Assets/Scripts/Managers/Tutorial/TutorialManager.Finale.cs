@@ -26,7 +26,11 @@ namespace KillingMahjong.Managers
             _revivalUI = TutorialRevivalUI.Create(transform);
             try
             {
-                yield return _revivalUI.Play(_scenario.revival, BorrowJapaneseFont());
+                // 画面が真っ黒になったら、怖い曲を A から C に切り替える（2026-10-30 プランナー「画面が暗くなったらCの曲に切り替えて」）
+                yield return _revivalUI.Play(_scenario.revival, BorrowJapaneseFont(), onDarkened: () =>
+                {
+                    if (AudioManager.Instance != null) AudioManager.Instance.PlayTutorialBgm(TutorialRevivalBgm);
+                });
                 if (_aborted) yield break;
                 Tutorial.TutorialAudioDirector.ResetVisuals();
                 TutorialNavigation.Complete(TutorialNavigation.RevivalToMatchMenu);

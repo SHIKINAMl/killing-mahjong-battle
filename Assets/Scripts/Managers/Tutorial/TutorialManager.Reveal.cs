@@ -37,6 +37,12 @@ namespace KillingMahjong.Managers
         /// </summary>
         private const string TutorialScaryBgm = "tut_scary_A";
 
+        /// <summary>
+        /// 負けて画面が真っ黒になってからの曲（Resources/Bgm）。同じく codex の合成曲の候補 C。
+        /// 2026-10-30 プランナー「画面が暗くなったらCの曲に切り替えて」
+        /// </summary>
+        private const string TutorialRevivalBgm = "tut_scary_C";
+
         /// <summary>2026-10-18の図。「はい」から動画後半、3つの質問、指定された決着まで。</summary>
         private IEnumerator RunWatchRestContinuation(TutorialRoundData data)
         {

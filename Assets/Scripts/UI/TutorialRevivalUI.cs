@@ -56,7 +56,8 @@ namespace KillingMahjong.UI
             return root.AddComponent<TutorialRevivalUI>();
         }
 
-        public IEnumerator Play(TutorialRevivalData data, TMP_FontAsset font, bool automatic = false)
+        /// <param name="onDarkened">赤い縁が閉じて画面が真っ黒になった瞬間に呼ぶ（チュートリアルが曲を切り替える）</param>
+        public IEnumerator Play(TutorialRevivalData data, TMP_FontAsset font, bool automatic = false, Action onDarkened = null)
         {
             if (data == null) throw new ArgumentNullException(nameof(data));
             stage = new SkillEffectStage("RevivalStage", UISortingOrders.TutorialRevival, transform);
@@ -76,6 +77,7 @@ namespace KillingMahjong.UI
             cover.color = Color.red;
             red.gameObject.SetActive(false);
             yield return Animate(1.5f, t => cover.color = Color.Lerp(Color.red, Color.black, t));
+            onDarkened?.Invoke();
 
             text = stage.AddText("RevivalText", "", 20f, Color.white);
             if (font != null) text.font = font;
