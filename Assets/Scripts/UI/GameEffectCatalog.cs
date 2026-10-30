@@ -43,6 +43,7 @@ namespace KillingMahjong.UI
             new Entry(Effects.EnemySkillBatchPresentation.EffectId, "スキル", "相手の能力連打：透視・透視・役強化・透視", "EnemySkillBatchPresentation.Play"),
             new Entry(Effects.EnemySkillBatchPresentation.SummaryEffectId, "スキル", "旧・相手の能力まとめ：透視 × 2・牌交換", "EnemySkillBatchPresentation.PlaySummary", unused: true),
             new Entry("ui.ability_bell", "スキル", "能力を開くベルの音", "AbilityUI.OnTriggerClicked / AudioManager.PlayAbilityBellSE"),
+            new Entry(Effects.AbilityBellDropEffect.EffectId, "スキル", "呼び鈴：落下して着地した時だけ縦揺れ", "TutorialManager.DropAbilityBellRoutine / AbilityBellDropEffect.Play"),
             new Entry("phase.dealing", "フェイズ", "配牌：暗転 → 局名がその場で短くフェード → 牌の山 → 明転", "PhaseTransitionUI.PlayRoundStartDarken / PlayRoundStartFadeOut"),
             new Entry("phase.betting", "フェイズ", "掛け金パネル：入る → 出る", "BettingUI.ShowFixedBettingPhase / HideBettingPhase"),
             new Entry(Effects.BetStakeFx.EffectId, "フェイズ", "掛け金の重さ：枠に血が溜まる・心音・赤い縁・揺れ", "BettingUI / BetStakeFx"),

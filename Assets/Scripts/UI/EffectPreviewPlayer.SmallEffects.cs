@@ -20,6 +20,25 @@ namespace KillingMahjong.UI
                     bellAudio.PlayAbilityBellSE();
                     yield return new WaitForSecondsRealtime(2.25f);
                     yield break;
+                case AbilityBellDropEffect.EffectId:
+                {
+                    var ability = FindFirstObjectByType<AbilityUI>(FindObjectsInactive.Include);
+                    if (ability == null || ability.BellRect == null)
+                        throw new InvalidOperationException("呼び鈴の画像がありません。");
+                    var bell = Instantiate(ability.BellRect.gameObject, rig.surface, false).GetComponent<RectTransform>();
+                    bell.name = "AbilityBellDropPreview";
+                    bell.GetComponent<Image>().sprite = ability.BellSprite;
+                    scope.Own(bell.gameObject);
+                    bell.anchorMin = bell.anchorMax = new Vector2(.5f, .5f);
+                    var goal = new Vector2(-330f, -210f);
+                    bell.anchoredPosition = goal + new Vector2(0f, AbilityBellDropEffect.Rise);
+                    foreach (var graphic in bell.GetComponentsInChildren<Graphic>(true)) graphic.raycastTarget = false;
+                    foreach (var bellButton in bell.GetComponentsInChildren<Button>(true)) bellButton.enabled = false;
+                    bell.gameObject.SetActive(true);
+                    yield return AbilityBellDropEffect.Play(bell, goal);
+                    yield return new WaitForSeconds(.4f);
+                    break;
+                }
                 case "tile.sort":
                     var from = new System.Collections.Generic.Dictionary<RectTransform, Vector2>();
                     var to = new System.Collections.Generic.Dictionary<RectTransform, Vector2>();

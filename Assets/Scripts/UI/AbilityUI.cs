@@ -201,6 +201,7 @@ namespace KillingMahjong.UI
         {
             get { return triggerButton != null ? triggerButton.transform as RectTransform : null; }
         }
+        public Sprite BellSprite => normalSprite;
 
         /// <summary>能力の一覧（行が並ぶ入れ物）の枠。「どれでも押して」と囲むのに使う。</summary>
         public RectTransform AbilityListRect

@@ -21,9 +21,9 @@ namespace KillingMahjong.Managers
         //   「それじゃあ第二局目だね」
         //     → フラッシュ →「むっ……後輩ちゃん けっこう点をもってるね」
         //     →「このまま手牌選択してもいいけど……せっかくなので」→「ほいっ……と！」
-        //     → 縦揺れ＆フラッシュ → 上から能力ベルが落ちてくる →「じゃーん！！」
+        //     → フラッシュ → 上から能力ベルが落ちる → 着地で縦揺れ →「じゃーん！！」
         //     →「これは呼び鈴」→「この鈴を鳴らすと便利な悪魔を召喚できるんだよね」
-        //     → 横揺れ →「あっ知らなかった？ エクソシストやってんだよねぇアタシ」
+        //     →「あっ知らなかった？ エクソシストやってんだよねぇアタシ」
         //     →「それで便利なことができるんだけど……まぁとりあえず鳴らしてみてよ！」
         //     → 能力ベルハイライト → プレイヤーが押す → 強襲を隠す → アニメ待ち
         //     →「コイツはベルル ギャンブルの悪魔なんだ」
@@ -144,16 +144,6 @@ namespace KillingMahjong.Managers
         /// </summary>
         private const int AbilityMoreMinScore = 8000;
 
-        /// <summary>画面を揺らす。出せない場面（UIが無い等）では黙って素通りする。</summary>
-        /// <summary>
-        /// 画面ぜんたいを揺らす。以前は PhaseTransitionUI 自身を揺らしていて、黒帯が出ていない場面では
-        /// 何も動いて見えなかった（2026-10-30 プランナー「どこが揺れとるんや」）
-        /// </summary>
-        private void ShakeScreen(float duration, float magnitude, Vector2 axis)
-        {
-            UI.Effects.WholeScreenShake.Play(duration, magnitude, axis);
-        }
-
         private void FlashScreen()
         {
             UI.Effects.ScreenFlash.Play();
@@ -194,14 +184,10 @@ namespace KillingMahjong.Managers
 
                 FlashScreen();
                 yield return new WaitForSeconds(0.35f);
-                // 「ほいっ……と！」が出るのと同時に、画面を少し縦に揺らす
-                // （2026-10-29 要望「『ほいっと』のときに画面がすこし縦揺れする演出がほしいかも」）
                 yield return StartCoroutine(PlayLines(AbilityRichLines.GetRange(0, AbilityRichLines.Count - 1)));
-                ShakeScreen(0.22f, 8f, new Vector2(0f, 1f));
                 yield return StartCoroutine(PlayLines(AbilityRichLines.GetRange(AbilityRichLines.Count - 1, 1)));
 
-                // 縦揺れ＆フラッシュ → 上から能力ベルが落ちてくる
-                ShakeScreen(0.25f, 18f, new Vector2(0f, 1f));
+                // 落下前には揺らさず、着地だけに衝撃を付ける。
                 FlashScreen();
                 yield return new WaitForSeconds(0.3f);
                 yield return StartCoroutine(DropAbilityBellRoutine());
@@ -266,28 +252,11 @@ namespace KillingMahjong.Managers
             bell = ability.BellRect;
             if (bell == null) { foreach (var g in hidden) if (g != null) g.enabled = true; yield break; }
 
+            // 最初のフレームも着地点には描かない。
             Vector2 goal = bell.anchoredPosition;
-            float rise = 420f;                    // 画面の外まで持ち上げる高さ
-            const float fall = 0.45f;
-
-            // 画面の外へ持ち上げてから描き始める
-            bell.anchoredPosition = goal + new Vector2(0f, rise);
+            bell.anchoredPosition = goal + new Vector2(0f, UI.Effects.AbilityBellDropEffect.Rise);
             foreach (var g in hidden) if (g != null) g.enabled = true;
-
-            float t = 0f;
-            while (t < fall)
-            {
-                t += Time.deltaTime;
-                float u = Mathf.Clamp01(t / fall);
-                // 落ちるので終わりを速く。**等速だと浮いて見える**
-                float e = u * u;
-                bell.anchoredPosition = goal + new Vector2(0f, rise * (1f - e));
-                yield return null;
-            }
-            bell.anchoredPosition = goal;
-
-            // 着地の衝撃。フロー図の「拳で机をドシンと叩きつけるイメージ」に寄せる
-            ShakeScreen(0.18f, 14f, new Vector2(0f, 1f));
+            yield return UI.Effects.AbilityBellDropEffect.Play(bell, goal);
         }
 
         /// <summary>
