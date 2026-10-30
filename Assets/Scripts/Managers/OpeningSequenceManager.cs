@@ -258,10 +258,9 @@ namespace KillingMahjong.Managers
         /// <summary>
         /// 契約書を閉じたあと。**ここでは立ち絵を出さない。**
         ///
-        /// 順序は「契約書を閉じる → 女の子がフェードイン → セリフ（と同時に曲）」
-        /// （2026-09-27 の指示。2026-09-12 のフロー図とは逆になっている）。
-        /// フェードインは <see cref="TutorialManager.CharacterRevealRequested"/> 経由で
-        /// TutorialManager が台詞を出す前に呼び戻してくる。
+        /// 順序は「契約書を閉じる → 1行目『おっ後輩ちゃんじゃーん』（と同時に曲） → フラッシュと同時に女の子が出る → 残りのセリフ」
+        /// （2026-10-30 バグ報告「先輩が出てくるのが早い」でフロー図の順に戻した。2026-09-27 の指示では立ち絵が先だった）。
+        /// 出すのは <see cref="TutorialManager.CharacterRevealRequested"/> 経由で、TutorialManager が1行目のあとに呼び戻してくる。
         /// </summary>
         private IEnumerator ShowEnemyRoutine()
         {
@@ -312,11 +311,13 @@ namespace KillingMahjong.Managers
 
             ApplyEnemyAlpha(sprites, spriteAlpha, images, imageAlpha, 0f);
 
+            // フラッシュと同時に出すときはフェードしない（2026-10-30 バグ報告「先輩が出てくるのが早い」）
+            float fadeSeconds = tutorialManager != null && tutorialManager.CharacterRevealInstant ? 0f : EnemyFadeInSeconds;
             float elapsed = 0f;
-            while (elapsed < EnemyFadeInSeconds)
+            while (elapsed < fadeSeconds)
             {
                 elapsed += Time.deltaTime;
-                float t = Mathf.Clamp01(elapsed / EnemyFadeInSeconds);
+                float t = Mathf.Clamp01(elapsed / fadeSeconds);
                 // 立ち上がりを緩めて、滲み出てくるように見せる
                 ApplyEnemyAlpha(sprites, spriteAlpha, images, imageAlpha, t * t * (3f - 2f * t));
                 yield return null;

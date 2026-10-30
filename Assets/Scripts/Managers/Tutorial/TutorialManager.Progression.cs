@@ -116,12 +116,22 @@ namespace KillingMahjong.Managers
             // 合図を受け取る人がいない（局を指定して始めた等）ときは、何も起きずに素通りする。
             var introLines = data.introLines;
             int reveal = data.revealBoardAfterLineIndex;
+            int firstLine = 0;
 
             if (CharacterRevealRequested != null && introLines != null && introLines.Count > 0)
             {
+                // **1行目「おっ後輩ちゃんじゃーん」を言ってから、フラッシュと同時に先輩を出す**
+                // （2026-10-30 バグ報告「先輩が出てくるのが早い」「『おっ後輩ちゃんじゃーん』と言ってからフラッシュが入って出てくるはず」）。
+                // 2026-09-27 の指示で「立ち絵が出きってから台詞」にしていたのを、フロー図の順に戻した
+                yield return StartCoroutine(PlayLines(introLines.GetRange(0, 1)));
+                if (_aborted) yield break;
+                firstLine = 1;
+                FlashScreen();
+
                 var reveal1 = CharacterRevealRequested;
                 CharacterRevealRequested = null;     // 出すのは一度きり
                 CharacterRevealFinished = false;
+                CharacterRevealInstant = true;
                 reveal1();
 
                 // **出し終わりを待つ。** 相手がいないところに台詞が出ないように。
@@ -132,18 +142,18 @@ namespace KillingMahjong.Managers
                 if (_aborted) yield break;
             }
 
-            if (reveal >= 0 && reveal < introLines.Count - 1)
+            if (reveal >= firstLine && reveal < introLines.Count - 1)
             {
                 // 盤面と山牌は局の頭の暗転の間に出してある（PlayRoundStartRoutine）。
                 // 以前はここで盤面を出し、第1局は山牌を1枚ずつ起こしていた（2026-09-12・09-19 の指示）が、
                 // 画面に物を生やさない決まりにしたのでやめた（2026-10-24 ユーザー指示「チュートリアルの対局フェイズでUIをニョキって生やすのは止めてくれ。基本的に画面が暗転しているときにUIは全部出すように」）
-                yield return StartCoroutine(PlayLines(introLines.GetRange(0, reveal + 1)));
+                yield return StartCoroutine(PlayLines(introLines.GetRange(firstLine, reveal + 1 - firstLine)));
                 yield return StartCoroutine(PlayLines(
                     introLines.GetRange(reveal + 1, introLines.Count - reveal - 1)));
             }
             else
             {
-                yield return StartCoroutine(PlayLines(introLines));
+                yield return StartCoroutine(PlayLines(introLines.GetRange(firstLine, introLines.Count - firstLine)));
                 // 第1局の盤面は「１局目」の暗転の間に出す（下）。ここで出すと牌が生えて見える
                 if (!IsFirstRound(data)) SetBoardVisible(true);
             }

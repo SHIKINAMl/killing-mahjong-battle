@@ -187,6 +187,11 @@ namespace KillingMahjong.Managers
         public bool CharacterRevealFinished;
 
         /// <summary>
+        /// 立ち絵をフェードせず、一度に出す（フラッシュと同時に出すとき）。シーン側の FadeInEnemyRoutine が読む
+        /// </summary>
+        public bool CharacterRevealInstant;
+
+        /// <summary>
         /// 導入セリフのあとに「麻雀を知っているか」を聞き、答えに応じて説明を見せる
         /// （2026-09-12、フロー図どおり）。
         ///
