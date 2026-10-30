@@ -401,9 +401,14 @@ namespace KillingMahjong.UI
                     _boostEffect = Effects.BoostHandSkillEffect.Create();
                     if (_boostEffect != null)
                     {
-                        var cutin = uiManager.PhaseTransitionUI;
-                        yield return _boostEffect.Play(boostedYakuName, uiManager.YakuListUI,
-                            cutin != null ? cutin.PlayerCutinSprite : null);
+                        if (uiManager.IsTutorialMode)
+                        {
+                            var cutin = uiManager.PhaseTransitionUI;
+                            yield return _boostEffect.Play(boostedYakuName, uiManager.YakuListUI,
+                                cutin != null ? cutin.PlayerCutinSprite : null);
+                        }
+                        else
+                            yield return _boostEffect.PlayAfterCutin(boostedYakuName, uiManager.YakuListUI);
                         _boostEffect = null;
                         if (!ownedLock.IsActive) yield break;
                     }

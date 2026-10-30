@@ -68,13 +68,10 @@ namespace KillingMahjong.Managers
         }
 
         /// <summary>
-        /// 未出牌の光がゲージに着いて、ポイントが増えたときの心音。
-        /// 段が上がったかどうかで強さを分ける。段が上がったときは、上がった合図の音も重ねる（2026-10-19）。
+        /// 未出牌の光がゲージに着いたときの合図。通常の加算は鳴らさず、段が上がったときだけ鳴らす。
         /// </summary>
         public void PlayVoltageHeartbeat(bool leveledUp, int level = 0)
         {
-            PlayHeartbeat(leveledUp ? HeartbeatStrength.Strong : HeartbeatStrength.Medium,
-                          HeartbeatSpacing.Spaced);
             if (leveledUp) PlayStingerPitched("se_voltage_up", 1f + .04f * Mathf.Clamp(level, 0, 4), PitchJitter.None);
         }
 

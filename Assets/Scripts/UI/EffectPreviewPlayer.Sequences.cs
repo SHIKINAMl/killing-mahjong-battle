@@ -40,6 +40,7 @@ namespace KillingMahjong.UI
                     rig.handTiles[4].GetComponent<Image>().sprite = rig.tiles.GetTileSprite(Tile(6));
                     rig.handTiles[7].GetComponent<Image>().sprite = rig.tiles.GetTileSprite(Tile(2)); break;
                 case "skill.boost_hand":
+                case "skill.boost_hand.tutorial":
                     // 右上の一覧に「清一色+1」を入れて、届くまで伏せておく（本編と同じ段取り）
                     var boostBoard = rig.yakuList;
                     if (boostBoard != null)
@@ -57,7 +58,10 @@ namespace KillingMahjong.UI
                     yield return rig.phase.PlaySkillCutinAnimationRoutine("役強化", true, rig.player.CurrentCharacterData, subText: "清一色");
                     var boost = BoostHandSkillEffect.Create();
                     scope.AddCleanup(() => { if (boost != null) boost.Dispose(); });
-                    yield return boost.Play("清一色", boostBoard, rig.phase.PlayerCutinSprite);
+                    if (EffectId == "skill.boost_hand.tutorial")
+                        yield return boost.Play("清一色", boostBoard, rig.phase.PlayerCutinSprite);
+                    else
+                        yield return boost.PlayAfterCutin("清一色", boostBoard);
                     yield return new WaitForSeconds(0.8f); break;
                 case "skill.assault":
                     yield return rig.phase.PlaySkillCutinAnimationRoutine("強襲", true, rig.player.CurrentCharacterData);

@@ -236,7 +236,6 @@ namespace KillingMahjong.UI
             UpdateTurnText();
             UpdateSiblingOrder();
 
-            PlayPlacedHeartbeat();
             if (!rebuildingRiver) DiscardFeedbackDirector.Notify(this, isEnemyRiver, discardedTiles.Count);
             if (willFly) FinishVoltage(rt);
         }
@@ -273,7 +272,6 @@ namespace KillingMahjong.UI
             UpdateTurnText();
             UpdateSiblingOrder();
 
-            PlayPlacedHeartbeat();
             if (!rebuildingRiver) DiscardFeedbackDirector.Notify(this, isEnemyRiver, discardedTiles.Count);
             if (willFly) FinishVoltage(rt);
         }
@@ -287,26 +285,6 @@ namespace KillingMahjong.UI
             if (visual != null) visual.SetTile(tileId, tileResourceManager.GetDiscardTileSprite(tileId, isEnemyRiver));
             discardedTiles.Add(rt);
             UpdateSiblingOrder();
-        }
-
-        /// <summary>
-        /// 牌が河に置かれた直後の心音（弱・詰まった1拍）。
-        ///
-        /// **ここ1か所だけで鳴らす。** <see cref="AddTile"/> と
-        /// <see cref="AddExistingTile"/> は自分・相手・チュートリアルの
-        /// すべての打牌が通る場所なので、`GameUIManager.HandleDiscardEvent` や
-        /// `TutorialManager` 側にも足すと二重に鳴る。
-        ///
-        /// **鳴らすのは自分の打牌だけ**（2026-10-01 の指示）。
-        /// 相手の打牌でも鳴らしていたが、自分が切る緊張を表す音なので、
-        /// 両方で鳴ると打牌のたびに鳴り続けて意味が薄れる。
-        /// </summary>
-        private void PlayPlacedHeartbeat()
-        {
-            if (isEnemyRiver) return;
-
-            var audio = KillingMahjong.Managers.AudioManager.Instance;
-            if (audio != null) audio.PlayDiscardHeartbeat();
         }
 
         /// <summary>
@@ -339,8 +317,7 @@ namespace KillingMahjong.UI
         private void FinishVoltage(RectTransform rt)
         {
             bool enemy = isEnemyRiver;
-            // **光が出せない場面でも同じ包みを通す。** 直に
-            // `ApplyDiscardResult` を呼ぶと、そちらの経路だけ心音が鳴らなくなる。
+            // 光が出せない場面でも同じ経路で反映し、段が上がった合図をそろえる。
             if (!VoltageTileFlightEffect.TryPlay(rt, enemy, () => ApplyVoltageWithHeartbeat(enemy)))
             {
                 ApplyVoltageWithHeartbeat(enemy);
@@ -348,7 +325,7 @@ namespace KillingMahjong.UI
         }
 
         /// <summary>
-        /// ゲージへ反映し、**実際にポイントが増えたときだけ**心音を鳴らす。
+        /// ゲージへ反映し、段が上がったときだけ短い合図を鳴らす。
         ///
         /// 増えたかどうかを前後で比べているのは、鳴らしてはいけない場合が
         /// 3つあるから。既出牌で途切れたとき（ここは `NotifyDiscard` 側を通るので

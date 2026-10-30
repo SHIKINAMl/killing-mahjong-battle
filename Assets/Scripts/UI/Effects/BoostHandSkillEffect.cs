@@ -46,7 +46,7 @@ namespace KillingMahjong.UI.Effects
     /// シーンには置かない。呼ばれるたびに自前の入れ物を作り、終わったら自分を消す。
     /// **AIで作った絵は使っていない。**
     /// </summary>
-    public class BoostHandSkillEffect : MonoBehaviour
+    public partial class BoostHandSkillEffect : MonoBehaviour
     {
         // 牌交換（MulliganSwapAnimator）と同じ秒数・同じ色にしてある
         private const float DimAlpha = 0.85f;
@@ -136,6 +136,7 @@ namespace KillingMahjong.UI.Effects
 
         private void OnDestroy()
         {
+            ClearFollowup();
             // 途中で打ち切られたら、沈めた音はここで戻す（残すと音が沈んだままになる）
             if (_trance != null && !_trance.IsReleased) _trance.Dispose();
             _trance = null;
