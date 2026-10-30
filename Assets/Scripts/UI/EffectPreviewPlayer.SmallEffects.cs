@@ -85,6 +85,28 @@ namespace KillingMahjong.UI
                     PixelToneUI.Attach(pixelImage); break;
                 case "screen.scene_break": ScreenFlash.PlaySceneBreak(); break;
                 case "screen.quake": ScreenQuake.Play(12f, 1f); break;
+                case "screen.whole_shake":
+                    WholeScreenShake.Play(0.22f, 8f, new Vector2(0f, 1f));
+                    yield return new WaitForSeconds(1.2f);
+                    WholeScreenShake.Play(0.25f, 18f, new Vector2(0f, 1f));
+                    yield return new WaitForSeconds(1f); break;
+                case "skill.mulligan_choice":
+                {
+                    // 出した3枚と山札の3枚。押している間だけ盤面を見せる「場を見る」も、押したことにして見せる
+                    var choice = MulliganChoiceUI.FindOrCreate();
+                    choice.Show(new System.Collections.Generic.List<int> { 0, 4, 8, 40, 44, 48 }, rig.tiles, picked => { });
+                    yield return new WaitForSeconds(1.8f);
+                    var peekHold = choice.GetComponentInChildren<PressHoldRelay>(true);
+                    if (peekHold != null && peekHold.OnHoldChanged != null)
+                    {
+                        peekHold.OnHoldChanged(true);
+                        yield return new WaitForSeconds(1.6f);
+                        peekHold.OnHoldChanged(false);
+                    }
+                    yield return new WaitForSeconds(1.2f);
+                    choice.Hide();
+                    break;
+                }
                 case "screen.tint": ScreenTint.Set(Color.red, .45f); yield return new WaitForSeconds(2f); ScreenTint.Clear(); break;
                 case "screen.flicker": ScreenTint.Flicker(Color.red, 2f); break;
                 case "screen.wake":
@@ -190,8 +212,22 @@ namespace KillingMahjong.UI
                         rig.dialogue.ShowText(logLine);
                         yield return new WaitForSeconds(1.2f);
                     }
+                    foreach (var logLine in new[] { "「ふんふん……鬼気迫ったメールにいてもたってもいられなくなった」", "「……ってアタシのこと好きすぎかよー！！」", "「それじゃはじめるよ」" })
+                    {
+                        rig.dialogue.ShowText(logLine);
+                        yield return new WaitForSeconds(0.6f);
+                    }
                     rig.dialogue.OpenLog();
-                    yield return new WaitForSeconds(3f);
+                    yield return new WaitForSeconds(2f);
+                    // 遡ると右下に「最新へ戻る」▼が出る。押したことにして一番下へ戻す（2026-10-29 要望）
+                    var logScroll = rig.dialogue.GetComponentInChildren<UnityEngine.UI.ScrollRect>(true);
+                    if (logScroll != null)
+                    {
+                        logScroll.verticalNormalizedPosition = 1f;
+                        yield return new WaitForSeconds(1.8f);
+                        rig.dialogue.JumpToLatestLog();
+                        yield return new WaitForSeconds(1.2f);
+                    }
                     rig.dialogue.CloseLog(); break;
                 case "camera.zoom":
                     var zoom = rig.viewCamera.gameObject.AddComponent<CameraZoomController>();

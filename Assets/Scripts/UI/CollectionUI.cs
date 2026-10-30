@@ -91,6 +91,8 @@ namespace KillingMahjong.UI
             new Track("Bgm", "bgm_ex_lofi",      "部屋の待機"),
             new Track("Bgm", "tut_lesson",       "チュートリアル"),
             new Track("Bgm", "tut_lesson_battle", "チュートリアルの対局"),
+            new Track("Bgm", "tut_scary_A",       "チュートリアル　正体を明かしたあと"),
+            new Track("Bgm", "tut_scary_C",       "チュートリアル　負けて暗転したあと"),
         };
 
         // 対局BGM「新2曲（切替）」と「第3案」は、2026-10-09 に曲ごと消した
@@ -338,6 +340,8 @@ namespace KillingMahjong.UI
             new Track("Stingers", "se_boost",      "役強化の演出"),
             new Track("Stingers", "se_assault",    "強襲　発射"),
             new Track("Stingers", "se_voltage_up", "ボルテージの段が上がる"),
+            new Track("Stingers", "se_voltage_ignite", "ボルテージの点火（登場）"),
+            new Track("Stingers", "se_senpai_collapse", "先輩が倒れる（動画の続き）"),
             new Track("Stingers", "se_jingle_win",  "決着　勝ち"),
             new Track("Stingers", "se_jingle_lose", "決着　負け"),
             new Track("Stingers", "se_flash",       "白いフラッシュ"),
