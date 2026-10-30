@@ -208,8 +208,8 @@ namespace KillingMahjong.Managers
 
                 yield return StartCoroutine(PlayLines(AbilityBellArrivedLines));
 
-                ShakeScreen(0.2f, 16f, new Vector2(1f, 0f));
-                yield return new WaitForSeconds(0.2f);
+                // 「じゃーん」のあとは揺らさない（2026-10-30 プランナー「じゃーんの後も揺れてるので、以後は揺らさないで」）。
+                // 以前はここで横に揺らしていた
                 yield return StartCoroutine(PlayLines(AbilityExorcistLines));
 
                 yield return StartCoroutine(RingBellRoutine());
