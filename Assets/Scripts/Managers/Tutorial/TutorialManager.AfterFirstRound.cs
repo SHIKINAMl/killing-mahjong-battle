@@ -17,7 +17,7 @@ namespace KillingMahjong.Managers
         //   → 「とまぁこれがゲームの流れね」 → 「わかった？」 → 分岐
         //        はい　 → 「おっ後輩ちゃんできるねぇ」 → 「うーん…じゃあいらないと思うけど……ハイコレ」
         //        いいえ → 「そうだねぇ……気持ちわかるわー」 → 「ならとりあえず……ハイコレ！」
-        //   → 左下に設定画面の画像を表示し、資料への入口を案内
+        //   → 設定ボタンを枠で囲み、資料への入口を案内（押させない）
         //   → 「ここに今までのチュートリアルがまとめてあるから困ったら見て」
         //
         // まで。**この続き（能力の紹介）は `TutorialManager.AbilityIntro.cs`。**
@@ -107,60 +107,30 @@ namespace KillingMahjong.Managers
             yield return StartCoroutine(RunAbilityIntroduction());
         }
 
-        /// <summary>資料への入口を画像で案内する。設定を開く操作は要求しない。</summary>
+        /// <summary>
+        /// 資料への入口を、設定ボタンを枠で囲んで示す。**押させはしない。**
+        ///
+        /// 2026-10-30 の要望（「設定の説明」）:「画像を表示するんじゃなくて、
+        /// 設定ボタンをハイライトするだけでいいかな」。以前は左下に設定画面の画像
+        /// （archive_access_hint）と「設定 → チュートリアル資料」の字を出していた。
+        /// 画像はコレクションの CG 一覧で使っているので消さない。
+        ///
+        /// 枠にするのは、押せるボタンに帯を敷くと押せないものに見えるため（2026-09-24）。
+        /// </summary>
         private IEnumerator RunTutorialArchiveGuide()
         {
             ClearGuide();
-            var hint = ShowArchiveAccessHint();
+            RectTransform optionButton = gameUIManager != null ? gameUIManager.OptionButtonRect : null;
+            if (optionButton != null)
+                GuideTo(optionButton, false, null, UI.TutorialHighlightUI.Style.Frame);
             try
             {
                 yield return StartCoroutine(PlayLines(ArchiveClosingLines));
             }
             finally
             {
-                if (hint != null) Destroy(hint);
+                ClearGuide();
             }
-        }
-
-        private GameObject ShowArchiveAccessHint()
-        {
-            var texture = Resources.Load<Texture2D>("Tutorial/archive_access_hint");
-            if (texture == null) return null;
-
-            var root = new GameObject("TutorialArchiveAccessHint", typeof(RectTransform),
-                typeof(UnityEngine.Canvas), typeof(UnityEngine.UI.CanvasScaler));
-            root.transform.SetParent(transform, false);
-            var canvas = root.GetComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = Common.UISortingOrders.TutorialIntro;
-            var scaler = root.GetComponent<UnityEngine.UI.CanvasScaler>();
-            scaler.uiScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(800f, 600f);
-            scaler.matchWidthOrHeight = 0.5f;
-
-            var picture = new GameObject("OptionsExample", typeof(RectTransform), typeof(UnityEngine.UI.RawImage));
-            picture.transform.SetParent(root.transform, false);
-            var rect = (RectTransform)picture.transform;
-            rect.anchorMin = rect.anchorMax = rect.pivot = Vector2.zero;
-            rect.anchoredPosition = new Vector2(16f, 16f);
-            rect.sizeDelta = new Vector2(320f, 320f * texture.height / texture.width);
-            var image = picture.GetComponent<UnityEngine.UI.RawImage>();
-            image.texture = texture;
-            image.raycastTarget = false;
-
-            var label = new GameObject("AccessLabel", typeof(RectTransform), typeof(TextMeshProUGUI));
-            label.transform.SetParent(root.transform, false);
-            var labelRect = (RectTransform)label.transform;
-            labelRect.anchorMin = labelRect.anchorMax = labelRect.pivot = Vector2.zero;
-            labelRect.anchoredPosition = new Vector2(16f, 24f + rect.sizeDelta.y);
-            labelRect.sizeDelta = new Vector2(320f, 40f);
-            var text = label.GetComponent<TextMeshProUGUI>();
-            text.font = BorrowJapaneseFont();
-            text.fontSize = 16f;
-            text.text = "設定 → チュートリアル資料\n困ったときに読み返せます";
-            text.color = new Color32(255, 244, 210, 255);
-            text.raycastTarget = false;
-            return root;
         }
     }
 }
