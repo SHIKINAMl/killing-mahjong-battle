@@ -264,14 +264,14 @@ namespace KillingMahjong.Common
         /// TutorialArchiveUI: オプションから開くチュートリアル資料。
         /// オプション画面より前で操作を受け、タイトルのコレクション画面とは重ならない。
         /// </summary>
-        public const int TutorialArchive = 83;
+        public const int TutorialArchive = 102;
 
         /// <summary>
         /// 資料の中で範囲を示す強調（2026-09-29）。**資料より手前に置く。**
-        /// 通常の `TutorialHighlight`(63) のままだと資料(83)の下に潜って見えない。
+        /// 通常の `TutorialHighlight` のままだと資料の下に潜って見えない。
         /// 実機で band を出しても画面に出ず、これで気づいた。
         /// </summary>
-        public const int TutorialArchiveHighlight = 84;
+        public const int TutorialArchiveHighlight = 103;
 
         /// <summary>WaitUI: 待ち牌表示を最前面に出す際のレイヤー</summary>
         public const int WaitDisplayFront = 84;
@@ -382,8 +382,14 @@ namespace KillingMahjong.Common
         /// 奥なのは、押している間もカーソルが見えていてよいため。</summary>
         public const int TutorialIntro = 98;
 
-        /// <summary>導入中の設定。会話送りと説明の覆いより手前で操作できるようにする。</summary>
-        public const int TutorialSettings = 99;
+        /// <summary>導入中の設定ボタン。問いかけの覆いより手前、資料と設定画面より奥。</summary>
+        public const int TutorialSettingsButton = 99;
+
+        /// <summary>チュートリアル資料。設定ボタンが資料に重ならないようにする。</summary>
+        public const int TutorialDocument = 100;
+
+        /// <summary>設定画面。設定ボタン・会話送り・資料の覆いより手前。</summary>
+        public const int TutorialSettings = 101;
 
         /// <summary>
         /// CustomCusor: 自前マウスカーソル。常に全UIより手前。

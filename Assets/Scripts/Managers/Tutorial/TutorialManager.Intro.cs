@@ -158,7 +158,7 @@ namespace KillingMahjong.Managers
             if (canvas == null) return;
             _introSettingsCanvas = canvas;
             _introSettingsOriginalOrder = canvas.sortingOrder;
-            canvas.sortingOrder = Mathf.Max(canvas.sortingOrder, UISortingOrders.TutorialSettings);
+            canvas.sortingOrder = Mathf.Max(canvas.sortingOrder, UISortingOrders.TutorialSettingsButton);
         }
 
         private void RestoreIntroSettings()
@@ -326,7 +326,7 @@ namespace KillingMahjong.Managers
                 yield break;
             }
 
-            Transform parent = BuildIntroCanvas(dim: false);
+            Transform parent = BuildIntroCanvas(dim: false, sortingOrder: UISortingOrders.TutorialDocument);
             if (parent == null) yield break;
 
             if (board != null)
@@ -396,7 +396,7 @@ namespace KillingMahjong.Managers
             }
 
             CloseIntro();
-            Transform parent = BuildIntroCanvas(dim: false);
+            Transform parent = BuildIntroCanvas(dim: false, sortingOrder: UISortingOrders.TutorialDocument);
             if (parent == null) yield break;
 
             var image = new GameObject("RuleBoard", typeof(RectTransform), typeof(Image));
@@ -532,14 +532,14 @@ namespace KillingMahjong.Managers
         /// あそこはセリフで聞くので、暗転すると会話が途切れて見える。
         /// 案内板は1枚の絵を読ませる場なので、こちらは落としたまま。
         /// </param>
-        private Transform BuildIntroCanvas(bool dim = true)
+        private Transform BuildIntroCanvas(bool dim = true, int sortingOrder = UISortingOrders.TutorialIntro)
         {
             _introRoot = new GameObject("TutorialIntro", typeof(RectTransform), typeof(Canvas),
                 typeof(CanvasScaler), typeof(GraphicRaycaster));
 
             var canvas = _introRoot.GetComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = UISortingOrders.TutorialIntro;
+            canvas.sortingOrder = sortingOrder;
 
             var scaler = _introRoot.GetComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
