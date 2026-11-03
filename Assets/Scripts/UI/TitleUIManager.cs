@@ -102,6 +102,7 @@ namespace KillingMahjong.UI
         /// **シーンの `onClick` はこのメソッド名で配線済みなので、名前は変えないこと。**
         /// 作り直すと配線が外れて「押しても何も起きない」状態になる。
         /// 展示用タイトルからはチュートリアルを最初から開始する。
+        /// ただし前にチュートリアルを始めたことがあれば、部屋の看板メニューへ送る（2026-11-04）。
         /// </summary>
         public void OnClickStartButton()
         {
@@ -111,6 +112,16 @@ namespace KillingMahjong.UI
                 return;
             }
             if (isStartingTutorial) return;
+
+            // 前にチュートリアルを始めたことがある人は、チュートリアルを飛ばして部屋の看板メニュー
+            // （対局へ・チュートリアル・コレクション）へ送る（2026-11-03 の会議の決定、2026-11-04 ユーザー判断）。
+            // チュートリアルをやり直したい人は、看板の「チュートリアル」から入れる。
+            if (TutorialManager.HasEverStarted())
+            {
+                OpenDebugRoom();
+                return;
+            }
+
             isStartingTutorial = true;
             if (titleClickTarget != null) titleClickTarget.SetActive(false);
             StartTutorialScene(0);

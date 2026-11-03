@@ -23,7 +23,7 @@ namespace KillingMahjong.Core
             "PlayerName",                                                          // PlayerProfile
             "Stats_Wins", "Stats_Losses", "Stats_SpecialWins", "Stats_BestScore", // PlayerStatsManager
             "Tutorial_LastCompletedRound",                                         // TutorialManager.Progression
-            "Tutorial_RequestedStartRound",                                        // TutorialManager
+            "Tutorial_RequestedStartRound", "Tutorial_EverStarted",                // TutorialManager
             "Tutorial_PendingReturn", "Title_ReturnToRoom",                        // TutorialNavigation
             "Reaction_LastPlayTicks",                                              // PlaySessionLog（前回の起動日）
         };

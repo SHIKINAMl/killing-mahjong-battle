@@ -207,8 +207,27 @@ namespace KillingMahjong.Managers
             PlayerPrefs.Save();
         }
 
+        /// <summary>
+        /// チュートリアルを一度でも始めたか（途中でやめても立つ）。
+        ///
+        /// 2026-11-03 の会議（議事録「11/3」）:「2回目の起動時に、チュートリアルスキップで
+        /// メインメニュー画面に飛ばす」。判定は「一度でも始めたら」（2026-11-04 ユーザー判断）。
+        /// 展示では <see cref="KillingMahjong.Core.ExhibitionReset"/> が来場者ごとに消すので、
+        /// 次の人はまたチュートリアルから始まる。
+        /// </summary>
+        private const string EverStartedKey = "Tutorial_EverStarted";
+
+        /// <summary>前にチュートリアルを始めたことがあるか。この旗より前に遊んだ人は、進み具合で見る。</summary>
+        public static bool HasEverStarted()
+        {
+            return PlayerPrefs.GetInt(EverStartedKey, 0) == 1 || GetSavedProgress() > 0;
+        }
+
         public void StartTutorial()
         {
+            PlayerPrefs.SetInt(EverStartedKey, 1);
+            PlayerPrefs.Save();
+
             int requestedRound = PlayerPrefs.GetInt(RequestedStartRoundKey, -1);
             if (requestedRound >= 0)
             {
