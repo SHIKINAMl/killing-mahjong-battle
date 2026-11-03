@@ -11,15 +11,6 @@ namespace KillingMahjong.UI
     {
         private void SyncLocalExposedState(Managers.BoardStateManager board)
         {
-            List<int> localExposedActualIds = new List<int>();
-            foreach (int exposedIdx in board.ExposedLocalHandWallIndexes)
-            {
-                if (exposedIdx >= 0 && exposedIdx < board.OriginalWallTiles.Count)
-                {
-                    localExposedActualIds.Add(board.OriginalWallTiles[exposedIdx]);
-                }
-            }
-
             if (uiManager.HandUI != null)
             {
                 foreach (var rt in uiManager.HandUI.GetHandSlots())
@@ -29,8 +20,7 @@ namespace KillingMahjong.UI
                     var visual = rt.GetComponent<TileVisual>();
                     if (interaction != null && visual != null)
                     {
-                        bool isExposed = localExposedActualIds.Contains(interaction.TileId);
-                        if (isExposed) localExposedActualIds.Remove(interaction.TileId);
+                        bool isExposed = board.ExposedLocalHandWallIndexes.Contains(interaction.WallIndex);
                         visual.SetExposed(isExposed);
                     }
                 }
@@ -45,8 +35,7 @@ namespace KillingMahjong.UI
                     var visual = rt.GetComponent<TileVisual>();
                     if (interaction != null && visual != null)
                     {
-                        bool isExposed = localExposedActualIds.Contains(interaction.TileId);
-                        if (isExposed) localExposedActualIds.Remove(interaction.TileId);
+                        bool isExposed = board.ExposedLocalHandWallIndexes.Contains(interaction.WallIndex);
                         visual.SetExposed(isExposed);
                     }
                 }

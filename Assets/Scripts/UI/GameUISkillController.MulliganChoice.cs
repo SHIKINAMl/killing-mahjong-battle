@@ -28,19 +28,28 @@ namespace KillingMahjong.UI
 
         private void ShowTutorialMulliganTargets()
         {
-            if (uiManager == null || !uiManager.IsTutorialMode || TutorialMulliganCanPick == null) return;
+            if (uiManager == null) return;
             var slots = new List<RectTransform>();
             if (uiManager.WallUI != null) slots.AddRange(uiManager.WallUI.GetWallSlots());
             if (uiManager.HandUI != null) slots.AddRange(uiManager.HandUI.GetHandSlots());
             foreach (var slot in slots)
             {
-                if (slot == null || TutorialMulliganCanPick(SlotWallIndex(slot))) continue;
+                if (slot == null || CanOfferMulliganIndex(SlotWallIndex(slot))) continue;
                 foreach (var image in slot.GetComponentsInChildren<Image>(true))
                 {
                     if (!_tutorialMulliganColors.ContainsKey(image)) _tutorialMulliganColors.Add(image, image.color);
                     image.color = new Color(0.35f, 0.35f, 0.35f, image.color.a);
                 }
             }
+        }
+
+        private bool CanOfferMulliganIndex(int wallIndex)
+        {
+            var board = BoardStateManager.Instance;
+            if (board == null || wallIndex < 0 || wallIndex >= board.OriginalWallTiles.Count) return false;
+            if (board.ExposedLocalHandWallIndexes.Contains(wallIndex)) return false;
+            return uiManager == null || !uiManager.IsTutorialMode || TutorialMulliganCanPick == null
+                || TutorialMulliganCanPick(wallIndex);
         }
 
         private void RestoreTutorialMulliganTargets()
@@ -106,6 +115,11 @@ namespace KillingMahjong.UI
             int wallIndex = -1;
             var clicked = slotRt != null ? slotRt.GetComponent<TileInteraction>() : null;
             if (clicked != null) wallIndex = clicked.WallIndex;
+            // 透視されている現物を、同じ絵柄の別の牌へ読み替えない。
+            if (wallIndex >= 0 && BoardStateManager.Instance.ExposedLocalHandWallIndexes.Contains(wallIndex)) return true;
+            if (wallIndex < 0)
+                foreach (int exposed in BoardStateManager.Instance.ExposedLocalHandWallIndexes)
+                    if (exposed >= 0 && exposed < wallTiles.Count && wallTiles[exposed] == tileId) return true;
             bool usable = wallIndex >= 0 && wallIndex < wallTiles.Count && wallTiles[wallIndex] == tileId
                 && !_mulliganPicks.Exists(p => p.WallIndex == wallIndex);
             if (!usable)
@@ -113,7 +127,7 @@ namespace KillingMahjong.UI
                 wallIndex = -1;
                 for (int i = 0; i < wallTiles.Count; i++)
                 {
-                    if (wallTiles[i] != tileId || _mulliganPicks.Exists(p => p.WallIndex == i)) continue;
+                    if (wallTiles[i] != tileId || !CanOfferMulliganIndex(i) || _mulliganPicks.Exists(p => p.WallIndex == i)) continue;
                     wallIndex = i;
                     break;
                 }
@@ -124,8 +138,7 @@ namespace KillingMahjong.UI
                 return true;
             }
 
-            if (uiManager.IsTutorialMode && TutorialMulliganCanPick != null
-                && !TutorialMulliganCanPick(wallIndex)) return true;
+            if (!CanOfferMulliganIndex(wallIndex)) return true;
 
             _mulliganPicks.Add(new MulliganPick { TileId = tileId, WallIndex = wallIndex, Slot = slotRt });
             TintSlot(slotRt, MulliganPickTint);
@@ -137,6 +150,18 @@ namespace KillingMahjong.UI
 
         private void SendMulliganPicks()
         {
+            // 選択の途中に透視状態が更新された場合も、公開された牌を送らない。
+            for (int i = _mulliganPicks.Count - 1; i >= 0; i--)
+            {
+                if (CanOfferMulliganIndex(_mulliganPicks[i].WallIndex)) continue;
+                TintSlot(_mulliganPicks[i].Slot, Color.white);
+                _mulliganPicks.RemoveAt(i);
+            }
+            if (_mulliganPicks.Count != MulliganGiveCount)
+            {
+                ShowTutorialMulliganTargets();
+                return;
+            }
             IsMulliganSelection = false;
             HideMulliganUI();
 
