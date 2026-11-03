@@ -162,14 +162,8 @@ namespace KillingMahjong.UI
                     && (owner.DialogueUI == null || !owner.DialogueUI.IsLogOpen)));
             bool overInfo = canHover && presentation.alpha > .001f && info != null && info.alpha > .001f
                 && Contains((RectTransform)info.transform, point);
-            bool overRoles = canHover && roleConditions.IsHovered && Contains((RectTransform)roleConditions.transform, point);
-            bool overCandidate = false;
-            if (canHover && presentation.alpha > .001f)
-                foreach (var card in cards) if (Contains(card, point)) { overCandidate = true; break; }
-            bool bridge = canHover && roleConditions.IsHovered && IsRoleHoverBridge(point);
-            bool roleHover = overInfo || (roleConditions.IsHovered && (overRoles || overCandidate || bridge));
             bool show = hoverHand == null || forceVisible || IsTransferring;
-            show |= overInfo || overRoles || bridge;
+            show |= overInfo;
             if (!show)
             {
                 foreach (var tile in hoverHand.GetHandSlots()) if (Contains(tile, point)) { show = true; break; }
@@ -183,8 +177,9 @@ namespace KillingMahjong.UI
                 : Mathf.MoveTowards(presentation.alpha, show ? 1 : 0, Time.unscaledDeltaTime / .08f);
             presentation.blocksRaycasts = show && !IsTransferring;
             presentation.interactable = show && !IsTransferring;
-            roleConditions.SetHovered(roleHover);
-            string focused = overRoles ? roleConditions.GetHoveredRole(point) : null;
+            // 条件の詳細は立ち絵を覆うため開かない。左の役名と対応する牌の強調は残す。
+            roleConditions.SetHovered(false);
+            string focused = null;
             int lineIndex = -1;
             if (overInfo && Contains(yakuText.rectTransform, point)) focused = RoleAtLeftPoint(point, out lineIndex);
             roleConditions.SetFocusedRole(focused);

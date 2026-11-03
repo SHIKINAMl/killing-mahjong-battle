@@ -47,8 +47,7 @@ namespace KillingMahjong.UI
             reveal.RefreshHoverVisibility(RolePreviewLeftPoint(label, 1)); yield return new WaitForSecondsRealtime(1.2f);
             for (int i = 0; i < 4; i++)
             {
-                var card = (RectTransform)reveal.RoleConditions.transform.Find("RoleCard" + i);
-                reveal.RefreshHoverVisibility(RectTransformUtility.WorldToScreenPoint(null, card.TransformPoint(card.rect.center)));
+                reveal.RefreshHoverVisibility(RolePreviewLeftPoint(label, i));
                 yield return new WaitForSecondsRealtime(1.2f);
             }
             reveal.RefreshHoverVisibility(new Vector2(-100000, -100000)); yield return new WaitForSecondsRealtime(.6f);
