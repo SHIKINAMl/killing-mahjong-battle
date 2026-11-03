@@ -125,6 +125,7 @@ namespace KillingMahjong.Managers
 
         public void ProcessNextReaction()
         {
+            if (_currentReaction != null) return;
             if (reactionQueue.Count > 0)
             {
                 // ログが開かれている間はキューの消化を止める
@@ -278,9 +279,19 @@ namespace KillingMahjong.Managers
 
         /// <summary>いま何局目か。ルールの共通変数として配るために公開している</summary>
         public int CurrentRound { get { return _currentRound; } }
+        public int CurrentDiscardTurn => Mathf.Max(_playerDiscardHistory.Count, _enemyDiscardHistory.Count) + 1;
 
         public void SetCurrentRound(int round)
         {
+            if (_currentRound != round)
+            {
+                discardRevision++;
+                _playerDiscardHistory.Clear();
+                _enemyDiscardHistory.Clear();
+                _lastDiscardedTileId = -1;
+                _playerConsecutiveHonorCount = 0;
+                nextOrdinaryDiscardAt = 0;
+            }
             _currentRound = round;
         }
 

@@ -124,7 +124,7 @@ namespace KillingMahjong.UI
             // 2026-10-25 にドラの表示（左の壁ぎわの「ドラ」と光る牌）を本編から外した。ドラは牌の発光（tile.dora）だけで示す
             new Entry("dora.float", "キャラクター・背景", "ドラ牌の浮遊・回転（左の壁ぎわのドラの表示）", "DoraFloatAnimator", unused: true),
             new Entry("dialogue.typewriter", "チュートリアル", "セリフの文字送り（音の高さは相手で変わる）", "DialogueUI.ShowText"),
-            new Entry("dialogue.log", "チュートリアル", "セリフのログ：過去の吹き出しが並ぶ・遡ると最新へ戻る▼", "DialogueUI.OpenLog"),
+            new Entry("dialogue.log", "チュートリアル", "セリフのログ：余白・場面の区切り・新着件数と最新へ戻る▼", "DialogueUI.OpenLog / DialogueUI.Readability"),
             new Entry("tutorial.highlight", "チュートリアル", "注目する場所の枠", "TutorialHighlightUI.Show"),
             new Entry("tutorial.arrow", "チュートリアル", "操作する場所の矢印", "TutorialArrowUI.ShowAt"),
             new Entry("tutorial.mask", "チュートリアル", "注目する場所だけを明るく", "TutorialMaskUI.Show"),

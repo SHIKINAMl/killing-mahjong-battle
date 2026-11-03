@@ -204,6 +204,7 @@ namespace KillingMahjong.UI
             
             AddToLog(text);
             dialoguePanel.SetActive(true);
+            NoticeSpeech();
         }
 
         private System.Collections.IEnumerator TypeMessageRoutine(string fullText)
@@ -243,6 +244,7 @@ namespace KillingMahjong.UI
 
             for (int i = 0; i < visibleCharacterCount; i++)
             {
+                while (OptionUI.AnyOpen || IsLogOpen) yield return null;
                 dialogueText.maxVisibleCharacters = i + 1;
 
                 // 音が連続しすぎないように、一定間隔（例: 0.06秒）で鳴らす
@@ -377,12 +379,14 @@ namespace KillingMahjong.UI
         {
             TextMeshProUGUI created = null;
             dialogueHistory.Add(text);
+            AddLogSection();
             
             if (logContainer != null && logItemPrefab != null)
             {
                 var scroll = logContainer.GetComponentInParent<ScrollRect>(true);
                 bool visible = logPanel != null && logPanel.activeInHierarchy;
                 if (visible) followLatestLog = IsNearLatestLog(scroll);
+                if (!visible || !followLatestLog) unreadLogCount++;
                 var position = ((RectTransform)logContainer).anchoredPosition;
                 // 新しいログ枠（四角）を生成して配置
                 GameObject newLogItem = Instantiate(logItemPrefab, logContainer);
@@ -395,6 +399,7 @@ namespace KillingMahjong.UI
                     tmp.text = text;
                 }
                 created = tmp;
+                if (!skillColor.HasValue) StyleSpeechLog(newLogItem, tmp);
                 if (skillColor.HasValue)
                 {
                     var color = skillColor.Value;
@@ -412,6 +417,7 @@ namespace KillingMahjong.UI
 
                 if (visible) ScheduleLogScroll(scroll, position);
             }
+            reactionLogContext = null;
             return created;
         }
 
@@ -530,6 +536,7 @@ namespace KillingMahjong.UI
             scroll.StopMovement();
             scroll.verticalNormalizedPosition = 0f;
             followLatestLog = true;
+            unreadLogCount = 0;
         }
 
         public void CloseLog()

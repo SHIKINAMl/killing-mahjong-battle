@@ -126,6 +126,7 @@ namespace KillingMahjong.Managers.Reactions
         [NonSerialized] public float lastFiredAt = -9999f;
         [NonSerialized] public int firedInRound;
         [NonSerialized] public int firedInMatch;
+        [NonSerialized] public int lastLineIndex = -1;
     }
 
     /// <summary>
@@ -191,7 +192,13 @@ namespace KillingMahjong.Managers.Reactions
             // 局番号は `ReactionController` が持っている。共通の値として全イベントに配る
             // （ここで配らないと、カタログに載っていても値が届かない条件になる）
             if (ReactionController.Instance != null)
+            {
                 Set(ReactionVars.RoundNumber, ReactionController.Instance.CurrentRound);
+                Set("discard_turn", ReactionController.Instance.CurrentDiscardTurn);
+            }
+            // 表示へ届いた公開ゲージだけを使う。相手の隠れた手牌は参照しない。
+            Set("voltage_level", VoltageSystem.GetLevel(false));
+            Set("enemy_voltage_level", VoltageSystem.GetLevel(true));
 
             Set(ReactionVars.TotalWins, KillingMahjong.Core.PlayerStatsManager.Wins);
             Set(ReactionVars.TotalLosses, KillingMahjong.Core.PlayerStatsManager.Losses);

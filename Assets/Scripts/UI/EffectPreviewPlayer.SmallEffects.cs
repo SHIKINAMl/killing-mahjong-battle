@@ -247,6 +247,8 @@ namespace KillingMahjong.UI
                     if (logScroll != null)
                     {
                         logScroll.verticalNormalizedPosition = 1f;
+                        yield return new WaitForSeconds(.3f);
+                        rig.dialogue.ShowText("「それじゃはじめるよ」");
                         yield return new WaitForSeconds(1.8f);
                         rig.dialogue.JumpToLatestLog();
                         yield return new WaitForSeconds(1.2f);

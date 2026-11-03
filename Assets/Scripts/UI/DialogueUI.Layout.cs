@@ -11,6 +11,7 @@ namespace KillingMahjong.UI
 
         private void LateUpdate()
         {
+            UpdateReadability();
             if (!readabilityBackdropDirty) return;
             readabilityBackdropDirty = false;
             UpdateDialogueControlLayout();

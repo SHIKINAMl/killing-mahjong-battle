@@ -13,6 +13,11 @@ namespace KillingMahjong.Managers
 
         private void ResetStateForNewGameCore()
         {
+            ClearReactions();
+            discardRevision++;
+            discardCsvTimes.Clear();
+            nextOrdinaryDiscardAt = 0;
+            lastReactionText = null;
             _firstTerminalHonorPlayed = false;
             _firstMiddleTilePlayed = false;
             _firstMaxBetPlayed = false;
@@ -77,7 +82,8 @@ namespace KillingMahjong.Managers
             var captured = rule;
             string text = line.text;
             string face = line.faceId;
-            reactionQueue.Enqueue(() => _currentReaction = StartCoroutine(ProcessRuleLine(captured, text, face)));
+            QueueContextual(() => ProcessRuleLine(captured, text, face),
+                () => _queuedRules.Remove(captured), rule.priority != ReactionPriority.Progress);
             if (!isProcessingReactions) ProcessNextReaction();
             return true;
         }
@@ -87,7 +93,7 @@ namespace KillingMahjong.Managers
             if (dialogueUI != null)
             {
                 dialogueUI.gameObject.SetActive(true);
-                dialogueUI.ShowText(text.Contains("「") ? text : $"「{text}」");
+                ShowReactionText(text);
             }
             if (enemyInfoUI != null && !string.IsNullOrEmpty(faceId))
             {
@@ -109,7 +115,9 @@ namespace KillingMahjong.Managers
 
         private bool PlayOrFallback(ReactionTrigger trigger, ReactionPriority priority, string csvCondition)
         {
-            if (Trigger(trigger, priority)) return true;
+            // クールダウンで抑えた反応を、CSV経由で再び喋らせない。
+            if (enemyInfoUI != null && enemyInfoUI.HasReaction(trigger))
+            { Trigger(trigger, priority); return true; }
             if (string.IsNullOrEmpty(csvCondition)) return false;
             EnqueueCSVDialogue(csvCondition);
             return true;

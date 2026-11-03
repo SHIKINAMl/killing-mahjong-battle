@@ -18,6 +18,7 @@ namespace KillingMahjong.UI
         [SerializeField] private ScrollRect scroll;
         [SerializeField] private GameObject visual;
         private DialogueUI owner;
+        private TMPro.TMP_Text unreadCount;
 
         /// <summary>ログの枠（<paramref name="logPanel"/>）の直下から探す。無ければ作る。</summary>
         public static LogLatestButtonUI Ensure(Transform logPanel, ScrollRect scroll, DialogueUI owner)
@@ -26,6 +27,18 @@ namespace KillingMahjong.UI
             var ui = go.GetComponent<LogLatestButtonUI>();
             if (made) { ui.Build(scroll); ui.Awake(); }
             ui.owner = owner;
+            if (ui.unreadCount == null)
+            {
+                var badge = new GameObject("UnreadCount", typeof(RectTransform), typeof(TMPro.TextMeshProUGUI));
+                badge.transform.SetParent(go.transform, false);
+                ui.unreadCount = badge.GetComponent<TMPro.TextMeshProUGUI>();
+                ui.unreadCount.font = Resources.Load<TMPro.TMP_FontAsset>("PixelMplus10_DynamicFixed");
+                ui.unreadCount.fontSize = 14; ui.unreadCount.alignment = TMPro.TextAlignmentOptions.Center;
+                ui.unreadCount.color = new Color32(255, 225, 150, 255); ui.unreadCount.raycastTarget = false;
+                var rect = ui.unreadCount.rectTransform;
+                rect.anchorMin = rect.anchorMax = new Vector2(.5f, 1);
+                rect.sizeDelta = new Vector2(40, 22); rect.anchoredPosition = new Vector2(0, 10);
+            }
             if (ui.scroll == null) ui.scroll = scroll;
             var button = go.GetComponentInChildren<Button>(true);
             if (button != null)
@@ -86,6 +99,12 @@ namespace KillingMahjong.UI
             if (visual == null || scroll == null) return;
             bool show = !IsAtLatest();
             if (visual.activeSelf != show) visual.SetActive(show);
+            if (unreadCount != null)
+            {
+                int count = owner != null ? owner.UnreadLogCount : 0;
+                unreadCount.gameObject.SetActive(show && count > 0);
+                unreadCount.text = count > 99 ? "99+" : count.ToString();
+            }
         }
 
         /// <summary>最新の行（一番下）が見えているか。DialogueUI の「新しい行を追いかける」判定と同じ幅で見る</summary>
