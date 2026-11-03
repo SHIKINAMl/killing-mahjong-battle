@@ -275,12 +275,13 @@ namespace KillingMahjong.Managers
                 // PlayLinesUntilAutoIntro で済んでいる。ここでは決定へ進めるだけ。
                 // HasClickedAutoMangan は待ち牌の公開と決定の解禁に使われているので、ここで立てる。
                 HasClickedAutoMangan = true;
-                IsAutoButtonLocked = false;   // ここから先は『自動』を出さないので旗も下ろす
+                // 紹介したボタンを決定まで残す。自力で組んだ手牌は置き換えない。
+                IsAutoButtonLocked = true;
 
                 // **決定ボタンはセリフより先に出す**（2026-10-29 バグ報告「最初の手牌選択フェイズで独力で満貫を作ると決定ボタンが出ない」）。
                 // 以前はセリフを送り終えるまで出さず、「決定ボタンを押してね」と言われた先に何も無かった。
                 // 『おまかせ』を押した経路（FinishMockAutoMangan）も、ボタンを出してから同じ言葉を言う。
-                SetHandButtonStage(HandButtonStage.DecideOnly);
+                SetHandButtonStage(HandButtonStage.AutoAndDecide);
 
                 // フロー図どおり、**ハイライトの前に**決定を促す一言を入れる（2026-09-23）。
                 yield return StartCoroutine(PlayLines(new List<TutorialLine>
