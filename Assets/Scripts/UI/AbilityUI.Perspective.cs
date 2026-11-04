@@ -19,15 +19,15 @@ namespace KillingMahjong.UI
             if (menu == PerspectiveMenu.Mode)
             {
                 entries.Add(new AbilityData(SkillNames.Perspective, "種別を選ぶ",
-                    "萬子・筒子・索子・字牌から、透視する種別を選ぶ。"));
+                    "萬子・筒子・索子・字牌。\n透かして見たい種別を\n選んでね。"));
                 entries.Add(new AbilityData(SkillNames.Perspective, "ランダム",
-                    "相手の山の未公開牌を、種別を問わず最大3枚公開する。"));
+                    "種別を問わず、\n相手の山の未公開牌を\n最大3枚、透かして見れるよ。"));
             }
             else if (menu == PerspectiveMenu.Suit)
             {
                 for (int i = 0; i < PerspectiveSuitLabels.Length; i++)
                     entries.Add(new AbilityData(SkillNames.Perspective, PerspectiveSuitLabels[i],
-                        PerspectiveSuitLabels[i] + "の未公開牌を最大3枚公開する。該当する牌がなくてもコストはかかる。"));
+                        PerspectiveSuitLabels[i] + "の未公開牌を\n最大3枚、透かして見れるよ。\nその種別の牌がなくても\nコストはかかるからね。"));
             }
             PopulateEntries(entries);
             HideTooltip();

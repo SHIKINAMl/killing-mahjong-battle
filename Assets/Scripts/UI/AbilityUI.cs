@@ -165,14 +165,10 @@ namespace KillingMahjong.UI
         private const float ListTopMargin = 4f;
 
         /// <summary>
-        /// 説明欄は**巻物の外（右側）**に出す（2026-08-31 に依頼者の指定で変更）。
-        /// 内枠の下に置いていたときは、閉じるボタンと場所を取り合っていた。
+        /// ベルルの頭上に置く、能力説明の吹き出し。
         /// </summary>
-        private const float DescPanelWidth = 150f;
-        private const float DescPanelHeight = 70f;
-
-        /// <summary>巻物の右端から説明欄までの間。</summary>
-        private const float DescPanelGap = 8f;
+        private const float DescPanelWidth = 196f;
+        private const float DescPanelHeight = 114f;
 
         /// <summary>
         /// 閉じるボタンの大きさと、内枠の下端からの余白。
@@ -371,17 +367,6 @@ namespace KillingMahjong.UI
         private const string DescBoxName = "AbilityDescriptionBox";
         private const string DescFillName = "AbilityDescriptionFill";
         private const string DescTextName = "AbilityDescriptionText";
-
-        /// <summary>説明欄の面。行のタイルと同じ暗い紺。</summary>
-        private static readonly Color DescBoxColor = new Color32(0x1B, 0x23, 0x38, 0xE6);
-
-        /// <summary>説明欄の縁。**行と同じ色にする。**
-        /// 4行が縁を持つと、縁の有無が「一覧の仲間かどうか」の合図になる。
-        /// 説明欄だけ縁が無いと、別の透明なパネルが割り込んで見える。</summary>
-        private static readonly Color DescBorderColor = new Color32(0x35, 0x42, 0x70, 0xFF);
-
-        /// <summary>縁の太さ。行のタイルと同じ1ドット。</summary>
-        private const float DescBorder = 2f;
 
         /// <summary>閉じるボタンの縁。他の赤（コスト・HPバッジ）と同じ赤に揃える。</summary>
         private static readonly Color CloseBorderColor = new Color32(0xFF, 0x59, 0x59, 0xFF);

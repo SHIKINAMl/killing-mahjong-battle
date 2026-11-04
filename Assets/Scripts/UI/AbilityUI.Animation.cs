@@ -128,7 +128,8 @@ namespace KillingMahjong.UI
         {
             // 説明欄は一覧と一緒に出し入れする
             var box = abilityWindow != null ? abilityWindow.Find(DescBoxName) : null;
-            if (box != null && box.gameObject.activeSelf != visible) box.gameObject.SetActive(visible);
+            if (box != null) box.gameObject.SetActive(visible && _descText != null
+                && !string.IsNullOrEmpty(_descText.text) && _descText.text != DescPlaceholder);
 
             if (contentsShownWhenOpen == null) return;
             for (int i = 0; i < contentsShownWhenOpen.Length; i++)

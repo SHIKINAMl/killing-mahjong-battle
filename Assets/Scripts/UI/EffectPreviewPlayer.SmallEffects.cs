@@ -13,6 +13,33 @@ namespace KillingMahjong.UI
         {
             switch (EffectId)
             {
+                case "ui.skill_explanation":
+                {
+                    AbilityUI sourceAbility = null;
+                    foreach (var candidate in FindObjectsByType<AbilityUI>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                        if (candidate.name != "SkillExplanationPreview") { sourceAbility = candidate; break; }
+                    if (sourceAbility == null) throw new InvalidOperationException("能力UIがありません。");
+                    var sample = Instantiate(sourceAbility, rig.transform, false);
+                    scope.Own(sample.gameObject);
+                    sample.gameObject.name = "SkillExplanationPreview";
+                    sample.gameObject.SetActive(true);
+                    var sampleCanvas = sample.GetComponent<Canvas>();
+                    sampleCanvas.enabled = true;
+                    sampleCanvas.overrideSorting = true;
+                    sampleCanvas.sortingOrder = 25;
+                    yield return null; // Startで一覧を用意してから開く。
+                    foreach (var control in sample.GetComponentsInChildren<Button>(true)) control.interactable = false;
+                    sample.OpenWindow();
+                    yield return new WaitForSecondsRealtime(.7f);
+                    foreach (var description in sample.SkillExplanations)
+                    {
+                        sample.ShowTooltip(description);
+                        yield return new WaitForSecondsRealtime(3f);
+                    }
+                    sample.CloseWindow(false);
+                    yield return new WaitForSecondsRealtime(.7f);
+                    break;
+                }
                 case "ui.ability_bell":
                     var bellAudio = KillingMahjong.Managers.AudioManager.Instance;
                     if (bellAudio == null) throw new InvalidOperationException("AudioManagerがありません。");

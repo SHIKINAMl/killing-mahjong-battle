@@ -42,6 +42,7 @@ namespace KillingMahjong.UI
             new Entry("skill.cutin.enemy", "スキル", "相手の能力カットイン", "PhaseTransitionUI.PlaySkillCutinAnimationRoutine"),
             new Entry(Effects.EnemySkillBatchPresentation.EffectId, "スキル", "相手の能力連打：透視・透視・役強化・透視", "EnemySkillBatchPresentation.Play"),
             new Entry(Effects.EnemySkillBatchPresentation.SummaryEffectId, "スキル", "旧・相手の能力まとめ：透視 × 2・牌交換", "EnemySkillBatchPresentation.PlaySummary", unused: true),
+            new Entry("ui.skill_explanation", "スキル", "ベルルの吹き出し：4つの能力説明", "AbilityUI.ShowTooltip"),
             new Entry("ui.ability_bell", "スキル", "能力を開くベルの音", "AbilityUI.OnTriggerClicked / AudioManager.PlayAbilityBellSE"),
             new Entry(Effects.AbilityBellDropEffect.EffectId, "スキル", "呼び鈴：落下して着地した時だけ縦揺れ", "TutorialManager.DropAbilityBellRoutine / AbilityBellDropEffect.Play"),
             new Entry("phase.dealing", "フェイズ", "配牌：暗転 → 局名がその場で短くフェード → 牌の山 → 明転", "PhaseTransitionUI.PlayRoundStartDarken / PlayRoundStartFadeOut"),
