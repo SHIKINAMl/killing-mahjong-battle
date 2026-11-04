@@ -12,6 +12,30 @@ namespace KillingMahjong.Tests
         private ScriptableObject Canonical => (ScriptableObject)Resources.Load("Tutorial/TutorialScenario", ScenarioType);
 
         [Test]
+        public void OpeningFollowsConnectedOctober30ChartThroughDealing()
+        {
+            var round = ((IList)ScenarioType.GetField("rounds").GetValue(Canonical))[0];
+            var type = round.GetType();
+            var lines = (IList)type.GetField("introLines").GetValue(round);
+            var expected = new[] {
+                "「おっ後輩ちゃんじゃーん」", "「先輩を助けに来たんだな？えらいぞー」",
+                "「なになに\n先輩のためならどこへでも……って」", "「ソダネー\nうーん……」",
+                "「まっ…突然だけどね\n今からアタシとゲームをしてもらえるかな」",
+                "「うんゲームゲーム\n君はぶっちゃけ\n人数合わせ的な？」",
+                "「だけどただのゲームじゃない……それは命がけのギャンブル！！」",
+                "「って触れ込みの麻雀対戦ゲーム（笑）」", "「まっ長くなっちゃったから早速ルール説明するわ」",
+                "「大丈夫！ガチで殺し合いとかしないからさ！何回かギャンブルして帰ろうZE」",
+                "「ちな後輩ちゃんは敗けたらアタシにメシ作れよな」", "「それじゃはじめるよ」",
+                "「ここでは特殊な麻雀をプレイしてギャンブルをしていくよ」"
+            };
+            Assert.That(lines.Count, Is.EqualTo(expected.Length));
+            for (int i = 0; i < expected.Length; i++)
+                Assert.That(lines[i].GetType().GetField("text").GetValue(lines[i]), Is.EqualTo(expected[i]), "opening line " + i);
+            Assert.That(type.GetField("introFlashAfterLineIndex").GetValue(round), Is.EqualTo(3));
+            Assert.That(type.GetField("revealBoardAfterLineIndex").GetValue(round), Is.EqualTo(11));
+        }
+
+        [Test]
         public void AssaultExplanationIsExportedAndObsoleteBetAdjustmentLinesAreAbsent()
         {
             var source = Canonical;

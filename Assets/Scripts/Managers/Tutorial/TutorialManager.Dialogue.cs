@@ -74,6 +74,10 @@ namespace KillingMahjong.Managers
                 _isWaitingForLine = false;
 
                 if (dialogueUI != null) dialogueUI.HideAdvanceOnAnyClick();
+                if (_round != null && _round.introFlashAfterLineIndex >= 0
+                    && _round.introFlashAfterLineIndex < _round.introLines.Count
+                    && ReferenceEquals(line, _round.introLines[_round.introFlashAfterLineIndex]))
+                    FlashScreen();
             }
         }
 

@@ -106,27 +106,16 @@ namespace KillingMahjong.Managers
                 if (_aborted) yield break;
             }
 
-            // **立ち絵が出きってから台詞を出す（2026-09-27 の指示）。**
-            // 2026-09-12 のフロー図は「契約書を閉じる → セリフ1行 → 立ち絵」だったが、
-            // 順番を入れ替えた。誰もいない画面に声だけが出るのではなく、
-            // 先に相手が滲み出てきて、そのあとで喋り出す。
-            // 曲も1行目の合図で鳴り始めるので、無音のまま立ち絵が浮かぶことになる。
-            //
-            // 立ち絵を持っているのはシーン側なので、こちらは合図を出して待つだけ。
-            // 合図を受け取る人がいない（局を指定して始めた等）ときは、何も起きずに素通りする。
+            // フロー図の接続順：最初の一言 → 立ち絵 → 残りの導入会話。
             var introLines = data.introLines;
             int reveal = data.revealBoardAfterLineIndex;
             int firstLine = 0;
 
             if (CharacterRevealRequested != null && introLines != null && introLines.Count > 0)
             {
-                // **1行目「おっ後輩ちゃんじゃーん」を言ってから、フラッシュと同時に先輩を出す**
-                // （2026-10-30 バグ報告「先輩が出てくるのが早い」「『おっ後輩ちゃんじゃーん』と言ってからフラッシュが入って出てくるはず」）。
-                // 2026-09-27 の指示で「立ち絵が出きってから台詞」にしていたのを、フロー図の順に戻した
                 yield return StartCoroutine(PlayLines(introLines.GetRange(0, 1)));
                 if (_aborted) yield break;
                 firstLine = 1;
-                FlashScreen();
 
                 var reveal1 = CharacterRevealRequested;
                 CharacterRevealRequested = null;     // 出すのは一度きり
@@ -144,10 +133,9 @@ namespace KillingMahjong.Managers
 
             if (reveal >= firstLine && reveal < introLines.Count - 1)
             {
-                // 盤面と山牌は局の頭の暗転の間に出してある（PlayRoundStartRoutine）。
-                // 以前はここで盤面を出し、第1局は山牌を1枚ずつ起こしていた（2026-09-12・09-19 の指示）が、
-                // 画面に物を生やさない決まりにしたのでやめた（2026-10-24 ユーザー指示「チュートリアルの対局フェイズでUIをニョキって生やすのは止めてくれ。基本的に画面が暗転しているときにUIは全部出すように」）
                 yield return StartCoroutine(PlayLines(introLines.GetRange(firstLine, reveal + 1 - firstLine)));
+                // 指定行と次のセリフの間へ、既存の暗転・配牌表示を移す。
+                if (IsFirstRound(data) && !_boardVisible) yield return PlayRoundLabelRoutine(1);
                 yield return StartCoroutine(PlayLines(
                     introLines.GetRange(reveal + 1, introLines.Count - reveal - 1)));
             }
@@ -493,7 +481,7 @@ namespace KillingMahjong.Managers
 
             // **第1局は、頭では暗転も盤面も出さない**（2026-10-29 ユーザー指示「契約書を書くといきなり『第一局』表示が出るので困惑した」
             // 「一局目の演出が出てから自分の牌が出るようにして」）。まだ先輩も出てきておらず、何の1局目なのか分からない。
-            // 「１局目」の暗転は「アタシと実践してみよっかー」のあとに出し、その暗いあいだに牌を出す（<see cref="PlayRoundLabelRoutine"/>）
+            // 「１局目」の暗転は導入の配牌位置で出し、その暗いあいだに牌を出す。
             // **第2局も、局名と盤面は「それじゃあ第二局目だね」のあとに出す**（2026-10-29 ユーザー指示
             // 「それじゃ第二局ね というセリフの後黒帯の演出出てほしい」）。頭で出すと、第1局のまとめの会話の前に「２局目」が出ていた
             if (number == 1 || IsSecondTutorialRound(data)) yield break;
@@ -506,8 +494,7 @@ namespace KillingMahjong.Managers
             && _scenario.rounds.Count > 0 && _scenario.rounds[0] == data;
 
         /// <summary>
-        /// 「N局目」の暗転を出し、暗いあいだに盤面（自分の牌）を出す。第1局の「アタシと実践してみよっかー」のあと
-        /// （2026-10-29 ユーザー指示「このセリフの後 １局目の演出を出して」「一局目の演出が出てから自分の牌が出るようにして」）。
+        /// 「N局目」の暗転を出し、暗いあいだに盤面（自分の牌）を出す。
         /// 暗転の部品が無いときは、盤面だけ出す。
         /// </summary>
         private IEnumerator PlayRoundLabelRoutine(int number)

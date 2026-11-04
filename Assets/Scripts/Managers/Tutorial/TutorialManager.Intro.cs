@@ -249,9 +249,8 @@ namespace KillingMahjong.Managers
 
             yield return PlayLines(AfterRuleUiLines);
 
-            // 「アタシと実践してみよっかー」のあとに「１局目」の暗転を出す（2026-10-29 ユーザー指示）。
-            // 局の頭（契約書の直後）では、何の1局目か分からないので出さないことにした
-            yield return PlayRoundLabelRoutine(1);
+            // 冒頭の指定行ですでに配牌している場合、ここでは繰り返さない。
+            if (!_boardVisible) yield return PlayRoundLabelRoutine(1);
 
             // ここからフロー図の続き（2026-09-19）。山牌を見せて、満貫を作らせるまで。
             // 山牌は局の頭の暗転の間に出してある。以前は「じゃーん！これが君の山牌ね」と同時に1枚ずつ起こしていた

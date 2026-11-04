@@ -66,7 +66,11 @@ namespace KillingMahjong.UI
 
             bool settlement = entry.Status == RoundStatus.Agari || entry.Status == RoundStatus.Ron
                 || entry.Status == RoundStatus.Result || entry.Status == RoundStatus.Draw;
-            if (!settlement) Effects.ScreenFlash.Play(playSound: false);
+            // 第一局の導入は、台本で指定した会話の切れ目でだけ光らせる。
+            bool openingHand = uiManager.IsTutorialMode && entry.Status == RoundStatus.HandSelection
+                && uiManager.TutorialManager != null
+                && uiManager.TutorialManager.CurrentRound == TutorialManager.TutorialRound.Round1_BasicRon;
+            if (!settlement && !openingHand) Effects.ScreenFlash.Play(playSound: false);
             RefreshPhaseView(entry.Status);
 
             switch (entry.Status)

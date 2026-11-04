@@ -258,8 +258,8 @@ namespace KillingMahjong.Managers
         /// <summary>
         /// 契約書を閉じたあと。**ここでは立ち絵を出さない。**
         ///
-        /// 順序は「契約書を閉じる → 1行目『おっ後輩ちゃんじゃーん』（と同時に曲） → フラッシュと同時に女の子が出る → 残りのセリフ」
-        /// （2026-10-30 バグ報告「先輩が出てくるのが早い」でフロー図の順に戻した。2026-09-27 の指示では立ち絵が先だった）。
+        /// 順序は「契約書を閉じる → 最初の一言（と同時に曲） → 女の子 → 残りのセリフ」。
+        /// フラッシュは台本で指定した行の後に出す。
         /// 出すのは <see cref="TutorialManager.CharacterRevealRequested"/> 経由で、TutorialManager が1行目のあとに呼び戻してくる。
         /// </summary>
         private IEnumerator ShowEnemyRoutine()

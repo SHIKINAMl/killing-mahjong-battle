@@ -220,6 +220,9 @@ namespace KillingMahjong.Managers
         [Tooltip("イントロの何行目のあとに盤面（山牌・手牌・ドラ・HP）を出すか。0始まり。" +
                  "-1 ならイントロを全て流し終えたあと。それまでは女の子とセリフだけが見える。")]
         public int revealBoardAfterLineIndex = -1;
+
+        [Tooltip("導入の指定行を送り終えた直後にフラッシュを出す。-1なら出さない。")]
+        public int introFlashAfterLineIndex = -1;
         [Tooltip("13枚そろったあと、『自動』ボタンを開放する直前のセリフ。空なら会話を挟まない。")]
         public List<TutorialLine> onHandFilledLines = new List<TutorialLine>();
 
