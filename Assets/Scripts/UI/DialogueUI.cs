@@ -188,6 +188,7 @@ namespace KillingMahjong.UI
             // **`StopAllCoroutines` で止めた分は `finally` が走らない。** 先に倒しておく。
             // 送りの途中で次のセリフが来たとき、旗が立ちっぱなしになるのを防ぐ。
             IsTalking = false;
+            typingRunning = false;
             StopAllCoroutines(); // 既存の文字送り演出などがあれば即座にキャンセルする
 
             ApplyShadow();
@@ -211,6 +212,7 @@ namespace KillingMahjong.UI
         {
             // 先に全文を TMP に解析させ、可視文字数だけを進める。
             // これなら <color> / <size> のタグそのものを文字送りで見せずに済む。
+            typingRunning = true;
             dialogueText.text = fullText;
             dialogueText.maxVisibleCharacters = 0;
             yield return null; // ShowText() が DialoguePanel を有効化した次フレームに解析する
@@ -224,6 +226,7 @@ namespace KillingMahjong.UI
             if (PhaseTransitionUI.IsScreenDarkened)
             {
                 dialogueText.maxVisibleCharacters = int.MaxValue;
+                typingRunning = false;
                 yield break;
             }
 
@@ -271,6 +274,7 @@ namespace KillingMahjong.UI
             }
 
             dialogueText.maxVisibleCharacters = int.MaxValue;
+            typingRunning = false;
             IsTalking = false;
         }
 
@@ -286,6 +290,9 @@ namespace KillingMahjong.UI
         private void OnDisable()
         {
             IsTalking = false;
+            // 送りの途中で伏せられたらコルーチンは死ぬ。字数を途中で残すと、次に出したとき「大 のような切れ端が見える
+            typingRunning = false;
+            if (dialogueText != null) dialogueText.maxVisibleCharacters = int.MaxValue;
             if (logScrollRoutine != null) StopCoroutine(logScrollRoutine);
             logScrollRoutine = null;
         }

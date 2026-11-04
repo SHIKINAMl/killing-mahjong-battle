@@ -9,11 +9,14 @@ namespace KillingMahjong.UI
     {
         private string reactionLogContext, lastLogSection;
         private int unreadLogCount;
-        private TMP_Text unreadBadge;
         private float speechNoticeUntil;
         private Outline speechNotice;
         public int UnreadLogCount => unreadLogCount;
-        public bool IsTyping => dialogueText != null && dialogueText.maxVisibleCharacters < dialogueText.textInfo.characterCount;
+        // 文字送りのコルーチンが**いま回っているか**で見る（2026-11-05 のバグ報告「セリフシステムが機能停止しているきがする」）。
+        // 以前は「出した字数 < 全体の字数」で見ていた。送りの途中で吹き出しごと伏せられるとコルーチンが死んで字数が
+        // 途中（「大 の2字など）で残り、ずっと true のまま。反応の列（WaitWhileLogIsOpen）がそこで止まり、以後のセリフが全部出なくなった。
+        private bool typingRunning;
+        public bool IsTyping => typingRunning && isActiveAndEnabled;
         public int VisibleCharacterCount => dialogueText != null ? dialogueText.textInfo.characterCount : 0;
         public void SetReactionLogContext(string context) { reactionLogContext = context; }
 
@@ -73,6 +76,9 @@ namespace KillingMahjong.UI
             text.textWrappingMode = TextWrappingModes.Normal; text.alignment = TextAlignmentOptions.TopLeft;
             text.lineSpacing = 4; text.raycastTarget = false;
             text.color = new Color32(42, 22, 28, 255);
+            // 黒い縁取り（PixelMplus10_Underlay）を外す。濃い字に黒い縁が重なって字が潰れていた
+            // （2026-11-05 のバグ報告「ログの文字が潰れている」）。ピンクの吹き出しに濃い字なら縁は要らない。
+            if (text.font != null && text.font.material != null) text.fontSharedMaterial = text.font.material;
             var shadow = text.GetComponent<Shadow>(); if (shadow != null) shadow.enabled = false;
             var rect = text.rectTransform;
             rect.anchorMin = Vector2.zero; rect.anchorMax = Vector2.one;
@@ -101,21 +107,8 @@ namespace KillingMahjong.UI
                 var scroll = logContainer != null ? logContainer.GetComponentInParent<ScrollRect>(true) : null;
                 if (logScrollRoutine == null && IsNearLatestLog(scroll)) unreadLogCount = 0;
             }
-            if (unreadBadge == null && toggleLogButton != null)
-            {
-                var go = new GameObject("UnreadCount", typeof(RectTransform), typeof(TextMeshProUGUI));
-                go.transform.SetParent(toggleLogButton.transform, false);
-                unreadBadge = go.GetComponent<TextMeshProUGUI>(); unreadBadge.font = dialogueText.font;
-                unreadBadge.fontSize = 14; unreadBadge.color = new Color32(255, 225, 150, 255);
-                unreadBadge.alignment = TextAlignmentOptions.Center; unreadBadge.raycastTarget = false;
-                var r = unreadBadge.rectTransform; r.anchorMin = r.anchorMax = Vector2.one;
-                r.sizeDelta = new Vector2(34, 22); r.anchoredPosition = new Vector2(8, 2);
-            }
-            if (unreadBadge != null)
-            {
-                unreadBadge.text = unreadLogCount > 99 ? "99+" : unreadLogCount.ToString();
-                unreadBadge.gameObject.SetActive(unreadLogCount > 0);
-            }
+            // Log ボタンの上に未読の数を出すのはやめた（2026-11-05 のバグ報告「セリフ下の数字は何用？」）。
+            // 何の数か分からず、セリフの下に浮いて見えた。数はログの中の「最新へ」ボタンにだけ出す（LogLatestButtonUI）。
             if (speechNotice != null) speechNotice.enabled = Time.unscaledTime < speechNoticeUntil;
         }
 
