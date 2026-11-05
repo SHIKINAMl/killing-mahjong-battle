@@ -197,7 +197,7 @@ namespace KillingMahjong.UI
             const float ReadyHold = .05f;
             const float WindUp = .15f;
             const float SmearHold = .10f;
-            const float BiteHold = .08f;
+            const float BiteHold = .10f;
             const float TileRelease = .12f;
             Vector2 tilePosition = tile.anchoredPosition;
             Vector3 tileScale = tile.localScale;
@@ -228,6 +228,11 @@ namespace KillingMahjong.UI
             teeth.SetParent(jaws.transform, false);
             teeth.anchoredPosition = tilePosition;
             var images = new RawImage[2];
+            var biteTextures = new[]
+            {
+                Resources.Load<Texture2D>("UI/AssaultFangsBiteUpper"),
+                Resources.Load<Texture2D>("UI/AssaultFangsBiteLower")
+            };
             var bite = new[] { new Vector2(-14, 44), new Vector2(14, -44) };
             var ready = new[] { bite[0] + new Vector2(-133, 82), bite[1] + new Vector2(133, -90) };
             var open = new[] { ready[0] + new Vector2(-12, 36), ready[1] + new Vector2(12, -36) };
@@ -260,11 +265,15 @@ namespace KillingMahjong.UI
             teeth.localScale = new Vector3(biteWidthScale, 1f, 1f);
             var biteOffset = new Vector2(-PaintedBiteCenterX * biteWidthScale, 0f);
             teeth.anchoredPosition = tilePosition + biteOffset;
-            for (int jaw = 0; jaw < images.Length; jaw++) images[jaw].rectTransform.anchoredPosition = bite[jaw];
+            for (int jaw = 0; jaw < images.Length; jaw++)
+            {
+                if (biteTextures[jaw] != null) images[jaw].texture = biteTextures[jaw];
+                images[jaw].rectTransform.anchoredPosition = bite[jaw];
+            }
             tile.anchoredPosition = pressedPosition;
             tile.localScale = pressedScale;
             title.alpha = note.alpha = 0;
-            AudioManager.Instance?.PlayAssaultSE();
+            AudioManager.Instance?.PlayStinger("se_fang_bite", AudioManager.PitchJitter.None);
 
             // 着弾位置は固定し、各残像を通常再生でも見分けられる長さだけ残す。
             for (int frame = 0; frame < smearFrames.Length; frame++)
