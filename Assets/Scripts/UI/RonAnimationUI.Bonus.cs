@@ -194,7 +194,8 @@ namespace KillingMahjong.UI
         {
             const float FadeIn = .36f;
             const float Retreat = .30f;
-            const float WindUp = .065f;
+            const float ReadyHold = .05f;
+            const float WindUp = .15f;
             const float SmearHold = .10f;
             const float BiteHold = .08f;
             const float TileRelease = .12f;
@@ -228,13 +229,11 @@ namespace KillingMahjong.UI
             teeth.anchoredPosition = tilePosition;
             var images = new RawImage[2];
             var bite = new[] { new Vector2(-14, 44), new Vector2(14, -44) };
-            var ready = new[] { bite[0] + new Vector2(-133, 102), bite[1] + new Vector2(133, -102) };
-            var open = new Vector2[2];
+            var ready = new[] { bite[0] + new Vector2(-133, 82), bite[1] + new Vector2(133, -90) };
+            var open = new[] { ready[0] + new Vector2(-12, 36), ready[1] + new Vector2(12, -36) };
             for (int jaw = 0; jaw < images.Length; jaw++)
             {
                 var texture = Resources.Load<Texture2D>(jaw == 0 ? "UI/AssaultFangsUpper" : "UI/AssaultFangsLower");
-                var direction = (ready[jaw] - bite[jaw]).normalized;
-                open[jaw] = ready[jaw] + direction * 14f;
                 images[jaw] = CreateFangImage(teeth, "Fang", texture);
                 images[jaw].rectTransform.anchoredPosition = ready[jaw];
             }
@@ -250,6 +249,7 @@ namespace KillingMahjong.UI
                 yield return null;
             }
             opacity.alpha = 1;
+            yield return new WaitForSeconds(ReadyHold);
             for (float elapsed = 0; elapsed < WindUp; elapsed += Time.deltaTime)
             {
                 float progress = Mathf.SmoothStep(0, 1, (elapsed + Time.deltaTime) / WindUp);
