@@ -169,65 +169,127 @@ namespace KillingMahjong.UI
 
             if (!s.IsTankiWait)
             {
-                // 発動者本人の既存立ち絵と顔を帯の中へ重ねる。
-                var data = s.LocalWon ? player != null ? player.CurrentCharacterData : null
-                    : enemy != null ? enemy.CurrentCharacterData : null;
-                var band = new GameObject("AssaultBand", typeof(RectTransform));
-                band.transform.SetParent(rt, false);
-                var bandRt = (RectTransform)band.transform;
-                bandRt.anchoredPosition = new Vector2(0, 40);
-                var maskRt = CutinPixelBackgroundUI.Attach(bandRt,
-                    s.LocalWon ? "skill_band_blue" : "skill_band_red");
-                if (maskRt == null) maskRt = bandRt;
-                if (data != null)
+                var caster = s.LocalWon ? player?.CurrentCharacterData : enemy?.CurrentCharacterData;
+                yield return PlayAssaultCutin(rt, group, caster, s.LocalWon);
+                yield break;
+            }
+
+            var tile = BonusImage(rt, "WinningTile", tileResourceManager != null && ronTile >= 0
+                ? tileResourceManager.GetTileSprite(ronTile) : null, new Vector2(0, 75), new Vector2(88, 112));
+            // 不明な牌IDでは別の牌を捏造しない。見出しはそのまま出せる。
+            tile.enabled = tile.sprite != null;
+            var title = BonusText(rt, "単騎", new Vector2(0, -8), 52, PanelInk);
+            var note = BonusText(rt, "2倍ボーナス", new Vector2(0, -50), 25, AccentGold);
+            if (s.AssaultApplied)
+            {
+                var rays = new GameObject("TileRays", typeof(RectTransform), typeof(PixelShapeGraphic)).GetComponent<PixelShapeGraphic>();
+                rays.transform.SetParent(rt, false); rays.raycastTarget = false;
+                rays.rectTransform.sizeDelta = new Vector2(800, 600);
+                rays.transform.SetSiblingIndex(tile.transform.GetSiblingIndex());
+                group.alpha = 0;
+                for (float t = 0; t < .7f; t += Time.deltaTime)
                 {
-                    var body = data.bodySprites?.Find(x => x.id == data.defaultBodyId);
-                    var portrait = BonusImage(maskRt, "Caster", body != null ? body.sprite : data.normalSprite,
-                        new Vector2(-145, -185), new Vector2(720, 720));
-                    var face = data.faceSprites?.Find(x => x.id == data.defaultFaceId);
-                    if (face != null) BonusImage(portrait.rectTransform, "Face", face.sprite, Vector2.zero, new Vector2(720, 720));
+                    group.alpha = Mathf.Clamp01(t / .2f);
+                    DrawBonusRays(rays, t); yield return null;
                 }
-                BonusText(rt, "強襲", new Vector2(160, 60), 64, PanelInk);
-                group.alpha = 0f;
-                for (float t = 0; t < .16f; t += Time.deltaTime)
-                {
-                    float p = Mathf.Clamp01(t / .16f);
-                    rt.anchoredPosition = new Vector2(Mathf.Round(Mathf.Lerp(-120, 0, p) / 2) * 2, 0);
-                    group.alpha = p; yield return null;
-                }
-                rt.anchoredPosition = Vector2.zero; group.alpha = 1;
-                AudioManager.Instance?.PlayAssaultSE();
+                group.alpha = 1;
+                yield return PlayFangBite(rt, tile.rectTransform, title, note);
                 yield return new WaitForSeconds(.65f);
             }
-            else
-            {
-                var tile = BonusImage(rt, "WinningTile", tileResourceManager != null && ronTile >= 0
-                    ? tileResourceManager.GetTileSprite(ronTile) : null, new Vector2(0, 75), new Vector2(88, 112));
-                // 不明な牌IDでは別の牌を捏造しない。見出しはそのまま出せる。
-                tile.enabled = tile.sprite != null;
-                var title = BonusText(rt, "単騎", new Vector2(0, -8), 52, PanelInk);
-                var note = BonusText(rt, "2倍ボーナス", new Vector2(0, -50), 25, AccentGold);
-                if (s.AssaultApplied)
-                {
-                    var rays = new GameObject("TileRays", typeof(RectTransform), typeof(PixelShapeGraphic)).GetComponent<PixelShapeGraphic>();
-                    rays.transform.SetParent(rt, false); rays.raycastTarget = false;
-                    rays.rectTransform.sizeDelta = new Vector2(800, 600);
-                    rays.transform.SetSiblingIndex(tile.transform.GetSiblingIndex());
-                    group.alpha = 0;
-                    for (float t = 0; t < .7f; t += Time.deltaTime)
-                    {
-                        group.alpha = Mathf.Clamp01(t / .2f);
-                        DrawBonusRays(rays, t); yield return null;
-                    }
-                    group.alpha = 1;
-                    yield return PlayFangBite(rt, tile.rectTransform, title, note);
-                    yield return new WaitForSeconds(.65f);
-                }
-                else yield return PlayTankiBonus(group, tile, title, note);
-            }
+            else yield return PlayTankiBonus(group, tile, title, note);
             for (float t = 0; t < .2f; t += Time.deltaTime)
             { group.alpha = 1 - Mathf.Clamp01(t / .2f); yield return null; }
             group.alpha = 0;
+        }
+
+        private static IEnumerator PlayAssaultCutin(RectTransform parent, CanvasGroup group,
+            CharacterData caster, bool localWon)
+        {
+            var maskTexture = Resources.Load<Texture2D>("UI/Cutin/assault_slash_mask");
+            var frameTexture = Resources.Load<Texture2D>("UI/Cutin/assault_slash_frame");
+            var band = new GameObject("AssaultCutin", typeof(RectTransform)).GetComponent<RectTransform>();
+            band.SetParent(parent, false);
+            var bandPosition = new Vector2(0f, 74f);
+            Vector2 bandSize = new Vector2(800f, 400f);
+
+            if (maskTexture != null && frameTexture != null)
+            {
+                var slash = AssaultSlashLayer(band, "AssaultSlashMask", maskTexture, bandSize);
+                slash.color = localWon ? new Color32(23, 49, 93, 255) : new Color32(106, 16, 36, 255);
+                slash.gameObject.AddComponent<Mask>();
+
+                var strokes = new GameObject("AssaultSpeedLines", typeof(RectTransform), typeof(PixelShapeGraphic))
+                    .GetComponent<PixelShapeGraphic>();
+                strokes.transform.SetParent(slash.transform, false);
+                strokes.raycastTarget = false;
+                Color accent = localWon ? new Color32(58, 109, 177, 255) : new Color32(189, 30, 53, 255);
+                strokes.Begin();
+                strokes.Line(new Vector2(-408, -120), new Vector2(400, 114), 64f, accent);
+                strokes.Line(new Vector2(-403, -136), new Vector2(-190, -74), 5f, PanelInk);
+                strokes.Line(new Vector2(238, 67), new Vector2(405, 115), 4f, PanelInk);
+                strokes.End();
+
+                var body = caster?.bodySprites?.Find(x => x.id == caster.defaultBodyId)?.sprite ?? caster?.normalSprite;
+                var face = caster?.faceSprites?.Find(x => x.id == "キメ顔")?.sprite
+                    ?? caster?.faceSprites?.Find(x => x.id == caster.defaultFaceId)?.sprite;
+                if (body != null && !caster.showAsPlaceholder)
+                {
+                    // 各立ち絵の元画像での目の位置。顔差分も同じ座標と倍率で重ねる。
+                    bool senior = caster.characterName == "TutorialGirl";
+                    var eye = senior ? new Vector2(.59f, .63f) : new Vector2(.49f, .766f);
+                    float height = senior ? 1060f : 2100f;
+                    var size = new Vector2(height * body.rect.width / body.rect.height, height);
+                    var position = new Vector2(6f, 16f) - Vector2.Scale(eye - Vector2.one * .5f, size);
+                    var portrait = BonusImage(slash.rectTransform, "AssaultCaster", body, position, size);
+                    if (face != null)
+                        BonusImage(portrait.rectTransform, "Face", face, Vector2.zero, size);
+                }
+
+                AssaultSlashLayer(band, "AssaultSlashFrame", frameTexture, bandSize);
+            }
+
+            var shadow = BonusText(band, "強襲", new Vector2(2f, -73f), 66f, Color.black);
+            var title = BonusText(band, "強襲", new Vector2(0f, -69f), 66f, PanelInk);
+            title.characterSpacing = shadow.characterSpacing = 14f;
+
+            const float Entry = .16f;
+            Vector2 start = bandPosition - new Vector2(420f, 118f);
+            group.alpha = 0f;
+            AudioManager.Instance?.PlayAssaultSE();
+            for (float t = 0f; t < Entry; t += Time.deltaTime)
+            {
+                float progress = t / Entry;
+                float brake = 1f - Mathf.Pow(1f - progress, 3f);
+                band.anchoredPosition = Vector2.Lerp(start, bandPosition, brake);
+                band.localScale = new Vector3(1f, Mathf.Lerp(.65f, 1f, brake), 1f);
+                group.alpha = Mathf.Clamp01(progress * 3f);
+                yield return null;
+            }
+            band.anchoredPosition = bandPosition;
+            band.localScale = Vector3.one;
+            group.alpha = 1f;
+            yield return new WaitForSeconds(.57f);
+
+            const float Exit = .15f;
+            for (float t = 0f; t < Exit; t += Time.deltaTime)
+            {
+                float progress = t / Exit;
+                band.anchoredPosition = bandPosition + new Vector2(140f, 40f) * (progress * progress);
+                band.localScale = new Vector3(1f, Mathf.Lerp(1f, .75f, progress), 1f);
+                group.alpha = 1f - progress;
+                yield return null;
+            }
+            group.alpha = 0f;
+        }
+
+        private static RawImage AssaultSlashLayer(RectTransform parent, string name, Texture2D texture, Vector2 size)
+        {
+            var layer = new GameObject(name, typeof(RectTransform), typeof(RawImage)).GetComponent<RawImage>();
+            layer.transform.SetParent(parent, false);
+            layer.rectTransform.sizeDelta = size;
+            layer.texture = texture;
+            layer.raycastTarget = false;
+            return layer;
         }
 
         private static Image BonusImage(RectTransform parent, string name, Sprite sprite, Vector2 pos, Vector2 size)
