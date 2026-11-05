@@ -173,7 +173,8 @@ namespace KillingMahjong.Managers
             var ronUI = gameUIManager != null ? gameUIManager.RonAnimationUI : null;
             if (ronUI != null)
             {
-                ronUI.ShowTutorialSettlement(settlement);
+                yield return ronUI.ShowTutorialSettlementWithBonus(settlement, tile,
+                    gameUIManager.PlayerInfoUI, gameUIManager.EnemyInfoUI);
                 yield return new WaitForSeconds(2f);
                 if (_aborted) { ronUI.HideTutorialSettlement(); yield break; }
             }

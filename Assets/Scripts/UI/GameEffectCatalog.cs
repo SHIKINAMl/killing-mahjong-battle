@@ -71,6 +71,12 @@ namespace KillingMahjong.UI
             new Entry(Effects.RonAuraUI.LocalEffectId, "ロン・清算", "自分のロン：吹き出し背面の青いオーラ", "RonImpactEffect.Play / RonAuraUI.BehindCallout"),
             new Entry(Effects.RonAuraUI.EnemyEffectId, "ロン・清算", "相手のロン：立ち絵背面の赤いオーラ", "CutinAnimationUI.PlayCutin / RonAuraUI.BehindCharacter"),
             new Entry("ron.local", "ロン・清算", "自分のロン：斜めの役表示 → 清算表（青） → 血の移動", "RonAnimationUI.PlayRonSequence / ShowYakuRibbon / SettlementRoutine"),
+            new Entry(RonAnimationUI.TankiBonusEffectId, "ロン・清算", "単騎：ロン牌が光る → 精算表へ反映", "RonAnimationUI.PreviewSettlementBonus / SettlementRoutine"),
+            new Entry(RonAnimationUI.AssaultBonusEffectId, "ロン・清算", "強襲：発動者のカットイン → 精算表へ反映", "RonAnimationUI.PreviewSettlementBonus / SettlementRoutine"),
+            new Entry(RonAnimationUI.TankiAssaultEffectId, "ロン・清算", "単騎強襲：ロン牌を牙で噛む → 精算表へ反映", "RonAnimationUI.PreviewSettlementBonus / SettlementRoutine"),
+            new Entry("ron.bonus_assault_enemy", "ロン・清算", "相手の強襲：発動者のカットイン → 精算表へ反映", "RonAnimationUI.PreviewSettlementBonus / SettlementRoutine"),
+            new Entry("ron.bonus_tanki_enemy", "ロン・清算", "相手の単騎：ロン牌が光る → 精算表へ反映", "RonAnimationUI.PreviewSettlementBonus / SettlementRoutine"),
+            new Entry("ron.bonus_tanki_assault_enemy", "ロン・清算", "相手の単騎強襲：ロン牌を牙で噛む → 精算表へ反映", "RonAnimationUI.PreviewSettlementBonus / SettlementRoutine"),
             new Entry("ron.enemy", "ロン・清算", "相手のロン：斜めの役表示 → 清算表（赤） → 血の移動", "RonAnimationUI.PlayRonSequence / ShowYakuRibbon / SettlementRoutine"),
             // 2026-10-19 に本編が霧（全身から血が霧散）になったので、それまでのホースを通る筋を没案に置く
             new Entry("ron.stream_local", "ロン・清算", "自分のロン：卓の血だまりからホースで血が流れ込む", "RonAnimationUI.PreviewStreamDrain", unused: true),

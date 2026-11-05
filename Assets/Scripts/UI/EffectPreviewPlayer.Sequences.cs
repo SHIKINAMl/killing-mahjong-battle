@@ -21,6 +21,13 @@ namespace KillingMahjong.UI
             }
             switch (EffectId)
             {
+                case RonAnimationUI.TankiBonusEffectId:
+                case RonAnimationUI.AssaultBonusEffectId:
+                case RonAnimationUI.TankiAssaultEffectId:
+                case "ron.bonus_assault_enemy":
+                case "ron.bonus_tanki_enemy":
+                case "ron.bonus_tanki_assault_enemy":
+                    yield return PreviewRonBonus(); break;
                 case RankingRowsTransition.EffectId: yield return PreviewRankingRows(); break;
                 case "skill.perspective":
                     yield return rig.phase.PlaySkillCutinAnimationRoutine("透視", true, rig.player.CurrentCharacterData);
@@ -277,6 +284,25 @@ namespace KillingMahjong.UI
                 settlement.MyHpAfter, 20000, settlement.TheirHpAfter, () => done = true,
                 "2000 × 1 × 1.3 = 2600", settlement);
             yield return Until(() => done);
+        }
+
+        private IEnumerator PreviewRonBonus()
+        {
+            bool tanki = EffectId.Contains("tanki"), assault = EffectId.Contains("assault");
+            bool won = !EffectId.EndsWith("_enemy", StringComparison.Ordinal);
+            // 表示用の固定値。実戦の判定・計算には使わない。
+            int gain = assault ? 0 : 2600;
+            int loss = tanki ? (assault ? 6600 : 4000) : 4600;
+            var sample = new RonSettlementInfo {
+                TotalHan = 5, Multiplier = 1, VoltageMultiplier = 1.3f, RankName = "満貫",
+                MyBet = 2000, TheirBet = 2000, LocalWon = won,
+                IsTankiWait = tanki, AssaultApplied = assault, AssaultBonusDamage = assault ? 2600 : 0,
+                MyDelta = won ? gain : -loss, TheirDelta = won ? -loss : gain,
+                MyHpBefore = 20000, TheirHpBefore = 20000,
+                MyHpAfter = won ? 20000 + gain : 20000 - loss,
+                TheirHpAfter = won ? 20000 - loss : 20000 + gain
+            };
+            yield return rig.ron.PreviewSettlementBonus(sample, Tile(17), rig.player, rig.enemy);
         }
         private static int Tile(int baseId) => KillingMahjong.Managers.TutorialTiles.Encode(baseId, false);
     }

@@ -311,7 +311,8 @@ namespace KillingMahjong.UI
         }
 
         private IEnumerator SettlementRoutine(RectTransform containerRt, GameObject container, RonSettlementInfo s,
-            PlayerInfoUI playerInfo, EnemyInfoUI enemyInfo, int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp)
+            PlayerInfoUI playerInfo, EnemyInfoUI enemyInfo, int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp,
+            int ronTile = -1, bool previewOnly = false)
         {
             // 役の紹介は斜め帯で完了している。表は合計翻数と血の精算へ進む。
             TextMeshProUGUI totalHanText, multiplierText;
@@ -324,6 +325,11 @@ namespace KillingMahjong.UI
                 out myBetText, out theirBetText, out myMultText, out theirMultText,
                 out tankiMine, out tankiTheirs,
                 out myDeltaText, out theirDeltaText, out myHpText, out theirHpText);
+
+            // 行の場所は先に確保し、単騎・強襲の答えはカットイン後に出す。
+            bool hasBonus = s.IsTankiWait || s.AssaultApplied;
+            SetBonusRowAlpha(panelGroup.transform, 0f);
+            if (hasBonus) myDeltaText.transform.parent.gameObject.SetActive(false);
 
             // 枠がフェードインする。ここではまだ数字は入っていない
             const float fadeIn = PanelFadeIn;
@@ -350,7 +356,20 @@ namespace KillingMahjong.UI
             theirMultText.text = s.ShowHpBalances ? s.TheirHpAfter.ToString() : multLabel;
             yield return new WaitForSeconds(AfterSideValue);
 
-            // 単騎で倍になるのは負けた側だけ。**今まで画面のどこにも出ていなかった行。**
+            if (hasBonus)
+            {
+                yield return new WaitForSeconds(.35f);
+                panelGroup.alpha = .2f;
+                yield return PlaySettlementBonus(containerRt, s, ronTile, playerInfo, enemyInfo);
+                panelGroup.alpha = 1f;
+                SetBonusRowAlpha(panelGroup.transform, 1f);
+                // 増減はサーバー（チュートリアルは台本）の確定値だけ。途中の仮精算ではHPを動かさない。
+                myDeltaText.transform.parent.gameObject.SetActive(true);
+                myDeltaText.text = FormatDelta(s.MyDelta);
+                theirDeltaText.text = FormatDelta(s.TheirDelta);
+            }
+
+            // 単騎で倍になるのは負けた側だけ。
             if (s.IsTankiWait && tankiMine != null && tankiTheirs != null)
             {
                 // **ダッシュ `—`(U+2014) もフォントに無い。** ASCII のハイフンで代用する
@@ -359,17 +378,16 @@ namespace KillingMahjong.UI
                 yield return new WaitForSeconds(AfterTanki);
             }
 
-            // ④ 表を読み切る間。**パネルはこのあと消える**ので、ここが表を見られる最後の時間。
-            //
-            // **`myDeltaText` / `theirDeltaText` / `myHpText` / `theirHpText` には何も入れない。**
-            // 血の増減はこの下の演出が答えとして出すもので、先にパネルへ書くと山が消える。
-            // 行そのものも `BuildSettlementPanel` で非アクティブにしてある（out は署名維持のために残している）。
-            if (KillingMahjong.Managers.AudioManager.Instance != null)
+            // ④ 最終の内訳を読む間。ボーナス無しは従来どおり飛ぶ数字で答えを示す。
+            // ボーナス有りはカットイン後の表でも確定額を示してから、既存の血移動へ進む。
+            if (!previewOnly && KillingMahjong.Managers.AudioManager.Instance != null)
             {
                 KillingMahjong.Managers.AudioManager.Instance.PlayRankVoice(s.RankName);
             }
 
             yield return new WaitForSeconds(ReadHold);
+
+            if (previewOnly) yield break;
 
             // ⑤ 血が動く。**パネルを消しながら**素点の数字を持ち出す
             // 血を抜く直前に相手が一言しゃべる（BloodDrawLineRoutine）

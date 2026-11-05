@@ -24,7 +24,9 @@ namespace KillingMahjong.Tests
             Assert.That(type.GetField("MyHpAfter").GetValue(result), Is.EqualTo(0));
             Assert.That(type.GetField("MyDelta").GetValue(result), Is.EqualTo(-23600));
             Assert.That(type.GetProperty("MyShownDelta").GetValue(result), Is.EqualTo(-remainingHp));
-            Assert.That(type.GetProperty("TheirShownDelta").GetValue(result), Is.EqualTo(5000), "儲けは0でも自分の掛け金は返還される");
+            Assert.That(type.GetField("TheirHpBefore").GetValue(result), Is.EqualTo(20000), "掛け金5000は精算の演出前に返還する");
+            Assert.That(type.GetField("TheirHpAfter").GetValue(result), Is.EqualTo(20000));
+            Assert.That(type.GetProperty("TheirShownDelta").GetValue(result), Is.EqualTo(0), "返還を強襲の獲得として表示しない");
             Assert.That(type.GetField("TotalHan").GetValue(result), Is.EqualTo(13));
             Assert.That(type.GetField("AssaultApplied").GetValue(result), Is.True);
             Assert.That(type.GetField("AssaultBonusDamage").GetValue(result), Is.EqualTo(22000));

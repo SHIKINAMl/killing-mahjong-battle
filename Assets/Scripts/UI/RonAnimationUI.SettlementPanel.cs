@@ -135,6 +135,7 @@ namespace KillingMahjong.UI
             if (s.IsTankiWait)
             {
                 GameObject tankiRow = MakeBox(body.transform, Color.clear, 0, 1);
+                tankiRow.name = "TankiRow";
                 MakeText(tankiRow.transform, "単騎待ち", 18f, PanelFaint, TextAlignmentOptions.Left, true);
                 tankiMine = MakeText(tankiRow.transform, "", 21f, AccentGold, TextAlignmentOptions.Right, false, ValueColumn);
                 tankiTheirs = MakeText(tankiRow.transform, "", 21f, AccentGold, TextAlignmentOptions.Right, false, ValueColumn);
@@ -144,6 +145,7 @@ namespace KillingMahjong.UI
             if (s.AssaultApplied)
             {
                 GameObject assaultRow = MakeBox(body.transform, Color.clear, 0, 1);
+                assaultRow.name = "AssaultRow";
                 MakeText(assaultRow.transform, "強襲", 18f, PanelFaint, TextAlignmentOptions.Left, true);
                 MakeText(assaultRow.transform, s.LocalWon ? "獲得なし" : "+" + s.AssaultBonusDamage, 20f, AccentGold, TextAlignmentOptions.Right, false, ValueColumn);
                 MakeText(assaultRow.transform, s.LocalWon ? "+" + s.AssaultBonusDamage : "獲得なし", 20f, AccentGold, TextAlignmentOptions.Right, false, ValueColumn);
@@ -152,6 +154,7 @@ namespace KillingMahjong.UI
             MakeRule(body.transform);
 
             GameObject deltaRow = MakeBox(body.transform, Color.clear, 0, 2);
+            deltaRow.name = "DeltaRow";
             MakeText(deltaRow.transform, "血", 22f, PanelInk, TextAlignmentOptions.Left, true);
             myDeltaText = MakeText(deltaRow.transform, "", 30f, AccentMine, TextAlignmentOptions.Right, false, ValueColumn);
             theirDeltaText = MakeText(deltaRow.transform, "", 30f, AccentThem, TextAlignmentOptions.Right, false, ValueColumn);

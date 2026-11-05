@@ -222,7 +222,7 @@ namespace KillingMahjong.UI
             }
 
             yield return SettlementRoutine(containerRt, container, settlement,
-                playerInfo, enemyInfo, prevLocalHp, newLocalHp, prevEnemyHp, newEnemyHp);
+                playerInfo, enemyInfo, prevLocalHp, newLocalHp, prevEnemyHp, newEnemyHp, ronTile);
 
             onComplete?.Invoke();
         }
