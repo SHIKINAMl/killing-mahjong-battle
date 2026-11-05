@@ -127,9 +127,6 @@ namespace KillingMahjong.UI
             }
             else
             {
-                var rays = new GameObject("TileRays", typeof(RectTransform), typeof(PixelShapeGraphic)).GetComponent<PixelShapeGraphic>();
-                rays.transform.SetParent(rt, false); rays.raycastTarget = false;
-                rays.rectTransform.sizeDelta = new Vector2(800, 600);
                 var tile = BonusImage(rt, "WinningTile", tileResourceManager != null && ronTile >= 0
                     ? tileResourceManager.GetTileSprite(ronTile) : null, new Vector2(0, 75), new Vector2(88, 112));
                 // 不明な牌IDでは別の牌を捏造しない。見出しはそのまま出せる。
@@ -138,6 +135,10 @@ namespace KillingMahjong.UI
                 var note = BonusText(rt, "2倍ボーナス", new Vector2(0, -50), 25, AccentGold);
                 if (s.AssaultApplied)
                 {
+                    var rays = new GameObject("TileRays", typeof(RectTransform), typeof(PixelShapeGraphic)).GetComponent<PixelShapeGraphic>();
+                    rays.transform.SetParent(rt, false); rays.raycastTarget = false;
+                    rays.rectTransform.sizeDelta = new Vector2(800, 600);
+                    rays.transform.SetSiblingIndex(tile.transform.GetSiblingIndex());
                     group.alpha = 0;
                     for (float t = 0; t < .7f; t += Time.deltaTime)
                     {
@@ -148,7 +149,7 @@ namespace KillingMahjong.UI
                     yield return PlayFangBite(rt, tile.rectTransform, title, note);
                     yield return new WaitForSeconds(.65f);
                 }
-                else yield return PlayTankiBonus(group, dim, rays, tile, title, note);
+                else yield return PlayTankiBonus(group, tile, title, note);
             }
             for (float t = 0; t < .2f; t += Time.deltaTime)
             { group.alpha = 1 - Mathf.Clamp01(t / .2f); yield return null; }
@@ -189,88 +190,51 @@ namespace KillingMahjong.UI
             g.End();
         }
 
-        private static IEnumerator PlayTankiBonus(CanvasGroup group, Image dim, PixelShapeGraphic shapes,
-            Image tile, TextMeshProUGUI title, TextMeshProUGUI note)
+        private static IEnumerator PlayTankiBonus(CanvasGroup group, Image tile,
+            TextMeshProUGUI title, TextMeshProUGUI note)
         {
-            const float FocusTime = .22f;
-            const float StampTime = .13f;
-            const float RevealTime = .16f;
-            var center = tile.rectTransform.anchoredPosition;
-            var raised = center + new Vector2(0, 32f);
-            dim.color = new Color(0f, 0f, 0f, .59f);
-            title.alpha = note.alpha = 0f;
-            note.fontSize = 32f;
-            note.rectTransform.anchoredPosition = new Vector2(0f, -67f);
-            group.alpha = 0f;
+            const float TileFadeIn = .24f;
+            const float BloomTime = .30f;
+            var glow = new GameObject("TankiGlow", typeof(RectTransform), typeof(RawImage)).GetComponent<RawImage>();
+            glow.transform.SetParent(tile.transform.parent, false);
+            glow.transform.SetSiblingIndex(tile.transform.GetSiblingIndex());
+            glow.raycastTarget = false;
+            glow.texture = Resources.Load<Texture2D>("UI/TankiBonusGlow");
+            glow.enabled = tile.enabled && glow.texture != null;
+            glow.rectTransform.sizeDelta = new Vector2(450f, 450f);
+            glow.rectTransform.anchoredPosition = tile.rectTransform.anchoredPosition;
+            glow.color = Color.clear;
 
-            for (float elapsed = 0f; elapsed < FocusTime; elapsed += Time.deltaTime)
+            title.alpha = note.alpha = 0f;
+            note.fontSize = 30f;
+            note.rectTransform.anchoredPosition = new Vector2(0f, -59f);
+            group.alpha = 0f;
+            tile.color = Color.clear;
+            for (float elapsed = 0f; elapsed < TileFadeIn; elapsed += Time.deltaTime)
             {
-                float time = Mathf.Clamp01(elapsed / FocusTime);
-                float close = time * time;
-                group.alpha = Mathf.Clamp01(time * 2f);
-                tile.rectTransform.anchoredPosition = Vector2.Lerp(raised, center, close);
-                DrawTankiFocus(shapes, center, tile.enabled, 1f - close, 0f, 0f);
+                float fade = Mathf.SmoothStep(0f, 1f, elapsed / TileFadeIn);
+                group.alpha = fade;
+                tile.color = new Color(1f, 1f, 1f, fade);
                 yield return null;
             }
 
             group.alpha = 1f;
-            tile.rectTransform.anchoredPosition = center;
-            title.alpha = 1f;
-            if (tile.enabled)
-                AudioManager.Instance?.PlayStingerPitched("se_hit", 1.22f, AudioManager.PitchJitter.None, .65f);
-            for (float elapsed = 0f; elapsed < StampTime; elapsed += Time.deltaTime)
+            tile.color = Color.white;
+            AudioManager.Instance?.PlayStinger("se_tanki_bonus", AudioManager.PitchJitter.None);
+            for (float elapsed = 0f; elapsed < BloomTime; elapsed += Time.deltaTime)
             {
-                float time = Mathf.Clamp01(elapsed / StampTime);
-                tile.rectTransform.localScale = Vector3.Lerp(new Vector3(1.07f, .94f, 1f), Vector3.one, time);
-                DrawTankiFocus(shapes, center, tile.enabled, 0f, 1f - time, 0f);
+                float bloom = Mathf.SmoothStep(0f, 1f, elapsed / .16f);
+                float settle = Mathf.SmoothStep(0f, 1f, (elapsed - .16f) / .14f);
+                glow.color = new Color(1f, 1f, 1f, bloom * Mathf.Lerp(1f, .78f, settle));
+                glow.rectTransform.localScale = Vector3.one * Mathf.Lerp(.56f, 1f, bloom);
+                title.alpha = Mathf.SmoothStep(0f, 1f, (elapsed - .04f) / .12f);
+                note.alpha = Mathf.SmoothStep(0f, 1f, (elapsed - .12f) / .16f);
                 yield return null;
             }
 
-            tile.rectTransform.localScale = Vector3.one;
-            AudioManager.Instance?.PlayStingerPitched("se_bet_confirm", 1.12f, AudioManager.PitchJitter.None, .72f);
-            for (float elapsed = 0f; elapsed < RevealTime; elapsed += Time.deltaTime)
-            {
-                float reveal = Mathf.SmoothStep(0f, 1f, elapsed / RevealTime);
-                note.alpha = reveal;
-                DrawTankiFocus(shapes, center, tile.enabled, 0f, 0f, reveal);
-                yield return null;
-            }
-            note.alpha = 1f;
-            DrawTankiFocus(shapes, center, tile.enabled, 0f, 0f, 1f);
+            glow.color = new Color(1f, 1f, 1f, .78f);
+            title.alpha = note.alpha = 1f;
             yield return new WaitForSeconds(.58f);
-        }
-
-        private static void DrawTankiFocus(PixelShapeGraphic shapes, Vector2 center, bool hasTile,
-            float spread, float impact, float reveal)
-        {
-            shapes.Begin();
-            if (hasTile)
-            {
-                Color gold = Color.Lerp(AccentGold, PanelInk, impact);
-                for (int x = -1; x <= 1; x += 2)
-                for (int y = -1; y <= 1; y += 2)
-                {
-                    var corner = center + new Vector2(x * (60f + 32f * spread), y * (67f + 23f * spread));
-                    shapes.Line(corner, corner - new Vector2(x * 19f, 0f), 3f, gold);
-                    shapes.Line(corner, corner - new Vector2(0f, y * 14f), 3f, gold);
-                    if (impact > 0f)
-                    {
-                        var direction = new Vector2(x, y);
-                        var start = corner + direction * Mathf.Lerp(28f, 4f, impact);
-                        var spark = new Color(1f, .83f, .44f, impact);
-                        shapes.Line(start, start + direction * (10f + 9f * impact), 3f, spark);
-                    }
-                }
-            }
-
-            if (reveal > 0f)
-            {
-                float width = 132f * reveal;
-                shapes.Box(-width, -89f, width, -45f, new Color(.12f, .06f, .03f, .91f));
-                shapes.Box(-width, -47f, width, -45f, AccentGold);
-                shapes.Box(-width, -89f, width, -87f, AccentGold);
-            }
-            shapes.End();
         }
 
         private static IEnumerator PlayFangBite(RectTransform parent, RectTransform tile,
