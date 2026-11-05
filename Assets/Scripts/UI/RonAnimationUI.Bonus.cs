@@ -200,9 +200,27 @@ namespace KillingMahjong.UI
             var opacity = jaws.GetComponent<CanvasGroup>();
             opacity.blocksRaycasts = false;
 
+            var smearFrames = new[]
+            {
+                Resources.Load<Texture2D>("UI/AssaultFangsSmearLong"),
+                Resources.Load<Texture2D>("UI/AssaultFangsSmearShort")
+            };
+            var smear = new GameObject("FangSmearFrame", typeof(RectTransform), typeof(RawImage)).GetComponent<RawImage>();
+            smear.transform.SetParent(jaws.transform, false);
+            smear.rectTransform.sizeDelta = new Vector2(PanelWidth, PanelWidth * .75f);
+            smear.rectTransform.anchoredPosition = tilePosition;
+            smear.raycastTarget = false;
+            smear.enabled = false;
+
+            // 噛みついた絵の透過余白を除いた横幅と中心。精算表と同じ幅に合わせる。
+            const float PaintedBiteWidth = 322f;
+            const float PaintedBiteCenterX = -22f;
+            float biteWidthScale = PanelWidth / PaintedBiteWidth;
+            var teeth = new GameObject("FangTeeth", typeof(RectTransform)).GetComponent<RectTransform>();
+            teeth.SetParent(jaws.transform, false);
+            teeth.anchoredPosition = tilePosition;
             var images = new RawImage[2];
-            var trails = new RectTransform[2];
-            var bite = new[] { tilePosition + new Vector2(-14, 44), tilePosition + new Vector2(14, -44) };
+            var bite = new[] { new Vector2(-14, 44), new Vector2(14, -44) };
             var ready = new[] { bite[0] + new Vector2(-133, 102), bite[1] + new Vector2(133, -102) };
             var open = new Vector2[2];
             for (int jaw = 0; jaw < images.Length; jaw++)
@@ -210,19 +228,9 @@ namespace KillingMahjong.UI
                 var texture = Resources.Load<Texture2D>(jaw == 0 ? "UI/AssaultFangsUpper" : "UI/AssaultFangsLower");
                 var direction = (ready[jaw] - bite[jaw]).normalized;
                 open[jaw] = ready[jaw] + direction * 14f;
-                var trailRoot = new GameObject("FangTrail", typeof(RectTransform)).GetComponent<RectTransform>();
-                trailRoot.SetParent(jaws.transform, false);
-                float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
-                trailRoot.localRotation = Quaternion.Euler(0, 0, angle);
-                var trail = CreateFangImage(trailRoot, "Stretch", texture);
-                trail.rectTransform.localRotation = Quaternion.Euler(0, 0, 20 - angle);
-                trail.color = new Color(1f, .82f, .77f, .70f);
-                trailRoot.gameObject.SetActive(false);
-                trails[jaw] = trailRoot;
-                images[jaw] = CreateFangImage(jaws.transform, "Fang", texture);
+                images[jaw] = CreateFangImage(teeth, "Fang", texture);
                 images[jaw].rectTransform.anchoredPosition = ready[jaw];
             }
-            foreach (var image in images) image.transform.SetAsLastSibling();
             var impact = new GameObject("FangImpact", typeof(RectTransform), typeof(PixelShapeGraphic))
                 .GetComponent<PixelShapeGraphic>();
             impact.transform.SetParent(jaws.transform, false);
@@ -242,25 +250,22 @@ namespace KillingMahjong.UI
                     images[jaw].rectTransform.anchoredPosition = Vector2.Lerp(ready[jaw], open[jaw], progress);
                 yield return null;
             }
+            teeth.localScale = new Vector3(biteWidthScale, 1f, 1f);
+            var biteOffset = new Vector2(-PaintedBiteCenterX * biteWidthScale, 0f);
+            teeth.anchoredPosition = tilePosition + biteOffset;
             for (int jaw = 0; jaw < images.Length; jaw++) images[jaw].rectTransform.anchoredPosition = bite[jaw];
             title.alpha = note.alpha = 0;
             AudioManager.Instance?.PlayAssaultSE();
 
-            // 1コマ目で着弾。残像だけを2コマで短くする。
-            for (int frame = 0; frame < 2; frame++)
+            // 着弾位置は固定し、描き分けた長い残像と短い残像を1コマずつ重ねる。
+            for (int frame = 0; frame < smearFrames.Length; frame++)
             {
-                float trailLength = frame == 0 ? 1f : .5f;
-                for (int jaw = 0; jaw < images.Length; jaw++)
-                {
-                    var trail = trails[jaw];
-                    trail.anchoredPosition = Vector2.Lerp(bite[jaw], open[jaw], trailLength * .5f);
-                    trail.localScale = new Vector3(1 + trailLength * .85f, 1, 1);
-                    trail.gameObject.SetActive(true);
-                }
+                smear.texture = smearFrames[frame];
+                smear.enabled = smear.texture != null;
                 DrawFangImpact(impact, frame == 0 ? 1f : .5f);
                 yield return null;
             }
-            foreach (var trail in trails) trail.gameObject.SetActive(false);
+            smear.enabled = false;
             impact.gameObject.SetActive(false);
             // 3コマ目は噛みついた姿。そのままさらに2コマ待つ。
             for (int frame = 0; frame < 3; frame++) yield return null;
@@ -270,8 +275,11 @@ namespace KillingMahjong.UI
             for (float elapsed = 0; elapsed < Retreat; elapsed += Time.deltaTime)
             {
                 float progress = Mathf.Clamp01(elapsed / Retreat);
+                float movement = Mathf.SmoothStep(0, 1, progress);
+                teeth.localScale = new Vector3(Mathf.Lerp(biteWidthScale, 1f, movement), 1f, 1f);
+                teeth.anchoredPosition = tilePosition + Vector2.Lerp(biteOffset, Vector2.zero, movement);
                 for (int jaw = 0; jaw < images.Length; jaw++)
-                    images[jaw].rectTransform.anchoredPosition = Vector2.Lerp(bite[jaw], ready[jaw], Mathf.SmoothStep(0, 1, progress));
+                    images[jaw].rectTransform.anchoredPosition = Vector2.Lerp(bite[jaw], ready[jaw], movement);
                 opacity.alpha = 1 - progress;
                 title.alpha = note.alpha = progress;
                 yield return null;
