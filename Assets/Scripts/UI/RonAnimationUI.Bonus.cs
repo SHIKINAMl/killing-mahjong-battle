@@ -14,17 +14,100 @@ namespace KillingMahjong.UI
         public const string AssaultBonusEffectId = "ron.bonus_assault";
         public const string TankiAssaultEffectId = "ron.bonus_tanki_assault";
 
-        private static void SetBonusRowAlpha(Transform panel, float alpha)
+        private static void SetSettlementRowAlpha(Transform row, float alpha)
         {
-            foreach (string name in new[] { "TankiRow", "AssaultRow" })
+            var group = row.GetComponent<CanvasGroup>();
+            if (group == null) group = row.gameObject.AddComponent<CanvasGroup>();
+            group.alpha = alpha;
+            group.blocksRaycasts = false;
+        }
+
+        private static void PrepareBonusSettlement(Transform panel)
+        {
+            foreach (string rowName in new[] { "TankiRow", "AssaultRow", "DeltaRow" })
             {
-                var row = panel.Find("Body/" + name);
+                var row = panel.Find("Body/" + rowName);
                 if (row == null) continue;
-                var group = row.GetComponent<CanvasGroup>();
-                if (group == null) group = row.gameObject.AddComponent<CanvasGroup>();
-                group.alpha = alpha;
-                group.blocksRaycasts = false;
+                SetSettlementRowAlpha(row, 0f);
+                row.gameObject.SetActive(true);
             }
+        }
+
+        private static IEnumerator RevealBonusSettlement(Transform panel, RonSettlementInfo settlement)
+        {
+            var result = panel.Find("Body/DeltaRow");
+            var myValue = result.GetChild(1).GetComponent<TextMeshProUGUI>();
+            var theirValue = result.GetChild(2).GetComponent<TextMeshProUGUI>();
+            int winnerColumn = settlement.LocalWon ? 1 : 2;
+            int loserColumn = settlement.LocalWon ? 2 : 1;
+
+            if (settlement.IsTankiWait)
+            {
+                var tanki = panel.Find("Body/TankiRow");
+                tanki.GetChild(winnerColumn).GetComponent<TextMeshProUGUI>().text = "-";
+                tanki.GetChild(loserColumn).GetComponent<TextMeshProUGUI>().text = "×2";
+                SetSettlementRowAlpha(tanki, 1f);
+                yield return SweepSettlementCells(AccentGold, .36f, (RectTransform)tanki.GetChild(loserColumn));
+                if (panel == null) yield break;
+            }
+
+            if (settlement.AssaultApplied)
+            {
+                var assault = panel.Find("Body/AssaultRow");
+                SetSettlementRowAlpha(assault, 1f);
+                yield return SweepSettlementCells(AccentGold, .46f,
+                    (RectTransform)assault.GetChild(winnerColumn), (RectTransform)assault.GetChild(loserColumn));
+                if (panel == null) yield break;
+            }
+
+            ShowSettledDelta(myValue, settlement.MyDelta);
+            ShowSettledDelta(theirValue, settlement.TheirDelta);
+            SetSettlementRowAlpha(result, 1f);
+            yield return SweepSettlementCells(PanelInk, .25f, myValue.rectTransform, theirValue.rectTransform);
+        }
+
+        private static void ShowSettledDelta(TextMeshProUGUI text, int delta)
+        {
+            HpNumberStyle.Apply(text, delta);
+            if (delta == 0) text.color = PanelFaint;
+            text.text = FormatDelta(delta);
+        }
+
+        private static IEnumerator SweepSettlementCells(Color tint, float duration, params RectTransform[] cells)
+        {
+            var highlights = new Image[cells.Length];
+            for (int i = 0; i < cells.Length; i++)
+            {
+                // テキストより背面で、列の幅に沿って下線が走る。
+                var highlight = new GameObject("SettlementUnderline", typeof(RectTransform), typeof(Image)).GetComponent<Image>();
+                highlight.transform.SetParent(cells[i].parent, false);
+                highlight.transform.SetSiblingIndex(0);
+                highlight.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
+                highlight.raycastTarget = false;
+                var rect = highlight.rectTransform;
+                rect.anchorMin = rect.anchorMax = Vector2.zero;
+                rect.pivot = Vector2.zero;
+                highlights[i] = highlight;
+            }
+
+            for (float t = 0f; t < duration; t += Time.deltaTime)
+            {
+                float progress = t / duration;
+                tint.a = 1f - Mathf.SmoothStep(0f, 1f, (progress - .42f) / .58f);
+                for (int i = 0; i < cells.Length; i++)
+                {
+                    if (cells[i] == null) yield break;
+                    var cell = cells[i];
+                    var rect = highlights[i].rectTransform;
+                    rect.localPosition = cell.localPosition - (Vector3)Vector2.Scale(cell.pivot, cell.rect.size);
+                    rect.sizeDelta = new Vector2(cell.rect.width * Mathf.SmoothStep(0f, 1f, progress / .42f), 2f);
+                    highlights[i].color = tint;
+                }
+                yield return null;
+            }
+
+            foreach (var highlight in highlights)
+                if (highlight != null) Destroy(highlight.gameObject);
         }
 
         // 台本の強襲説明が終わってから呼ぶ。表は残し、HP転送は従来の台本側が行う。
@@ -36,24 +119,15 @@ namespace KillingMahjong.UI
             if (!settlement.IsTankiWait && !settlement.AssaultApplied) yield break;
             var panel = _tutorialSettlementPanel;
             var group = panel.GetComponent<CanvasGroup>();
-            SetBonusRowAlpha(panel, 0f);
-            var delta = panel.Find("Body/DeltaRow");
-            if (delta != null) delta.gameObject.SetActive(false);
+            PrepareBonusSettlement(panel);
             yield return new WaitForSeconds(.7f);
-            if (_tutorialSettlementContainer == null) yield break;
+            if (panel == null || _tutorialSettlementContainer == null) yield break;
             group.alpha = .2f;
             yield return PlaySettlementBonus((RectTransform)_tutorialSettlementContainer.transform,
                 settlement, ronTile, player, enemy);
             if (panel == null) yield break;
             group.alpha = 1f;
-            SetBonusRowAlpha(panel, 1f);
-            if (delta != null)
-            {
-                var labels = delta.GetComponentsInChildren<TextMeshProUGUI>(true);
-                labels[1].text = FormatDelta(settlement.MyDelta);
-                labels[2].text = FormatDelta(settlement.TheirDelta);
-                delta.gameObject.SetActive(true);
-            }
+            yield return RevealBonusSettlement(panel, settlement);
         }
 
         // コレクションも本編と同じ表・同じ演出を使う。HP・通信・戦績には触れない。

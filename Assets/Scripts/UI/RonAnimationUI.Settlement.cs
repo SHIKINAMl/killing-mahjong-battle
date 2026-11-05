@@ -47,7 +47,6 @@ namespace KillingMahjong.UI
         private const float AfterSideValue = 0.30f;
 
         /// <summary>単騎待ちの行を出したあとの間。0.25 → 0.45</summary>
-        private const float AfterTanki = 0.45f;
 
         /// <summary>表を読み切らせる最後の静止。0.80 → 1.50</summary>
         private const float ReadHold = 1.5f;
@@ -328,8 +327,7 @@ namespace KillingMahjong.UI
 
             // 行の場所は先に確保し、単騎・強襲の答えはカットイン後に出す。
             bool hasBonus = s.IsTankiWait || s.AssaultApplied;
-            SetBonusRowAlpha(panelGroup.transform, 0f);
-            if (hasBonus) myDeltaText.transform.parent.gameObject.SetActive(false);
+            if (hasBonus) PrepareBonusSettlement(panelGroup.transform);
 
             // 枠がフェードインする。ここではまだ数字は入っていない
             const float fadeIn = PanelFadeIn;
@@ -362,20 +360,7 @@ namespace KillingMahjong.UI
                 panelGroup.alpha = .2f;
                 yield return PlaySettlementBonus(containerRt, s, ronTile, playerInfo, enemyInfo);
                 panelGroup.alpha = 1f;
-                SetBonusRowAlpha(panelGroup.transform, 1f);
-                // 増減はサーバー（チュートリアルは台本）の確定値だけ。途中の仮精算ではHPを動かさない。
-                myDeltaText.transform.parent.gameObject.SetActive(true);
-                myDeltaText.text = FormatDelta(s.MyDelta);
-                theirDeltaText.text = FormatDelta(s.TheirDelta);
-            }
-
-            // 単騎で倍になるのは負けた側だけ。
-            if (s.IsTankiWait && tankiMine != null && tankiTheirs != null)
-            {
-                // **ダッシュ `—`(U+2014) もフォントに無い。** ASCII のハイフンで代用する
-                tankiMine.text = s.LocalWon ? "-" : "×2";
-                tankiTheirs.text = s.LocalWon ? "×2" : "-";
-                yield return new WaitForSeconds(AfterTanki);
+                yield return RevealBonusSettlement(panelGroup.transform, s);
             }
 
             // ④ 最終の内訳を読む間。ボーナス無しは従来どおり飛ぶ数字で答えを示す。
