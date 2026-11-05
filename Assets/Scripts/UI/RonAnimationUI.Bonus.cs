@@ -195,6 +195,7 @@ namespace KillingMahjong.UI
             const float FadeIn = .36f;
             const float Retreat = .30f;
             const float WindUp = .065f;
+            const float SmearHold = .10f;
             var jaws = new GameObject("BitingFangs", typeof(RectTransform), typeof(CanvasGroup));
             jaws.transform.SetParent(parent, false);
             var opacity = jaws.GetComponent<CanvasGroup>();
@@ -257,17 +258,22 @@ namespace KillingMahjong.UI
             title.alpha = note.alpha = 0;
             AudioManager.Instance?.PlayAssaultSE();
 
-            // 着弾位置は固定し、描き分けた長い残像と短い残像を1コマずつ重ねる。
+            // 着弾位置は固定し、各残像を通常再生でも見分けられる長さだけ残す。
             for (int frame = 0; frame < smearFrames.Length; frame++)
             {
                 smear.texture = smearFrames[frame];
                 smear.enabled = smear.texture != null;
                 DrawFangImpact(impact, frame == 0 ? 1f : .5f);
-                yield return null;
+                bool fading = frame == smearFrames.Length - 1;
+                for (float elapsed = 0; elapsed < SmearHold; elapsed += Time.deltaTime)
+                {
+                    smear.color = new Color(1f, 1f, 1f, fading ? 1f - elapsed / SmearHold : 1f);
+                    yield return null;
+                }
             }
             smear.enabled = false;
             impact.gameObject.SetActive(false);
-            // 3コマ目は噛みついた姿。そのままさらに2コマ待つ。
+            // 残像が消えた後も、噛みついた姿を3コマ見せる。
             for (int frame = 0; frame < 3; frame++) yield return null;
 
             title.text = "単騎強襲"; title.color = AccentThem;
