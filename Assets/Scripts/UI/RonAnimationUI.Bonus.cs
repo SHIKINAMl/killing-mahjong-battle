@@ -180,24 +180,17 @@ namespace KillingMahjong.UI
             tile.enabled = tile.sprite != null;
             var title = BonusText(rt, "単騎", new Vector2(0, -8), 52, PanelInk);
             var note = BonusText(rt, "2倍ボーナス", new Vector2(0, -50), 25, AccentGold);
+            var glow = CreateTankiGlow(tile);
+            yield return RevealTankiBonus(group, tile, glow, title, note);
             if (s.AssaultApplied)
             {
-                var glow = CreateTankiGlow(tile);
-                glow.color = new Color(1f, 1f, 1f, .56f);
-                group.alpha = 0f;
-                for (float t = 0f; t < .7f; t += Time.deltaTime)
-                {
-                    float reveal = Mathf.Clamp01(t / .2f);
-                    group.alpha = reveal;
-                    glow.rectTransform.localScale = Vector3.one * Mathf.Lerp(.64f, 1f, reveal);
-                    yield return null;
-                }
-                group.alpha = 1f;
-                glow.rectTransform.localScale = Vector3.one;
-                yield return PlayFangBite(rt, tile.rectTransform, title, note);
-                yield return new WaitForSeconds(.65f);
+                yield return PlayFangBite(rt, tile.rectTransform, glow, title, note);
+                yield return new WaitForSeconds(.50f);
             }
-            else yield return PlayTankiBonus(group, tile, title, note);
+            else
+            {
+                yield return new WaitForSeconds(.58f);
+            }
             for (float t = 0; t < .2f; t += Time.deltaTime)
             { group.alpha = 1 - Mathf.Clamp01(t / .2f); yield return null; }
             group.alpha = 0;
@@ -326,14 +319,12 @@ namespace KillingMahjong.UI
             return glow;
         }
 
-        private static IEnumerator PlayTankiBonus(CanvasGroup group, Image tile,
+        private static IEnumerator RevealTankiBonus(CanvasGroup group, Image tile, RawImage glow,
             TextMeshProUGUI title, TextMeshProUGUI note)
         {
-            const float TileFadeIn = .24f;
-            const float BloomTime = .30f;
-            var glow = CreateTankiGlow(tile);
+            const float TileFadeIn = .19f;
+            const float BloomTime = .28f;
             glow.color = Color.clear;
-
             title.alpha = note.alpha = 0f;
             note.fontSize = 30f;
             note.rectTransform.anchoredPosition = new Vector2(0f, -59f);
@@ -352,29 +343,29 @@ namespace KillingMahjong.UI
             AudioManager.Instance?.PlayStinger("se_tanki_bonus", AudioManager.PitchJitter.None);
             for (float elapsed = 0f; elapsed < BloomTime; elapsed += Time.deltaTime)
             {
-                float bloom = Mathf.SmoothStep(0f, 1f, elapsed / .16f);
-                float settle = Mathf.SmoothStep(0f, 1f, (elapsed - .16f) / .14f);
-                glow.color = new Color(1f, 1f, 1f, bloom * Mathf.Lerp(1f, .78f, settle));
-                glow.rectTransform.localScale = Vector3.one * Mathf.Lerp(.56f, 1f, bloom);
-                title.alpha = Mathf.SmoothStep(0f, 1f, (elapsed - .04f) / .12f);
-                note.alpha = Mathf.SmoothStep(0f, 1f, (elapsed - .12f) / .16f);
+                // 牌の後ろで小さな光が一度弾け、外側の輪まで広がる。
+                float scale = elapsed < .035f ? .62f : elapsed < .070f ? .84f : 1f;
+                float alpha = elapsed < .070f ? .88f : Mathf.Lerp(1f, .72f, (elapsed - .070f) / .15f);
+                glow.rectTransform.localScale = Vector3.one * scale;
+                glow.color = new Color(1f, 1f, 1f, alpha);
+                title.alpha = Mathf.SmoothStep(0f, 1f, (elapsed - .06f) / .09f);
+                note.alpha = Mathf.SmoothStep(0f, 1f, (elapsed - .13f) / .10f);
                 yield return null;
             }
 
-            glow.color = new Color(1f, 1f, 1f, .78f);
+            glow.rectTransform.localScale = Vector3.one;
+            glow.color = new Color(1f, 1f, 1f, .72f);
             title.alpha = note.alpha = 1f;
-            yield return new WaitForSeconds(.58f);
         }
 
-        private static IEnumerator PlayFangBite(RectTransform parent, RectTransform tile,
+        private static IEnumerator PlayFangBite(RectTransform parent, RectTransform tile, RawImage glow,
             TextMeshProUGUI title, TextMeshProUGUI note)
         {
-            const float FadeIn = .36f;
+            const float FadeIn = .24f;
             const float Retreat = .30f;
-            const float ReadyHold = .05f;
-            const float WindUp = .15f;
-            const float SmearHold = .10f;
-            const float BiteHold = .10f;
+            const float ReadyHold = .06f;
+            const float WindUp = .19f;
+            const float BiteHold = .14f;
             const float TileRelease = .12f;
             Vector2 tilePosition = tile.anchoredPosition;
             Vector3 tileScale = tile.localScale;
@@ -412,7 +403,7 @@ namespace KillingMahjong.UI
             };
             var bite = new[] { new Vector2(-14, 44), new Vector2(14, -44) };
             var ready = new[] { bite[0] + new Vector2(-133, 82), bite[1] + new Vector2(133, -90) };
-            var open = new[] { ready[0] + new Vector2(-12, 36), ready[1] + new Vector2(12, -36) };
+            var open = new[] { ready[0] + new Vector2(-18, 48), ready[1] + new Vector2(18, -48) };
             for (int jaw = 0; jaw < images.Length; jaw++)
             {
                 var texture = Resources.Load<Texture2D>(jaw == 0 ? "UI/AssaultFangsUpper" : "UI/AssaultFangsLower");
@@ -434,7 +425,9 @@ namespace KillingMahjong.UI
             yield return new WaitForSeconds(ReadyHold);
             for (float elapsed = 0; elapsed < WindUp; elapsed += Time.deltaTime)
             {
-                float progress = Mathf.SmoothStep(0, 1, (elapsed + Time.deltaTime) / WindUp);
+                // 開き切るまでを三つの姿勢で見せ、次のフレームで牌へ飛ぶ。
+                float progress = elapsed < .05f ? .28f : elapsed < .11f ? .68f : 1f;
+                glow.color = new Color(1f, 1f, 1f, Mathf.Lerp(.72f, .43f, progress));
                 for (int jaw = 0; jaw < images.Length; jaw++)
                     images[jaw].rectTransform.anchoredPosition = Vector2.Lerp(ready[jaw], open[jaw], progress);
                 yield return null;
@@ -450,23 +443,23 @@ namespace KillingMahjong.UI
             tile.anchoredPosition = pressedPosition;
             tile.localScale = pressedScale;
             title.alpha = note.alpha = 0;
+            glow.color = new Color(1f, .83f, .63f, .96f);
             AudioManager.Instance?.PlayStinger("se_fang_bite", AudioManager.PitchJitter.None);
 
-            // 着弾位置は固定し、各残像を通常再生でも見分けられる長さだけ残す。
+            // 長い残像と短い残像はそれぞれ一枚の絵として見せる。
             for (int frame = 0; frame < smearFrames.Length; frame++)
             {
+                bool first = frame == 0;
                 smear.texture = smearFrames[frame];
                 smear.enabled = smear.texture != null;
-                DrawFangImpact(impact, frame == 0 ? 1f : .5f);
-                bool fading = frame == smearFrames.Length - 1;
-                for (float elapsed = 0; elapsed < SmearHold; elapsed += Time.deltaTime)
-                {
-                    smear.color = new Color(1f, 1f, 1f, fading ? 1f - elapsed / SmearHold : 1f);
-                    yield return null;
-                }
+                smear.color = new Color(1f, 1f, 1f, first ? 1f : .82f);
+                DrawFangImpact(impact, first ? 1f : .42f);
+                glow.color = new Color(1f, .83f, .63f, first ? .96f : .34f);
+                yield return new WaitForSeconds(first ? .075f : .095f);
             }
             smear.enabled = false;
             impact.gameObject.SetActive(false);
+            glow.color = new Color(1f, .83f, .63f, .18f);
             // 残像が消えてから、牙が牌を挟んだ姿をひと呼吸残す。
             yield return new WaitForSeconds(BiteHold);
 
@@ -484,11 +477,13 @@ namespace KillingMahjong.UI
                 for (int jaw = 0; jaw < images.Length; jaw++)
                     images[jaw].rectTransform.anchoredPosition = Vector2.Lerp(bite[jaw], ready[jaw], movement);
                 opacity.alpha = 1 - progress;
+                glow.color = new Color(1f, .83f, .63f, Mathf.Lerp(.18f, .40f, release));
                 title.alpha = note.alpha = progress;
                 yield return null;
             }
             tile.anchoredPosition = tilePosition;
             tile.localScale = tileScale;
+            glow.color = new Color(1f, .83f, .63f, .40f);
             jaws.SetActive(false);
             Destroy(jaws);
             title.alpha = note.alpha = 1;
