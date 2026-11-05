@@ -194,29 +194,40 @@ namespace KillingMahjong.UI
         {
             const float FadeIn = .36f;
             const float Retreat = .30f;
-            const int TrailCopies = 8;
+            const float WindUp = .065f;
             var jaws = new GameObject("BitingFangs", typeof(RectTransform), typeof(CanvasGroup));
             jaws.transform.SetParent(parent, false);
             var opacity = jaws.GetComponent<CanvasGroup>();
             opacity.blocksRaycasts = false;
 
             var images = new RawImage[2];
-            var trails = new RawImage[2, TrailCopies];
-            var bite = new[] { tilePosition + new Vector2(-15, 57), tilePosition + new Vector2(14, -58) };
-            var ready = new[] { bite[0] + new Vector2(-136, 99), bite[1] + new Vector2(136, -99) };
+            var trails = new RectTransform[2];
+            var bite = new[] { tilePosition + new Vector2(-14, 44), tilePosition + new Vector2(14, -44) };
+            var ready = new[] { bite[0] + new Vector2(-133, 102), bite[1] + new Vector2(133, -102) };
+            var open = new Vector2[2];
             for (int jaw = 0; jaw < images.Length; jaw++)
             {
                 var texture = Resources.Load<Texture2D>(jaw == 0 ? "UI/AssaultFangsUpper" : "UI/AssaultFangsLower");
-                for (int copy = 0; copy < TrailCopies; copy++)
-                {
-                    var trail = CreateFangImage(jaws.transform, "FangTrail", texture);
-                    trail.gameObject.SetActive(false);
-                    trails[jaw, copy] = trail;
-                }
+                var direction = (ready[jaw] - bite[jaw]).normalized;
+                open[jaw] = ready[jaw] + direction * 14f;
+                var trailRoot = new GameObject("FangTrail", typeof(RectTransform)).GetComponent<RectTransform>();
+                trailRoot.SetParent(jaws.transform, false);
+                float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
+                trailRoot.localRotation = Quaternion.Euler(0, 0, angle);
+                var trail = CreateFangImage(trailRoot, "Stretch", texture);
+                trail.rectTransform.localRotation = Quaternion.Euler(0, 0, 20 - angle);
+                trail.color = new Color(1f, .82f, .77f, .70f);
+                trailRoot.gameObject.SetActive(false);
+                trails[jaw] = trailRoot;
                 images[jaw] = CreateFangImage(jaws.transform, "Fang", texture);
                 images[jaw].rectTransform.anchoredPosition = ready[jaw];
             }
             foreach (var image in images) image.transform.SetAsLastSibling();
+            var impact = new GameObject("FangImpact", typeof(RectTransform), typeof(PixelShapeGraphic))
+                .GetComponent<PixelShapeGraphic>();
+            impact.transform.SetParent(jaws.transform, false);
+            impact.raycastTarget = false;
+            impact.rectTransform.anchoredPosition = tilePosition;
 
             for (float elapsed = 0; elapsed < FadeIn; elapsed += Time.deltaTime)
             {
@@ -224,6 +235,13 @@ namespace KillingMahjong.UI
                 yield return null;
             }
             opacity.alpha = 1;
+            for (float elapsed = 0; elapsed < WindUp; elapsed += Time.deltaTime)
+            {
+                float progress = Mathf.SmoothStep(0, 1, (elapsed + Time.deltaTime) / WindUp);
+                for (int jaw = 0; jaw < images.Length; jaw++)
+                    images[jaw].rectTransform.anchoredPosition = Vector2.Lerp(ready[jaw], open[jaw], progress);
+                yield return null;
+            }
             for (int jaw = 0; jaw < images.Length; jaw++) images[jaw].rectTransform.anchoredPosition = bite[jaw];
             title.alpha = note.alpha = 0;
             AudioManager.Instance?.PlayAssaultSE();
@@ -231,18 +249,19 @@ namespace KillingMahjong.UI
             // 1コマ目で着弾。残像だけを2コマで短くする。
             for (int frame = 0; frame < 2; frame++)
             {
+                float trailLength = frame == 0 ? 1f : .5f;
                 for (int jaw = 0; jaw < images.Length; jaw++)
-                for (int copy = 0; copy < TrailCopies; copy++)
                 {
-                    float fraction = (copy + 1f) / TrailCopies;
-                    var trail = trails[jaw, copy];
-                    trail.rectTransform.anchoredPosition = Vector2.Lerp(bite[jaw], ready[jaw], fraction * (frame == 0 ? 1f : .5f));
-                    trail.color = new Color(1, 1, 1, Mathf.Lerp(.44f, .08f, fraction));
+                    var trail = trails[jaw];
+                    trail.anchoredPosition = Vector2.Lerp(bite[jaw], open[jaw], trailLength * .5f);
+                    trail.localScale = new Vector3(1 + trailLength * .85f, 1, 1);
                     trail.gameObject.SetActive(true);
                 }
+                DrawFangImpact(impact, frame == 0 ? 1f : .5f);
                 yield return null;
             }
             foreach (var trail in trails) trail.gameObject.SetActive(false);
+            impact.gameObject.SetActive(false);
             // 3コマ目は噛みついた姿。そのままさらに2コマ待つ。
             for (int frame = 0; frame < 3; frame++) yield return null;
 
@@ -260,6 +279,17 @@ namespace KillingMahjong.UI
             jaws.SetActive(false);
             Destroy(jaws);
             title.alpha = note.alpha = 1;
+        }
+
+        private static void DrawFangImpact(PixelShapeGraphic impact, float strength)
+        {
+            var color = new Color(1f, .78f, .58f, strength);
+            impact.Begin();
+            impact.Line(new Vector2(-51, 6), new Vector2(-93, -1), 4 * strength, color);
+            impact.Line(new Vector2(-48, -17), new Vector2(-75, -38), 3 * strength, color);
+            impact.Line(new Vector2(49, 7), new Vector2(95, 15), 4 * strength, color);
+            impact.Line(new Vector2(46, 26), new Vector2(70, 49), 3 * strength, color);
+            impact.End();
         }
 
         private static RawImage CreateFangImage(Transform parent, string name, Texture2D texture)
