@@ -145,25 +145,7 @@ namespace KillingMahjong.UI
                 group.alpha = 1;
                 if (s.AssaultApplied)
                 {
-                    var jaws = new GameObject("BitingFangs", typeof(RectTransform), typeof(PixelShapeGraphic)).GetComponent<PixelShapeGraphic>();
-                    jaws.transform.SetParent(rt, false); jaws.raycastTarget = false;
-                    jaws.rectTransform.sizeDelta = new Vector2(800, 600);
-                    // 奥から上下の歯列が迫り、単騎の牌を噛む。
-                    for (float t = 0; t < .32f; t += Time.deltaTime)
-                    { DrawBonusFangs(jaws, Mathf.Clamp01(t / .32f), 0); yield return null; }
-                    DrawBonusFangs(jaws, 1, 0);
-                    AudioManager.Instance?.PlayAssaultSE();
-                    title.alpha = note.alpha = 0;
-                    yield return new WaitForSeconds(.10f);
-                    title.text = "単騎強襲"; title.color = AccentThem;
-                    note.text = "2倍ダメージ";
-                    for (float t = 0; t < .2f; t += Time.deltaTime)
-                    {
-                        float p = Mathf.Clamp01(t / .2f);
-                        DrawBonusFangs(jaws, 1, p * 540);
-                        title.alpha = note.alpha = p; yield return null;
-                    }
-                    jaws.gameObject.SetActive(false); title.alpha = note.alpha = 1;
+                    yield return PlayFangBite(rt, tile.rectTransform.anchoredPosition, title, note);
                     yield return new WaitForSeconds(.65f);
                 }
                 else yield return new WaitForSeconds(.45f);
@@ -207,31 +189,89 @@ namespace KillingMahjong.UI
             g.End();
         }
 
-        // 既存ドットUIと同じ2pxの段。歯の輪郭を黒、面を生成りで描く。
-        private static void DrawBonusFangs(PixelShapeGraphic g, float close, float rise)
+        private static IEnumerator PlayFangBite(RectTransform parent, Vector2 tilePosition,
+            TextMeshProUGUI title, TextMeshProUGUI note)
         {
-            g.Begin();
-            float gap = Mathf.Lerp(300, 42, close);
-            for (int side = -1; side <= 1; side += 2)
-            for (int k = -4; k <= 4; k++)
+            const float FadeIn = .36f;
+            const float Retreat = .30f;
+            const int TrailCopies = 8;
+            var jaws = new GameObject("BitingFangs", typeof(RectTransform), typeof(CanvasGroup));
+            jaws.transform.SetParent(parent, false);
+            var opacity = jaws.GetComponent<CanvasGroup>();
+            opacity.blocksRaycasts = false;
+
+            var images = new RawImage[2];
+            var trails = new RawImage[2, TrailCopies];
+            var bite = new[] { tilePosition + new Vector2(-15, 57), tilePosition + new Vector2(14, -58) };
+            var ready = new[] { bite[0] + new Vector2(-136, 99), bite[1] + new Vector2(136, -99) };
+            for (int jaw = 0; jaw < images.Length; jaw++)
             {
-                float x = k * 58;
-                float length = Mathf.Abs(k) == 3 ? 118 : 76;
-                float baseY = 70 + side * (gap + 45 + Mathf.Abs(k) * 6) + rise;
-                for (float step = 0; step < length; step += 4)
+                var texture = Resources.Load<Texture2D>(jaw == 0 ? "UI/AssaultFangsUpper" : "UI/AssaultFangsLower");
+                for (int copy = 0; copy < TrailCopies; copy++)
                 {
-                    float half = Mathf.Round(Mathf.Lerp(27, 3, step / length) / 2) * 2;
-                    float y = baseY - side * step;
-                    g.Box(x - half - 3, y - 3, x + half + 3, y + 5, Color.black);
+                    var trail = CreateFangImage(jaws.transform, "FangTrail", texture);
+                    trail.gameObject.SetActive(false);
+                    trails[jaw, copy] = trail;
                 }
-                for (float step = 4; step < length - 4; step += 4)
-                {
-                    float half = Mathf.Round(Mathf.Lerp(24, 1, step / length) / 2) * 2;
-                    float y = baseY - side * step;
-                    g.Box(x - half, y - 1, x + half, y + 4, PanelInk);
-                }
+                images[jaw] = CreateFangImage(jaws.transform, "Fang", texture);
+                images[jaw].rectTransform.anchoredPosition = ready[jaw];
             }
-            g.End();
+            foreach (var image in images) image.transform.SetAsLastSibling();
+
+            for (float elapsed = 0; elapsed < FadeIn; elapsed += Time.deltaTime)
+            {
+                opacity.alpha = Mathf.SmoothStep(0, 1, elapsed / FadeIn);
+                yield return null;
+            }
+            opacity.alpha = 1;
+            for (int jaw = 0; jaw < images.Length; jaw++) images[jaw].rectTransform.anchoredPosition = bite[jaw];
+            title.alpha = note.alpha = 0;
+            AudioManager.Instance?.PlayAssaultSE();
+
+            // 1コマ目で着弾。残像だけを2コマで短くする。
+            for (int frame = 0; frame < 2; frame++)
+            {
+                for (int jaw = 0; jaw < images.Length; jaw++)
+                for (int copy = 0; copy < TrailCopies; copy++)
+                {
+                    float fraction = (copy + 1f) / TrailCopies;
+                    var trail = trails[jaw, copy];
+                    trail.rectTransform.anchoredPosition = Vector2.Lerp(bite[jaw], ready[jaw], fraction * (frame == 0 ? 1f : .5f));
+                    trail.color = new Color(1, 1, 1, Mathf.Lerp(.44f, .08f, fraction));
+                    trail.gameObject.SetActive(true);
+                }
+                yield return null;
+            }
+            foreach (var trail in trails) trail.gameObject.SetActive(false);
+            // 3コマ目は噛みついた姿。そのままさらに2コマ待つ。
+            for (int frame = 0; frame < 3; frame++) yield return null;
+
+            title.text = "単騎強襲"; title.color = AccentThem;
+            note.text = "2倍ダメージ";
+            for (float elapsed = 0; elapsed < Retreat; elapsed += Time.deltaTime)
+            {
+                float progress = Mathf.Clamp01(elapsed / Retreat);
+                for (int jaw = 0; jaw < images.Length; jaw++)
+                    images[jaw].rectTransform.anchoredPosition = Vector2.Lerp(bite[jaw], ready[jaw], Mathf.SmoothStep(0, 1, progress));
+                opacity.alpha = 1 - progress;
+                title.alpha = note.alpha = progress;
+                yield return null;
+            }
+            jaws.SetActive(false);
+            Destroy(jaws);
+            title.alpha = note.alpha = 1;
+        }
+
+        private static RawImage CreateFangImage(Transform parent, string name, Texture2D texture)
+        {
+            var image = new GameObject(name, typeof(RectTransform), typeof(RawImage)).GetComponent<RawImage>();
+            image.transform.SetParent(parent, false);
+            image.texture = texture;
+            image.enabled = texture != null;
+            image.raycastTarget = false;
+            if (texture != null) image.rectTransform.sizeDelta = new Vector2(texture.width, texture.height) * .43f;
+            image.rectTransform.localRotation = Quaternion.Euler(0, 0, 20);
+            return image;
         }
     }
 }
