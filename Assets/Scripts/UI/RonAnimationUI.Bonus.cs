@@ -145,7 +145,7 @@ namespace KillingMahjong.UI
                 group.alpha = 1;
                 if (s.AssaultApplied)
                 {
-                    yield return PlayFangBite(rt, tile.rectTransform.anchoredPosition, title, note);
+                    yield return PlayFangBite(rt, tile.rectTransform, title, note);
                     yield return new WaitForSeconds(.65f);
                 }
                 else yield return new WaitForSeconds(.45f);
@@ -189,13 +189,19 @@ namespace KillingMahjong.UI
             g.End();
         }
 
-        private static IEnumerator PlayFangBite(RectTransform parent, Vector2 tilePosition,
+        private static IEnumerator PlayFangBite(RectTransform parent, RectTransform tile,
             TextMeshProUGUI title, TextMeshProUGUI note)
         {
             const float FadeIn = .36f;
             const float Retreat = .30f;
             const float WindUp = .065f;
             const float SmearHold = .10f;
+            const float BiteHold = .08f;
+            const float TileRelease = .12f;
+            Vector2 tilePosition = tile.anchoredPosition;
+            Vector3 tileScale = tile.localScale;
+            Vector2 pressedPosition = tilePosition + new Vector2(4f, -8f);
+            Vector3 pressedScale = Vector3.Scale(tileScale, new Vector3(1.04f, .92f, 1f));
             var jaws = new GameObject("BitingFangs", typeof(RectTransform), typeof(CanvasGroup));
             jaws.transform.SetParent(parent, false);
             var opacity = jaws.GetComponent<CanvasGroup>();
@@ -255,6 +261,8 @@ namespace KillingMahjong.UI
             var biteOffset = new Vector2(-PaintedBiteCenterX * biteWidthScale, 0f);
             teeth.anchoredPosition = tilePosition + biteOffset;
             for (int jaw = 0; jaw < images.Length; jaw++) images[jaw].rectTransform.anchoredPosition = bite[jaw];
+            tile.anchoredPosition = pressedPosition;
+            tile.localScale = pressedScale;
             title.alpha = note.alpha = 0;
             AudioManager.Instance?.PlayAssaultSE();
 
@@ -273,8 +281,8 @@ namespace KillingMahjong.UI
             }
             smear.enabled = false;
             impact.gameObject.SetActive(false);
-            // 残像が消えた後も、噛みついた姿を3コマ見せる。
-            for (int frame = 0; frame < 3; frame++) yield return null;
+            // 残像が消えてから、牙が牌を挟んだ姿をひと呼吸残す。
+            yield return new WaitForSeconds(BiteHold);
 
             title.text = "単騎強襲"; title.color = AccentThem;
             note.text = "2倍ダメージ";
@@ -282,6 +290,9 @@ namespace KillingMahjong.UI
             {
                 float progress = Mathf.Clamp01(elapsed / Retreat);
                 float movement = Mathf.SmoothStep(0, 1, progress);
+                float release = Mathf.SmoothStep(0, 1, elapsed / TileRelease);
+                tile.anchoredPosition = Vector2.Lerp(pressedPosition, tilePosition, release);
+                tile.localScale = Vector3.Lerp(pressedScale, tileScale, release);
                 teeth.localScale = new Vector3(Mathf.Lerp(biteWidthScale, 1f, movement), 1f, 1f);
                 teeth.anchoredPosition = tilePosition + Vector2.Lerp(biteOffset, Vector2.zero, movement);
                 for (int jaw = 0; jaw < images.Length; jaw++)
@@ -290,6 +301,8 @@ namespace KillingMahjong.UI
                 title.alpha = note.alpha = progress;
                 yield return null;
             }
+            tile.anchoredPosition = tilePosition;
+            tile.localScale = tileScale;
             jaws.SetActive(false);
             Destroy(jaws);
             title.alpha = note.alpha = 1;
