@@ -182,17 +182,18 @@ namespace KillingMahjong.UI
             var note = BonusText(rt, "2倍ボーナス", new Vector2(0, -50), 25, AccentGold);
             if (s.AssaultApplied)
             {
-                var rays = new GameObject("TileRays", typeof(RectTransform), typeof(PixelShapeGraphic)).GetComponent<PixelShapeGraphic>();
-                rays.transform.SetParent(rt, false); rays.raycastTarget = false;
-                rays.rectTransform.sizeDelta = new Vector2(800, 600);
-                rays.transform.SetSiblingIndex(tile.transform.GetSiblingIndex());
-                group.alpha = 0;
-                for (float t = 0; t < .7f; t += Time.deltaTime)
+                var glow = CreateTankiGlow(tile);
+                glow.color = new Color(1f, 1f, 1f, .56f);
+                group.alpha = 0f;
+                for (float t = 0f; t < .7f; t += Time.deltaTime)
                 {
-                    group.alpha = Mathf.Clamp01(t / .2f);
-                    DrawBonusRays(rays, t); yield return null;
+                    float reveal = Mathf.Clamp01(t / .2f);
+                    group.alpha = reveal;
+                    glow.rectTransform.localScale = Vector3.one * Mathf.Lerp(.64f, 1f, reveal);
+                    yield return null;
                 }
-                group.alpha = 1;
+                group.alpha = 1f;
+                glow.rectTransform.localScale = Vector3.one;
                 yield return PlayFangBite(rt, tile.rectTransform, title, note);
                 yield return new WaitForSeconds(.65f);
             }
@@ -312,25 +313,8 @@ namespace KillingMahjong.UI
             return text;
         }
 
-        private static void DrawBonusRays(PixelShapeGraphic g, float time)
+        private static RawImage CreateTankiGlow(Image tile)
         {
-            g.Begin();
-            var center = new Vector2(0, 75);
-            for (int k = 0; k < 12; k++)
-            {
-                float a = k * Mathf.PI / 6;
-                Vector2 dir = new Vector2(Mathf.Cos(a), Mathf.Sin(a));
-                float radius = 110 + (k % 2) * 30 + Mathf.Min(time * 35, 20);
-                g.Line(center + dir * 55, center + dir * radius, k % 2 == 0 ? 6 : 3, new Color(1, .8f, .2f, .65f));
-            }
-            g.End();
-        }
-
-        private static IEnumerator PlayTankiBonus(CanvasGroup group, Image tile,
-            TextMeshProUGUI title, TextMeshProUGUI note)
-        {
-            const float TileFadeIn = .24f;
-            const float BloomTime = .30f;
             var glow = new GameObject("TankiGlow", typeof(RectTransform), typeof(RawImage)).GetComponent<RawImage>();
             glow.transform.SetParent(tile.transform.parent, false);
             glow.transform.SetSiblingIndex(tile.transform.GetSiblingIndex());
@@ -339,6 +323,15 @@ namespace KillingMahjong.UI
             glow.enabled = tile.enabled && glow.texture != null;
             glow.rectTransform.sizeDelta = new Vector2(450f, 450f);
             glow.rectTransform.anchoredPosition = tile.rectTransform.anchoredPosition;
+            return glow;
+        }
+
+        private static IEnumerator PlayTankiBonus(CanvasGroup group, Image tile,
+            TextMeshProUGUI title, TextMeshProUGUI note)
+        {
+            const float TileFadeIn = .24f;
+            const float BloomTime = .30f;
+            var glow = CreateTankiGlow(tile);
             glow.color = Color.clear;
 
             title.alpha = note.alpha = 0f;
@@ -519,7 +512,8 @@ namespace KillingMahjong.UI
             image.texture = texture;
             image.enabled = texture != null;
             image.raycastTarget = false;
-            if (texture != null) image.rectTransform.sizeDelta = new Vector2(texture.width, texture.height) * .43f;
+            // 牙素材を1/5のドットに描き直しても、牌に食い込む位置と表示寸法は元のまま。
+            if (texture != null) image.rectTransform.sizeDelta = new Vector2(texture.width, texture.height) * 2.15f;
             image.rectTransform.localRotation = Quaternion.Euler(0, 0, 20);
             return image;
         }
