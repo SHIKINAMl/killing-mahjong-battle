@@ -22,15 +22,21 @@ namespace KillingMahjong.UI
             group.blocksRaycasts = false;
         }
 
-        private static void PrepareBonusSettlement(Transform panel)
+        private static void PrepareBonusSettlement(Transform panel, RonSettlementInfo settlement)
         {
-            foreach (string rowName in new[] { "TankiRow", "AssaultRow", "DeltaRow" })
+            foreach (string rowName in new[] { "TankiRow", "AssaultRow" })
             {
                 var row = panel.Find("Body/" + rowName);
                 if (row == null) continue;
                 SetSettlementRowAlpha(row, 0f);
                 row.gameObject.SetActive(true);
             }
+
+            // ボーナス行を読む間も、サーバー確定の増減は同じ位置に残す。
+            var result = panel.Find("Body/DeltaRow");
+            ShowSettledDelta(result.GetChild(1).GetComponent<TextMeshProUGUI>(), settlement.MyDelta);
+            ShowSettledDelta(result.GetChild(2).GetComponent<TextMeshProUGUI>(), settlement.TheirDelta);
+            result.gameObject.SetActive(true);
         }
 
         private static IEnumerator RevealBonusSettlement(Transform panel, RonSettlementInfo settlement)
@@ -60,9 +66,6 @@ namespace KillingMahjong.UI
                 if (panel == null) yield break;
             }
 
-            ShowSettledDelta(myValue, settlement.MyDelta);
-            ShowSettledDelta(theirValue, settlement.TheirDelta);
-            SetSettlementRowAlpha(result, 1f);
             yield return SweepSettlementCells(PanelInk, .25f, myValue.rectTransform, theirValue.rectTransform);
         }
 
@@ -118,15 +121,12 @@ namespace KillingMahjong.UI
             if (settlement == null || _tutorialSettlementPanel == null) yield break;
             if (!settlement.IsTankiWait && !settlement.AssaultApplied) yield break;
             var panel = _tutorialSettlementPanel;
-            var group = panel.GetComponent<CanvasGroup>();
-            PrepareBonusSettlement(panel);
+            PrepareBonusSettlement(panel, settlement);
             yield return new WaitForSeconds(.7f);
             if (panel == null || _tutorialSettlementContainer == null) yield break;
-            group.alpha = .2f;
             yield return PlaySettlementBonus((RectTransform)_tutorialSettlementContainer.transform,
                 settlement, ronTile, player, enemy);
             if (panel == null) yield break;
-            group.alpha = 1f;
             yield return RevealBonusSettlement(panel, settlement);
         }
 
@@ -163,7 +163,7 @@ namespace KillingMahjong.UI
             rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one; rt.sizeDelta = Vector2.zero;
             var group = root.GetComponent<CanvasGroup>(); group.blocksRaycasts = false;
             var dim = new GameObject("BonusDim", typeof(RectTransform), typeof(Image)).GetComponent<Image>();
-            dim.transform.SetParent(rt, false); dim.color = new Color(0, 0, 0, .45f); dim.raycastTarget = false;
+            dim.transform.SetParent(rt, false); dim.color = new Color(0, 0, 0, .20f); dim.raycastTarget = false;
             dim.rectTransform.anchorMin = Vector2.zero; dim.rectTransform.anchorMax = Vector2.one;
             dim.rectTransform.sizeDelta = Vector2.zero;
 
@@ -174,22 +174,23 @@ namespace KillingMahjong.UI
                 yield break;
             }
 
+            float raise = s.AssaultApplied ? 24f : 0f;
             var tile = BonusImage(rt, "WinningTile", tileResourceManager != null && ronTile >= 0
-                ? tileResourceManager.GetTileSprite(ronTile) : null, new Vector2(0, 75), new Vector2(88, 112));
+                ? tileResourceManager.GetTileSprite(ronTile) : null, new Vector2(0, 75 + raise), new Vector2(88, 112));
             // 不明な牌IDでは別の牌を捏造しない。見出しはそのまま出せる。
             tile.enabled = tile.sprite != null;
-            var title = BonusText(rt, "単騎", new Vector2(0, -8), 52, PanelInk);
-            var note = BonusText(rt, "2倍ボーナス", new Vector2(0, -50), 25, AccentGold);
+            var title = BonusText(rt, "単騎", new Vector2(0, -8 + raise), 52, PanelInk);
+            var note = BonusText(rt, "2倍ボーナス", new Vector2(0, -50 + raise), 25, AccentGold);
             var glow = CreateTankiGlow(tile);
             yield return RevealTankiBonus(group, tile, glow, title, note);
             if (s.AssaultApplied)
             {
                 yield return PlayFangBite(rt, tile.rectTransform, glow, title, note);
-                yield return new WaitForSeconds(.50f);
+                yield return new WaitForSeconds(.62f);
             }
             else
             {
-                yield return new WaitForSeconds(.58f);
+                yield return new WaitForSeconds(.80f);
             }
             for (float t = 0; t < .2f; t += Time.deltaTime)
             { group.alpha = 1 - Mathf.Clamp01(t / .2f); yield return null; }
@@ -262,7 +263,7 @@ namespace KillingMahjong.UI
             band.anchoredPosition = bandPosition;
             band.localScale = Vector3.one;
             group.alpha = 1f;
-            yield return new WaitForSeconds(.57f);
+            yield return new WaitForSeconds(.80f);
 
             const float Exit = .15f;
             for (float t = 0f; t < Exit; t += Time.deltaTime)
@@ -327,7 +328,7 @@ namespace KillingMahjong.UI
             glow.color = Color.clear;
             title.alpha = note.alpha = 0f;
             note.fontSize = 30f;
-            note.rectTransform.anchoredPosition = new Vector2(0f, -59f);
+            note.rectTransform.anchoredPosition += Vector2.down * 9f;
             group.alpha = 0f;
             tile.color = Color.clear;
             for (float elapsed = 0f; elapsed < TileFadeIn; elapsed += Time.deltaTime)
@@ -361,11 +362,11 @@ namespace KillingMahjong.UI
         private static IEnumerator PlayFangBite(RectTransform parent, RectTransform tile, RawImage glow,
             TextMeshProUGUI title, TextMeshProUGUI note)
         {
-            const float FadeIn = .24f;
+            const float Entry = .29f;
             const float Retreat = .30f;
-            const float ReadyHold = .06f;
-            const float WindUp = .19f;
-            const float BiteHold = .14f;
+            const float ReadyHold = .14f;
+            const float WindUp = .25f;
+            const float BiteHold = .20f;
             const float TileRelease = .12f;
             Vector2 tilePosition = tile.anchoredPosition;
             Vector3 tileScale = tile.localScale;
@@ -383,7 +384,7 @@ namespace KillingMahjong.UI
             };
             var smear = new GameObject("FangSmearFrame", typeof(RectTransform), typeof(RawImage)).GetComponent<RawImage>();
             smear.transform.SetParent(jaws.transform, false);
-            smear.rectTransform.sizeDelta = new Vector2(PanelWidth, PanelWidth * .75f);
+            smear.rectTransform.sizeDelta = new Vector2(parent.rect.width * 1.08f, parent.rect.height * .81f);
             smear.rectTransform.anchoredPosition = tilePosition;
             smear.raycastTarget = false;
             smear.enabled = false;
@@ -402,13 +403,24 @@ namespace KillingMahjong.UI
                 Resources.Load<Texture2D>("UI/AssaultFangsBiteLower")
             };
             var bite = new[] { new Vector2(-14, 44), new Vector2(14, -44) };
-            var ready = new[] { bite[0] + new Vector2(-133, 82), bite[1] + new Vector2(133, -90) };
-            var open = new[] { ready[0] + new Vector2(-18, 48), ready[1] + new Vector2(18, -48) };
+            Vector2 halfScreen = parent.rect.size * .5f;
+            // 左上と右下の画面外から入り、中央を大きく挟む位置で構える。
+            var outside = new[]
+            {
+                new Vector2(-halfScreen.x - 210f, halfScreen.y + 100f) - tilePosition,
+                new Vector2(halfScreen.x + 160f, -halfScreen.y - 100f) - tilePosition,
+            };
+            var ready = new[]
+            {
+                new Vector2(-halfScreen.x * .56f, halfScreen.y * .69f) - tilePosition,
+                new Vector2(halfScreen.x * .61f, -halfScreen.y * .48f) - tilePosition,
+            };
+            var open = new[] { ready[0] + new Vector2(-28f, 33f), ready[1] + new Vector2(28f, -33f) };
             for (int jaw = 0; jaw < images.Length; jaw++)
             {
                 var texture = Resources.Load<Texture2D>(jaw == 0 ? "UI/AssaultFangsUpper" : "UI/AssaultFangsLower");
                 images[jaw] = CreateFangImage(teeth, "Fang", texture);
-                images[jaw].rectTransform.anchoredPosition = ready[jaw];
+                images[jaw].rectTransform.anchoredPosition = outside[jaw];
             }
             var impact = new GameObject("FangImpact", typeof(RectTransform), typeof(PixelShapeGraphic))
                 .GetComponent<PixelShapeGraphic>();
@@ -416,17 +428,23 @@ namespace KillingMahjong.UI
             impact.raycastTarget = false;
             impact.rectTransform.anchoredPosition = tilePosition;
 
-            for (float elapsed = 0; elapsed < FadeIn; elapsed += Time.deltaTime)
+            for (float elapsed = 0; elapsed < Entry; elapsed += Time.deltaTime)
             {
-                opacity.alpha = Mathf.SmoothStep(0, 1, elapsed / FadeIn);
+                float progress = elapsed / Entry;
+                float brake = 1f - Mathf.Pow(1f - progress, 3f);
+                opacity.alpha = Mathf.Clamp01(progress * 4f);
+                for (int jaw = 0; jaw < images.Length; jaw++)
+                    images[jaw].rectTransform.anchoredPosition = Vector2.Lerp(outside[jaw], ready[jaw], brake);
                 yield return null;
             }
-            opacity.alpha = 1;
+            opacity.alpha = 1f;
+            for (int jaw = 0; jaw < images.Length; jaw++)
+                images[jaw].rectTransform.anchoredPosition = ready[jaw];
             yield return new WaitForSeconds(ReadyHold);
             for (float elapsed = 0; elapsed < WindUp; elapsed += Time.deltaTime)
             {
                 // 開き切るまでを三つの姿勢で見せ、次のフレームで牌へ飛ぶ。
-                float progress = elapsed < .05f ? .28f : elapsed < .11f ? .68f : 1f;
+                float progress = elapsed < .05f ? .28f : elapsed < .12f ? .68f : 1f;
                 glow.color = new Color(1f, 1f, 1f, Mathf.Lerp(.72f, .43f, progress));
                 for (int jaw = 0; jaw < images.Length; jaw++)
                     images[jaw].rectTransform.anchoredPosition = Vector2.Lerp(ready[jaw], open[jaw], progress);
@@ -475,7 +493,7 @@ namespace KillingMahjong.UI
                 teeth.localScale = new Vector3(Mathf.Lerp(biteWidthScale, 1f, movement), 1f, 1f);
                 teeth.anchoredPosition = tilePosition + Vector2.Lerp(biteOffset, Vector2.zero, movement);
                 for (int jaw = 0; jaw < images.Length; jaw++)
-                    images[jaw].rectTransform.anchoredPosition = Vector2.Lerp(bite[jaw], ready[jaw], movement);
+                    images[jaw].rectTransform.anchoredPosition = Vector2.Lerp(bite[jaw], outside[jaw], movement);
                 opacity.alpha = 1 - progress;
                 glow.color = new Color(1f, .83f, .63f, Mathf.Lerp(.18f, .40f, release));
                 title.alpha = note.alpha = progress;

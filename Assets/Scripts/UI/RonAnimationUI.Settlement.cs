@@ -325,9 +325,9 @@ namespace KillingMahjong.UI
                 out tankiMine, out tankiTheirs,
                 out myDeltaText, out theirDeltaText, out myHpText, out theirHpText);
 
-            // 行の場所は先に確保し、単騎・強襲の答えはカットイン後に出す。
+            // 増減は先に表示し、単騎・強襲の内訳だけカットイン後に出す。
             bool hasBonus = s.IsTankiWait || s.AssaultApplied;
-            if (hasBonus) PrepareBonusSettlement(panelGroup.transform);
+            if (hasBonus) PrepareBonusSettlement(panelGroup.transform, s);
 
             // 枠がフェードインする。ここではまだ数字は入っていない
             const float fadeIn = PanelFadeIn;
@@ -356,10 +356,8 @@ namespace KillingMahjong.UI
 
             if (hasBonus)
             {
-                yield return new WaitForSeconds(.35f);
-                panelGroup.alpha = .2f;
+                yield return new WaitForSeconds(.50f);
                 yield return PlaySettlementBonus(containerRt, s, ronTile, playerInfo, enemyInfo);
-                panelGroup.alpha = 1f;
                 yield return RevealBonusSettlement(panelGroup.transform, s);
             }
 
