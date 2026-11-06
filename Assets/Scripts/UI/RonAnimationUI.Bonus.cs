@@ -32,10 +32,23 @@ namespace KillingMahjong.UI
                 row.gameObject.SetActive(true);
             }
 
-            // ボーナス行を読む間も、サーバー確定の増減は同じ位置に残す。
             var result = panel.Find("Body/DeltaRow");
-            ShowSettledDelta(result.GetChild(1).GetComponent<TextMeshProUGUI>(), settlement.MyDelta);
-            ShowSettledDelta(result.GetChild(2).GetComponent<TextMeshProUGUI>(), settlement.TheirDelta);
+            var myValue = result.GetChild(1).GetComponent<TextMeshProUGUI>();
+            var theirValue = result.GetChild(2).GetComponent<TextMeshProUGUI>();
+            if (settlement.AssaultApplied && !settlement.IsTankiWait)
+            {
+                // 通常精算は、勝者から敗者へ移した強襲分を表示上だけ戻して見せる。
+                var winnerValue = settlement.LocalWon ? myValue : theirValue;
+                var loserValue = settlement.LocalWon ? theirValue : myValue;
+                int loserDelta = settlement.LocalWon ? settlement.TheirDelta : settlement.MyDelta;
+                ShowSettledDelta(winnerValue, settlement.AssaultBonusDamage);
+                ShowSettledDelta(loserValue, loserDelta + settlement.AssaultBonusDamage);
+            }
+            else
+            {
+                ShowSettledDelta(myValue, settlement.MyDelta);
+                ShowSettledDelta(theirValue, settlement.TheirDelta);
+            }
             result.gameObject.SetActive(true);
         }
 
@@ -64,6 +77,11 @@ namespace KillingMahjong.UI
                 yield return SweepSettlementCells(AccentGold, .46f,
                     (RectTransform)assault.GetChild(winnerColumn), (RectTransform)assault.GetChild(loserColumn));
                 if (panel == null) yield break;
+                if (!settlement.IsTankiWait)
+                {
+                    ShowSettledDelta(myValue, settlement.MyDelta);
+                    ShowSettledDelta(theirValue, settlement.TheirDelta);
+                }
             }
 
             yield return SweepSettlementCells(PanelInk, .25f, myValue.rectTransform, theirValue.rectTransform);

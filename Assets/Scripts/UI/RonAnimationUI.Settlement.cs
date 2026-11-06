@@ -327,7 +327,10 @@ namespace KillingMahjong.UI
 
             // 増減は先に表示し、単騎・強襲の内訳だけカットイン後に出す。
             bool hasBonus = s.IsTankiWait || s.AssaultApplied;
+            bool assaultOnly = s.AssaultApplied && !s.IsTankiWait;
             if (hasBonus) PrepareBonusSettlement(panelGroup.transform, s);
+            var deltaRow = myDeltaText.transform.parent;
+            if (assaultOnly) SetSettlementRowAlpha(deltaRow, 0f);
 
             // 枠がフェードインする。ここではまだ数字は入っていない
             const float fadeIn = PanelFadeIn;
@@ -356,7 +359,8 @@ namespace KillingMahjong.UI
 
             if (hasBonus)
             {
-                yield return new WaitForSeconds(.50f);
+                if (assaultOnly) SetSettlementRowAlpha(deltaRow, 1f);
+                yield return new WaitForSeconds(assaultOnly ? .75f : .50f);
                 yield return PlaySettlementBonus(containerRt, s, ronTile, playerInfo, enemyInfo);
                 yield return RevealBonusSettlement(panelGroup.transform, s);
             }
