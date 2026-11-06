@@ -81,6 +81,7 @@ namespace KillingMahjong.UI
                 {
                     ShowSettledDelta(myValue, settlement.MyDelta);
                     ShowSettledDelta(theirValue, settlement.TheirDelta);
+                    AudioManager.Instance?.PlayStinger("se_assault_settlement_stamp", AudioManager.PitchJitter.None);
                 }
             }
 
@@ -268,7 +269,7 @@ namespace KillingMahjong.UI
             const float Entry = .16f;
             Vector2 start = bandPosition - new Vector2(420f, 118f);
             group.alpha = 0f;
-            AudioManager.Instance?.PlayAssaultSE();
+            AudioManager.Instance?.PlayStinger("se_assault_settlement_cutin", AudioManager.PitchJitter.None);
             for (float t = 0f; t < Entry; t += Time.deltaTime)
             {
                 float progress = t / Entry;
