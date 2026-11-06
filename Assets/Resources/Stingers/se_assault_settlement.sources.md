@@ -4,7 +4,8 @@
 
 | 使用箇所 | 素材 | 作者 | 素材ページ | プレビュー |
 | --- | --- | --- | --- | --- |
-| カットイン | whip01.wav | snowflakes | https://freesound.org/people/snowflakes/sounds/72189/ | https://cdn.freesound.org/previews/72/72189_1070711-hq.mp3 |
+| カットインの立ち上がり | Sword Unsheathe | SecureSubset | https://freesound.org/people/SecureSubset/sounds/788532/ | https://cdn.freesound.org/previews/788/788532_16752880-hq.mp3 |
+| カットインの金属の余韻 | Sword draw | xkeril | https://freesound.org/people/xkeril/sounds/666580/ | https://cdn.freesound.org/previews/666/666580_13504080-hq.mp3 |
 | 精算額更新 | stamp_4presses.wav | Mihacappy | https://freesound.org/people/Mihacappy/sounds/814248/ | https://cdn.freesound.org/previews/814/814248_10594370-hq.mp3 |
 
-カットインには風切りの0.054〜0.431秒を1.2倍速で使用。精算額更新にはスタンプの0.160〜0.282秒を使用。いずれも帯域、音量、末尾のフェードを調整。48kHz、モノラル、16bit PCM。
+カットインには抜刀音の0.156〜0.318秒を使い、金属の余韻（0.578〜1.250秒）を26ms遅らせて重ねた。精算額更新にはスタンプの0.160〜0.282秒を使用。いずれも帯域、音量、末尾のフェードを調整。48kHz、モノラル、16bit PCM。
