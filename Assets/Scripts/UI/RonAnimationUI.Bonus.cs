@@ -389,31 +389,46 @@ namespace KillingMahjong.UI
             smear.raycastTarget = false;
             smear.enabled = false;
 
-            // 噛みついた絵の透過余白を除いた横幅と中心。精算表と同じ幅に合わせる。
+            // 噛みつく瞬間は精算表より広げ、犬歯の先だけを牌の対角に残す。
             const float PaintedBiteWidth = 322f;
             const float PaintedBiteCenterX = -22f;
-            float biteWidthScale = PanelWidth / PaintedBiteWidth;
+            const float BiteWidthBoost = 1.34f;
+            const float BiteHeightBoost = 1.20f;
+            const float ApproachScale = 1.28f;
+            float biteWidthScale = PanelWidth / PaintedBiteWidth * BiteWidthBoost;
+            var biteScale = new Vector3(biteWidthScale, BiteHeightBoost, 1f);
+            var approachScale = new Vector3(ApproachScale, ApproachScale, 1f);
             var teeth = new GameObject("FangTeeth", typeof(RectTransform)).GetComponent<RectTransform>();
             teeth.SetParent(jaws.transform, false);
             teeth.anchoredPosition = tilePosition;
+            teeth.localScale = approachScale;
             var images = new RawImage[2];
             var biteTextures = new[]
             {
                 Resources.Load<Texture2D>("UI/AssaultFangsBiteUpper"),
                 Resources.Load<Texture2D>("UI/AssaultFangsBiteLower")
             };
-            var bite = new[] { new Vector2(-14, 44), new Vector2(14, -44) };
+            // 旧サイズで牌を挟んでいた、上と下の犬歯の先の位置（牌の原点からの差）。
+            var upperContact = new Vector2(26f, 1f);
+            var lowerContact = new Vector2(-21f, -42f);
+            var contactCorrection = new Vector2((1f - BiteWidthBoost) / biteScale.x,
+                (1f - BiteHeightBoost) / biteScale.y);
+            var bite = new[]
+            {
+                new Vector2(-14f, 44f) + Vector2.Scale(upperContact, contactCorrection),
+                new Vector2(14f, -44f) + Vector2.Scale(lowerContact, contactCorrection),
+            };
             Vector2 halfScreen = parent.rect.size * .5f;
             // 左上と右下の画面外から入り、中央を大きく挟む位置で構える。
             var outside = new[]
             {
-                new Vector2(-halfScreen.x - 210f, halfScreen.y + 100f) - tilePosition,
-                new Vector2(halfScreen.x + 160f, -halfScreen.y - 100f) - tilePosition,
+                (new Vector2(-halfScreen.x - 250f, halfScreen.y + 125f) - tilePosition) / ApproachScale,
+                (new Vector2(halfScreen.x + 190f, -halfScreen.y - 125f) - tilePosition) / ApproachScale,
             };
             var ready = new[]
             {
-                new Vector2(-halfScreen.x * .56f, halfScreen.y * .69f) - tilePosition,
-                new Vector2(halfScreen.x * .61f, -halfScreen.y * .48f) - tilePosition,
+                (new Vector2(-halfScreen.x * .56f, halfScreen.y * .64f) - tilePosition) / ApproachScale,
+                (new Vector2(halfScreen.x * .67f, -halfScreen.y * .46f) - tilePosition) / ApproachScale,
             };
             var open = new[] { ready[0] + new Vector2(-28f, 33f), ready[1] + new Vector2(28f, -33f) };
             for (int jaw = 0; jaw < images.Length; jaw++)
@@ -450,7 +465,7 @@ namespace KillingMahjong.UI
                     images[jaw].rectTransform.anchoredPosition = Vector2.Lerp(ready[jaw], open[jaw], progress);
                 yield return null;
             }
-            teeth.localScale = new Vector3(biteWidthScale, 1f, 1f);
+            teeth.localScale = biteScale;
             var biteOffset = new Vector2(-PaintedBiteCenterX * biteWidthScale, 0f);
             teeth.anchoredPosition = tilePosition + biteOffset;
             for (int jaw = 0; jaw < images.Length; jaw++)
@@ -490,7 +505,7 @@ namespace KillingMahjong.UI
                 float release = Mathf.SmoothStep(0, 1, elapsed / TileRelease);
                 tile.anchoredPosition = Vector2.Lerp(pressedPosition, tilePosition, release);
                 tile.localScale = Vector3.Lerp(pressedScale, tileScale, release);
-                teeth.localScale = new Vector3(Mathf.Lerp(biteWidthScale, 1f, movement), 1f, 1f);
+                teeth.localScale = Vector3.Lerp(biteScale, approachScale, movement);
                 teeth.anchoredPosition = tilePosition + Vector2.Lerp(biteOffset, Vector2.zero, movement);
                 for (int jaw = 0; jaw < images.Length; jaw++)
                     images[jaw].rectTransform.anchoredPosition = Vector2.Lerp(bite[jaw], outside[jaw], movement);
