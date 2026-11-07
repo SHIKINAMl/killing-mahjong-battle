@@ -201,11 +201,13 @@ namespace KillingMahjong.UI
             var title = BonusText(rt, "単騎", new Vector2(0, -8 + raise), 52, PanelInk);
             var note = BonusText(rt, "2倍ボーナス", new Vector2(0, -50 + raise), 25, AccentGold);
             var glow = CreateTankiGlow(tile);
-            yield return RevealTankiBonus(group, tile, glow, title, note);
+            // 単騎強襲は全体を強襲単独のカットイン（約1.1秒）と同じくらいに収める（2026-11-07 ユーザー指示
+            // 「もっとはやめて。強襲のみの時と同じぐらいの演出時間」）。単騎の光も倍速で流す。
+            yield return RevealTankiBonus(group, tile, glow, title, note, s.AssaultApplied ? .4f : 1f);
             if (s.AssaultApplied)
             {
                 yield return PlayFangBite(rt, tile.rectTransform, glow, title, note, dim);
-                yield return new WaitForSeconds(.62f);
+                yield return new WaitForSeconds(.05f);
             }
             else
             {
@@ -339,11 +341,12 @@ namespace KillingMahjong.UI
             return glow;
         }
 
+        /// <param name="pace">1 で通常。0.5 なら半分の時間で同じ流れを見せる。</param>
         private static IEnumerator RevealTankiBonus(CanvasGroup group, Image tile, RawImage glow,
-            TextMeshProUGUI title, TextMeshProUGUI note)
+            TextMeshProUGUI title, TextMeshProUGUI note, float pace = 1f)
         {
-            const float TileFadeIn = .19f;
-            const float BloomTime = .28f;
+            float TileFadeIn = .19f * pace;
+            float BloomTime = .28f * pace;
             glow.color = Color.clear;
             title.alpha = note.alpha = 0f;
             note.fontSize = 30f;
@@ -361,8 +364,9 @@ namespace KillingMahjong.UI
             group.alpha = 1f;
             tile.color = Color.white;
             AudioManager.Instance?.PlayStinger("se_tanki_bonus", AudioManager.PitchJitter.None);
-            for (float elapsed = 0f; elapsed < BloomTime; elapsed += Time.deltaTime)
+            for (float real = 0f; real < BloomTime; real += Time.deltaTime)
             {
+                float elapsed = real / pace; // 以下の刻みは通常の速さで書いてある
                 // 牌の後ろで小さな光が一度弾け、外側の輪まで広がる。
                 float scale = elapsed < .035f ? .62f : elapsed < .070f ? .84f : 1f;
                 float alpha = elapsed < .070f ? .88f : Mathf.Lerp(1f, .72f, (elapsed - .070f) / .15f);
@@ -401,13 +405,13 @@ namespace KillingMahjong.UI
             TextMeshProUGUI title, TextMeshProUGUI note, Image dim)
         {
             float baseDim = dim != null ? dim.color.a : 0f;
-            const float Emerge = .85f;
+            const float Emerge = .28f;
             const float MaterializeSteps = 6f;
-            const float Retreat = .30f;
-            const float ReadyHold = .14f;
-            const float WindUp = .25f;
-            const float BiteHold = .20f;
-            const float TileRelease = .12f;
+            const float Retreat = .20f;
+            const float ReadyHold = 0f;
+            const float WindUp = .10f;
+            const float BiteHold = .08f;
+            const float TileRelease = .08f;
             Vector2 tilePosition = tile.anchoredPosition;
             Vector3 tileScale = tile.localScale;
             Vector2 pressedPosition = tilePosition + new Vector2(4f, -8f);
@@ -505,7 +509,7 @@ namespace KillingMahjong.UI
             {
                 SetBiteDim(dim, baseDim, .6f + .4f * (ReadyHold + elapsed) / (ReadyHold + WindUp));
                 // 開き切るまでを三つの姿勢で見せ、次のフレームで牌へ飛ぶ。
-                float progress = elapsed < .05f ? .28f : elapsed < .12f ? .68f : 1f;
+                float progress = elapsed < WindUp * .2f ? .28f : elapsed < WindUp * .5f ? .68f : 1f;
                 glow.color = new Color(1f, 1f, 1f, Mathf.Lerp(.72f, .43f, progress));
                 for (int jaw = 0; jaw < images.Length; jaw++)
                     images[jaw].rectTransform.anchoredPosition = Vector2.Lerp(ready[jaw], open[jaw], progress);
@@ -537,7 +541,7 @@ namespace KillingMahjong.UI
                 DrawFangImpact(impact, first ? 1f : .42f);
                 glow.color = new Color(1f, .83f, .63f, first ? .96f : .34f);
                 // 1枚目を長めに置いて当たりの瞬間を止める
-                yield return new WaitForSeconds(first ? .11f : .095f);
+                yield return new WaitForSeconds(first ? .08f : .06f);
             }
             smear.enabled = false;
             impact.gameObject.SetActive(false);
@@ -547,9 +551,9 @@ namespace KillingMahjong.UI
 
             title.text = "単騎強襲"; title.color = AccentThem;
             note.text = "2倍ダメージ";
-            const float TitleSlam = .10f;
-            const float NoteDelay = .10f;
-            const float NotePop = .12f;
+            const float TitleSlam = .08f;
+            const float NoteDelay = .04f;
+            const float NotePop = .08f;
             bool landed = false;
             float titleSize = title.fontSize;
             title.fontSize = titleSize * 1.25f;
