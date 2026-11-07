@@ -27,7 +27,7 @@ namespace KillingMahjong.UI
             boxTr.anchorMin = boxTr.anchorMax = new Vector2(.5f, .5f);
             boxTr.pivot = new Vector2(0f, 1f);
             boxTr.sizeDelta = new Vector2(DescPanelWidth, DescPanelHeight);
-            boxTr.anchoredPosition = new Vector2(-98f, 271f);
+            boxTr.anchoredPosition = new Vector2(-18f, 271f);
             boxTr.localScale = Vector3.one;
             var art = boxTr.Find("SpeechOutline") as RectTransform;
             if (art == null)
@@ -95,6 +95,7 @@ namespace KillingMahjong.UI
         // 既存UIと同じ2px単位。半透明や影を重ねず、輪郭を一重にする。
         private static void DrawSkillSpeech(Effects.PixelShapeGraphic shape)
         {
+            const float tailX = 18f;
             var edge = new Color32(0x51, 0x19, 0x19, 0xFF);
             var fill = new Color32(0xFF, 0x93, 0x93, 0xFF);
             shape.Begin();
@@ -102,11 +103,11 @@ namespace KillingMahjong.UI
             for (int row = 0; row < 10; row++)
             {
                 float half = 12f - row;
-                shape.Box(98f - half, -DescPanelHeight - row * 2f - 2f,
-                    98f + half, -DescPanelHeight - row * 2f, edge);
+                shape.Box(tailX - half, -DescPanelHeight - row * 2f - 2f,
+                    tailX + half, -DescPanelHeight - row * 2f, edge);
                 if (row < 8)
-                    shape.Box(100f - half, -DescPanelHeight - row * 2f - 2f,
-                        96f + half, -DescPanelHeight - row * 2f, fill);
+                    shape.Box(tailX + 2f - half, -DescPanelHeight - row * 2f - 2f,
+                        tailX - 2f + half, -DescPanelHeight - row * 2f, fill);
             }
             // 左上を原点とするRectTransformなので、本文は下向きの座標。
             for (int row = 0; row < (int)DescPanelHeight / 2; row++)
@@ -119,7 +120,7 @@ namespace KillingMahjong.UI
                     shape.Box(inset + 2f, y - 2f, DescPanelWidth - inset - 2f, y, fill);
             }
             // 尻尾の付け根だけは本文とつなぐ。
-            shape.Box(88f, -DescPanelHeight, 108f, -DescPanelHeight + 2f, fill);
+            shape.Box(tailX - 10f, -DescPanelHeight, tailX + 10f, -DescPanelHeight + 2f, fill);
             shape.End();
         }
         private void HideLegacyTooltip()

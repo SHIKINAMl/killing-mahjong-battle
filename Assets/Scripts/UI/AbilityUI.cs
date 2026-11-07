@@ -167,7 +167,7 @@ namespace KillingMahjong.UI
         /// <summary>
         /// ベルルの頭上に置く、能力説明の吹き出し。
         /// </summary>
-        private const float DescPanelWidth = 196f;
+        private const float DescPanelWidth = 276f;
         private const float DescPanelHeight = 114f;
 
         /// <summary>
