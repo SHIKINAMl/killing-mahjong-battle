@@ -379,11 +379,7 @@ namespace KillingMahjong.UI
             if (fx != null) fx.Begin(currentBet, currentMoney);
             StartPanelSlideIn();
             
-            // Start Auto Dialogue
-            if (dialogueUI != null && enemyDialogueLines.Length > 0)
-            {
-                autoDialogueCoroutine = StartCoroutine(AutoDialogueRoutine());
-            }
+            // スマホの操作中は相手を喋らせない。台本のセリフとログは DialogueUI 側で扱う。
         }
 
         /// <summary>矢印UIの誘導先として使う決定ボタンの RectTransform。</summary>

@@ -205,6 +205,7 @@ namespace KillingMahjong.UI
             
             AddToLog(text);
             dialoguePanel.SetActive(true);
+            UpdateSpeechCover();
             NoticeSpeech();
         }
 
@@ -223,7 +224,7 @@ namespace KillingMahjong.UI
             // 「第1局進行中...」で画面が真っ暗な裏でセリフ送りが走っていて、
             // 見えないのに送りの音だけが「ポポポポポ」と鳴っていた。
             // ここで全文を出してしまえば、音も鳴らず、待っている側も普通に先へ進む。
-            if (PhaseTransitionUI.IsScreenDarkened)
+            if (IsSpeechCovered)
             {
                 dialogueText.maxVisibleCharacters = int.MaxValue;
                 typingRunning = false;
@@ -247,7 +248,17 @@ namespace KillingMahjong.UI
 
             for (int i = 0; i < visibleCharacterCount; i++)
             {
-                while (OptionUI.AnyOpen || IsLogOpen) yield return null;
+                while (!IsSpeechCovered && (OptionUI.AnyOpen || IsLogOpen)) yield return null;
+                // 途中で黒帯やスマホが重なった場合も、裏で読み上げ続けない。
+                // 台本の進行待ちを詰まらせないよう、ログと全文は残して送りだけ終える。
+                if (IsSpeechCovered)
+                {
+                    dialogueText.maxVisibleCharacters = int.MaxValue;
+                    typingRunning = false;
+                    IsTalking = false;
+                    yield break;
+                }
+                IsTalking = true;
                 dialogueText.maxVisibleCharacters = i + 1;
 
                 // 音が連続しすぎないように、一定間隔（例: 0.06秒）で鳴らす

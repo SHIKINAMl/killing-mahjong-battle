@@ -11,10 +11,58 @@ namespace KillingMahjong.UI
 
         private void LateUpdate()
         {
+            UpdateSpeechCover();
             UpdateReadability();
             if (!readabilityBackdropDirty) return;
             readabilityBackdropDirty = false;
             UpdateDialogueControlLayout();
+        }
+
+        private PhaseTransitionUI speechPhase;
+        private BettingUI speechBetting;
+        private CanvasGroup speechCanvasGroup;
+        private bool speechHidden;
+        private float speechAlpha;
+        private bool speechInteractable, speechBlocksRaycasts;
+
+        private bool IsSpeechCovered
+        {
+            get
+            {
+                if (PhaseTransitionUI.IsScreenDarkened) return true;
+                if (speechPhase == null) speechPhase = FindFirstObjectByType<PhaseTransitionUI>(FindObjectsInactive.Include);
+                if (speechBetting == null) speechBetting = FindFirstObjectByType<BettingUI>(FindObjectsInactive.Include);
+                return (speechPhase != null && speechPhase.isActiveAndEnabled && speechPhase.IsCoveringScreen)
+                    || (speechBetting != null && speechBetting.gameObject.activeInHierarchy);
+            }
+        }
+
+        private void UpdateSpeechCover()
+        {
+            bool covered = IsSpeechCovered;
+            if (covered) IsTalking = false;
+            if (dialoguePanel == null || covered == speechHidden) return;
+            if (speechCanvasGroup == null)
+            {
+                speechCanvasGroup = dialoguePanel.GetComponent<CanvasGroup>();
+                if (speechCanvasGroup == null) speechCanvasGroup = dialoguePanel.AddComponent<CanvasGroup>();
+            }
+            if (covered)
+            {
+                speechAlpha = speechCanvasGroup.alpha;
+                speechInteractable = speechCanvasGroup.interactable;
+                speechBlocksRaycasts = speechCanvasGroup.blocksRaycasts;
+                speechCanvasGroup.alpha = 0;
+                speechCanvasGroup.interactable = false;
+                speechCanvasGroup.blocksRaycasts = false;
+            }
+            else
+            {
+                speechCanvasGroup.alpha = speechAlpha;
+                speechCanvasGroup.interactable = speechInteractable;
+                speechCanvasGroup.blocksRaycasts = speechBlocksRaycasts;
+            }
+            speechHidden = covered;
         }
 
         // 操作欄は3行分の余白を確保した位置に固定する。
