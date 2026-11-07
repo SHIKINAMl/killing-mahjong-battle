@@ -14,6 +14,7 @@ namespace KillingMahjong.UI
 
         private void LateUpdate()
         {
+            RefreshTransitionSuppression();
             bool speaking = _descText != null && _descText.gameObject.activeInHierarchy
                 && !string.IsNullOrEmpty(_descText.text) && _descText.text != DescPlaceholder;
             if (!speaking)

@@ -382,6 +382,7 @@ namespace KillingMahjong.UI
         /// </summary>
         public void ShowTooltip(string description)
         {
+            RefreshTransitionSuppression();
             HideLegacyTooltip();
 
             var text = EnsureDescriptionBox();
@@ -414,6 +415,19 @@ namespace KillingMahjong.UI
         // 演出中に ShowTooltip が走っても 20/25 へ戻らないよう、
         // sortingOrder を書く箇所はすべてこのフラグを見ている。
         private bool _transitionSuppressed;
+        private GameUIManager transitionOwner;
+        private CanvasGroup transitionInputGroup;
+        private bool inputWasInteractable;
+
+        private void RefreshTransitionSuppression()
+        {
+            if (transitionOwner == null)
+                transitionOwner = FindFirstObjectByType<GameUIManager>(FindObjectsInactive.Include);
+            if (transitionOwner == null) return;
+            var phase = transitionOwner.PhaseTransitionUI;
+            bool covered = phase != null && phase.isActiveAndEnabled && phase.IsCoveringScreen;
+            SetSuppressedForTransition(transitionOwner.IsTransitioning || covered);
+        }
 
         /// <summary>フェーズ演出中だけ帯より下へ退避する。GameUIManager.SetIsTransitioning から呼ぶ。</summary>
         public void SetSuppressedForTransition(bool suppressed)
@@ -424,10 +438,22 @@ namespace KillingMahjong.UI
             Canvas rootCanvas = this.GetComponent<Canvas>();
             if (rootCanvas != null)
             {
+                rootCanvas.overrideSorting = true;
                 rootCanvas.sortingOrder = suppressed
                     ? UISortingOrders.AbilityDuringTransition
                     : (isWindowVisible ? UISortingOrders.InfoPanelHighlight : UISortingOrders.InfoPanelNormal);
             }
+            if (transitionInputGroup == null)
+            {
+                transitionInputGroup = GetComponent<CanvasGroup>();
+                if (transitionInputGroup == null) transitionInputGroup = gameObject.AddComponent<CanvasGroup>();
+            }
+            if (suppressed)
+            {
+                inputWasInteractable = transitionInputGroup.interactable;
+                transitionInputGroup.interactable = false;
+            }
+            else transitionInputGroup.interactable = inputWasInteractable;
 
             // 旧ツールチップ用の Canvas 退避はここにあったが、2026-08-24 に削除。
             // 説明欄はパネルの中に入ったので、ルートの sortingOrder だけで前後が決まる。
