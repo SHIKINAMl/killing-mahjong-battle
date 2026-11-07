@@ -6,6 +6,7 @@ namespace KillingMahjong.UI
 {
     public partial class PhaseTransitionUI
     {
+        private bool promptStyleApplied;
 
         private IEnumerator PlayPromptTextRoutine(string text, float duration)
         {
@@ -15,6 +16,26 @@ namespace KillingMahjong.UI
                 yield break;
             }
 
+            while (IsPhaseBackdropVisible)
+                yield return null;
+
+            if (!promptStyleApplied)
+            {
+                var material = promptText.fontMaterial;
+                if (material != null)
+                {
+                    material.EnableKeyword("OUTLINE_ON");
+                    material.SetFloat(TMPro.ShaderUtilities.ID_OutlineWidth, .18f);
+                    material.SetColor(TMPro.ShaderUtilities.ID_OutlineColor, new Color32(18, 7, 10, 255));
+                    material.EnableKeyword("UNDERLAY_ON");
+                    material.SetColor("_UnderlayColor", Color.black);
+                    material.SetFloat("_UnderlayOffsetX", .5f);
+                    material.SetFloat("_UnderlayOffsetY", -.5f);
+                    material.SetFloat("_UnderlaySoftness", 0f);
+                    promptText.UpdateMeshPadding();
+                    promptStyleApplied = true;
+                }
+            }
             promptText.text = text;
             promptText.gameObject.SetActive(true);
             promptText.color = new Color(1, 1, 1, 0); // 初期は透明

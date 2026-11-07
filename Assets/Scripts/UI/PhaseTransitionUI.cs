@@ -224,6 +224,8 @@ namespace KillingMahjong.UI
             IsScreenDarkened = false;
             _additionalRoundStartDarkenedCallbacks = null;
             _additionalRoundStartReadyCallbacks = null;
+            darkenTextRoutine = null;
+            roundStartTextVisibleUntil = 0f;
             _roundStartCleanupDone = false;
             if (fullScreenCheckerImage != null) fullScreenCheckerImage.gameObject.SetActive(false);
             if (horizontalLineRt != null) horizontalLineRt.gameObject.SetActive(false);
@@ -271,6 +273,7 @@ namespace KillingMahjong.UI
                 return;
             }
             isDarkened = true;
+            roundStartTextVisibleUntil = 0f;
             IsScreenDarkened = true;
             IsDarkenTransitioning = true;
             StartCoroutine(RoundStartDarkenRoutine(text, onDarkened, onReady));
@@ -297,8 +300,7 @@ namespace KillingMahjong.UI
             // 折り返すので、**そろった盤面が暗転にかぶる前に見えてしまう**
             // （ユーザー報告「暗転する前に全部そろっている画面が映っています」）。
             //
-            // ここで待つのは「降りきるまで」だけ。**待ちを増やしているのではなく、
-            // 順番を戻しているだけ**で、降りきったあとはすぐ晴らしに入る。
+            // 降りきってから局名の表示時間を確保し、そのあと晴らす。
             if (IsDarkenTransitioning)
             {
                 if (!_fadeOutPendingUntilDarkened)
@@ -315,7 +317,6 @@ namespace KillingMahjong.UI
                 return;
             }
             isDarkened = false;
-            IsScreenDarkened = false;
             StartCoroutine(RoundStartFadeOutRoutine(onComplete));
         }
 
@@ -323,8 +324,12 @@ namespace KillingMahjong.UI
         {
             if (isDarkened && centerText != null && centerText.text != text)
             {
-                // 暗転中の文字の差し替えも、薄くして消してから1字ずつ出す（2026-10-25）
-                if (isActiveAndEnabled) StartCoroutine(SwapDarkenText(text));
+                // 暗転中の文字は、薄くして消してから全文を短くフェードして出す。
+                if (isActiveAndEnabled)
+                {
+                    if (darkenTextRoutine != null) StopCoroutine(darkenTextRoutine);
+                    darkenTextRoutine = StartCoroutine(SwapDarkenText(text));
+                }
                 else centerText.text = text;
             }
         }
@@ -333,6 +338,9 @@ namespace KillingMahjong.UI
         {
             yield return HideBandText();
             yield return RevealBandText(text);
+            roundStartTextVisibleUntil = string.IsNullOrEmpty(text)
+                ? 0f : Time.unscaledTime + MinimumRoundTitleSeconds;
+            darkenTextRoutine = null;
         }
 
 
