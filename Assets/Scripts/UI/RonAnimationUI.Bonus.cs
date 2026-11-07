@@ -385,15 +385,17 @@ namespace KillingMahjong.UI
         // 2026-11-07 ユーザー指示。
         //   1回目「単騎強襲はもっと迫力よくできませんか」
         //   2回目「赤色とかではなく、画面の奥から現れてがぶっとしてる感じ。奥から透明状態のものがだんだんと実体化していって」
-        // 牙は画面外から飛び込ませず、**牌の奥から小さく透けた姿で現れ、近づくほど実体になって手前で噛む。**
-        //   出現 … 入れ物の大きさを奥行きとして扱い、見かけの大きさ 1/z で寄せる（遠いうちはゆっくり、手前で一気に迫る）。
-        //           透明度は段に刻んで上げ、色も影の色から本来の色へ移す（ドット絵なので滑らかな半透明より段の方が読める）
+        //   3回目「もっとはやめて。強襲のみの時と同じぐらいの演出時間」
+        //   4回目 参考動画（ワニが濁った水に半分見えないまま静止して待ち、3〜4コマで一気に飛びかかって鳥を噛む）「こんなイメージで」
+        // 牙は**奥に潜んで止まったまま待ち、一瞬で手前まで飛びかかって噛む。** だんだん寄せてはこない。
+        //   潜む … 奥で小さく、影の色で薄く浮かぶ。ぴたりと止まる（静止が長いほど飛びかかりが速く見える）
+        //   飛びかかる … 数コマで手前まで来て、そのあいだに実体の色になり口を開き切る。見かけの大きさは遠近の 1/z
         //   当たり … 赤や白の閃光は使わない。画面全体の揺れと、最初の残像での一瞬の止め（ヒットストップ）だけ
         //   退場 … また奥へ沈んで消える
         //   文字 … 「単騎強襲」は大きい所から叩きつけて着地で小さく揺らす。「2倍ダメージ」は一拍遅れて弾む
         private const float BiteDimDepth = .45f;
         private const float FangFarScale = .22f;
-        private static readonly Color FangShadowColor = new Color(.30f, .24f, .34f, 1f);
+        private static readonly Color FangShadowColor = new Color(.62f, .56f, .66f, 1f); // 濁った水越しに見えるような灰色。暗くすると紺の精算表に溶けて見えない
 
         /// <summary>奥行き 0（いちばん奥）〜1（構えの位置）に対する見かけの大きさ。遠近の 1/z で、手前ほど速く大きくなる。</summary>
         private static float FangDepthScale(float t)
@@ -405,11 +407,13 @@ namespace KillingMahjong.UI
             TextMeshProUGUI title, TextMeshProUGUI note, Image dim)
         {
             float baseDim = dim != null ? dim.color.a : 0f;
-            const float Emerge = .28f;
+            const float LurkFadeIn = .10f;
+            const float LurkHold = .30f;
+            const float Lunge = .08f;
+            const float LurkDepth = .45f;
+            const float LurkAlpha = .50f;
             const float MaterializeSteps = 6f;
             const float Retreat = .20f;
-            const float ReadyHold = 0f;
-            const float WindUp = .10f;
             const float BiteHold = .08f;
             const float TileRelease = .08f;
             Vector2 tilePosition = tile.anchoredPosition;
@@ -483,36 +487,37 @@ namespace KillingMahjong.UI
             impact.raycastTarget = false;
             impact.rectTransform.anchoredPosition = tilePosition;
 
-            teeth.localScale = approachScale * FangDepthScale(0f);
+            // 潜む：奥で薄い影として浮かび上がり、止まったまま待つ。
+            Vector3 lurkScale = approachScale * FangDepthScale(LurkDepth);
+            teeth.localScale = lurkScale;
             opacity.alpha = 0f;
-            for (float elapsed = 0; elapsed < Emerge; elapsed += Time.deltaTime)
+            for (float elapsed = 0; elapsed < LurkFadeIn; elapsed += Time.deltaTime)
             {
-                float progress = elapsed / Emerge;
-                teeth.localScale = approachScale * FangDepthScale(progress);
-                // 透けた影から段を踏んで実体になる。色は後半で本来の色へ。
-                float solid = Mathf.Ceil(Mathf.Pow(progress, 1.3f) * MaterializeSteps) / MaterializeSteps;
-                opacity.alpha = solid;
-                var tint = Color.Lerp(FangShadowColor, Color.white, Mathf.SmoothStep(0f, 1f, (progress - .35f) / .55f));
-                for (int jaw = 0; jaw < images.Length; jaw++) images[jaw].color = tint;
-                SetBiteDim(dim, baseDim, progress * .6f);
+                opacity.alpha = Mathf.Ceil(elapsed / LurkFadeIn * 3f) / 3f * LurkAlpha;
                 yield return null;
             }
-            teeth.localScale = approachScale;
-            opacity.alpha = 1f;
-            for (int jaw = 0; jaw < images.Length; jaw++) images[jaw].color = Color.white;
-            for (float elapsed = 0; elapsed < ReadyHold; elapsed += Time.deltaTime)
+            opacity.alpha = LurkAlpha;
+            for (float elapsed = 0; elapsed < LurkHold; elapsed += Time.deltaTime)
             {
-                SetBiteDim(dim, baseDim, .6f + .4f * elapsed / (ReadyHold + WindUp));
+                SetBiteDim(dim, baseDim, .5f * elapsed / LurkHold);
                 yield return null;
             }
-            for (float elapsed = 0; elapsed < WindUp; elapsed += Time.deltaTime)
+
+            // 飛びかかる：数コマで手前まで来て実体になり、口を開き切る。速さは終わりほど上がる。
+            for (float elapsed = 0; elapsed < Lunge; elapsed += Time.deltaTime)
             {
-                SetBiteDim(dim, baseDim, .6f + .4f * (ReadyHold + elapsed) / (ReadyHold + WindUp));
-                // 開き切るまでを三つの姿勢で見せ、次のフレームで牌へ飛ぶ。
-                float progress = elapsed < WindUp * .2f ? .28f : elapsed < WindUp * .5f ? .68f : 1f;
-                glow.color = new Color(1f, 1f, 1f, Mathf.Lerp(.72f, .43f, progress));
+                float progress = elapsed / Lunge;
+                float rush = progress * progress;
+                teeth.localScale = approachScale * FangDepthScale(Mathf.Lerp(LurkDepth, 1f, rush));
+                opacity.alpha = Mathf.Max(LurkAlpha, Mathf.Ceil(rush * MaterializeSteps) / MaterializeSteps);
+                var tint = Color.Lerp(FangShadowColor, Color.white, rush);
                 for (int jaw = 0; jaw < images.Length; jaw++)
+                {
+                    images[jaw].color = tint;
                     images[jaw].rectTransform.anchoredPosition = Vector2.Lerp(ready[jaw], open[jaw], progress);
+                }
+                glow.color = new Color(1f, 1f, 1f, Mathf.Lerp(.72f, .43f, progress));
+                SetBiteDim(dim, baseDim, .5f + .5f * progress);
                 yield return null;
             }
             teeth.localScale = biteScale;
