@@ -376,8 +376,7 @@ namespace KillingMahjong.UI
             // ロン成立時は局が終わって次局でリセットされるので、ここで弾く必要はない。
             if (IsWaitDeductionUIEnabled) WaitDeduction.RegisterDiscard(discardedTileId, isLocalPlayer);
 
-            if (KillingMahjong.Managers.AudioManager.Instance != null)
-                KillingMahjong.Managers.AudioManager.Instance.PlayDiscardSE(KillingMahjong.Managers.AudioManager.Instance.discardSE);
+            PlayReceivedDiscardSound();
 
             bool isGameEndPhase = currentPhaseStatus == RoundStatus.Agari ||
                                   currentPhaseStatus == RoundStatus.Ron ||
@@ -439,6 +438,18 @@ namespace KillingMahjong.UI
             }
 
             ReactionController.Instance.CheckDiscardConditions(discardedTileId, isLocalPlayer);
+        }
+
+        private void PlayReceivedDiscardSound()
+        {
+            if (IsBusyWithTransition)
+            {
+                // 黒幕の裏で反映した打牌は、盤面が戻るときにまとめて1回鳴らす。
+                DeferUntilIdle("discardSound", PlayReceivedDiscardSound);
+                return;
+            }
+            if (currentPhaseStatus != RoundStatus.Discard || IsGameOver) return;
+            KillingMahjong.Managers.AudioManager.Instance?.PlayDiscardSE();
         }
 
         public void ClearAllTiles()
