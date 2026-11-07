@@ -142,6 +142,8 @@ namespace KillingMahjong.UI
             // タイトルへ戻るクリック処理を登録する前に資料ボタンを複製する。
             CreateTutorialArchiveButton();
             CreateExhibitionResetButton();
+            NavigationBadgeButton.Apply(returnToTitleButton, NavigationBadgeButton.Symbol.Match);
+            NavigationBadgeButton.Apply(tutorialArchiveButton, NavigationBadgeButton.Symbol.Book);
             BuildSettingRows();
 
             // --- スライダーのイベント登録 ---

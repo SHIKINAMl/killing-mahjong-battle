@@ -3,6 +3,7 @@ using KillingMahjong.Common;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using Symbol = KillingMahjong.UI.NavigationBadgeButton.Symbol;
 
 namespace KillingMahjong.UI
 {
@@ -137,43 +138,17 @@ namespace KillingMahjong.UI
             pageImage.raycastTarget = false;
 
             pageNumber = CreateText(root, "PageNumber", string.Empty, new Vector2(330f, 262f), new Vector2(96f, 34f), 20f, TextAlignmentOptions.Center);
-            previousButton = CreateButton(root, "PreviousButton", "◀ 前へ", new Vector2(-210f, -250f), new Vector2(150f, 48f));
-            nextButton = CreateButton(root, "NextButton", "次へ ▶", new Vector2(0f, -250f), new Vector2(150f, 48f));
-            closeButton = CreateButton(root, "CloseButton", "閉じる", new Vector2(210f, -250f), new Vector2(150f, 48f));
+            var buttonSize = new Vector2(150f, 48f);
+            previousButton = NavigationBadgeButton.Create(root, "PreviousButton", "前へ", font,
+                new Vector2(-210f, -250f), buttonSize, Symbol.Back);
+            nextButton = NavigationBadgeButton.Create(root, "NextButton", "次へ", font,
+                new Vector2(0f, -250f), buttonSize, Symbol.Next);
+            closeButton = NavigationBadgeButton.Create(root, "CloseButton", "閉じる", font,
+                new Vector2(210f, -250f), buttonSize, Symbol.Close);
 
             previousButton.onClick.AddListener(ShowPreviousPage);
             nextButton.onClick.AddListener(ShowNextPage);
             closeButton.onClick.AddListener(CloseArchive);
-        }
-
-        private Button CreateButton(RectTransform parent, string name, string label, Vector2 position, Vector2 size)
-        {
-            var buttonObject = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
-            buttonObject.transform.SetParent(parent, false);
-            var rect = (RectTransform)buttonObject.transform;
-            Center(rect, size);
-            rect.anchoredPosition = position;
-
-            var image = buttonObject.GetComponent<Image>();
-            image.color = new Color(0.8f, 0.2f, 0.2f, 1f);
-            var outline = buttonObject.AddComponent<Outline>();
-            outline.effectColor = new Color(0.2f, 0.03f, 0.05f, 1f);
-            outline.effectDistance = new Vector2(2f, -2f);
-
-            var labelObject = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
-            labelObject.transform.SetParent(buttonObject.transform, false);
-            Stretch((RectTransform)labelObject.transform);
-            var labelText = labelObject.GetComponent<TextMeshProUGUI>();
-            ApplyFont(labelText);
-            labelText.text = label;
-            labelText.fontSize = 18f;
-            labelText.alignment = TextAlignmentOptions.Center;
-            labelText.raycastTarget = false;
-            labelText.color = Color.white;
-
-            // 既存のオプションボタンと同じホバー処理を付け、生成UIだけ操作感が変わらないようにする。
-            buttonObject.AddComponent<UIButtonHoverEffect>();
-            return buttonObject.GetComponent<Button>();
         }
 
         private TextMeshProUGUI CreateText(RectTransform parent, string name, string value, Vector2 position, Vector2 size, float fontSize, TextAlignmentOptions alignment)
@@ -220,32 +195,8 @@ namespace KillingMahjong.UI
             pageImage.sprite = pages.Length > 0 ? pages[pageIndex] : null;
             pageImage.enabled = pages.Length > 0;
             pageNumber.text = string.Format("{0} / {1}", pages.Length > 0 ? pageIndex + 1 : 0, pages.Length);
-            SetPagingButtonEnabled(previousButton, pageIndex > 0);
-            SetPagingButtonEnabled(nextButton, pageIndex < pages.Length - 1);
-        }
-
-        /// <summary>端のページで送りボタンを無効にする色（2026-09-23 に実機で見て足した）。</summary>
-        private static readonly Color PagingEnabledColor = new Color(0.8f, 0.2f, 0.2f, 1f);
-        private static readonly Color PagingDisabledColor = new Color(0.32f, 0.14f, 0.16f, 1f);
-
-        /// <summary>
-        /// 送りボタンの可否を、見た目にも出す。
-        ///
-        /// `interactable` を false にするだけでは、このボタンは**色が変わらない**。
-        /// 標準の ColorTint は `targetGraphic` に当たるが、生成時に色を直接塗っているため、
-        /// 見た目は押せるままになる（最終ページで「次へ」が明るいままだった）。
-        /// </summary>
-        private static void SetPagingButtonEnabled(Button button, bool enabled)
-        {
-            if (button == null) return;
-
-            button.interactable = enabled;
-
-            var image = button.targetGraphic as Image;
-            if (image != null) image.color = enabled ? PagingEnabledColor : PagingDisabledColor;
-
-            var label = button.GetComponentInChildren<TMP_Text>(true);
-            if (label != null) label.color = enabled ? Color.white : new Color(0.65f, 0.6f, 0.62f, 1f);
+            previousButton.interactable = pageIndex > 0;
+            nextButton.interactable = pageIndex < pages.Length - 1;
         }
 
         private void CloseArchive()

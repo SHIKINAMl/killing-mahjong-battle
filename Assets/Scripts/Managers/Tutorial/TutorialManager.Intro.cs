@@ -5,6 +5,8 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using KillingMahjong.Common;
+using KillingMahjong.UI;
+using Symbol = KillingMahjong.UI.NavigationBadgeButton.Symbol;
 
 namespace KillingMahjong.Managers
 {
@@ -32,8 +34,8 @@ namespace KillingMahjong.Managers
         private const string YesLabel = "はい";
         private const string NoLabel = "いいえ";
         private const string GuideStartLabel = "閉じる";
-        private const string PreviousPageLabel = "◀ 前へ";
-        private const string NextPageLabel = "次へ ▶";
+        private const string PreviousPageLabel = "前へ";
+        private const string NextPageLabel = "次へ";
 
         // 「いいえ」を選んだときの流れ。**麻雀そのものを知らない人向け。**
         // 麻雀ルール説明UI を挟んでから、17歩ルール説明UI へ合流する。
@@ -366,7 +368,7 @@ namespace KillingMahjong.Managers
             }
 
             bool done = false;
-            CreateButton(parent, font, GuideStartLabel, new Vector2(0f, -250f), () => done = true);
+            CreateDocumentButton(parent, font, GuideStartLabel, new Vector2(0f, -250f), Symbol.Close, () => done = true);
             var reading = UI.TutorialReadingPresentation.Prepare(parent);
             yield return reading.Enter();
             yield return new WaitUntil(() => done || _aborted || reading == null);
@@ -423,10 +425,13 @@ namespace KillingMahjong.Managers
 
             int index = 0;
             bool done = false;
-            var previous = CreateButton(parent, font, PreviousPageLabel, new Vector2(-220f, -250f), () => index--);
-            var next = CreateButton(parent, font, NextPageLabel, new Vector2(220f, -250f), () => index++);
+            var previous = CreateDocumentButton(parent, font, PreviousPageLabel,
+                new Vector2(-220f, -250f), Symbol.Back, () => index--);
+            var next = CreateDocumentButton(parent, font, NextPageLabel,
+                new Vector2(220f, -250f), Symbol.Next, () => index++);
             // 「閉じる」は「次へ」と同じ場所。最後まで送った人だけが押せる。
-            var close = CreateButton(parent, font, GuideStartLabel, new Vector2(220f, -250f), () => done = true);
+            var close = CreateDocumentButton(parent, font, GuideStartLabel,
+                new Vector2(220f, -250f), Symbol.Close, () => done = true);
 
             int shown = -1;
             UI.TutorialReadingPresentation reading = null;
@@ -567,6 +572,15 @@ namespace KillingMahjong.Managers
                 : new Color(0f, 0f, 0f, 0f);
 
             return _introRoot.transform;
+        }
+
+        private static GameObject CreateDocumentButton(Transform parent, TMP_FontAsset font, string label,
+            Vector2 position, Symbol symbol, Action onClick)
+        {
+            var button = NavigationBadgeButton.Create(parent, "Button_" + label, label, font,
+                position, new Vector2(200f, 56f), symbol);
+            button.onClick.AddListener(() => onClick());
+            return button.gameObject;
         }
 
         private GameObject CreateButton(Transform parent, TMP_FontAsset font, string label,
