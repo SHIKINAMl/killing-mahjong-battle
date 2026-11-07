@@ -204,7 +204,7 @@ namespace KillingMahjong.UI
             yield return RevealTankiBonus(group, tile, glow, title, note);
             if (s.AssaultApplied)
             {
-                yield return PlayFangBite(rt, tile.rectTransform, glow, title, note);
+                yield return PlayFangBite(rt, tile.rectTransform, glow, title, note, dim);
                 yield return new WaitForSeconds(.62f);
             }
             else
@@ -378,9 +378,17 @@ namespace KillingMahjong.UI
             title.alpha = note.alpha = 1f;
         }
 
+        // 2026-11-07 ユーザー指示「単騎強襲はもっと迫力よくできませんか」で、溜め・当たり・文字に重みを足した。
+        //   溜め … 牙が構えて口を開くあいだ、画面を赤黒く沈めていく（明るさの落差で当たりを大きく見せる）
+        //   当たり … 白1コマ → 赤の閃光、画面全体を斜めに揺らし、最初の残像で一瞬止める（ヒットストップ）
+        //   文字 … 「単騎強襲」は薄く出さず、大きい所から叩きつけて着地でもう一度揺らす。「2倍ダメージ」は一拍遅れて弾む
+        private const float BiteDimDepth = .62f;
+        private static readonly Color BiteDimTint = new Color(.10f, 0f, .02f, 1f);
+
         private static IEnumerator PlayFangBite(RectTransform parent, RectTransform tile, RawImage glow,
-            TextMeshProUGUI title, TextMeshProUGUI note)
+            TextMeshProUGUI title, TextMeshProUGUI note, Image dim)
         {
+            float baseDim = dim != null ? dim.color.a : 0f;
             const float Entry = .29f;
             const float Retreat = .30f;
             const float ReadyHold = .14f;
@@ -474,9 +482,14 @@ namespace KillingMahjong.UI
             opacity.alpha = 1f;
             for (int jaw = 0; jaw < images.Length; jaw++)
                 images[jaw].rectTransform.anchoredPosition = ready[jaw];
-            yield return new WaitForSeconds(ReadyHold);
+            for (float elapsed = 0; elapsed < ReadyHold; elapsed += Time.deltaTime)
+            {
+                SetBiteDim(dim, baseDim, elapsed / (ReadyHold + WindUp));
+                yield return null;
+            }
             for (float elapsed = 0; elapsed < WindUp; elapsed += Time.deltaTime)
             {
+                SetBiteDim(dim, baseDim, (ReadyHold + elapsed) / (ReadyHold + WindUp));
                 // 開き切るまでを三つの姿勢で見せ、次のフレームで牌へ飛ぶ。
                 float progress = elapsed < .05f ? .28f : elapsed < .12f ? .68f : 1f;
                 glow.color = new Color(1f, 1f, 1f, Mathf.Lerp(.72f, .43f, progress));
@@ -497,6 +510,15 @@ namespace KillingMahjong.UI
             title.alpha = note.alpha = 0;
             glow.color = new Color(1f, .83f, .63f, .96f);
             AudioManager.Instance?.PlayStinger("se_fang_bite", AudioManager.PitchJitter.None);
+            SetBiteDim(dim, baseDim, 1f);
+            var flash = new GameObject("FangFlash", typeof(RectTransform), typeof(Image)).GetComponent<Image>();
+            flash.transform.SetParent(parent, false);
+            flash.transform.SetSiblingIndex(jaws.transform.GetSiblingIndex()); // 牙は閃光の上に影として残す
+            flash.raycastTarget = false;
+            flash.rectTransform.anchorMin = Vector2.zero; flash.rectTransform.anchorMax = Vector2.one;
+            flash.rectTransform.sizeDelta = new Vector2(80f, 80f); // 揺れても縁が覗かないよう少し大きく
+            flash.color = new Color(1f, .97f, .92f, .92f);
+            WholeScreenShake.Play(.38f, 22f, new Vector2(.7f, 1f));
 
             // 長い残像と短い残像はそれぞれ一枚の絵として見せる。
             for (int frame = 0; frame < smearFrames.Length; frame++)
@@ -507,16 +529,29 @@ namespace KillingMahjong.UI
                 smear.color = new Color(1f, 1f, 1f, first ? 1f : .82f);
                 DrawFangImpact(impact, first ? 1f : .42f);
                 glow.color = new Color(1f, .83f, .63f, first ? .96f : .34f);
-                yield return new WaitForSeconds(first ? .075f : .095f);
+                // 1枚目は白、2枚目から赤。1枚目を長めに置いて当たりの瞬間を止める
+                flash.color = first ? new Color(1f, .97f, .92f, .92f) : new Color(.78f, .04f, .10f, .55f);
+                yield return new WaitForSeconds(first ? .11f : .095f);
             }
             smear.enabled = false;
             impact.gameObject.SetActive(false);
             glow.color = new Color(1f, .83f, .63f, .18f);
-            // 残像が消えてから、牙が牌を挟んだ姿をひと呼吸残す。
-            yield return new WaitForSeconds(BiteHold);
+            // 残像が消えてから、牙が牌を挟んだ姿をひと呼吸残す。赤い閃光はそのあいだに引く。
+            for (float elapsed = 0; elapsed < BiteHold; elapsed += Time.deltaTime)
+            {
+                flash.color = new Color(.78f, .04f, .10f, Mathf.Lerp(.55f, 0f, elapsed / BiteHold));
+                yield return null;
+            }
+            Destroy(flash.gameObject);
 
             title.text = "単騎強襲"; title.color = AccentThem;
             note.text = "2倍ダメージ";
+            const float TitleSlam = .10f;
+            const float NoteDelay = .10f;
+            const float NotePop = .12f;
+            bool landed = false;
+            float titleSize = title.fontSize;
+            title.fontSize = titleSize * 1.25f;
             for (float elapsed = 0; elapsed < Retreat; elapsed += Time.deltaTime)
             {
                 float progress = Mathf.Clamp01(elapsed / Retreat);
@@ -530,15 +565,39 @@ namespace KillingMahjong.UI
                     images[jaw].rectTransform.anchoredPosition = Vector2.Lerp(bite[jaw], outside[jaw], movement);
                 opacity.alpha = 1 - progress;
                 glow.color = new Color(1f, .83f, .63f, Mathf.Lerp(.18f, .40f, release));
-                title.alpha = note.alpha = progress;
+                SetBiteDim(dim, baseDim, 1f - .45f * movement);
+                // 見出しは大きい所から速く落とす（加速して着地）。
+                float slam = Mathf.Clamp01(elapsed / TitleSlam);
+                title.alpha = 1f;
+                title.rectTransform.localScale = Vector3.one * Mathf.Lerp(2.6f, 1f, slam * slam);
+                if (!landed && slam >= 1f)
+                {
+                    landed = true;
+                    WholeScreenShake.Play(.16f, 10f, new Vector2(0f, 1f));
+                }
+                float pop = Mathf.Clamp01((elapsed - TitleSlam - NoteDelay) / NotePop);
+                note.alpha = pop > 0f ? 1f : 0f;
+                note.rectTransform.localScale = Vector3.one * (pop < .6f ? Mathf.Lerp(1.7f, .92f, pop / .6f)
+                                                                        : Mathf.Lerp(.92f, 1f, (pop - .6f) / .4f));
                 yield return null;
             }
+            title.rectTransform.localScale = note.rectTransform.localScale = Vector3.one;
             tile.anchoredPosition = tilePosition;
             tile.localScale = tileScale;
             glow.color = new Color(1f, .83f, .63f, .40f);
             jaws.SetActive(false);
             Destroy(jaws);
             title.alpha = note.alpha = 1;
+        }
+
+        /// <summary>沈め具合 0〜1。0 で元の暗さ、1 で赤黒く深く沈める。</summary>
+        private static void SetBiteDim(Image dim, float baseAlpha, float depth)
+        {
+            if (dim == null) return;
+            depth = Mathf.Clamp01(depth);
+            var c = Color.Lerp(Color.black, BiteDimTint, depth);
+            c.a = Mathf.Lerp(baseAlpha, BiteDimDepth, depth);
+            dim.color = c;
         }
 
         private static void DrawFangImpact(PixelShapeGraphic impact, float strength)
