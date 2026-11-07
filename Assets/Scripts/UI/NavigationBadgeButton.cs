@@ -55,8 +55,15 @@ namespace KillingMahjong.UI
             var label = button.GetComponentInChildren<TMP_Text>(true);
             if (label == null) return;
 
-            // ボタン本体を透明にして、アイコンと文字を表示する。
-            if (button.targetGraphic != null) button.targetGraphic.color = Color.clear;
+            button.transition = Selectable.Transition.None;
+            if (button.targetGraphic != null)
+            {
+                var face = button.targetGraphic;
+                var border = face.GetComponent<Outline>();
+                if (border == null) border = face.gameObject.AddComponent<Outline>();
+                border.effectColor = new Color32(143, 111, 117, 255);
+                border.effectDistance = new Vector2(1f, -1f);
+            }
             foreach (Transform child in button.transform)
             {
                 if (child.name.StartsWith("PixelEdge", System.StringComparison.Ordinal))
@@ -113,6 +120,10 @@ namespace KillingMahjong.UI
         {
             if (button == null) return;
             bool available = button.IsInteractable();
+            if (button.targetGraphic != null)
+                button.targetGraphic.color = available
+                    ? new Color32(80, 31, 42, 255)
+                    : new Color32(42, 29, 35, 255);
             float offset = available && feedback.IsPressed ? -1f : 0f;
             badge.rectTransform.anchoredPosition = badgePosition + new Vector2(0f, offset);
             label.rectTransform.anchoredPosition = new Vector2((IconWidth + IconGap) * .5f, offset);
