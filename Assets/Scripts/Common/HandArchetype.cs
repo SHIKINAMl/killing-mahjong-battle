@@ -64,7 +64,7 @@ namespace KillingMahjong.Common
             Name = "役満",
             Yaku = new[] { "四暗刻", "緑一色", "清老頭", "九蓮宝燈", "純正九蓮宝燈" },
             Summary = "それだけで役満になる手",
-            Tell = "どの役満かで、捨て牌の特徴が変わる",
+            Tell = "捨て牌の特徴は役満の種類で変わる",
         };
 
         public static readonly Info Some = new Info
@@ -75,7 +75,7 @@ namespace KillingMahjong.Common
             Name = "染め",
             Yaku = new[] { "混一色", "清一色" },
             Summary = "1つの柄（と東・西）に寄せる",
-            Tell = "1つの柄だけ、まったく捨てられない",
+            Tell = "ひとつの柄だけ捨て牌に出てこない",
         };
 
         public static readonly Info Chiitoi = new Info
@@ -86,7 +86,7 @@ namespace KillingMahjong.Common
             Name = "七対子",
             Yaku = new[] { "七対子" },
             Summary = "同じ牌2枚の組を7つ",
-            Tell = "同じ牌を2枚捨てない。捨て牌はばらばら",
+            Tell = "同じ牌は2枚捨てない",
         };
 
         public static readonly Info Koutsu = new Info
@@ -97,7 +97,7 @@ namespace KillingMahjong.Common
             Name = "刻子",
             Yaku = new[] { "対々和", "三暗刻", "三色同刻" },
             Summary = "同じ牌3枚の組を重ねる",
-            Tell = "真ん中の続いた牌も平気で捨てる",
+            Tell = "順子になりそうな牌も捨てる",
         };
 
         public static readonly Info Hashi = new Info
@@ -108,7 +108,7 @@ namespace KillingMahjong.Common
             Name = "端",
             Yaku = new[] { "純全帯么九", "混全帯么九", "混老頭" },
             Summary = "どの組にも1・9（か東・西）を入れる",
-            Tell = "3から7の真ん中の牌がよく捨てられる",
+            Tell = "3〜7の牌をよく捨てる",
         };
 
         public static readonly Info Narabi = new Info
@@ -119,7 +119,7 @@ namespace KillingMahjong.Common
             Name = "並び",
             Yaku = new[] { "一気通貫", "三色同順", "二盃口", "一盃口", "平和", "断么九" },
             Summary = "順子（123のような並び）で役を重ねる",
-            Tell = "1・9や東・西が早く捨てられる",
+            Tell = "1・9や東・西を早めに捨てる",
         };
 
         public static readonly Info Dora = new Info
@@ -130,7 +130,7 @@ namespace KillingMahjong.Common
             Name = "ドラ頼み",
             Yaku = new[] { "ドラ", "赤ドラ" },
             Summary = "ドラの枚数で満貫に届かせる",
-            Tell = "形の特徴が薄い。ドラは捨てられない",
+            Tell = "捨て牌に特徴が出にくい。ドラは捨てない",
         };
 
         /// <summary>優先順。役一覧の並びもこの順。</summary>

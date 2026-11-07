@@ -710,7 +710,7 @@ namespace KillingMahjong.UI
                 _boostText.text = _browseOnly
                     ? "<color=#33CCFF>自分：" + (bonus > 0 ? "強化済み +" + bonus : "強化なし")
                         + "</color>　<color=#FF4858>敵：" + (EnemyBonusOf(yaku) > 0 ? "強化済み +" + EnemyBonusOf(yaku) : "強化なし") + "</color>"
-                    : bonus > 0 ? "強化済み。1つの役は1回だけ強化できる" : "";
+                    : bonus > 0 ? "強化済み（1つの役は1回まで）" : "";
             }
             // 強化済みの役は選べない（送るとサーバーがエラーを返す）
             if (_confirm != null) _confirm.interactable = bonus <= 0;

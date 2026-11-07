@@ -52,7 +52,7 @@ namespace KillingMahjong.UI
             // ---- 1翻 ----
             new Entry("立直",     "", "形は問わない"),
             new Entry("断么九",   "m234 m567 p345 s456 s8 + s8"),
-            new Entry("平和",     "m123 p567 s234 s67 p88 + s8", "順子4組。待ちは両側（5索か8索）"),
+            new Entry("平和",     "m123 p567 s234 s67 p88 + s8", "順子4組。待ちは両面（5索か8索）"),
             new Entry("一盃口",   "m223344 p567 s789 E1 + E1"),
             new Entry("東",       "E3 m234 p567 s345 s9 + s9"),
             new Entry("西",       "W3 m345 p234 s678 p9 + p9"),
@@ -81,7 +81,7 @@ namespace KillingMahjong.UI
 
             // ---- 役満 ----
             new Entry("九蓮宝燈", "m1112245678999 + m3"),
-            new Entry("緑一色",   "s234 s234 s666 s888 s4 + s4", "2・3・4・6・8索だけ。このゲームに發は無い"),
+            new Entry("緑一色",   "s234 s234 s666 s888 s4 + s4", "2・3・4・6・8索だけ（發はこのゲームに無い）"),
             new Entry("清老頭",   "m111 m999 p111 s11 s99 + s9"),
             new Entry("四暗刻",   "m222 p444 p777 s333 E1 + E1"),
 
