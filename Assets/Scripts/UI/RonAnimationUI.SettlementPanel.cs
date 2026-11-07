@@ -13,7 +13,6 @@ namespace KillingMahjong.UI
             out TextMeshProUGUI totalHanText, out TextMeshProUGUI multiplierText,
             out TextMeshProUGUI myBetText, out TextMeshProUGUI theirBetText,
             out TextMeshProUGUI myMultText, out TextMeshProUGUI theirMultText,
-            out TextMeshProUGUI tankiMine, out TextMeshProUGUI tankiTheirs,
             out TextMeshProUGUI myDeltaText, out TextMeshProUGUI theirDeltaText,
             out TextMeshProUGUI myHpText, out TextMeshProUGUI theirHpText)
         {
@@ -113,6 +112,7 @@ namespace KillingMahjong.UI
             theirBetText = MakeNumber(betRow.transform, 21f, PanelInk, ValueColumn);
 
             GameObject multRow = MakeBox(body.transform, Color.clear, 0, 1);
+            multRow.name = "MultRow"; // 単騎の再計算で、負けた側の倍率をここで書き換える（RevealBonusSettlement）
             MakeText(multRow.transform, s.ShowHpBalances ? "精算後" : "倍率", 18f, PanelFaint, TextAlignmentOptions.Left, true);
             myMultText = MakeNumber(multRow.transform, 21f, PanelInk, ValueColumn);
             theirMultText = MakeNumber(multRow.transform, 21f, PanelInk, ValueColumn);
@@ -130,26 +130,10 @@ namespace KillingMahjong.UI
                     s.LocalWon ? PanelFaint : AccentGold, TextAlignmentOptions.Right, false, ValueColumn);
             }
 
-            tankiMine = null;
-            tankiTheirs = null;
-            if (s.IsTankiWait)
-            {
-                GameObject tankiRow = MakeBox(body.transform, Color.clear, 0, 1);
-                tankiRow.name = "TankiRow";
-                MakeText(tankiRow.transform, "単騎待ち", 18f, PanelFaint, TextAlignmentOptions.Left, true);
-                tankiMine = MakeText(tankiRow.transform, "", 21f, AccentGold, TextAlignmentOptions.Right, false, ValueColumn);
-                tankiTheirs = MakeText(tankiRow.transform, "", 21f, AccentGold, TextAlignmentOptions.Right, false, ValueColumn);
-            }
-
-            // 強襲は「獲得が 0 に潰れ、その分が相手への追加ダメージへ回る」。式ではなく文で見せる
-            if (s.AssaultApplied)
-            {
-                GameObject assaultRow = MakeBox(body.transform, Color.clear, 0, 1);
-                assaultRow.name = "AssaultRow";
-                MakeText(assaultRow.transform, "強襲", 18f, PanelFaint, TextAlignmentOptions.Left, true);
-                MakeText(assaultRow.transform, s.LocalWon ? "獲得なし" : FormatDelta(-s.AssaultBonusDamage), 20f, AccentGold, TextAlignmentOptions.Right, false, ValueColumn);
-                MakeText(assaultRow.transform, s.LocalWon ? FormatDelta(-s.AssaultBonusDamage) : "獲得なし", 20f, AccentGold, TextAlignmentOptions.Right, false, ValueColumn);
-            }
+            // 内訳の行は素点・倍率・ボルテージの3つだけ（2026-11-08 ユーザー指示
+            // 「単騎、強襲っていう枠を作る必要ない。素点、倍率、ボルテージの3つの枠のみで。
+            //   単騎、強襲などの演出があったら、再計算する感じの演出で」）。
+            // 単騎・強襲は行を足さず、演出のあとで倍率と血の数字を書き換えて見せる（RevealBonusSettlement）。
 
             MakeRule(body.transform);
 

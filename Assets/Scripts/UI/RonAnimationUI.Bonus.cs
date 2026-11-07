@@ -22,34 +22,30 @@ namespace KillingMahjong.UI
             group.blocksRaycasts = false;
         }
 
+        // 単騎・強襲は表に行を足さない（2026-11-08 ユーザー指示「素点、倍率、ボルテージの3つの枠のみで。
+        // 単騎、強襲などの演出があったら、再計算する感じの演出で」）。
+        // 表は最初、単騎も強襲も掛かる前の数字で出し、カットインのあとで掛かった順に書き換える。
+        //   単騎 … 負けた側の倍率が ×2 に変わり、その血の数字が数え上がる
+        //   強襲 … 勝った側の獲得が 0 まで数え下がり、同じぶん負けた側の血が増える
+        // 途中の数字はサーバーの確定値から逆にたどるだけで、掛け算をやり直しはしない
+        // （単騎は敗者の支払いを2倍、強襲は勝者の獲得をそのまま敗者へ上乗せ。RonSettlementInfo の注記どおり）。
+
         private static void PrepareBonusSettlement(Transform panel, RonSettlementInfo settlement)
         {
-            foreach (string rowName in new[] { "TankiRow", "AssaultRow" })
-            {
-                var row = panel.Find("Body/" + rowName);
-                if (row == null) continue;
-                SetSettlementRowAlpha(row, 0f);
-                row.gameObject.SetActive(true);
-            }
-
             var result = panel.Find("Body/DeltaRow");
             var myValue = result.GetChild(1).GetComponent<TextMeshProUGUI>();
             var theirValue = result.GetChild(2).GetComponent<TextMeshProUGUI>();
-            if (settlement.AssaultApplied && !settlement.IsTankiWait)
-            {
-                // 通常精算は、勝者から敗者へ移した強襲分を表示上だけ戻して見せる。
-                var winnerValue = settlement.LocalWon ? myValue : theirValue;
-                var loserValue = settlement.LocalWon ? theirValue : myValue;
-                int loserDelta = settlement.LocalWon ? settlement.TheirDelta : settlement.MyDelta;
-                ShowSettledDelta(winnerValue, settlement.AssaultBonusDamage);
-                ShowSettledDelta(loserValue, loserDelta + settlement.AssaultBonusDamage);
-            }
-            else
-            {
-                ShowSettledDelta(myValue, settlement.MyDelta);
-                ShowSettledDelta(theirValue, settlement.TheirDelta);
-            }
+            var start = BonusStageDeltas(settlement, false, false);
+            ShowSettledDelta(settlement.LocalWon ? myValue : theirValue, start.winner);
+            ShowSettledDelta(settlement.LocalWon ? theirValue : myValue, start.loser);
             result.gameObject.SetActive(true);
+
+            var loserMult = LoserMultiplierCell(panel, settlement);
+            if (loserMult != null)
+            {
+                loserMult.text = FormatMultiplier(settlement.Multiplier);
+                loserMult.color = PanelInk;
+            }
         }
 
         private static IEnumerator RevealBonusSettlement(Transform panel, RonSettlementInfo settlement)
@@ -57,35 +53,118 @@ namespace KillingMahjong.UI
             var result = panel.Find("Body/DeltaRow");
             var myValue = result.GetChild(1).GetComponent<TextMeshProUGUI>();
             var theirValue = result.GetChild(2).GetComponent<TextMeshProUGUI>();
-            int winnerColumn = settlement.LocalWon ? 1 : 2;
-            int loserColumn = settlement.LocalWon ? 2 : 1;
+            var winnerValue = settlement.LocalWon ? myValue : theirValue;
+            var loserValue = settlement.LocalWon ? theirValue : myValue;
+            var loserMult = LoserMultiplierCell(panel, settlement);
+            var before = BonusStageDeltas(settlement, false, false);
 
             if (settlement.IsTankiWait)
             {
-                var tanki = panel.Find("Body/TankiRow");
-                tanki.GetChild(winnerColumn).GetComponent<TextMeshProUGUI>().text = "-";
-                tanki.GetChild(loserColumn).GetComponent<TextMeshProUGUI>().text = "×2";
-                SetSettlementRowAlpha(tanki, 1f);
-                yield return SweepSettlementCells(AccentGold, .36f, (RectTransform)tanki.GetChild(loserColumn));
+                var after = BonusStageDeltas(settlement, true, false);
+                if (loserMult != null)
+                {
+                    yield return RewriteSettlementCell(loserMult, FormatMultiplier(settlement.Multiplier * 2f));
+                    if (panel == null) yield break;
+                }
+                yield return CountSettledDeltas(.40f, (loserValue, before.loser, after.loser));
                 if (panel == null) yield break;
+                before = after;
             }
 
             if (settlement.AssaultApplied)
             {
-                var assault = panel.Find("Body/AssaultRow");
-                SetSettlementRowAlpha(assault, 1f);
-                yield return SweepSettlementCells(AccentGold, .46f,
-                    (RectTransform)assault.GetChild(winnerColumn), (RectTransform)assault.GetChild(loserColumn));
+                var after = BonusStageDeltas(settlement, true, true);
+                if (settlement.IsTankiWait) yield return new WaitForSeconds(.15f);
+                yield return CountSettledDeltas(.45f,
+                    (winnerValue, before.winner, after.winner), (loserValue, before.loser, after.loser));
                 if (panel == null) yield break;
                 if (!settlement.IsTankiWait)
-                {
-                    ShowSettledDelta(myValue, settlement.MyDelta);
-                    ShowSettledDelta(theirValue, settlement.TheirDelta);
                     AudioManager.Instance?.PlayStinger("se_assault_settlement_stamp", AudioManager.PitchJitter.None);
-                }
             }
 
             yield return SweepSettlementCells(PanelInk, .25f, myValue.rectTransform, theirValue.rectTransform);
+        }
+
+        /// <summary>
+        /// 単騎・強襲をどこまで掛けたときの血の増減か（勝者は正、敗者は負）。
+        /// 両方掛けたものがサーバーの確定値で、そこから逆にたどる。
+        /// </summary>
+        private static (int winner, int loser) BonusStageDeltas(RonSettlementInfo s, bool withTanki, bool withAssault)
+        {
+            int winner = s.LocalWon ? s.MyDelta : s.TheirDelta;
+            int loser = s.LocalWon ? s.TheirDelta : s.MyDelta;
+            if (s.AssaultApplied && !withAssault)
+            {
+                // 強襲は勝者の獲得を 0 にし、その額を敗者へ上乗せする
+                winner = s.AssaultBonusDamage;
+                loser += s.AssaultBonusDamage;
+            }
+            if (s.IsTankiWait && !withTanki) loser = Mathf.RoundToInt(loser / 2f);
+            return (winner, loser);
+        }
+
+        /// <summary>負けた側の倍率の欄。精算前後の持ち点を出す表では倍率が無いので null。</summary>
+        private static TextMeshProUGUI LoserMultiplierCell(Transform panel, RonSettlementInfo s)
+        {
+            if (s.ShowHpBalances) return null;
+            var row = panel.Find("Body/MultRow");
+            return row != null ? row.GetChild(s.LocalWon ? 2 : 1).GetComponent<TextMeshProUGUI>() : null;
+        }
+
+        private static string FormatMultiplier(float multiplier)
+        {
+            return "×" + multiplier.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        /// <summary>欄の字を書き換え、大きく置いてから段を踏んで元の大きさへ戻す。書き換えた欄は金色にする。
+        /// 右端の欄は表の縁に接しているので、膨らませすぎると表の外へはみ出す（1.7 倍ではみ出した）。</summary>
+        private static IEnumerator RewriteSettlementCell(TextMeshProUGUI cell, string value)
+        {
+            var rect = cell.rectTransform;
+            cell.text = value;
+            cell.color = AccentGold;
+            foreach (float scale in new[] { 1.45f, 1.22f, 1.08f })
+            {
+                rect.localScale = Vector3.one * scale;
+                yield return new WaitForSeconds(.05f);
+                if (cell == null) yield break;
+            }
+            rect.localScale = Vector3.one;
+            yield return SweepSettlementCells(AccentGold, .30f, rect);
+        }
+
+        /// <summary>血の数字を、前の値から新しい値まで段を踏んで数え直す。終わりに一度弾ませる。</summary>
+        private static IEnumerator CountSettledDeltas(float duration, params (TextMeshProUGUI text, int from, int to)[] cells)
+        {
+            const float Steps = 8f;
+            for (float t = 0f; t < duration; t += Time.deltaTime)
+            {
+                float progress = Mathf.Ceil(t / duration * Steps) / Steps;
+                foreach (var cell in cells)
+                {
+                    if (cell.text == null) yield break;
+                    // 途中は10の位でそろえ、端数がちらつかないようにする
+                    int value = Mathf.RoundToInt(Mathf.Lerp(cell.from, cell.to, progress) / 10f) * 10;
+                    ShowSettledDelta(cell.text, progress >= 1f ? cell.to : value);
+                }
+                yield return null;
+            }
+
+            var rects = new RectTransform[cells.Length];
+            for (int i = 0; i < cells.Length; i++)
+            {
+                if (cells[i].text == null) yield break;
+                ShowSettledDelta(cells[i].text, cells[i].to);
+                rects[i] = cells[i].text.rectTransform;
+            }
+            foreach (float scale in new[] { 1.3f, 1.12f })
+            {
+                foreach (var rect in rects) rect.localScale = Vector3.one * scale;
+                yield return new WaitForSeconds(.05f);
+                if (rects[0] == null) yield break;
+            }
+            foreach (var rect in rects) rect.localScale = Vector3.one;
+            yield return SweepSettlementCells(AccentGold, .30f, rects);
         }
 
         private static void ShowSettledDelta(TextMeshProUGUI text, int delta)

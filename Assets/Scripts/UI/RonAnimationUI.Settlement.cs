@@ -46,8 +46,6 @@ namespace KillingMahjong.UI
         /// <summary>素点・倍率ラベルを出したあとの間。0.18 → 0.30</summary>
         private const float AfterSideValue = 0.30f;
 
-        /// <summary>単騎待ちの行を出したあとの間。0.25 → 0.45</summary>
-
         /// <summary>表を読み切らせる最後の静止。0.80 → 1.50</summary>
         private const float ReadHold = 1.5f;
 
@@ -103,17 +101,15 @@ namespace KillingMahjong.UI
 
             TextMeshProUGUI totalHanText, multiplierText;
             TextMeshProUGUI myBetText, theirBetText, myMultText, theirMultText;
-            TextMeshProUGUI tankiMine, tankiTheirs;
             TextMeshProUGUI myDeltaText, theirDeltaText, myHpText, theirHpText;
 
             CanvasGroup panelGroup = BuildSettlementPanel(containerRt, settlement,
                 out totalHanText, out multiplierText,
                 out myBetText, out theirBetText, out myMultText, out theirMultText,
-                out tankiMine, out tankiTheirs,
                 out myDeltaText, out theirDeltaText, out myHpText, out theirHpText);
 
             FillTutorialSettlementValues(settlement, totalHanText, multiplierText,
-                myBetText, theirBetText, myMultText, theirMultText, tankiMine, tankiTheirs);
+                myBetText, theirBetText, myMultText, theirMultText);
             panelGroup.alpha = 1f;
 
             _tutorialSettlementPanel = panelGroup.transform as RectTransform;
@@ -151,7 +147,7 @@ namespace KillingMahjong.UI
         {
             if (_tutorialSettlementPanel == null) return;
 
-            // 単騎待ちや強襲の有無で高さが変わるので、寸法は確定させてから読む。
+            // 血の行を出すかどうかで高さが変わるので、寸法は確定させてから読む。
             LayoutRebuilder.ForceRebuildLayoutImmediate(_tutorialSettlementPanel);
             float w = _tutorialSettlementPanel.rect.width;
             float h = _tutorialSettlementPanel.rect.height;
@@ -243,10 +239,9 @@ namespace KillingMahjong.UI
         private void FillTutorialSettlementValues(RonSettlementInfo settlement,
             TextMeshProUGUI totalHanText, TextMeshProUGUI multiplierText,
             TextMeshProUGUI myBetText, TextMeshProUGUI theirBetText,
-            TextMeshProUGUI myMultText, TextMeshProUGUI theirMultText,
-            TextMeshProUGUI tankiMine, TextMeshProUGUI tankiTheirs)
+            TextMeshProUGUI myMultText, TextMeshProUGUI theirMultText)
         {
-            string multiplier = "×" + settlement.Multiplier.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+            string multiplier = FormatMultiplier(settlement.Multiplier);
             if (totalHanText != null) totalHanText.text = $"{settlement.TotalHan}翻";
             if (multiplierText != null) multiplierText.text = settlement.ShowHpBalances ? "" : multiplier;
             if (myBetText != null) myBetText.text = (settlement.ShowHpBalances ? settlement.MyHpBefore : settlement.MyBet).ToString();
@@ -254,10 +249,12 @@ namespace KillingMahjong.UI
             if (myMultText != null) myMultText.text = settlement.ShowHpBalances ? settlement.MyHpAfter.ToString() : multiplier;
             if (theirMultText != null) theirMultText.text = settlement.ShowHpBalances ? settlement.TheirHpAfter.ToString() : multiplier;
 
-            if (settlement.IsTankiWait && tankiMine != null && tankiTheirs != null)
+            // 単騎待ちは負けた側の倍率が2倍になる。行は足さず、倍率の欄にそのまま出す。
+            var loserMult = settlement.LocalWon ? theirMultText : myMultText;
+            if (settlement.IsTankiWait && !settlement.ShowHpBalances && loserMult != null)
             {
-                tankiMine.text = settlement.LocalWon ? "-" : "×2";
-                tankiTheirs.text = settlement.LocalWon ? "×2" : "-";
+                loserMult.text = FormatMultiplier(settlement.Multiplier * 2f);
+                loserMult.color = AccentGold;
             }
         }
 
@@ -316,13 +313,11 @@ namespace KillingMahjong.UI
             // 役の紹介は斜め帯で完了している。表は合計翻数と血の精算へ進む。
             TextMeshProUGUI totalHanText, multiplierText;
             TextMeshProUGUI myBetText, theirBetText, myMultText, theirMultText;
-            TextMeshProUGUI tankiMine, tankiTheirs;
             TextMeshProUGUI myDeltaText, theirDeltaText, myHpText, theirHpText;
 
             CanvasGroup panelGroup = BuildSettlementPanel(containerRt, s,
                 out totalHanText, out multiplierText,
                 out myBetText, out theirBetText, out myMultText, out theirMultText,
-                out tankiMine, out tankiTheirs,
                 out myDeltaText, out theirDeltaText, out myHpText, out theirHpText);
 
             // 増減は先に表示し、単騎・強襲の内訳だけカットイン後に出す。
