@@ -10,6 +10,8 @@ namespace KillingMahjong.UI
         [SerializeField] private GameObject tilePrefab;
         [SerializeField] private TileResourceManager tileResourceManager;
         [SerializeField] private TMPro.TextMeshProUGUI turnText; // 左上の打目表示用UI
+        [Tooltip("左上の打牌数の円グラフ。置いてあれば文字（turnText）の代わりにこちらを出す")]
+        [SerializeField] private TurnPieUI turnPie;
 
         [Header("Layout Settings")]
         [SerializeField] private float tileWidth = 50.0f;
@@ -434,11 +436,24 @@ namespace KillingMahjong.UI
         /// </summary>
         public RectTransform TurnTextRect
         {
-            get { return turnText != null ? turnText.rectTransform : null; }
+            get
+            {
+                if (turnPie != null) return turnPie.rectTransform;
+                return turnText != null ? turnText.rectTransform : null;
+            }
         }
 
         public void UpdateTurnText()
         {
+            // 円グラフがあれば、文字は出さずにこちらで見せる（2026-11-08 ユーザー指示。TurnPieUI の注記）
+            if (turnPie != null)
+            {
+                turnPie.Show(discardedTiles.Count,
+                    KillingMahjong.Managers.BoardStateManager.Instance.IsLocalPlayerFirstRound);
+                turnPie.gameObject.SetActive(true);
+                if (turnText != null) turnText.gameObject.SetActive(false);
+                return;
+            }
             if (turnText != null)
             {
                 int turnCount = discardedTiles.Count;

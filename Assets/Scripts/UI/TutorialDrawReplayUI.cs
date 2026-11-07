@@ -20,6 +20,7 @@ namespace KillingMahjong.UI
         public string NormalText => normal != null ? normal.text : "";
         private RectTransform viewport, progress, seekKnob;
         private TextMeshProUGUI normal, marker, paused, turnCounter;
+        private TurnPieUI turnPie;
         private Material ownedMaterial;
         private Button advance;
         private TutorialSubtitleUI subtitles;
@@ -212,6 +213,15 @@ namespace KillingMahjong.UI
             copy.name = "ReplayTurnCounter";
             foreach (var m in copy.GetComponentsInChildren<MonoBehaviour>(true))
                 if (!(m is Graphic) && !(m is BaseMeshEffect) && !(m is TMP_SubMeshUI)) Destroy(m);
+            // 本編が円グラフ（TurnPieUI）なら、動画の中も同じ円グラフで出す
+            turnPie = copy.GetComponent<TurnPieUI>();
+            if (turnPie != null)
+            {
+                turnPie.raycastTarget = false;
+                SetTurnCounter(17);
+                copy.SetActive(true);
+                return;
+            }
             turnCounter = copy.GetComponent<TextMeshProUGUI>();
             if (turnCounter == null) { Destroy(copy); return; }
             turnCounter.raycastTarget = false;
@@ -222,6 +232,12 @@ namespace KillingMahjong.UI
         /// <summary>動画の中の打牌数を出す。0 なら隠す。</summary>
         private void SetTurnCounter(int turn)
         {
+            if (turnPie != null)
+            {
+                turnPie.gameObject.SetActive(turn > 0);
+                if (turn > 0) turnPie.Show(turn - 1, false); // 「N打目」＝N-1打ち終えた。動画の後輩ちゃんは後攻
+                return;
+            }
             if (turnCounter == null) return;
             turnCounter.gameObject.SetActive(turn > 0);
             if (turn > 0) turnCounter.text = "後：" + KanjiNumber(turn) + "打目";
