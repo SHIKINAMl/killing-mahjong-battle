@@ -24,6 +24,9 @@ namespace KillingMahjong.UI
         private PixelShapeGraphic badge;
         private UIInteractionFeedback feedback;
         private Vector2 badgePosition;
+        private const float LabelSize = 24f;
+        private const float IconWidth = 30f;
+        private const float IconGap = 8f;
 
         internal static Button Create(Transform parent, string name, string text, TMP_FontAsset font,
             Vector2 position, Vector2 size, Symbol symbol)
@@ -39,7 +42,6 @@ namespace KillingMahjong.UI
             labelObject.transform.SetParent(rect, false);
             var textLabel = labelObject.GetComponent<TextMeshProUGUI>();
             if (font != null) textLabel.font = font;
-            textLabel.fontSize = 20f;
             textLabel.text = text;
             var button = go.GetComponent<Button>();
             button.targetGraphic = go.GetComponent<Image>();
@@ -53,7 +55,7 @@ namespace KillingMahjong.UI
             var label = button.GetComponentInChildren<TMP_Text>(true);
             if (label == null) return;
 
-            // 当たり判定は元の矩形を使い、表示だけを置き換える。
+            // ボタン本体を透明にして、アイコンと文字を表示する。
             if (button.targetGraphic != null) button.targetGraphic.color = Color.clear;
             foreach (Transform child in button.transform)
             {
@@ -67,19 +69,24 @@ namespace KillingMahjong.UI
             skin.feedback = UIInteractionFeedback.Attach(button.gameObject);
             label.raycastTarget = false;
             label.alignment = TextAlignmentOptions.Center;
-            label.fontSize = 20f;
+            label.fontSize = LabelSize;
             var labelRect = label.rectTransform;
             labelRect.anchorMin = labelRect.anchorMax = labelRect.pivot = new Vector2(.5f, .5f);
             float width = Mathf.Ceil(label.GetPreferredValues(label.text).x);
-            labelRect.sizeDelta = new Vector2(width + 4f, 32f);
+            labelRect.sizeDelta = new Vector2(width + 4f, 38f);
+
+            var buttonRect = (RectTransform)button.transform;
+            float hitWidth = Mathf.Max(buttonRect.rect.width, width + IconWidth + IconGap + 8f);
+            buttonRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, hitWidth);
+            buttonRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, Mathf.Max(buttonRect.rect.height, 56f));
 
             var iconObject = new GameObject("NavigationBadge", typeof(RectTransform), typeof(PixelShapeGraphic));
             iconObject.transform.SetParent(button.transform, false);
             iconObject.transform.SetAsFirstSibling();
             skin.badge = iconObject.GetComponent<PixelShapeGraphic>();
             skin.badge.raycastTarget = false;
-            skin.badge.rectTransform.sizeDelta = new Vector2(26f, 32f);
-            skin.badgePosition = new Vector2(-Mathf.Ceil(width * .5f) - 3f, 0f);
+            skin.badge.rectTransform.sizeDelta = new Vector2(IconWidth, 36f);
+            skin.badgePosition = new Vector2(-Mathf.Ceil((width + IconGap) * .5f), 0f);
             skin.DrawBadge(Marks[(int)symbol]);
             skin.LateUpdate();
         }
@@ -90,15 +97,15 @@ namespace KillingMahjong.UI
             var blue = new Color32(42, 52, 126, 255);
             var gold = new Color32(249, 213, 62, 255);
             badge.Begin();
-            badge.Box(-12, -14, 12, 8, edge);
-            badge.Box(-10, 8, 10, 12, edge);
-            badge.Box(-8, 12, 8, 14, edge);
-            badge.Box(-10, -12, 10, 8, blue);
-            badge.Box(-8, 8, 8, 12, blue);
+            badge.Box(-15, -17, 15, 10, edge);
+            badge.Box(-12, 10, 12, 15, edge);
+            badge.Box(-9, 15, 9, 17, edge);
+            badge.Box(-13, -15, 13, 10, blue);
+            badge.Box(-10, 10, 10, 15, blue);
             for (int y = 0; y < mark.Length; y++)
                 for (int x = 0; x < mark[y].Length; x++)
                     if (mark[y][x] == '#')
-                        badge.Box(-7 + x * 2, 5 - y * 2, -5 + x * 2, 7 - y * 2, gold);
+                        badge.Box(-10 + x * 3, 7 - y * 3, -7 + x * 3, 10 - y * 3, gold);
             badge.End();
         }
 
@@ -108,7 +115,7 @@ namespace KillingMahjong.UI
             bool available = button.IsInteractable();
             float offset = available && feedback.IsPressed ? -1f : 0f;
             badge.rectTransform.anchoredPosition = badgePosition + new Vector2(0f, offset);
-            label.rectTransform.anchoredPosition = new Vector2(16f, offset);
+            label.rectTransform.anchoredPosition = new Vector2((IconWidth + IconGap) * .5f, offset);
             badge.canvasRenderer.SetAlpha(available ? 1f : .45f);
             label.color = available ? new Color32(247, 239, 222, 255) : new Color32(149, 142, 142, 255);
         }
