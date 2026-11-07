@@ -567,6 +567,7 @@ namespace KillingMahjong.UI
             impact.rectTransform.anchoredPosition = tilePosition;
 
             // 潜む：奥で薄い影として浮かび上がり、止まったまま待つ。
+            AudioManager.Instance?.PlayStinger("se_fang_anticipation", AudioManager.PitchJitter.None);
             Vector3 lurkScale = approachScale * FangDepthScale(LurkDepth);
             teeth.localScale = lurkScale;
             opacity.alpha = 0f;
