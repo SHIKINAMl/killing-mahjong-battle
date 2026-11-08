@@ -117,6 +117,10 @@ namespace KillingMahjong.UI
         private readonly List<TextMeshProUGUI> _allRowBadges = new List<TextMeshProUGUI>();
         private readonly List<string> _allRowYaku = new List<string>();
         private TextMeshProUGUI _typeText;
+        /// <summary>型の文の、シーンに置いた横位置。役一覧では札が無いぶん左へ寄せる。</summary>
+        private float? _typeTextX;
+        /// <summary>型の文の前に空けてある、札のぶんの幅。</summary>
+        private const float TypeBadgeRoom = 80f;
         private HandTypeBadge _typeBadge;
         private int _selectedAll;
         private TextMeshProUGUI _nameText;
@@ -726,20 +730,16 @@ namespace KillingMahjong.UI
             if (_nameText != null) _nameText.text = YakuExamples.DisplayName(yaku);
             // **役強化は「翻数 +1」ではなく「倍率を1段上げる」**（2026-10-11 のスキル変更）。
             // 翻数は変わらないので「6翻 → 7翻」は出さない。どこまで上がれるかは役で決まる
+            // 翻数は左の一覧の見出しにあるので出さない（2026-11-08 ユーザー「別の場所で示している情報は
+            // もう一回表示しなくてもいい」）。役強化のときだけ、強めるとどこまで上がるかを出す
             if (_hanText != null)
             {
-                string cap = "<color=" + BoostHex + ">倍率 1段昇格（" + GameRules.GetBoostTierCapLabel(yaku) + "まで）</color>";
-                _hanText.text = _browseOnly ? (baseHan > 0 ? baseHan + "翻" : "役満")
-                    : baseHan > 0 ? baseHan + "翻  " + cap : cap;
+                _hanText.text = _browseOnly ? ""
+                    : "<color=" + BoostHex + ">倍率1段上げ・" + GameRules.GetBoostTierCapLabel(yaku) + "まで</color>";
             }
             if (_descText != null) _descText.text = YakuInfo.GetDescription(yaku);
-            if (_boostText != null)
-            {
-                _boostText.text = _browseOnly
-                    ? "<color=" + BoostHex + ">自分：" + (bonus > 0 ? "強化済み +" + bonus : "強化なし")
-                        + "</color>　<color=" + EnemyHex + ">敵：" + (EnemyBonusOf(yaku) > 0 ? "強化済み +" + EnemyBonusOf(yaku) : "強化なし") + "</color>"
-                    : bonus > 0 ? "強化済み（1つの役は1回まで）" : "";
-            }
+            // 強めてあるかは一覧の「+1」で分かるので、ここでは言わない
+            if (_boostText != null) _boostText.text = "";
             // 強化済みの役は選べない（送るとサーバーがエラーを返す）
             if (_confirm != null) _confirm.interactable = bonus <= 0;
 
@@ -747,9 +747,21 @@ namespace KillingMahjong.UI
             if (_exampleHead != null) _exampleHead.gameObject.SetActive(hasExample);
             if (_noteText != null) _noteText.text = YakuExamples.NoteOf(entry);
 
+            // 型の札は、役一覧では行の横に出ているので、ここには出さない（文を札の位置から始める）
             var type = HandArchetype.Of(yaku);
-            if (_typeBadge != null) _typeBadge.Show(type);
-            if (_typeText != null) _typeText.text = type == null ? "" : "相手がこの型なら、" + type.Tell;
+            if (_typeBadge != null)
+            {
+                _typeBadge.gameObject.SetActive(!_browseOnly);
+                if (!_browseOnly) _typeBadge.Show(type);
+            }
+            if (_typeText != null)
+            {
+                _typeText.text = type == null ? "" : type.Tell;
+                if (_typeTextX == null) _typeTextX = _typeText.rectTransform.anchoredPosition.x;
+                var pos = _typeText.rectTransform.anchoredPosition;
+                pos.x = _browseOnly ? _typeTextX.Value - TypeBadgeRoom : _typeTextX.Value;
+                _typeText.rectTransform.anchoredPosition = pos;
+            }
         }
 
         /// <summary>例の牌を並べる。並べたら true。牌の絵はその場で作る（選ぶたびに入れ替わる）。</summary>
