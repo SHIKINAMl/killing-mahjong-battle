@@ -10,17 +10,20 @@ namespace KillingMahjong.UI
 
         private void CreateSortTilesButton()
         {
-            sortTilesButton = Instantiate(decideButton, decideButton.transform.parent);
+            // 「おまかせ」と同じ白いドット絵のボタンにする（2026-11-08。決定の赤は決める操作だけ）。
+            // 置き場所は今までどおり決定の左上
+            sortTilesButton = Instantiate(autoManganButton, decideButton.transform.parent);
             sortTilesButton.name = "SortTilesButton";
             sortTilesButton.onClick.RemoveAllListeners();
             sortTilesButton.onClick.AddListener(OnSortTilesClicked);
             SetButtonLabel(sortTilesButton, "並べ直す");
-            // 決定の複製なので、面を控えの色に切り替える（2026-11-08）
-            var sortFace = sortTilesButton.GetComponentInChildren<PixelButtonFace>(true);
-            if (sortFace != null) sortFace.SetTone(PixelButtonFace.Tone.Secondary);
             var rect = (RectTransform)sortTilesButton.transform;
+            var decideRect = (RectTransform)decideButton.transform;
+            rect.anchorMin = decideRect.anchorMin;
+            rect.anchorMax = decideRect.anchorMax;
+            rect.pivot = decideRect.pivot;
             rect.sizeDelta = new Vector2(ActionButtonWidth, 32f);
-            rect.anchoredPosition += new Vector2(-16f, 46f);
+            rect.anchoredPosition = decideRect.anchoredPosition + new Vector2(-16f, 46f);
             sortTilesButton.gameObject.SetActive(false);
         }
 
