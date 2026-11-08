@@ -49,8 +49,8 @@ namespace KillingMahjong.UI
         // 黒い四角のパネルをやめ、もともとある役一覧の黒板の絵（Resources/役一覧.png。緑の枠・クリーム色の紙・
         // 金の「役一覧」の札）を後ろに敷いて、部屋に掛かった一覧表に書き込んだように見せる。
         // 字は紙に書いた墨の色、見出しは朱色。題の一文（「強化する役を選んでください」）は札があるので出さない
-        private static readonly Color TextMain = new Color32(46, 30, 26, 255);    // 墨
-        private static readonly Color TextDim = new Color32(112, 92, 78, 255);    // 薄墨
+        private static readonly Color TextMain = new Color32(24, 14, 10, 255);    // 墨
+        private static readonly Color TextDim = new Color32(66, 50, 42, 255);    // 薄墨
         private static readonly Color Marker = new Color32(178, 34, 44, 255);     // 朱
         private static readonly Color PaperText = new Color32(246, 248, 197, 255); // 紙の色（朱の判の上の字）
         private static readonly Color PanelBg = new Color(0f, 0f, 0f, 0f);
