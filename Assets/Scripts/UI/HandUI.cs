@@ -128,6 +128,8 @@ namespace KillingMahjong.UI
                 var txt = reselectButton.GetComponentInChildren<UnityEngine.UI.Text>();
                 if (txt != null) txt.text = "選び直す";
 
+                var reselectFace = reselectButton.GetComponentInChildren<PixelButtonFace>(true);
+                if (reselectFace != null) reselectFace.SetTone(PixelButtonFace.Tone.Secondary);
                 reselectButton.gameObject.SetActive(false);
 
                 autoDiscardButton = Instantiate(decideButton, decideButton.transform.parent);

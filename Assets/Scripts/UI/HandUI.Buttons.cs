@@ -15,6 +15,9 @@ namespace KillingMahjong.UI
             sortTilesButton.onClick.RemoveAllListeners();
             sortTilesButton.onClick.AddListener(OnSortTilesClicked);
             SetButtonLabel(sortTilesButton, "並べ直す");
+            // 決定の複製なので、面を控えの色に切り替える（2026-11-08）
+            var sortFace = sortTilesButton.GetComponentInChildren<PixelButtonFace>(true);
+            if (sortFace != null) sortFace.SetTone(PixelButtonFace.Tone.Secondary);
             var rect = (RectTransform)sortTilesButton.transform;
             rect.sizeDelta = new Vector2(ActionButtonWidth, 32f);
             rect.anchoredPosition += new Vector2(-16f, 46f);
