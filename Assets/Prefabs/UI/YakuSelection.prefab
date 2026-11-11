@@ -17252,7 +17252,7 @@ GameObject:
   - component: {fileID: 5208867634023763766}
   - component: {fileID: 5643493870153018270}
   m_Layer: 0
-  m_Name: NotebookSignature
+  m_Name: SeniorMemo
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -17274,8 +17274,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 112, y: -116}
-  m_SizeDelta: {x: 460, y: 20}
+  m_AnchoredPosition: {x: 112, y: -118}
+  m_SizeDelta: {x: 460, y: 38}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &5208867634023763766
 CanvasRenderer:
@@ -17305,7 +17305,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "\u5148\u8F29\u3088\u308A"
+  m_text:
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
   m_sharedMaterial: {fileID: -7116387803404704443, guid: 8c71a35d4ab85d049b9a84e70e601640, type: 2}
@@ -17315,7 +17315,7 @@ MonoBehaviour:
   m_fontColor32:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontColor: {r: 0.8039216, g: 0.59607846, b: 0.62352943, a: 1}
+  m_fontColor: {r: 0.8745098, g: 0.81960785, b: 0.8, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -17339,8 +17339,8 @@ MonoBehaviour:
   m_fontSizeMin: 18
   m_fontSizeMax: 72
   m_fontStyle: 0
-  m_HorizontalAlignment: 4
-  m_VerticalAlignment: 512
+  m_HorizontalAlignment: 1
+  m_VerticalAlignment: 256
   m_textAlignment: 65535
   m_characterSpacing: 0
   m_wordSpacing: 0

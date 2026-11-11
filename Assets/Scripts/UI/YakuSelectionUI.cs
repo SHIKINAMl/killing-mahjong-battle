@@ -103,6 +103,7 @@ namespace KillingMahjong.UI
         private readonly List<TextMeshProUGUI> _allRowBadges = new List<TextMeshProUGUI>();
         private readonly List<string> _allRowYaku = new List<string>();
         private TextMeshProUGUI _typeText;
+        private TextMeshProUGUI _seniorMemoText;
         /// <summary>型の文の、シーンに置いた横位置。役一覧では札が無いぶん左へ寄せる。</summary>
         private float? _typeTextX;
         /// <summary>型の文の前に空けてある、札のぶんの幅。</summary>
@@ -626,6 +627,10 @@ namespace KillingMahjong.UI
             _typeText = Txt(parent, "YakuType", "", new Vector2(DetailCenterX + 40f, -166f),
                 new Vector2(DetailWidth - 80f, 18f), 12.5f, TextAlignmentOptions.Left, TextDim);
 
+            _seniorMemoText = Txt(parent, "SeniorMemo", "", new Vector2(112f, -118f),
+                new Vector2(DetailWidth, 38f), 14f, TextAlignmentOptions.TopLeft, TextMain, out bool madeMemo);
+            if (madeMemo) _seniorMemoText.textWrappingMode = TextWrappingModes.Normal;
+
         }
 
         // ---- 右下: 決める・やめる ----
@@ -719,6 +724,12 @@ namespace KillingMahjong.UI
             bool hasExample = ShowExample(entry.Example);
             if (_exampleHead != null) _exampleHead.gameObject.SetActive(hasExample);
             if (_noteText != null) _noteText.text = NotebookNote(entry);
+            if (_seniorMemoText != null)
+            {
+                bool hasMemo = SeniorMemos.TryGetValue(yaku, out string memo);
+                _seniorMemoText.gameObject.SetActive(hasMemo);
+                _seniorMemoText.text = hasMemo ? "<color=#CD989F>先輩メモ</color>　" + memo : "";
+            }
 
             // 型の札は、役一覧では行の横に出ているので、ここには出さない（文を札の位置から始める）
             var type = HandArchetype.Of(yaku);
