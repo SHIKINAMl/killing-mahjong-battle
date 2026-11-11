@@ -93,7 +93,7 @@ namespace KillingMahjong.UI
         }
 
         /// <summary>型を出す。null なら隠す。</summary>
-        public void Show(HandArchetype.Info info)
+        public void Show(HandArchetype.Info info, string displayName = null)
         {
             Current = info;
             gameObject.SetActive(info != null);
@@ -101,7 +101,7 @@ namespace KillingMahjong.UI
             if (plate != null) plate.color = info.Badge;
             if (label != null)
             {
-                label.text = info.Name;
+                label.text = displayName ?? info.Name;
                 label.color = info.BadgeInk;
             }
         }

@@ -27,7 +27,7 @@ namespace KillingMahjong.UI
     /// 足したら `Tools > UI > 実行時UIをシーンへ置く（対局）` で焼き込むこと。
     /// 再生時に書き換えるのは、選んだ役で変わる所（右の説明・翻数・例の牌・行の色・「+1」）だけ。
     /// </summary>
-    public class YakuSelectionUI : MonoBehaviour
+    public partial class YakuSelectionUI : MonoBehaviour
     {
         /// <summary>シーンに置く入れ物の名前。</summary>
         public const string RootName = "YakuSelection";
@@ -543,6 +543,7 @@ namespace KillingMahjong.UI
         private void BuildRowType(Transform row, TextMeshProUGUI name, HandArchetype.Info info)
         {
             HandTypeBadge badge = HandTypeBadge.Ensure(row, "TypeBadge", RowTypeFontSize, _font, true, out bool made);
+            badge.Show(info, NotebookTag(info));
             if (!made) return;
 
             // 役名の文字の幅のすぐ右。役名は置いたあと変わらないので、置くときに一度だけ測る
@@ -555,7 +556,6 @@ namespace KillingMahjong.UI
             rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
             rt.pivot = new Vector2(0f, 0.5f);
             rt.anchoredPosition = new Vector2(Mathf.Round(nameLeft + width + 4f), 0f);
-            badge.Show(info);
         }
 
         // ---- 右: 選んだ役の説明と例 ----
@@ -709,7 +709,8 @@ namespace KillingMahjong.UI
                 _hanText.text = _browseOnly ? ""
                     : "<color=" + BoostHex + ">倍率1段上げ・" + GameRules.GetBoostTierCapLabel(yaku) + "まで</color>";
             }
-            if (_descText != null) _descText.text = YakuInfo.GetDescription(yaku);
+            if (_descText != null) _descText.text = NotebookDescriptions.TryGetValue(yaku, out string description)
+                ? description : YakuInfo.GetDescription(yaku);
             // 強めてあるかは一覧の「+1」で分かるので、ここでは言わない
             if (_boostText != null) _boostText.text = "";
             // 強化済みの役は選べない（送るとサーバーがエラーを返す）
@@ -717,18 +718,18 @@ namespace KillingMahjong.UI
 
             bool hasExample = ShowExample(entry.Example);
             if (_exampleHead != null) _exampleHead.gameObject.SetActive(hasExample);
-            if (_noteText != null) _noteText.text = YakuExamples.NoteOf(entry);
+            if (_noteText != null) _noteText.text = NotebookNote(entry);
 
             // 型の札は、役一覧では行の横に出ているので、ここには出さない（文を札の位置から始める）
             var type = HandArchetype.Of(yaku);
             if (_typeBadge != null)
             {
                 _typeBadge.gameObject.SetActive(!_browseOnly);
-                if (!_browseOnly) _typeBadge.Show(type);
+                if (!_browseOnly) _typeBadge.Show(type, NotebookTag(type));
             }
             if (_typeText != null)
             {
-                _typeText.text = type == null ? "" : type.Tell;
+                _typeText.text = NotebookTell(type);
                 if (_typeTextX == null) _typeTextX = _typeText.rectTransform.anchoredPosition.x;
                 var pos = _typeText.rectTransform.anchoredPosition;
                 pos.x = _browseOnly ? _typeTextX.Value - TypeBadgeRoom : _typeTextX.Value;

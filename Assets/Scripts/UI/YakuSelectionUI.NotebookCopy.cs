@@ -1,0 +1,79 @@
+using System.Collections.Generic;
+using KillingMahjong.Common;
+
+namespace KillingMahjong.UI
+{
+    public partial class YakuSelectionUI
+    {
+        // 対局中の帳面に書く短い説明。役名と成立条件は共通の資料とそろえる。
+        private static readonly Dictionary<string, string> NotebookDescriptions = new Dictionary<string, string>
+        {
+            { "立直", "聴牌したら、立直は勝手に付くわ。" },
+            { "断么九", "2から8の牌だけでそろえてね。" },
+            { "平和", "順子だけでそろえて、待ちは両面よ。" },
+            { "一盃口", "同じ順子をふた組。覚えやすいでしょ？" },
+            { "東", "東を3枚。これでひと役よ。" },
+            { "西", "西を3枚。こちらもひと役ね。" },
+            { "一発", "相手の一打目でロン。逃さないでね。" },
+            { "河底撈魚", "最後の捨て牌でロン。最後まで油断しないで。" },
+            { "ドラ", "表示されている牌がドラ。欲張ってもいいのよ。" },
+            { "赤ドラ", "赤い5は、1枚で1翻よ。" },
+            { "三色同順", "萬子・筒子・索子で、同じ数の順子をひと組ずつ。" },
+            { "三色同刻", "萬子・筒子・索子で、同じ数の刻子をひと組ずつ。" },
+            { "三暗刻", "暗刻を3つ。こっそりそろえてね。" },
+            { "対々和", "4つの面子を、ぜんぶ刻子にするの。" },
+            { "混老頭", "1・9と字牌だけ。真ん中の数字はお休みね。" },
+            { "混全帯么九", "面子にも雀頭にも、1・9か字牌を入れてね。" },
+            { "七対子", "同じ牌を2枚ずつ。そんな組を7つよ。" },
+            { "一気通貫", "同じ柄で123・456・789。端から端まで通すの。" },
+            { "二盃口", "一盃口をふたつ。欲張りな手ね。" },
+            { "混一色", "使う柄はひとつ。字牌は混ぜていいわ。" },
+            { "純全帯么九", "面子にも雀頭にも1か9。字牌は入れないでね。" },
+            { "清一色", "ひとつの柄だけでそろえて。字牌も抜くのよ。" },
+            { "九蓮宝燈", "同じ柄で1112345678999。そこにその柄の牌をもう1枚。" },
+            { "緑一色", "使っていいのは2・3・4・6・8索だけ。" },
+            { "清老頭", "1と9の牌だけ。端っこがお好きなのね。" },
+            { "四暗刻", "暗刻を4つ。そろったら大物よ。" },
+            { "純正九蓮宝燈", "九蓮宝燈で9面待ち。そこでアガるのよ。" },
+        };
+
+        private static readonly Dictionary<HandArchetype.Info, (string Tag, string Tell)> NotebookTypes =
+            new Dictionary<HandArchetype.Info, (string, string)>
+            {
+                { HandArchetype.Narabi, ("並び派", "1・9や東・西を早く切るなら、並びを疑ってね。") },
+                { HandArchetype.Koutsu, ("刻子派", "順子になりそうな牌まで切るなら、刻子かもね。") },
+                { HandArchetype.Hashi, ("端牌派", "3から7をよく切るなら、端の牌に気をつけて。") },
+                { HandArchetype.Some, ("染め手", "ひとつの柄だけ捨てないなら、染めてるかもね。") },
+                { HandArchetype.Chiitoi, ("対子派", "同じ牌を2枚は切らないなら、対子を疑ってね。") },
+                { HandArchetype.Dora, ("ドラ勝負", "癖は出にくいけど、ドラは手放さないわ。") },
+                { HandArchetype.Yakuman, ("役満狙い", "捨て方の癖は、狙っている役満しだいね。") },
+            };
+
+        private static string NotebookTag(HandArchetype.Info type)
+        {
+            return type != null && NotebookTypes.TryGetValue(type, out var copy) ? copy.Tag : null;
+        }
+
+        private static string NotebookTell(HandArchetype.Info type)
+        {
+            if (type == null) return "";
+            return NotebookTypes.TryGetValue(type, out var copy) ? copy.Tell : type.Tell;
+        }
+
+        private static string NotebookNote(YakuExamples.Entry entry)
+        {
+            switch (entry.Name)
+            {
+                case "立直":
+                case "ドラ":
+                case "一発":
+                case "河底撈魚": return "手の形は何でもいいわ。";
+                case "平和": return "この手なら、5索か8索でアガれるわ。";
+                case "赤ドラ": return "赤い5は、この3枚よ。";
+                case "緑一色": return "この卓に發はないわ。";
+                case "純正九蓮宝燈": return "1から9、どれが出てもアタリよ。";
+                default: return YakuExamples.NoteOf(entry);
+            }
+        }
+    }
+}
