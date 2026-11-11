@@ -45,33 +45,19 @@ namespace KillingMahjong.UI
             "九蓮宝燈", "緑一色", "清老頭", "四暗刻", "純正九蓮宝燈"
         };
 
-        // 2026-11-08 ユーザー指示「やっぱりAIくさい。みやすさよりも、このゲームの雰囲気に似合うように」。
-        // 黒い四角のパネルをやめ、もともとある役一覧の黒板の絵（Resources/役一覧.png。緑の枠・クリーム色の紙・
-        // 金の「役一覧」の札）を後ろに敷いて、部屋に掛かった一覧表に書き込んだように見せる。
-        // 字は紙に書いた墨の色、見出しは朱色。題の一文（「強化する役を選んでください」）は札があるので出さない
-        private static readonly Color TextMain = new Color32(24, 14, 10, 255);    // 墨
-        private static readonly Color TextDim = new Color32(66, 50, 42, 255);    // 薄墨
-        private static readonly Color Marker = new Color32(178, 34, 44, 255);     // 朱
-        private static readonly Color PaperText = new Color32(246, 248, 197, 255); // 紙の色（朱の判の上の字）
-        private static readonly Color PanelBg = new Color(0f, 0f, 0f, 0f);
-        private static readonly Color PanelEdge = new Color32(46, 30, 26, 80);    // 鉛筆の罫線
-        private static readonly Color RowSelected = new Color32(232, 128, 104, 120); // 蛍光ペン
-        private static readonly Color ButtonBg = new Color(0f, 0f, 0f, 0f);
+        // 色はコレクション（CollectionUI）と同じ
+        private static readonly Color TextMain = new Color32(240, 232, 236, 255);
+        private static readonly Color TextDim = new Color32(170, 156, 164, 255);
+        private static readonly Color Marker = new Color32(214, 40, 62, 255);
+        private static readonly Color PanelBg = new Color32(28, 18, 26, 252);
+        private static readonly Color PanelEdge = new Color32(80, 48, 62, 255);
+        private static readonly Color RowSelected = new Color32(64, 28, 40, 255);
+        private static readonly Color ButtonBg = new Color32(52, 30, 42, 255);
         private static readonly Color Clear = new Color(0f, 0f, 0f, 0f);
 
-        /// <summary>強化した分の色。紙の上で読めるよう、牌交換の IN の水色を青インクの濃さまで落とした。</summary>
-        private const string BoostHex = "#1F5FB0";
-        private static readonly Color BoostColor = new Color32(31, 95, 176, 255);
-        /// <summary>敵が強めている分の色（役一覧で出す）。</summary>
-        private const string EnemyHex = "#B0222C";
-
-        /// <summary>黒板の絵の名前（Resources）と、置き方。絵は 2560 四方の中に枠が描いてあり、周りは透明。</summary>
-        private const string BoardSpriteName = "役一覧";
-        private const float BoardSize = 1075.2f;                              // 2560 × 0.42
-        private static readonly Vector2 BoardPosition = new Vector2(-8.4f, -41.7f); // 枠の真ん中が (0, -6) に来る
-        /// <summary>中身は紙の内側に収まるよう縮め、札の下まで下げる。</summary>
-        private const float PanelScale = 0.85f;
-        private static readonly Vector2 PanelPosition = new Vector2(0f, -30f);
+        /// <summary>強化した分の色。牌交換の IN・役強化の演出の「新しい翻数」と同じ水色。</summary>
+        private const string BoostHex = "#33CCFF";
+        private static readonly Color BoostColor = new Color(0.2f, 0.8f, 1f, 1f);
 
         // 割り付け（800x600 の画面の中心が原点）。コレクションの役タブと同じ寸法を、枠に合わせて上へ寄せた
         private static readonly Vector2 PanelSize = new Vector2(720f, 480f);
@@ -227,8 +213,8 @@ namespace KillingMahjong.UI
             {
                 int local = BonusOf(_allRowYaku[i]);
                 int enemy = EnemyBonusOf(_allRowYaku[i]);
-                _allRowBadges[i].text = (local > 0 ? "<color=" + BoostHex + ">+" + local + "</color> " : "")
-                    + (enemy > 0 ? "<color=" + EnemyHex + ">+" + enemy + "</color>" : "");
+                _allRowBadges[i].text = (local > 0 ? "<color=#33CCFF>+" + local + "</color> " : "")
+                    + (enemy > 0 ? "<color=#FF4858>+" + enemy + "</color>" : "");
             }
             SelectAllRow(wasOpen ? selected : 0);
             if (_scroll != null) _scroll.verticalNormalizedPosition = wasOpen ? scroll : 1f;
@@ -325,25 +311,12 @@ namespace KillingMahjong.UI
                 img.raycastTarget = true;
             }
 
-            // 後ろに敷く黒板の絵。パネルより先（後ろ）に置く
-            Image board = Img(_body.transform, "Board", Color.white, BoardPosition, new Vector2(BoardSize, BoardSize),
-                out bool madeBoard);
-            if (madeBoard)
-            {
-                board.sprite = Resources.Load<Sprite>(BoardSpriteName);
-                board.transform.SetSiblingIndex(scrim.transform.GetSiblingIndex() + 1);
-            }
-
-            Image panel = Img(_body.transform, "Panel", PanelBg, PanelPosition, PanelSize, out bool madePanel);
-            if (madePanel) panel.transform.localScale = new Vector3(PanelScale, PanelScale, 1f);
+            Image panel = Img(_body.transform, "Panel", PanelBg, Vector2.zero, PanelSize);
             Transform p = panel.transform;
 
-            // 題は札（「役一覧」）があるので出さない。役一覧の開き方（ShowBrowser）が名前で探すので、物は残す
-            TextMeshProUGUI title = Txt(p, "Title", "強化する役を選んでください", new Vector2(0f, 214f), new Vector2(680f, 28f),
-                20f, TextAlignmentOptions.Left, TextMain, out bool madeTitle);
-            if (madeTitle) title.gameObject.SetActive(false);
-            Image titleRule = Img(p, "TitleRule", PanelEdge, new Vector2(0f, 196f), new Vector2(680f, 1f), out bool madeTitleRule);
-            if (madeTitleRule) titleRule.gameObject.SetActive(false);
+            Txt(p, "Title", "強化する役を選んでください", new Vector2(0f, 214f), new Vector2(680f, 28f),
+                20f, TextAlignmentOptions.Left, TextMain);
+            Img(p, "TitleRule", PanelEdge, new Vector2(0f, 196f), new Vector2(680f, 1f));
 
             BuildList(p);
             BuildDetail(p);
@@ -659,9 +632,8 @@ namespace KillingMahjong.UI
 
         private void BuildButtons(Transform parent)
         {
-            // 「やめる」は箱を付けず墨の字だけ。「この役を強化する」は朱の判
-            _cancel = Btn(parent, "CancelButton", "やめる", new Vector2(-45f, -206f), new Vector2(150f, 40f), 16f, ButtonBg, TextMain);
-            _confirm = Btn(parent, "ConfirmButton", "この役を強化する", new Vector2(190f, -206f), new Vector2(300f, 40f), 18f, Marker, PaperText);
+            _cancel = Btn(parent, "CancelButton", "やめる", new Vector2(-45f, -206f), new Vector2(150f, 40f), 16f, ButtonBg);
+            _confirm = Btn(parent, "ConfirmButton", "この役を強化する", new Vector2(190f, -206f), new Vector2(300f, 40f), 18f, Marker);
 
             _cancel.onClick.RemoveAllListeners();
             _cancel.onClick.AddListener(() =>
@@ -804,12 +776,7 @@ namespace KillingMahjong.UI
 
         private static Image Img(Transform parent, string name, Color color, Vector2 pos, Vector2 size)
         {
-            return Img(parent, name, color, pos, size, out bool _);
-        }
-
-        private static Image Img(Transform parent, string name, Color color, Vector2 pos, Vector2 size, out bool created)
-        {
-            GameObject go = SceneFirst.Child(parent, name, out created, typeof(RectTransform), typeof(Image));
+            GameObject go = SceneFirst.Child(parent, name, out bool created, typeof(RectTransform), typeof(Image));
             var img = go.GetComponent<Image>();
             if (created)
             {
@@ -846,8 +813,7 @@ namespace KillingMahjong.UI
             return tmp;
         }
 
-        private Button Btn(Transform parent, string name, string label, Vector2 pos, Vector2 size, float fontSize, Color color,
-            Color textColor)
+        private Button Btn(Transform parent, string name, string label, Vector2 pos, Vector2 size, float fontSize, Color color)
         {
             GameObject go = SceneFirst.Child(parent, name, out bool created,
                 typeof(RectTransform), typeof(Image), typeof(Button));
@@ -862,7 +828,7 @@ namespace KillingMahjong.UI
                 img.raycastTarget = true;
                 button.targetGraphic = img;
             }
-            Txt(go.transform, "Text", label, Vector2.zero, size, fontSize, TextAlignmentOptions.Center, textColor);
+            Txt(go.transform, "Text", label, Vector2.zero, size, fontSize, TextAlignmentOptions.Center, TextMain);
             return button;
         }
 
