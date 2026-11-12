@@ -124,7 +124,7 @@ namespace KillingMahjong.UI
             new Entry("character.senior_bounce", "キャラクター・背景", "先輩の待機中の跳ね：60fps", "TutorialManager.SetSeniorIdleBounce / SlimeBounceAnimator"),
             new Entry("character.talk", "キャラクター・背景", "喋るときの上下の動き", "TalkBobAnimator / DialogueUI.ShowText"),
             new Entry("camera.zoom", "キャラクター・背景", "カメラが寄って戻る", "CameraZoomController.ZoomToTargetRoutine", unused: true),
-            new Entry("character.hair", "キャラクター・背景", "髪のネオン", "HairNeonGlow.Attach", unused: true),
+            new Entry("character.hair", "キャラクター・背景", "髪のネオン（本編からは 11/12 に外した）", "HairNeonGlow.Attach", unused: true),
             new Entry("scene.atmosphere", "キャラクター・背景", "背景の粒子・暗い縁", "SceneAtmosphere.Attach"),
             new Entry("scene.room", "キャラクター・背景", "部屋の待機：浮遊・ホタル", "RoomAmbience.Attach"),
             new Entry("scene.battle", "キャラクター・背景", "対局の雰囲気", "BattleAtmosphere.SetVisible"),

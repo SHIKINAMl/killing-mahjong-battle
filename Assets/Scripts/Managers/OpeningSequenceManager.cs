@@ -333,14 +333,8 @@ namespace KillingMahjong.Managers
             if (enemyCharacterObj.GetComponent<UI.TalkBobAnimator>() == null)
                 enemyCharacterObj.AddComponent<UI.TalkBobAnimator>();
 
-            // **髪の黄色だけを蛍光色に光らせる**（2026-09-30 のユーザー指示）。
-            // **フェードが終わってから付けること。** 先に付けると、上の
-            // `ApplyEnemyAlpha` が光の板まで掴んで不透明度を上書きしてしまう
-            // （あの配列はここより前に作られていて、光の板は入っていない）。
-            foreach (var sr in sprites)
-            {
-                UI.Effects.HairNeonGlow.Attach(sr);
-            }
+            // 髪のネオン（HairNeonGlow）は 2026-11-12 にユーザー指示で本編から外した。
+            // コレクションの没案からは今も試写できる。
         }
 
         private void NotifyRevealFinished()
