@@ -19,6 +19,9 @@ namespace KillingMahjong.UI
         /// <summary>1人が1局で打てる数。サーバーの DISCARDS_PER_PLAYER（mahjong_engine/engine/game_engine.py）と同じ。</summary>
         public const int DiscardsPerPlayer = 17;
 
+        /// <summary>コレクションの「演出」タブの ID（<see cref="GameEffectCatalog"/>）。</summary>
+        public const string EffectId = "turn.pie";
+
         [SerializeField] private float radius = 22f;
         [SerializeField] private Color firstColor = new Color32(232, 180, 64, 255);
         [SerializeField] private Color firstNextColor = new Color32(255, 232, 160, 255);

@@ -326,6 +326,34 @@ namespace KillingMahjong.UI
                     var intro = TutorialButtonIntroUI.Show(rig.handTiles[6]);
                     if (intro == null) throw new InvalidOperationException("導入の対象がありません。");
                     yield return intro.PopIn(); break;
+                case TurnPieUI.EffectId:
+                {
+                    // 本編の円グラフ（RiverUI の turnPie）を写して、先攻で1打ずつ塗り、続けて後攻で塗る。
+                    // コレクションはタイトルや部屋のシーンにもあり、そこには円グラフが無いので、無ければ新しく作る
+                    var source = FindFirstObjectByType<TurnPieUI>(FindObjectsInactive.Include);
+                    TurnPieUI pie = source != null
+                        ? Instantiate(source, rig.surface, false)
+                        : new GameObject("TurnPie", typeof(RectTransform), typeof(CanvasRenderer), typeof(TurnPieUI)).GetComponent<TurnPieUI>();
+                    if (source == null) { pie.transform.SetParent(rig.surface, false); pie.rectTransform.sizeDelta = new Vector2(48f, 48f); }
+                    pie.name = "TurnPiePreview";
+                    scope.Own(pie.gameObject);
+                    var rt = pie.rectTransform;
+                    rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(.5f, .5f);
+                    rt.anchoredPosition = Vector2.zero;
+                    rt.localScale = Vector3.one * 3f;
+                    pie.raycastTarget = false;
+                    pie.gameObject.SetActive(true);
+                    foreach (bool first in new[] { true, false })
+                    {
+                        for (int n = 0; n <= TurnPieUI.DiscardsPerPlayer; n++)
+                        {
+                            pie.Show(n, first);
+                            yield return new WaitForSeconds(.18f);
+                        }
+                        yield return new WaitForSeconds(.8f);
+                    }
+                    yield break;
+                }
                 default: throw new ArgumentException("再生方法が未登録です: " + EffectId);
             }
             yield return new WaitForSeconds(4f);

@@ -42,17 +42,17 @@ namespace KillingMahjong.UI
             new Entry("skill.cutin.enemy", "スキル", "相手の能力カットイン", "PhaseTransitionUI.PlaySkillCutinAnimationRoutine"),
             new Entry(Effects.EnemySkillBatchPresentation.EffectId, "スキル", "相手の能力連打：透視・透視・役強化・透視", "EnemySkillBatchPresentation.Play"),
             new Entry(Effects.EnemySkillBatchPresentation.SummaryEffectId, "スキル", "旧・相手の能力まとめ：透視 × 2・牌交換", "EnemySkillBatchPresentation.PlaySummary", unused: true),
-            new Entry("ui.skill_explanation", "スキル", "ベルルの吹き出し：4つの能力説明", "AbilityUI.ShowTooltip"),
+            new Entry("ui.skill_explanation", "スキル", "ベルルの吹き出し：4つの能力説明（説明中は頭だけ小さく揺れる）", "AbilityUI.ShowTooltip"),
             new Entry("ui.ability_bell", "スキル", "能力を開くベルの音", "AbilityUI.OnTriggerClicked / AudioManager.PlayAbilityBellSE"),
             new Entry(Effects.AbilityBellDropEffect.EffectId, "スキル", "呼び鈴：落下して着地した時だけ縦揺れ", "TutorialManager.DropAbilityBellRoutine / AbilityBellDropEffect.Play"),
-            new Entry("phase.dealing", "フェイズ", "配牌：暗転 → 局名がその場で短くフェード → 牌の山 → 明転", "PhaseTransitionUI.PlayRoundStartDarken / PlayRoundStartFadeOut"),
+            new Entry("phase.dealing", "フェイズ", "配牌：暗転 → 局名がその場で短くフェード（最低1秒） → 牌の山 → 明転", "PhaseTransitionUI.PlayRoundStartDarken / PlayRoundStartFadeOut"),
             new Entry("phase.betting", "フェイズ", "掛け金パネル：入る → 出る", "BettingUI.ShowFixedBettingPhase / HideBettingPhase"),
             new Entry(Effects.BetStakeFx.EffectId, "フェイズ", "掛け金の重さ：枠に血が溜まる・心音・赤い縁・揺れ", "BettingUI / BetStakeFx"),
             new Entry(Effects.BetStakeFx.CardEffectId, "フェイズ", "賭けたあとの血：勝ち・負け・単騎の札", "BettingUI / BetOutcomePreviewUI", unused: true),
             new Entry("phase.battle_start", "フェイズ", "対局開始：黒帯と文字は60fps基準のフェードと数値表示", "PhaseTransitionUI.PlayTransition"),
             new Entry("phase.local_turn", "フェイズ", "先行の表示", "PhaseTransitionUI.PlayCenterTextAnimRoutine"),
             new Entry("phase.enemy_turn", "フェイズ", "後攻の表示", "PhaseTransitionUI.PlayCenterTextAnimRoutine"),
-            new Entry("phase.prompt", "フェイズ", "手牌選択の案内", "PhaseTransitionUI.PlayPromptText"),
+            new Entry("phase.prompt", "フェイズ", "手牌選択の案内（縁取りの字）", "PhaseTransitionUI.PlayPromptText"),
             new Entry("hand.wait_reveal", "牌・血・ゲージ", "13枚成立：役名・待ち牌と着弾SE", "HandRankCallUI.ShowRank / HandWaitRevealUI.Show / HandSelectionFeedbackAudio.PlayRankImpact"),
             new Entry("hand.wait_transfer", "牌・血・ゲージ", "手牌決定：光の移動・着地と効果音", "HandWaitRevealUI.Transfer / WaitUI.RevealArrivalTile / HandSelectionFeedbackAudio"),
             new Entry(HandRoleConditionsUI.EffectId, "牌・血・ゲージ", "手牌の役名ホバー：詳細を開かず対応する牌を強調", "HandWaitRevealUI / HandRoleTileSupport"),
@@ -71,12 +71,12 @@ namespace KillingMahjong.UI
             new Entry(Effects.RonAuraUI.LocalEffectId, "ロン・清算", "自分のロン：吹き出し背面の青いオーラ", "RonImpactEffect.Play / RonAuraUI.BehindCallout"),
             new Entry(Effects.RonAuraUI.EnemyEffectId, "ロン・清算", "相手のロン：立ち絵背面の赤いオーラ", "CutinAnimationUI.PlayCutin / RonAuraUI.BehindCharacter"),
             new Entry("ron.local", "ロン・清算", "自分のロン：斜めの役表示 → 清算表（青） → 血の移動", "RonAnimationUI.PlayRonSequence / ShowYakuRibbon / SettlementRoutine"),
-            new Entry(RonAnimationUI.TankiBonusEffectId, "ロン・清算", "単騎：ロン牌が光る → 精算表へ反映", "RonAnimationUI.PreviewSettlementBonus / SettlementRoutine"),
-            new Entry(RonAnimationUI.AssaultBonusEffectId, "ロン・清算", "強襲：発動者のカットイン → 精算表へ反映", "RonAnimationUI.PreviewSettlementBonus / SettlementRoutine"),
-            new Entry(RonAnimationUI.TankiAssaultEffectId, "ロン・清算", "単騎強襲：ロン牌を牙で噛む → 精算表へ反映", "RonAnimationUI.PreviewSettlementBonus / SettlementRoutine"),
-            new Entry("ron.bonus_assault_enemy", "ロン・清算", "相手の強襲：発動者のカットイン → 精算表へ反映", "RonAnimationUI.PreviewSettlementBonus / SettlementRoutine"),
-            new Entry("ron.bonus_tanki_enemy", "ロン・清算", "相手の単騎：ロン牌が光る → 精算表へ反映", "RonAnimationUI.PreviewSettlementBonus / SettlementRoutine"),
-            new Entry("ron.bonus_tanki_assault_enemy", "ロン・清算", "相手の単騎強襲：ロン牌を牙で噛む → 精算表へ反映", "RonAnimationUI.PreviewSettlementBonus / SettlementRoutine"),
+            new Entry(RonAnimationUI.TankiBonusEffectId, "ロン・清算", "単騎：ロン牌を囲って光る → 精算表の倍率と血を書き換え", "RonAnimationUI.PreviewSettlementBonus / SettlementRoutine"),
+            new Entry(RonAnimationUI.AssaultBonusEffectId, "ロン・清算", "強襲：目元の斜めアップのカットイン・抜刀の音 → 精算表の倍率と血を書き換え", "RonAnimationUI.PreviewSettlementBonus / SettlementRoutine"),
+            new Entry(RonAnimationUI.TankiAssaultEffectId, "ロン・清算", "単騎強襲：奥に潜んだ牙が飛びかかってロン牌を噛む → 精算表の倍率と血を書き換え", "RonAnimationUI.PreviewSettlementBonus / SettlementRoutine"),
+            new Entry("ron.bonus_assault_enemy", "ロン・清算", "相手の強襲：目元の斜めアップのカットイン・抜刀の音 → 精算表の倍率と血を書き換え", "RonAnimationUI.PreviewSettlementBonus / SettlementRoutine"),
+            new Entry("ron.bonus_tanki_enemy", "ロン・清算", "相手の単騎：ロン牌を囲って光る → 精算表の倍率と血を書き換え", "RonAnimationUI.PreviewSettlementBonus / SettlementRoutine"),
+            new Entry("ron.bonus_tanki_assault_enemy", "ロン・清算", "相手の単騎強襲：奥に潜んだ牙が飛びかかってロン牌を噛む → 精算表の倍率と血を書き換え", "RonAnimationUI.PreviewSettlementBonus / SettlementRoutine"),
             new Entry("ron.enemy", "ロン・清算", "相手のロン：斜めの役表示 → 清算表（赤） → 血の移動", "RonAnimationUI.PlayRonSequence / ShowYakuRibbon / SettlementRoutine"),
             // 2026-10-19 に本編が霧（全身から血が霧散）になったので、それまでのホースを通る筋を没案に置く
             new Entry("ron.stream_local", "ロン・清算", "自分のロン：卓の血だまりからホースで血が流れ込む", "RonAnimationUI.PreviewStreamDrain", unused: true),
@@ -110,6 +110,7 @@ namespace KillingMahjong.UI
             new Entry("hp.zoom_enemy", "牌・血・ゲージ", "相手の体力表示の拡大", "EnemyInfoUI.ZoomInRoutine", unused: true),
             new Entry("tile.dora", "牌・血・ゲージ", "ドラ牌の発光", "TileVisual.SetTile / DoraShine"),
             new Entry("gauge.absorb", "牌・血・ゲージ", "掛け金の吸収・獲得ゲージ", "ScoreGaugeUI.AbsorbStakesIntoGauge"),
+            new Entry(TurnPieUI.EffectId, "牌・血・ゲージ", "打牌数の円グラフ：打つたびに1つ塗る（先攻は金・後攻は青）", "RiverUI / TurnPieUI.Show"),
             new Entry("voltage.flight", "牌・血・ゲージ", "牌がボルテージへ吸い込まれる", "VoltageTileFlightEffect.TryPlay"),
             new Entry(VoltageUI.RevealEffectId, "牌・血・ゲージ", "ボルテージ登場：ブロック → 炎の点火", "VoltageUI.RevealRoutine / TutorialManager.RunVoltageIntroduction"),
             new Entry("character.death", "キャラクター・背景", "相手が倒れる", "EnemyInfoUI.PlayDeathRoutine"),
@@ -172,7 +173,7 @@ namespace KillingMahjong.UI
             if (Starts(id, "skill.", "hand.", "phase.dealing", "phase.prompt", "tile.sort", "tile.clatter",
                     "ui.ability_bell", "unused.special_victory")) return "手牌選択";
             if (Starts(id, "phase.bet", "phase.battle_start", "gauge.absorb")) return "掛け金";
-            if (Starts(id, "phase.local_turn", "phase.enemy_turn", "voltage.", "tile.dora", "dora.", "ron.chance"))
+            if (Starts(id, "phase.local_turn", "phase.enemy_turn", "turn.pie", "voltage.", "tile.dora", "dora.", "ron.chance"))
                 return "対局";
             if (Starts(id, "ron.", "phase.draw", "settlement.", "hp.damage", "hp.heal", "hp.glitch", "hp.zoom",
                     "blood.", "scene.momentum")) return "ロン・流局";
