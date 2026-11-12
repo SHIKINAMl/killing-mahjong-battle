@@ -541,16 +541,20 @@ namespace KillingMahjong.UI
             badge.Show(info, NotebookTag(info));
             if (!made) return;
 
-            // 役名の文字の幅のすぐ右。役名は置いたあと変わらないので、置くときに一度だけ測る
-            float width = name.GetPreferredValues(name.text).x;
-            if (width <= 0f) width = name.fontSize * name.text.Length;
-            var nameRt = name.rectTransform;
-            float nameLeft = nameRt.anchoredPosition.x - nameRt.sizeDelta.x * 0.5f;
-
             var rt = (RectTransform)badge.transform;
             rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
             rt.pivot = new Vector2(0f, 0.5f);
-            rt.anchoredPosition = new Vector2(Mathf.Round(nameLeft + width + 4f), 0f);
+            PositionTypeBadge(badge, name, 4f);
+        }
+
+        private static void PositionTypeBadge(HandTypeBadge badge, TMP_Text name, float gap)
+        {
+            var nameRect = name.rectTransform;
+            float width = name.GetPreferredValues(name.text).x;
+            if (width <= 0f) width = name.fontSize * name.text.Length;
+            float left = nameRect.anchoredPosition.x + nameRect.rect.xMin;
+            var badgeRect = (RectTransform)badge.transform;
+            badgeRect.anchoredPosition = new Vector2(Mathf.Round(left + width + gap), nameRect.anchoredPosition.y);
         }
 
         // ---- 右: 選んだ役の説明と例 ----
@@ -614,7 +618,7 @@ namespace KillingMahjong.UI
                 var rt = (RectTransform)_typeBadge.transform;
                 rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
                 rt.pivot = new Vector2(0f, 0.5f);
-                rt.anchoredPosition = new Vector2(left, -166f);
+                PositionTypeBadge(_typeBadge, _nameText, 10f);
                 _typeBadge.Show(HandArchetype.Some);
             }
             _seniorMemoText = Txt(parent, "SeniorMemo", "", new Vector2(112f, -128f),
@@ -726,8 +730,9 @@ namespace KillingMahjong.UI
             var type = HandArchetype.Of(yaku);
             if (_typeBadge != null)
             {
-                _typeBadge.gameObject.SetActive(!_browseOnly);
-                if (!_browseOnly) _typeBadge.Show(type, NotebookTag(type));
+                _typeBadge.Show(_browseOnly ? null : type, NotebookTag(type));
+                if (!_browseOnly && type != null && _nameText != null)
+                    PositionTypeBadge(_typeBadge, _nameText, 10f);
             }
         }
 
