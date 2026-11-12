@@ -95,11 +95,12 @@ namespace KillingMahjong.UI
 
         private GameObject _body;
         private readonly List<Image> _rowBgs = new List<Image>();
-        private readonly List<TextMeshProUGUI> _rowBadges = new List<TextMeshProUGUI>();
+        private readonly List<HandTypeBadge> _rowBadges = new List<HandTypeBadge>();
         private RectTransform _hanContent;
         private RectTransform _allContent;
         private readonly List<Image> _allRowBgs = new List<Image>();
-        private readonly List<TextMeshProUGUI> _allRowBadges = new List<TextMeshProUGUI>();
+        private readonly List<HandTypeBadge> _allRowBadges = new List<HandTypeBadge>();
+        private readonly List<HandTypeBadge> _allRowEnemyBadges = new List<HandTypeBadge>();
         private readonly List<string> _allRowYaku = new List<string>();
         private TextMeshProUGUI _seniorMemoText;
         private HandTypeBadge _typeBadge;
@@ -165,7 +166,7 @@ namespace KillingMahjong.UI
             for (int i = 0; i < _rowBadges.Count; i++)
             {
                 int bonus = BonusOf(Yakus[i]);
-                if (_rowBadges[i] != null) _rowBadges[i].text = bonus > 0 ? "+" + bonus : "";
+                ShowBoost(_rowBadges[i], bonus, MineBoostPlate);
             }
 
             // 開くたびに、いちばん上の役から。前に選んだ役を残すと、一覧の見えていない所が選ばれたままになる
@@ -208,11 +209,61 @@ namespace KillingMahjong.UI
             {
                 int local = BonusOf(_allRowYaku[i]);
                 int enemy = EnemyBonusOf(_allRowYaku[i]);
-                _allRowBadges[i].text = (local > 0 ? "<color=#33CCFF>+" + local + "</color> " : "")
-                    + (enemy > 0 ? "<color=#FFB3A7>+" + enemy + "</color>" : "");
+                ShowBoost(_allRowBadges[i], local, MineBoostPlate);
+                ShowBoost(_allRowEnemyBadges[i], enemy, EnemyBoostPlate);
+                // 相手の札がいちばん右。自分の札はその左に詰める
+                PlaceBoost(_allRowEnemyBadges[i], null);
+                PlaceBoost(_allRowBadges[i], enemy > 0 ? _allRowEnemyBadges[i] : null);
             }
             SelectAllRow(wasOpen ? selected : 0);
             if (_scroll != null) _scroll.verticalNormalizedPosition = wasOpen ? scroll : 1f;
+        }
+
+        // ---- 強化済みの「+1」（2026-11-12 プランナー「+1の強化済み表示をもう少し目立たせられますかね」） ----
+        // 前は水色の字だけで、行の右端に小さく出ていて目に入らなかった。
+        // 型の札と同じ板（HandTypeBadge）に載せ、色の面で見せる（コントラスト）。
+        // 自分は牌交換の IN と同じ水色、相手は桃色。字は面の暗い色。
+
+        private static readonly Color MineBoostPlate = new Color32(51, 204, 255, 255);
+        private static readonly Color EnemyBoostPlate = new Color32(255, 179, 167, 255);
+        private static readonly Color BoostInk = new Color32(28, 18, 26, 255);
+        /// <summary>札の右端。一覧の右端（つまみの手前）から少し内側</summary>
+        private const float BoostRight = ListWidth * 0.5f - 4f;
+
+        private HandTypeBadge BuildBoost(Transform row, string name)
+        {
+            HandTypeBadge badge = HandTypeBadge.Ensure(row, name, RowTypeFontSize, _font, true, out bool made);
+            if (made)
+            {
+                var rt = (RectTransform)badge.transform;
+                rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+                rt.pivot = new Vector2(1f, 0.5f);
+                rt.anchoredPosition = new Vector2(BoostRight, 0f);
+                badge.gameObject.SetActive(false);
+            }
+            return badge;
+        }
+
+        private static void ShowBoost(HandTypeBadge badge, int bonus, Color plate)
+        {
+            if (badge == null) return;
+            if (bonus <= 0) { badge.gameObject.SetActive(false); return; }
+            badge.ShowPlain("+" + bonus, plate, BoostInk);
+        }
+
+        /// <summary>右隣に札があればその左へ、無ければ一覧の右端へ寄せる（横の位置だけ。中身で幅が変わるため）</summary>
+        private static void PlaceBoost(HandTypeBadge badge, HandTypeBadge rightNeighbor)
+        {
+            if (badge == null) return;
+            var rt = (RectTransform)badge.transform;
+            float x = BoostRight;
+            if (rightNeighbor != null)
+            {
+                var n = (RectTransform)rightNeighbor.transform;
+                LayoutRebuilder.ForceRebuildLayoutImmediate(n);
+                x = n.anchoredPosition.x - n.rect.width - 2f;
+            }
+            rt.anchoredPosition = new Vector2(x, rt.anchoredPosition.y);
         }
 
         /// <summary>左の一覧を、役一覧用の並び（全部の役）と役強化用の並び（強化できる役）で切り替える。</summary>
@@ -273,6 +324,7 @@ namespace KillingMahjong.UI
             _rowBadges.Clear();
             _allRowBgs.Clear();
             _allRowBadges.Clear();
+            _allRowEnemyBadges.Clear();
             _allRowYaku.Clear();
             _font = BorrowJapaneseFont();
 
@@ -381,9 +433,8 @@ namespace KillingMahjong.UI
 
                 Txt(rowGo.transform, "Name", YakuExamples.DisplayName(Yakus[i]), new Vector2(-14f, 0f),
                     new Vector2(ListWidth - 44f, 18f), 14f, TextAlignmentOptions.Left, TextMain);
-                // すでに強めている役に付ける「+1」。中身は開くたびに入れる
-                TextMeshProUGUI badge = Txt(rowGo.transform, "Boost", "", new Vector2(ListWidth * 0.5f - 22f, 0f),
-                    new Vector2(36f, 18f), 13f, TextAlignmentOptions.Right, BoostColor);
+                // すでに強めている役に付ける「+1」の札。中身は開くたびに入れる
+                HandTypeBadge badge = BuildBoost(rowGo.transform, "BoostTag");
 
                 // 押したときの動きはシーンに保存しない。置いてあるボタンは使い回すので、つなぎ直す
                 int index = i;
@@ -507,8 +558,8 @@ namespace KillingMahjong.UI
                 // 名前は左寄せ。右端の「+1 +1」（自分・敵の強化）のぶん幅を空ける
                 TextMeshProUGUI name = Txt(rowGo.transform, "Name", YakuExamples.DisplayName(yaku), new Vector2(-30f, 0f),
                     new Vector2(ListWidth - 76f, 18f), 14f, TextAlignmentOptions.Left, TextMain);
-                TextMeshProUGUI badge = Txt(rowGo.transform, "Boost", "", new Vector2(ListWidth * 0.5f - 34f, 0f),
-                    new Vector2(62f, 18f), 13f, TextAlignmentOptions.Right, BoostColor);
+                HandTypeBadge badge = BuildBoost(rowGo.transform, "BoostTag");
+                HandTypeBadge enemyBadge = BuildBoost(rowGo.transform, "EnemyBoostTag");
                 BuildRowType(rowGo.transform, name, HandArchetype.Of(yaku));
 
                 int index = i;
@@ -517,6 +568,7 @@ namespace KillingMahjong.UI
 
                 _allRowBgs.Add(rowImage);
                 _allRowBadges.Add(badge);
+                _allRowEnemyBadges.Add(enemyBadge);
                 _allRowYaku.Add(yaku);
                 y -= RowPitch;
             }
