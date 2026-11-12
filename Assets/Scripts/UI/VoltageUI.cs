@@ -90,8 +90,14 @@ namespace KillingMahjong.UI
         /// </summary>
         private const float SelfPosX = -280f;
         private const float SelfPosY = -120f;
-        private const float EnemyPosX = 149f;
-        private const float EnemyPosY = -68f;
+        // 2026-11-12 ユーザー「敵のボルテージがかぶっているので調整して」。
+        // 吹き出しの真下 (149, -68) は相手の右の翼に重なっていた。
+        // **吹き出しの右隣の壁**へ移す。吹き出し（DialoguePanel）の右端は画面 x=670、
+        // 上の役一覧の下端は y=165、右下の血袋と羽ペンは y=300 より下なので、
+        // 倍率の上端 y=184〜四角の下端 y=272、x=683〜787 がその間に収まる。
+        // 吹き出しのすぐ横なので「敵の物」という結び付き（近接）は残る。
+        private const float EnemyPosX = 335f;
+        private const float EnemyPosY = 40f;
 
         // 点いた四角の色は段ごとに変わるので、ここには持たない。
         // 配っているのは VoltageFlame.PipColorFor（2026-09-13）。
