@@ -101,12 +101,7 @@ namespace KillingMahjong.UI
         private readonly List<Image> _allRowBgs = new List<Image>();
         private readonly List<TextMeshProUGUI> _allRowBadges = new List<TextMeshProUGUI>();
         private readonly List<string> _allRowYaku = new List<string>();
-        private TextMeshProUGUI _typeText;
         private TextMeshProUGUI _seniorMemoText;
-        /// <summary>型の文の、シーンに置いた横位置。役一覧では札が無いぶん左へ寄せる。</summary>
-        private float? _typeTextX;
-        /// <summary>型の文の前に空けてある、札のぶんの幅。</summary>
-        private const float TypeBadgeRoom = 80f;
         private HandTypeBadge _typeBadge;
         private int _selectedAll;
         private TextMeshProUGUI _nameText;
@@ -612,8 +607,7 @@ namespace KillingMahjong.UI
                     new Vector2(x, -144f), new Vector2(cell, 18f), 12f, TextAlignmentOptions.Center, TextDim);
             }
 
-            // その役が入る型と、相手がその型のときに捨て牌に出る特徴（2026-10-15）
-            // 左に型の札、右に特徴。札の幅は型で変わるので、文は一番広い札（ドラ頼み）の右から始める
+            // その役が入る型の札。対局中のヒントは下の先輩メモにまとめる。
             _typeBadge = HandTypeBadge.Ensure(parent, "YakuTypeBadge", 13f, _font, true, out bool madeBadge);
             if (madeBadge)
             {
@@ -623,11 +617,8 @@ namespace KillingMahjong.UI
                 rt.anchoredPosition = new Vector2(left, -166f);
                 _typeBadge.Show(HandArchetype.Some);
             }
-            _typeText = Txt(parent, "YakuType", "", new Vector2(DetailCenterX + 40f, -166f),
-                new Vector2(DetailWidth - 80f, 18f), 12.5f, TextAlignmentOptions.Left, TextDim);
-
-            _seniorMemoText = Txt(parent, "SeniorMemo", "", new Vector2(112f, -118f),
-                new Vector2(DetailWidth, 38f), 14f, TextAlignmentOptions.TopLeft, TextMain, out bool madeMemo);
+            _seniorMemoText = Txt(parent, "SeniorMemo", "", new Vector2(112f, -128f),
+                new Vector2(430f, 56f), 14f, TextAlignmentOptions.TopLeft, TextMain, out bool madeMemo);
             if (madeMemo) _seniorMemoText.textWrappingMode = TextWrappingModes.Normal;
 
         }
@@ -713,8 +704,8 @@ namespace KillingMahjong.UI
                 _hanText.text = _browseOnly ? ""
                     : "倍率1段上げ・" + GameRules.GetBoostTierCapLabel(yaku) + "まで";
             }
-            if (_descText != null) _descText.text = NotebookDescriptions.TryGetValue(yaku, out string description)
-                ? description : YakuInfo.GetDescription(yaku);
+            bool hasCopy = NotebookCopy.TryGetValue(yaku, out var copy);
+            if (_descText != null) _descText.text = hasCopy ? copy.Condition : YakuInfo.GetDescription(yaku);
             // 強めてあるかは一覧の「+1」で分かるので、ここでは言わない
             if (_boostText != null) _boostText.text = "";
             // 強化済みの役は選べない（送るとサーバーがエラーを返す）
@@ -725,25 +716,18 @@ namespace KillingMahjong.UI
             if (_noteText != null) _noteText.text = NotebookNote(entry);
             if (_seniorMemoText != null)
             {
-                bool hasMemo = SeniorMemos.TryGetValue(yaku, out string memo);
-                _seniorMemoText.gameObject.SetActive(hasMemo);
-                _seniorMemoText.text = hasMemo ? "<color=#8B3048>先輩メモ</color>　" + memo : "";
+                _seniorMemoText.gameObject.SetActive(hasCopy);
+                _seniorMemoText.text = hasCopy
+                    ? "<color=#8B3048>先輩メモ</color>\n" + copy.Aside + "\n" + copy.Tip
+                    : "";
             }
 
-            // 型の札は、役一覧では行の横に出ているので、ここには出さない（文を札の位置から始める）
+            // 閲覧では型の札を一覧の各行で見せる。
             var type = HandArchetype.Of(yaku);
             if (_typeBadge != null)
             {
                 _typeBadge.gameObject.SetActive(!_browseOnly);
                 if (!_browseOnly) _typeBadge.Show(type, NotebookTag(type));
-            }
-            if (_typeText != null)
-            {
-                _typeText.text = NotebookTell(type);
-                if (_typeTextX == null) _typeTextX = _typeText.rectTransform.anchoredPosition.x;
-                var pos = _typeText.rectTransform.anchoredPosition;
-                pos.x = _browseOnly ? _typeTextX.Value - TypeBadgeRoom : _typeTextX.Value;
-                _typeText.rectTransform.anchoredPosition = pos;
             }
         }
 
