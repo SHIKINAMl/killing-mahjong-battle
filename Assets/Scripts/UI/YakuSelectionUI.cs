@@ -56,7 +56,6 @@ namespace KillingMahjong.UI
         private static readonly Color Clear = new Color(0f, 0f, 0f, 0f);
 
         /// <summary>強化した分の色。牌交換の IN・役強化の演出の「新しい翻数」と同じ水色。</summary>
-        private const string BoostHex = "#33CCFF";
         private static readonly Color BoostColor = new Color(0.2f, 0.8f, 1f, 1f);
 
         // 割り付け（800x600 の画面の中心が原点）。コレクションの役タブと同じ寸法を、枠に合わせて上へ寄せた
@@ -712,7 +711,7 @@ namespace KillingMahjong.UI
             if (_hanText != null)
             {
                 _hanText.text = _browseOnly ? ""
-                    : "<color=" + BoostHex + ">倍率1段上げ・" + GameRules.GetBoostTierCapLabel(yaku) + "まで</color>";
+                    : "倍率1段上げ・" + GameRules.GetBoostTierCapLabel(yaku) + "まで";
             }
             if (_descText != null) _descText.text = NotebookDescriptions.TryGetValue(yaku, out string description)
                 ? description : YakuInfo.GetDescription(yaku);
@@ -728,7 +727,7 @@ namespace KillingMahjong.UI
             {
                 bool hasMemo = SeniorMemos.TryGetValue(yaku, out string memo);
                 _seniorMemoText.gameObject.SetActive(hasMemo);
-                _seniorMemoText.text = hasMemo ? "<color=#CD989F>先輩メモ</color>　" + memo : "";
+                _seniorMemoText.text = hasMemo ? "<color=#8B3048>先輩メモ</color>　" + memo : "";
             }
 
             // 型の札は、役一覧では行の横に出ているので、ここには出さない（文を札の位置から始める）
