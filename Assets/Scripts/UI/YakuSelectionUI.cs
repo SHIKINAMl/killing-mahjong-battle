@@ -51,7 +51,7 @@ namespace KillingMahjong.UI
         private static readonly Color Marker = new Color32(214, 40, 62, 255);
         private static readonly Color PanelBg = new Color32(28, 18, 26, 252);
         private static readonly Color PanelEdge = new Color32(80, 48, 62, 255);
-        private static readonly Color RowSelected = new Color32(64, 28, 40, 255);
+        private static readonly Color RowSelected = new Color32(160, 53, 86, 255);
         private static readonly Color ButtonBg = new Color32(52, 30, 42, 255);
         private static readonly Color Clear = new Color(0f, 0f, 0f, 0f);
 
@@ -209,7 +209,7 @@ namespace KillingMahjong.UI
                 int local = BonusOf(_allRowYaku[i]);
                 int enemy = EnemyBonusOf(_allRowYaku[i]);
                 _allRowBadges[i].text = (local > 0 ? "<color=#33CCFF>+" + local + "</color> " : "")
-                    + (enemy > 0 ? "<color=#FF4858>+" + enemy + "</color>" : "");
+                    + (enemy > 0 ? "<color=#FFB3A7>+" + enemy + "</color>" : "");
             }
             SelectAllRow(wasOpen ? selected : 0);
             if (_scroll != null) _scroll.verticalNormalizedPosition = wasOpen ? scroll : 1f;
