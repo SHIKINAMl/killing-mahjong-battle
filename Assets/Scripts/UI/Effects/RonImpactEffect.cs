@@ -83,15 +83,22 @@ namespace KillingMahjong.UI.Effects
 
             if (!displayedAnyHand) handImage.gameObject.SetActive(false);
 
-            Texture2D burstTexture = CreateBurstTexture();
+            // 縁と中は別の絵（どちらも半分の解像度で作り、2倍で映す＝1ドットが2単位）
+            Texture2D burstTexture = CreateBurstTexture(BurstDot, 0f);
+            Texture2D innerTexture = CreateBurstTexture(BurstDot, BurstRim);
             Sprite burstSprite = Sprite.Create(
                 burstTexture,
                 new Rect(0f, 0f, burstTexture.width, burstTexture.height),
                 new Vector2(0.5f, 0.5f),
                 100f);
+            Sprite innerSprite = Sprite.Create(
+                innerTexture,
+                new Rect(0f, 0f, innerTexture.width, innerTexture.height),
+                new Vector2(0.5f, 0.5f),
+                100f);
             // 集中線は手と吹き出しの奥。吹き出しへ向けて集める
             var lines = CreateFocusLines(overlayRt);
-            RectTransform callout = CreateBurstCallout(overlayRt, burstSprite);
+            RectTransform callout = CreateBurstCallout(overlayRt, burstSprite, innerSprite);
             RonAuraUI.BehindCallout(callout);
 
             // 吹き出し・声・ドン・揺れを**同じ1コマに揃える**
@@ -115,6 +122,8 @@ namespace KillingMahjong.UI.Effects
             if (handSprite != null) Object.Destroy(handSprite);
             Object.Destroy(burstSprite);
             Object.Destroy(burstTexture);
+            Object.Destroy(innerSprite);
+            Object.Destroy(innerTexture);
         }
 
         /// <summary>
@@ -240,7 +249,21 @@ namespace KillingMahjong.UI.Effects
         private static readonly Vector2 BurstPosition = new Vector2(202f, 62f);
 
         /// <summary>吹き出しを1つの入れ物にまとめて作る。叩きつけと震えは入れ物ごと動かす。</summary>
-        private static RectTransform CreateBurstCallout(RectTransform root, Sprite burstSprite)
+        // ---- 吹き出しの見た目（2026-11-12 MnoA「吹き出しももう少し雰囲気が合うように」） ----
+        // 前はクリーム色の漫画の吹き出しに、太字の「ロン!!!」を少し傾けて載せていた。
+        // ほかの絵（手牌のボタン・型の札）に合わせ、黒い縁・赤い面・明るい字のべた塗りのドット絵にする。
+        // 縁はなめらかな線ではなく1ドット＝2単位の階段。字はドットフォントを太字にも傾けもせず、
+        // 1ドットが揃う大きさ（40）で置く（傾けたり太字にしたりすると、ドットが崩れてにじむ）。
+
+        /// <summary>吹き出しの絵の1ドットが何単位か</summary>
+        private const int BurstDot = 2;
+        /// <summary>黒い縁の太さ（単位）</summary>
+        private const float BurstRim = 12f;
+        private static readonly Color32 BurstInk = new Color32(20, 12, 16, 255);
+        private static readonly Color32 BurstFace = new Color32(194, 39, 45, 255);
+        private static readonly Color32 BurstText = new Color32(250, 246, 228, 255);
+
+        private static RectTransform CreateBurstCallout(RectTransform root, Sprite burstSprite, Sprite innerSprite)
         {
             var group = new GameObject("RonBurst", typeof(RectTransform));
             group.transform.SetParent(root, false);
@@ -250,30 +273,30 @@ namespace KillingMahjong.UI.Effects
 
             Image outline = CreateImage("RonBurstOutline", parent);
             outline.sprite = burstSprite;
-            outline.color = new Color32(52, 19, 25, 255);
+            outline.color = BurstInk;
             SetRect(outline.rectTransform, position, new Vector2(292f, 234f));
 
             Image inner = CreateImage("RonBurstInner", parent);
-            inner.sprite = burstSprite;
-            inner.color = new Color32(255, 248, 225, 255);
-            SetRect(inner.rectTransform, position, new Vector2(252f, 202f));
+            inner.sprite = innerSprite;
+            inner.color = BurstFace;
+            SetRect(inner.rectTransform, position, new Vector2(292f, 234f));
 
             GameObject textObject = new GameObject("RonBurstText", typeof(RectTransform), typeof(TextMeshProUGUI));
             textObject.transform.SetParent(parent, false);
             TextMeshProUGUI text = textObject.GetComponent<TextMeshProUGUI>();
             text.text = "\u30ed\u30f3!!!";
-            // **吹き出しの白の中に収める。** 57 固定だと「ロ」が左へはみ出して赤い背景に沈み、
-            // 最後の「!」も切れていた（2026-10-18 の録画で確認。「コン!!」に見えた）
-            text.enableAutoSizing = true;
-            text.fontSizeMax = 57f;
-            text.fontSizeMin = 28f;
-            text.fontStyle = FontStyles.Bold;
-            text.color = new Color32(46, 17, 24, 255);
+            // **吹き出しの赤い面の中に収める。** 40（フォントの4倍）で「ロン!!!」が幅 140。
+            // 50 では谷のところで縁へはみ出した（2026-10-18 にも、はみ出して「コン!!」に見えたことがある）
+            var pixelFont = Resources.Load<TMP_FontAsset>("PixelMplus10_DynamicFixed");
+            if (pixelFont != null) text.font = pixelFont;
+            text.enableAutoSizing = false;
+            text.fontSize = 40f;
+            text.fontStyle = FontStyles.Normal;
+            text.color = BurstText;
             text.alignment = TextAlignmentOptions.Center;
             text.textWrappingMode = TextWrappingModes.NoWrap;
             text.raycastTarget = false;
-            SetRect(text.rectTransform, position, new Vector2(176f, 110f));
-            text.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -5f);
+            SetRect(text.rectTransform, position, new Vector2(170f, 60f));
             return parent;
         }
 
@@ -291,10 +314,15 @@ namespace KillingMahjong.UI.Effects
         /// 外側と内側で同じスプライトを重ね、濃色の太枠を作る。
         /// 戦況グラフのロンの吹き出し（MatchMomentumUI）も同じ形を使う。
         /// </summary>
-        internal static Texture2D CreateBurstTexture()
+        internal static Texture2D CreateBurstTexture() => CreateBurstTexture(1, 0f);
+
+        /// <param name="dot">1ドットを何単位にするか。絵はこの分だけ小さく作る</param>
+        /// <param name="inset">形を内側へ縮める幅（単位）。縁の内側の面を作るときに使う</param>
+        internal static Texture2D CreateBurstTexture(int dot, float inset)
         {
-            const int width = 292;
-            const int height = 234;
+            dot = Mathf.Max(1, dot);
+            int width = 292 / dot;
+            int height = 234 / dot;
             const int pointCount = 20;
             Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
             texture.filterMode = FilterMode.Point;
@@ -312,7 +340,7 @@ namespace KillingMahjong.UI.Effects
             {
                 float angle = (-90f + 360f * i / pointCount) * Mathf.Deg2Rad;
                 float baseRadius = i % 2 == 0 ? 112f : 88f;
-                float radius = baseRadius * jitter[i];
+                float radius = (baseRadius * jitter[i] - inset) / dot;
                 px[i] = width * 0.5f + Mathf.Cos(angle) * radius;
                 py[i] = height * 0.5f + Mathf.Sin(angle) * radius;
             }
