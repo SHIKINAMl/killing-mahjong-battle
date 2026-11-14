@@ -10,12 +10,10 @@ namespace KillingMahjong.UI
         /// 暗転まわりの一発物を鳴らす（2026-09-11）。`Resources/Stingers/` から読む。
         ///
         /// **繋ぎの尺は `checkerFadeDuration` に合わせて作ってある。**
-        /// `br_riser` は 1.0 秒かけて上がり切った瞬間に着地の音が鳴る。
+        /// `br_riser` と局開始用の `br_round_riser` は、明転開始から約1秒で打音が鳴る。
         /// 市松模様が晴れる瞬間と打点を合わせるためなので、
         /// `checkerFadeDuration` を変えたら音も作り直すこと。ずれると打点だけ遅れて聞こえる。
-        /// 暗転・明転・着弾は Freesound（CC0）の素材を重ねたものに替えた（2026-10-19、
-        /// 作り方は km-bridge/効果音/game_se_make.py）。黒帯の開く・閉じるは、吸血鬼のマントとコウモリの
-        /// 羽ばたきを 8bit 風に荒くしたもの（閉じるは、前の音のいちばん強い所と同じ時刻に「バサッ」が来る）。
+        /// 流局や掛け金確定の切り替えと、局開始の暗転・明転は別の音源を使う。
         /// </summary>
         private void PlayTransitionStinger(string name)
         {
@@ -93,6 +91,7 @@ namespace KillingMahjong.UI
         /// 先に終わっていた場合はこの旗に積んでおく。
         /// </summary>
         private bool _fadeOutPendingUntilDarkened;
+        private bool _useRoundStartRevealSound;
         private float roundStartTextVisibleUntil;
         private Coroutine darkenTextRoutine;
         private const float MinimumRoundTitleSeconds = 1f;
@@ -126,6 +125,7 @@ namespace KillingMahjong.UI
             // （進行管理の BeginRoundStart）。配牌が暗転より先に終わっている場合に
             // ここで倒すと、「もう待っていないのに山を置く」が復活する。
             ResetVisuals();
+            _useRoundStartRevealSound = true;
 
             // 濃さを抑える。ResetVisuals のあとに当てないと戻される
             if (fullScreenCheckerImage != null)
@@ -135,8 +135,8 @@ namespace KillingMahjong.UI
                 fullScreenCheckerImage.color = c;
             }
 
-            // 市松模様フェードイン (暗転)。落ちていくスイープを重ねる
-            PlayTransitionStinger("br_fall");
+            // 市松模様が暗くなるところに、布と短い打音を合わせる。
+            PlayTransitionStinger("br_round_fall");
             if (fullScreenCheckerImage != null) fullScreenCheckerImage.gameObject.SetActive(true);
             if (checkerMaterial != null)
             {
@@ -159,14 +159,11 @@ namespace KillingMahjong.UI
             _additionalRoundStartDarkenedCallbacks = null;
             additionalCallbacks?.Invoke();
 
-            // ドン！とテキスト表示。画面揺れと同じ「着弾」なので打撃音を当てる。
-            // 字が空なら、暗転だけにして字も音も出さない（チュートリアルの第1局。2026-10-29）
+            // 局名を描画するまで文字を透明にしておく。空なら暗転だけを出す。
             if (centerText != null && !string.IsNullOrEmpty(text))
             {
-                PlayTransitionStinger("br_blackout");
                 centerText.text = text;
                 centerText.color = Color.white;
-                // 字は下で1字ずつ出すので、それまでは透明にしておく
                 centerText.alpha = 0f;
                 centerText.gameObject.SetActive(true);
             }
@@ -197,6 +194,7 @@ namespace KillingMahjong.UI
                 centerText.ForceMeshUpdate();
                 // その場でぱっと出す（2026-10-26 のユーザー指示。以前は1字ずつ浮かせていた）
                 centerText.alpha = 1f;
+                PlayTransitionStinger("br_blackout");
                 roundStartTextVisibleUntil = Time.unscaledTime + MinimumRoundTitleSeconds;
             }
 
@@ -263,8 +261,9 @@ namespace KillingMahjong.UI
             yield return HideBandText();
             if (horizontalLineRt != null) horizontalLineRt.gameObject.SetActive(false);
 
-            // 市松模様フェードアウト (晴れる)。上がり切ったところでキックが着地する
-            PlayTransitionStinger("br_riser");
+            // 流局後もここで明転するので、局名を出す経路から来たときは専用の音を鳴らす。
+            PlayTransitionStinger(_useRoundStartRevealSound ? "br_round_riser" : "br_riser");
+            _useRoundStartRevealSound = false;
             float t = 0;
             while (t < checkerFadeDuration)
             {

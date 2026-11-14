@@ -227,6 +227,7 @@ namespace KillingMahjong.UI
             darkenTextRoutine = null;
             roundStartTextVisibleUntil = 0f;
             _roundStartCleanupDone = false;
+            _useRoundStartRevealSound = false;
             if (fullScreenCheckerImage != null) fullScreenCheckerImage.gameObject.SetActive(false);
             if (horizontalLineRt != null) horizontalLineRt.gameObject.SetActive(false);
             if (centerText != null) { centerText.gameObject.SetActive(false); centerText.alpha = 1f; }
