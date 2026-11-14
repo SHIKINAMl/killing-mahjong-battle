@@ -606,6 +606,7 @@ GameObject:
   - component: {fileID: 23884374}
   - component: {fileID: 23884373}
   - component: {fileID: 23884371}
+  - component: {fileID: 23884377}
   m_Layer: 5
   m_Name: ConfirmWeakHand
   m_TagString: Untagged
@@ -664,7 +665,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
-  m_EffectColor: {r: 0.9607843, g: 0.9607843, b: 0.8627451, a: 1}
+  m_EffectColor: {r: 0.078431375, g: 0.047058824, b: 0.0627451, a: 1}
   m_EffectDistance: {x: 2, y: -2}
   m_UseGraphicAlpha: 1
 --- !u!114 &23884374
@@ -749,6 +750,21 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 23884369}
   m_CullTransparentMesh: 1
+--- !u!114 &23884377
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 23884369}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
+  m_EffectColor: {r: 0.9607843, g: 0.9607843, b: 0.8627451, a: 1}
+  m_EffectDistance: {x: 1, y: -1}
+  m_UseGraphicAlpha: 1
 --- !u!1 &28573448
 GameObject:
   m_ObjectHideFlags: 0
@@ -4710,6 +4726,7 @@ GameObject:
   - component: {fileID: 229336175}
   - component: {fileID: 229336174}
   - component: {fileID: 229336178}
+  - component: {fileID: 229336179}
   m_Layer: 0
   m_Name: "\u623B\u308B"
   m_TagString: Untagged
@@ -4752,7 +4769,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
-  m_EffectColor: {r: 0.9607843, g: 0.9607843, b: 0.8627451, a: 1}
+  m_EffectColor: {r: 0.078431375, g: 0.047058824, b: 0.0627451, a: 1}
   m_EffectDistance: {x: 2, y: -2}
   m_UseGraphicAlpha: 1
 --- !u!114 &229336175
@@ -4865,6 +4882,21 @@ MonoBehaviour:
   frame: {fileID: 1418098107}
   hoverArt: {fileID: 2056331898}
   selectedArt: {fileID: 994002977}
+--- !u!114 &229336179
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 229336171}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
+  m_EffectColor: {r: 0.9607843, g: 0.9607843, b: 0.8627451, a: 1}
+  m_EffectDistance: {x: 1, y: -1}
+  m_UseGraphicAlpha: 1
 --- !u!1 &231615392
 GameObject:
   m_ObjectHideFlags: 0
@@ -6864,6 +6896,7 @@ GameObject:
   - component: {fileID: 306529788}
   - component: {fileID: 306529792}
   - component: {fileID: 306529793}
+  - component: {fileID: 306529794}
   m_Layer: 5
   m_Name: "\u639B\u3051\u91D1\u4E0A\u3052\u30DC\u30BF\u30F3"
   m_TagString: Untagged
@@ -6988,7 +7021,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
-  m_EffectColor: {r: 0.9607843, g: 0.9607843, b: 0.8627451, a: 1}
+  m_EffectColor: {r: 0.078431375, g: 0.047058824, b: 0.0627451, a: 1}
   m_EffectDistance: {x: 1, y: -1}
   m_UseGraphicAlpha: 1
 --- !u!114 &306529793
@@ -7007,6 +7040,21 @@ MonoBehaviour:
   frame: {fileID: 994290868}
   hoverArt: {fileID: 160801011}
   selectedArt: {fileID: 1358663401}
+--- !u!114 &306529794
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 306529786}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
+  m_EffectColor: {r: 0.9607843, g: 0.9607843, b: 0.8627451, a: 1}
+  m_EffectDistance: {x: 1, y: -1}
+  m_UseGraphicAlpha: 1
 --- !u!1 &312065927
 GameObject:
   m_ObjectHideFlags: 0
@@ -8731,6 +8779,7 @@ GameObject:
   - component: {fileID: 394205230}
   - component: {fileID: 394205229}
   - component: {fileID: 394205233}
+  - component: {fileID: 394205234}
   m_Layer: 5
   m_Name: "FullBet\u30DC\u30BF\u30F3"
   m_TagString: Untagged
@@ -8773,7 +8822,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
-  m_EffectColor: {r: 0.9607843, g: 0.9607843, b: 0.8627451, a: 1}
+  m_EffectColor: {r: 0.078431375, g: 0.047058824, b: 0.0627451, a: 1}
   m_EffectDistance: {x: 1, y: -1}
   m_UseGraphicAlpha: 1
 --- !u!114 &394205230
@@ -8874,6 +8923,21 @@ MonoBehaviour:
   frame: {fileID: 1587496034}
   hoverArt: {fileID: 1395403021}
   selectedArt: {fileID: 598692621}
+--- !u!114 &394205234
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 394205226}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
+  m_EffectColor: {r: 0.9607843, g: 0.9607843, b: 0.8627451, a: 1}
+  m_EffectDistance: {x: 1, y: -1}
+  m_UseGraphicAlpha: 1
 --- !u!1 &400179984
 GameObject:
   m_ObjectHideFlags: 0
@@ -11613,7 +11677,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 0.5
+  m_PixelsPerUnitMultiplier: 1
 --- !u!222 &519346421
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -18238,7 +18302,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 0.5
+  m_PixelsPerUnitMultiplier: 1
 --- !u!222 &874971846
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -21051,6 +21115,7 @@ GameObject:
   - component: {fileID: 1020557675}
   - component: {fileID: 1020557679}
   - component: {fileID: 1020557680}
+  - component: {fileID: 1020557681}
   m_Layer: 5
   m_Name: Button
   m_TagString: Untagged
@@ -21175,7 +21240,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
-  m_EffectColor: {r: 0.9607843, g: 0.9607843, b: 0.8627451, a: 1}
+  m_EffectColor: {r: 0.078431375, g: 0.047058824, b: 0.0627451, a: 1}
   m_EffectDistance: {x: 1, y: -1}
   m_UseGraphicAlpha: 1
 --- !u!114 &1020557680
@@ -21194,6 +21259,21 @@ MonoBehaviour:
   frame: {fileID: 1714205557}
   hoverArt: {fileID: 22933594}
   selectedArt: {fileID: 1704433841}
+--- !u!114 &1020557681
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1020557673}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
+  m_EffectColor: {r: 0.9607843, g: 0.9607843, b: 0.8627451, a: 1}
+  m_EffectDistance: {x: 1, y: -1}
+  m_UseGraphicAlpha: 1
 --- !u!1 &1035962681
 GameObject:
   m_ObjectHideFlags: 0
@@ -21533,6 +21613,7 @@ GameObject:
   - component: {fileID: 1042621546}
   - component: {fileID: 1042621550}
   - component: {fileID: 1042621551}
+  - component: {fileID: 1042621552}
   m_Layer: 5
   m_Name: "\u639B\u3051\u91D1\u4E0B\u3052\u30DC\u30BF\u30F3"
   m_TagString: Untagged
@@ -21657,7 +21738,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
-  m_EffectColor: {r: 0.9607843, g: 0.9607843, b: 0.8627451, a: 1}
+  m_EffectColor: {r: 0.078431375, g: 0.047058824, b: 0.0627451, a: 1}
   m_EffectDistance: {x: 1, y: -1}
   m_UseGraphicAlpha: 1
 --- !u!114 &1042621551
@@ -21676,6 +21757,21 @@ MonoBehaviour:
   frame: {fileID: 267395908}
   hoverArt: {fileID: 557154684}
   selectedArt: {fileID: 907595131}
+--- !u!114 &1042621552
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1042621544}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
+  m_EffectColor: {r: 0.9607843, g: 0.9607843, b: 0.8627451, a: 1}
+  m_EffectDistance: {x: 1, y: -1}
+  m_UseGraphicAlpha: 1
 --- !u!1 &1051853180
 GameObject:
   m_ObjectHideFlags: 0
@@ -22763,6 +22859,7 @@ GameObject:
   - component: {fileID: 1121907429}
   - component: {fileID: 1121907433}
   - component: {fileID: 1121907434}
+  - component: {fileID: 1121907435}
   m_Layer: 5
   m_Name: NoButton
   m_TagString: Untagged
@@ -22887,7 +22984,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
-  m_EffectColor: {r: 0.9607843, g: 0.9607843, b: 0.8627451, a: 1}
+  m_EffectColor: {r: 0.078431375, g: 0.047058824, b: 0.0627451, a: 1}
   m_EffectDistance: {x: 2, y: -2}
   m_UseGraphicAlpha: 1
 --- !u!114 &1121907434
@@ -22906,6 +23003,21 @@ MonoBehaviour:
   frame: {fileID: 479901541}
   hoverArt: {fileID: 1484418769}
   selectedArt: {fileID: 761730566}
+--- !u!114 &1121907435
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1121907427}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
+  m_EffectColor: {r: 0.9607843, g: 0.9607843, b: 0.8627451, a: 1}
+  m_EffectDistance: {x: 1, y: -1}
+  m_UseGraphicAlpha: 1
 --- !u!1 &1124958517
 GameObject:
   m_ObjectHideFlags: 0
@@ -26227,6 +26339,7 @@ GameObject:
   - component: {fileID: 1335786870}
   - component: {fileID: 1335786874}
   - component: {fileID: 1335786875}
+  - component: {fileID: 1335786876}
   m_Layer: 5
   m_Name: OkButton
   m_TagString: Untagged
@@ -26351,7 +26464,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
-  m_EffectColor: {r: 0.9607843, g: 0.9607843, b: 0.8627451, a: 1}
+  m_EffectColor: {r: 0.078431375, g: 0.047058824, b: 0.0627451, a: 1}
   m_EffectDistance: {x: 2, y: -2}
   m_UseGraphicAlpha: 1
 --- !u!114 &1335786875
@@ -26370,6 +26483,21 @@ MonoBehaviour:
   frame: {fileID: 754916343}
   hoverArt: {fileID: 670567902}
   selectedArt: {fileID: 851100292}
+--- !u!114 &1335786876
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1335786868}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
+  m_EffectColor: {r: 0.9607843, g: 0.9607843, b: 0.8627451, a: 1}
+  m_EffectDistance: {x: 1, y: -1}
+  m_UseGraphicAlpha: 1
 --- !u!1 &1337835220
 GameObject:
   m_ObjectHideFlags: 0
@@ -29879,6 +30007,7 @@ GameObject:
   - component: {fileID: 1511643336}
   - component: {fileID: 1511643335}
   - component: {fileID: 1511643333}
+  - component: {fileID: 1511643339}
   m_Layer: 5
   m_Name: BackToSelection
   m_TagString: Untagged
@@ -29937,7 +30066,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
-  m_EffectColor: {r: 0.9607843, g: 0.9607843, b: 0.8627451, a: 1}
+  m_EffectColor: {r: 0.078431375, g: 0.047058824, b: 0.0627451, a: 1}
   m_EffectDistance: {x: 2, y: -2}
   m_UseGraphicAlpha: 1
 --- !u!114 &1511643336
@@ -30022,6 +30151,21 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1511643331}
   m_CullTransparentMesh: 1
+--- !u!114 &1511643339
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1511643331}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
+  m_EffectColor: {r: 0.9607843, g: 0.9607843, b: 0.8627451, a: 1}
+  m_EffectDistance: {x: 1, y: -1}
+  m_UseGraphicAlpha: 1
 --- !u!1 &1511801353
 GameObject:
   m_ObjectHideFlags: 0
@@ -41409,6 +41553,7 @@ GameObject:
   - component: {fileID: 2044738477}
   - component: {fileID: 2044738481}
   - component: {fileID: 2044738482}
+  - component: {fileID: 2044738483}
   m_Layer: 5
   m_Name: "\u6C7A\u5B9A\u30DC\u30BF\u30F3"
   m_TagString: Untagged
@@ -41533,7 +41678,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
-  m_EffectColor: {r: 0.9607843, g: 0.9607843, b: 0.8627451, a: 1}
+  m_EffectColor: {r: 0.078431375, g: 0.047058824, b: 0.0627451, a: 1}
   m_EffectDistance: {x: 2, y: -2}
   m_UseGraphicAlpha: 1
 --- !u!114 &2044738482
@@ -41552,6 +41697,21 @@ MonoBehaviour:
   frame: {fileID: 430357178}
   hoverArt: {fileID: 541185366}
   selectedArt: {fileID: 1749016757}
+--- !u!114 &2044738483
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2044738475}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
+  m_EffectColor: {r: 0.9607843, g: 0.9607843, b: 0.8627451, a: 1}
+  m_EffectDistance: {x: 1, y: -1}
+  m_UseGraphicAlpha: 1
 --- !u!1 &2046538994
 GameObject:
   m_ObjectHideFlags: 0
