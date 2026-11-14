@@ -268,7 +268,15 @@ namespace KillingMahjong.UI
             if (!s.IsTankiWait)
             {
                 var caster = s.LocalWon ? player?.CurrentCharacterData : enemy?.CurrentCharacterData;
-                yield return PlayAssaultCutin(rt, group, caster, s.LocalWon);
+                // 自分の強襲では、自分の立ち絵ではなくベルル（目の光った、スキルのカットインと同じ絵）を映す
+                // （2026-11-14 ユーザー指示「自分が強襲したらベルルを映しといて」）。
+                Sprite belle = null;
+                if (s.LocalWon)
+                {
+                    var phase = FindFirstObjectByType<PhaseTransitionUI>(FindObjectsInactive.Include);
+                    belle = phase != null ? phase.PlayerCutinSprite : null;
+                }
+                yield return PlayAssaultCutin(rt, group, caster, s.LocalWon, belle);
                 yield break;
             }
 
@@ -286,7 +294,9 @@ namespace KillingMahjong.UI
             if (s.AssaultApplied)
             {
                 yield return PlayFangBite(rt, tile.rectTransform, glow, title, note, dim);
-                yield return new WaitForSeconds(.05f);
+                // 「単騎強襲」の字が出ている時間を約1秒にする（2026-11-14 ユーザー指示「単騎強襲の文字の時間を1秒くらい」）。
+                // 字は噛んだあとの沈み（0.2秒）で着地し、ここで待ち、最後の 0.2秒で薄れる。
+                yield return new WaitForSeconds(.60f);
             }
             else
             {
@@ -298,7 +308,7 @@ namespace KillingMahjong.UI
         }
 
         private static IEnumerator PlayAssaultCutin(RectTransform parent, CanvasGroup group,
-            CharacterData caster, bool localWon)
+            CharacterData caster, bool localWon, Sprite belle = null)
         {
             var maskTexture = Resources.Load<Texture2D>("UI/Cutin/assault_slash_mask");
             var frameTexture = Resources.Load<Texture2D>("UI/Cutin/assault_slash_frame");
@@ -327,7 +337,16 @@ namespace KillingMahjong.UI
                 var body = caster?.bodySprites?.Find(x => x.id == caster.defaultBodyId)?.sprite ?? caster?.normalSprite;
                 var face = caster?.faceSprites?.Find(x => x.id == "キメ顔")?.sprite
                     ?? caster?.faceSprites?.Find(x => x.id == caster.defaultFaceId)?.sprite;
-                if (body != null && !caster.showAsPlaceholder)
+                if (belle != null)
+                {
+                    // ベルルの両目（元絵 660x510 の x250〜429・y110〜169）を、相手の目元と同じ所に合わせる。
+                    // ドットが崩れないよう、ちょうど2倍で映す。
+                    var size = new Vector2(belle.rect.width, belle.rect.height) * 2f;
+                    var eye = new Vector2(340f / 660f, 1f - 140f / 510f);
+                    var position = new Vector2(6f, 16f) - Vector2.Scale(eye - Vector2.one * .5f, size);
+                    BonusImage(slash.rectTransform, "AssaultBelle", belle, position, size);
+                }
+                else if (body != null && !caster.showAsPlaceholder)
                 {
                     // 各立ち絵の元画像での目の位置。顔差分も同じ座標と倍率で重ねる。
                     bool senior = caster.characterName == "TutorialGirl";
