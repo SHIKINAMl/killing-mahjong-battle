@@ -144,7 +144,15 @@ namespace KillingMahjong.UI
                     RonChanceEffect.Show(rig.handTiles[6]); yield return new WaitForSeconds(3f); break;
                 case "ron.impact":
                 case RonAuraUI.LocalEffectId:
-                    yield return RonImpactEffect.Play(this, new List<RectTransform> { rig.player.HpAnchor, rig.enemy.HpAnchor }); break;
+                    {
+                        // 本編の雫のボタンがシーンにあれば、その位置と押された絵を使う（無ければ画面の真ん中）
+                        var ui = FindFirstObjectByType<GameUIManager>(FindObjectsInactive.Include);
+                        var ronButton = ui != null && ui.RonWaitPanel != null
+                            ? ui.RonWaitPanel.GetComponentInChildren<Button>(true) : null;
+                        yield return RonImpactEffect.Play(this, new List<RectTransform> { rig.player.HpAnchor, rig.enemy.HpAnchor },
+                            ronButton != null ? (RectTransform)ronButton.transform : null);
+                    }
+                    break;
                 case "ron.local": case "ron.enemy":
                     yield return Ron(EffectId == "ron.local"); break;
                 case "ron.stream_local": case "ron.stream_enemy":
