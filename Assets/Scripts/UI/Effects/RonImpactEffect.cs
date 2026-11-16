@@ -41,10 +41,10 @@ namespace KillingMahjong.UI.Effects
         // 押した雫のボタンをその場に残し、下から伸びた手の指先がそれを押し込み、雫が弾けて
         // 同じ場所で血しぶきの「ロン!!!」になる（吹き出しは km-docs screenshots/20261114/ron_bubble の案A）。
 
-        /// <summary>手の絵（400x300）での、手3の指先の位置（画素。左上が原点）</summary>
-        private static readonly Vector2 FingerTipPixel = new Vector2(254f, 219f);
-        /// <summary>手の絵の1画素を何単位で映すか（線の太さをボタンの縁と揃えるため2倍のまま）</summary>
-        private const float HandDot = 2f;
+        /// <summary>元の手の絵（800x600）での、手3の指先の位置（画素。左上が原点）</summary>
+        private static readonly Vector2 FingerTipPixel = new Vector2(510f, 438f);
+        private const float HandWidth = 800f;
+        private const float HandHeight = 600f;
         /// <summary>指先を当てる所。雫のボタンの中心からのずれ（雫の下寄りの丸い所）</summary>
         private static readonly Vector2 FingerAimOnDrop = new Vector2(0f, -50f);
         /// <summary>指先が雫に届いてから弾けるまで（押し込んで潰れている間）</summary>
@@ -128,12 +128,12 @@ namespace KillingMahjong.UI.Effects
             // 手は画面の下端から伸ばす。指先が雫に届く高さまで持ち上げ、下にできる隙間は腕の最下段の1列を伸ばして埋める
             Image handImage = CreateImage("RonHand", overlayRt);
             handImage.preserveAspect = true;
-            SetRect(handImage.rectTransform, Vector2.zero, new Vector2(400f * HandDot, 300f * HandDot));
+            SetRect(handImage.rectTransform, Vector2.zero, new Vector2(HandWidth, HandHeight));
             handImage.rectTransform.anchorMin = handImage.rectTransform.anchorMax = new Vector2(.5f, 0);
             handImage.rectTransform.pivot = new Vector2(.5f, 0);
             Vector2 aim = dropPosition + FingerAimOnDrop * (dropSize.y / 216f);
-            float tipFromBottom = (300f - FingerTipPixel.y) * HandDot;
-            float handX = Mathf.Round(aim.x - (FingerTipPixel.x - 200f) * HandDot);
+            float tipFromBottom = HandHeight - FingerTipPixel.y;
+            float handX = Mathf.Round(aim.x - (FingerTipPixel.x - HandWidth * .5f));
             float handLift = Mathf.Max(0f, Mathf.Round(aim.y + overlayHeight * .5f - tipFromBottom));
             Image armImage = CreateImage("RonArm", handImage.rectTransform);
             armImage.rectTransform.anchorMin = new Vector2(0f, 0f);
