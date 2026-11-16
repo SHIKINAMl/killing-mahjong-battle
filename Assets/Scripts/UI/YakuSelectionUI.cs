@@ -414,7 +414,7 @@ namespace KillingMahjong.UI
                     if (i > 0) y -= 6f;
                     TextMeshProUGUI head = Txt(content, "Section_" + han, YakuExamples.SectionName(han), Vector2.zero,
                         new Vector2(ListWidth - 8f, 20f), 13f, TextAlignmentOptions.Left, Marker);
-                    PlaceRow(head.rectTransform, y);
+                    PlaceSectionHeader(content, head.rectTransform, han, y);
                     y -= RowPitch;
                 }
 
@@ -540,7 +540,7 @@ namespace KillingMahjong.UI
                     if (i > 0) y -= 6f;
                     TextMeshProUGUI head = Txt(content, "AllSection_" + han, YakuExamples.SectionName(han), Vector2.zero,
                         new Vector2(ListWidth - 8f, 20f), 13f, TextAlignmentOptions.Left, Marker);
-                    PlaceRow(head.rectTransform, y);
+                    PlaceSectionHeader(content, head.rectTransform, han, y);
                     y -= RowPitch;
                 }
 
@@ -895,6 +895,16 @@ namespace KillingMahjong.UI
             return button;
         }
 
+        private static void PlaceSectionHeader(RectTransform content, RectTransform heading, int han, float y)
+        {
+            var anchor = heading.anchoredPosition;
+            PlaceRow(heading, y);
+            heading.anchoredPosition = new Vector2(anchor.x, y);
+
+            var ribbon = content.Find("IndexRibbon_" + han) as RectTransform;
+            if (ribbon != null)
+                ribbon.anchoredPosition = new Vector2(ribbon.anchoredPosition.x, y);
+        }
         /// <summary>行を、枠の上端から y の位置に置く（上端基準）。</summary>
         private static void PlaceRow(RectTransform rt, float y)
         {

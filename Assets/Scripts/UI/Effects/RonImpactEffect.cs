@@ -106,10 +106,16 @@ namespace KillingMahjong.UI.Effects
                 pressedSprite = button != null && button.spriteState.pressedSprite != null
                     ? button.spriteState.pressedSprite
                     : buttonImage != null ? buttonImage.sprite : null;
-                // ロンのボタンは Screen Space - Overlay なので、ワールド座標がそのまま画面の画素になる
-                Vector2 screen = RectTransformUtility.WorldToScreenPoint(null, ronButton.TransformPoint(ronButton.rect.center));
+                var sourceCanvas = ronButton.GetComponentInParent<Canvas>()?.rootCanvas;
+                var camera = sourceCanvas != null && sourceCanvas.renderMode != RenderMode.ScreenSpaceOverlay
+                    ? sourceCanvas.worldCamera : null;
+                var corners = new Vector3[4];
+                ronButton.GetWorldCorners(corners);
+                Vector2 lowerLeft = RectTransformUtility.WorldToScreenPoint(camera, corners[0]);
+                Vector2 upperRight = RectTransformUtility.WorldToScreenPoint(camera, corners[2]);
+                Vector2 screen = (lowerLeft + upperRight) * 0.5f;
                 dropPosition = (screen - new Vector2(Screen.width, Screen.height) * .5f) / overlayScale;
-                dropSize = ronButton.rect.size * ronButton.lossyScale.x / overlayScale;
+                dropSize = (upperRight - lowerLeft) / overlayScale;
             }
             Image drop = null;
             if (pressedSprite != null)

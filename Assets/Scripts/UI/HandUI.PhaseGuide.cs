@@ -146,8 +146,17 @@ namespace KillingMahjong.UI
             var canvas = guide.canvas;
             if (canvas == null) return;
 
-            _wallRect.GetWorldCorners(phaseGuideCorners);
-            float topScreenY = RectTransformUtility.WorldToScreenPoint(null, phaseGuideCorners[1]).y;
+            float topScreenY = float.NegativeInfinity;
+            var wall = gameUIManager != null ? gameUIManager.WallUI : null;
+            if (wall != null)
+            {
+                foreach (var tile in wall.GetWallSlots())
+                {
+                    if (tile == null || !tile.gameObject.activeInHierarchy) continue;
+                    topScreenY = Mathf.Max(topScreenY, ScreenTop(tile));
+                }
+            }
+            if (float.IsNegativeInfinity(topScreenY)) topScreenY = ScreenTop(_wallRect);
 
             float scale = Mathf.Approximately(canvas.scaleFactor, 0f) ? 1f : canvas.scaleFactor;
             float y = topScreenY / scale + PhaseGuideLift;
@@ -172,15 +181,35 @@ namespace KillingMahjong.UI
             var bounds = river != null ? river.GetTilesBoundsRect() : null;
             if (bounds == null) return left;
             bounds.GetWorldCorners(phaseGuideCorners);
+            var camera = CanvasCamera(bounds);
             foreach (var corner in phaseGuideCorners)
-                left = Mathf.Min(left, RectTransformUtility.WorldToScreenPoint(null, corner).x);
+                left = Mathf.Min(left, RectTransformUtility.WorldToScreenPoint(camera, corner).x);
             return left;
         }
 
+        private float ScreenTop(RectTransform target)
+        {
+            target.GetWorldCorners(phaseGuideCorners);
+            var camera = CanvasCamera(target);
+            float top = float.NegativeInfinity;
+            foreach (var corner in phaseGuideCorners)
+                top = Mathf.Max(top, RectTransformUtility.WorldToScreenPoint(camera, corner).y);
+            return top;
+        }
+
+        private static Camera CanvasCamera(RectTransform target)
+        {
+            var canvas = target.GetComponentInParent<Canvas>();
+            var root = canvas != null ? canvas.rootCanvas : null;
+            return root != null && root.renderMode != RenderMode.ScreenSpaceOverlay ? root.worldCamera : null;
+        }
         /// <summary>山牌の器を探す（GameObject.Find は表示中の物しか見つけないので、見つかった物を覚えておく）</summary>
         private void FindWallRect()
         {
             if (_wallRect != null) return;
+            _wallRect = gameUIManager != null ? gameUIManager.WallUI?.GuideTargetRect : null;
+            if (_wallRect != null) return;
+
             var go = GameObject.Find("WallContainer");
             if (go != null) _wallRect = go.transform as RectTransform;
         }
