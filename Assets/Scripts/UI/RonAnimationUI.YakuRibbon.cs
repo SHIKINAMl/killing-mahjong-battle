@@ -32,13 +32,13 @@ namespace KillingMahjong.UI
             var text = label.GetComponent<TextMeshProUGUI>();
             text.rectTransform.anchorMin = Vector2.zero;
             text.rectTransform.anchorMax = Vector2.one;
-            text.rectTransform.sizeDelta = new Vector2(-100f, 0f);
+            text.rectTransform.sizeDelta = new Vector2(-248f, -8f);
             text.font = GameUiTypography.Body;
             text.color = Color.white;
             text.fontSizeMin = Common.UITypography.BodySmall;
             text.fontSizeMax = 32f;
             text.enableAutoSizing = true;
-            text.textWrappingMode = TextWrappingModes.NoWrap;
+            text.textWrappingMode = TextWrappingModes.Normal;
             text.alignment = TextAlignmentOptions.Center;
             text.raycastTarget = false;
 
@@ -49,14 +49,16 @@ namespace KillingMahjong.UI
                 var row = hasRows ? settlement.Rows[i] : null;
                 string name = hasRows ? row.Name : fallbackNames[i];
                 if (revealed.Length > 0) revealed.Append("・");
-                revealed.Append(name);
+                revealed.Append("<nobr>").Append(YakuExamples.DisplayName(name));
                 if (row != null && row.Boost > 0)
                     revealed.Append(" <color=#FFD700>+").Append(row.Boost).Append("段</color>");
                 if (row != null && settlement.ShowPerRowHan)
                     revealed.Append("   ").Append(row.Han).Append("翻");
+                revealed.Append("</nobr>");
                 text.text = revealed.ToString();
-                Managers.AudioManager.Instance?.PlayYakuVoice(name);
-                yield return new WaitForSeconds(YakuRevealInterval);
+                float voiceTime = Managers.AudioManager.Instance?.PlayYakuVoiceForSequence(name) ?? 0f;
+                float minHold = i == count - 1 ? 0.9f : YakuRevealInterval;
+                yield return new WaitForSecondsRealtime(Mathf.Max(minHold, voiceTime + 0.04f));
             }
 
             // 表を出すフレームには帯を残さない。

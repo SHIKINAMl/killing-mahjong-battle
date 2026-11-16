@@ -18,7 +18,6 @@ namespace KillingMahjong.UI
         private Effects.BoostHandSkillEffect _boostEffect;
         private Effects.AssaultSkillEffect _assaultEffect;
         private readonly HashSet<TransitionLockSet.Lease> skillTransitions = new HashSet<TransitionLockSet.Lease>();
-        private readonly HashSet<System.Action<StatusData>> skillStatusHandlers = new HashSet<System.Action<StatusData>>();
 
         public void CancelPendingSkillRequest()
         {
@@ -51,9 +50,7 @@ namespace KillingMahjong.UI
             _skillRunGeneration++;
             foreach (var lease in skillTransitions) lease.Dispose();
             skillTransitions.Clear();
-            if (NetworkMessageHandler.Instance != null)
-                foreach (var handler in skillStatusHandlers) NetworkMessageHandler.Instance.OnStatusReceived -= handler;
-            skillStatusHandlers.Clear();
+
             CancelPendingSkillRequest();
             CancelSkillSelection();
         }
@@ -81,6 +78,14 @@ namespace KillingMahjong.UI
             {
                 StartCoroutine(HandleSkillCastedRoutine(data));
                 return;
+            }
+
+            if (data.skillType == "boost_hand")
+            {
+                // status の問い合わせと演出の順番待ちより先に、強化状況を控える。
+                var boosts = CurrentBoosts(data.player_id == SkillLocalPlayerId);
+                data.BoostsBeforeCast = boosts != null
+                    ? new Dictionary<string, int>(boosts) : new Dictionary<string, int>();
             }
 
             var queue = Effects.EffectQueue.Instance;
@@ -128,6 +133,23 @@ namespace KillingMahjong.UI
             if (data != null && !skipCutin)
                 uiManager.DialogueUI?.AddSkillToLog(data.skillType, data.player_id == SkillLocalPlayerId);
             yield return HandleSkillCastedRoutine(data, skipCutin);
+        }
+
+        private static Dictionary<string, int> CurrentBoosts(bool local)
+        {
+            var board = BoardStateManager.Instance;
+            return local ? board?.LocalBoostHandBonus : board?.EnemyBoostHandBonus;
+        }
+
+        private static string FindBoostIncrease(Dictionary<string, int> before, Dictionary<string, int> after)
+        {
+            if (after == null) return null;
+            foreach (var entry in after)
+            {
+                before.TryGetValue(entry.Key, out int prior);
+                if (entry.Value > prior) return entry.Key;
+            }
+            return null;
         }
 
         private string SkillLocalPlayerId => NetworkMessageHandler.Instance != null
@@ -188,54 +210,22 @@ namespace KillingMahjong.UI
             string subText = null;
 
             // 役強化で強まった役の名前。発動後の演出でも出すので、外に出しておく
-            string boostedYakuName = uiManager.IsTutorialMode ? data.yaku_name : "";
+            string boostedYakuName = data.yaku_name;
 
             if (data.skillType == "boost_hand" && !uiManager.IsTutorialMode)
             {
-                var oldLocalBonus = Managers.BoardStateManager.Instance.LocalBoostHandBonus != null ?
-                    new Dictionary<string, int>(Managers.BoardStateManager.Instance.LocalBoostHandBonus) : new Dictionary<string, int>();
-                var oldEnemyBonus = Managers.BoardStateManager.Instance.EnemyBoostHandBonus != null ?
-                    new Dictionary<string, int>(Managers.BoardStateManager.Instance.EnemyBoostHandBonus) : new Dictionary<string, int>();
-
-                bool statusReceived = false;
-                System.Action<KillingMahjong.EngineData.StatusData> onStatus = (statusData) => { statusReceived = true; };
-                NetworkMessageHandler.Instance.OnStatusReceived += onStatus;
-                skillStatusHandlers.Add(onStatus);
-
-                float timeout = 2.0f;
-                try
+                float until = Time.unscaledTime + 2f;
+                while (string.IsNullOrEmpty(boostedYakuName) && data.BoostsBeforeCast != null)
                 {
-                    while (!statusReceived && timeout > 0)
-                    {
-                        timeout -= Time.deltaTime;
-                        yield return null;
-                        if (!ownedLock.IsActive) yield break;
-                    }
+                    boostedYakuName = FindBoostIncrease(data.BoostsBeforeCast, CurrentBoosts(isLocalPlayer));
+                    if (!string.IsNullOrEmpty(boostedYakuName) || Time.unscaledTime >= until) break;
+                    yield return null;
+                    if (!ownedLock.IsActive) yield break;
                 }
-                finally
-                {
-                    NetworkMessageHandler.Instance.OnStatusReceived -= onStatus;
-                    skillStatusHandlers.Remove(onStatus);
-                }
-
-                var newLocalBonus = Managers.BoardStateManager.Instance.LocalBoostHandBonus ?? new Dictionary<string, int>();
-                var newEnemyBonus = Managers.BoardStateManager.Instance.EnemyBoostHandBonus ?? new Dictionary<string, int>();
-
-                var targetOldBonus = isLocalPlayer ? oldLocalBonus : oldEnemyBonus;
-                var targetNewBonus = isLocalPlayer ? newLocalBonus : newEnemyBonus;
-
-                foreach (var kvp in targetNewBonus)
-                {
-                    if (!targetOldBonus.ContainsKey(kvp.Key) || targetOldBonus[kvp.Key] < kvp.Value)
-                    {
-                        boostedYakuName = kvp.Key;
-                        break;
-                    }
-                }
-
                 if (!string.IsNullOrEmpty(boostedYakuName))
                 {
-                    subText = $"<color=yellow>{boostedYakuName}</color>";
+                    // 自分の役名は後続の札で示す。相手側はカットインで知らせる。
+                    if (!isLocalPlayer) subText = $"<color=yellow>{YakuExamples.DisplayName(boostedYakuName)}</color>";
 
                     // 右上の一覧は返事が届いた時点でもう新しい値になっている。演出の最後に役名が
                     // そこへ飛んでいくので、届くまでその枠だけ伏せておく（戻すのは演出。上限つき）

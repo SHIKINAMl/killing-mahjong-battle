@@ -68,6 +68,12 @@ namespace KillingMahjong.UI.Effects
             return fx;
         }
 
+        /// <summary>押下時に、暗幕の濃さを入力演出へ引き継ぐ。</summary>
+        internal static float GetDimAlpha(float fallback)
+        {
+            return _current != null && _current._dim != null ? _current._dim.color.a : fallback;
+        }
+
         /// <summary>出ていれば片付ける。出ていなくても呼んでよい。</summary>
         public static void HideCurrent()
         {

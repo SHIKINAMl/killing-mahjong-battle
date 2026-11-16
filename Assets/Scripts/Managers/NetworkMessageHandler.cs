@@ -44,6 +44,7 @@ namespace KillingMahjong.Network
         public int health;
 
         public string yaku_name;
+        [System.NonSerialized] internal Dictionary<string, int> BoostsBeforeCast;
         public List<int> exposedHandIndexes;
         // manually populated
         public System.Collections.Generic.Dictionary<string, System.Collections.Generic.List<int>> exposedHandIndexesByPlayer;

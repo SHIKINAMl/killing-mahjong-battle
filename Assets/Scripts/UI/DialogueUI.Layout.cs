@@ -18,6 +18,7 @@ namespace KillingMahjong.UI
             UpdateDialogueControlLayout();
         }
 
+        private GameUIManager speechOwner;
         private PhaseTransitionUI speechPhase;
         private BettingUI speechBetting;
         private CanvasGroup speechCanvasGroup;
@@ -30,6 +31,8 @@ namespace KillingMahjong.UI
             get
             {
                 if (PhaseTransitionUI.IsScreenDarkened) return true;
+                if (speechOwner == null) speechOwner = FindFirstObjectByType<GameUIManager>();
+                if (speechOwner != null && speechOwner.IsRonInputPlaying) return true;
                 if (speechPhase == null) speechPhase = FindFirstObjectByType<PhaseTransitionUI>(FindObjectsInactive.Include);
                 if (speechBetting == null) speechBetting = FindFirstObjectByType<BettingUI>(FindObjectsInactive.Include);
                 return (speechPhase != null && speechPhase.isActiveAndEnabled && speechPhase.IsCoveringScreen)

@@ -125,6 +125,8 @@ namespace KillingMahjong.UI
             try
             {
                 yield return new WaitForSecondsRealtime(RonHitStopSeconds);
+                while (uiManager.IsRonInputPlaying && roundEnd.IsCurrent(ticket) && ownedLock.IsActive)
+                    yield return null;
                 if (!roundEnd.IsCurrent(ticket) || !ownedLock.IsActive) yield break;
 
                 // 戦況グラフに、この点がロン（どちらが・どの強さで）だったと残す

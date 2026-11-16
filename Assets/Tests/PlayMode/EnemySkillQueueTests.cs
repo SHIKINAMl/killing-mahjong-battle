@@ -4,6 +4,7 @@ using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
+using UnityEngine.UI;
 
 namespace KillingMahjong.Tests
 {
@@ -42,12 +43,14 @@ namespace KillingMahjong.Tests
             var row = new GameObject("IntroAbilityRow", typeof(RectTransform)); row.transform.SetParent(window.transform);
             item = row.AddComponent(Main("UI.AbilityItemUI"));
             ((IList)Field(ability, "instantiatedItems")).Add(item);
-            ability.GetType().GetProperty("TutorialActivationHandler", Members).SetValue(ability, activation);
+            ability.GetType().GetProperty("TutorialActivationHandler", Members)
+                .SetValue(ability, (Func<string, string, bool>)((type, _) => activation(type)));
+            Call(ability, "EnsureActivateButton");
             return ability;
         }
 
         [UnityTest]
-        public IEnumerator TutorialSelectionNeedsAnActualSecondActivation()
+        public IEnumerator TutorialSelectionNeedsTheActivateButton()
         {
             int accepted = 0;
             var ability = IntroAbility(type => { Assert.That(type, Is.EqualTo("mulligan")); accepted++; return true; }, out Component item);
@@ -55,6 +58,10 @@ namespace KillingMahjong.Tests
             Assert.That(accepted, Is.Zero, "選択だけで実演済みにしない");
             Assert.That(Get(ability, "SelectedSkillType"), Is.EqualTo("mulligan"));
             Call(ability, "OnAbilitySelected", item);
+            Assert.That(accepted, Is.Zero, "同じ行を押しても発動しない");
+            var activate = (Button)Field(ability, "activateButton");
+            Assert.That(activate.gameObject.activeSelf && activate.interactable, Is.True);
+            activate.onClick.Invoke();
             Assert.That(accepted, Is.EqualTo(1));
             Assert.That(Get(ability, "IsWindowOpen"), Is.False);
             Assert.That(Get(ability, "SelectedSkillType"), Is.Null);
@@ -66,7 +73,8 @@ namespace KillingMahjong.Tests
         {
             int attempts = 0;
             var ability = IntroAbility(type => { attempts++; return false; }, out Component item);
-            Call(ability, "OnAbilitySelected", item); Call(ability, "OnAbilitySelected", item);
+            Call(ability, "OnAbilitySelected", item);
+            ((Button)Field(ability, "activateButton")).onClick.Invoke();
             Assert.That(attempts, Is.EqualTo(1));
             Assert.That(Get(ability, "IsWindowOpen"), Is.True);
             Assert.That(Get(ability, "SelectedSkillType"), Is.EqualTo("mulligan"));

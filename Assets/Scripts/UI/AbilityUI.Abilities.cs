@@ -99,6 +99,7 @@ namespace KillingMahjong.UI
             // **選択は行と一緒に消える。** 行を作り直しているので、
             // 参照を残すと破棄済みのオブジェクトを掴んだままになる
             currentSelection = null;
+            RefreshActivateButton();
 
             LayoutContentContainer();
 

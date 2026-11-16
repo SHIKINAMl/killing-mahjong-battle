@@ -48,7 +48,8 @@ namespace KillingMahjong.UI.Effects
         /// <summary>指先を当てる所。雫のボタンの中心からのずれ（雫の下寄りの丸い所）</summary>
         private static readonly Vector2 FingerAimOnDrop = new Vector2(0f, -50f);
         /// <summary>指先が雫に届いてから弾けるまで（押し込んで潰れている間）</summary>
-        private const float PressSeconds = 0.08f;
+        private const float PressSeconds = 0.20f;
+        private const float SettlementDimAlpha = 0.35f;
         /// <summary>血しぶきの吹き出しの絵（160x120 を2倍で映す）</summary>
         private const string BloodCalloutPath = "UI/RonCallout/ron_callout_blood";
 
@@ -57,11 +58,39 @@ namespace KillingMahjong.UI.Effects
         /// 雫が弾けた所に血しぶきの「ロン!!!」を叩きつけ、体力表示を揺らしてから決着処理へ返す。
         /// <paramref name="ronButton"/> が無いとき（試写など）は画面の真ん中にボタンがあるものとして動かす。
         /// </summary>
-        public static IEnumerator Play(MonoBehaviour runner, IList<RectTransform> hpPanels, RectTransform ronButton = null)
+        public static IEnumerator Play(MonoBehaviour runner, IList<RectTransform> hpPanels, RectTransform ronButton = null,
+            System.Action onImpact = null, System.Func<bool> waitingForResponse = null,
+            PresentationScope owner = null)
         {
             if (runner == null) yield break;
+            using var scope = new PresentationScope(Debug.LogException);
+            owner?.AddCleanup(scope.Dispose);
+            yield return scope.Run(PlayCore(runner, hpPanels, ronButton, onImpact, waitingForResponse, scope));
+        }
 
-            GameObject overlay = CreateOverlay(out RectTransform overlayRt);
+        private static IEnumerator PlayCore(MonoBehaviour runner, IList<RectTransform> hpPanels,
+            RectTransform ronButton, System.Action onImpact, System.Func<bool> waitingForResponse,
+            PresentationScope scope)
+        {
+            GameObject overlay = scope.Own(CreateOverlay(out RectTransform overlayRt));
+            Sprite handSprite = null, armSprite = null, bloodSprite = null, burstSprite = null, innerSprite = null;
+            Texture2D burstTexture = null, innerTexture = null;
+            scope.AddCleanup(() =>
+            {
+                if (handSprite != null) Object.Destroy(handSprite);
+                if (armSprite != null) Object.Destroy(armSprite);
+                if (bloodSprite != null) Object.Destroy(bloodSprite);
+                if (burstSprite != null) Object.Destroy(burstSprite);
+                if (burstTexture != null) Object.Destroy(burstTexture);
+                if (innerSprite != null) Object.Destroy(innerSprite);
+                if (innerTexture != null) Object.Destroy(innerTexture);
+            });
+            var shade = CreateImage("RonInputDim", overlayRt);
+            shade.rectTransform.anchorMin = Vector2.zero;
+            shade.rectTransform.anchorMax = Vector2.one;
+            shade.rectTransform.offsetMin = shade.rectTransform.offsetMax = Vector2.zero;
+            shade.color = new Color(0f, 0f, 0f, RonChanceEffect.GetDimAlpha(SettlementDimAlpha));
+            RonChanceEffect.HideCurrent();
             // 作ったばかりの Canvas はまだ大きさが決まっていないので、CanvasScaler（800x600・Expand）と同じ式で測る
             float overlayScale = Mathf.Max(0.0001f, Mathf.Min(Screen.width / 800f, Screen.height / 600f));
             float overlayHeight = Screen.height / overlayScale;
@@ -112,8 +141,7 @@ namespace KillingMahjong.UI.Effects
             var audio = KillingMahjong.Managers.AudioManager.Instance;
             if (audio != null) audio.PlayRonInputSore();
 
-            bool displayedAnyHand = false;
-            Sprite handSprite = null, armSprite = null;
+            bool raisedHand = false;
             for (int i = 0; i < HandFrameNames.Length; i++)
             {
                 Texture2D handTexture = Resources.Load<Texture2D>(HandFrameNames[i]);
@@ -132,12 +160,16 @@ namespace KillingMahjong.UI.Effects
                 if (previousHandSprite != null) Object.Destroy(previousHandSprite);
                 if (previousArmSprite != null) Object.Destroy(previousArmSprite);
                 handImage.gameObject.SetActive(true);
-                displayedAnyHand = true;
-                if (i == 0) yield return RaiseHandFromBottom(handImage.rectTransform, new Vector2(handX, handLift));
+                if (!raisedHand)
+                {
+                    raisedHand = true;
+                    yield return RaiseHandFromBottom(handImage.rectTransform, new Vector2(handX, handLift), shade);
+                }
                 else if (i < HandFrameNames.Length - 1) yield return new WaitForSeconds(HandFrameSeconds);
             }
 
-            if (!displayedAnyHand) handImage.gameObject.SetActive(false);
+            if (!raisedHand) handImage.gameObject.SetActive(false);
+            shade.color = new Color(0f, 0f, 0f, SettlementDimAlpha);
 
             // 指先が雫を押し込む。雫は横へ潰れる
             if (drop != null)
@@ -151,8 +183,6 @@ namespace KillingMahjong.UI.Effects
             // 雫が弾けた所に、血しぶきの「ロン!!!」
             var lines = CreateFocusLines(overlayRt, dropPosition);
             Texture2D bloodTexture = Resources.Load<Texture2D>(BloodCalloutPath);
-            Sprite bloodSprite = null, burstSprite = null, innerSprite = null;
-            Texture2D burstTexture = null, innerTexture = null;
             RectTransform callout;
             if (bloodTexture != null)
             {
@@ -191,15 +221,17 @@ namespace KillingMahjong.UI.Effects
                 }
             }
 
+            onImpact?.Invoke();
             yield return SlamCallout(callout, lines, CalloutHoldSeconds);
-            Object.Destroy(overlay);
-            if (handSprite != null) Object.Destroy(handSprite);
-            if (armSprite != null) Object.Destroy(armSprite);
-            if (bloodSprite != null) Object.Destroy(bloodSprite);
-            if (burstSprite != null) Object.Destroy(burstSprite);
-            if (burstTexture != null) Object.Destroy(burstTexture);
-            if (innerSprite != null) Object.Destroy(innerSprite);
-            if (innerTexture != null) Object.Destroy(innerTexture);
+            if (waitingForResponse != null)
+            {
+                callout.gameObject.SetActive(false);
+                handImage.gameObject.SetActive(false);
+                lines.gameObject.SetActive(false);
+                float until = Time.unscaledTime + 1f;
+                while (waitingForResponse() && Time.unscaledTime < until) yield return null;
+            }
+
         }
 
         /// <summary>血しぶきの「ロン!!!」（字も絵に描き込んである）。叩きつけと震えは入れ物ごと動かす。</summary>
@@ -287,14 +319,16 @@ namespace KillingMahjong.UI.Effects
             return lines;
         }
 
-        private static IEnumerator RaiseHandFromBottom(RectTransform hand, Vector2 target)
+        private static IEnumerator RaiseHandFromBottom(RectTransform hand, Vector2 target, Image shade)
         {
             float start = -hand.rect.height;
+            float startDimAlpha = shade.color.a;
             hand.anchoredPosition = new Vector2(target.x, start);
             for (float elapsed = 0; elapsed < HandFrameSeconds; elapsed += Time.deltaTime)
             {
                 float progress = Mathf.Clamp01(PresentationTiming.Sample(elapsed) / HandRiseSeconds);
                 float eased = 1 - Mathf.Pow(1 - progress, 3);
+                shade.color = new Color(0f, 0f, 0f, Mathf.Lerp(startDimAlpha, SettlementDimAlpha, eased));
                 hand.anchoredPosition = new Vector2(target.x, Mathf.Round(Mathf.Lerp(start, target.y, eased)));
                 yield return null;
             }

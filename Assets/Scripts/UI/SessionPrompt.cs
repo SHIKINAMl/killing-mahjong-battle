@@ -13,7 +13,7 @@ namespace KillingMahjong.UI
         private TMP_Text message;
         private bool returning;
 
-        public static SessionPrompt Show(string text, string actionLabel, Action action)
+        public static SessionPrompt Show(string text, string actionLabel, Action action, string cancelLabel = null)
         {
             var root = new GameObject("SessionPrompt", typeof(RectTransform), typeof(Canvas),
                 typeof(CanvasScaler), typeof(GraphicRaycaster), typeof(Image), typeof(SessionPrompt));
@@ -26,7 +26,26 @@ namespace KillingMahjong.UI
             root.GetComponent<Image>().color = new Color(0.04f, 0.01f, 0.02f, 0.96f);
             var prompt = root.GetComponent<SessionPrompt>();
             prompt.message = MakeText(root.transform, text, new Vector2(0f, 50f), new Vector2(700f, 180f));
-            CreateButton(root.transform, actionLabel, new Vector2(0f, -100f), action);
+            if (string.IsNullOrEmpty(cancelLabel))
+            {
+                CreateButton(root.transform, actionLabel, new Vector2(0f, -100f), action);
+            }
+            else
+            {
+                var cancel = CreateButton(root.transform, cancelLabel, new Vector2(-114f, -100f), () => Destroy(root));
+                var confirm = CreateButton(root.transform, actionLabel, new Vector2(114f, -100f), () =>
+                {
+                    root.SetActive(false);
+                    Destroy(root);
+                    action();
+                });
+                foreach (var button in new[] { cancel, confirm })
+                {
+                    var rect = (RectTransform)button.transform;
+                    rect.sizeDelta = new Vector2(200f, 50f);
+                    button.GetComponentInChildren<TMP_Text>().rectTransform.sizeDelta = rect.sizeDelta;
+                }
+            }
             return prompt;
         }
 

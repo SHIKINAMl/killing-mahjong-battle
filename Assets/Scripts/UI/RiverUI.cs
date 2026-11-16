@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using System.Collections.Generic;
 
 namespace KillingMahjong.UI
@@ -56,6 +56,7 @@ namespace KillingMahjong.UI
         }
 
         private RectTransform _tilesBoundsProxy;
+        private readonly Vector3[] tileBoundsCorners = new Vector3[4];
 
         /// <summary>
         /// いま置いてある牌ぜんぶを囲む矩形（2026-10-07）。
@@ -79,18 +80,16 @@ namespace KillingMahjong.UI
             bool any = false;
             Vector2 min = new Vector2(float.MaxValue, float.MaxValue);
             Vector2 max = new Vector2(float.MinValue, float.MinValue);
-            var corners = new Vector3[4];
-
             foreach (var t in discardedTiles)
             {
                 var rt = t as RectTransform;
                 if (rt == null || !rt.gameObject.activeInHierarchy) continue;
 
                 // 敵の河は180度回してあるので、ローカルの大きさではなく世界座標の四隅で測る
-                rt.GetWorldCorners(corners);
+                rt.GetWorldCorners(tileBoundsCorners);
                 for (int i = 0; i < 4; i++)
                 {
-                    Vector2 p = self.InverseTransformPoint(corners[i]);
+                    Vector2 p = self.InverseTransformPoint(tileBoundsCorners[i]);
                     min = Vector2.Min(min, p);
                     max = Vector2.Max(max, p);
                     any = true;

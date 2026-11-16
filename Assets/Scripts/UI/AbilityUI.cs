@@ -114,9 +114,8 @@ namespace KillingMahjong.UI
             // 両シーンとも `activateButton` に `CloseButton` が入っていて、X を押すと
             // `CloseWindow` → `DeselectAll` → `OnActivateClicked` の順に走っていた。
             // 選択が消えたあとなので発動は空振りだが、繋がっていること自体が誤解のもと。
-            // 発動は「選んだ行をもう一度押す」（OnAbilitySelected）に一本化してある。
-            if (activateButton != null && activateButton != closeButton)
-                activateButton.onClick.AddListener(OnActivateClicked);
+            // 発動は選択後に表示する専用ボタンで受け付ける。
+            EnsureActivateButton();
 
             if (abilityWindow != null)
                 abilityWindow.anchoredPosition = hiddenPosition;
@@ -316,7 +315,16 @@ namespace KillingMahjong.UI
         /// DialogueUI.ShowText でチュートリアルのセリフが上書きされ、
         /// 送りボタン待ちのまま進行が止まってしまう。
         /// </summary>
-        public bool IsDisplayOnly { get; set; }
+        private bool displayOnly;
+        public bool IsDisplayOnly
+        {
+            get => displayOnly;
+            set
+            {
+                displayOnly = value;
+                RefreshActivateButton();
+            }
+        }
 
         public void OnAbilitySelected(AbilityItemUI item)
         {
@@ -336,23 +344,14 @@ namespace KillingMahjong.UI
                 }
             }
 
-            if (currentSelection == item)
-            {
-                // すでに選択されているものをもう一度クリックしたら発動とする
-                OnActivateClicked();
-            }
-            else
+            if (currentSelection != item)
             {
                 if (currentSelection != null) currentSelection.Deselect();
                 currentSelection = item;
                 currentSelection.Select();
-
-                // **選んだら説明を出したままにする。**
-                // 説明欄はホバーで出し引きしているので、これが無いと
-                // 選んだ直後にカーソルを外しただけで、いま何を選んでいるのかの
-                // 説明が読めなくなる（説明文を行から追い出したぶんの穴）
-                ShowTooltip(currentSelection.Description);
             }
+            ShowTooltip(currentSelection.Description);
+            RefreshActivateButton();
         }
 
         public void DeselectAll()
@@ -362,6 +361,7 @@ namespace KillingMahjong.UI
                 currentSelection.Deselect();
                 currentSelection = null;
             }
+            RefreshActivateButton();
             HideTooltip();
         }
         private const string DescBoxName = "AbilityDescriptionBox";
@@ -387,7 +387,7 @@ namespace KillingMahjong.UI
 
             var text = EnsureDescriptionBox();
             if (text == null) return;
-            text.text = string.IsNullOrEmpty(description) ? DescPlaceholder : description;
+            text.text = string.IsNullOrEmpty(description) ? DescPlaceholder : description.Replace("\n", "");
             // 説明が無いときは箱ごと消す。案内文だけの箱が浮いて見えるのを避ける。
             SetDescriptionVisible(!string.IsNullOrEmpty(description));
             // 表示した直後に当て直す。初めて表示されたときに TextMeshPro が字の大きさを既定へ戻すため
@@ -475,7 +475,7 @@ namespace KillingMahjong.UI
             if (text != null)
             {
                 bool hasSelection = currentSelection != null && !string.IsNullOrEmpty(currentSelection.Description);
-                text.text = hasSelection ? currentSelection.Description : DescPlaceholder;
+                text.text = hasSelection ? currentSelection.Description.Replace("\n", "") : DescPlaceholder;
                 // 選択が無いなら箱ごと消す。対局開始直後はここを通る。
                 SetDescriptionVisible(hasSelection);
                 ApplyDescriptionStyle(text);

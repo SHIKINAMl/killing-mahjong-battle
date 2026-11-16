@@ -208,6 +208,7 @@ namespace KillingMahjong.UI
 
         private void HandleAgari(bool isLocalWin)
         {
+            if (isLocalWin) uiManager.RonResponseReceived = true;
             uiManager.PhaseController?.HandleAgari(isLocalWin);
         }
 

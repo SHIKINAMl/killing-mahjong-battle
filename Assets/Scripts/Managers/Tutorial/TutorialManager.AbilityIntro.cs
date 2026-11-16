@@ -364,7 +364,7 @@ namespace KillingMahjong.Managers
             {
                 RectTransform highlighted = null;
                 GuideTo(ability.AbilityListRect, false, null, UI.TutorialHighlightUI.Style.Frame);
-                // 選んだ行の再クリックが現在の発動操作。選択解除・Xでは実演済みにしない。
+                // 能力の選択後は発動ボタンへ案内する。選択解除・Xでは実演済みにしない。
                 //
                 // **枠は選んだ行そのものを追う**（2026-10-29 バグ報告「透視スキルを使う際、選択演出がクリックに連動しない」）。
                 // 以前は能力の種類で見ていたので、透視の種別（萬子〜字牌）を選び替えても「透視」のままで、

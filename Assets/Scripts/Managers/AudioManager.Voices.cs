@@ -182,20 +182,23 @@ namespace KillingMahjong.Managers
         /// 素の名前で引けたときはそれを使い、外れたときだけ崩して引き直す。
         /// **素の役名を渡す既存の呼び出しは、今までと同じ経路を通る。**
         /// </summary>
-        public void PlayYakuVoice(string yakuName)
+        public void PlayYakuVoice(string yakuName) => PlayYakuVoiceForSequence(yakuName);
+
+        internal float PlayYakuVoiceForSequence(string yakuName)
         {
+            if (!CanPlay || voiceSource == null || string.IsNullOrEmpty(yakuName)) return 0f;
             if (yakuVoiceClips == null) InitializeYakuVoices();
-            if (string.IsNullOrEmpty(yakuName)) return;
 
             AudioClip clip;
             if (!yakuVoiceClips.TryGetValue(yakuName, out clip))
             {
                 string key = KillingMahjong.Common.YakuNameUtil.ToVoiceKey(yakuName);
-                if (key == yakuName) return; // 崩しても同じなら、本当に持っていない役
-                if (!yakuVoiceClips.TryGetValue(key, out clip)) return;
+                if (key == yakuName || !yakuVoiceClips.TryGetValue(key, out clip)) return 0f;
             }
 
+            if (clip == null) return 0f;
             PlayVoice(clip);
+            return clip.length / Mathf.Max(0.01f, Mathf.Abs(voiceSource.pitch));
         }
 
         /// <summary>

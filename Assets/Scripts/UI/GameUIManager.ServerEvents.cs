@@ -80,6 +80,7 @@ namespace KillingMahjong.UI
         {
             if (RonWaitPanel == null) return;
 
+            YakuListUI?.CloseYakuList();
             RonWaitPanel.SetActive(true);
             RonWaitPanel.transform.SetAsLastSibling();
 
@@ -147,9 +148,7 @@ namespace KillingMahjong.UI
         {
             Debug.Log($"[GameUIManager] ExecuteRonAction called. _isAgariPending={_isAgariPending}");
 
-            // 暗幕と牌の点滅をここで畳む。押したのに光ったままだと、
-            // 「まだ押せていない」のか分からない
-            Effects.RonChanceEffect.HideCurrent();
+            if (IsRonInputPlaying) return;
 
             // チュートリアルはサーバーに繋がっていないので、進行役へ返すだけ
             if (_tutorialRonCallback != null)
@@ -165,24 +164,24 @@ namespace KillingMahjong.UI
             {
                 _isAgariPending = false;
                 if (RonWaitPanel != null) RonWaitPanel.SetActive(false);
-                StartCoroutine(RonImpactThen(() =>
-                {
-                    SendActionToServer("agari", new KillingMahjong.Network.ActionPayload { accept = true });
-                    Debug.Log("[GameUIManager] Sent 'agari' action to server. Waiting for server response to play animation.");
-                }));
+                StartCoroutine(RonImpactThen(null, sendToServer: true));
                 return; // サーバーからの確定（役のデータ等）を待ってからアニメーションを再生するため、ここでは抜ける
             }
 
+            Effects.RonChanceEffect.HideCurrent();
             PhaseController?.ExecuteRonAction();
         }
+
+        internal bool IsRonInputPlaying { get; private set; }
+        internal bool RonResponseReceived { private get; set; }
+        private PresentationScope ronInputScope;
 
         /// <summary>
         /// 手の三段階を見せ、指差しのあとに吹き出しと体力表示だけを揺らして次へ渡す。
         ///
-        /// サーバーへはこの短い入力演出の後に送る。返答で始まる既存の決着カットインと
-        /// 重ならず、入力が受理されたことも盤面上で読み取れる。
+        /// サーバーの確定は吹き出しが出た時点で送り、結果表示は入力演出が明けるまで待つ。
         /// </summary>
-        private System.Collections.IEnumerator RonImpactThen(System.Action next)
+        private System.Collections.IEnumerator RonImpactThen(System.Action next, bool sendToServer = false)
         {
             var hpPanels = new System.Collections.Generic.List<RectTransform>();
             if (PlayerInfoUI != null && PlayerInfoUI.HpAnchor != null) hpPanels.Add(PlayerInfoUI.HpAnchor);
@@ -193,10 +192,34 @@ namespace KillingMahjong.UI
             // 押された雫のボタンの位置から、指先・弾ける所・吹き出しを揃える（2026-11-15）。
             // 本物のボタンは押した時点で隠し、演出の画面に押された絵を写して続ける
             var ronButton = RonWaitPanel != null ? RonWaitPanel.GetComponentInChildren<UnityEngine.UI.Button>(true) : null;
-            yield return Effects.RonImpactEffect.Play(this, hpPanels,
-                ronButton != null ? (RectTransform)ronButton.transform : null);
+            IsRonInputPlaying = true;
+            RonResponseReceived = false;
+            System.Action onImpact = null;
+            System.Func<bool> waitingForResponse = null;
+            if (sendToServer)
+            {
+                onImpact = () => SendActionToServer("agari",
+                    new KillingMahjong.Network.ActionPayload { accept = true });
+                waitingForResponse = () => !RonResponseReceived;
+            }
 
-            next?.Invoke();
+            using var scope = new PresentationScope(Debug.LogException);
+            ronInputScope = scope;
+            using (BeginTransition("ron-input"))
+            {
+                try
+                {
+                    yield return Effects.RonImpactEffect.Play(this, hpPanels,
+                        ronButton != null ? (RectTransform)ronButton.transform : null,
+                        onImpact, waitingForResponse, scope);
+                }
+                finally
+                {
+                    IsRonInputPlaying = false;
+                    ronInputScope = null;
+                }
+            }
+            if (scope.IsActive) next?.Invoke();
         }
     }
 }

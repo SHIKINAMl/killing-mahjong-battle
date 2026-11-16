@@ -64,7 +64,8 @@ namespace KillingMahjong.UI
         private const float ListWidth = 200f;
         private const float ListTop = 184f;
         private const float ListBottom = -224f;
-        private const float RowPitch = 21f;
+        private const float RowHeight = 26f;
+        private const float RowPitch = 28f;
         private const float DetailCenterX = 110f;
         private const float DetailWidth = 460f;
         private const float TileWidth = 28f;
@@ -412,8 +413,8 @@ namespace KillingMahjong.UI
                     lastHan = han;
                     if (i > 0) y -= 6f;
                     TextMeshProUGUI head = Txt(content, "Section_" + han, YakuExamples.SectionName(han), Vector2.zero,
-                        new Vector2(ListWidth - 8f, 20f), 13f, TextAlignmentOptions.Left, Marker, out bool madeHead);
-                    if (madeHead) PlaceRow(head.rectTransform, y);
+                        new Vector2(ListWidth - 8f, 20f), 13f, TextAlignmentOptions.Left, Marker);
+                    PlaceRow(head.rectTransform, y);
                     y -= RowPitch;
                 }
 
@@ -421,18 +422,20 @@ namespace KillingMahjong.UI
                     typeof(RectTransform), typeof(Image), typeof(Button));
                 var rowImage = rowGo.GetComponent<Image>();
                 var button = rowGo.GetComponent<Button>();
+                var rowRect = (RectTransform)rowGo.transform;
+                rowRect.sizeDelta = new Vector2(ListWidth, RowHeight);
+                PlaceRow(rowRect, y);
                 if (madeRow)
                 {
-                    var rt = (RectTransform)rowGo.transform;
-                    rt.sizeDelta = new Vector2(ListWidth, 20f);
-                    PlaceRow(rt, y);
                     rowImage.color = Clear;
                     rowImage.raycastTarget = true;
                     button.targetGraphic = rowImage;
                 }
 
-                Txt(rowGo.transform, "Name", YakuExamples.DisplayName(Yakus[i]), new Vector2(-14f, 0f),
-                    new Vector2(ListWidth - 44f, 18f), 14f, TextAlignmentOptions.Left, TextMain);
+                var name = Txt(rowGo.transform, "Name", YakuExamples.DisplayName(Yakus[i]), new Vector2(-14f, 0f),
+                    new Vector2(ListWidth - 44f, 22f), 16f, TextAlignmentOptions.Left, TextMain);
+                name.rectTransform.sizeDelta = new Vector2(ListWidth - 44f, 22f);
+                name.fontSize = 16f;
                 // すでに強めている役に付ける「+1」の札。中身は開くたびに入れる
                 HandTypeBadge badge = BuildBoost(rowGo.transform, "BoostTag");
 
@@ -446,9 +449,9 @@ namespace KillingMahjong.UI
                 y -= RowPitch;
             }
 
+            content.sizeDelta = new Vector2(ListWidth, -y + 6f);
             if (madeContent)
             {
-                content.sizeDelta = new Vector2(ListWidth, -y + 6f);
                 content.anchoredPosition = Vector2.zero;
             }
             _hanContent = content;
@@ -536,8 +539,8 @@ namespace KillingMahjong.UI
                     lastHan = han;
                     if (i > 0) y -= 6f;
                     TextMeshProUGUI head = Txt(content, "AllSection_" + han, YakuExamples.SectionName(han), Vector2.zero,
-                        new Vector2(ListWidth - 8f, 20f), 13f, TextAlignmentOptions.Left, Marker, out bool madeHead);
-                    if (madeHead) PlaceRow(head.rectTransform, y);
+                        new Vector2(ListWidth - 8f, 20f), 13f, TextAlignmentOptions.Left, Marker);
+                    PlaceRow(head.rectTransform, y);
                     y -= RowPitch;
                 }
 
@@ -545,11 +548,11 @@ namespace KillingMahjong.UI
                     typeof(RectTransform), typeof(Image), typeof(Button));
                 var rowImage = rowGo.GetComponent<Image>();
                 var button = rowGo.GetComponent<Button>();
+                var rowRect = (RectTransform)rowGo.transform;
+                rowRect.sizeDelta = new Vector2(ListWidth, RowHeight);
+                PlaceRow(rowRect, y);
                 if (madeRow)
                 {
-                    var rt = (RectTransform)rowGo.transform;
-                    rt.sizeDelta = new Vector2(ListWidth, 20f);
-                    PlaceRow(rt, y);
                     rowImage.color = Clear;
                     rowImage.raycastTarget = true;
                     button.targetGraphic = rowImage;
@@ -557,7 +560,9 @@ namespace KillingMahjong.UI
 
                 // 名前は左寄せ。右端の「+1 +1」（自分・敵の強化）のぶん幅を空ける
                 TextMeshProUGUI name = Txt(rowGo.transform, "Name", YakuExamples.DisplayName(yaku), new Vector2(-30f, 0f),
-                    new Vector2(ListWidth - 76f, 18f), 14f, TextAlignmentOptions.Left, TextMain);
+                    new Vector2(ListWidth - 76f, 22f), 16f, TextAlignmentOptions.Left, TextMain);
+                name.rectTransform.sizeDelta = new Vector2(ListWidth - 76f, 22f);
+                name.fontSize = 16f;
                 HandTypeBadge badge = BuildBoost(rowGo.transform, "BoostTag");
                 HandTypeBadge enemyBadge = BuildBoost(rowGo.transform, "EnemyBoostTag");
                 BuildRowType(rowGo.transform, name, HandArchetype.Of(yaku));
@@ -573,9 +578,9 @@ namespace KillingMahjong.UI
                 y -= RowPitch;
             }
 
+            content.sizeDelta = new Vector2(ListWidth, -y + 6f);
             if (madeContent)
             {
-                content.sizeDelta = new Vector2(ListWidth, -y + 6f);
                 content.anchoredPosition = Vector2.zero;
                 // 置いた時点では役強化の並びを出しておく（役強化で開くのはこちら）
                 contentGo.SetActive(false);
@@ -589,10 +594,8 @@ namespace KillingMahjong.UI
 
         private void BuildRowType(Transform row, TextMeshProUGUI name, HandArchetype.Info info)
         {
-            HandTypeBadge badge = HandTypeBadge.Ensure(row, "TypeBadge", RowTypeFontSize, _font, true, out bool made);
+            HandTypeBadge badge = HandTypeBadge.Ensure(row, "TypeBadge", RowTypeFontSize, _font, true, out _);
             badge.Show(info, NotebookTag(info));
-            if (!made) return;
-
             var rt = (RectTransform)badge.transform;
             rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
             rt.pivot = new Vector2(0f, 0.5f);
@@ -673,9 +676,17 @@ namespace KillingMahjong.UI
                 PositionTypeBadge(_typeBadge, _nameText, 10f);
                 _typeBadge.Show(HandArchetype.Some);
             }
-            _seniorMemoText = Txt(parent, "SeniorMemo", "", new Vector2(112f, -128f),
-                new Vector2(430f, 56f), 14f, TextAlignmentOptions.TopLeft, TextMain, out bool madeMemo);
-            if (madeMemo) _seniorMemoText.textWrappingMode = TextWrappingModes.Normal;
+            var memoSize = new Vector2(430f, 66f);
+            var memoPosition = new Vector2(112f, -121f);
+            _seniorMemoText = Txt(parent, "SeniorMemo", "", memoPosition, memoSize, 16f,
+                TextAlignmentOptions.TopLeft, TextMain);
+            _seniorMemoText.rectTransform.sizeDelta = memoSize;
+            _seniorMemoText.rectTransform.anchoredPosition = memoPosition;
+            _seniorMemoText.textWrappingMode = TextWrappingModes.Normal;
+            _seniorMemoText.enableAutoSizing = true;
+            _seniorMemoText.fontSizeMin = 14f;
+            _seniorMemoText.fontSizeMax = 16f;
+            _seniorMemoText.lineSpacing = 3f;
 
         }
 
@@ -758,7 +769,7 @@ namespace KillingMahjong.UI
             if (_hanText != null)
             {
                 _hanText.text = _browseOnly ? ""
-                    : "倍率1段上げ・" + GameRules.GetBoostTierCapLabel(yaku) + "まで";
+                    : bonus > 0 ? "強化済み" : "倍率1段上げ・" + GameRules.GetBoostTierCapLabel(yaku) + "まで";
             }
             bool hasCopy = NotebookCopy.TryGetValue(yaku, out var copy);
             if (_descText != null) _descText.text = hasCopy ? copy.Condition : YakuInfo.GetDescription(yaku);

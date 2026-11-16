@@ -89,7 +89,7 @@ namespace KillingMahjong.UI
             text.textWrappingMode = TMPro.TextWrappingModes.Normal;
             text.overflowMode = TMPro.TextOverflowModes.Truncate;
             text.enableAutoSizing = true;
-            text.fontSizeMax = 14f;
+            text.fontSizeMax = 16f;
             text.fontSizeMin = 13f;
         }
         // 既存UIと同じ2px単位。半透明や影を重ねず、輪郭を一重にする。
@@ -123,6 +123,38 @@ namespace KillingMahjong.UI
             shape.Box(tailX - 10f, -DescPanelHeight, tailX + 10f, -DescPanelHeight + 2f, fill);
             shape.End();
         }
+        private void EnsureActivateButton()
+        {
+            if (abilityWindow == null) return;
+
+            if (activateButton == null || activateButton == closeButton)
+            {
+                float bottom = PanelInnerCenter.y - PanelInnerHeight * 0.5f;
+                activateButton = SessionPrompt.CreateButton(abilityWindow, "発動",
+                    new Vector2(PanelInnerCenter.x + 19f,
+                        bottom + CloseButtonBottomMargin + CloseButtonSize * 0.5f), OnActivateClicked);
+                var rect = (RectTransform)activateButton.transform;
+                rect.sizeDelta = new Vector2(108f, 36f);
+                var label = activateButton.GetComponentInChildren<TMPro.TMP_Text>();
+                label.rectTransform.sizeDelta = rect.sizeDelta;
+                label.fontSize = 18f;
+                activateButton.image.color = new Color32(43, 51, 94, 255);
+                activateButton.gameObject.AddComponent<UIButtonHoverEffect>();
+            }
+            else activateButton.onClick.AddListener(OnActivateClicked);
+
+            RefreshActivateButton();
+        }
+
+        private void RefreshActivateButton()
+        {
+            if (activateButton == null || activateButton == closeButton) return;
+            bool selected = currentSelection != null;
+            activateButton.gameObject.SetActive(selected);
+            activateButton.interactable = selected && !IsDisplayOnly
+                && currentSelection.IsUsable && currentSelection.IsAffordable;
+        }
+
         private void HideLegacyTooltip()
         {
             if (tooltipText != null && !string.IsNullOrEmpty(tooltipText.text)) tooltipText.text = "";
@@ -155,7 +187,7 @@ namespace KillingMahjong.UI
             rt.pivot = new Vector2(0.5f, 0.5f);
             rt.sizeDelta = new Vector2(CloseButtonSize, CloseButtonSize);
             rt.anchoredPosition = new Vector2(
-                PanelInnerCenter.x,
+                PanelInnerCenter.x - 56f,
                 innerBottom + CloseButtonBottomMargin + CloseButtonSize * 0.5f);
             rt.localScale = Vector3.one;
 

@@ -75,6 +75,9 @@ namespace KillingMahjong.UI
                 ? phaseStatus == RoundStatus.HandSelection && IsWallShown()
                 : (phaseStatus == RoundStatus.HandSelection ||
                    (phaseStatus == RoundStatus.Discard && localTurn)));
+            if (gameUIManager != null && (gameUIManager.IsRonInputPlaying ||
+                (gameUIManager.RonWaitPanel != null && gameUIManager.RonWaitPanel.activeInHierarchy)))
+                wanted = false;
 
             if (!wanted)
             {
@@ -123,18 +126,19 @@ namespace KillingMahjong.UI
                 _lastGuideHandCount = handCount;
             }
 
-            PlaceGuideAboveWall(guide);
+            PlaceGuideAboveWall(guide, phaseStatus == RoundStatus.Discard && !mulligan);
             guide.gameObject.SetActive(true);
         }
 
-        /// <summary>手牌の枚数。ルール上13枚で固定</summary>
+        private readonly Vector3[] phaseGuideCorners = new Vector3[4];
+
         /// <summary>
         /// 案内を山牌のすぐ上に置く。
         ///
         /// 案内は ScreenSpace-Overlay の Canvas に下端中央アンカーで置いてあるので、
         /// 画面座標を scaleFactor で割れば、そのまま anchoredPosition.y になる。
         /// </summary>
-        private void PlaceGuideAboveWall(TMPro.TextMeshProUGUI guide)
+        private void PlaceGuideAboveWall(TMPro.TextMeshProUGUI guide, bool avoidRiver)
         {
             FindWallRect();
             if (_wallRect == null) return;
@@ -142,18 +146,35 @@ namespace KillingMahjong.UI
             var canvas = guide.canvas;
             if (canvas == null) return;
 
-            var corners = new Vector3[4];
-            _wallRect.GetWorldCorners(corners);
-            float topScreenY = RectTransformUtility.WorldToScreenPoint(null, corners[1]).y;
+            _wallRect.GetWorldCorners(phaseGuideCorners);
+            float topScreenY = RectTransformUtility.WorldToScreenPoint(null, phaseGuideCorners[1]).y;
 
             float scale = Mathf.Approximately(canvas.scaleFactor, 0f) ? 1f : canvas.scaleFactor;
             float y = topScreenY / scale + PhaseGuideLift;
 
             var rt = guide.rectTransform;
-            if (!Mathf.Approximately(rt.anchoredPosition.y, y))
+            float x = 0f;
+            if (avoidRiver && gameUIManager != null)
             {
-                rt.anchoredPosition = new Vector2(0f, y);
+                // 卓の左側の空きへ寄せ、両方の河の左端と案内の右端を離す。
+                float left = Screen.width * 0.5f;
+                left = LeftOfRiver(gameUIManager.RiverUI, left);
+                left = LeftOfRiver(gameUIManager.EnemyRiverUI, left);
+                x = (left - Screen.width * 0.5f) / scale - guide.preferredWidth * 0.5f - 12f;
             }
+
+            var target = new Vector2(Mathf.Round(x), Mathf.Round(y));
+            if (rt.anchoredPosition != target) rt.anchoredPosition = target;
+        }
+
+        private float LeftOfRiver(RiverUI river, float left)
+        {
+            var bounds = river != null ? river.GetTilesBoundsRect() : null;
+            if (bounds == null) return left;
+            bounds.GetWorldCorners(phaseGuideCorners);
+            foreach (var corner in phaseGuideCorners)
+                left = Mathf.Min(left, RectTransformUtility.WorldToScreenPoint(null, corner).x);
+            return left;
         }
 
         /// <summary>山牌の器を探す（GameObject.Find は表示中の物しか見つけないので、見つかった物を覚えておく）</summary>
