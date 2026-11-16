@@ -14,8 +14,7 @@ namespace KillingMahjong.UI.Effects
     /// </summary>
     public static class RonImpactEffect
     {
-        private const float HandFrameSeconds = 0.22f;
-        private const float HandRiseSeconds = 0.14f;
+        private const float HandRetractSeconds = 0.22f;
         // 2026-10-18「自分からロンする時の勢いも強くして」で、揺れと間を大きくした（前は 0.30秒 / 0.56秒 / 12px）
         private const float HpShakeSeconds = 0.45f;
         private const float CalloutHoldSeconds = 0.85f;
@@ -41,8 +40,16 @@ namespace KillingMahjong.UI.Effects
         // 押した雫のボタンをその場に残し、下から伸びた手の指先がそれを押し込み、雫が弾けて
         // 同じ場所で血しぶきの「ロン!!!」になる（吹き出しは km-docs screenshots/20261114/ron_bubble の案A）。
 
-        /// <summary>手の絵（400x300）での、手3の指先の位置（画素。左上が原点）</summary>
-        private static readonly Vector2 FingerTipPixel = new Vector2(254f, 219f);
+        /// <summary>手の絵（400x300）ごとの指先の位置（画素。左上が原点）。</summary>
+        private static readonly Vector2[] FingerTipPixels =
+        {
+            new Vector2(202f, 276f),
+            new Vector2(253f, 243f),
+            new Vector2(254f, 219f)
+        };
+
+        private static readonly float[] ApproachEnds = { 0.24f, 0.46f, 1f };
+        private static readonly float[] ApproachSeconds = { 0.12f, 0.08f, 0.24f };
         /// <summary>手の絵の1画素を何単位で映すか（線の太さをボタンの縁と揃えるため2倍のまま）</summary>
         private const float HandDot = 2f;
         /// <summary>指先を当てる所。雫のボタンの中心からのずれ（雫の下寄りの丸い所）</summary>
@@ -132,16 +139,14 @@ namespace KillingMahjong.UI.Effects
             handImage.rectTransform.anchorMin = handImage.rectTransform.anchorMax = new Vector2(.5f, 0);
             handImage.rectTransform.pivot = new Vector2(.5f, 0);
             Vector2 aim = dropPosition + FingerAimOnDrop * (dropSize.y / 216f);
-            float tipFromBottom = (300f - FingerTipPixel.y) * HandDot;
-            float handX = Mathf.Round(aim.x - (FingerTipPixel.x - 200f) * HandDot);
-            float handLift = Mathf.Max(0f, Mathf.Round(aim.y + overlayHeight * .5f - tipFromBottom));
+            aim.y += overlayHeight * .5f;
+            Vector2 startTip = new Vector2(aim.x + 32f, -16f);
+            Vector2 previousTip = startTip;
             Image armImage = CreateImage("RonArm", handImage.rectTransform);
             armImage.rectTransform.anchorMin = new Vector2(0f, 0f);
             armImage.rectTransform.anchorMax = new Vector2(1f, 0f);
             armImage.rectTransform.pivot = new Vector2(.5f, 1f);
             armImage.rectTransform.anchoredPosition = Vector2.zero;
-            armImage.rectTransform.sizeDelta = new Vector2(0f, handLift + 4f);
-            armImage.gameObject.SetActive(handLift > 0f);
 
             // 声「それ、ロン」は、指が動いている間に「それ」、吹き出しで「ロン」（2026-10-15）
             var audio = KillingMahjong.Managers.AudioManager.Instance;
@@ -166,12 +171,11 @@ namespace KillingMahjong.UI.Effects
                 if (previousHandSprite != null) Object.Destroy(previousHandSprite);
                 if (previousArmSprite != null) Object.Destroy(previousArmSprite);
                 handImage.gameObject.SetActive(true);
-                if (!raisedHand)
-                {
-                    raisedHand = true;
-                    yield return RaiseHandFromBottom(handImage.rectTransform, new Vector2(handX, handLift), shade);
-                }
-                else if (i < HandFrameNames.Length - 1) yield return new WaitForSeconds(HandFrameSeconds);
+                raisedHand = true;
+                Vector2 nextTip = Vector2.Lerp(startTip, aim, ApproachEnds[i]);
+                yield return MoveHand(handImage.rectTransform, armImage.rectTransform, FingerTipPixels[i],
+                    previousTip, nextTip, ApproachSeconds[i], i == 0 ? shade : null);
+                previousTip = nextTip;
             }
 
             if (!raisedHand) handImage.gameObject.SetActive(false);
@@ -228,7 +232,7 @@ namespace KillingMahjong.UI.Effects
             }
 
             onImpact?.Invoke();
-            yield return SlamCallout(callout, lines, CalloutHoldSeconds);
+            yield return SlamCallout(callout, lines, CalloutHoldSeconds, raisedHand ? handImage.rectTransform : null);
             if (waitingForResponse != null)
             {
                 callout.gameObject.SetActive(false);
@@ -257,7 +261,7 @@ namespace KillingMahjong.UI.Effects
         /// 吹き出しを大きいところから叩きつけ、潰れた形で一瞬止めてから、震わせながら収める。
         /// 吹き出しの中だけを白く光らせる（画面全体は光らせない）。
         /// </summary>
-        private static IEnumerator SlamCallout(RectTransform callout, Effects.PerspectiveFocusLines lines, float total)
+        private static IEnumerator SlamCallout(RectTransform callout, Effects.PerspectiveFocusLines lines, float total, RectTransform hand)
         {
             Image inner = callout.Find("RonBurstInner")?.GetComponent<Image>();
             Color innerColor = inner != null ? inner.color : Color.white;
@@ -279,6 +283,7 @@ namespace KillingMahjong.UI.Effects
             yield return new WaitForSeconds(HitStopSeconds);
 
             float rest = Mathf.Max(0.1f, total - SlamSeconds - HitStopSeconds);
+            Vector2 handStart = hand != null ? hand.anchoredPosition : Vector2.zero;
             float nextJitter = 0f;
             Vector2 jitter = Vector2.zero;
             t = 0f;
@@ -298,6 +303,12 @@ namespace KillingMahjong.UI.Effects
                     float amp = CalloutTremblePixels * (1f - k);
                     jitter = new Vector2(Mathf.Round(Random.Range(-amp, amp)), Mathf.Round(Random.Range(-amp, amp)));
                     nextJitter = t + 1f / 15f;
+                }
+                if (hand != null)
+                {
+                    float retreat = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / HandRetractSeconds));
+                    float bottom = Mathf.Lerp(handStart.y, -hand.rect.height, retreat);
+                    hand.anchoredPosition = new Vector2(handStart.x, Mathf.Round(bottom));
                 }
                 callout.anchoredPosition = home + jitter;
 
@@ -325,20 +336,26 @@ namespace KillingMahjong.UI.Effects
             return lines;
         }
 
-        private static IEnumerator RaiseHandFromBottom(RectTransform hand, Vector2 target, Image shade)
+        private static IEnumerator MoveHand(RectTransform hand, RectTransform arm, Vector2 tipPixel,
+            Vector2 from, Vector2 to, float seconds, Image shade)
         {
-            float start = -hand.rect.height;
-            float startDimAlpha = shade.color.a;
-            hand.anchoredPosition = new Vector2(target.x, start);
-            for (float elapsed = 0; elapsed < HandFrameSeconds; elapsed += Time.deltaTime)
+            Vector2 tipFromPivot = new Vector2(tipPixel.x - 200f, 300f - tipPixel.y) * HandDot;
+            float startDimAlpha = shade != null ? shade.color.a : SettlementDimAlpha;
+            for (float elapsed = 0f; elapsed < seconds; elapsed += Time.deltaTime)
             {
-                float progress = Mathf.Clamp01(PresentationTiming.Sample(elapsed) / HandRiseSeconds);
-                float eased = 1 - Mathf.Pow(1 - progress, 3);
-                shade.color = new Color(0f, 0f, 0f, Mathf.Lerp(startDimAlpha, SettlementDimAlpha, eased));
-                hand.anchoredPosition = new Vector2(target.x, Mathf.Round(Mathf.Lerp(start, target.y, eased)));
+                float progress = Mathf.Clamp01(elapsed / seconds);
+                PlaceHand(hand, arm, Vector2.Lerp(from, to, progress) - tipFromPivot);
+                if (shade != null)
+                    shade.color = new Color(0f, 0f, 0f, Mathf.Lerp(startDimAlpha, SettlementDimAlpha, progress));
                 yield return null;
             }
-            hand.anchoredPosition = target;
+            PlaceHand(hand, arm, to - tipFromPivot);
+        }
+
+        private static void PlaceHand(RectTransform hand, RectTransform arm, Vector2 position)
+        {
+            hand.anchoredPosition = new Vector2(Mathf.Round(position.x), Mathf.Round(position.y));
+            arm.sizeDelta = new Vector2(0f, Mathf.Max(0f, hand.anchoredPosition.y + 2f));
         }
 
         private static GameObject CreateOverlay(out RectTransform overlayRt)
