@@ -83,6 +83,7 @@ namespace KillingMahjong.UI
             YakuListUI?.CloseYakuList();
             RonWaitPanel.SetActive(true);
             RonWaitPanel.transform.SetAsLastSibling();
+            Effects.RonButtonFlow.Attach(RonWaitPanel);
 
             // **画面を落として、ロンできる牌だけを光らせる**（2026-10-04、`ロン演出.pdf`）。
             // 光らせるのは敵がいま捨てた牌＝敵の河のいちばん最後。
