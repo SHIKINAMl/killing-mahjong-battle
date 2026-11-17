@@ -38,24 +38,25 @@ namespace KillingMahjong.UI.Effects
 
         // ---- ボタン・手・吹き出しを1つの流れにつなぐ（2026-11-15 ユーザー指示） ----
         // 「せっかく吹き出しが出るならロンボタンと吹き出し、また手の部分も全部演出としてつながっている感じに」。
-        // 押した雫のボタンをその場に残し、下から伸びた手の指先がそれを押し込み、雫が弾けて
+        // 押したボタンをその場に残し、下から伸びた手の指先が押し込むと、先端から矢印が走って
         // 同じ場所で血しぶきの「ロン!!!」になる（吹き出しは km-docs screenshots/20261114/ron_bubble の案A）。
 
         /// <summary>元の手の絵（800x600）での、手3の指先の位置（画素。左上が原点）</summary>
         private static readonly Vector2 FingerTipPixel = new Vector2(510f, 438f);
         private const float HandWidth = 800f;
         private const float HandHeight = 600f;
-        /// <summary>指先を当てる所。雫のボタンの中心からのずれ（雫の下寄りの丸い所）</summary>
+        /// <summary>指先を当てる所。ボタンの中心から下縁へのずれ。</summary>
         private static readonly Vector2 FingerAimOnDrop = new Vector2(0f, -50f);
         /// <summary>指先が雫に届いてから弾けるまで（押し込んで潰れている間）</summary>
         private const float PressSeconds = 0.20f;
+        private const string ArrowFramesPath = "UI/RonCallout/ron_arrow_frames";
         private const float SettlementDimAlpha = 0.35f;
         /// <summary>血しぶきの吹き出しの絵（160x120 を2倍で映す）</summary>
         private const string BloodCalloutPath = "UI/RonCallout/ron_callout_blood";
 
         /// <summary>
-        /// 押された雫のボタンを残したまま、手1・手2で指を伸ばし、手3で指先が雫を押し込む。
-        /// 雫が弾けた所に血しぶきの「ロン!!!」を叩きつけ、体力表示を揺らしてから決着処理へ返す。
+        /// 手1・手2で指を伸ばし、手3でボタンを押し込むとその先端から矢印を伸ばす。
+        /// ボタンの位置に血しぶきの「ロン!!!」を叩きつけ、体力表示を揺らしてから決着処理へ返す。
         /// <paramref name="ronButton"/> が無いとき（試写など）は画面の真ん中にボタンがあるものとして動かす。
         /// </summary>
         public static IEnumerator Play(MonoBehaviour runner, IList<RectTransform> hpPanels, RectTransform ronButton = null,
@@ -177,12 +178,12 @@ namespace KillingMahjong.UI.Effects
             if (!raisedHand) handImage.gameObject.SetActive(false);
             shade.color = new Color(0f, 0f, 0f, SettlementDimAlpha);
 
-            // 指先が雫を押し込む。雫は横へ潰れる
+            // 指先がボタンを押し込むと、先端から相手へ矢印が走る。
             if (drop != null)
             {
                 drop.rectTransform.localScale = new Vector3(1.08f, 0.86f, 1f);
                 drop.rectTransform.anchoredPosition = dropPosition + new Vector2(0f, -dropSize.y * .07f);
-                yield return new WaitForSeconds(PressSeconds);
+                yield return PlayPointingArrow(overlayRt, drop.rectTransform, dropSize);
                 drop.gameObject.SetActive(false);
             }
 
@@ -238,6 +239,39 @@ namespace KillingMahjong.UI.Effects
                 while (waitingForResponse() && Time.unscaledTime < until) yield return null;
             }
 
+        }
+
+        private static IEnumerator PlayPointingArrow(RectTransform overlay, RectTransform button, Vector2 buttonSize)
+        {
+            Texture2D frames = Resources.Load<Texture2D>(ArrowFramesPath);
+            if (frames == null)
+            {
+                yield return new WaitForSeconds(PressSeconds);
+                yield break;
+            }
+
+            const int frameCount = 3;
+            const float frameWidth = 1f / frameCount;
+            var arrow = new GameObject("RonPointingArrow", typeof(RectTransform), typeof(RawImage))
+                .GetComponent<RawImage>();
+            arrow.transform.SetParent(overlay, false);
+            arrow.transform.SetSiblingIndex(button.GetSiblingIndex());
+            arrow.raycastTarget = false;
+            arrow.texture = frames;
+
+            // 矢印の原点は1コマ内の (6, 36)。ボタンの尖った上辺に合わせる。
+            float scale = buttonSize.x / 320f;
+            var origin = button.anchoredPosition + new Vector2(buttonSize.x * .2f, buttonSize.y * .28f);
+            SetRect(arrow.rectTransform, origin + new Vector2(36f, 32f) * scale, new Vector2(96f, 80f) * scale);
+            var frameDelay = new WaitForSeconds(PressSeconds / frameCount);
+            for (int frame = 0; frame < frameCount; frame++)
+            {
+                arrow.uvRect = new Rect(frame * frameWidth, 0f, frameWidth, 1f);
+                yield return frameDelay;
+            }
+
+            arrow.gameObject.SetActive(false);
+            Object.Destroy(arrow.gameObject);
         }
 
         /// <summary>血しぶきの「ロン!!!」（字も絵に描き込んである）。叩きつけと震えは入れ物ごと動かす。</summary>
