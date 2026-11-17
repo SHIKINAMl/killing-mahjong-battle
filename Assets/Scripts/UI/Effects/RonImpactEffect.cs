@@ -15,7 +15,7 @@ namespace KillingMahjong.UI.Effects
     public static class RonImpactEffect
     {
         private const float HandFrameSeconds = 0.22f;
-        private const float HandRiseSeconds = 0.14f;
+        private const float InputDimSeconds = 0.14f;
         // 2026-10-18「自分からロンする時の勢いも強くして」で、揺れと間を大きくした（前は 0.30秒 / 0.56秒 / 12px）
         private const float HpShakeSeconds = 0.45f;
         private const float CalloutHoldSeconds = 0.85f;
@@ -38,16 +38,12 @@ namespace KillingMahjong.UI.Effects
 
         // ---- ボタン・手・吹き出しを1つの流れにつなぐ（2026-11-15 ユーザー指示） ----
         // 「せっかく吹き出しが出るならロンボタンと吹き出し、また手の部分も全部演出としてつながっている感じに」。
-        // 押したボタンをその場に残し、下から伸びた手の指先が押し込むと、先端から矢印が走って
+        // 押したボタンをその場に残し、画面下の手が指を伸ばすと、ボタンの先端から矢印が走って
         // 同じ場所で血しぶきの「ロン!!!」になる（吹き出しは km-docs screenshots/20261114/ron_bubble の案A）。
 
-        /// <summary>元の手の絵（800x600）での、手3の指先の位置（画素。左上が原点）</summary>
-        private static readonly Vector2 FingerTipPixel = new Vector2(510f, 438f);
         private const float HandWidth = 800f;
         private const float HandHeight = 600f;
-        /// <summary>指先を当てる所。ボタンの中心から下縁へのずれ。</summary>
-        private static readonly Vector2 FingerAimOnDrop = new Vector2(0f, -50f);
-        /// <summary>指先が雫に届いてから弾けるまで（押し込んで潰れている間）</summary>
+        /// <summary>押されたボタンが潰れて矢印を出している時間。</summary>
         private const float PressSeconds = 0.20f;
         private const string ArrowFramesPath = "UI/RonCallout/ron_arrow_frames";
         private const float SettlementDimAlpha = 0.35f;
@@ -55,7 +51,7 @@ namespace KillingMahjong.UI.Effects
         private const string BloodCalloutPath = "UI/RonCallout/ron_callout_blood";
 
         /// <summary>
-        /// 手1・手2で指を伸ばし、手3でボタンを押し込むとその先端から矢印を伸ばす。
+        /// 画面下に手1・手2・手3を順に出し、指さしと同時にボタンの先端から矢印を伸ばす。
         /// ボタンの位置に血しぶきの「ロン!!!」を叩きつけ、体力表示を揺らしてから決着処理へ返す。
         /// <paramref name="ronButton"/> が無いとき（試写など）は画面の真ん中にボタンがあるものとして動かす。
         /// </summary>
@@ -74,12 +70,11 @@ namespace KillingMahjong.UI.Effects
             PresentationScope scope)
         {
             GameObject overlay = scope.Own(CreateOverlay(out RectTransform overlayRt));
-            Sprite handSprite = null, armSprite = null, bloodSprite = null, burstSprite = null, innerSprite = null;
+            Sprite handSprite = null, bloodSprite = null, burstSprite = null, innerSprite = null;
             Texture2D burstTexture = null, innerTexture = null;
             scope.AddCleanup(() =>
             {
                 if (handSprite != null) Object.Destroy(handSprite);
-                if (armSprite != null) Object.Destroy(armSprite);
                 if (bloodSprite != null) Object.Destroy(bloodSprite);
                 if (burstSprite != null) Object.Destroy(burstSprite);
                 if (burstTexture != null) Object.Destroy(burstTexture);
@@ -94,7 +89,6 @@ namespace KillingMahjong.UI.Effects
             RonChanceEffect.HideCurrent();
             // 作ったばかりの Canvas はまだ大きさが決まっていないので、CanvasScaler（800x600・Expand）と同じ式で測る
             float overlayScale = Mathf.Max(0.0001f, Mathf.Min(Screen.width / 800f, Screen.height / 600f));
-            float overlayHeight = Screen.height / overlayScale;
 
             // 押されたボタンを、この演出の画面に同じ位置・同じ大きさで写す（本物のボタンは呼び出し側で隠す）
             Vector2 dropPosition = Vector2.zero;
@@ -126,29 +120,17 @@ namespace KillingMahjong.UI.Effects
                 SetRect(drop.rectTransform, dropPosition, dropSize);
             }
 
-            // 手は画面の下端から伸ばす。指先が雫に届く高さまで持ち上げ、下にできる隙間は腕の最下段の1列を伸ばして埋める
+            // 原画は画面下端まで描かれている。3枚の位置を揃えたまま切り替える。
             Image handImage = CreateImage("RonHand", overlayRt);
             handImage.preserveAspect = true;
             SetRect(handImage.rectTransform, Vector2.zero, new Vector2(HandWidth, HandHeight));
             handImage.rectTransform.anchorMin = handImage.rectTransform.anchorMax = new Vector2(.5f, 0);
             handImage.rectTransform.pivot = new Vector2(.5f, 0);
-            Vector2 aim = dropPosition + FingerAimOnDrop * (dropSize.y / 216f);
-            float tipFromBottom = HandHeight - FingerTipPixel.y;
-            float handX = Mathf.Round(aim.x - (FingerTipPixel.x - HandWidth * .5f));
-            float handLift = Mathf.Max(0f, Mathf.Round(aim.y + overlayHeight * .5f - tipFromBottom));
-            Image armImage = CreateImage("RonArm", handImage.rectTransform);
-            armImage.rectTransform.anchorMin = new Vector2(0f, 0f);
-            armImage.rectTransform.anchorMax = new Vector2(1f, 0f);
-            armImage.rectTransform.pivot = new Vector2(.5f, 1f);
-            armImage.rectTransform.anchoredPosition = Vector2.zero;
-            armImage.rectTransform.sizeDelta = new Vector2(0f, handLift + 4f);
-            armImage.gameObject.SetActive(handLift > 0f);
 
             // 声「それ、ロン」は、指が動いている間に「それ」、吹き出しで「ロン」（2026-10-15）
             var audio = KillingMahjong.Managers.AudioManager.Instance;
             if (audio != null) audio.PlayRonInputSore();
 
-            bool raisedHand = false;
             for (int i = 0; i < HandFrameNames.Length; i++)
             {
                 Texture2D handTexture = Resources.Load<Texture2D>(HandFrameNames[i]);
@@ -158,27 +140,19 @@ namespace KillingMahjong.UI.Effects
                     continue;
                 }
 
-                Sprite previousHandSprite = handImage.sprite, previousArmSprite = armImage.sprite;
+                Sprite previousHandSprite = handSprite;
                 handSprite = Sprite.Create(handTexture, new Rect(0f, 0f, handTexture.width, handTexture.height),
                     new Vector2(0.5f, 0.5f), 100f);
-                armSprite = Sprite.Create(handTexture, new Rect(0f, 0f, handTexture.width, 1f), new Vector2(0.5f, 0.5f), 100f);
                 handImage.sprite = handSprite;
-                armImage.sprite = armSprite;
                 if (previousHandSprite != null) Object.Destroy(previousHandSprite);
-                if (previousArmSprite != null) Object.Destroy(previousArmSprite);
-                handImage.gameObject.SetActive(true);
-                if (!raisedHand)
-                {
-                    raisedHand = true;
-                    yield return RaiseHandFromBottom(handImage.rectTransform, new Vector2(handX, handLift), shade);
-                }
+                if (i == 0) yield return FadeInputShade(shade);
                 else if (i < HandFrameNames.Length - 1) yield return new WaitForSeconds(HandFrameSeconds);
             }
 
-            if (!raisedHand) handImage.gameObject.SetActive(false);
+            if (handSprite == null) handImage.gameObject.SetActive(false);
             shade.color = new Color(0f, 0f, 0f, SettlementDimAlpha);
 
-            // 指先がボタンを押し込むと、先端から相手へ矢印が走る。
+            // 指さしに合わせ、ボタンの先端から相手へ矢印が走る。
             if (drop != null)
             {
                 drop.rectTransform.localScale = new Vector3(1.08f, 0.86f, 1f);
@@ -359,20 +333,16 @@ namespace KillingMahjong.UI.Effects
             return lines;
         }
 
-        private static IEnumerator RaiseHandFromBottom(RectTransform hand, Vector2 target, Image shade)
+        private static IEnumerator FadeInputShade(Image shade)
         {
-            float start = -hand.rect.height;
             float startDimAlpha = shade.color.a;
-            hand.anchoredPosition = new Vector2(target.x, start);
             for (float elapsed = 0; elapsed < HandFrameSeconds; elapsed += Time.deltaTime)
             {
-                float progress = Mathf.Clamp01(PresentationTiming.Sample(elapsed) / HandRiseSeconds);
+                float progress = Mathf.Clamp01(PresentationTiming.Sample(elapsed) / InputDimSeconds);
                 float eased = 1 - Mathf.Pow(1 - progress, 3);
                 shade.color = new Color(0f, 0f, 0f, Mathf.Lerp(startDimAlpha, SettlementDimAlpha, eased));
-                hand.anchoredPosition = new Vector2(target.x, Mathf.Round(Mathf.Lerp(start, target.y, eased)));
                 yield return null;
             }
-            hand.anchoredPosition = target;
         }
 
         private static GameObject CreateOverlay(out RectTransform overlayRt)
