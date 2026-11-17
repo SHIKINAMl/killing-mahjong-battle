@@ -186,7 +186,7 @@ namespace KillingMahjong.UI
             Debug.Log("PhaseTransition: Step 6 - Turn Indicator");
 
             // === 6. 線が入り「先行/後攻」 ===
-            PlayTransitionStinger("br_band_open");
+            PlayTransitionStinger("br_turn_open");
             yield return OpenBand();
 
             bool isFirst = displayIsLocalTurn ?? KillingMahjong.Managers.BoardStateManager.Instance.IsLocalTurn;
