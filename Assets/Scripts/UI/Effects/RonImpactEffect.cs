@@ -37,7 +37,7 @@ namespace KillingMahjong.UI.Effects
 
         // ---- ボタン・手・吹き出しを1つの流れにつなぐ（2026-11-15 ユーザー指示） ----
         // 「せっかく吹き出しが出るならロンボタンと吹き出し、また手の部分も全部演出としてつながっている感じに」。
-        // 押したボタンをその場に残し、画面下の手が指を伸ばすと、ボタンの先端から矢印が走って
+        // 押したボタンはすぐ消し、画面下の手が指を伸ばすと、元のボタン位置から矢印が走って
         // 背後の閃光から「ロン！」の宣言へつなぐ。
 
         private const float HandWidth = 800f;
@@ -81,17 +81,11 @@ namespace KillingMahjong.UI.Effects
             // 作ったばかりの Canvas はまだ大きさが決まっていないので、CanvasScaler（800x600・Expand）と同じ式で測る
             float overlayScale = Mathf.Max(0.0001f, Mathf.Min(Screen.width / 800f, Screen.height / 600f));
 
-            // 押されたボタンを、この演出の画面に同じ位置・同じ大きさで写す（本物のボタンは呼び出し側で隠す）
+            // ボタンの絵は残さず、矢印と宣言の配置用に元の位置・大きさだけを読む。
             Vector2 dropPosition = Vector2.zero;
             Vector2 dropSize = new Vector2(320f, 216f);
-            Sprite pressedSprite = null;
             if (ronButton != null)
             {
-                var button = ronButton.GetComponent<Button>();
-                var buttonImage = ronButton.GetComponent<Image>();
-                pressedSprite = button != null && button.spriteState.pressedSprite != null
-                    ? button.spriteState.pressedSprite
-                    : buttonImage != null ? buttonImage.sprite : null;
                 var sourceCanvas = ronButton.GetComponentInParent<Canvas>()?.rootCanvas;
                 var camera = sourceCanvas != null && sourceCanvas.renderMode != RenderMode.ScreenSpaceOverlay
                     ? sourceCanvas.worldCamera : null;
@@ -102,13 +96,6 @@ namespace KillingMahjong.UI.Effects
                 Vector2 screen = (lowerLeft + upperRight) * 0.5f;
                 dropPosition = (screen - new Vector2(Screen.width, Screen.height) * .5f) / overlayScale;
                 dropSize = (upperRight - lowerLeft) / overlayScale;
-            }
-            Image drop = null;
-            if (pressedSprite != null)
-            {
-                drop = CreateImage("RonDropPressed", overlayRt);
-                drop.sprite = pressedSprite;
-                SetRect(drop.rectTransform, dropPosition, dropSize);
             }
 
             // 原画は画面下端まで描かれている。3枚の位置を揃えたまま切り替える。
@@ -143,14 +130,9 @@ namespace KillingMahjong.UI.Effects
             if (handSprite == null) handImage.gameObject.SetActive(false);
             shade.color = new Color(0f, 0f, 0f, SettlementDimAlpha);
 
-            // 指さしに合わせ、ボタンの先端から相手へ矢印が走る。
-            if (drop != null)
-            {
-                drop.rectTransform.localScale = new Vector3(1.08f, 0.86f, 1f);
-                drop.rectTransform.anchoredPosition = dropPosition + new Vector2(0f, -dropSize.y * .07f);
-                yield return PlayPointingArrow(overlayRt, drop.rectTransform, dropSize);
-                drop.gameObject.SetActive(false);
-            }
+            // 指さしに合わせ、元のボタン位置から相手へ矢印が走る。
+            if (ronButton != null)
+                yield return PlayPointingArrow(overlayRt, dropPosition + new Vector2(0f, -dropSize.y * .07f), dropSize);
 
             SpriteRenderer backFlash = CreateBackFlash(scope);
             yield return PrimeStrike(shade, backFlash);
@@ -185,7 +167,7 @@ namespace KillingMahjong.UI.Effects
 
         }
 
-        private static IEnumerator PlayPointingArrow(RectTransform overlay, RectTransform button, Vector2 buttonSize)
+        private static IEnumerator PlayPointingArrow(RectTransform overlay, Vector2 buttonPosition, Vector2 buttonSize)
         {
             Texture2D frames = Resources.Load<Texture2D>(ArrowFramesPath);
             if (frames == null)
@@ -199,13 +181,12 @@ namespace KillingMahjong.UI.Effects
             var arrow = new GameObject("RonPointingArrow", typeof(RectTransform), typeof(RawImage))
                 .GetComponent<RawImage>();
             arrow.transform.SetParent(overlay, false);
-            arrow.transform.SetSiblingIndex(button.GetSiblingIndex());
             arrow.raycastTarget = false;
             arrow.texture = frames;
 
             // 矢印の原点は1コマ内の (6, 36)。ボタンの尖った上辺に合わせる。
             float scale = buttonSize.x / 320f;
-            var origin = button.anchoredPosition + new Vector2(buttonSize.x * .2f, buttonSize.y * .28f);
+            var origin = buttonPosition + new Vector2(buttonSize.x * .2f, buttonSize.y * .28f);
             SetRect(arrow.rectTransform, origin + new Vector2(36f, 32f) * scale, new Vector2(96f, 80f) * scale);
             var frameDelay = new WaitForSeconds(PressSeconds / frameCount);
             for (int frame = 0; frame < frameCount; frame++)

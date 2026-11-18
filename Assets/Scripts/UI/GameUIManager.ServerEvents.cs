@@ -191,7 +191,7 @@ namespace KillingMahjong.UI
             // 声「それ、ロン」は RonImpactEffect の中で、手振りと吹き出しに合わせて鳴らす（2026-10-15）。
             // 前はここ（演出を見せ終えた後）でまるごと鳴らしていて、「ロン」が大きく遅れていた
             // 押された雫のボタンの位置から、指先・弾ける所・吹き出しを揃える（2026-11-15）。
-            // 本物のボタンは押した時点で隠し、演出の画面に押された絵を写して続ける
+            // ボタンは押した時点で隠す。位置だけを渡して、指さしと宣言を続ける。
             var ronButton = RonWaitPanel != null ? RonWaitPanel.GetComponentInChildren<UnityEngine.UI.Button>(true) : null;
             IsRonInputPlaying = true;
             RonResponseReceived = false;
