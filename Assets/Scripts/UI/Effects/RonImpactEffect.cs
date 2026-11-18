@@ -8,9 +8,9 @@ using KillingMahjong.Common;
 namespace KillingMahjong.UI.Effects
 {
     /// <summary>
-    /// ロン入力直後の手振り、破裂吹き出し、体力表示の揺れ。
+    /// ロン入力直後の手振り、相手背後の閃光、宣言の文字、体力表示の揺れ。
     /// 画面、盤面、立ち絵には ScreenQuake / ScreenFlash を使わない。
-    /// 勢いは吹き出しの叩きつけ・集中線・音・体力表示の揺れで出す（2026-10-18）。
+    /// 勢いは背後の閃光、宣言の叩きつけ、音と体力表示の揺れで出す。
     /// </summary>
     public static class RonImpactEffect
     {
@@ -22,7 +22,7 @@ namespace KillingMahjong.UI.Effects
         private const float HpShakePixels = 22f;
 
         /// <summary>吹き出しを叩きつけるときの、出始めの大きさ（倍）と、そこから落ちる時間。</summary>
-        private const float SlamFromScale = 2.4f;
+        private const float SlamFromScale = 1.65f;
         private const float SlamSeconds = 0.06f;
         /// <summary>当たった瞬間に潰れた形で止める時間（ヒットストップ）。</summary>
         private const float HitStopSeconds = 0.07f;
@@ -39,7 +39,7 @@ namespace KillingMahjong.UI.Effects
         // ---- ボタン・手・吹き出しを1つの流れにつなぐ（2026-11-15 ユーザー指示） ----
         // 「せっかく吹き出しが出るならロンボタンと吹き出し、また手の部分も全部演出としてつながっている感じに」。
         // 押したボタンをその場に残し、画面下の手が指を伸ばすと、ボタンの先端から矢印が走って
-        // 同じ場所で血しぶきの「ロン!!!」になる（吹き出しは km-docs screenshots/20261114/ron_bubble の案A）。
+        // 背後の閃光から「ロン！」の宣言へつなぐ。
 
         private const float HandWidth = 800f;
         private const float HandHeight = 600f;
@@ -47,12 +47,10 @@ namespace KillingMahjong.UI.Effects
         private const float PressSeconds = 0.20f;
         private const string ArrowFramesPath = "UI/RonCallout/ron_arrow_frames";
         private const float SettlementDimAlpha = 0.35f;
-        /// <summary>血しぶきの吹き出しの絵（160x120 を2倍で映す）</summary>
-        private const string BloodCalloutPath = "UI/RonCallout/ron_callout_blood";
 
         /// <summary>
         /// 画面下に手1・手2・手3を順に出し、指さしと同時にボタンの先端から矢印を伸ばす。
-        /// ボタンの位置に血しぶきの「ロン!!!」を叩きつけ、体力表示を揺らしてから決着処理へ返す。
+        /// 相手の背後に閃光を走らせて「ロン！」を叩きつけ、決着処理へ返す。
         /// <paramref name="ronButton"/> が無いとき（試写など）は画面の真ん中にボタンがあるものとして動かす。
         /// </summary>
         public static IEnumerator Play(MonoBehaviour runner, IList<RectTransform> hpPanels, RectTransform ronButton = null,
@@ -70,16 +68,10 @@ namespace KillingMahjong.UI.Effects
             PresentationScope scope)
         {
             GameObject overlay = scope.Own(CreateOverlay(out RectTransform overlayRt));
-            Sprite handSprite = null, bloodSprite = null, burstSprite = null, innerSprite = null;
-            Texture2D burstTexture = null, innerTexture = null;
+            Sprite handSprite = null;
             scope.AddCleanup(() =>
             {
                 if (handSprite != null) Object.Destroy(handSprite);
-                if (bloodSprite != null) Object.Destroy(bloodSprite);
-                if (burstSprite != null) Object.Destroy(burstSprite);
-                if (burstTexture != null) Object.Destroy(burstTexture);
-                if (innerSprite != null) Object.Destroy(innerSprite);
-                if (innerTexture != null) Object.Destroy(innerTexture);
             });
             var shade = CreateImage("RonInputDim", overlayRt);
             shade.rectTransform.anchorMin = Vector2.zero;
@@ -161,31 +153,8 @@ namespace KillingMahjong.UI.Effects
                 drop.gameObject.SetActive(false);
             }
 
-            // 雫が弾けた所に、血しぶきの「ロン!!!」
-            var lines = CreateFocusLines(overlayRt, dropPosition);
-            Texture2D bloodTexture = Resources.Load<Texture2D>(BloodCalloutPath);
-            RectTransform callout;
-            if (bloodTexture != null)
-            {
-                bloodSprite = Sprite.Create(bloodTexture, new Rect(0f, 0f, bloodTexture.width, bloodTexture.height),
-                    new Vector2(0.5f, 0.5f), 100f);
-                callout = CreateBloodCallout(overlayRt, bloodSprite, dropPosition,
-                    new Vector2(bloodTexture.width * 2f, bloodTexture.height * 2f));
-            }
-            else
-            {
-                Debug.LogError("[RonImpactEffect] ロンの吹き出しの絵が見つかりません: Resources/" + BloodCalloutPath);
-                burstTexture = CreateBurstTexture(BurstDot, 0f);
-                innerTexture = CreateBurstTexture(BurstDot, BurstRim);
-                burstSprite = Sprite.Create(burstTexture, new Rect(0f, 0f, burstTexture.width, burstTexture.height),
-                    new Vector2(0.5f, 0.5f), 100f);
-                innerSprite = Sprite.Create(innerTexture, new Rect(0f, 0f, innerTexture.width, innerTexture.height),
-                    new Vector2(0.5f, 0.5f), 100f);
-                callout = CreateBurstCallout(overlayRt, burstSprite, innerSprite);
-                callout.anchoredPosition = dropPosition;
-            }
-            RonAuraUI.BehindCallout(callout);
-
+            yield return FlashBehindEnemy(scope);
+            RectTransform callout = CreateRonTitle(overlayRt, dropPosition + new Vector2(0f, -18f), scope);
             // 吹き出し・声・ドン・揺れを**同じ1コマに揃える**
             if (audio != null)
             {
@@ -203,12 +172,11 @@ namespace KillingMahjong.UI.Effects
             }
 
             onImpact?.Invoke();
-            yield return SlamCallout(callout, lines, CalloutHoldSeconds);
+            yield return SlamCallout(callout, CalloutHoldSeconds);
             if (waitingForResponse != null)
             {
                 callout.gameObject.SetActive(false);
                 handImage.gameObject.SetActive(false);
-                lines.gameObject.SetActive(false);
                 float until = Time.unscaledTime + 1f;
                 while (waitingForResponse() && Time.unscaledTime < until) yield return null;
             }
@@ -248,29 +216,71 @@ namespace KillingMahjong.UI.Effects
             Object.Destroy(arrow.gameObject);
         }
 
-        /// <summary>血しぶきの「ロン!!!」（字も絵に描き込んである）。叩きつけと震えは入れ物ごと動かす。</summary>
-        private static RectTransform CreateBloodCallout(RectTransform root, Sprite sprite, Vector2 position, Vector2 size)
+        private static IEnumerator FlashBehindEnemy(PresentationScope scope)
         {
-            var group = new GameObject("RonBurst", typeof(RectTransform));
-            group.transform.SetParent(root, false);
-            var parent = (RectTransform)group.transform;
-            SetRect(parent, position, size);
-            Image splash = CreateImage("RonBloodSplash", parent);
-            splash.sprite = sprite;
-            SetRect(splash.rectTransform, Vector2.zero, size);
-            return parent;
+            var enemy = Object.FindFirstObjectByType<EnemyInfoUI>();
+            SpriteRenderer portrait = enemy != null ? enemy.CharacterRenderer : null;
+            var camera = Camera.main;
+            Texture2D texture = Resources.Load<Texture2D>("UI/RonCallout/ron_back_flash");
+            if (portrait == null || camera == null || texture == null) yield break;
+
+            Sprite sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height),
+                new Vector2(.5f, .5f), 100f);
+            scope.AddCleanup(() => { if (sprite != null) Object.Destroy(sprite); });
+            var flash = scope.Own(new GameObject("RonFlashBehindEnemy"));
+            flash.layer = portrait.gameObject.layer;
+            var renderer = flash.AddComponent<SpriteRenderer>();
+            renderer.sprite = sprite;
+            renderer.sharedMaterial = portrait.sharedMaterial;
+            renderer.sortingLayerID = portrait.sortingLayerID;
+            renderer.sortingOrder = portrait.sortingOrder;
+            renderer.spriteSortPoint = SpriteSortPoint.Pivot;
+            Vector3 screen = camera.WorldToScreenPoint(portrait.bounds.center);
+            // 原画の顔と肩がある上寄りを横切る。画面比によらず横幅を合わせる。
+            screen.y = Mathf.Clamp(screen.y + Screen.height * .17f, Screen.height * .52f, Screen.height * .72f);
+            float depth = camera.WorldToScreenPoint(portrait.bounds.center).z + .05f;
+            screen.z = depth;
+            Vector3 center = camera.ScreenToWorldPoint(screen);
+            Vector3 left = camera.ScreenToWorldPoint(new Vector3(0, screen.y, depth));
+            Vector3 right = camera.ScreenToWorldPoint(new Vector3(Screen.width, screen.y, depth));
+            float width = Vector3.Distance(left, right);
+            float size = width / sprite.bounds.size.x;
+            flash.transform.position = center;
+            flash.transform.localScale = new Vector3(size * .18f, size * .32f, 1);
+            yield return new WaitForSeconds(.033f);
+            flash.transform.localScale = new Vector3(size * .76f, size * .75f, 1);
+            yield return new WaitForSeconds(.033f);
+            flash.transform.localScale = new Vector3(size * 1.1f, size, 1);
+            yield return new WaitForSeconds(.05f);
+            renderer.color = new Color(1, 1, 1, .25f);
+            flash.transform.localScale = new Vector3(size * 1.15f, size * .25f, 1);
+            yield return new WaitForSeconds(.033f);
+            flash.SetActive(false);
         }
 
+        private static RectTransform CreateRonTitle(RectTransform root, Vector2 position, PresentationScope scope)
+        {
+            var group = new GameObject("RonDeclaration", typeof(RectTransform));
+            group.transform.SetParent(root, false);
+            var rect = (RectTransform)group.transform;
+            SetRect(rect, position, new Vector2(360f, 160f));
+            rect.localRotation = Quaternion.Euler(0, 0, 7f);
+            Texture2D texture = Resources.Load<Texture2D>("UI/RonCallout/ron_declaration");
+            if (texture == null) return rect;
+            Sprite sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height),
+                new Vector2(.5f, .5f), 100f);
+            scope.AddCleanup(() => { if (sprite != null) Object.Destroy(sprite); });
+            var text = CreateImage("RonText", rect);
+            text.sprite = sprite;
+            SetRect(text.rectTransform, Vector2.zero, new Vector2(360f, 160f));
+            return rect;
+        }
         /// <summary>
-        /// 吹き出しを大きいところから叩きつけ、潰れた形で一瞬止めてから、震わせながら収める。
+        /// 宣言を叩きつけ、潰れた形で一瞬止めてから、震わせながら収める。
         /// 吹き出しの中だけを白く光らせる（画面全体は光らせない）。
         /// </summary>
-        private static IEnumerator SlamCallout(RectTransform callout, Effects.PerspectiveFocusLines lines, float total)
+        private static IEnumerator SlamCallout(RectTransform callout, float total)
         {
-            Image inner = callout.Find("RonBurstInner")?.GetComponent<Image>();
-            Color innerColor = inner != null ? inner.color : Color.white;
-            if (inner != null) inner.color = Color.white;
-            if (lines != null) lines.Progress = 1f;
             Vector2 home = callout.anchoredPosition;
 
             float t = 0f;
@@ -297,8 +307,6 @@ namespace KillingMahjong.UI.Effects
                 float settle = Mathf.Clamp01(PresentationTiming.Sample(t) / 0.16f);
                 float over = Mathf.Sin(settle * Mathf.PI) * 0.08f;
                 callout.localScale = Vector3.Lerp(new Vector3(1.12f, 0.86f, 1f), Vector3.one, settle) + Vector3.one * over;
-                if (inner != null) inner.color = Color.Lerp(Color.white, innerColor, Mathf.Clamp01(PresentationTiming.Sample(t) / 0.12f));
-                if (lines != null) lines.Progress = Mathf.Lerp(1f, 0f, Mathf.Clamp01(PresentationTiming.Sample(t) / 0.5f));
 
                 // 震えはコマ打ち（毎秒15回）
                 if (t >= nextJitter)
@@ -312,25 +320,6 @@ namespace KillingMahjong.UI.Effects
                 t += Time.deltaTime;
                 yield return null;
             }
-        }
-
-        /// <summary>吹き出しへ向かう集中線。手と吹き出しより奥に置く。</summary>
-        private static Effects.PerspectiveFocusLines CreateFocusLines(RectTransform overlay, Vector2 center)
-        {
-            var go = new GameObject("RonFocusLines", typeof(RectTransform));
-            go.transform.SetParent(overlay, false);
-            go.transform.SetAsFirstSibling();
-            var rt = (RectTransform)go.transform;
-            rt.anchorMin = Vector2.zero;
-            rt.anchorMax = Vector2.one;
-            rt.offsetMin = rt.offsetMax = Vector2.zero;
-            var lines = go.AddComponent<Effects.PerspectiveFocusLines>();
-            lines.raycastTarget = false;
-            Canvas.ForceUpdateCanvases();
-            float w = Mathf.Max(1f, rt.rect.width);
-            lines.Setup(center, new Vector2(190f, 150f), w / 800f);
-            lines.Progress = 0f;
-            return lines;
         }
 
         private static IEnumerator FadeInputShade(Image shade)
@@ -376,61 +365,6 @@ namespace KillingMahjong.UI.Effects
             Image image = go.GetComponent<Image>();
             image.raycastTarget = false;
             return image;
-        }
-
-        /// <summary>吹き出しの中心。画面中央からのずれ。</summary>
-        private static readonly Vector2 BurstPosition = new Vector2(202f, 62f);
-
-        /// <summary>吹き出しを1つの入れ物にまとめて作る。叩きつけと震えは入れ物ごと動かす。</summary>
-        // ---- 吹き出しの見た目（2026-11-12 MnoA「吹き出しももう少し雰囲気が合うように」） ----
-        // 前はクリーム色の漫画の吹き出しに、太字の「ロン!!!」を少し傾けて載せていた。
-        // ほかの絵（手牌のボタン・型の札）に合わせ、黒い縁・赤い面・明るい字のべた塗りのドット絵にする。
-        // 縁はなめらかな線ではなく1ドット＝2単位の階段。字はドットフォントを太字にも傾けもせず、
-        // 1ドットが揃う大きさ（40）で置く（傾けたり太字にしたりすると、ドットが崩れてにじむ）。
-
-        /// <summary>吹き出しの絵の1ドットが何単位か</summary>
-        private const int BurstDot = 2;
-        /// <summary>黒い縁の太さ（単位）</summary>
-        private const float BurstRim = 12f;
-        private static readonly Color32 BurstInk = new Color32(20, 12, 16, 255);
-        private static readonly Color32 BurstFace = new Color32(194, 39, 45, 255);
-        private static readonly Color32 BurstText = new Color32(250, 246, 228, 255);
-
-        private static RectTransform CreateBurstCallout(RectTransform root, Sprite burstSprite, Sprite innerSprite)
-        {
-            var group = new GameObject("RonBurst", typeof(RectTransform));
-            group.transform.SetParent(root, false);
-            var parent = (RectTransform)group.transform;
-            SetRect(parent, BurstPosition, new Vector2(292f, 234f));
-            Vector2 position = Vector2.zero;
-
-            Image outline = CreateImage("RonBurstOutline", parent);
-            outline.sprite = burstSprite;
-            outline.color = BurstInk;
-            SetRect(outline.rectTransform, position, new Vector2(292f, 234f));
-
-            Image inner = CreateImage("RonBurstInner", parent);
-            inner.sprite = innerSprite;
-            inner.color = BurstFace;
-            SetRect(inner.rectTransform, position, new Vector2(292f, 234f));
-
-            GameObject textObject = new GameObject("RonBurstText", typeof(RectTransform), typeof(TextMeshProUGUI));
-            textObject.transform.SetParent(parent, false);
-            TextMeshProUGUI text = textObject.GetComponent<TextMeshProUGUI>();
-            text.text = "\u30ed\u30f3!!!";
-            // **吹き出しの赤い面の中に収める。** 40（フォントの4倍）で「ロン!!!」が幅 140。
-            // 50 では谷のところで縁へはみ出した（2026-10-18 にも、はみ出して「コン!!」に見えたことがある）
-            var pixelFont = Resources.Load<TMP_FontAsset>("PixelMplus10_DynamicFixed");
-            if (pixelFont != null) text.font = pixelFont;
-            text.enableAutoSizing = false;
-            text.fontSize = 40f;
-            text.fontStyle = FontStyles.Normal;
-            text.color = BurstText;
-            text.alignment = TextAlignmentOptions.Center;
-            text.textWrappingMode = TextWrappingModes.NoWrap;
-            text.raycastTarget = false;
-            SetRect(text.rectTransform, position, new Vector2(170f, 60f));
-            return parent;
         }
 
         private static void SetRect(RectTransform rect, Vector2 position, Vector2 size)
