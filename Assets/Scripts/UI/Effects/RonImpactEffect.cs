@@ -37,18 +37,15 @@ namespace KillingMahjong.UI.Effects
 
         // ---- ボタン・手・吹き出しを1つの流れにつなぐ（2026-11-15 ユーザー指示） ----
         // 「せっかく吹き出しが出るならロンボタンと吹き出し、また手の部分も全部演出としてつながっている感じに」。
-        // 押したボタンはすぐ消し、画面下の手が指を伸ばすと、元のボタン位置から矢印が走って
+        // 押したボタンはすぐ消し、画面下の手が指を伸ばして
         // 背後の閃光から「ロン！」の宣言へつなぐ。
 
         private const float HandWidth = 800f;
         private const float HandHeight = 600f;
-        /// <summary>押されたボタンが潰れて矢印を出している時間。</summary>
-        private const float PressSeconds = 0.20f;
-        private const string ArrowFramesPath = "UI/RonCallout/ron_arrow_frames";
         private const float SettlementDimAlpha = 0.35f;
 
         /// <summary>
-        /// 画面下に手1・手2・手3を順に出し、指さしと同時にボタンの先端から矢印を伸ばす。
+        /// 画面下に手1・手2・手3を順に出し、指さしから背後の閃光へつなぐ。
         /// 相手の背後に閃光を走らせて「ロン！」を叩きつけ、決着処理へ返す。
         /// <paramref name="ronButton"/> が無いとき（試写など）は画面の真ん中にボタンがあるものとして動かす。
         /// </summary>
@@ -81,9 +78,8 @@ namespace KillingMahjong.UI.Effects
             // 作ったばかりの Canvas はまだ大きさが決まっていないので、CanvasScaler（800x600・Expand）と同じ式で測る
             float overlayScale = Mathf.Max(0.0001f, Mathf.Min(Screen.width / 800f, Screen.height / 600f));
 
-            // ボタンの絵は残さず、矢印と宣言の配置用に元の位置・大きさだけを読む。
+            // ボタンの絵は残さず、宣言の配置用に元の位置だけを読む。
             Vector2 dropPosition = Vector2.zero;
-            Vector2 dropSize = new Vector2(320f, 216f);
             if (ronButton != null)
             {
                 var sourceCanvas = ronButton.GetComponentInParent<Canvas>()?.rootCanvas;
@@ -95,7 +91,6 @@ namespace KillingMahjong.UI.Effects
                 Vector2 upperRight = RectTransformUtility.WorldToScreenPoint(camera, corners[2]);
                 Vector2 screen = (lowerLeft + upperRight) * 0.5f;
                 dropPosition = (screen - new Vector2(Screen.width, Screen.height) * .5f) / overlayScale;
-                dropSize = (upperRight - lowerLeft) / overlayScale;
             }
 
             // 原画は画面下端まで描かれている。3枚の位置を揃えたまま切り替える。
@@ -130,10 +125,6 @@ namespace KillingMahjong.UI.Effects
             if (handSprite == null) handImage.gameObject.SetActive(false);
             shade.color = new Color(0f, 0f, 0f, SettlementDimAlpha);
 
-            // 指さしに合わせ、元のボタン位置から相手へ矢印が走る。
-            if (ronButton != null)
-                yield return PlayPointingArrow(overlayRt, dropPosition + new Vector2(0f, -dropSize.y * .07f), dropSize);
-
             SpriteRenderer backFlash = CreateBackFlash(scope);
             yield return PrimeStrike(shade, backFlash);
             RectTransform callout = CreateRonTitle(overlayRt, dropPosition + new Vector2(0f, -18f), scope);
@@ -165,38 +156,6 @@ namespace KillingMahjong.UI.Effects
                 while (waitingForResponse() && Time.unscaledTime < until) yield return null;
             }
 
-        }
-
-        private static IEnumerator PlayPointingArrow(RectTransform overlay, Vector2 buttonPosition, Vector2 buttonSize)
-        {
-            Texture2D frames = Resources.Load<Texture2D>(ArrowFramesPath);
-            if (frames == null)
-            {
-                yield return new WaitForSeconds(PressSeconds);
-                yield break;
-            }
-
-            const int frameCount = 3;
-            const float frameWidth = 1f / frameCount;
-            var arrow = new GameObject("RonPointingArrow", typeof(RectTransform), typeof(RawImage))
-                .GetComponent<RawImage>();
-            arrow.transform.SetParent(overlay, false);
-            arrow.raycastTarget = false;
-            arrow.texture = frames;
-
-            // 矢印の原点は1コマ内の (6, 36)。ボタンの尖った上辺に合わせる。
-            float scale = buttonSize.x / 320f;
-            var origin = buttonPosition + new Vector2(buttonSize.x * .2f, buttonSize.y * .28f);
-            SetRect(arrow.rectTransform, origin + new Vector2(36f, 32f) * scale, new Vector2(96f, 80f) * scale);
-            var frameDelay = new WaitForSeconds(PressSeconds / frameCount);
-            for (int frame = 0; frame < frameCount; frame++)
-            {
-                arrow.uvRect = new Rect(frame * frameWidth, 0f, frameWidth, 1f);
-                yield return frameDelay;
-            }
-
-            arrow.gameObject.SetActive(false);
-            Object.Destroy(arrow.gameObject);
         }
 
         private static SpriteRenderer CreateBackFlash(PresentationScope scope)
