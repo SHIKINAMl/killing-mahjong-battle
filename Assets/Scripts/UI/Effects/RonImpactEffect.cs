@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Collections.Generic;
-using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using KillingMahjong.Common;
@@ -18,11 +17,11 @@ namespace KillingMahjong.UI.Effects
         private const float InputDimSeconds = 0.14f;
         // 2026-10-18「自分からロンする時の勢いも強くして」で、揺れと間を大きくした（前は 0.30秒 / 0.56秒 / 12px）
         private const float HpShakeSeconds = 0.45f;
-        private const float CalloutHoldSeconds = 0.85f;
+        private const float CalloutHoldSeconds = 0.70f;
         private const float HpShakePixels = 22f;
 
         /// <summary>吹き出しを叩きつけるときの、出始めの大きさ（倍）と、そこから落ちる時間。</summary>
-        private const float SlamFromScale = 1.65f;
+        private const float SlamFromScale = 1.40f;
         private const float SlamSeconds = 0.06f;
         /// <summary>当たった瞬間に潰れた形で止める時間（ヒットストップ）。</summary>
         private const float HitStopSeconds = 0.07f;
@@ -153,9 +152,12 @@ namespace KillingMahjong.UI.Effects
                 drop.gameObject.SetActive(false);
             }
 
-            yield return FlashBehindEnemy(scope);
+            SpriteRenderer backFlash = CreateBackFlash(scope);
+            yield return PrimeStrike(shade, backFlash);
             RectTransform callout = CreateRonTitle(overlayRt, dropPosition + new Vector2(0f, -18f), scope);
-            // 吹き出し・声・ドン・揺れを**同じ1コマに揃える**
+            callout.localScale = Vector3.one * SlamFromScale;
+            shade.color = new Color(0f, 0f, 0f, SettlementDimAlpha);
+            // 光のピーク・宣言・声・着弾音を同じコマに揃える。
             if (audio != null)
             {
                 audio.PlayRonInputRon();
@@ -172,7 +174,7 @@ namespace KillingMahjong.UI.Effects
             }
 
             onImpact?.Invoke();
-            yield return SlamCallout(callout, CalloutHoldSeconds);
+            yield return SlamCallout(callout, CalloutHoldSeconds, backFlash);
             if (waitingForResponse != null)
             {
                 callout.gameObject.SetActive(false);
@@ -216,13 +218,21 @@ namespace KillingMahjong.UI.Effects
             Object.Destroy(arrow.gameObject);
         }
 
-        private static IEnumerator FlashBehindEnemy(PresentationScope scope)
+        private static SpriteRenderer CreateBackFlash(PresentationScope scope)
         {
-            var enemy = Object.FindFirstObjectByType<EnemyInfoUI>();
-            SpriteRenderer portrait = enemy != null ? enemy.CharacterRenderer : null;
+            SpriteRenderer portrait = null;
+            foreach (var enemy in Object.FindObjectsByType<EnemyInfoUI>(FindObjectsSortMode.None))
+            {
+                var candidate = enemy.CharacterRenderer;
+                if (candidate != null && candidate.enabled && candidate.gameObject.activeInHierarchy)
+                {
+                    portrait = candidate;
+                    break;
+                }
+            }
             var camera = Camera.main;
             Texture2D texture = Resources.Load<Texture2D>("UI/RonCallout/ron_back_flash");
-            if (portrait == null || camera == null || texture == null) yield break;
+            if (portrait == null || camera == null || texture == null) return null;
 
             Sprite sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height),
                 new Vector2(.5f, .5f), 100f);
@@ -246,16 +256,40 @@ namespace KillingMahjong.UI.Effects
             float width = Vector3.Distance(left, right);
             float size = width / sprite.bounds.size.x;
             flash.transform.position = center;
-            flash.transform.localScale = new Vector3(size * .18f, size * .32f, 1);
+            flash.transform.localScale = new Vector3(size * 1.1f, size * .8f, 1);
+            renderer.enabled = false;
+            return renderer;
+        }
+
+        private static IEnumerator PrimeStrike(Image shade, SpriteRenderer flash)
+        {
+            // 短い暗さを挟み、左から走った光が相手の背後で伸び切る。
+            shade.color = new Color(0f, 0f, 0f, .62f);
+            yield return new WaitForSeconds(.067f);
+            if (flash == null) yield break;
+
+            var home = flash.transform.position;
+            var scale = flash.transform.localScale;
+            float width = flash.sprite.bounds.size.x * scale.x;
+            flash.enabled = true;
+            flash.transform.position = home + Vector3.left * width * .36f;
+            flash.transform.localScale = new Vector3(scale.x * .28f, scale.y * .25f, 1);
             yield return new WaitForSeconds(.033f);
-            flash.transform.localScale = new Vector3(size * .76f, size * .75f, 1);
+            flash.transform.position = home + Vector3.left * width * .12f;
+            flash.transform.localScale = new Vector3(scale.x * .72f, scale.y * .55f, 1);
             yield return new WaitForSeconds(.033f);
-            flash.transform.localScale = new Vector3(size * 1.1f, size, 1);
-            yield return new WaitForSeconds(.05f);
-            renderer.color = new Color(1, 1, 1, .25f);
-            flash.transform.localScale = new Vector3(size * 1.15f, size * .25f, 1);
-            yield return new WaitForSeconds(.033f);
-            flash.SetActive(false);
+            flash.transform.position = home;
+            flash.transform.localScale = scale;
+        }
+
+        private static void FadeBackFlash(SpriteRenderer flash, float elapsed, Vector3 peakScale)
+        {
+            if (flash == null) return;
+            float tail = Mathf.Clamp01((elapsed - .045f) / .12f);
+            flash.color = new Color(1, 1, 1, 1 - tail);
+            flash.transform.localScale = new Vector3(peakScale.x * (1 + tail * .08f),
+                peakScale.y * Mathf.Lerp(1, .08f, tail), 1);
+            flash.enabled = tail < 1;
         }
 
         private static RectTransform CreateRonTitle(RectTransform root, Vector2 position, PresentationScope scope)
@@ -276,18 +310,19 @@ namespace KillingMahjong.UI.Effects
             return rect;
         }
         /// <summary>
-        /// 宣言を叩きつけ、潰れた形で一瞬止めてから、震わせながら収める。
-        /// 吹き出しの中だけを白く光らせる（画面全体は光らせない）。
+        /// 閃光と同時に宣言を叩きつけ、短い余震の後は文字を止めて読ませる。
         /// </summary>
-        private static IEnumerator SlamCallout(RectTransform callout, float total)
+        private static IEnumerator SlamCallout(RectTransform callout, float total, SpriteRenderer backFlash)
         {
             Vector2 home = callout.anchoredPosition;
+            Vector3 peakScale = backFlash != null ? backFlash.transform.localScale : Vector3.one;
 
             float t = 0f;
             while (t < SlamSeconds)
             {
                 float k = PresentationTiming.Sample(t) / SlamSeconds;
                 callout.localScale = Vector3.one * Mathf.Lerp(SlamFromScale, 1f, k * k);
+                FadeBackFlash(backFlash, t, peakScale);
                 t += Time.deltaTime;
                 yield return null;
             }
@@ -302,24 +337,28 @@ namespace KillingMahjong.UI.Effects
             t = 0f;
             while (t < rest && callout != null)
             {
-                float k = Mathf.Clamp01(PresentationTiming.Sample(t) / rest);
                 // 少し行き過ぎてから戻る
                 float settle = Mathf.Clamp01(PresentationTiming.Sample(t) / 0.16f);
                 float over = Mathf.Sin(settle * Mathf.PI) * 0.08f;
                 callout.localScale = Vector3.Lerp(new Vector3(1.12f, 0.86f, 1f), Vector3.one, settle) + Vector3.one * over;
 
                 // 震えはコマ打ち（毎秒15回）
-                if (t >= nextJitter)
+                if (t < .10f && t >= nextJitter)
                 {
-                    float amp = CalloutTremblePixels * (1f - k);
+                    float amp = CalloutTremblePixels * (1f - t / .10f);
                     jitter = new Vector2(Mathf.Round(Random.Range(-amp, amp)), Mathf.Round(Random.Range(-amp, amp)));
                     nextJitter = t + 1f / 15f;
                 }
+                if (t >= .10f) jitter = Vector2.zero;
                 callout.anchoredPosition = home + jitter;
+                FadeBackFlash(backFlash, SlamSeconds + HitStopSeconds + t, peakScale);
 
                 t += Time.deltaTime;
                 yield return null;
             }
+            callout.anchoredPosition = home;
+            callout.localScale = Vector3.one;
+            if (backFlash != null) backFlash.enabled = false;
         }
 
         private static IEnumerator FadeInputShade(Image shade)

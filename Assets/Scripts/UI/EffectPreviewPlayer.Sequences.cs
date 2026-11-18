@@ -150,7 +150,7 @@ namespace KillingMahjong.UI
                         var ronButton = ui != null && ui.RonWaitPanel != null
                             ? ui.RonWaitPanel.GetComponentInChildren<Button>(true) : null;
                         yield return RonImpactEffect.Play(this, new List<RectTransform> { rig.player.HpAnchor, rig.enemy.HpAnchor },
-                            ronButton != null ? (RectTransform)ronButton.transform : null);
+                            ronButton != null ? (RectTransform)ronButton.transform : null, owner: scope);
                     }
                     break;
                 case "ron.local": case "ron.enemy":

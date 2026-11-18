@@ -67,7 +67,7 @@ namespace KillingMahjong.UI
             new Entry(TutorialDeadEndUI.EffectId, "チュートリアル", "DEADEND No1：赤い遷移・本文・結果・クレジット・復帰", "TutorialManager.RunTutorialDeadEnd / TutorialDeadEndUI.Play"),
             new Entry(TutorialRevivalUI.EffectId, "チュートリアル", "復活：暗転・ベル・ベルル・メニューへの導入", "TutorialManager.RunRevivalFinale / TutorialRevivalUI.Play"),
             new Entry("ron.chance", "ロン・清算", "あたり牌：暗幕・牌の点滅", "RonChanceEffect.Show"),
-            new Entry("ron.impact", "ロン・清算", "ロン入力：手振り・吹き出し", "RonImpactEffect.Play"),
+            new Entry("ron.impact", "ロン・清算", "ロン入力：指さし・背後の閃光・宣言", "RonImpactEffect.Play"),
             new Entry(Effects.RonAuraUI.LocalEffectId, "ロン・清算", "自分のロン：吹き出し背面の青いオーラ", "RonImpactEffect.Play / RonAuraUI.BehindCallout"),
             new Entry(Effects.RonAuraUI.EnemyEffectId, "ロン・清算", "相手のロン：立ち絵背面の赤いオーラ", "CutinAnimationUI.PlayCutin / RonAuraUI.BehindCharacter"),
             new Entry("ron.local", "ロン・清算", "自分のロン：斜めの役表示 → 清算表（青） → 血の移動", "RonAnimationUI.PlayRonSequence / ShowYakuRibbon / SettlementRoutine"),
