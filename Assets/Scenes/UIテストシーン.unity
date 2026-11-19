@@ -10139,7 +10139,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 465870941}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 938fce054c42f40a3969e27a88d9bdd8, type: 3}
   m_Name: 
@@ -10295,7 +10295,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
-  m_Material: {fileID: 0}
+  m_Material: {fileID: 2100000, guid: e3ee205cf93ee1d4e909d01579aa8049, type: 2}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
@@ -14493,6 +14493,59 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 660826302}
   m_CullTransparentMesh: 1
+--- !u!1 &666616865
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 666616867}
+  - component: {fileID: 666616866}
+  m_Layer: 0
+  m_Name: SceneLight
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &666616866
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 666616865}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3b64cd5f264c226408b6fc5cd6f590d3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.Effects.SceneLight
+  position: {x: 0.5, y: 0.3}
+  height: 70
+  ambient: 0.5
+  intensity: 1.4
+  radius: 340
+  sharpness: 1.6
+  color: {r: 1, g: 0.93, b: 0.82, a: 1}
+  flicker: 0.12
+  sway: {x: 0.012, y: 0.008}
+--- !u!4 &666616867
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 666616865}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &668446460
 GameObject:
   m_ObjectHideFlags: 0
@@ -15191,66 +15244,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 711026254}
   m_CullTransparentMesh: 1
---- !u!1 &712939918
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 712939920}
-  - component: {fileID: 712939919}
-  m_Layer: 0
-  m_Name: ScreenLightCanvas
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!223 &712939919
-Canvas:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 712939918}
-  m_Enabled: 1
-  serializedVersion: 3
-  m_RenderMode: 0
-  m_Camera: {fileID: 0}
-  m_PlaneDistance: 100
-  m_PixelPerfect: 0
-  m_ReceivesEvents: 1
-  m_OverrideSorting: 0
-  m_OverridePixelPerfect: 0
-  m_SortingBucketNormalizedSize: 0
-  m_VertexColorAlwaysGammaSpace: 0
-  m_AdditionalShaderChannelsFlag: 0
-  m_UpdateRectTransformForStandalone: 0
-  m_SortingLayerID: 0
-  m_SortingOrder: 30050
-  m_TargetDisplay: 0
---- !u!224 &712939920
-RectTransform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 712939918}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0, y: 0, z: 0}
-  m_ConstrainProportionsScale: 0
-  m_Children:
-  - {fileID: 1327188704}
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
-  m_Pivot: {x: 0, y: 0}
 --- !u!1 &718519592
 GameObject:
   m_ObjectHideFlags: 0
@@ -23127,7 +23120,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
-  m_Material: {fileID: 0}
+  m_Material: {fileID: 2100000, guid: 97fb5a78be404e240adb805b632a4f27, type: 2}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
@@ -26308,78 +26301,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1327028410}
   m_CullTransparentMesh: 1
---- !u!1 &1327188703
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1327188704}
-  - component: {fileID: 1327188706}
-  - component: {fileID: 1327188705}
-  m_Layer: 0
-  m_Name: ScreenLight
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!224 &1327188704
-RectTransform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1327188703}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 712939920}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
-  m_Pivot: {x: 0.5, y: 0.5}
---- !u!114 &1327188705
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1327188703}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 1344c3c82d62a2a41a3576d8abb8e3ea, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.RawImage
-  m_Material: {fileID: 2100000, guid: b5f9e6ff4dbb0c54f8de12818dbac822, type: 2}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_RaycastTarget: 0
-  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
-  m_Maskable: 0
-  m_OnCullStateChanged:
-    m_PersistentCalls:
-      m_Calls: []
-  m_Texture: {fileID: 0}
-  m_UVRect:
-    serializedVersion: 2
-    x: 0
-    y: 0
-    width: 1
-    height: 1
---- !u!222 &1327188706
-CanvasRenderer:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1327188703}
-  m_CullTransparentMesh: 1
 --- !u!1 &1335465192
 GameObject:
   m_ObjectHideFlags: 0
@@ -27000,6 +26921,7 @@ GameObject:
   - component: {fileID: 1355573765}
   - component: {fileID: 1355573764}
   - component: {fileID: 1355573766}
+  - component: {fileID: 1355573767}
   m_Layer: 0
   m_Name: "\u30AD\u30E3\u30E9"
   m_TagString: Untagged
@@ -27032,7 +26954,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 9dfc825aed78fcd4ba02077103263b40, type: 2}
+  - {fileID: 2100000, guid: e10c97ae2dcdc0f4ea2990d5dae0aa8a, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -27109,6 +27031,45 @@ MonoBehaviour:
     offset: {x: 1.26, y: 0.61}
   showDebugArea: 0
   debugAreaColor: {r: 0, g: 1, b: 0, a: 0.25}
+--- !u!114 &1355573767
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1355573763}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1adcf35505989864d8ed357ca982f9d7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.Effects.LitArtNormalSwap
+  pairs:
+  - art: {fileID: 2800000, guid: 442c0f2bc7f7fa64fb5602337bca67ed, type: 3}
+    normal: {fileID: 2800000, guid: e8665a544a18dd844a31d92ed1cea79f, type: 3}
+  - art: {fileID: 2800000, guid: 8595f14d7ac7d9f4cbfc9efa4f24b0cf, type: 3}
+    normal: {fileID: 2800000, guid: 62798f3345aaee849b0d10cc6f7592c5, type: 3}
+  - art: {fileID: 2800000, guid: 676d11e9034f836488bb0fda21d14ad9, type: 3}
+    normal: {fileID: 2800000, guid: 3ea5c89aac08a3c46b56b761805c26d2, type: 3}
+  - art: {fileID: 2800000, guid: 657de045cc25a964c8af23f0365faf6a, type: 3}
+    normal: {fileID: 2800000, guid: 8f78f2f4ef1f1e948bfa09a155070d67, type: 3}
+  - art: {fileID: 2800000, guid: bd73288f768b05745915c54d2181f00e, type: 3}
+    normal: {fileID: 2800000, guid: dc58581fffdae3541aca10b789461fcc, type: 3}
+  - art: {fileID: 2800000, guid: 18d6838353e1a1f4f9c9a6ff38f64e72, type: 3}
+    normal: {fileID: 2800000, guid: 7ea95a01881c0d1438c5e6325c59a99b, type: 3}
+  - art: {fileID: 2800000, guid: bf778c7af5630404585a4ad08283d6e3, type: 3}
+    normal: {fileID: 2800000, guid: 05fe83bab23ba444c8c540e0caea88d1, type: 3}
+  - art: {fileID: 2800000, guid: 7a78e33cd8fed53499577dbc44b9f29c, type: 3}
+    normal: {fileID: 2800000, guid: 5bf2cba0eba63e547b3cb4b225b72cd2, type: 3}
+  - art: {fileID: 2800000, guid: 0df19ad4c61e1e649be3caa64c4e2724, type: 3}
+    normal: {fileID: 2800000, guid: 5346fc69f7df89d45a7ae64b3aa561bd, type: 3}
+  - art: {fileID: 2800000, guid: 6753a7c59e6f3ab46ba2af4928325a62, type: 3}
+    normal: {fileID: 2800000, guid: cdb264475af6ed94a83b701dad47088b, type: 3}
+  - art: {fileID: 2800000, guid: 18cc9a3089f434347b19cace7a24e749, type: 3}
+    normal: {fileID: 2800000, guid: 99865843d9320fd49875193b2b9f19cd, type: 3}
+  - art: {fileID: 2800000, guid: 34ce26344f6b30c4ca9493273ba73ef6, type: 3}
+    normal: {fileID: 2800000, guid: 54f93262851625a48b9774e1e1428185, type: 3}
+  - art: {fileID: 2800000, guid: 314ce57c615640f47b3b490e51830163, type: 3}
+    normal: {fileID: 2800000, guid: ba273c23f3dc13a4a89e256c814b7e2d, type: 3}
 --- !u!1 &1356557469
 GameObject:
   m_ObjectHideFlags: 0
@@ -40528,6 +40489,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1987903977}
   - component: {fileID: 1987903976}
+  - component: {fileID: 1987903978}
   m_Layer: 0
   m_Name: "\u9854"
   m_TagString: Untagged
@@ -40560,7 +40522,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 9dfc825aed78fcd4ba02077103263b40, type: 2}
+  - {fileID: 2100000, guid: e10c97ae2dcdc0f4ea2990d5dae0aa8a, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -40608,6 +40570,45 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1355573765}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1987903978
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1987903975}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1adcf35505989864d8ed357ca982f9d7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.Effects.LitArtNormalSwap
+  pairs:
+  - art: {fileID: 2800000, guid: 442c0f2bc7f7fa64fb5602337bca67ed, type: 3}
+    normal: {fileID: 2800000, guid: e8665a544a18dd844a31d92ed1cea79f, type: 3}
+  - art: {fileID: 2800000, guid: 8595f14d7ac7d9f4cbfc9efa4f24b0cf, type: 3}
+    normal: {fileID: 2800000, guid: 62798f3345aaee849b0d10cc6f7592c5, type: 3}
+  - art: {fileID: 2800000, guid: 676d11e9034f836488bb0fda21d14ad9, type: 3}
+    normal: {fileID: 2800000, guid: 3ea5c89aac08a3c46b56b761805c26d2, type: 3}
+  - art: {fileID: 2800000, guid: 657de045cc25a964c8af23f0365faf6a, type: 3}
+    normal: {fileID: 2800000, guid: 8f78f2f4ef1f1e948bfa09a155070d67, type: 3}
+  - art: {fileID: 2800000, guid: bd73288f768b05745915c54d2181f00e, type: 3}
+    normal: {fileID: 2800000, guid: dc58581fffdae3541aca10b789461fcc, type: 3}
+  - art: {fileID: 2800000, guid: 18d6838353e1a1f4f9c9a6ff38f64e72, type: 3}
+    normal: {fileID: 2800000, guid: 7ea95a01881c0d1438c5e6325c59a99b, type: 3}
+  - art: {fileID: 2800000, guid: bf778c7af5630404585a4ad08283d6e3, type: 3}
+    normal: {fileID: 2800000, guid: 05fe83bab23ba444c8c540e0caea88d1, type: 3}
+  - art: {fileID: 2800000, guid: 7a78e33cd8fed53499577dbc44b9f29c, type: 3}
+    normal: {fileID: 2800000, guid: 5bf2cba0eba63e547b3cb4b225b72cd2, type: 3}
+  - art: {fileID: 2800000, guid: 0df19ad4c61e1e649be3caa64c4e2724, type: 3}
+    normal: {fileID: 2800000, guid: 5346fc69f7df89d45a7ae64b3aa561bd, type: 3}
+  - art: {fileID: 2800000, guid: 6753a7c59e6f3ab46ba2af4928325a62, type: 3}
+    normal: {fileID: 2800000, guid: cdb264475af6ed94a83b701dad47088b, type: 3}
+  - art: {fileID: 2800000, guid: 18cc9a3089f434347b19cace7a24e749, type: 3}
+    normal: {fileID: 2800000, guid: 99865843d9320fd49875193b2b9f19cd, type: 3}
+  - art: {fileID: 2800000, guid: 34ce26344f6b30c4ca9493273ba73ef6, type: 3}
+    normal: {fileID: 2800000, guid: 54f93262851625a48b9774e1e1428185, type: 3}
+  - art: {fileID: 2800000, guid: 314ce57c615640f47b3b490e51830163, type: 3}
+    normal: {fileID: 2800000, guid: ba273c23f3dc13a4a89e256c814b7e2d, type: 3}
 --- !u!1 &1997792205
 GameObject:
   m_ObjectHideFlags: 0
@@ -42792,4 +42793,4 @@ SceneRoots:
   - {fileID: 291622811}
   - {fileID: 1951419611}
   - {fileID: 487177333}
-  - {fileID: 712939920}
+  - {fileID: 666616867}
