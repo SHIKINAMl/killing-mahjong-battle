@@ -32,6 +32,7 @@ Material:
     - _Ambient: 0.59
     - _BobPeriod: 3.5
     - _ColorMask: 15
+    - _Flicker: 0.12
     - _Peak: 0.69
     - _Radius: 88
     - _Sharpness: 1.4
@@ -43,8 +44,8 @@ Material:
     - _Strength: 1
     - _SwayPeriod: 7
     m_Colors:
-    - _Amplitude: {r: 0.42, g: 0.16, b: 0, a: 0}
-    - _Center: {r: 0.5, g: 0.34, b: 0, a: 0}
+    - _Amplitude: {r: 0.012, g: 0.008, b: 0, a: 0}
+    - _Center: {r: 0.5, g: 0.3, b: 0, a: 0}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _LightColor: {r: 1, g: 1, b: 1, a: 1}
   m_BuildTextureStacks: []
