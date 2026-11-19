@@ -5,25 +5,26 @@ namespace KillingMahjong.UI.Effects
     /// <summary>
     /// 場面の光（ろうそくのような1灯）。KM/LitArt を使う絵（壁・卓・女の子）だけを照らし、UI は照らさない。
     /// 毎フレーム、光の位置・強さ・ちらつきを全体用のシェーダー値として渡す。場面に1つ置く。
+    /// 明るさの計算は Pixel Art Lighter と同じ。項目名の括弧はツールの表示名で、ツールで決めた値をそのまま入れられる
+    /// （Ambient の % は 0〜1 に直す。px は画面の高さを 600 としたときの値）。
     /// </summary>
     [ExecuteAlways]
     public sealed class SceneLight : MonoBehaviour
     {
         [Header("光の位置（画面上。x は左から、y は上から 0〜1）")]
-        [SerializeField] private Vector2 position = new Vector2(0.5f, 0.3f);
-        [Tooltip("光の高さ（画面の高さを 600 とした px）。低いほど凹凸の影が長く濃くなる")]
-        [SerializeField] private float height = 70f;
+        [SerializeField] private Vector2 position = new Vector2(0.5f, 0.2f);
+        [Tooltip("光の高さ（Height。画面の高さを 600 とした px）。低いほど凹凸の影が長く濃くなる")]
+        [SerializeField] private float height = 60f;
 
         [Header("明るさ")]
-        [Tooltip("光が届かない所の明るさ。1 で元の絵のまま")]
-        [SerializeField, Range(0f, 1.5f)] private float ambient = 0.5f;
-        [Tooltip("光の強さ")]
-        [SerializeField, Range(0f, 3f)] private float intensity = 1.4f;
-        [Tooltip("光の届く半径（画面の高さを 600 とした px）")]
-        [SerializeField] private float radius = 340f;
-        [Tooltip("届く範囲の端の減り方。大きいほど境目がはっきりする")]
-        [SerializeField] private float sharpness = 1.6f;
-        [SerializeField] private Color color = new Color(1f, 0.93f, 0.82f, 1f);
+        [Tooltip("光が届かない所の明るさ（Ambient）。1 で元の絵のまま")]
+        [SerializeField, Range(0f, 1.5f)] private float ambient = 0.35f;
+        [Tooltip("光の強さ（Brightness）")]
+        [SerializeField, Range(0f, 25f)] private float intensity = 2.5f;
+        [Tooltip("光の届く距離（Falloff。画面の高さを 600 とした px）")]
+        [SerializeField] private float radius = 200f;
+        [Tooltip("光の色（Light Color）")]
+        [SerializeField] private Color color = Color.white;
 
         [Header("ろうそくのちらつき")]
         [Tooltip("明るさのちらつきの大きさ。0 で止まる")]
@@ -71,7 +72,7 @@ namespace KillingMahjong.UI.Effects
                 ambient * (1f + 0.3f * flicker * wobble),
                 intensity * (1f + flicker * wobble),
                 radius * (1f + 0.5f * flicker * wobble),
-                sharpness);
+                0f);
 
             ScreenPosition = new Vector2(pos.x * Screen.width, (1f - pos.y) * Screen.height);
             ShadowFlicker = 1f + 0.5f * flicker * wobble;

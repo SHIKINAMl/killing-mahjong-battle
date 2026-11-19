@@ -82,7 +82,7 @@ Shader "KM/LitArt"
 
             // SceneLight が渡す値。SceneLight が無いときは 0 になるので、そのときは光を当てない
             float4 _KMLightPos;     // x, y（上から）: 画面上の光の位置。z: 光の高さ(px)。w: 1 なら有効
-            float4 _KMLightParams;  // x: 遠くの明るさ, y: 光の強さ, z: 光の届く半径(px), w: 減り方の鋭さ
+            float4 _KMLightParams;  // x: 遠くの明るさ(Ambient), y: 光の強さ(Brightness), z: 光の届く距離(Falloff px), w: 使わない
             float4 _KMLightColor;
 
             v2f vert(appdata_t IN)
@@ -117,9 +117,13 @@ Shader "KM/LitArt"
                 float2 d = (lightUv - uv) * float2(600.0 * aspect, 600.0);
                 float dist = length(d);
 
-                float3 toLight = normalize(float3(d, max(_KMLightPos.z, 1.0)));
-                float diffuse = saturate(dot(n, toLight));
-                float atten = exp(-pow(dist / max(_KMLightParams.z, 1.0), _KMLightParams.w));
+                // Pixel Art Lighter（v3.6.1 renderPixels）と同じ式。プロジェクトはリニア色空間なので、
+                // ここでの色はツールの albedoLinear と同じ扱いになる
+                float3 toLight3 = float3(d, max(_KMLightPos.z, 1.0));
+                float dist3 = length(toLight3);
+                float diffuse = saturate(dot(n, toLight3 / dist3));
+                float r = dist3 / max(_KMLightParams.z, 1.0);
+                float atten = 1.0 / (1.0 + r * r);
 
                 float3 light = _KMLightParams.x + _KMLightParams.y * atten * diffuse * _KMLightColor.rgb;
                 albedo.rgb *= light;

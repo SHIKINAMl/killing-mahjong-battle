@@ -3605,7 +3605,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &154181865
 RectTransform:
   m_ObjectHideFlags: 0
@@ -11519,7 +11519,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &491260152
 RectTransform:
   m_ObjectHideFlags: 0
@@ -14715,13 +14715,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3b64cd5f264c226408b6fc5cd6f590d3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KillingMahjong.UI.Effects.SceneLight
-  position: {x: 0.3, y: 0.12}
-  height: 70
-  ambient: 0.5
-  intensity: 1.4
-  radius: 380
-  sharpness: 1.6
-  color: {r: 1, g: 0.93, b: 0.82, a: 1}
+  position: {x: 0.5, y: 0.2}
+  height: 60
+  ambient: 0.35
+  intensity: 2.5
+  radius: 200
+  color: {r: 1, g: 1, b: 1, a: 1}
   flicker: 0.12
   sway: {x: 0.012, y: 0.008}
 --- !u!4 &666616867
@@ -20940,7 +20939,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &999520619
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -32731,7 +32730,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1600825944
 RectTransform:
   m_ObjectHideFlags: 0
@@ -34402,7 +34401,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1676236776
 RectTransform:
   m_ObjectHideFlags: 0
