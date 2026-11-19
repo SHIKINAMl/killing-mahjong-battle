@@ -14,6 +14,9 @@ Shader "KM/LitArt"
         [Enum(UnityEngine.Rendering.CompareFunction)] _ZTestMode ("ZTest", Float) = 4
         // UIEffect の Sampling: Pixelation と同じ計算（壁はもともと強さ 0.4 でドット化していた）。0 で使わない
         _Pixelation ("Pixelation (UIEffect compatible, 0 = off)", Range(0,1)) = 0
+        // 絵ごとの光の受け方。女の子は光の真下で白飛びしたので、ここで弱める
+        _DirectScale ("Direct Light Scale", Range(0,2)) = 1
+        _MaxLight ("Max Brightness (multiplier)", Range(0.5,10)) = 10
 
         _StencilComp ("Stencil Comparison", Float) = 8
         _Stencil ("Stencil ID", Float) = 0
@@ -79,6 +82,8 @@ Shader "KM/LitArt"
             fixed4 _Color;
             float _NormalStrength;
             float _Pixelation;
+            float _DirectScale;
+            float _MaxLight;
 
             // SceneLight が渡す値。SceneLight が無いときは 0 になるので、そのときは光を当てない
             float4 _KMLightPos;     // x, y（上から）: 画面上の光の位置。z: 光の高さ(px)。w: 1 なら有効
@@ -125,7 +130,8 @@ Shader "KM/LitArt"
                 float r = dist3 / max(_KMLightParams.z, 1.0);
                 float atten = 1.0 / (1.0 + r * r);
 
-                float3 light = _KMLightParams.x + _KMLightParams.y * atten * diffuse * _KMLightColor.rgb;
+                float3 light = _KMLightParams.x + _DirectScale * _KMLightParams.y * atten * diffuse * _KMLightColor.rgb;
+                light = min(light, _MaxLight);
                 albedo.rgb *= light;
                 return albedo;
             }
