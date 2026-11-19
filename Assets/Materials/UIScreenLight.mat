@@ -29,13 +29,13 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _Ambient: 0.59
+    - _Ambient: 0.62
     - _BobPeriod: 3.5
     - _ColorMask: 15
     - _Flicker: 0.12
-    - _Peak: 0.69
-    - _Radius: 88
-    - _Sharpness: 1.4
+    - _Peak: 0.55
+    - _Radius: 300
+    - _Sharpness: 1.6
     - _Stencil: 0
     - _StencilComp: 8
     - _StencilOp: 0
@@ -45,7 +45,7 @@ Material:
     - _SwayPeriod: 7
     m_Colors:
     - _Amplitude: {r: 0.012, g: 0.008, b: 0, a: 0}
-    - _Center: {r: 0.5, g: 0.3, b: 0, a: 0}
+    - _Center: {r: 0.5, g: 0.38, b: 0, a: 0}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _LightColor: {r: 1, g: 1, b: 1, a: 1}
   m_BuildTextureStacks: []
