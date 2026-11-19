@@ -89,6 +89,7 @@ Shader "KM/LitArt"
             float4 _KMLightPos;     // x, y（上から）: 画面上の光の位置。z: 光の高さ(px)。w: 1 なら有効
             float4 _KMLightParams;  // x: 遠くの明るさ(Ambient), y: 光の強さ(Brightness), z: 光の届く距離(Falloff px), w: 使わない
             float4 _KMLightColor;
+            float _KMLightDebug;    // 確認用。1 で法線の色を出す（ふだんは 0）
 
             v2f vert(appdata_t IN)
             {
@@ -110,6 +111,8 @@ Shader "KM/LitArt"
                 }
 
                 fixed4 albedo = tex2D(_MainTex, texUv) * IN.color;
+                // 確認用: 全体用の値 _KMLightDebug を 1 にすると、法線が載っている所をノーマルマップの色で描く
+                if (_KMLightDebug > 0.5) return fixed4(tex2D(_NormalMap, texUv).rgb, albedo.a);
                 if (_KMLightPos.w < 0.5) return albedo;
 
                 float3 n = tex2D(_NormalMap, texUv).rgb * 2.0 - 1.0;
