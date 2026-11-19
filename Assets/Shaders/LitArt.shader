@@ -17,6 +17,8 @@ Shader "KM/LitArt"
         // 絵ごとの光の受け方。女の子は光の真下で白飛びしたので、ここで弱める
         _DirectScale ("Direct Light Scale", Range(0,2)) = 1
         _MaxLight ("Max Brightness (multiplier)", Range(0.5,10)) = 10
+        // 上からの補助光（SceneFillLight）の受け方。0 で受けない。いまは卓だけ 1
+        _FillScale ("Fill Light Scale", Range(0,2)) = 0
 
         _StencilComp ("Stencil Comparison", Float) = 8
         _Stencil ("Stencil ID", Float) = 0
@@ -84,12 +86,31 @@ Shader "KM/LitArt"
             float _Pixelation;
             float _DirectScale;
             float _MaxLight;
+            float _FillScale;
 
             // SceneLight が渡す値。SceneLight が無いときは 0 になるので、そのときは光を当てない
             float4 _KMLightPos;     // x, y（上から）: 画面上の光の位置。z: 光の高さ(px)。w: 1 なら有効
             float4 _KMLightParams;  // x: 遠くの明るさ(Ambient), y: 光の強さ(Brightness), z: 光の届く距離(Falloff px), w: 使わない
             float4 _KMLightColor;
             float _KMLightDebug;    // 確認用。1 で法線の色を出す（ふだんは 0）
+
+            // SceneFillLight が渡す値（上からの補助光）。並びは _KMLight* と同じ。遠くの明るさは足さない
+            float4 _KMFillPos;
+            float4 _KMFillParams;
+            float4 _KMFillColor;
+
+            // Pixel Art Lighter と同じ、1灯ぶんの光の当たり方（遠くの明るさは含まない）
+            float3 DirectLight(float3 n, float2 uv, float4 pos, float4 prm, float4 col, float aspect)
+            {
+                float2 lightUv = float2(pos.x, 1.0 - pos.y);
+                float2 d = (lightUv - uv) * float2(600.0 * aspect, 600.0);
+                float3 toLight3 = float3(d, max(pos.z, 1.0));
+                float dist3 = length(toLight3);
+                float diffuse = saturate(dot(n, toLight3 / dist3));
+                float r = dist3 / max(prm.z, 1.0);
+                float atten = 1.0 / (1.0 + r * r);
+                return prm.y * atten * diffuse * col.rgb;
+            }
 
             v2f vert(appdata_t IN)
             {
@@ -120,20 +141,13 @@ Shader "KM/LitArt"
                 n = normalize(n);
 
                 float2 uv = IN.screenPos.xy / max(IN.screenPos.w, 1e-5);
-                float2 lightUv = float2(_KMLightPos.x, 1.0 - _KMLightPos.y);
                 float aspect = _ScreenParams.x / _ScreenParams.y;
-                float2 d = (lightUv - uv) * float2(600.0 * aspect, 600.0);
-                float dist = length(d);
 
                 // Pixel Art Lighter（v3.6.1 renderPixels）と同じ式。プロジェクトはリニア色空間なので、
                 // ここでの色はツールの albedoLinear と同じ扱いになる
-                float3 toLight3 = float3(d, max(_KMLightPos.z, 1.0));
-                float dist3 = length(toLight3);
-                float diffuse = saturate(dot(n, toLight3 / dist3));
-                float r = dist3 / max(_KMLightParams.z, 1.0);
-                float atten = 1.0 / (1.0 + r * r);
-
-                float3 light = _KMLightParams.x + _DirectScale * _KMLightParams.y * atten * diffuse * _KMLightColor.rgb;
+                float3 light = _KMLightParams.x + _DirectScale * DirectLight(n, uv, _KMLightPos, _KMLightParams, _KMLightColor, aspect);
+                if (_KMFillPos.w > 0.5 && _FillScale > 0)
+                    light += _FillScale * DirectLight(n, uv, _KMFillPos, _KMFillParams, _KMFillColor, aspect);
                 light = min(light, _MaxLight);
                 albedo.rgb *= light;
                 return albedo;

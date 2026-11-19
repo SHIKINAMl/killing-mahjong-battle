@@ -34,7 +34,11 @@ Material:
     m_Ints: []
     m_Floats:
     - _ColorMask: 15
+    - _DirectScale: 1
+    - _FillScale: 1
+    - _MaxLight: 10
     - _NormalStrength: 1
+    - _Pixelation: 0
     - _Stencil: 0
     - _StencilComp: 8
     - _StencilOp: 0
