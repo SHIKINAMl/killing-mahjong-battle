@@ -35,12 +35,26 @@ namespace KillingMahjong.UI.Effects
         private static readonly int LightParamsId = Shader.PropertyToID("_KMLightParams");
         private static readonly int LightColorId = Shader.PropertyToID("_KMLightColor");
 
-        private void OnEnable() => Apply();
+        /// <summary>いま有効な光。無ければ null（影も出さない）。</summary>
+        public static SceneLight Current { get; private set; }
+
+        /// <summary>いまの光の位置（画面の px。左下が原点）。ちらつきの揺れも入る。</summary>
+        public Vector2 ScreenPosition { get; private set; }
+
+        /// <summary>ちらつきに合わせた影の濃さの倍率（明るいほど影も濃い）。</summary>
+        public float ShadowFlicker { get; private set; } = 1f;
+
+        private void OnEnable()
+        {
+            Current = this;
+            Apply();
+        }
 
         private void Update() => Apply();
 
         private void OnDisable()
         {
+            if (Current == this) Current = null;
             // 光を消したら絵は元の色に戻る
             Shader.SetGlobalVector(LightPosId, Vector4.zero);
         }
@@ -58,6 +72,9 @@ namespace KillingMahjong.UI.Effects
                 intensity * (1f + flicker * wobble),
                 radius * (1f + 0.5f * flicker * wobble),
                 sharpness);
+
+            ScreenPosition = new Vector2(pos.x * Screen.width, (1f - pos.y) * Screen.height);
+            ShadowFlicker = 1f + 0.5f * flicker * wobble;
 
             Shader.SetGlobalVector(LightPosId, pos);
             Shader.SetGlobalVector(LightParamsId, prm);
