@@ -1590,9 +1590,9 @@ MonoBehaviour:
   - position: {x: 0.37, y: 0.41}
   - position: {x: 0.62, y: 0.41}
   height: 30
-  intensity: 1.2
-  radius: 70
-  color: {r: 1, g: 0.55, b: 0.3, a: 1}
+  intensity: 2
+  radius: 85
+  color: {r: 1, g: 0.72, b: 0.36, a: 1}
   flicker: 0.18
 --- !u!4 &1681235233
 Transform:
