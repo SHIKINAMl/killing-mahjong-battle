@@ -162,7 +162,8 @@ namespace KillingMahjong.UI
             // 局名を描画するまで文字を透明にしておく。空なら暗転だけを出す。
             if (centerText != null && !string.IsNullOrEmpty(text))
             {
-                centerText.text = text;
+                // 第2局以降で波紋を出せるときは、ひとつ前の局の数字で出してから送る（PhaseTransitionUI.RoundRipple）
+                centerText.text = RoundTitleBeforeFlip(text);
                 centerText.color = Color.white;
                 centerText.alpha = 0f;
                 centerText.gameObject.SetActive(true);
@@ -196,6 +197,12 @@ namespace KillingMahjong.UI
                 centerText.alpha = 1f;
                 PlayTransitionStinger("br_blackout");
                 roundStartTextVisibleUntil = Time.unscaledTime + MinimumRoundTitleSeconds;
+                // 数字を送って波紋を出す。晴らす側（RoundStartFadeOutRoutine）は darkenTextRoutine が終わるまで待つ
+                if (CanPlayRoundNumberRipple(text))
+                {
+                    if (darkenTextRoutine != null) StopCoroutine(darkenTextRoutine);
+                    darkenTextRoutine = StartCoroutine(RoundNumberRippleRoutine(text));
+                }
             }
 
             // 局名を描画してから通知する。通知内で配牌が完了しても表示時間を数えられる。
@@ -250,6 +257,7 @@ namespace KillingMahjong.UI
             // 局名の差し替えが終わり、全文が見えてから最低1秒を確保する。
             while (darkenTextRoutine != null || Time.unscaledTime < roundStartTextVisibleUntil)
                 yield return null;
+            ClearRoundRipple();
             IsScreenDarkened = false;
 
             // 配牌が完了したら、局名と一緒に手混ぜ用の牌の山も消す。

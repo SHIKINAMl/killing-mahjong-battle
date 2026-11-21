@@ -135,6 +135,25 @@ namespace KillingMahjong.UI.Effects
             }
         }
 
+        /// <summary>
+        /// 途切れない輪。円周を <paramref name="grid"/> 刻みで回り、点をその格子に寄せて置く（ドット絵の輪になる）。
+        /// <see cref="Ring"/> は点の数に上限があり、大きな輪では点線になる。
+        /// </summary>
+        public void PixelRing(Vector2 center, float radius, float thickness, float grid, Color color)
+        {
+            if (radius <= 0.5f || color.a <= 0f || grid <= 0f) return;
+
+            int count = Mathf.Clamp(Mathf.CeilToInt(2f * Mathf.PI * radius / grid), 8, 720);
+            var used = new HashSet<Vector2Int>();
+            for (int i = 0; i < count; i++)
+            {
+                float a = i * Mathf.PI * 2f / count;
+                var cell = new Vector2Int(Mathf.RoundToInt(Mathf.Cos(a) * radius / grid), Mathf.RoundToInt(Mathf.Sin(a) * radius / grid));
+                if (!used.Add(cell)) continue;
+                BoxCentered(center + new Vector2(cell.x * grid, cell.y * grid), thickness, thickness, color);
+            }
+        }
+
         protected override void OnPopulateMesh(VertexHelper vh)
         {
             vh.Clear();

@@ -225,6 +225,7 @@ namespace KillingMahjong.UI
             _additionalRoundStartDarkenedCallbacks = null;
             _additionalRoundStartReadyCallbacks = null;
             darkenTextRoutine = null;
+            ClearRoundRipple();
             roundStartTextVisibleUntil = 0f;
             _roundStartCleanupDone = false;
             _useRoundStartRevealSound = false;
@@ -337,6 +338,7 @@ namespace KillingMahjong.UI
 
         private System.Collections.IEnumerator SwapDarkenText(string text)
         {
+            ClearRoundRipple();
             yield return HideBandText();
             yield return RevealBandText(text);
             roundStartTextVisibleUntil = string.IsNullOrEmpty(text)
