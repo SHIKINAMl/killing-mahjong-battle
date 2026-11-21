@@ -34,13 +34,9 @@ namespace KillingMahjong.UI.Effects
         // 60fps なら約2フレーム。光が一度は画面に残り、「叩いた」合図として読める長さにする。
         private const float PeakHoldDuration = 0.03f;
 
-        // 白フラッシュの輪郭を耳でも読ませる、短い上昇音。「キーーン」と伸びるが、
-        // 画面の操作を待たせるほど長くは残さない。鋭すぎる倍音は足さず、純音にして
-        // BGM やボイスの上でも耳に痛くなりにくくしている。
-        private const float FlashSeStartFrequency = 1800f;
-        private const float FlashSeEndFrequency = 3600f;
-        private const float FlashSeDuration = 0.18f;
-        private const float FlashSeVolume = 1.4f;
+        // 白フラッシュの輪郭を耳でも読ませる音。以前は 1800→3600Hz の合成の「キーーン」だったが、
+        // 高い音ばかりで耳に痛く、合成音らしさも強かったので、Freesound（CC0）の
+        // ウインクの音とカメラのフラッシュの音を重ねたもの（se_flash）に替えた（2026-10-19）。
 
         // ------------------------------------------------------------
         //  場面が変わるときの白飛ばし（2026-09-25）
@@ -75,7 +71,6 @@ namespace KillingMahjong.UI.Effects
         private Color _color;
         private float _duration;
         private float _peakAlpha;
-        private bool _sceneBreak;
 
         /// <summary>白く一瞬光らせる。</summary>
         public static void Play(float duration = DefaultDuration, float peakAlpha = DefaultPeakAlpha, bool playSound = true)
@@ -114,7 +109,6 @@ namespace KillingMahjong.UI.Effects
             var flash = go.AddComponent<ScreenFlash>();
             flash._color = Color.white;
             flash._peakAlpha = 1f;          // 参考動画の頂点は 253/255。真っ白まで飛んでいる
-            flash._sceneBreak = true;
             flash.Build();
             flash._image.color = new Color(1f, 1f, 1f, 0f);   // 立ち上がりがあるので 0 から始める
 
@@ -123,17 +117,12 @@ namespace KillingMahjong.UI.Effects
             flash.StartCoroutine(flash.SceneBreakRoutine());
         }
 
-        /// <summary>フラッシュ開始と同時に、上へ抜ける「キーーン」を一度だけ鳴らす。</summary>
+        /// <summary>フラッシュ開始と同時に、フラッシュの音を一度だけ鳴らす。</summary>
         private static void PlayFlashSe()
         {
             if (AudioManager.Instance == null) return;
 
-            AudioManager.Instance.PlaySynthSound(
-                SynthWaveType.Sine,
-                FlashSeStartFrequency,
-                FlashSeEndFrequency,
-                FlashSeDuration,
-                FlashSeVolume);
+            AudioManager.Instance.PlayStinger("se_flash", AudioManager.PitchJitter.VerySmall);
         }
 
         private IEnumerator SceneBreakRoutine()
@@ -143,7 +132,7 @@ namespace KillingMahjong.UI.Effects
             {
                 t += Time.unscaledDeltaTime;
                 if (_image == null) yield break;
-                _image.color = new Color(1f, 1f, 1f, Mathf.Clamp01(t / SceneBreakRise));
+                _image.color = new Color(1f, 1f, 1f, Mathf.Clamp01(PresentationTiming.Sample(t) / SceneBreakRise));
                 yield return null;
             }
 
@@ -162,7 +151,7 @@ namespace KillingMahjong.UI.Effects
             {
                 t += Time.unscaledDeltaTime;
                 if (_image == null) yield break;
-                float u = Mathf.Clamp01(t / SceneBreakFade);
+                float u = Mathf.Clamp01(PresentationTiming.Sample(t) / SceneBreakFade);
                 _image.color = new Color(1f, 1f, 1f, Mathf.Pow(1f - u, fadeGamma));
                 yield return null;
             }
@@ -210,7 +199,7 @@ namespace KillingMahjong.UI.Effects
             while (fadeElapsed < fadeDuration)
             {
                 fadeElapsed += Time.unscaledDeltaTime;
-                float t = Mathf.Clamp01(fadeElapsed / fadeDuration);
+                float t = Mathf.Clamp01(PresentationTiming.Sample(fadeElapsed) / fadeDuration);
                 float alpha = _peakAlpha * Mathf.Pow(1f - t, 3f);
                 if (_image == null) break;
                 _image.color = new Color(_color.r, _color.g, _color.b, alpha);

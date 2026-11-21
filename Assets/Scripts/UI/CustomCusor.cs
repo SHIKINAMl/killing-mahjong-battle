@@ -1,3 +1,6 @@
+using System.Collections.Generic;
+using UnityEngine.EventSystems;
+using KillingMahjong.UI;
 using UnityEngine;
 using UnityEngine.UI;
 using KillingMahjong.Common;
@@ -110,6 +113,7 @@ public class CustomCursor : MonoBehaviour
         
         // 巨大化バグを防ぐため、指定したサイズに固定
         cursorRect.sizeDelta = new Vector2(cursorSize, cursorSize);
+        CreateInteractionFeedback(img);
     }
 
     void Update()
@@ -148,6 +152,7 @@ public class CustomCursor : MonoBehaviour
     // 元のマウスカーソルに戻す時の処理
     public void ResetCursor()
     {
+        ReleaseInteractionFeedback();
         Cursor.visible = true;
         if (cursorCanvasObj != null)
         {
@@ -157,7 +162,118 @@ public class CustomCursor : MonoBehaviour
     
     void OnDestroy()
     {
+        ReleaseInteractionFeedback();
+        if (cursorCanvasObj != null) Destroy(cursorCanvasObj);
         // シーン遷移や破棄時にカーソルを元に戻す
         Cursor.visible = true;
+    }
+
+    private readonly List<RaycastResult> feedbackHits = new List<RaycastResult>();
+    private PointerEventData feedbackPointer;
+    private EventSystem feedbackEvents;
+    private Outline hoverOutline;
+    private Image backBadge;
+    private Texture2D backTexture;
+    private Sprite backSprite;
+    private float hoverAmount;
+    private float nextBackCheck;
+
+    private void CreateInteractionFeedback(Image hand)
+    {
+        hoverOutline = hand.gameObject.AddComponent<Outline>();
+        hoverOutline.effectDistance = new Vector2(1f, -1f);
+        hoverOutline.effectColor = new Color(1f, 0.95f, 0.72f, 0f);
+        hoverOutline.useGraphicAlpha = true;
+
+        // 小さな戻る矢印と R。手の画像・指先の位置・サイズは変えない。
+        string[] pixels = {
+            "....................", "....#...............", "...##.......###.....",
+            "..########..#..#....", ".#########..###.....", "..##....##..#.#.....",
+            "...#....##..#..#....", "........##..........", "....######..........",
+            "....#####...........", "...................."
+        };
+        backTexture = new Texture2D(22, 13, TextureFormat.RGBA32, false);
+        backTexture.name = "CursorBackBadge";
+        backTexture.filterMode = FilterMode.Point;
+        var colors = new Color32[22 * 13];
+        for (int y = 0; y < pixels.Length; y++)
+            for (int x = 0; x < pixels[y].Length; x++)
+                if (pixels[y][x] == '#')
+                {
+                    int px = x + 1, py = 11 - y;
+                    for (int dy = -1; dy <= 1; dy++)
+                        for (int dx = -1; dx <= 1; dx++)
+                            colors[(py + dy) * 22 + px + dx] = new Color32(35, 21, 18, 255);
+                }
+        for (int y = 0; y < pixels.Length; y++)
+            for (int x = 0; x < pixels[y].Length; x++)
+                if (pixels[y][x] == '#') colors[(11 - y) * 22 + x + 1] = new Color32(255, 243, 193, 255);
+        backTexture.SetPixels32(colors);
+        backTexture.Apply();
+        backSprite = Sprite.Create(backTexture, new Rect(0, 0, 22, 13), Vector2.one * 0.5f);
+        var badgeObject = new GameObject("RightClickBack", typeof(RectTransform), typeof(Image));
+        badgeObject.transform.SetParent(hand.transform, false);
+        backBadge = badgeObject.GetComponent<Image>();
+        backBadge.sprite = backSprite;
+        backBadge.raycastTarget = false;
+        var rect = backBadge.rectTransform;
+        rect.anchorMin = rect.anchorMax = hand.rectTransform.pivot;
+        rect.anchoredPosition = new Vector2(22f, -30f);
+        rect.sizeDelta = new Vector2(22f, 13f);
+        badgeObject.SetActive(false);
+    }
+
+    private void LateUpdate()
+    {
+        if (cursorRect == null || hoverOutline == null) return;
+        var mouse = UnityEngine.InputSystem.Mouse.current;
+        bool hasPointer = mouse != null && Application.isFocused;
+        Vector2 position = mouse != null ? mouse.position.ReadValue() : Vector2.zero;
+        bool clickable = hasPointer && IsClickableAt(position);
+        hoverAmount = Mathf.MoveTowards(hoverAmount, clickable ? 1f : 0f, Time.unscaledDeltaTime * 12f);
+        hoverOutline.effectColor = new Color(1f, 0.95f, 0.72f, 0.48f * hoverAmount);
+
+        if (!hasPointer) backBadge.gameObject.SetActive(false);
+        else if (Time.unscaledTime >= nextBackCheck)
+        {
+            nextBackCheck = Time.unscaledTime + 0.12f;
+            backBadge.gameObject.SetActive(RightClickCancel.FindCancelButtonAt(position) != null);
+        }
+    }
+
+    private bool IsClickableAt(Vector2 position)
+    {
+        var events = EventSystem.current;
+        if (events == null) return false;
+        if (feedbackPointer == null || feedbackEvents != events)
+        {
+            feedbackPointer = new PointerEventData(events);
+            feedbackEvents = events;
+        }
+        feedbackPointer.position = position;
+        feedbackHits.Clear();
+        events.RaycastAll(feedbackPointer, feedbackHits);
+        if (feedbackHits.Count == 0 || feedbackHits[0].gameObject == null) return false;
+        var hit = feedbackHits[0].gameObject;
+        var tile = hit.GetComponentInParent<TileInteraction>();
+        if (tile != null) return tile.isActiveAndEnabled && tile.CanReceivePointerInput;
+        var handler = ExecuteEvents.GetEventHandler<IPointerClickHandler>(hit);
+        if (handler == null) handler = ExecuteEvents.GetEventHandler<IPointerDownHandler>(hit);
+        if (handler == null) return false;
+        var selectable = handler.GetComponent<Selectable>();
+        if (selectable != null) return selectable.isActiveAndEnabled && selectable.IsInteractable();
+        var behaviours = handler.GetComponents<MonoBehaviour>();
+        foreach (var behaviour in behaviours)
+            if (behaviour.isActiveAndEnabled && (behaviour is IPointerClickHandler || behaviour is IPointerDownHandler))
+                return true;
+        return false;
+    }
+
+    private void ReleaseInteractionFeedback()
+    {
+        if (backSprite != null) Destroy(backSprite);
+        if (backTexture != null) Destroy(backTexture);
+        backSprite = null;
+        backTexture = null;
     }
 }

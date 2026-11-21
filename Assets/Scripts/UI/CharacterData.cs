@@ -166,6 +166,21 @@ namespace KillingMahjong.UI
         [Header("Placeholder (仮の四角)")]
         public bool showAsPlaceholder;
         public Color placeholderColor = new Color(0.34f, 0.34f, 0.40f, 1f);
+
+        /// <summary>
+        /// セリフの文字送りの音の高さ[Hz]。鳴り始め → 鳴り終わり（2026-10-25 のユーザー指示
+        /// 「金髪は少し低く、赤はすこし女の子っぽい感じで」）。0 ならいつもの 330Hz。
+        /// 鳴らすのは <see cref="DialogueUI"/>。話しているのは画面の相手キャラなので、その相手の値を使う。
+        /// </summary>
+        [Header("文字送りの音 (0 = 330Hz)")]
+        public float textBlipStartHz = 0f;
+        public float textBlipEndHz = 0f;
+
+        /// <summary>いつもの文字送りの音の高さ。</summary>
+        public const float DefaultTextBlipHz = 330f;
+
+        public float TextBlipStart => textBlipStartHz > 0f ? textBlipStartHz : DefaultTextBlipHz;
+        public float TextBlipEnd => textBlipEndHz > 0f ? textBlipEndHz : TextBlipStart;
     }
 
     /// <summary>

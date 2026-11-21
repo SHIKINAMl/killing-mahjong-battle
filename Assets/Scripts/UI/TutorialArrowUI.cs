@@ -117,7 +117,7 @@ namespace KillingMahjong.UI
 
         private void Animate()
         {
-            float yOffset = Mathf.Sin(Time.time * bobbingSpeed) * bobbingAmount;
+            float yOffset = Mathf.Sin(PresentationTiming.Sample(Time.time) * bobbingSpeed) * bobbingAmount;
             myRectTransform.anchoredPosition = basePosition + new Vector2(0, yOffset);
         }
     }

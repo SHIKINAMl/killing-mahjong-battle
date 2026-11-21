@@ -20,6 +20,7 @@ namespace KillingMahjong.UI
         private Vector3 initialScale;
         private Quaternion initialRotation;
         private float timeElapsed = 0f;
+        private int presentationFrame = -1;
 
         private void Start()
         {
@@ -35,6 +36,7 @@ namespace KillingMahjong.UI
         {
             timeElapsed += Time.deltaTime * speed;
 
+            if (!PresentationTiming.IsNewFrame(ref presentationFrame, Time.time)) return;
             // Sin波（-1 〜 1を行き来する波）を使ってゆったりとした動きを作る
             float breath = Mathf.Sin(timeElapsed);
 

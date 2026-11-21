@@ -50,7 +50,7 @@ namespace KillingMahjong.UI
             while (elapsed < animationDuration)
             {
                 elapsed += Time.deltaTime;
-                float t = Mathf.Clamp01(elapsed / animationDuration);
+                float t = Mathf.Clamp01(PresentationTiming.Sample(elapsed) / animationDuration);
                 t = t * t * (3f - 2f * t);
 
                 abilityWindow.anchoredPosition = Vector2.Lerp(startPos, targetPos, t);
@@ -128,7 +128,8 @@ namespace KillingMahjong.UI
         {
             // 説明欄は一覧と一緒に出し入れする
             var box = abilityWindow != null ? abilityWindow.Find(DescBoxName) : null;
-            if (box != null && box.gameObject.activeSelf != visible) box.gameObject.SetActive(visible);
+            if (box != null) box.gameObject.SetActive(visible && _descText != null
+                && !string.IsNullOrEmpty(_descText.text) && _descText.text != DescPlaceholder);
 
             if (contentsShownWhenOpen == null) return;
             for (int i = 0; i < contentsShownWhenOpen.Length; i++)

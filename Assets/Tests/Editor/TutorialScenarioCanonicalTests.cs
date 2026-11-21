@@ -1,0 +1,158 @@
+using System;
+using System.Collections;
+using System.Reflection;
+using NUnit.Framework;
+using UnityEngine;
+
+namespace KillingMahjong.Tests
+{
+    public class TutorialScenarioCanonicalTests
+    {
+        private Type ScenarioType => Type.GetType("KillingMahjong.Managers.TutorialScenario, Assembly-CSharp", true);
+        private ScriptableObject Canonical => (ScriptableObject)Resources.Load("Tutorial/TutorialScenario", ScenarioType);
+
+        [Test]
+        public void OpeningFollowsConnectedOctober30ChartThroughDealing()
+        {
+            var round = ((IList)ScenarioType.GetField("rounds").GetValue(Canonical))[0];
+            var type = round.GetType();
+            var lines = (IList)type.GetField("introLines").GetValue(round);
+            var expected = new[] {
+                "「おっ後輩ちゃんじゃーん」", "「先輩を助けに来たんだな？えらいぞー」",
+                "「なになに\n先輩のためならどこへでも……って」", "「ソダネー\nうーん……」",
+                "「まっ…突然だけどね\n今からアタシとゲームをしてもらえるかな」",
+                "「うんゲームゲーム\n君はぶっちゃけ\n人数合わせ的な？」",
+                "「だけどただのゲームじゃない……それは命がけのギャンブル！！」",
+                "「って触れ込みの麻雀対戦ゲーム（笑）」", "「まっ長くなっちゃったから早速ルール説明するわ」",
+                "「大丈夫！ガチで殺し合いとかしないからさ！何回かギャンブルして帰ろうZE」",
+                "「ちな後輩ちゃんは敗けたらアタシにメシ作れよな」", "「それじゃはじめるよ」",
+                "「ここでは特殊な麻雀をプレイしてギャンブルをしていくよ」"
+            };
+            Assert.That(lines.Count, Is.EqualTo(expected.Length));
+            for (int i = 0; i < expected.Length; i++)
+                Assert.That(lines[i].GetType().GetField("text").GetValue(lines[i]), Is.EqualTo(expected[i]), "opening line " + i);
+            Assert.That(type.GetField("introFlashAfterLineIndex").GetValue(round), Is.EqualTo(3));
+            Assert.That(type.GetField("revealBoardAfterLineIndex").GetValue(round), Is.EqualTo(11));
+        }
+
+        [Test]
+        public void AssaultExplanationIsExportedAndObsoleteBetAdjustmentLinesAreAbsent()
+        {
+            var source = Canonical;
+            var round = ((IList)ScenarioType.GetField("rounds").GetValue(source))[1];
+            Assert.That(round.GetType().GetField("onLowBetLines"), Is.Not.Null);
+            var table = Type.GetType("KillingMahjong.Managers.Tutorial.TutorialLineTable, Assembly-CSharp", true);
+            var rows = (IList)table.GetMethod("Dump", BindingFlags.Static | BindingFlags.Public)
+                .Invoke(null, new object[] { source });
+            int explanations = 0, intro = 0, lowBet = 0;
+            foreach (var row in rows)
+            {
+                string id = (string)row.GetType().GetField("id").GetValue(row);
+                string text = (string)row.GetType().GetField("text").GetValue(row);
+                if (id.StartsWith("defeatRon.assaultExplainLines[")) explanations++;
+                if (id.StartsWith("r1.beforeEnemyAssaultLines[")) intro++;
+                if (id == "r1.onLowBetLines[0]")
+                {
+                    lowBet++;
+                    Assert.That(text, Is.EqualTo("ちょ\nビビり過ぎ"));
+                }
+                Assert.That(text, Does.Not.Contain("あげるね！"));
+                Assert.That(text, Does.Not.Contain("ここは3000くらい"));
+            }
+            Assert.That(explanations, Is.EqualTo(3));
+            Assert.That(intro, Is.EqualTo(2));
+            Assert.That(lowBet, Is.EqualTo(1));
+        }
+
+        [TestCase(200, 1)]
+        [TestCase(999, 1)]
+        [TestCase(1000, 1)]
+        [TestCase(3999, 1)]
+        [TestCase(4000, 1)]
+        [TestCase(5000, 1)]
+        public void BetReactionsFollowAllThreeChartBranches(int amount, int count)
+        {
+            var round = ((IList)ScenarioType.GetField("rounds").GetValue(Canonical))[1];
+            var manager = Type.GetType("KillingMahjong.Managers.TutorialManager, Assembly-CSharp", true);
+            var lines = (IList)manager.GetMethod("FreeBetReaction", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { round, amount });
+            Assert.That(lines.Count, Is.EqualTo(count));
+            if (count > 0)
+                Assert.That(lines[0].GetType().GetField("text").GetValue(lines[0]),
+                    Is.EqualTo(amount >= 4000 ? "うわーギャンブラーだねー"
+                        : amount >= 1000 ? "手堅いねー" : "ちょ\nビビり過ぎ"));
+        }
+        [Test]
+        public void FirstRoundManganExampleIncludesHonorsAndMatchesDisplayedFiveHan()
+        {
+            var rounds = (IList)ScenarioType.GetField("rounds").GetValue(Canonical);
+            var round = rounds[0];
+            var type = round.GetType();
+            var hand = (IList)type.GetField("manganHandBaseIds").GetValue(round);
+            bool hasHonor = false;
+            foreach (int tile in hand) hasHonor |= tile >= 27;
+            Assert.That(hand.Count, Is.EqualTo(13));
+            Assert.That(hasHonor, Is.True, "混一色の例を清一色・九蓮宝燈の牌姿に戻さない");
+
+            var yaku = (IList)type.GetField("manganHandYaku").GetValue(round);
+            var winYaku = (IList)type.GetField("yakuList").GetValue(round);
+            CollectionAssert.AreEquivalent(yaku, winYaku);
+            var rules = Type.GetType("KillingMahjong.GameRules, Assembly-CSharp", true);
+            int han = 0;
+            foreach (string name in yaku)
+                han += (int)rules.GetMethod("GetBaseHan").Invoke(null, new object[] { name });
+            Assert.That(han, Is.EqualTo(5));
+            Assert.That(type.GetField("manganHandHan").GetValue(round), Is.EqualTo(han));
+            Assert.That(type.GetField("rankText").GetValue(round), Is.EqualTo("満貫"));
+            int bet = (int)type.GetField("betAmount").GetValue(round);
+            Assert.That(rules.GetMethod("CalculateWinnerGain", new[] { typeof(int), typeof(int) })
+                .Invoke(null, new object[] { bet, han }), Is.EqualTo(2000));
+        }
+
+        [Test]
+        public void MissingSceneReferenceUsesIndependentCopyOfCanonicalScript()
+        {
+            var source = Canonical;
+            Assert.That(source, Is.Not.Null);
+            var copy = (ScriptableObject)ScenarioType.GetMethod("BuildDefault").Invoke(null, null);
+            try
+            {
+                Assert.That(JsonUtility.ToJson(copy), Is.EqualTo(JsonUtility.ToJson(source)));
+                var rounds = (IList)ScenarioType.GetField("rounds").GetValue(copy);
+                var lines = (IList)rounds[0].GetType().GetField("introLines").GetValue(rounds[0]);
+                var text = lines[0].GetType().GetField("text");
+                string original = (string)text.GetValue(lines[0]);
+                text.SetValue(lines[0], "複製だけを編集");
+                var sourceRounds = (IList)ScenarioType.GetField("rounds").GetValue(source);
+                var sourceLines = (IList)sourceRounds[0].GetType().GetField("introLines").GetValue(sourceRounds[0]);
+                Assert.That(text.GetValue(sourceLines[0]), Is.EqualTo(original));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(copy); }
+        }
+
+        [Test]
+        public void ExportAndResumeDoNotExposeRemovedLegacyRounds()
+        {
+            var source = Canonical;
+            var rounds = (IList)ScenarioType.GetField("rounds").GetValue(source);
+            Assert.That(rounds.Count, Is.EqualTo(2), "現行フローは第2局の分岐で完結する");
+            var clamp = ScenarioType.GetMethod("ClampStartRound");
+            foreach (int saved in new[] { 2, 3, 4, 5 })
+                Assert.That(clamp.Invoke(null, new object[] { saved }), Is.EqualTo(1));
+
+            var table = Type.GetType("KillingMahjong.Managers.Tutorial.TutorialLineTable, Assembly-CSharp", true);
+            var rows = (IList)table.GetMethod("Dump", BindingFlags.Static | BindingFlags.Public)
+                .Invoke(null, new object[] { source });
+            foreach (var row in rows)
+            {
+                string id = (string)row.GetType().GetField("id").GetValue(row);
+                Assert.That(id.StartsWith("r0.") || id.StartsWith("r1.") || id.StartsWith("revival.") || id.StartsWith("defeatRon."),
+                    Is.True, "未使用の旧会話がTSVへ混ざっている: " + id);
+            }
+
+            var ron = ScenarioType.GetField("defeatRon").GetValue(source);
+            Assert.That(((IList)ron.GetType().GetField("meldBaseIds").GetValue(ron)).Count, Is.EqualTo(12),
+                "旧第3局から分離した、現行の敗北演出用の面子は残す");
+        }
+    }
+}

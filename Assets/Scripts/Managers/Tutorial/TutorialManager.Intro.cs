@@ -5,22 +5,12 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using KillingMahjong.Common;
+using KillingMahjong.UI;
+using Symbol = KillingMahjong.UI.NavigationBadgeButton.Symbol;
 
 namespace KillingMahjong.Managers
 {
-    /// <summary>
-    /// チュートリアルを始める前の問いかけ。ユーザーの指示（2026-09-07）。
-    ///
-    /// 「あなた、麻雀は打てるの？」を先に聞き、
-    /// **経験あり → そのまま開始 / 初めて → 短い説明会話と案内板の後に開始** とする。
-    ///
-    /// **シーンには置かず実行時に組み立てる。** 対局シーンが2つ（UIテストシーン /
-    /// OpeningScene）あるので、シーンに置くと片方だけ直る事故が起きる（AGENTS.md §2）。
-    ///
-    /// **`StartTutorialFrom` には入れない。** あちらは局を指定して直接始める入口で、
-    /// 自動でチュートリアルを通す仕掛け（AGENTS.md §14）が毎フレーム叩いている。
-    /// ここで待ちを挟むと自動走行が止まる。問いかけるのは `StartTutorial()` だけ。
-    /// </summary>
+    /// <summary>冒頭の経験分岐・ルール資料・最初の手牌選択への案内。経験者も17歩ルールを確認する。</summary>
     public partial class TutorialManager
     {
         /// <summary>
@@ -44,6 +34,8 @@ namespace KillingMahjong.Managers
         private const string YesLabel = "はい";
         private const string NoLabel = "いいえ";
         private const string GuideStartLabel = "閉じる";
+        private const string PreviousPageLabel = "前へ";
+        private const string NextPageLabel = "次へ";
 
         // 「いいえ」を選んだときの流れ。**麻雀そのものを知らない人向け。**
         // 麻雀ルール説明UI を挟んでから、17歩ルール説明UI へ合流する。
@@ -132,14 +124,22 @@ namespace KillingMahjong.Managers
         private int _mahjongExperienceAnswer = -1;
 
         /// <summary>
-        /// 「17歩ルール説明UI」の**仮の板**（2026-09-19）。
+        /// 「17歩ルール説明UI」の絵（2026-10-18 に届いた）。
         ///
-        /// フロー図は説明UIを3枚（麻雀ルール／17歩ルール／満貫）要求しているが、絵は2枚しかない。
-        /// `案内板_満貫` は中身が「13枚の牌から満貫手を組もう」なので**満貫説明UI**に当たり、
-        /// 17歩ルール（この賭場の決まり）に当たる絵が無い。
-        /// ルールの文面は企画の領分なので**こちらで書かない**。絵が届いたら差し替えること。
+        /// ユーザーが描いた「まとめ①〜⑤」（手牌選択 → 掛け金 → 打牌 → 流局と持ち越し → 勝ち方）。
+        /// 元は 800x600 で周りが透明だったので、余白だけ切って取り込んである。
+        /// それまでは絵が無く、下の文字板を仮に出していた。いまは絵が読めなかったときの控え。
         /// **AIで絵を描かないこと。**
         /// </summary>
+        private static readonly string[] Rule17PagePaths =
+        {
+            "Tutorial/ゲームの流れ_まとめ1",
+            "Tutorial/ゲームの流れ_まとめ2",
+            "Tutorial/ゲームの流れ_まとめ3",
+            "Tutorial/ゲームの流れ_まとめ4",
+            "Tutorial/ゲームの流れ_まとめ5",
+        };
+
         private const string Rule17Title = "17歩ルール説明";
         private static readonly string[] Rule17Placeholder =
         {
@@ -147,11 +147,6 @@ namespace KillingMahjong.Managers
             "画像が届いたら差し替えます",
         };
 
-        /// <summary>
-        /// 山牌を「じゃーん！これが君の山牌ね」の行まで出さずにおくか（2026-09-19 のユーザー指示）。
-        /// 最初から始めたチュートリアルの第1局だけ立つ。立っていれば、その行で1枚ずつ起こす。
-        /// </summary>
-        private bool _wallRevealDeferred;
 
         private GameObject _introRoot;
         private Canvas _introSettingsCanvas;
@@ -165,7 +160,7 @@ namespace KillingMahjong.Managers
             if (canvas == null) return;
             _introSettingsCanvas = canvas;
             _introSettingsOriginalOrder = canvas.sortingOrder;
-            canvas.sortingOrder = Mathf.Max(canvas.sortingOrder, UISortingOrders.TutorialSettings);
+            canvas.sortingOrder = Mathf.Max(canvas.sortingOrder, UISortingOrders.TutorialSettingsButton);
         }
 
         private void RestoreIntroSettings()
@@ -192,6 +187,11 @@ namespace KillingMahjong.Managers
         /// 出すのはシーン側、待つのはこちらなので、旗で受け渡す。
         /// </summary>
         public bool CharacterRevealFinished;
+
+        /// <summary>
+        /// 立ち絵をフェードせず、一度に出す（フラッシュと同時に出すとき）。シーン側の FadeInEnemyRoutine が読む
+        /// </summary>
+        public bool CharacterRevealInstant;
 
         /// <summary>
         /// 導入セリフのあとに「麻雀を知っているか」を聞き、答えに応じて説明を見せる
@@ -245,20 +245,18 @@ namespace KillingMahjong.Managers
             }
 
             // ここで合流。**この賭場の決まりは、どちらの経路でも必ず見せる。**
-            // フロー図の「17歩ルール説明UI」。絵がまだ無いので仮の文字板（Rule17Placeholder）。
+            // フロー図の「17歩ルール説明UI」。ユーザーが描いたまとめ①〜⑤を順に送って見せる（2026-10-18）。
             // 以前はここに `案内板_満貫` を出していたが、あれは満貫の説明なので下へ移した（2026-09-19）
-            yield return ShowRulePanelRoutine(font, Rule17Title, Rule17Placeholder, null);
+            yield return ShowRulePagesRoutine(font, Rule17Title, Rule17Placeholder, Rule17PagePaths);
 
             yield return PlayLines(AfterRuleUiLines);
 
+            // 冒頭の指定行ですでに配牌している場合、ここでは繰り返さない。
+            if (!_boardVisible) yield return PlayRoundLabelRoutine(1);
+
             // ここからフロー図の続き（2026-09-19）。山牌を見せて、満貫を作らせるまで。
-            // **「じゃーん！これが君の山牌ね」と同時に山牌を1枚ずつ起こす**（ユーザー指示）。
-            // 待たずに走らせて、セリフの表示と重ねる
-            if (_wallRevealDeferred)
-            {
-                _wallRevealDeferred = false;
-                StartCoroutine(DealTilesRoutine());
-            }
+            // 山牌は局の頭の暗転の間に出してある。以前は「じゃーん！これが君の山牌ね」と同時に1枚ずつ起こしていた
+            // （2026-09-19 のユーザー指示）が、画面に物を生やさない決まりにしたのでやめた（2026-10-24 ユーザー指示「チュートリアルの対局フェイズでUIをニョキって生やすのは止めてくれ。基本的に画面が暗転しているときにUIは全部出すように」）
             yield return PlayLines(ShowWallLines);
 
             // **知らないと答えた人にだけテンパイの説明。** 知っている人はそのまま合流する
@@ -329,7 +327,7 @@ namespace KillingMahjong.Managers
                 yield break;
             }
 
-            Transform parent = BuildIntroCanvas();
+            Transform parent = BuildIntroCanvas(dim: false, sortingOrder: UISortingOrders.TutorialDocument);
             if (parent == null) yield break;
 
             if (board != null)
@@ -339,10 +337,26 @@ namespace KillingMahjong.Managers
                 var imageRect = (RectTransform)image.transform;
                 imageRect.anchorMin = new Vector2(0.5f, 0.5f);
                 imageRect.anchorMax = new Vector2(0.5f, 0.5f);
-                imageRect.anchoredPosition = new Vector2(0f, 30f);
-                // 元画像の縦横比のまま、画面に収まる大きさへ。
-                float scale = Mathf.Min(700f / board.rect.width, 450f / board.rect.height);
-                imageRect.sizeDelta = new Vector2(board.rect.width * scale, board.rect.height * scale);
+                imageRect.anchoredPosition = new Vector2(0f, 20f);
+                // 透明な余白ではなく、絵の範囲をまとめと同じ幅へ合わせる。
+                var contentSize = board.rect.size;
+                var contentOffset = Vector2.zero;
+                var vertices = board.vertices;
+                if (vertices.Length > 0)
+                {
+                    var bounds = new Bounds(vertices[0], Vector3.zero);
+                    foreach (var vertex in vertices) bounds.Encapsulate(vertex);
+                    contentSize = (Vector2)bounds.size * board.pixelsPerUnit;
+                    contentOffset = (Vector2)bounds.center * board.pixelsPerUnit + board.pivot - board.rect.size * .5f;
+                }
+                float scale = Mathf.Min(722f / contentSize.x, 470f / contentSize.y);
+                // ほぼ整数倍なら整数倍にして、元のドットをそろえる。
+                float integerScale = Mathf.Round(scale);
+                if (integerScale >= 1f && Mathf.Abs(scale - integerScale) < .05f
+                    && contentSize.x * integerScale <= 760f && contentSize.y * integerScale <= 470f)
+                    scale = integerScale;
+                imageRect.sizeDelta = board.rect.size * scale;
+                imageRect.anchoredPosition -= contentOffset * scale;
 
                 var boardImage = image.GetComponent<Image>();
                 boardImage.sprite = board;
@@ -354,9 +368,98 @@ namespace KillingMahjong.Managers
             }
 
             bool done = false;
-            CreateButton(parent, font, GuideStartLabel, new Vector2(0f, -250f), () => done = true);
-            yield return new WaitUntil(() => done);
+            CreateDocumentButton(parent, font, GuideStartLabel, new Vector2(0f, -250f), Symbol.Close, () => done = true);
+            var reading = UI.TutorialReadingPresentation.Prepare(parent);
+            yield return reading.Enter();
+            yield return new WaitUntil(() => done || _aborted || reading == null);
+            if (!_aborted && reading != null) yield return reading.Exit();
+            CloseIntro();
+        }
 
+        /// <summary>
+        /// 絵を数枚、前へ・次へで送って見せる。**最後のページでだけ「閉じる」を出す。**
+        /// 1枚も読めなかったときは、文字の板1枚に落とす（<see cref="ShowRulePanelRoutine"/> と同じ控え）。
+        /// </summary>
+        private IEnumerator ShowRulePagesRoutine(TMP_FontAsset font, string fallbackTitle,
+                                                 string[] fallbackBody, string[] spritePaths)
+        {
+            var pages = new List<Sprite>();
+            foreach (var path in spritePaths)
+            {
+                var sprite = Resources.Load<Sprite>(path);
+                if (sprite != null) pages.Add(sprite);
+                else Debug.LogWarning("[TutorialIntro] 説明の絵が見つかりません: " + path);
+            }
+            if (pages.Count == 0)
+            {
+                yield return ShowRulePanelRoutine(font, fallbackTitle, fallbackBody, null);
+                yield break;
+            }
+
+            CloseIntro();
+            Transform parent = BuildIntroCanvas(dim: false, sortingOrder: UISortingOrders.TutorialDocument);
+            if (parent == null) yield break;
+
+            var image = new GameObject("RuleBoard", typeof(RectTransform), typeof(Image));
+            image.transform.SetParent(parent, false);
+            var imageRect = (RectTransform)image.transform;
+            imageRect.anchorMin = new Vector2(0.5f, 0.5f);
+            imageRect.anchorMax = new Vector2(0.5f, 0.5f);
+            imageRect.anchoredPosition = new Vector2(0f, 30f);
+            var boardImage = image.GetComponent<Image>();
+            boardImage.raycastTarget = false;
+
+            var counter = new GameObject("PageNumber", typeof(RectTransform), typeof(TextMeshProUGUI));
+            counter.transform.SetParent(parent, false);
+            var counterRect = (RectTransform)counter.transform;
+            counterRect.anchorMin = new Vector2(0.5f, 0.5f);
+            counterRect.anchorMax = new Vector2(0.5f, 0.5f);
+            counterRect.anchoredPosition = new Vector2(0f, -250f);
+            counterRect.sizeDelta = new Vector2(120f, 40f);
+            var counterText = counter.GetComponent<TextMeshProUGUI>();
+            if (font != null) counterText.font = font;
+            counterText.fontSize = 22f;
+            counterText.color = new Color32(240, 232, 236, 255);
+            counterText.alignment = TextAlignmentOptions.Center;
+            counterText.raycastTarget = false;
+
+            int index = 0;
+            bool done = false;
+            var previous = CreateDocumentButton(parent, font, PreviousPageLabel,
+                new Vector2(-220f, -250f), Symbol.Back, () => index--);
+            var next = CreateDocumentButton(parent, font, NextPageLabel,
+                new Vector2(220f, -250f), Symbol.Next, () => index++);
+            // 「閉じる」は「次へ」と同じ場所。最後まで送った人だけが押せる。
+            var close = CreateDocumentButton(parent, font, GuideStartLabel,
+                new Vector2(220f, -250f), Symbol.Close, () => done = true);
+
+            int shown = -1;
+            UI.TutorialReadingPresentation reading = null;
+            while (!done && !_aborted && parent != null)
+            {
+                index = Mathf.Clamp(index, 0, pages.Count - 1);
+                if (index != shown)
+                {
+                    shown = index;
+                    Sprite page = pages[index];
+                    boardImage.sprite = page;
+                    // 元画像の縦横比のまま。この絵は 722x418 なので等倍で収まる。
+                    float scale = Mathf.Min(1f, Mathf.Min(760f / page.rect.width, 450f / page.rect.height));
+                    imageRect.sizeDelta = new Vector2(page.rect.width * scale, page.rect.height * scale);
+                    counterText.text = string.Format("{0} / {1}", index + 1, pages.Count);
+                    previous.SetActive(index > 0);
+                    next.SetActive(index < pages.Count - 1);
+                    close.SetActive(index == pages.Count - 1);
+                    if (reading == null)
+                    {
+                        reading = UI.TutorialReadingPresentation.Prepare(parent);
+                        yield return reading.Enter();
+                    }
+                }
+                yield return null;
+            }
+
+            if (!_aborted && reading != null) yield return reading.Exit();
             CloseIntro();
         }
 
@@ -370,6 +473,7 @@ namespace KillingMahjong.Managers
             cardRect.anchorMax = new Vector2(0.5f, 0.5f);
             cardRect.anchoredPosition = new Vector2(0f, 30f);
             cardRect.sizeDelta = new Vector2(620f, 380f);
+            cardRect.localScale = Vector3.one * (722f / 620f);
             card.GetComponent<Image>().color = new Color32(28, 16, 20, 245);
 
             if (!string.IsNullOrEmpty(title))
@@ -432,14 +536,14 @@ namespace KillingMahjong.Managers
         /// あそこはセリフで聞くので、暗転すると会話が途切れて見える。
         /// 案内板は1枚の絵を読ませる場なので、こちらは落としたまま。
         /// </param>
-        private Transform BuildIntroCanvas(bool dim = true)
+        private Transform BuildIntroCanvas(bool dim = true, int sortingOrder = UISortingOrders.TutorialIntro)
         {
             _introRoot = new GameObject("TutorialIntro", typeof(RectTransform), typeof(Canvas),
                 typeof(CanvasScaler), typeof(GraphicRaycaster));
 
             var canvas = _introRoot.GetComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = UISortingOrders.TutorialIntro;
+            canvas.sortingOrder = sortingOrder;
 
             var scaler = _introRoot.GetComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
@@ -470,11 +574,21 @@ namespace KillingMahjong.Managers
             return _introRoot.transform;
         }
 
-        private void CreateButton(Transform parent, TMP_FontAsset font, string label,
-                                  Vector2 position, Action onClick)
+        private static GameObject CreateDocumentButton(Transform parent, TMP_FontAsset font, string label,
+            Vector2 position, Symbol symbol, Action onClick)
         {
-            var go = new GameObject("Button_" + label, typeof(RectTransform), typeof(Image), typeof(Button));
-            go.transform.SetParent(parent, false);
+            var button = NavigationBadgeButton.Create(parent, "Button_" + label, label, font,
+                position, new Vector2(200f, 56f), symbol);
+            button.onClick.AddListener(() => onClick());
+            return button.gameObject;
+        }
+
+        private GameObject CreateButton(Transform parent, TMP_FontAsset font, string label,
+                                        Vector2 position, Action onClick)
+        {
+            var prefab = Resources.Load<GameObject>("UI/TutorialChoiceButton");
+            var go = Instantiate(prefab, parent, false);
+            go.name = "Button_" + label;
 
             var rect = (RectTransform)go.transform;
             rect.anchorMin = new Vector2(0.5f, 0.5f);
@@ -482,45 +596,56 @@ namespace KillingMahjong.Managers
             rect.anchoredPosition = position;
             rect.sizeDelta = new Vector2(200f, 56f);
 
-            go.GetComponent<Image>().color = new Color32(120, 24, 32, 255);
+            var text = go.GetComponentInChildren<TextMeshProUGUI>();
+            if (font != null) text.font = font;
+            text.text = label;
+
+            go.GetComponent<Button>().onClick.AddListener(() => onClick?.Invoke());
+            return go;
+        }
+
+        /// <summary>
+        /// 選択肢の上に置く地の文（だれのセリフでもない問いかけ）。暗い板に白い字で出す。
+        /// </summary>
+        private void CreateSystemPrompt(Transform parent, TMP_FontAsset font, string message, Vector2 position)
+        {
+            var go = new GameObject("SystemPrompt", typeof(RectTransform), typeof(Image));
+            go.transform.SetParent(parent, false);
+            var rect = (RectTransform)go.transform;
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = position;
+            rect.sizeDelta = new Vector2(460f, 44f);
+            var plate = go.GetComponent<Image>();
+            plate.color = new Color32(12, 6, 10, 220);
+            plate.raycastTarget = false;
 
             var textObject = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
             textObject.transform.SetParent(go.transform, false);
             StretchFull((RectTransform)textObject.transform);
-
             var text = textObject.GetComponent<TextMeshProUGUI>();
             if (font != null) text.font = font;
-            text.text = label;
+            text.text = message;
             text.fontSize = 22f;
             text.color = new Color32(240, 232, 236, 255);
             text.alignment = TextAlignmentOptions.Center;
             text.raycastTarget = false;
-
-            go.GetComponent<Button>().onClick.AddListener(() => onClick?.Invoke());
         }
 
         private void CloseIntro()
         {
             if (_introRoot == null) return;
+            var reading = _introRoot.GetComponent<UI.TutorialReadingPresentation>();
+            if (reading != null) reading.Cancel();
             Destroy(_introRoot);
             _introRoot = null;
         }
 
         /// <summary>
-        /// 画面にある文字から日本語の使えるフォントを借りる。
-        /// `PixelMplus10_DynamicFixed` は同名のアセットが複数あって直接引くと当たりが不定なため、
-        /// RoomScreenUI と同じやり方に揃えている。
+        /// 説明と選択肢には、対局の案内と共通の本文用フォントを使う。
         /// </summary>
         private static TMP_FontAsset BorrowJapaneseFont()
         {
-            var labels = FindObjectsByType<TextMeshProUGUI>(FindObjectsInactive.Include,
-                FindObjectsSortMode.None);
-            foreach (var label in labels)
-            {
-                if (label != null && label.font != null) return label.font;
-            }
-
-            return TMP_Settings.defaultFontAsset;
+            return KillingMahjong.UI.GameUiTypography.Body;
         }
 
         private static void StretchFull(RectTransform rect)

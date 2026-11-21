@@ -14,8 +14,21 @@ namespace KillingMahjong.UI
     {
         private IEnumerator PlayEffect()
         {
+            if (EffectId == DiscardFeedbackDirector.EffectId)
+            {
+                yield return PreviewDiscardFeedback();
+                yield break;
+            }
             switch (EffectId)
             {
+                case RonAnimationUI.TankiBonusEffectId:
+                case RonAnimationUI.AssaultBonusEffectId:
+                case RonAnimationUI.TankiAssaultEffectId:
+                case "ron.bonus_assault_enemy":
+                case "ron.bonus_tanki_enemy":
+                case "ron.bonus_tanki_assault_enemy":
+                    yield return PreviewRonBonus(); break;
+                case RankingRowsTransition.EffectId: yield return PreviewRankingRows(); break;
                 case "skill.perspective":
                     yield return rig.phase.PlaySkillCutinAnimationRoutine("透視", true, rig.player.CurrentCharacterData);
                     yield return ExposedTileEffectPlayer.PlayReveal(scope, rig.enemyTiles, new List<int> { 3, 12, 25 },
@@ -25,9 +38,16 @@ namespace KillingMahjong.UI
                     yield return rig.phase.PlaySkillCutinAnimationRoutine("牌交換", true, rig.player.CurrentCharacterData);
                     var swap = new MulliganSwapAnimator(rig.tiles);
                     scope.AddCleanup(swap.CancelPresentation);
-                    yield return swap.PlayRoutine(Tile(1), Tile(8), rig.handTiles[1]);
-                    rig.handTiles[1].GetComponent<Image>().sprite = rig.tiles.GetTileSprite(Tile(8)); break;
+                    // 本編と同じく3枚を一度に入れ替える
+                    yield return swap.PlayRoutine(new[] {
+                        new MulliganSwapAnimator.Swap(Tile(1), Tile(8), rig.handTiles[1]),
+                        new MulliganSwapAnimator.Swap(Tile(4), Tile(6), rig.handTiles[4]),
+                        new MulliganSwapAnimator.Swap(Tile(7), Tile(2), rig.handTiles[7]) });
+                    rig.handTiles[1].GetComponent<Image>().sprite = rig.tiles.GetTileSprite(Tile(8));
+                    rig.handTiles[4].GetComponent<Image>().sprite = rig.tiles.GetTileSprite(Tile(6));
+                    rig.handTiles[7].GetComponent<Image>().sprite = rig.tiles.GetTileSprite(Tile(2)); break;
                 case "skill.boost_hand":
+                case "skill.boost_hand.tutorial":
                     // 右上の一覧に「清一色+1」を入れて、届くまで伏せておく（本編と同じ段取り）
                     var boostBoard = rig.yakuList;
                     if (boostBoard != null)
@@ -45,7 +65,10 @@ namespace KillingMahjong.UI
                     yield return rig.phase.PlaySkillCutinAnimationRoutine("役強化", true, rig.player.CurrentCharacterData, subText: "清一色");
                     var boost = BoostHandSkillEffect.Create();
                     scope.AddCleanup(() => { if (boost != null) boost.Dispose(); });
-                    yield return boost.Play("清一色", boostBoard, rig.phase.PlayerCutinSprite);
+                    if (EffectId == "skill.boost_hand.tutorial")
+                        yield return boost.Play("清一色", boostBoard, rig.phase.PlayerCutinSprite);
+                    else
+                        yield return boost.PlayAfterCutin("清一色", boostBoard);
                     yield return new WaitForSeconds(0.8f); break;
                 case "skill.assault":
                     yield return rig.phase.PlaySkillCutinAnimationRoutine("強襲", true, rig.player.CurrentCharacterData);
@@ -91,14 +114,17 @@ namespace KillingMahjong.UI
                     yield return rig.betting.WaitForSlideAnimation();
                     yield return new WaitForSeconds(2f);
                     rig.betting.HideBettingPhase(); yield return rig.betting.WaitForSlideAnimation(); break;
+                case Effects.BetStakeFx.EffectId:
+                case Effects.BetStakeFx.CardEffectId:
+                    yield return PreviewBetStake(EffectId == Effects.BetStakeFx.CardEffectId); break;
                 case "phase.battle_start":
                     bool started = false;
-                    rig.phase.PlayTransition("1 Round", rig.player, new BettingCompletedInfo {
+                    rig.phase.PlayTransition("第1局目", rig.player, new BettingCompletedInfo {
                         LocalBet = 2000, EnemyBet = 2000, LocalHpBefore = 20000, EnemyHpBefore = 20000,
                         LocalHpAfter = 18000, EnemyHpAfter = 18000, HasServerHealth = true
                     }, () => { }, () => started = true, displayIsLocalTurn: true);
                     yield return Until(() => started); break;
-                case "phase.local_turn": yield return rig.phase.PlayCenterTextAnimRoutine("先行"); break;
+                case "phase.local_turn": yield return rig.phase.PlayCenterTextAnimRoutine("先攻"); break;
                 case "phase.enemy_turn": yield return rig.phase.PlayCenterTextAnimRoutine("後攻"); break;
                 case "phase.prompt": rig.phase.PlayPromptText("手牌を選んでください"); yield return new WaitForSeconds(3f); break;
                 case "hand.wait_reveal": case "hand.wait_transfer": case "hand.confirm":
@@ -112,22 +138,62 @@ namespace KillingMahjong.UI
                     bool drawn = false; rig.phase.PlayDrawTransition(() => { }, () => drawn = true);
                     yield return Until(() => drawn); break;
                 case TutorialDrawReplayUI.EffectId:
-                    var replay = TutorialDrawReplayUI.Create(transform);
-                    try { yield return replay.Play(true); }
-                    finally { if (replay != null) replay.Close(); }
+                    yield return PreviewTutorialPhoneVideo(false);
                     break;
                 case "ron.chance":
                     RonChanceEffect.Show(rig.handTiles[6]); yield return new WaitForSeconds(3f); break;
                 case "ron.impact":
-                    yield return RonImpactEffect.Play(this, new List<RectTransform> { rig.player.HpAnchor, rig.enemy.HpAnchor }); break;
+                case RonAuraUI.LocalEffectId:
+                    {
+                        // 本編の雫のボタンがシーンにあれば、その位置と押された絵を使う（無ければ画面の真ん中）
+                        var ui = FindFirstObjectByType<GameUIManager>(FindObjectsInactive.Include);
+                        var ronButton = ui != null && ui.RonWaitPanel != null
+                            ? ui.RonWaitPanel.GetComponentInChildren<Button>(true) : null;
+                        yield return RonImpactEffect.Play(this, new List<RectTransform> { rig.player.HpAnchor, rig.enemy.HpAnchor },
+                            ronButton != null ? (RectTransform)ronButton.transform : null, owner: scope);
+                    }
+                    break;
                 case "ron.local": case "ron.enemy":
                     yield return Ron(EffectId == "ron.local"); break;
+                case "ron.stream_local": case "ron.stream_enemy":
+                    RonAnimationUI.PreviewStreamDrain = true;
+                    try { yield return Ron(EffectId == "ron.stream_local"); }
+                    finally { RonAnimationUI.PreviewStreamDrain = false; }
+                    break;
                 case "settlement.local": case "settlement.enemy":
                     bool paid = false; bool won = EffectId == "settlement.local";
                     rig.phase.PlayScoreSettlementAnimation(won, 2000, 2000, 20000, 20000,
                         won ? 22000 : 18000, won ? 18000 : 22000, "満貫", () => paid = true);
                     yield return Until(() => paid); break;
                 case "ending.normal_win": yield return Ending(VictoryType.NormalVictory); break;
+                case TutorialDeadEndUI.EffectId:
+                    var tutorialEnding = TutorialDeadEndUI.Create(transform);
+                    scope.AddCleanup(() => { if (tutorialEnding != null) tutorialEnding.Close(); });
+                    try { yield return tutorialEnding.Play(rig.font, true); }
+                    finally { if (tutorialEnding != null) tutorialEnding.Close(); }
+                    break;
+                case TutorialRevivalUI.EffectId:
+                    // 操作用Canvasの子にすると復活の画面が100x100へ縮むため、本編と同じ独立Canvasにする。
+                    var revival = TutorialRevivalUI.Create(null);
+                    UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(revival.gameObject, previewScene);
+                    scope.AddCleanup(() => { if (revival != null) revival.Close(); });
+                    try
+                    {
+                        yield return revival.Play(new KillingMahjong.Managers.TutorialRevivalData(), rig.font, true);
+                        yield return revival.PlayTitleReturn(null);
+                    }
+                    finally { if (revival != null) revival.Close(); }
+                    break;
+                case TutorialDrawReplayUI.ContinuationEffectId:
+                    yield return PreviewTutorialPhoneVideo(true);
+                    break;
+                case EnemyInfoUI.TutorialRevealEffectId:
+                    // 先輩の絵は顔まで1枚（2026-10-25）。顔の層は空にする
+                    rig.character.sprite = Resources.Load<Sprite>("女の子/tutorialexe");
+                    rig.face.sprite = null;
+                    try { yield return rig.enemy.RevealTutorialCharacter(); }
+                    finally { if (rig.enemy != null) rig.enemy.RestoreTutorialCharacter(); }
+                    break;
                 case "ending.normal_lose": yield return Ending(VictoryType.NormalDefeat); break;
                 case "ending.special_win": yield return Ending(VictoryType.SpecialVictory); break;
                 case "ending.special_lose": yield return Ending(VictoryType.SpecialDefeat); break;
@@ -139,6 +205,50 @@ namespace KillingMahjong.UI
                 default: yield return PlaySmallEffect(); break;
             }
             yield return new WaitForSeconds(.6f);
+        }
+
+        private IEnumerator PreviewTutorialPhoneVideo(bool continuation)
+        {
+            var body = rig.character.sprite;
+            var face = rig.face.sprite;
+            rig.character.sprite = Resources.Load<Sprite>("女の子/tutorialexe_smartphone");
+            rig.face.sprite = null;
+            var replay = TutorialDrawReplayUI.Create(transform, rig.enemy);
+            try
+            {
+                if (continuation) yield return replay.PlayContinuation(true);
+                else yield return replay.Play(true);
+            }
+            finally
+            {
+                if (replay != null) replay.Close();
+                rig.character.sprite = body;
+                rig.face.sprite = face;
+            }
+        }
+
+        /// <summary>
+        /// 掛け金の重さ（<see cref="BetStakeFx"/>）。本編と同じく自分で選ぶ形で開き、
+        /// 200 → 5000 まで上げて少し置き、1200 まで下げて閉じる。
+        /// <paramref name="card"/> なら没案の「賭けたあとの血」の札を出した版。
+        /// </summary>
+        private IEnumerator PreviewBetStake(bool card)
+        {
+            BettingUI.PreviewOutcomeCard = card;
+            BettingUI.PreviewWinMultiplier = 1.5f;   // 録画したときの手と同じ倍率
+            try
+            {
+                rig.betting.gameObject.SetActive(true);
+                rig.betting.ShowPreviewBettingPhase(20000);
+                yield return rig.betting.WaitForSlideAnimation();
+                yield return new WaitForSeconds(1.5f);
+                for (int bet = 400; bet <= 5000; bet += 200) { rig.betting.ForceSetBet(bet); yield return new WaitForSeconds(.22f); }
+                yield return new WaitForSeconds(3f);
+                for (int bet = 4800; bet >= 1200; bet -= 200) { rig.betting.ForceSetBet(bet); yield return new WaitForSeconds(.1f); }
+                yield return new WaitForSeconds(2f);
+                rig.betting.HideBettingPhase(); yield return rig.betting.WaitForSlideAnimation();
+            }
+            finally { BettingUI.PreviewOutcomeCard = false; BettingUI.PreviewWinMultiplier = 0f; }
         }
 
         private IEnumerator Until(Func<bool> predicate)
@@ -169,19 +279,38 @@ namespace KillingMahjong.UI
             var hand = new List<int>();
             foreach (int id in new[] {0,0,0,0,1,2,3,4,5,6,8,27,27}) hand.Add(Tile(id));
             var settlement = new RonSettlementInfo {
-                TotalHan = 5, Multiplier = 1, RankName = "満貫", MyBet = 2000, TheirBet = 2000,
-                LocalWon = won, MyDelta = won ? 2000 : -2000, TheirDelta = won ? -2000 : 2000,
+                TotalHan = 5, Multiplier = 1, VoltageMultiplier = 1.3f, RankName = "満貫", MyBet = 2000, TheirBet = 2000,
+                LocalWon = won, MyDelta = won ? 2600 : -2000, TheirDelta = won ? -2000 : 2600,
                 MyHpBefore = 20000, TheirHpBefore = 20000,
-                MyHpAfter = won ? 22000 : 18000, TheirHpAfter = won ? 18000 : 22000,
+                MyHpAfter = won ? 22600 : 18000, TheirHpAfter = won ? 18000 : 22600,
                 ShowPerRowHan = true, Rows = new List<RonSettlementInfo.YakuRow> {
                     new RonSettlementInfo.YakuRow { Name = "混一色", Han = 3 },
                     new RonSettlementInfo.YakuRow { Name = "一気通貫", Han = 2 } }
             };
             rig.ron.PlayRonSequence(hand, Tile(7), new List<string> { "混一色", "一気通貫" },
-                "2000 × 1", "満貫", 2000, won, rig.player, rig.enemy, 20000,
+                "2000 × 1 × 1.3 = 2600", "満貫", 2600, won, rig.player, rig.enemy, 20000,
                 settlement.MyHpAfter, 20000, settlement.TheirHpAfter, () => done = true,
-                "2000 × 1", settlement);
+                "2000 × 1 × 1.3 = 2600", settlement);
             yield return Until(() => done);
+        }
+
+        private IEnumerator PreviewRonBonus()
+        {
+            bool tanki = EffectId.Contains("tanki"), assault = EffectId.Contains("assault");
+            bool won = !EffectId.EndsWith("_enemy", StringComparison.Ordinal);
+            // 表示用の固定値。実戦の判定・計算には使わない。
+            int gain = assault ? 0 : 2600;
+            int loss = tanki ? (assault ? 6600 : 4000) : 4600;
+            var sample = new RonSettlementInfo {
+                TotalHan = 5, Multiplier = 1, VoltageMultiplier = 1.3f, RankName = "満貫",
+                MyBet = 2000, TheirBet = 2000, LocalWon = won,
+                IsTankiWait = tanki, AssaultApplied = assault, AssaultBonusDamage = assault ? 2600 : 0,
+                MyDelta = won ? gain : -loss, TheirDelta = won ? -loss : gain,
+                MyHpBefore = 20000, TheirHpBefore = 20000,
+                MyHpAfter = won ? 20000 + gain : 20000 - loss,
+                TheirHpAfter = won ? 20000 - loss : 20000 + gain
+            };
+            yield return rig.ron.PreviewSettlementBonus(sample, Tile(17), rig.player, rig.enemy);
         }
         private static int Tile(int baseId) => KillingMahjong.Managers.TutorialTiles.Encode(baseId, false);
     }

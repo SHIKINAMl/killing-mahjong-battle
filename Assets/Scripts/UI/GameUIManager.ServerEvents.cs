@@ -16,6 +16,10 @@ namespace KillingMahjong.UI
             {
                 yakuListUI.UpdateBoostData(BoardStateManager.Instance.LocalBoostHandBonus, BoardStateManager.Instance.EnemyBoostHandBonus);
             }
+            // 役強化のログに、強化した役を書き足す（2026-10-25）
+            DialogueUI?.ResolveBoostLog(BoardStateManager.Instance.LocalBoostHandBonus, BoardStateManager.Instance.EnemyBoostHandBonus);
+            // 強化が変わっていたら、13枚の役の予想を問い合わせ直す（2026-10-29）
+            HandSelectionController?.RefreshRankCallAfterBoost();
         }
 
         private void HandleOpeningBoostAssigned()
@@ -24,6 +28,8 @@ namespace KillingMahjong.UI
             {
                 yakuListUI.UpdateBoostData(BoardStateManager.Instance.LocalBoostHandBonus, BoardStateManager.Instance.EnemyBoostHandBonus);
             }
+            // 局の初めに配られる強化はログに出さない。見た一覧として覚えておくだけ
+            DialogueUI?.ResolveBoostLog(BoardStateManager.Instance.LocalBoostHandBonus, BoardStateManager.Instance.EnemyBoostHandBonus, openingBoosts: true);
         }
 
         private bool _isAgariPending = false;
@@ -49,11 +55,14 @@ namespace KillingMahjong.UI
                     return;
                 }
 
+                // **満貫未満の待ち（NonManganWaitTiles）でも、ここでは断らない。**
+                // サーバーは満貫以上で上がれるとき（can_agari）にしか agari_pending を送らない。
+                // 手牌を決めたときの判定には一発・河底が入っていないので、そこでは満貫未満だった待ちが
+                // 和了のときに満貫に届くことがある。以前はその一覧で自動辞退していて、
+                // 「当たり牌が出たのにロンできない」になっていた（2026-10-17）
                 if (BoardStateManager.Instance.NonManganWaitTiles.Contains(data.tile))
                 {
-                    Debug.Log($"[GameUIManager] Ignored agari_pending because tile {data.tile} is non-mangan.");
-                    SendActionToServer("agari", new KillingMahjong.Network.ActionPayload { accept = false });
-                    return;
+                    Debug.Log($"[GameUIManager] tile {data.tile} was non-mangan at hand selection, but the server allows agari (situational yaku). Showing RonWaitPanel.");
                 }
 
                 Debug.Log("[GameUIManager] I am the winner! Showing RonWaitPanel.");
@@ -71,8 +80,10 @@ namespace KillingMahjong.UI
         {
             if (RonWaitPanel == null) return;
 
+            YakuListUI?.CloseYakuList();
             RonWaitPanel.SetActive(true);
             RonWaitPanel.transform.SetAsLastSibling();
+            Effects.RonButtonFlow.Attach(RonWaitPanel);
 
             // **画面を落として、ロンできる牌だけを光らせる**（2026-10-04、`ロン演出.pdf`）。
             // 光らせるのは敵がいま捨てた牌＝敵の河のいちばん最後。
@@ -138,9 +149,7 @@ namespace KillingMahjong.UI
         {
             Debug.Log($"[GameUIManager] ExecuteRonAction called. _isAgariPending={_isAgariPending}");
 
-            // 暗幕と牌の点滅をここで畳む。押したのに光ったままだと、
-            // 「まだ押せていない」のか分からない
-            Effects.RonChanceEffect.HideCurrent();
+            if (IsRonInputPlaying) return;
 
             // チュートリアルはサーバーに繋がっていないので、進行役へ返すだけ
             if (_tutorialRonCallback != null)
@@ -156,24 +165,24 @@ namespace KillingMahjong.UI
             {
                 _isAgariPending = false;
                 if (RonWaitPanel != null) RonWaitPanel.SetActive(false);
-                StartCoroutine(RonImpactThen(() =>
-                {
-                    SendActionToServer("agari", new KillingMahjong.Network.ActionPayload { accept = true });
-                    Debug.Log("[GameUIManager] Sent 'agari' action to server. Waiting for server response to play animation.");
-                }));
+                StartCoroutine(RonImpactThen(null, sendToServer: true));
                 return; // サーバーからの確定（役のデータ等）を待ってからアニメーションを再生するため、ここでは抜ける
             }
 
+            Effects.RonChanceEffect.HideCurrent();
             PhaseController?.ExecuteRonAction();
         }
+
+        internal bool IsRonInputPlaying { get; private set; }
+        internal bool RonResponseReceived { private get; set; }
+        private PresentationScope ronInputScope;
 
         /// <summary>
         /// 手の三段階を見せ、指差しのあとに吹き出しと体力表示だけを揺らして次へ渡す。
         ///
-        /// サーバーへはこの短い入力演出の後に送る。返答で始まる既存の決着カットインと
-        /// 重ならず、入力が受理されたことも盤面上で読み取れる。
+        /// サーバーの確定は吹き出しが出た時点で送り、結果表示は入力演出が明けるまで待つ。
         /// </summary>
-        private System.Collections.IEnumerator RonImpactThen(System.Action next)
+        private System.Collections.IEnumerator RonImpactThen(System.Action next, bool sendToServer = false)
         {
             var hpPanels = new System.Collections.Generic.List<RectTransform>();
             if (PlayerInfoUI != null && PlayerInfoUI.HpAnchor != null) hpPanels.Add(PlayerInfoUI.HpAnchor);
@@ -181,9 +190,37 @@ namespace KillingMahjong.UI
 
             // 声「それ、ロン」は RonImpactEffect の中で、手振りと吹き出しに合わせて鳴らす（2026-10-15）。
             // 前はここ（演出を見せ終えた後）でまるごと鳴らしていて、「ロン」が大きく遅れていた
-            yield return Effects.RonImpactEffect.Play(this, hpPanels);
+            // 押された雫のボタンの位置から、指先・弾ける所・吹き出しを揃える（2026-11-15）。
+            // ボタンは押した時点で隠す。位置だけを渡して、指さしと宣言を続ける。
+            var ronButton = RonWaitPanel != null ? RonWaitPanel.GetComponentInChildren<UnityEngine.UI.Button>(true) : null;
+            IsRonInputPlaying = true;
+            RonResponseReceived = false;
+            System.Action onImpact = null;
+            System.Func<bool> waitingForResponse = null;
+            if (sendToServer)
+            {
+                onImpact = () => SendActionToServer("agari",
+                    new KillingMahjong.Network.ActionPayload { accept = true });
+                waitingForResponse = () => !RonResponseReceived;
+            }
 
-            next?.Invoke();
+            using var scope = new PresentationScope(Debug.LogException);
+            ronInputScope = scope;
+            using (BeginTransition("ron-input"))
+            {
+                try
+                {
+                    yield return Effects.RonImpactEffect.Play(this, hpPanels,
+                        ronButton != null ? (RectTransform)ronButton.transform : null,
+                        onImpact, waitingForResponse, scope);
+                }
+                finally
+                {
+                    IsRonInputPlaying = false;
+                    ronInputScope = null;
+                }
+            }
+            if (scope.IsActive) next?.Invoke();
         }
     }
 }

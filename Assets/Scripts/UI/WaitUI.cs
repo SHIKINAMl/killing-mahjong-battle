@@ -279,7 +279,7 @@ namespace KillingMahjong.UI
                 // フェードアウト
                 for (float t = 0; t < 0.2f; t += Time.deltaTime)
                 {
-                    cg.alpha = Mathf.Lerp(1f, 0f, t / 0.2f);
+                    cg.alpha = Mathf.Lerp(1f, 0f, PresentationTiming.Sample(t) / 0.2f);
                     yield return null;
                 }
                 cg.alpha = 0f;
@@ -290,7 +290,7 @@ namespace KillingMahjong.UI
                 // フェードイン
                 for (float t = 0; t < 0.2f; t += Time.deltaTime)
                 {
-                    cg.alpha = Mathf.Lerp(0f, 1f, t / 0.2f);
+                    cg.alpha = Mathf.Lerp(0f, 1f, PresentationTiming.Sample(t) / 0.2f);
                     yield return null;
                 }
                 cg.alpha = 1f;

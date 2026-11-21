@@ -83,12 +83,16 @@ namespace KillingMahjong.UI
         /// 対局の外で鳴る曲。
         ///   bgm_ex_summer / bgm_ex_lofi  AudioManager.PlayTitleBgm / PlayRoomBgm
         ///   tut_lesson                   TutorialAudioDirector の台本（契約書のあと）
+        ///   tut_lesson_battle            チュートリアルの対局のあいだ（TutorialManager.Board。2026-10-23 にコレクションへ足した）
         /// </summary>
         private static readonly Track[] BgmsScenes =
         {
             new Track("Bgm", "bgm_ex_summer",    "タイトル"),
             new Track("Bgm", "bgm_ex_lofi",      "部屋の待機"),
             new Track("Bgm", "tut_lesson",       "チュートリアル"),
+            new Track("Bgm", "tut_lesson_battle", "チュートリアルの対局"),
+            new Track("Bgm", "tut_scary_A",       "チュートリアル　正体を明かしたあと"),
+            new Track("Bgm", "tut_scary_C",       "チュートリアル　負けて暗転したあと"),
         };
 
         // 対局BGM「新2曲（切替）」と「第3案」は、2026-10-09 に曲ごと消した
@@ -180,7 +184,12 @@ namespace KillingMahjong.UI
         /// </summary>
         private static readonly Track[] BgmsReturningTheme = MatchTracks("Bgm/ReturningTheme", "rt_", true,
             new Track("Bgm/ReturningTheme", "rt_bgm_draw_base",  "流局　土台だけ"),
-            new Track("Bgm/ReturningTheme", "rt_bgm_draw_motif", "流局　モチーフだけ"));
+            new Track("Bgm/ReturningTheme", "rt_bgm_draw_motif", "流局　モチーフだけ"),
+            // 場の曲のドラムとベースを合わせた版（2026-10-23 にコレクションへ足した。「すべて入れて」のユーザー指示）
+            new Track("Bgm/ReturningTheme", "rt_bgm_field_1_drums_bass_sync", "場 1　ドラムとベースを合わせた版"),
+            new Track("Bgm/ReturningTheme", "rt_bgm_field_2_drums_bass_sync", "場 2　ドラムとベースを合わせた版"),
+            new Track("Bgm/ReturningTheme", "rt_bgm_field_3_drums_bass_sync", "場 3　ドラムとベースを合わせた版"),
+            new Track("Bgm/ReturningTheme", "rt_bgm_field_4_drums_bass_sync", "場 4　ドラムとベースを合わせた版"));
 
         /// <summary>
         /// 対局BGM「賭けの合図 I / II」（2026-10-10 に対局BGMとして選べるようにした。ユーザーが作った曲）。
@@ -190,6 +199,19 @@ namespace KillingMahjong.UI
         {
             new Track("Bgm", "bgm_kake_1", "賭けの合図 I"),
             new Track("Bgm", "bgm_kake_2", "賭けの合図 II"),
+        };
+
+        /// <summary>
+        /// 対局の曲に重ねるドラム（AudioManager.Drums が Resources/Drums から読む）。
+        /// 2026-10-23 にコレクションへ足した（ユーザー指示「コレクションに入れてないものがないか確認して。すべて入れてほしい」）
+        /// </summary>
+        private static readonly Track[] BgmsDrums =
+        {
+            new Track("Drums", "drum_prepare", "準備"),
+            new Track("Drums", "drum_betting", "賭け金"),
+            new Track("Drums", "drum_discard", "打牌"),
+            new Track("Drums", "drum_ron",     "ロン"),
+            new Track("Drums", "drum_result",  "結果"),
         };
 
         /// <summary>
@@ -223,6 +245,8 @@ namespace KillingMahjong.UI
                              Note = "選んだ1曲を、対局のあいだ通して流す" },
             new MusicGroup { Label = "従来", Path = "対局BGM ＞ 従来", Indent = 1, Tracks = BgmsLegacy,
                              Note = "流局の曲だけ残した。対局では鳴らない" },
+            new MusicGroup { Label = "ドラムの重ね", Path = "対局BGM ＞ ドラムの重ね", Indent = 1, Tracks = BgmsDrums,
+                             Note = "対局の曲に重ねて鳴らすドラム" },
             new MusicGroup { Label = "未使用", Path = "未使用", Tracks = BgmsUnused },
             };
         }
@@ -280,7 +304,9 @@ namespace KillingMahjong.UI
         ///   Inspector で割り当てた音 … ManagerClip("AudioManager のフィールド名", "ファイル名", 名前)
         ///   合成音（ファイル無し）  … SynthSe(名前, 本編と同じ呼び方)
         /// 手牌決定の確認の音（手牌決定！.mp3）は対局シーンの ConfirmationDialogUI に割り当ててあり、
-        /// コレクションのある部屋シーンからは取れないので載せていない。
+        /// コレクションのある部屋シーンからは取れないので、**Resources/Se に写しを置いて載せている**（2026-10-23。
+        /// 元は Assets/Se/。直すときは両方直す）。
+        /// 役と打点の読み上げの声（Resources/Voice）も 2026-10-23 に足した（「すべて入れて」のユーザー指示）。
         /// </summary>
         private static readonly Track[] Stingers =
         {
@@ -288,7 +314,10 @@ namespace KillingMahjong.UI
             new Track("Stingers", "br_band_close", "黒帯　閉じる"),
             new Track("Stingers", "br_fall",       "暗転"),
             new Track("Stingers", "br_riser",      "明転"),
-            new Track("Stingers", "br_blackout",   "着弾（局の頭の文字）"),
+            new Track("Stingers", "br_round_fall",  "局開始の暗転"),
+            new Track("Stingers", "br_blackout",    "局名の表示"),
+            new Track("Stingers", "br_round_riser", "局開始の明転"),
+            new Track("Stingers", "br_turn_open",   "先攻・後攻の帯"),
             ManagerClip("selectTileSE", "決定ボタンを押す32", "牌に触れる"),
             ManagerClip("discardSE",    "牌を置く音",         "牌を捨てる"),
             ManagerClip("hoverSE",      "選択",               "牌にカーソル"),
@@ -307,13 +336,21 @@ namespace KillingMahjong.UI
             ManagerClip("clairvoyanceLoop",        "clairvoyance_concentration_submerged_loop_v1", "透視　集中"),
             ManagerClip("clairvoyanceFlashReturn", "clairvoyance_flash_focus_return_v1",           "透視　戻る光"),
             ManagerClip("clairvoyanceHeartbeat",   "clairvoyance_heartbeat_return_v1",             "透視　戻る鼓動"),
-            SynthSe("被弾",         a => a.PlayDamageSE(1f)),
-            SynthSe("打撃",         a => a.PlayHitSE(1f)),
-            SynthSe("回復",         a => a.PlayHealSE()),
-            SynthSe("強襲　発射",   a => a.PlaySynthSoundDual(KillingMahjong.Managers.SynthWaveType.Sine,
-                                         KillingMahjong.Managers.SynthWaveType.Noise, 620f, 180f, 0.16f, 0.9f)),
-            SynthSe("強襲　着弾",   a => a.PlaySynthSoundDual(KillingMahjong.Managers.SynthWaveType.Sine,
-                                         KillingMahjong.Managers.SynthWaveType.Noise, 200f, 60f, 0.24f, 1.0f)),
+            new Track("Stingers", "se_damage",     "被弾"),
+            new Track("Stingers", "se_hit",        "打撃"),
+            new Track("Stingers", "se_heal",       "回復"),
+            new Track("Stingers", "se_impact",     "ロンの衝撃"),
+            new Track("Stingers", "se_boost",      "役強化の演出"),
+            new Track("Stingers", "se_assault",    "強襲　発射"),
+            new Track("Stingers", "se_voltage_up", "ボルテージの段が上がる"),
+            new Track("Stingers", "se_voltage_ignite", "ボルテージの点火（登場）"),
+            new Track("Stingers", "se_senpai_collapse", "先輩が倒れる（動画の続き）"),
+            new Track("Stingers", "se_jingle_win",  "決着　勝ち"),
+            new Track("Stingers", "se_jingle_lose", "決着　負け"),
+            new Track("Stingers", "se_flash",       "白いフラッシュ"),
+            new Track("Stingers", "se_ron_pop",     "戦況グラフ　ロンの吹き出し"),
+            new Track("Stingers", "se_graph_tick",  "戦況グラフ　線が伸びる"),
+            new Track("Stingers", "se_lowhp_heartbeat", "体力が少ないときの心音"),
             ManagerClip("heartbeatWeakSpaced",     "se_heartbeat_weak_spaced",     "瀕死の心音　弱"),
             ManagerClip("heartbeatWeakCompact",    "se_heartbeat_weak_compact",    "瀕死の心音　弱・詰"),
             ManagerClip("heartbeatMediumSpaced",   "se_heartbeat_medium_spaced",   "瀕死の心音　中"),
@@ -321,7 +358,46 @@ namespace KillingMahjong.UI
             ManagerClip("heartbeatStrongSpaced",   "se_heartbeat_strong_spaced",   "瀕死の心音　強"),
             ManagerClip("heartbeatStrongCompact",  "se_heartbeat_strong_compact",  "瀕死の心音　強・詰"),
             new Track("Stingers", "se_click_empty", "何も無い所のクリック"),
-            ManagerClip("paperSlideSE", "ページめくり", "紙をめくる（設定・オープニング）"),
+            ManagerClip("paperSlideSE", "ページめくり", "紙をめくる（オープニング）"),
+            new Track("Stingers", "se_settings", "設定を開く・閉じる"),
+            new Track("Se/HandSelection", "wait_flight",  "待ち牌が飛ぶ"),
+            new Track("Se/HandSelection", "wait_arrival", "待ち牌が届く"),
+            new Track("Se", "手牌決定！", "手牌決定の確認"),
+            ManagerClip("ronVoice", "レコーディング", "ロンの声（レコーディング）"),
+            new Track("Voice/Yaku", "ron", "声　ロン"),
+            new Track("Voice/Yaku", "yaku_riichi", "声　立直"),
+            new Track("Voice/Yaku", "yaku_tanyao", "声　断幺九"),
+            new Track("Voice/Yaku", "yaku_pinfu", "声　平和"),
+            new Track("Voice/Yaku", "yaku_iipeikou", "声　一盃口"),
+            new Track("Voice/Yaku", "yaku_ton", "声　東"),
+            new Track("Voice/Yaku", "yaku_shaa", "声　西"),
+            new Track("Voice/Yaku", "yaku_dora", "声　ドラ"),
+            new Track("Voice/Yaku", "yaku_akadora", "声　赤ドラ"),
+            new Track("Voice/Yaku", "yaku_ippatsu", "声　一発"),
+            new Track("Voice/Yaku", "yaku_houtei", "声　河底撈魚"),
+            new Track("Voice/Yaku", "yaku_sanshoku", "声　三色同順"),
+            new Track("Voice/Yaku", "yaku_sanshoku_doukou", "声　三色同刻"),
+            new Track("Voice/Yaku", "yaku_sanankou", "声　三暗刻"),
+            new Track("Voice/Yaku", "yaku_toitoi", "声　対々和"),
+            new Track("Voice/Yaku", "yaku_honroutou", "声　混老頭"),
+            new Track("Voice/Yaku", "yaku_chanta", "声　混全帯幺九"),
+            new Track("Voice/Yaku", "yaku_chiitoi", "声　七対子"),
+            new Track("Voice/Yaku", "yaku_ikkitsuukan", "声　一気通貫"),
+            new Track("Voice/Yaku", "yaku_ryanpeikou", "声　二盃口"),
+            new Track("Voice/Yaku", "yaku_honitsu", "声　混一色"),
+            new Track("Voice/Yaku", "yaku_junchan", "声　純全帯幺九"),
+            new Track("Voice/Yaku", "yaku_chinitsu", "声　清一色"),
+            new Track("Voice/Yaku", "yaku_chuuren", "声　九蓮宝燈"),
+            new Track("Voice/Yaku", "yaku_ryuuiisou", "声　緑一色"),
+            new Track("Voice/Yaku", "yaku_chinroutou", "声　清老頭"),
+            new Track("Voice/Yaku", "yaku_suuankou", "声　四暗刻"),
+            new Track("Voice/Yaku", "yaku_junsei_chuuren", "声　純正九蓮宝燈"),
+            new Track("Voice/rank", "rank_mangan", "声　満貫"),
+            new Track("Voice/rank", "rank_haneman", "声　跳満"),
+            new Track("Voice/rank", "rank_baiman", "声　倍満"),
+            new Track("Voice/rank", "rank_sanbaiman", "声　三倍満"),
+            new Track("Voice/rank", "rank_yakuman", "声　役満"),
+            new Track("Voice/rank", "rank_double_yakuman", "声　ダブル役満"),
         };
 
         private GameObject root;
@@ -375,6 +451,7 @@ namespace KillingMahjong.UI
             // **CGタブの絵はここで手放す。** 抱えたままだと、開くたびに
             // テクスチャが積もる（2048px のものが混ざっている）
             ReleaseCgThumbs();
+            ReleaseVideo();
 
             if (root != null) root.SetActive(false);
 
@@ -448,6 +525,14 @@ namespace KillingMahjong.UI
             Stretch(effectsPage.GetComponent<RectTransform>());
             BuildEffectsPage(effectsPage.transform);
 
+            videoPage = NewEmpty(panel.transform, "VideoPage");
+            Stretch(videoPage.GetComponent<RectTransform>());
+            BuildVideoPage(videoPage.transform);   // CollectionUI.Video.cs
+
+            rankingPage = NewEmpty(panel.transform, "RankingPage");
+            Stretch(rankingPage.GetComponent<RectTransform>());
+            BuildRankingPage(rankingPage.transform);   // CollectionUI.Ranking.cs
+
             BuildPlayer(panel.transform);
             EnsurePreviewSource();
         }
@@ -460,17 +545,21 @@ namespace KillingMahjong.UI
             //
             // **「没案」タブは一度畳んで、同じ日に戻した**（2026-10-07 の指示）。
             // 演出の一覧に没案が混ざっていたので、没案だけをこちらへ分けて並べる。
-            // 並びを変えたら <see cref="UnusedTab"/>／<see cref="EffectsTab"/> も合わせること。
-            string[] names = { "音楽", "効果音", "CG", "役", "没案", "演出" };
+            // 並びを変えたら <see cref="UnusedTab"/>／<see cref="EffectsTab"/>／<see cref="VideoTab"/>／
+            // <see cref="RankingTab"/> も合わせること。
+            //
+            // 「動画」「ランキング」は 2026-10-23 に足した（ユーザー指示）。8つ並べるため、
+            // 間隔を 92→86、幅を 86→80、字を 17→15 に詰めた（パネルの幅 740 に収める）
+            string[] names = { "音楽", "効果音", "CG", "役", "没案", "演出", "動画", "ランキング" };
             for (int i = 0; i < names.Length; i++)
             {
                 int index = i;
-                float x = -300f + i * 92f;
-                Button(parent, "Tab" + i, names[i], new Vector2(x, 202f), new Vector2(86f, 30f), 17f,
+                float x = -301f + i * 86f;
+                Button(parent, "Tab" + i, names[i], new Vector2(x, 202f), new Vector2(80f, 30f), 15f,
                     () => ShowTab(index));
 
                 var mark = NewImage(parent, "TabMark" + i, Marker);
-                Center(mark.rectTransform, new Vector2(86f, 3f));
+                Center(mark.rectTransform, new Vector2(80f, 3f));
                 mark.rectTransform.anchoredPosition = new Vector2(x, 185f);
                 mark.raycastTarget = false;
                 tabMarks.Add(mark);
@@ -485,6 +574,11 @@ namespace KillingMahjong.UI
             if (yakuPage != null) yakuPage.SetActive(index == 3);
             if (unusedPage != null) unusedPage.SetActive(index == UnusedTab);
             if (effectsPage != null) effectsPage.SetActive(index == EffectsTab);
+            if (videoPage != null) videoPage.SetActive(index == VideoTab);
+            if (rankingPage != null) rankingPage.SetActive(index == RankingTab);
+            // 動画は別のタブへ移ったら止める（音だけ残らないように）
+            if (index != VideoTab) StopVideo();
+            if (index == RankingTab) ShowRankingPage();
 
             // **試聴バーは音のあるタブだけ。** CG や役のタブに「曲を選んでください」が
             // 残っていると、何を選ぶ画面なのか分からなくなる。
@@ -937,6 +1031,7 @@ namespace KillingMahjong.UI
         private void Update()
         {
             if (EffectPreviewPlayer.IsOpen) return;
+            if (root != null && root.activeSelf) UpdateVideoPage();
             if (root == null || !root.activeSelf || preview == null) return;
 
             if (preview.clip != null)
@@ -1065,17 +1160,11 @@ namespace KillingMahjong.UI
         }
 
         /// <summary>
-        /// シーンに既にある日本語フォントを借りる。RoomScreenUI と同じ手口。
-        /// 専用のフォントアセットを持たせると、差し替えたときにここだけ取り残される。
+        /// 一覧や説明を読む文字は、場面によらず本文用のフォントを使う。
         /// </summary>
         private static TMP_FontAsset BorrowJapaneseFont()
         {
-            var labels = FindObjectsByType<TextMeshProUGUI>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-            foreach (var label in labels)
-            {
-                if (label != null && label.font != null) return label.font;
-            }
-            return null;
+            return GameUiTypography.Body;
         }
     }
 }

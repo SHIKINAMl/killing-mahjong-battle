@@ -19,9 +19,45 @@ namespace KillingMahjong.UI
     //
     // 2〜4 は1つの演出として順番待ち（Effects.EffectQueue）に入れる。カットイン（skill_casted）と重ならない。
     //
-    // **チュートリアルはこの流れを通らない。** 通信の代役が1枚の形のままなので、今までの流れのまま。
+    // チュートリアルも同じ選択UIを使い、通信部分だけ台本側の応答へ渡す。
     public partial class GameUISkillController
     {
+        internal System.Action<List<int>> TutorialMulliganPicked { get; set; }
+        internal System.Func<int, bool> TutorialMulliganCanPick { get; set; }
+        private readonly Dictionary<Image, Color> _tutorialMulliganColors = new Dictionary<Image, Color>();
+
+        private void ShowTutorialMulliganTargets()
+        {
+            if (uiManager == null) return;
+            var slots = new List<RectTransform>();
+            if (uiManager.WallUI != null) slots.AddRange(uiManager.WallUI.GetWallSlots());
+            if (uiManager.HandUI != null) slots.AddRange(uiManager.HandUI.GetHandSlots());
+            foreach (var slot in slots)
+            {
+                if (slot == null || CanOfferMulliganIndex(SlotWallIndex(slot))) continue;
+                foreach (var image in slot.GetComponentsInChildren<Image>(true))
+                {
+                    if (!_tutorialMulliganColors.ContainsKey(image)) _tutorialMulliganColors.Add(image, image.color);
+                    image.color = new Color(0.35f, 0.35f, 0.35f, image.color.a);
+                }
+            }
+        }
+
+        private bool CanOfferMulliganIndex(int wallIndex)
+        {
+            var board = BoardStateManager.Instance;
+            if (board == null || wallIndex < 0 || wallIndex >= board.OriginalWallTiles.Count) return false;
+            if (board.ExposedLocalHandWallIndexes.Contains(wallIndex)) return false;
+            return uiManager == null || !uiManager.IsTutorialMode || TutorialMulliganCanPick == null
+                || TutorialMulliganCanPick(wallIndex);
+        }
+
+        private void RestoreTutorialMulliganTargets()
+        {
+            foreach (var item in _tutorialMulliganColors)
+                if (item.Key != null) item.Key.color = item.Value;
+            _tutorialMulliganColors.Clear();
+        }
         private class MulliganPick
         {
             public int TileId;
@@ -31,6 +67,10 @@ namespace KillingMahjong.UI
 
         /// <summary>出す牌の枚数。サーバーは「3つちょうど・重複なし」しか受け付けない。</summary>
         private const int MulliganGiveCount = 3;
+
+        /// <summary>牌交換でいま選んでいる枚数と、選ぶ枚数（手牌の上の案内「交換する牌をえらぶ 1 / 3」に使う）。</summary>
+        public int MulliganPickedCount => _mulliganPicks.Count;
+        public int MulliganPickLimit => MulliganGiveCount;
 
         /// <summary>出すと決めた牌に掛ける色。</summary>
         private static readonly Color MulliganPickTint = new Color(1f, 0.55f, 0.55f, 1f);
@@ -50,10 +90,11 @@ namespace KillingMahjong.UI
         /// <summary>
         /// 出す牌を1枚選ぶ／外す。3枚そろったら送る。
         /// </summary>
-        /// <returns>ここで受け持ったら true。チュートリアルは false（今までの1枚の流れへ）</returns>
+        /// <returns>ここで3枚の選択を受け持ったら true。</returns>
         private bool TryPickForMulligan(int tileId, RectTransform slotRt)
         {
-            if (uiManager == null || uiManager.IsTutorialMode) return false;
+            if (uiManager == null) return false;
+            if (uiManager.IsTutorialMode && TutorialMulliganPicked == null) return true;
 
             var wallTiles = BoardStateManager.Instance != null ? BoardStateManager.Instance.OriginalWallTiles : null;
             if (wallTiles == null) return true;
@@ -74,6 +115,11 @@ namespace KillingMahjong.UI
             int wallIndex = -1;
             var clicked = slotRt != null ? slotRt.GetComponent<TileInteraction>() : null;
             if (clicked != null) wallIndex = clicked.WallIndex;
+            // 透視されている現物を、同じ絵柄の別の牌へ読み替えない。
+            if (wallIndex >= 0 && BoardStateManager.Instance.ExposedLocalHandWallIndexes.Contains(wallIndex)) return true;
+            if (wallIndex < 0)
+                foreach (int exposed in BoardStateManager.Instance.ExposedLocalHandWallIndexes)
+                    if (exposed >= 0 && exposed < wallTiles.Count && wallTiles[exposed] == tileId) return true;
             bool usable = wallIndex >= 0 && wallIndex < wallTiles.Count && wallTiles[wallIndex] == tileId
                 && !_mulliganPicks.Exists(p => p.WallIndex == wallIndex);
             if (!usable)
@@ -81,7 +127,7 @@ namespace KillingMahjong.UI
                 wallIndex = -1;
                 for (int i = 0; i < wallTiles.Count; i++)
                 {
-                    if (wallTiles[i] != tileId || _mulliganPicks.Exists(p => p.WallIndex == i)) continue;
+                    if (wallTiles[i] != tileId || !CanOfferMulliganIndex(i) || _mulliganPicks.Exists(p => p.WallIndex == i)) continue;
                     wallIndex = i;
                     break;
                 }
@@ -91,6 +137,8 @@ namespace KillingMahjong.UI
                 Debug.LogWarning("[Mulligan] 選んだ牌が山に見つかりません: " + tileId);
                 return true;
             }
+
+            if (!CanOfferMulliganIndex(wallIndex)) return true;
 
             _mulliganPicks.Add(new MulliganPick { TileId = tileId, WallIndex = wallIndex, Slot = slotRt });
             TintSlot(slotRt, MulliganPickTint);
@@ -102,12 +150,20 @@ namespace KillingMahjong.UI
 
         private void SendMulliganPicks()
         {
+            // 選択の途中に透視状態が更新された場合も、公開された牌を送らない。
+            for (int i = _mulliganPicks.Count - 1; i >= 0; i--)
+            {
+                if (CanOfferMulliganIndex(_mulliganPicks[i].WallIndex)) continue;
+                TintSlot(_mulliganPicks[i].Slot, Color.white);
+                _mulliganPicks.RemoveAt(i);
+            }
+            if (_mulliganPicks.Count != MulliganGiveCount)
+            {
+                ShowTutorialMulliganTargets();
+                return;
+            }
             IsMulliganSelection = false;
             HideMulliganUI();
-
-            // 返事が来るまで盤面を作り直させない（今までの1枚の流れと同じ）
-            CancelPendingSkillRequest();
-            pendingMulligan = uiManager.BeginTransition("mulligan-request");
 
             var indexes = new List<int>();
             _mulliganSentSlots.Clear();
@@ -118,8 +174,32 @@ namespace KillingMahjong.UI
             }
             ClearMulliganPicks();
 
+            if (uiManager.IsTutorialMode)
+            {
+                TutorialMulliganPicked?.Invoke(indexes);
+                return;
+            }
+            CancelPendingSkillRequest();
+            pendingMulligan = uiManager.BeginTransition("mulligan-request");
             uiManager.SendActionToServer("skill", new ActionPayload { skill_type = "mulligan", target_hand_indexes = indexes });
         }
+
+        internal IEnumerator ApplyTutorialMulliganChoice(MulliganSelectedData result)
+        {
+            if (uiManager == null || !uiManager.IsTutorialMode) yield break;
+            var ownedLock = uiManager.BeginTransition("skill:mulligan-choice");
+            skillTransitions.Add(ownedLock);
+            try { yield return ApplyMulliganSelected(result, ownedLock, animate: true); }
+            finally
+            {
+                _mulliganSentSlots.Clear();
+                skillTransitions.Remove(ownedLock);
+                ownedLock.Dispose();
+            }
+            uiManager.RefreshBoardAfterTransition();
+        }
+
+        internal static List<int> ArrangeTutorialMulliganChoices(List<int> choices) => ArrangeMulliganChoices(choices);
 
         /// <summary>選びかけを捨てる。色も戻す。</summary>
         private void ClearMulliganPicks()
@@ -288,18 +368,18 @@ namespace KillingMahjong.UI
             {
                 if (change == null || change.oldTile == change.newTile) continue;   // 元のままの所
 
-                // サーバーが入れ替えた「位置」を正として山を合わせる（牌IDは山に複数あるので、IDでは探さない）
+                // サーバーが入れ替えた「位置」を正として山を合わせる（牌IDは山に複数あるので、IDでは探さない）。
+                // 手牌に入っている位置なら、手牌の側もそこで持ち替わる。
+                // **ここで手牌を値で探して持ち替えてはいけない。** 山の牌を出したのに、手牌の同じ牌まで替わる
                 if (!state.ReplaceWallTileAt(change.wallIndex, change.newTile))
                 {
                     int wallIdx = state.CurrentWallTiles.IndexOf(change.oldTile);
                     if (wallIdx >= 0) state.CurrentWallTiles[wallIdx] = change.newTile;
-                }
-                // 出した牌が手牌に入っていたら、手牌も持ち替える
-                if (state.CurrentHandTiles.Contains(change.oldTile))
-                {
-                    state.CurrentHandTiles.Remove(change.oldTile);
-                    state.CurrentHandTiles.Add(change.newTile);
-                    state.SortTileIds(state.CurrentHandTiles);
+                    else if (state.CurrentHandTiles.Remove(change.oldTile))
+                    {
+                        state.CurrentHandTiles.Add(change.newTile);
+                        state.SortTileIds(state.CurrentHandTiles);
+                    }
                 }
                 swaps.Add(change);
             }
@@ -318,16 +398,51 @@ namespace KillingMahjong.UI
 
             if (!animate || _mulliganSwapAnimator == null) yield break;
 
+            // 替わった牌は**一度に**入れ替える（2026-10-22 ユーザー指示「3枚指定した時、一気に3枚交換してほしい」）。
+            // 以前は1枚ずつ演出を流していた
+            var animated = new List<MulliganSwapAnimator.Swap>();
             foreach (var change in swaps)
             {
-                RectTransform slot;
-                if (!_mulliganSentSlots.TryGetValue(change.wallIndex, out slot) || slot == null)
+                // 置き場は**いまの盤面から山の位置で探す。** 送ったときに覚えた置き場は、
+                // その後に盤面が作り直されていると別の牌に使い回されていて、そこを書き換えると
+                // 位置と値の合わない牌（触れない牌）ができる
+                RectTransform slot = FindSlotByWallIndex(change.wallIndex);
+                if (slot == null)
                 {
-                    slot = uiManager.HandUI != null ? uiManager.HandUI.GetTileSlotRectTransform(change.oldTile) : null;
+                    RectTransform sent;
+                    if (_mulliganSentSlots.TryGetValue(change.wallIndex, out sent) && sent != null
+                        && SlotWallIndex(sent) == change.wallIndex) slot = sent;
                 }
-                yield return _mulliganSwapAnimator.PlayRoutine(change.oldTile, change.newTile, slot);
-                if (ownedLock != null && !ownedLock.IsActive) yield break;
+                animated.Add(new MulliganSwapAnimator.Swap(change.oldTile, change.newTile, slot));
             }
+            yield return _mulliganSwapAnimator.PlayRoutine(animated);
+        }
+
+        /// <summary>山の位置 <paramref name="wallIndex"/> の牌を、いま山か手牌に並んでいる置き場から探す。</summary>
+        private RectTransform FindSlotByWallIndex(int wallIndex)
+        {
+            if (wallIndex < 0) return null;
+            if (uiManager.WallUI != null)
+            {
+                foreach (var slot in uiManager.WallUI.GetWallSlots())
+                {
+                    if (slot != null && SlotWallIndex(slot) == wallIndex) return slot;
+                }
+            }
+            if (uiManager.HandUI != null)
+            {
+                foreach (var slot in uiManager.HandUI.GetHandSlots())
+                {
+                    if (slot != null && SlotWallIndex(slot) == wallIndex) return slot;
+                }
+            }
+            return null;
+        }
+
+        private static int SlotWallIndex(RectTransform slot)
+        {
+            var tile = slot != null ? slot.GetComponent<TileInteraction>() : null;
+            return tile != null ? tile.WallIndex : -1;
         }
     }
 }

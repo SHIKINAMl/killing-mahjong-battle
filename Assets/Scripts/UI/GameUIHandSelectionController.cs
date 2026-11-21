@@ -30,6 +30,9 @@ namespace KillingMahjong.UI
         private int _rankRequestGeneration;
         private HandRankCallUI _rankCallUI;
 
+        /// <summary>即席の役名が消えきるまで。チュートリアルの会話と操作の再開に使う。</summary>
+        public bool IsInstantRankCallPlaying => _rankCallUI != null && _rankCallUI.IsShowing;
+
         /// <summary>
         /// 役名表示を出してよいか。**自分の手で13枚目を入れたときだけ立つ**（2026-10-11 のユーザー指示）。
         ///
@@ -63,6 +66,26 @@ namespace KillingMahjong.UI
             _hasRankResult = false;
             _rankCallArmed = true;
             UpdateInstantRankCallForCurrentHand();
+        }
+
+        /// <summary>前回見た役強化の並び。変わったら役の予想を問い合わせ直す（<see cref="RefreshRankCallAfterBoost"/>）</summary>
+        private string _lastBoostKey;
+
+        /// <summary>
+        /// 役強化が届いたときに呼ぶ（2026-10-29 バグ報告「役予想の反映が遅い　手牌が完成した後に役強化を押しても予想の手が強化されていない」）。
+        /// 13枚そろっていれば、強化を入れた役の予想をその場で問い合わせ直す。
+        /// 以前は「自分の手で13枚目を入れたときだけ」問い合わせていたので、牌を入れ替えるまで強化前の予想のままだった
+        /// </summary>
+        public void RefreshRankCallAfterBoost()
+        {
+            string signature = CurrentSelectionSignature();
+            int split = signature.IndexOf(';');
+            string boostKey = split >= 0 ? signature.Substring(split + 1) : "";
+            bool changed = _lastBoostKey != null && boostKey != _lastBoostKey;
+            _lastBoostKey = boostKey;
+            if (!changed || uiManager == null || uiManager.IsTutorialMode || _confirming) return;
+            if (uiManager.CurrentPhaseStatus != RoundStatus.HandSelection || !CanShowInstantRankCall()) return;
+            RequestInstantRankCallNow();
         }
 
         /// <summary>入れようとした牌が入らなかったときに呼ぶ。</summary>
@@ -128,8 +151,8 @@ namespace KillingMahjong.UI
         /// 手牌の増減後に HandUI.UpdateLayout から呼ばれる。
         /// 本編ではサーバーへ問い合わせ、返ってきた待ちの中で**いちばん上の格**を役名として出す
         /// （2026-09-20 の仕様書「即席満貫以上判定システム」のフロー図）。
-        /// チュートリアルにはサーバーが存在しないため、誤って通信エラーを出さないよう出さない
-        /// （確定時の既存チュートリアル処理は変更しない）。
+        /// チュートリアルにはサーバーが存在しないため問い合わせず、台本の満貫手と同じ13枚かどうかで出す
+        /// （TutorialManager.GetRankCallWaitTileIds。確定時の既存チュートリアル処理は変更しない）。
         /// </summary>
         public void UpdateInstantRankCallForCurrentHand()
         {
@@ -141,7 +164,7 @@ namespace KillingMahjong.UI
                 _rankCallArmed = false;
                 _rankResultIndexes = tutorialIndexes;
                 _rankSignature = CurrentSelectionSignature();
-                _rankWaits = BuildTutorialWaits().waits;
+                _rankWaits = BuildTutorialWaits(forRankCall: true).waits;
                 _hasRankResult = true;
                 ShowRankCall(_rankWaits);
                 return;
@@ -316,7 +339,7 @@ namespace KillingMahjong.UI
             if (queue == null || uiManager.IsTutorialMode)
             {
                 GetRankCallUI().ShowRank(rank);
-                _waitReveal?.Show(waits, uiManager.TileResourceManager);
+                // 候補は上で構築済み。同じ牌を消して再登場させない。
                 return;
             }
             queue.Enqueue("rank-call", () => ShowRankCallRoutine(rank, waits), cuttable: true,
@@ -331,7 +354,9 @@ namespace KillingMahjong.UI
         {
             var ui = GetRankCallUI();
             ui.ShowRank(rank);
-            _waitReveal?.Show(waits, uiManager.TileResourceManager);
+            // 順番待ちの前に表示した候補は、そのまま保つ。
+            if (_waitReveal != null && !_waitReveal.HasCandidates(waits))
+                _waitReveal.Show(waits, uiManager.TileResourceManager);
             while (ui != null && ui.IsShowing) yield return null;
         }
 

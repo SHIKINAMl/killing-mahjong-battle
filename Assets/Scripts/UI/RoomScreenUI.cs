@@ -130,7 +130,7 @@ namespace KillingMahjong.UI
             {
                 resumeButton.onClick.RemoveAllListeners();
                 // 保存値は「完了した局数」なので、次の局を開始する。全局完走済みの場合は最終局から。
-                int roundIndex = Mathf.Clamp(savedProgress, 0, 4);
+                int roundIndex = KillingMahjong.Managers.TutorialScenario.ClampStartRound(savedProgress);
                 resumeButton.onClick.AddListener(() =>
                 {
                     tutorialModal.SetActive(false);
@@ -355,16 +355,26 @@ namespace KillingMahjong.UI
             CreateCenteredImage(midLayer, "RoomBookshelf", new Vector2(-304f, 8f), new Vector2(158f, 292f), WoodDark);
             CreateCenteredImage(midLayer, "RoomBookshelfInner", new Vector2(-304f, 8f), new Vector2(134f, 268f),
                 new Color32(30, 20, 27, 255));
+            var bookWidths = new[] { 14f, 12f, 14f, 12f, 12f, 14f, 12f, 12f, 14f, 14f };
+            var bookColors = new[] {
+                new Color32(139, 53, 58, 255), new Color32(194, 158, 119, 255),
+                new Color32(58, 84, 111, 255), new Color32(93, 61, 100, 255),
+                new Color32(75, 100, 80, 255), new Color32(148, 105, 64, 255) };
             for (int i = 0; i < 4; i++)
             {
-                float y = 104f - i * 64f;
+                float y = 78f - i * 66f;
                 CreateCenteredImage(midLayer, "RoomShelf" + i, new Vector2(-304f, y), new Vector2(136f, 6f), WoodLight);
-                CreateCenteredImage(midLayer, "RoomBookRed" + i, new Vector2(-342f + i * 7f, y + 22f),
-                    new Vector2(12f, 38f), new Color32(139, 53, 58, 255));
-                CreateCenteredImage(midLayer, "RoomBookCream" + i, new Vector2(-326f + i * 8f, y + 20f),
-                    new Vector2(11f, 34f), new Color32(194, 158, 119, 255));
-                CreateCenteredImage(midLayer, "RoomBookBlue" + i, new Vector2(-307f + i * 5f, y + 18f),
-                    new Vector2(10f, 31f), new Color32(58, 84, 111, 255));
+                float left = -369f;
+                for (int column = 0; column < bookWidths.Length; column++)
+                {
+                    string name = column < 3 ? "RoomBook" + new[] { "Red", "Cream", "Blue" }[column] + i
+                        : "RoomBookPacked" + i + "_" + column;
+                    float width = bookWidths[column], height = i == 0 ? 59f : 60f;
+                    var color = bookColors[column < 3 ? column : (column + i) % bookColors.Length];
+                    CreateCenteredImage(midLayer, name, new Vector2(left + width / 2f, y + 3f + height / 2f),
+                        new Vector2(width, height), color);
+                    left += width;
+                }
             }
 
             CreateCenteredImage(midLayer, "RoomDesk", new Vector2(257f, -121f), new Vector2(168f, 106f), WoodDark);
@@ -484,7 +494,9 @@ namespace KillingMahjong.UI
                 float x = -370f + slot * (i + 0.5f);
                 var item = CreateMenuItem(bar.transform, it.Name, it.Label, new Vector2(x, -8f), new Vector2(122f, 44f),
                     it.Size, () => it.Act()?.Invoke(), out bool madeItem);
-                if (it.Name == "RoomMenu_Exit")
+                // 「タイトルへ」も押せない（2026-10-23 ユーザー指示「タイトルへは放置した時だけ行くようにして」）。
+                // タイトル（ランキングと動画の画面）へは、放置したときのリセットでしか行かない
+                if (it.Name == "RoomMenu_Exit" || it.Name == "RoomMenu_Title")
                 {
                     // 「やめる」は押せない。灰色にするのは作ったときだけ（置いてある物の色はシーンが正）
                     item.GetComponent<Button>().onClick.RemoveAllListeners();
@@ -698,14 +710,7 @@ namespace KillingMahjong.UI
 
         private static TMP_FontAsset BorrowJapaneseFont()
         {
-            var labels = FindObjectsByType<TextMeshProUGUI>(FindObjectsInactive.Include,
-                FindObjectsSortMode.None);
-            foreach (var label in labels)
-            {
-                if (label != null && label.font != null) return label.font;
-            }
-
-            return TMP_Settings.defaultFontAsset;
+            return GameUiTypography.Body;
         }
 
         private static void Stretch(RectTransform rect)

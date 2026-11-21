@@ -57,6 +57,7 @@ namespace KillingMahjong.UI
 
         private System.Collections.IEnumerator TemporaryVisualRoutine(Sprite newBody, Sprite newFace, float duration)
         {
+            CancelDiscardAttention();
             Sprite originalFace = (faceRenderer != null) ? normalFaceSprite : null;
             Sprite originalBody = normalSprite;
 

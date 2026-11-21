@@ -51,10 +51,27 @@ namespace KillingMahjong.UI
         [SerializeField] private float tileSpacing = 115f;
         [SerializeField] private float tileScale = 1.5f;
 
-        private static readonly Color PanelLine  = new Color32(0x3A, 0x44, 0x68, 0xFF);
-        private static readonly Color PanelBg    = new Color32(0x0F, 0x13, 0x26, 0xF2);
-        private static readonly Color PanelInk   = new Color32(0xE8, 0xE4, 0xF0, 0xFF);
-        private static readonly Color PanelFaint = new Color32(0x97, 0xA0, 0xC0, 0xFF);
+        // **紺の板をやめ、賭け金のスマホと同じ色にそろえる（2026-10-25）。**
+        // 紺(#0F1326)と青灰の文字は、黒・暗赤・くすんだ金の画面から浮いていた。
+        // 色は既存の素材（契約書・能力の窓・設定ボタン）から抜いた色。
+        private static readonly Color PanelLine  = new Color32(0x8F, 0x77, 0x54, 0xFF); // 鈍い金：区切り線
+        private static readonly Color PanelInk   = new Color32(0xF5, 0xF5, 0xDC, 0xFF); // 生成り
+        private static readonly Color PanelFaint = new Color32(0xD2, 0xC1, 0x95, 0xFF); // くすんだ金：見出し語
+
+        // 点数表の地と見出しの帯。自分の和了＝青、相手の和了＝赤（2026-10-25）
+        private static readonly Color GroundBlue = new Color32(0x1C, 0x2B, 0x4A, 0xFF); // 夜の紺（不透明。0xF2 でもリニア色空間では後ろが透けて見えた）
+        private static readonly Color GroundRed  = new Color32(0x4A, 0x1C, 0x28, 0xFF); // 暗い血色
+        private static readonly Color HeadBlue   = new Color32(0x26, 0x38, 0x5E, 0xFF);
+        private static readonly Color HeadRed    = new Color32(0x5E, 0x24, 0x32, 0xFF);
+
+        // 点数表の血飛沫のドット絵（既存の blood_splatter.png を Image-to-Pixel と同じ手順でドット絵にした物）
+        private const string SplatterPixelBlue = "UI/Settlement/settlement_splatter_blue";
+        private const string SplatterPixelRed = "UI/Settlement/settlement_splatter_red";
+        // 点数表の地と帯のドット絵（デバッグ部屋の本と同じ作り。tools/CutinPixelArt/settlement.mjs）
+        private const string GroundPixelBlue = "UI/Settlement/settlement_ground_blue";
+        private const string GroundPixelRed = "UI/Settlement/settlement_ground_red";
+        private const string HeadPixelBlue = "UI/Settlement/settlement_head_blue";
+        private const string HeadPixelRed = "UI/Settlement/settlement_head_red";
         private static readonly Color AccentGold = new Color32(0xFF, 0xD3, 0x4D, 0xFF); // 翻数
         private static readonly Color AccentMine = new Color32(0x57, 0xC7, 0xE8, 0xFF); // 自分
         private static readonly Color AccentThem = new Color32(0xF2, 0x70, 0x5A, 0xFF); // 相手

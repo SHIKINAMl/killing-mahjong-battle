@@ -85,6 +85,10 @@ namespace KillingMahjong.UI
 
         private void OnDisable()
         {
+            ronInputScope?.Dispose();
+            ronInputScope = null;
+            IsRonInputPlaying = false;
+
             // 保留通知は維持する。非表示中の時間をタイムアウトに数えない。
             ResetDeferredWait();
             if (PhaseController != null) PhaseController.CancelPhasePresentations();

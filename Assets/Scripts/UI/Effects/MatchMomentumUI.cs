@@ -165,6 +165,7 @@ namespace KillingMahjong.UI.Effects
             int nextRon = 0;
             float progress = 0f;
             int lastPulse = -1;
+            int presentationFrame = -1;
             while (progress < 1f)
             {
                 // ロンの点に近づくと線の伸びがスローになり、点を過ぎると元の速さへ戻る
@@ -172,7 +173,8 @@ namespace KillingMahjong.UI.Effects
                 progress = Mathf.Min(1f, progress + Time.deltaTime / GrowthDuration * RonSpeedAt(progress));
                 while (nextRon < ronCallouts.Count && progress >= ronCallouts[nextRon].Progress)
                     StartCoroutine(PopRonCallout(ronCallouts[nextRon++]));
-                SetGraphProgress(progress);
+                if (progress >= 1f || PresentationTiming.IsNewFrame(ref presentationFrame, Time.time))
+                    SetGraphProgress(progress);
                 int pulse = Mathf.FloorToInt(progress * (GrowthPulseCount - 1));
                 if (pulse != lastPulse)
                 {
@@ -209,15 +211,15 @@ namespace KillingMahjong.UI.Effects
             var audio = KillingMahjong.Managers.AudioManager.Instance;
             if (audio != null)
             {
-                // 強いロンほど低く太い音にする
-                float frequency = 140f / callout.Scale;
-                audio.PlaySynthSound(KillingMahjong.Managers.SynthWaveType.Square,
-                    frequency, frequency * 0.5f, 0.18f, 1f);
+                // 強いロンほど低く太い音にする（ダブル役満で約1オクターブ下）。
+                // 音は Freesound（CC0）のポップ音2つを重ねたもの（2026-10-19）
+                audio.PlayStingerPitched("se_ron_pop", 1f / callout.Scale,
+                    KillingMahjong.Managers.AudioManager.PitchJitter.None);
             }
             float t = 0f;
             while (t < RonPopSeconds && callout.Rect != null)
             {
-                float k = t / RonPopSeconds;
+                float k = PresentationTiming.Sample(t) / RonPopSeconds;
                 // 0 → 1.25倍 → 1倍
                 float s = k < 0.6f ? Mathf.Lerp(0.3f, 1.25f, k / 0.6f) : Mathf.Lerp(1.25f, 1f, (k - 0.6f) / 0.4f);
                 callout.Rect.localScale = Vector3.one * (s * callout.Scale);
@@ -231,9 +233,12 @@ namespace KillingMahjong.UI.Effects
         {
             var audio = KillingMahjong.Managers.AudioManager.Instance;
             if (audio == null) return;
-            float frequency = 220f * Mathf.Pow(2f, pulse / 12f);
-            audio.PlaySynthSound(KillingMahjong.Managers.SynthWaveType.Triangle,
-                frequency, frequency * 0.9f, 0.045f, 0.9f);
+            // 線が伸びるにつれて高くなる。最後の1回で1オクターブ上に届く。
+            // 合成の三角波（2オクターブ上がる）から Freesound（CC0）の電子音2つを重ねたものに替えた（2026-10-19）。
+            // 録音を2オクターブも上げると細くキンキンするので、上がり幅は1オクターブにしてある
+            float pitch = Mathf.Pow(2f, pulse / (float)(GrowthPulseCount - 1));
+            audio.PlayStingerPitched("se_graph_tick", pitch,
+                KillingMahjong.Managers.AudioManager.PitchJitter.None);
         }
 
         private void SetGraphProgress(float progress)
@@ -448,7 +453,7 @@ namespace KillingMahjong.UI.Effects
             while (time < fadeDuration)
             {
                 time += Time.deltaTime;
-                canvasGroup.alpha = Mathf.Lerp(startAlpha, targetAlpha, time / fadeDuration);
+                canvasGroup.alpha = Mathf.Lerp(startAlpha, targetAlpha, PresentationTiming.Sample(time) / fadeDuration);
                 yield return null;
             }
             canvasGroup.alpha = targetAlpha;

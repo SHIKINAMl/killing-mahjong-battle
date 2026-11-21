@@ -1,0 +1,7 @@
+{
+  "name": "room-pixel-parts",
+  "private": true,
+  "type": "module",
+  "scripts": { "generate": "node generate.mjs" },
+  "dependencies": { "image-to-pixel": "3.1.0", "pngjs": "7.0.0" }
+}

@@ -57,14 +57,14 @@ namespace KillingMahjong.Editor
         public static void CreateOptionUI()
         {
             // 既存のOptionUIがあれば削除
-            OptionUI existing = FindObjectOfType<OptionUI>();
+            OptionUI existing = FindFirstObjectByType<OptionUI>();
             if (existing != null)
             {
                 DestroyImmediate(existing.gameObject);
             }
 
             // Canvasを探す
-            Canvas canvas = FindObjectOfType<Canvas>();
+            Canvas canvas = FindFirstObjectByType<Canvas>();
             if (canvas == null)
             {
                 Debug.LogError("シーンにCanvasがありません。先にCanvasを作成してください。");

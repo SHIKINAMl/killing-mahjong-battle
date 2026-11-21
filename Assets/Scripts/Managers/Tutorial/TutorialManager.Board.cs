@@ -14,14 +14,28 @@ namespace KillingMahjong.Managers
 
         // ==================== 盤面セットアップ ====================
 
-        private void SetupBoard(TutorialRoundData data, List<int> handBaseIds)
+        private TutorialRoundData _pendingRoundBoard;
+
+        private void InitializeRoundBoard(TutorialRoundData data, bool preserveRoundCover = false)
         {
+            if (IsFirstTutorialRound(data)) IsVoltageUiRevealed = false;
+            else if (IsSecondTutorialRound(data)) IsVoltageUiRevealed = false;
+            ClearPerspectiveMarks();
+            SetHandButtonStage(HandButtonStage.Hidden);
+            SetupBoard(data, null, preserveRoundCover);
+            if (data.enemyUsesAbility) _abilityBellRevealed = true;
+            SetAbilityBellVisible(_abilityBellRevealed);
+        }
+
+        private void SetupBoard(TutorialRoundData data, List<int> handBaseIds, bool preserveRoundCover = false)
+        {
+            _tutorialEnemyAssaultActive = false;
             if (gameUIManager == null || gameUIManager.HandUI == null || gameUIManager.WallUI == null) return;
 
             gameUIManager.IsTutorialMode = true;
             gameUIManager.TutorialManager = this;
 
-            if (gameUIManager.PhaseTransitionUI != null)
+            if (!preserveRoundCover && gameUIManager.PhaseTransitionUI != null)
                 gameUIManager.PhaseTransitionUI.gameObject.SetActive(false);
 
             gameUIManager.ClearAllTiles();
@@ -48,6 +62,21 @@ namespace KillingMahjong.Managers
             {
                 // 手牌が空のときは待ち牌も出さない（まだ何も組んでいないため）
                 board.SetLocalState(wall, hand, hand.Count > 0 ? waits : new List<int>());
+
+                // **相手の山は、透視の実演がある第2局だけ伏せて置く**（2026-10-24 プランナー指摘「透視スキルの効果が
+                // わかるようにチュートリアルでも相手の手牌があった方がいいかも」）。以前は相手の牌が画面に1枚も無く、
+                // 透視を押してもめくれた牌が見えなかった。盤面ごと局の頭の暗転の間に出るので、画面に生えない。
+                // 自分の山を除いた予備牌から置き、同種4枚を超えないようにする。ほかの局は今までどおり置かない。
+                board.OriginalEnemyWallTiles.Clear();
+                board.CurrentEnemyWallTiles.Clear();
+                board.ExposedEnemyHandWallIndexes.Clear();
+                if (IsSecondTutorialRound(data))
+                {
+                    var stock = TutorialSkillStock.Remaining(wall, null, data.doraBaseId);
+                    foreach (int tile in TutorialTiles.EncodeAll(data.mulliganReplacementBaseIds, data.doraBaseId))
+                        stock.Remove(tile);
+                    board.SetEnemyState(TutorialSkillStock.Draw(stock, wall.Count, _introSkillRandom), new List<int>());
+                }
             }
 
             if (gameUIManager.VisualController != null)
@@ -66,11 +95,8 @@ namespace KillingMahjong.Managers
         ///
         /// チュートリアルはサーバーに繋がないので手牌を評価できない。
         /// そこで「台本の満貫手と同じ13枚がそろっているか」で判定する。
-        /// この局の山牌は『台本の満貫手（同一色13枚）＋ 筒子9枚 ＋ 索子9枚 ＋ 字牌3枚』で、
-        /// 台本の色の牌はその13枚しか入っていない。他の色は9枚しかなく13枚に届かないので、
-        /// この山から作れる満貫以上の手は台本の13枚だけ。よってこの一致判定で過不足がない。
-        ///
-        /// 山牌の構成を変えるときは、この前提が崩れていないか確認すること。
+        /// 台本以外の組み方を網羅する判定ではない。正解例の配牌・待ち・役を変更するときは、
+        /// サーバーの判定で実際に満貫になることを確認し、台本の表示もそろえること。
         /// </summary>
         private bool IsSelfMadeManganHand()
         {
@@ -91,25 +117,14 @@ namespace KillingMahjong.Managers
             return remaining.Count == 0;
         }
 
-        private static readonly List<TutorialLine> DefaultSelfManganLines = new List<TutorialLine>
-        {
-            new TutorialLine("おっきっちりできたね"),
-            new TutorialLine("さすがは後輩ちゃん 飲み込み早いねー"),
-            new TutorialLine("じゃあまぁいらないと思うけど"),
-        };
-
         private static List<TutorialLine> ResolveSelfManganLines(TutorialRoundData data)
         {
-            return (data.onSelfManganLines != null && data.onSelfManganLines.Count > 0)
-                ? data.onSelfManganLines
-                : DefaultSelfManganLines;
+            return data.onSelfManganLines;
         }
 
         private static List<TutorialLine> ResolveHandFilledLines(TutorialRoundData data)
         {
-            return (data.onHandFilledLines != null && data.onHandFilledLines.Count > 0)
-                ? data.onHandFilledLines
-                : DefaultHandFilledLines;
+            return data.onHandFilledLines;
         }
 
         /// <summary>ボタンの開放段階を変えて、HandUI に即座に反映させる。</summary>
@@ -136,14 +151,56 @@ namespace KillingMahjong.Managers
         /// 演出そのものが出せない場面（UIが無い等）では、**待たずにフェイズだけ進める。**
         /// ここで待つと、盤面が揃っていない入り方をしたときに止まってしまう。
         /// </summary>
-        private IEnumerator RunDiscardEntryTransition()
+        // ==================== 対局のあいだの曲（2026-10-23） ====================
+        //
+        // ユーザーが採用した対局用の曲（`tut_lesson_battle`、144 BPM）を、チュートリアルで
+        // 実際に対局を進める区間にだけ流す。説明の区間は今までどおり `tut_lesson`（135 BPM）。
+        //
+        //   入る: 「対局開始」の黒帯が画面を覆い切ったところ（フェイズが打牌に切り替わるのと同時）
+        //         DEADEND から対局へ戻ったところ
+        //   戻る: 次の局の頭（手牌選択の説明に戻る）。**対局の曲が鳴っているときだけ。**
+        //         第1局の頭は無音から立ち絵が浮かぶ作りなので、ここで曲を鳴らし始めない。
+        //         続きから（第2局以降を指定して）始めたときは何も鳴っていないので、説明の曲を鳴らす
+        //
+        // 同じ曲を続けて指定しても頭出しはしない（AudioManager.PlayTutorialBgm）。
+        // 台本で断ち切った（「BGM止まる」など）あとは、ここから勝手に鳴らし直さない。
+
+        private const string TutorialLessonBgm = "tut_lesson";
+        private const string TutorialBattleBgm = "tut_lesson_battle";
+
+        private static void PlayTutorialBattleBgm()
         {
+            if (AudioManager.Instance != null) AudioManager.Instance.PlayTutorialBgm(TutorialBattleBgm);
+        }
+
+        /// <param name="resumedRound">
+        /// 第2局以降の頭か。局を指定して始め直したとき（続きから）は曲が何も鳴っていないので、説明の曲を鳴らす。
+        /// 第1局の頭は台本の1行目の合図で鳴らすので、ここでは鳴らさない
+        /// </param>
+        private static void ReturnToTutorialLessonBgm(bool resumedRound = false)
+        {
+            var audio = AudioManager.Instance;
+            if (audio == null) return;
+            if (audio.IsTutorialBgmPlaying(TutorialBattleBgm) || (resumedRound && !audio.IsBgmPlaying))
+                audio.PlayTutorialBgm(TutorialLessonBgm);
+        }
+
+        /// <param name="whileCovered">覆いきった間に一緒に出す物（第1局の体力・ゲージなど）。画面に物をぱっと出さないため（2026-10-24 ユーザー指示「チュートリアルの対局フェイズでUIをニョキって生やすのは止めてくれ。基本的に画面が暗転しているときにUIは全部出すように」）</param>
+        private IEnumerator RunDiscardEntryTransition(System.Action whileCovered = null)
+        {
+            // **黒帯に入る前にセリフ欄を空にする**（2026-10-29 バグ報告「第二局開始時に前のセリフが残っている」
+            // 「開始時は一旦セリフを空にして、始まった時にしゃべらせたい」）。
+            // 賭け金の話のセリフが、明けたあとの対局の頭まで残っていた。次のセリフは明けてから出る
+            if (dialogueUI != null) dialogueUI.HideText();
+
             var transition = gameUIManager != null ? gameUIManager.PhaseTransitionUI : null;
             if (transition != null && !transition.gameObject.activeSelf) transition.gameObject.SetActive(true);
             // 親ごと消えていると演出が始まらない。来ない合図を待たずに進める
             if (transition == null || !transition.isActiveAndEnabled)
             {
+                whileCovered?.Invoke();
                 SetPhase(RoundStatus.Discard);
+                PlayTutorialBattleBgm();
                 yield break;
             }
 
@@ -151,11 +208,12 @@ namespace KillingMahjong.Managers
             var info = new EngineData.BettingCompletedInfo
             {
                 LocalBet = bet,
-                EnemyBet = bet,
-                LocalHpBefore = _playerHp + bet,
-                EnemyHpBefore = _enemyHp + bet,
-                LocalHpAfter = _playerHp,
-                EnemyHpAfter = _enemyHp,
+                EnemyBet = _enemyStake,
+                LocalHpBefore = _playerHpBeforeBet,
+                EnemyHpBefore = _enemyHpBeforeBet,
+                LocalHpAfter = PlayerShownHp,
+                EnemyHpAfter = EnemyShownHp,
+                HasServerHealth = true,
             };
 
             bool midpointDone = false;
@@ -164,14 +222,14 @@ namespace KillingMahjong.Managers
                 "対局開始",
                 gameUIManager.PlayerInfoUI,
                 info,
-                onMidpoint: () => { SetPhase(RoundStatus.Discard); midpointDone = true; },
+                onMidpoint: () => { whileCovered?.Invoke(); SetPhase(RoundStatus.Discard); PlayTutorialBattleBgm(); midpointDone = true; },
                 onComplete: () => finished = true);
 
             // **覆い切るまでは必ず待つ。** ここを待たないと、黒帯が降りている最中に
             // 次の台詞が走り、見えないところで喋ることになる。
             float limit = Time.time + 8f;
             yield return new WaitUntil(() => midpointDone || Time.time > limit);
-            if (!midpointDone) SetPhase(RoundStatus.Discard);
+            if (!midpointDone) { whileCovered?.Invoke(); SetPhase(RoundStatus.Discard); PlayTutorialBattleBgm(); }
 
             // 晴れるまでも待つ。上限を置いてあるので、演出が壊れても止まらない
             float limit2 = Time.time + 8f;
@@ -188,12 +246,17 @@ namespace KillingMahjong.Managers
                 gameUIManager.SetCurrentPhaseStatus(status);
         }
 
-        private void ApplyHpToUI()
+        private void ApplyHpToUI(bool updateVitals = true)
         {
             var board = BoardStateManager.Instance;
-            if (board != null) board.UpdateHp(_playerHp, _enemyHp);
+            if (board != null)
+            {
+                board.ClearStakesOnTable();
+                board.UpdateHp(_playerHp, _enemyHp);
+                board.AddStakesOnTable(_playerStake, _enemyStake);
+            }
 
-            if (gameUIManager == null) return;
+            if (gameUIManager == null || !updateVitals) return;
 
             // 盤面がまだ隠れている段階（女の子とセリフだけの状態）では表示を戻さない
             // 「準備完了」ボックスは次局待ち合わせ用。チュートリアルには待ち合わせがないので常に隠す
@@ -201,7 +264,7 @@ namespace KillingMahjong.Managers
             {
                 gameUIManager.PlayerInfoUI.gameObject.SetActive(_boardVisible);
                 gameUIManager.PlayerInfoUI.SetMaxHP(_scenario.playerStartHp);
-                gameUIManager.PlayerInfoUI.SetHP(_playerHp);
+                gameUIManager.PlayerInfoUI.SetHP(PlayerShownHp);
                 gameUIManager.PlayerInfoUI.ShowReadyBox(false);
             }
             if (gameUIManager.EnemyInfoUI != null)
@@ -218,7 +281,7 @@ namespace KillingMahjong.Managers
                 // 体力を消しているのは中の別の物なので、この症状が出ない。
                 gameUIManager.EnemyInfoUI.SetPanelVisible(_boardVisible && !_firstRoundChromeHidden);
                 gameUIManager.EnemyInfoUI.SetMaxHP(_scenario.enemyStartHp);
-                gameUIManager.EnemyInfoUI.SetHP(_enemyHp);
+                gameUIManager.EnemyInfoUI.SetHP(EnemyShownHp);
                 gameUIManager.EnemyInfoUI.ShowReadyBox(false);
             }
         }
@@ -279,100 +342,8 @@ namespace KillingMahjong.Managers
                 gameUIManager.BetPotUI.SetVisible(visible);
         }
 
-        /// <summary>
-        /// 牌を配る演出（2026-09-12、フロー図の「牌を配る演出」）。
-        ///
-        /// 山牌を一度に出さず、**左上から順に1枚ずつ置いていく。**
-        /// 以前はここも `SetBoardVisible(true)` 一発で、34枚が同時に現れていた。
-        ///
-        /// **並び順は子オブジェクトの順番ではなく、画面上の位置で決める。**
-        /// 牌は使い回し（<see cref="KillingMahjong.UI.TilePoolManager"/>）なので、
-        /// 子の順番は前局の出入りで入れ替わっていて当てにならない。
-        ///
-        /// **音は鳴らさない。** いま音は止めてあり（AGENTS.md 第6項）、
-        /// 戻すときに1枚ずつ音を当てる場所はここ。
-        /// </summary>
-        private IEnumerator DealTilesRoutine()
-        {
-            SetBoardVisible(true);
-
-            if (gameUIManager == null || gameUIManager.WallUI == null) yield break;
-
-            var tiles = new List<Transform>();
-            foreach (var t in gameUIManager.WallUI.GetComponentsInChildren<TileInteraction>(true))
-            {
-                if (t != null) tiles.Add(t.transform);
-            }
-            if (tiles.Count == 0) yield break;
-
-            // 上の段から、左から右へ。y は下に行くほど小さいので降順で見る
-            tiles.Sort((a, b) =>
-            {
-                Vector3 pa = a.position, pb = b.position;
-                if (Mathf.Abs(pa.y - pb.y) > DealRowTolerance) return pb.y.CompareTo(pa.y);
-                return pa.x.CompareTo(pb.x);
-            });
-
-            for (int i = 0; i < tiles.Count; i++)
-            {
-                if (tiles[i] != null) tiles[i].localScale = Vector3.zero;
-            }
-
-            // 1枚ずつ起こしていく。**待ち時間は実時間で数える。**
-            // 演出中に Time.timeScale をいじられても長さが変わらないようにする。
-            float started = Time.unscaledTime;
-            int placed = 0;
-            while (placed < tiles.Count)
-            {
-                float elapsed = Time.unscaledTime - started;
-                int want = Mathf.Min(tiles.Count, Mathf.FloorToInt(elapsed / DealInterval) + 1);
-
-                for (; placed < want; placed++)
-                {
-                    if (tiles[placed] != null) StartCoroutine(PopTileRoutine(tiles[placed]));
-                }
-                yield return null;
-            }
-
-            // 最後の1枚が起き上がりきるまで待つ
-            yield return new WaitForSecondsRealtime(DealPopSeconds);
-
-            // 途中で局が切り替わった等で取りこぼしても、最後は必ず等倍に戻す
-            for (int i = 0; i < tiles.Count; i++)
-            {
-                if (tiles[i] != null) tiles[i].localScale = Vector3.one;
-            }
-        }
-
-        /// <summary>牌1枚を起こす。**少し行き過ぎてから戻る**ので、置いた感じが出る。</summary>
-        private IEnumerator PopTileRoutine(Transform tile)
-        {
-            float t = 0f;
-            while (t < DealPopSeconds)
-            {
-                t += Time.unscaledDeltaTime;
-                if (tile == null) yield break;
-
-                float u = Mathf.Clamp01(t / DealPopSeconds);
-                // 1.0 を少し越えてから戻る
-                float scale = 1f + DealOvershoot * Mathf.Sin(u * Mathf.PI);
-                tile.localScale = Vector3.one * (scale * u + (1f - u) * 0f);
-                yield return null;
-            }
-            if (tile != null) tile.localScale = Vector3.one;
-        }
-
-        /// <summary>次の1枚を置くまでの間隔[秒]。34枚で 0.85 秒ほどになる。</summary>
-        private const float DealInterval = 0.025f;
-
-        /// <summary>1枚が起き上がるのにかける時間[秒]。</summary>
-        private const float DealPopSeconds = 0.14f;
-
-        /// <summary>行き過ぎる量。大きくすると牌が跳ねて見える。</summary>
-        private const float DealOvershoot = 0.18f;
-
-        /// <summary>同じ段とみなす y のずれ[px]。牌の高さより小さくすること。</summary>
-        private const float DealRowTolerance = 12f;
+        // 牌を1枚ずつ起こす演出（DealTilesRoutine。2026-09-12 のフロー図「牌を配る演出」）は 2026-10-24 に外した。
+        // 画面に物を生やさず、局の頭の暗転の間に盤面ごと出す（TutorialManager.Progression の PlayRoundStartRoutine）。
 
         private void SetBoardVisible(bool visible)
         {

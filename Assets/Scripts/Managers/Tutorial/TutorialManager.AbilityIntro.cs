@@ -21,9 +21,9 @@ namespace KillingMahjong.Managers
         //   「それじゃあ第二局目だね」
         //     → フラッシュ →「むっ……後輩ちゃん けっこう点をもってるね」
         //     →「このまま手牌選択してもいいけど……せっかくなので」→「ほいっ……と！」
-        //     → 縦揺れ＆フラッシュ → 上から能力ベルが落ちてくる →「じゃーん！！」
+        //     → フラッシュ → 上から能力ベルが落ちる → 着地で縦揺れ →「じゃーん！！」
         //     →「これは呼び鈴」→「この鈴を鳴らすと便利な悪魔を召喚できるんだよね」
-        //     → 横揺れ →「あっ知らなかった？ エクソシストやってんだよねぇアタシ」
+        //     →「あっ知らなかった？ エクソシストやってんだよねぇアタシ」
         //     →「それで便利なことができるんだけど……まぁとりあえず鳴らしてみてよ！」
         //     → 能力ベルハイライト → プレイヤーが押す → 強襲を隠す → アニメ待ち
         //     →「コイツはベルル ギャンブルの悪魔なんだ」
@@ -144,20 +144,6 @@ namespace KillingMahjong.Managers
         /// </summary>
         private const int AbilityMoreMinScore = 8000;
 
-        /// <summary>
-        /// 同じ能力を何周も試させない上限。フロー図には無いが、
-        /// **「はい」を押し続けると無限に回る**ので歯止めを置く。
-        /// 能力は3種類なので、3周すれば全部触れる。
-        /// </summary>
-        private const int AbilityShowcaseMaxRounds = 3;
-
-        /// <summary>画面を揺らす。出せない場面（UIが無い等）では黙って素通りする。</summary>
-        private void ShakeScreen(float duration, float magnitude, Vector2 axis)
-        {
-            var pt = gameUIManager != null ? gameUIManager.PhaseTransitionUI : null;
-            if (pt != null) StartCoroutine(pt.PlayScreenShakeRoutine(duration, magnitude, axis));
-        }
-
         private void FlashScreen()
         {
             UI.Effects.ScreenFlash.Play();
@@ -166,10 +152,10 @@ namespace KillingMahjong.Managers
         /// <summary>いまの自分の残り持ち点（= 血）。取れないときは境目より上として扱う。</summary>
         private int GetLocalScoreForAbilityGate()
         {
-            var board = BoardStateManager.Instance;
-            if (board == null) return AbilityMoreMinScore;
-            return board.LocalPlayerHp;
+            return PlayerShownHp;
         }
+
+        private bool CanRepeatAbilityIntroduction() => GetLocalScoreForAbilityGate() >= AbilityMoreMinScore;
 
         /// <summary>
         /// 能力の紹介ひとまとまり。フロー図シート3の後半。
@@ -180,25 +166,36 @@ namespace KillingMahjong.Managers
         /// </summary>
         private IEnumerator RunAbilityIntroduction()
         {
-            var restoreBoard = CaptureIntroDemoBoard();
+            System.Action restoreBoard = null;
+            _introPerspectiveUses = 0;
+            if (gameUIManager != null && gameUIManager.AbilityUI != null)
+            {
+                gameUIManager.AbilityUI.TutorialUnusableReason = IntroSkillUnusableReason;
+                gameUIManager.AbilityUI.TutorialUnusableClicked = SayIntroSkillUnusable;
+            }
+            UI.YakuSelectionUI.TutorialBoostedYakuPressed = SayYakuAlreadyBoosted;
             try
             {
                 yield return StartCoroutine(PlayLines(AbilityOpeningLines));
+                // 「それじゃあ第二局目だね」のあとに「２局目」の暗転を出し、暗いあいだに盤面を出す（2026-10-29 ユーザー指示）
+                if (_pendingRoundBoard != null || !_boardVisible) yield return StartCoroutine(PlayRoundLabelRoutine(2));
+                // 第2局の配牌が済んでから、能力実演の復帰先を保存する。
+                restoreBoard = CaptureIntroDemoBoard();
 
                 FlashScreen();
                 yield return new WaitForSeconds(0.35f);
-                yield return StartCoroutine(PlayLines(AbilityRichLines));
+                yield return StartCoroutine(PlayLines(AbilityRichLines.GetRange(0, AbilityRichLines.Count - 1)));
+                yield return StartCoroutine(PlayLines(AbilityRichLines.GetRange(AbilityRichLines.Count - 1, 1)));
 
-                // 縦揺れ＆フラッシュ → 上から能力ベルが落ちてくる
-                ShakeScreen(0.25f, 18f, new Vector2(0f, 1f));
+                // 落下前には揺らさず、着地だけに衝撃を付ける。
                 FlashScreen();
                 yield return new WaitForSeconds(0.3f);
                 yield return StartCoroutine(DropAbilityBellRoutine());
 
                 yield return StartCoroutine(PlayLines(AbilityBellArrivedLines));
 
-                ShakeScreen(0.2f, 16f, new Vector2(1f, 0f));
-                yield return new WaitForSeconds(0.2f);
+                // 「じゃーん」のあとは揺らさない（2026-10-30 プランナー「じゃーんの後も揺れてるので、以後は揺らさないで」）。
+                // 以前はここで横に揺らしていた
                 yield return StartCoroutine(PlayLines(AbilityExorcistLines));
 
                 yield return StartCoroutine(RingBellRoutine());
@@ -214,9 +211,15 @@ namespace KillingMahjong.Managers
             }
             finally
             {
-                restoreBoard();
+                ClearIntroSkillSelection();
+                restoreBoard?.Invoke();
                 if (gameUIManager != null && gameUIManager.AbilityUI != null)
+                {
                     gameUIManager.AbilityUI.TutorialActivationHandler = null;
+                    gameUIManager.AbilityUI.TutorialUnusableReason = null;
+                    gameUIManager.AbilityUI.TutorialUnusableClicked = null;
+                }
+                UI.YakuSelectionUI.TutorialBoostedYakuPressed = null;
             }
         }
 
@@ -235,31 +238,25 @@ namespace KillingMahjong.Managers
                 yield break;
             }
 
+            // **位置が取れるまでの1フレームは、ベルの絵を描かない**（2026-10-29 バグ報告
+            // 「呼び鈴を出すときに一瞬だけ呼び鈴がちらつく」）。以前は着地点に1フレームだけ出てから上へ飛んでいた
             SetAbilityBellVisible(true);
             _abilityBellRevealed = true;
+            RectTransform bell = ability.BellRect;
+            var hidden = new List<UnityEngine.UI.Graphic>();
+            if (bell != null)
+                foreach (var g in bell.GetComponentsInChildren<UnityEngine.UI.Graphic>())
+                    if (g.enabled) { g.enabled = false; hidden.Add(g); }
             yield return null;   // 出した次のフレームまで待たないと位置が取れない
 
-            RectTransform bell = ability.BellRect;
-            if (bell == null) yield break;
+            bell = ability.BellRect;
+            if (bell == null) { foreach (var g in hidden) if (g != null) g.enabled = true; yield break; }
 
+            // 最初のフレームも着地点には描かない。
             Vector2 goal = bell.anchoredPosition;
-            float rise = 420f;                    // 画面の外まで持ち上げる高さ
-            const float fall = 0.45f;
-
-            float t = 0f;
-            while (t < fall)
-            {
-                t += Time.deltaTime;
-                float u = Mathf.Clamp01(t / fall);
-                // 落ちるので終わりを速く。**等速だと浮いて見える**
-                float e = u * u;
-                bell.anchoredPosition = goal + new Vector2(0f, rise * (1f - e));
-                yield return null;
-            }
-            bell.anchoredPosition = goal;
-
-            // 着地の衝撃。フロー図の「拳で机をドシンと叩きつけるイメージ」に寄せる
-            ShakeScreen(0.18f, 14f, new Vector2(0f, 1f));
+            bell.anchoredPosition = goal + new Vector2(0f, UI.Effects.AbilityBellDropEffect.Rise);
+            foreach (var g in hidden) if (g != null) g.enabled = true;
+            yield return UI.Effects.AbilityBellDropEffect.Play(bell, goal);
         }
 
         /// <summary>
@@ -297,12 +294,16 @@ namespace KillingMahjong.Managers
         {
             var ability = gameUIManager != null ? gameUIManager.AbilityUI : null;
 
-            for (int round = 0; round < AbilityShowcaseMaxRounds; round++)
+            if (ability == null) yield break;
+
+            while (!_aborted)
             {
                 yield return StartCoroutine(PlayLines(AbilityPickLines));
 
                 string picked = null;
                 yield return StartCoroutine(RunOneAbilityShowcase(v => picked = v));
+                if (_aborted) yield break;
+                if (picked == null) continue; // 対象選択のキャンセルは発動にも説明済みにもしない。
 
                 // 説明。フロー図では能力ごとに文面が違う
                 if (picked != null && AbilityExplainLines.ContainsKey(picked))
@@ -323,8 +324,10 @@ namespace KillingMahjong.Managers
                 }
 
                 // はい → 残り持ち点が 8000点以上か
-                if (GetLocalScoreForAbilityGate() < AbilityMoreMinScore
-                    || round == AbilityShowcaseMaxRounds - 1)
+                // 「……もうさすがによくない？」は、**持ち点が 8000 を切ったときだけ**（2026-10-22 プランナー指摘
+                // 「役の使いすぎでライフ8000以下になりそうな時に出るやつ」）。以前は周回の上限に達したときにも
+                // 出していて、16000 残っていても言われていた
+                if (!CanRepeatAbilityIntroduction())
                 {
                     yield return StartCoroutine(PlayLines(AbilityTooPoorLines));
                     yield break;
@@ -347,33 +350,42 @@ namespace KillingMahjong.Managers
             yield return null;
 
             string picked = null;
-            System.Func<string, bool> activation = type =>
+            string suit = null;
+            bool applied = false;
+            System.Func<string, string, bool> activation = (type, selectedSuit) =>
             {
                 if (this == null || !isActiveAndEnabled || picked != null || !CanActivateIntroSkill(type)) return false;
                 picked = type;
+                suit = selectedSuit;
                 return true;
             };
             ability.TutorialActivationHandler = activation;
             try
             {
-                string highlighted = null;
+                RectTransform highlighted = null;
                 GuideTo(ability.AbilityListRect, false, null, UI.TutorialHighlightUI.Style.Frame);
-                // 選んだ行の再クリックが現在の発動操作。選択解除・Xでは実演済みにしない。
-                while (picked == null)
+                // 能力の選択後は発動ボタンへ案内する。選択解除・Xでは実演済みにしない。
+                //
+                // **枠は選んだ行そのものを追う**（2026-10-29 バグ報告「透視スキルを使う際、選択演出がクリックに連動しない」）。
+                // 以前は能力の種類で見ていたので、透視の種別（萬子〜字牌）を選び替えても「透視」のままで、
+                // 枠が最初の行（萬子）に残っていた
+                while (picked == null && !_aborted)
                 {
                     if (!ability.IsWindowOpen) { ability.OpenWindow(); highlighted = null; }
-                    string selected = ability.SelectedSkillType;
+                    var selected = ability.SelectedItemRect;
                     if (selected != highlighted)
                     {
                         highlighted = selected;
                         GuideTo(selected == null ? ability.AbilityListRect
-                            : ability.ActivateButtonRect ?? ability.GetAbilityItemRect(selected),
+                            : ability.ActivateButtonRect ?? selected,
                             false, null, UI.TutorialHighlightUI.Style.Frame);
                     }
                     yield return null;
                 }
                 ClearGuide();
-                yield return PlayIntroSkillEffect(picked);
+                // 「じゃ好きなの適当に押してみてよ」を、発動の演出のあいだ残さない（止まって見えるため。2026-10-30）
+                if (dialogueUI != null) dialogueUI.HideText();
+                if (!_aborted) yield return PlayIntroSkillEffect(picked, suit, done => applied = done);
             }
             finally
             {
@@ -382,9 +394,9 @@ namespace KillingMahjong.Managers
                 ClearGuide();
             }
 
-            // 効果発動の余韻
-            yield return new WaitForSeconds(0.4f);
-            onPicked(picked);
+            // 効果発動の余韻。透視は牌の明滅が裏で続いているので待たない（2026-10-30 バグ報告「透視をつかってからセリフが流れるまでラグがある」）
+            if (picked != SkillNames.Perspective) yield return new WaitForSeconds(0.4f);
+            onPicked(applied ? picked : null);
         }
 
         /// <summary>
@@ -393,15 +405,24 @@ namespace KillingMahjong.Managers
         /// </summary>
         /// <param name="yesLabel">0 を返すボタンの文字。省略すると「はい」</param>
         /// <param name="noLabel">1 を返すボタンの文字。省略すると「いいえ」</param>
+        /// <param name="asDialogue">
+        /// false なら問いかけをセリフの吹き出しに出さず、選択肢の上に地の文として出す
+        /// （2026-10-23 プランナー指摘「対局動画の続きをみますか？はセリフじゃないほうがいい」）
+        /// </param>
         private IEnumerator AskYesNo(string question, System.Action<int> onAnswered,
-            string yesLabel = null, string noLabel = null)
+            string yesLabel = null, string noLabel = null, bool asDialogue = true)
         {
             int answer = -1;
             TMP_FontAsset font = BorrowJapaneseFont();
             Transform parent = BuildIntroCanvas(dim: false);
             if (parent == null) { onAnswered(1); yield break; }
 
-            if (dialogueUI != null)
+            if (!asDialogue)
+            {
+                if (dialogueUI != null) dialogueUI.HideText();
+                CreateSystemPrompt(parent, font, question, new Vector2(0f, -40f));
+            }
+            else if (dialogueUI != null)
             {
                 dialogueUI.gameObject.SetActive(true);
                 // 問いかけの文にも、フロー図の青い太字（→黄色の太字）を当てる

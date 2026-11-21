@@ -126,43 +126,7 @@ namespace KillingMahjong.Managers.Reactions
         [NonSerialized] public float lastFiredAt = -9999f;
         [NonSerialized] public int firedInRound;
         [NonSerialized] public int firedInMatch;
-    }
-
-    /// <summary>
-    /// プランナーが編集する反応ルールの束。
-    ///
-    /// **`Resources` に置く。** 対局シーンが2つある（`UIテストシーン` と `OpeningScene`）ので、
-    /// シーンの参照で持たせると片方だけ設定し忘れる。`Resources.Load` なら両方から同じものを見る。
-    /// </summary>
-    [CreateAssetMenu(fileName = "ReactionRules", menuName = "Mahjong/反応ルール")]
-    public class ReactionRuleSet : ScriptableObject
-    {
-        /// <summary>`Resources.Load` で引くときの名前（拡張子なし）</summary>
-        public const string ResourcePath = "Reactions/ReactionRules";
-
-        public List<ReactionRule> rules = new List<ReactionRule>();
-
-        private static ReactionRuleSet _cached;
-        private static bool _lookedUp;
-
-        /// <summary>
-        /// 実行時に読む。**無くても動く**（従来のトリガーと CSV がそのまま使われる）ので、
-        /// 見つからなくてもエラーにはしない。
-        /// </summary>
-        public static ReactionRuleSet Load()
-        {
-            if (_lookedUp) return _cached;
-            _lookedUp = true;
-            _cached = Resources.Load<ReactionRuleSet>(ResourcePath);
-            return _cached;
-        }
-
-        /// <summary>エディタで作り直したときに読み直させる</summary>
-        public static void ClearCache()
-        {
-            _cached = null;
-            _lookedUp = false;
-        }
+        [NonSerialized] public int lastLineIndex = -1;
     }
 
     /// <summary>
@@ -228,7 +192,13 @@ namespace KillingMahjong.Managers.Reactions
             // 局番号は `ReactionController` が持っている。共通の値として全イベントに配る
             // （ここで配らないと、カタログに載っていても値が届かない条件になる）
             if (ReactionController.Instance != null)
+            {
                 Set(ReactionVars.RoundNumber, ReactionController.Instance.CurrentRound);
+                Set("discard_turn", ReactionController.Instance.CurrentDiscardTurn);
+            }
+            // 表示へ届いた公開ゲージだけを使う。相手の隠れた手牌は参照しない。
+            Set("voltage_level", VoltageSystem.GetLevel(false));
+            Set("enemy_voltage_level", VoltageSystem.GetLevel(true));
 
             Set(ReactionVars.TotalWins, KillingMahjong.Core.PlayerStatsManager.Wins);
             Set(ReactionVars.TotalLosses, KillingMahjong.Core.PlayerStatsManager.Losses);

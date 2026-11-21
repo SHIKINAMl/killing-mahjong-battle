@@ -13,6 +13,33 @@ namespace KillingMahjong.UI
         {
             switch (EffectId)
             {
+                case "ui.skill_explanation":
+                {
+                    AbilityUI sourceAbility = null;
+                    foreach (var candidate in FindObjectsByType<AbilityUI>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                        if (candidate.name != "SkillExplanationPreview") { sourceAbility = candidate; break; }
+                    if (sourceAbility == null) throw new InvalidOperationException("能力UIがありません。");
+                    var sample = Instantiate(sourceAbility, rig.transform, false);
+                    scope.Own(sample.gameObject);
+                    sample.gameObject.name = "SkillExplanationPreview";
+                    sample.gameObject.SetActive(true);
+                    var sampleCanvas = sample.GetComponent<Canvas>();
+                    sampleCanvas.enabled = true;
+                    sampleCanvas.overrideSorting = true;
+                    sampleCanvas.sortingOrder = 25;
+                    yield return null; // Startで一覧を用意してから開く。
+                    foreach (var control in sample.GetComponentsInChildren<Button>(true)) control.interactable = false;
+                    sample.OpenWindow();
+                    yield return new WaitForSecondsRealtime(.7f);
+                    foreach (var description in sample.SkillExplanations)
+                    {
+                        sample.ShowTooltip(description);
+                        yield return new WaitForSecondsRealtime(3f);
+                    }
+                    sample.CloseWindow(false);
+                    yield return new WaitForSecondsRealtime(.7f);
+                    break;
+                }
                 case "ui.ability_bell":
                     var bellAudio = KillingMahjong.Managers.AudioManager.Instance;
                     if (bellAudio == null) throw new InvalidOperationException("AudioManagerがありません。");
@@ -20,6 +47,25 @@ namespace KillingMahjong.UI
                     bellAudio.PlayAbilityBellSE();
                     yield return new WaitForSecondsRealtime(2.25f);
                     yield break;
+                case AbilityBellDropEffect.EffectId:
+                {
+                    var ability = FindFirstObjectByType<AbilityUI>(FindObjectsInactive.Include);
+                    if (ability == null || ability.BellRect == null)
+                        throw new InvalidOperationException("呼び鈴の画像がありません。");
+                    var bell = Instantiate(ability.BellRect.gameObject, rig.surface, false).GetComponent<RectTransform>();
+                    bell.name = "AbilityBellDropPreview";
+                    bell.GetComponent<Image>().sprite = ability.BellSprite;
+                    scope.Own(bell.gameObject);
+                    bell.anchorMin = bell.anchorMax = new Vector2(.5f, .5f);
+                    var goal = new Vector2(-330f, -210f);
+                    bell.anchoredPosition = goal + new Vector2(0f, AbilityBellDropEffect.Rise);
+                    foreach (var graphic in bell.GetComponentsInChildren<Graphic>(true)) graphic.raycastTarget = false;
+                    foreach (var bellButton in bell.GetComponentsInChildren<Button>(true)) bellButton.enabled = false;
+                    bell.gameObject.SetActive(true);
+                    yield return AbilityBellDropEffect.Play(bell, goal);
+                    yield return new WaitForSeconds(.4f);
+                    break;
+                }
                 case "tile.sort":
                     var from = new System.Collections.Generic.Dictionary<RectTransform, Vector2>();
                     var to = new System.Collections.Generic.Dictionary<RectTransform, Vector2>();
@@ -29,6 +75,7 @@ namespace KillingMahjong.UI
                     }
                     yield return TileMoveAnimator.AnimatePositions(from, to); break;
                 case "ron.cutin": case "ron.cutin_max":
+                case RonAuraUI.EnemyEffectId:
                     bool cutinDone = false;
                     var cutin = rig.surface.gameObject.AddComponent<CutinAnimationUI>();
                     cutin.PlayCutin(rig.character.sprite, rig.face.sprite, rig.font, "ロン", () => cutinDone = true,
@@ -84,6 +131,32 @@ namespace KillingMahjong.UI
                     PixelToneUI.Attach(pixelImage); break;
                 case "screen.scene_break": ScreenFlash.PlaySceneBreak(); break;
                 case "screen.quake": ScreenQuake.Play(12f, 1f); break;
+                case "screen.whole_shake":
+                    WholeScreenShake.Play(0.22f, 8f, new Vector2(0f, 1f));
+                    yield return new WaitForSeconds(1.2f);
+                    WholeScreenShake.Play(0.25f, 18f, new Vector2(0f, 1f));
+                    yield return new WaitForSeconds(1f); break;
+                case "skill.mulligan_choice":
+                {
+                    // 出した3枚と山札の3枚。押している間だけ盤面を見せる「場を見る」も、押したことにして見せる
+                    // 本編の画面は試写中にCanvasが隠れる。試写舞台に独立した画面を作る。
+                    var choiceRoot = scope.Own(new GameObject("MulliganChoicePreview", typeof(RectTransform), typeof(MulliganChoiceUI)));
+                    choiceRoot.transform.SetParent(rig.transform, false);
+                    var choice = choiceRoot.GetComponent<MulliganChoiceUI>();
+                    scope.AddCleanup(choice.Hide);
+                    choice.Show(new System.Collections.Generic.List<int> { 0, 4, 8, 40, 44, 48 }, rig.tiles, picked => { });
+                    yield return new WaitForSeconds(1.8f);
+                    var peekHold = choice.GetComponentInChildren<PressHoldRelay>(true);
+                    if (peekHold != null && peekHold.OnHoldChanged != null)
+                    {
+                        peekHold.OnHoldChanged(true);
+                        yield return new WaitForSeconds(1.6f);
+                        peekHold.OnHoldChanged(false);
+                    }
+                    yield return new WaitForSeconds(1.2f);
+                    choice.Hide();
+                    break;
+                }
                 case "screen.tint": ScreenTint.Set(Color.red, .45f); yield return new WaitForSeconds(2f); ScreenTint.Clear(); break;
                 case "screen.flicker": ScreenTint.Flicker(Color.red, 2f); break;
                 case "screen.wake":
@@ -120,9 +193,27 @@ namespace KillingMahjong.UI
                     var id = KillingMahjong.Managers.TutorialTiles.Encode(4, true);
                     rig.handTiles[6].GetComponent<TileVisual>().SetTile(id, rig.tiles.GetTileSprite(id), rig.tiles); break;
                 case "gauge.absorb":
-                    var gauge = rig.gameObject.AddComponent<ScoreGaugeUI>();
+                    // **舞台（rig）に直接付けない。** ScoreGaugeUI.SetVisible は自分の子を全部
+                    // 表示に切り替えるので、舞台に付けると控えの演出（まばたきの黒幕など）まで出て、
+                    // 画面が真っ暗になっていた（2026-10-17 のユーザー報告）。専用の入れ物に付ける
+                    var gaugeHolder = new GameObject("PreviewScoreGauge", typeof(RectTransform));
+                    gaugeHolder.transform.SetParent(rig.transform, false);
+                    var gauge = gaugeHolder.AddComponent<ScoreGaugeUI>();
                     gauge.SetVisible(true); gauge.SetStakes(2000, 2000);
-                    yield return new WaitForSeconds(1f); gauge.AbsorbStakesIntoGauge(true, 2000); break;
+                    // 本編では画面の上端にあるが、試写では上端に演出名の見出し（高さ 38）が被さる。
+                    // 試写のときだけ見出しの下まで下げる
+                    var gaugeBar = gauge.GuideTargetRect;
+                    if (gaugeBar != null) gaugeBar.anchoredPosition += new Vector2(0f, -40f);
+                    yield return new WaitForSeconds(1.2f);
+                    gauge.AbsorbStakesIntoGauge(true, 3000);
+                    yield return new WaitForSeconds(1.8f); break;   // 吸い込み 0.45 秒 + ゲージが伸びる 0.6 秒
+                case VoltageUI.RevealEffectId:
+                    var voltage = VoltageUI.CreatePresentation(rig.surface);
+                    scope.AddCleanup(() => { if (voltage != null) voltage.CancelRevealPresentation(); });
+                    voltage.PresentFeedback(2, false, 5, 5, 9, 1.3f);
+                    yield return voltage.RevealPresentation();
+                    yield return new WaitForSecondsRealtime(.8f);
+                    break;
                 case "voltage.flight":
                     var target = new GameObject("VoltageUI_Self", typeof(RectTransform), typeof(Image)).GetComponent<Image>();
                     target.transform.SetParent(rig.surface, false); target.color = new Color32(110, 240, 220, 255);
@@ -135,6 +226,11 @@ namespace KillingMahjong.UI
                 case "character.turn": rig.player.SetTurnGlow(true); rig.enemy.SetTurnGlow(true); break;
                 case "character.breathe": rig.character.gameObject.AddComponent<BreathingAnimator>(); break;
                 case "character.float": rig.character.gameObject.AddComponent<FloatingAnimator>(); break;
+                case "character.beat_dance":
+                    // 本編では、手牌を選ぶあいだが弾むだけ、打牌のあいだが笑顔と交互だった
+                    rig.enemy.SetBeatDance(BeatDanceAnimator.Mode.Bob); yield return new WaitForSeconds(5f);
+                    rig.enemy.SetBeatDance(BeatDanceAnimator.Mode.Swap); yield return new WaitForSeconds(7f);
+                    rig.enemy.SetBeatDance(BeatDanceAnimator.Mode.None); break;
                 case "character.blink":
                     var character = rig.enemy.CurrentCharacterData;
                     var blink = character.faceSprites.Find(item => item.id == character.blinkFaceId);
@@ -142,12 +238,49 @@ namespace KillingMahjong.UI
                     var before = rig.face.sprite;
                     for (int i = 0; i < 3; i++) { rig.enemy.SetFaceExpression(character.blinkFaceId); yield return new WaitForSeconds(.12f); rig.face.sprite = before; yield return new WaitForSeconds(.8f); }
                     break;
+                case "character.senior_bounce":
+                    rig.enemy.SetCharacterSprite(Resources.Load<Sprite>("女の子/tutorialexe"));
+                    if (rig.face != null) rig.face.enabled = false;
+                    if (rig.character.GetComponent<TalkBobAnimator>() == null)
+                        rig.character.gameObject.AddComponent<TalkBobAnimator>();
+                    rig.enemy.SetIdleSlimeBounce(true);
+                    scope.AddCleanup(() => { if (rig != null && rig.enemy != null) rig.enemy.SetIdleSlimeBounce(false); });
+                    yield return new WaitForSeconds(4f);
+                    rig.enemy.SetIdleSlimeBounce(false);
+                    break;
                 case "character.talk":
                     rig.character.gameObject.AddComponent<TalkBobAnimator>();
                     goto case "dialogue.typewriter";
                 case "dialogue.typewriter":
                     rig.dialogue.gameObject.SetActive(true);
                     rig.dialogue.ShowText("これは演出の再生見本です。文字送りとキャラクターの動きを確認できます。"); break;
+                case "dialogue.log":
+                    // ログに数行ためてから開く（2026-10-25 に、部屋に浮かぶ過去の吹き出しにした）
+                    rig.dialogue.gameObject.SetActive(true);
+                    foreach (var logLine in new[] { "「おっ後輩ちゃんじゃーん」", "「先輩を助けに来たんだな？えらいぞー」", "「まっ長くなっちゃったから早速ルール説明するわ」" })
+                    {
+                        rig.dialogue.ShowText(logLine);
+                        yield return new WaitForSeconds(1.2f);
+                    }
+                    foreach (var logLine in new[] { "「ふんふん……鬼気迫ったメールにいてもたってもいられなくなった」", "「……ってアタシのこと好きすぎかよー！！」", "「それじゃはじめるよ」" })
+                    {
+                        rig.dialogue.ShowText(logLine);
+                        yield return new WaitForSeconds(0.6f);
+                    }
+                    rig.dialogue.OpenLog();
+                    yield return new WaitForSeconds(2f);
+                    // 遡ると右下に「最新へ戻る」▼が出る。押したことにして一番下へ戻す（2026-10-29 要望）
+                    var logScroll = rig.dialogue.GetComponentInChildren<UnityEngine.UI.ScrollRect>(true);
+                    if (logScroll != null)
+                    {
+                        logScroll.verticalNormalizedPosition = 1f;
+                        yield return new WaitForSeconds(.3f);
+                        rig.dialogue.ShowText("「それじゃはじめるよ」");
+                        yield return new WaitForSeconds(1.8f);
+                        rig.dialogue.JumpToLatestLog();
+                        yield return new WaitForSeconds(1.2f);
+                    }
+                    rig.dialogue.CloseLog(); break;
                 case "camera.zoom":
                     var zoom = rig.viewCamera.gameObject.AddComponent<CameraZoomController>();
                     yield return zoom.ZoomToTargetRoutine(rig.character.transform); yield return new WaitForSeconds(1f);
@@ -178,6 +311,9 @@ namespace KillingMahjong.UI
                     rig.character.gameObject.SetActive(false); if (rig.face != null) rig.face.gameObject.SetActive(false);
                     RoomAmbience.Attach(rig.surface, girl.rectTransform, null, null, null, null, null, rig.font); break;
                 case "tutorial.highlight": TutorialHighlightUI.Show(rig.handTiles[6], TutorialHighlightUI.Style.Frame); break;
+                case TutorialReadingPresentation.EffectId:
+                    yield return PreviewReadingBoard();
+                    yield break;
                 case "tutorial.arrow":
                     var arrow = new GameObject("Arrow", typeof(RectTransform), typeof(Image));
                     arrow.transform.SetParent(rig.surface, false);
@@ -190,9 +326,63 @@ namespace KillingMahjong.UI
                     var intro = TutorialButtonIntroUI.Show(rig.handTiles[6]);
                     if (intro == null) throw new InvalidOperationException("導入の対象がありません。");
                     yield return intro.PopIn(); break;
+                case TurnPieUI.EffectId:
+                {
+                    // 本編の円グラフ（RiverUI の turnPie）を写して、先攻で1打ずつ塗り、続けて後攻で塗る。
+                    // コレクションはタイトルや部屋のシーンにもあり、そこには円グラフが無いので、無ければ新しく作る
+                    var source = FindFirstObjectByType<TurnPieUI>(FindObjectsInactive.Include);
+                    TurnPieUI pie = source != null
+                        ? Instantiate(source, rig.surface, false)
+                        : new GameObject("TurnPie", typeof(RectTransform), typeof(CanvasRenderer), typeof(TurnPieUI)).GetComponent<TurnPieUI>();
+                    if (source == null) { pie.transform.SetParent(rig.surface, false); pie.rectTransform.sizeDelta = new Vector2(48f, 48f); }
+                    pie.name = "TurnPiePreview";
+                    scope.Own(pie.gameObject);
+                    var rt = pie.rectTransform;
+                    rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(.5f, .5f);
+                    rt.anchoredPosition = Vector2.zero;
+                    rt.localScale = Vector3.one * 3f;
+                    pie.raycastTarget = false;
+                    pie.gameObject.SetActive(true);
+                    foreach (bool first in new[] { true, false })
+                    {
+                        for (int n = 0; n <= TurnPieUI.DiscardsPerPlayer; n++)
+                        {
+                            pie.Show(n, first);
+                            yield return new WaitForSeconds(.18f);
+                        }
+                        yield return new WaitForSeconds(.8f);
+                    }
+                    yield break;
+                }
                 default: throw new ArgumentException("再生方法が未登録です: " + EffectId);
             }
             yield return new WaitForSeconds(4f);
+        }
+
+        private IEnumerator PreviewReadingBoard()
+        {
+            var root = new GameObject("ReadingPreview", typeof(RectTransform));
+            root.transform.SetParent(rig.surface, false);
+            var rootRect = root.GetComponent<RectTransform>();
+            rootRect.anchorMin = Vector2.zero; rootRect.anchorMax = Vector2.one;
+            rootRect.offsetMin = rootRect.offsetMax = Vector2.zero;
+            var scrim = new GameObject("Scrim", typeof(RectTransform), typeof(Image));
+            scrim.transform.SetParent(root.transform, false);
+            var scrimRect = scrim.GetComponent<RectTransform>();
+            scrimRect.anchorMin = Vector2.zero; scrimRect.anchorMax = Vector2.one;
+            scrimRect.offsetMin = scrimRect.offsetMax = Vector2.zero;
+            var board = new GameObject("RuleBoard", typeof(RectTransform), typeof(Image)).GetComponent<Image>();
+            board.transform.SetParent(root.transform, false);
+            board.sprite = Resources.Load<Sprite>("Tutorial/案内板_満貫");
+            board.preserveAspect = true;
+            board.raycastTarget = false;
+            board.rectTransform.sizeDelta = new Vector2(722, 470);
+            board.rectTransform.anchoredPosition = new Vector2(0, 20);
+            var reading = TutorialReadingPresentation.Prepare(root.transform);
+            scope.AddCleanup(() => { if (reading != null) reading.Cancel(); if (root != null) Destroy(root); });
+            yield return reading.Enter();
+            yield return new WaitForSecondsRealtime(2.5f);
+            yield return reading.Exit();
         }
     }
 }

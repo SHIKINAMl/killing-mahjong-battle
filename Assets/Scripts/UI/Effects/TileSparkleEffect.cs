@@ -214,7 +214,7 @@ namespace KillingMahjong.UI.Effects
             {
                 if (!_sparkles[i].Alive) continue;
 
-                float t = Mathf.Clamp01(_sparkles[i].Age / Mathf.Max(0.0001f, _sparkles[i].Life));
+                float t = Mathf.Clamp01(PresentationTiming.Sample(_sparkles[i].Age) / Mathf.Max(0.0001f, _sparkles[i].Life));
 
                 // **膨らんでから縮む。** 出た瞬間に最大だと、点滅しているようにしか見えない。
                 // 0→0.3 で開き、0.3→1 で閉じる。
@@ -222,7 +222,7 @@ namespace KillingMahjong.UI.Effects
                 grow = Mathf.Clamp01(grow);
 
                 // 瞬き。粒ごとに位相をずらして、ばらばらに光らせる
-                float twinkle = 0.75f + 0.25f * Mathf.Sin(_sparkles[i].Phase + _sparkles[i].Age * 18f);
+                float twinkle = 0.75f + 0.25f * Mathf.Sin(_sparkles[i].Phase + PresentationTiming.Sample(_sparkles[i].Age) * 18f);
 
                 float arm = Mathf.Lerp(ArmMin, ArmMax, grow) * twinkle;
                 if (arm < 1f) continue;

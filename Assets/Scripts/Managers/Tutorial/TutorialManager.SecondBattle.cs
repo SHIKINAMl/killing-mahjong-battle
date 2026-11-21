@@ -32,7 +32,7 @@ namespace KillingMahjong.Managers
         // 2026-10-14 の図で、打牌数の説明→動画空間で流局・手牌の組み直し→再生停止が追加された。
         // RunDrawVideoExplanation がその部分を担当する。
         // 2026-10-15 の図で、動画の中の賭け金の話と、動画のあとの会話・1巡・「動画の続きを見ますか？」が
-        // 足された（RunAfterDrawVideo）。その分岐の先は未指定なので、従来の第2局へ戻る。
+        // 足された（RunAfterDrawVideo）。分岐の先は2026-10-17版のDEADENDと復帰を使う。
         //
         // 「敵10打目まで汎用対局会話」の枠には、プレイヤーがアワセをした／ボルテージの段階を
         // 初めて上げたときの特殊セリフを流す、という条件だけが描いてある。
@@ -176,19 +176,6 @@ namespace KillingMahjong.Managers
         private const float VoltageChargeWaitSeconds = 1.8f;
 
         /// <summary>
-        /// 制限時間の話のあと、自動で流し始める前の一言。
-        ///
-        /// **フロー図に無い。** 図が打牌数UIのハイライトで途切れているので、
-        /// その先はこれまでの第2局をそのまま続けている。このセリフも旧台本の
-        /// 対局開始時のもの（口調が前の人格のまま）で、黙って操作を取り上げないために
-        /// 残してある。続きが描かれたら、ここから先を差し替えること。
-        /// </summary>
-        private static readonly List<TutorialLine> SecondBattleResumeLines = new List<TutorialLine>
-        {
-            new TutorialLine("しばらく黙って見ていなさい。勝手に進めるわ。"),
-        };
-
-        /// <summary>
         /// 第2局の対局をこの専用の運びで進めるか。
         ///
         /// **流局で終わる局のときだけ。** ロンで決着する台本に差し替えられた場合、
@@ -243,11 +230,8 @@ namespace KillingMahjong.Managers
                     // 動画のあとの会話（2026-10-15 の図）。**この巡はプレイヤー→先輩の順に、ここで打ち終える**
                     yield return StartCoroutine(RunAfterDrawVideo(data, turn, seen));
                     if (_aborted) yield break;
-
-                    // ここから先はフロー図に無いので、これまでの第2局のまま流す
-                    if (turn + 1 <= autoTurns)
-                        yield return StartCoroutine(PlayLines(SecondBattleResumeLines));
-                    continue;
+                    // 正体の会話までで最新図の記載が終わる。未記載の旧局へ自動で進めない。
+                    yield break;
                 }
 
                 // 制限時間の話までは自分で打たせる（図の「普通の対局」「敵10打目まで汎用対局会話」）。
@@ -276,11 +260,19 @@ namespace KillingMahjong.Managers
                 if (isAutoTurn)
                 {
                     _lastAutoDiscardBaseId = -1;
-                    yield return StartCoroutine(AutoDiscardForPlayer());
+                    yield return StartCoroutine(AutoDiscardForPlayer(seen));   // 新規牌を打ってボルテージを切らさない
                     if (_lastAutoDiscardBaseId >= 0) seen.Add(_lastAutoDiscardBaseId);
                 }
                 else
                 {
+                    // 自分の番になったことを、第1局と同じフロー図の一言で知らせる（▼つきで送る）。
+                    // 2026-10-29 は送りなしの「後輩ちゃんの番だよ」を出していたが、第1局では「次は後輩ちゃんねー」の直後に重なり、
+                    // ▼も無いので「悪化しとる」と言われた（2026-10-30）
+                    yield return StartCoroutine(PlayLines(new List<TutorialLine>
+                    {
+                        new TutorialLine(PlayerTurnLine),
+                    }));
+                    if (_aborted) yield break;
                     _isWaitingForDiscard = true;
                     _lastPlayerDiscardBaseId = -1;
 
@@ -351,7 +343,7 @@ namespace KillingMahjong.Managers
         /// （ロンできる牌だけは、そのときも避ける）。ボルテージの説明は5打目なので、
         /// そこまでに尽きることは無い。
         /// </summary>
-        private int PickEnemyDiscardForSecondBattle(TutorialRoundData data, int turn, HashSet<int> seen)
+        private static int PickEnemyDiscardForSecondBattle(TutorialRoundData data, int turn, HashSet<int> seen)
         {
             var waits = data.waitBaseIds ?? new List<int>();
 
@@ -360,6 +352,8 @@ namespace KillingMahjong.Managers
             {
                 if (seen.Contains(candidate)) continue;
                 if (waits.Contains(candidate)) continue;
+                // 正体判明後は seen が組み直される。河の共通履歴も必ず確認する。
+                if (!VoltageSystem.IsNewTileType(TutorialTiles.Encode(candidate, false))) continue;
                 return candidate;
             }
 
@@ -368,6 +362,7 @@ namespace KillingMahjong.Managers
             {
                 if (seen.Contains(candidate)) continue;
                 if (waits.Contains(candidate)) continue;
+                if (!VoltageSystem.IsNewTileType(TutorialTiles.Encode(candidate, false))) continue;
                 return candidate;
             }
 
@@ -386,11 +381,9 @@ namespace KillingMahjong.Managers
         /// ボルテージのゲージを出す。図の「ボルテージUI表示」。
         /// 以後、打牌フェイズのあいだは出たままになる（<see cref="IsVoltageUiRevealed"/>）。
         /// </summary>
-        private void RevealVoltageUi()
+        private IEnumerator RevealVoltageUi()
         {
-            IsVoltageUiRevealed = true;
-            UI.VoltageUI.EnsureCreated();
-            UI.VoltageUI.SetCanvasVisible(true);
+            yield return UI.VoltageUI.RevealRoutine(() => IsVoltageUiRevealed = true);
         }
 
         /// <summary>
@@ -423,8 +416,7 @@ namespace KillingMahjong.Managers
             ClearGuide();
 
             // ボルテージUI表示 →「これはボルテージ」
-            RevealVoltageUi();
-            yield return new WaitForSeconds(0.4f);
+            yield return RevealVoltageUi();
             yield return StartCoroutine(PlayLines(VoltageIntroNameLines));
 
             // ボルテージUIハイライト。**自分のと相手のと、両方を囲む。**

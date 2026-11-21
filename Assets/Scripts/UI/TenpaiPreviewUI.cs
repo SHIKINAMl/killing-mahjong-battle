@@ -91,7 +91,7 @@ namespace KillingMahjong.UI
             text.fontSize = fontSize;
             text.alignment = alignment;
             text.color = Color.white;
-            text.enableWordWrapping = false;
+            text.textWrappingMode = TextWrappingModes.NoWrap;
             text.overflowMode = TextOverflowModes.Ellipsis;
             text.raycastTarget = false;
             return text;

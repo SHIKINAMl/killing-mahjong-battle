@@ -31,6 +31,12 @@ namespace KillingMahjong.UI
         private const float YakuDetailWidth = 480f;
         private const float YakuTileWidth = 28f;
         private const float YakuTileHeight = 37f;
+        /// <summary>
+        /// 牌の絵を置く正方形の一辺。**牌の絵は 320x320 の正方形の中に、牌が 190x270 で描いてある**（周りは透明）。
+        /// 以前は 28x37 の枠に正方形ごと押し込んでいて、牌が横に潰れて細く見えていた（2026-10-18）。
+        /// 正方形のまま 48 で置くと、牌は 28.5x40.5 で元の縦横比になる。並べる間隔は今までどおり。
+        /// </summary>
+        private const float YakuTileSpriteBox = 48f;
 
         private readonly List<Image> yakuRowBgs = new List<Image>();
         private readonly List<int> yakuRowEntry = new List<int>();   // 行 → YakuEntries の番号（見出しは -1）
@@ -127,7 +133,7 @@ namespace KillingMahjong.UI
             if (content.sizeDelta.y > height)
             {
                 var track = NewImage(parent, "YakuBar", new Color32(40, 24, 34, 255));
-                Center(track.rectTransform, new Vector2(4f, height));
+                Center(track.rectTransform, new Vector2(12f, height));
                 track.rectTransform.anchoredPosition = new Vector2(YakuListCenterX + YakuListWidth * 0.5f + 4f, centerY);
                 var area = NewEmpty(track.transform, "SlidingArea");
                 Stretch(area.GetComponent<RectTransform>());
@@ -139,6 +145,7 @@ namespace KillingMahjong.UI
                 bar.handleRect = handle.rectTransform;
                 bar.targetGraphic = handle;
                 bar.direction = Scrollbar.Direction.BottomToTop;
+                PixelScrollBar.Attach(bar);
                 scroll.verticalScrollbar = bar;
                 scroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
             }
@@ -205,11 +212,11 @@ namespace KillingMahjong.UI
             // 翻数と倍率の表。値はサーバーの精算（game_engine.py の _get_liquidation_multiplier）と同じ
             var tableRule = NewImage(parent, "YakuTableRule", PanelEdge);
             Center(tableRule.rectTransform, new Vector2(YakuDetailWidth, 1f));
-            tableRule.rectTransform.anchoredPosition = new Vector2(YakuDetailCenterX, -150f);
+            tableRule.rectTransform.anchoredPosition = new Vector2(YakuDetailCenterX, -112f);
             tableRule.raycastTarget = false;
 
-            Label(parent, "YakuTableHead", "翻数の合計と倍率", new Vector2(YakuDetailCenterX, -166f),
-                new Vector2(YakuDetailWidth, 20f), 13f, TextAlignmentOptions.Left, Marker);
+            Label(parent, "YakuTableHead", "翻数の合計と倍率", new Vector2(YakuDetailCenterX, -128f),
+                new Vector2(YakuDetailWidth, 20f), 14f, TextAlignmentOptions.Left, Marker);
 
             string[] ranks = { "満貫", "跳満", "倍満", "三倍満", "役満", "ダブル役満" };
             int[] hans = { 4, 6, 8, 11, 13, 26 };
@@ -217,12 +224,12 @@ namespace KillingMahjong.UI
             for (int i = 0; i < ranks.Length; i++)
             {
                 float x = left + cell * (i + 0.5f);
-                Label(parent, "YakuRank_" + i, ranks[i], new Vector2(x, -190f), new Vector2(cell, 20f),
-                    13f, TextAlignmentOptions.Center, TextMain);
-                Label(parent, "YakuRankHan_" + i, hans[i] + "翻から", new Vector2(x, -208f), new Vector2(cell, 18f),
-                    12f, TextAlignmentOptions.Center, TextDim);
+                Label(parent, "YakuRank_" + i, ranks[i], new Vector2(x, -152f), new Vector2(cell, 20f),
+                    14f, TextAlignmentOptions.Center, TextMain);
+                Label(parent, "YakuRankHan_" + i, hans[i] + "翻から", new Vector2(x, -174f), new Vector2(cell, 20f),
+                    14f, TextAlignmentOptions.Center, TextDim);
                 Label(parent, "YakuRankRate_" + i, "×" + GameRules.GetMultiplier(hans[i]).ToString("0.#"),
-                    new Vector2(x, -226f), new Vector2(cell, 18f), 12f, TextAlignmentOptions.Center, TextDim);
+                    new Vector2(x, -196f), new Vector2(cell, 20f), 14f, TextAlignmentOptions.Center, TextDim);
             }
 
         }
@@ -281,7 +288,7 @@ namespace KillingMahjong.UI
                 var img = NewImage(yakuTileRow, "Tile" + i, Color.white);
                 img.sprite = tiles.GetTileSprite(ids[i]);
                 img.raycastTarget = false;
-                Center(img.rectTransform, new Vector2(YakuTileWidth, YakuTileHeight));
+                Center(img.rectTransform, new Vector2(YakuTileSpriteBox, YakuTileSpriteBox));
                 img.rectTransform.anchoredPosition = new Vector2(x, 0f);
                 x += YakuTileWidth + gap;
             }

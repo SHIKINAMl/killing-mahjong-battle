@@ -68,6 +68,12 @@ namespace KillingMahjong.UI.Effects
             return fx;
         }
 
+        /// <summary>押下時に、暗幕の濃さを入力演出へ引き継ぐ。</summary>
+        internal static float GetDimAlpha(float fallback)
+        {
+            return _current != null && _current._dim != null ? _current._dim.color.a : fallback;
+        }
+
         /// <summary>出ていれば片付ける。出ていなくても呼んでよい。</summary>
         public static void HideCurrent()
         {
@@ -181,7 +187,7 @@ namespace KillingMahjong.UI.Effects
             while (t < FadeInDuration)
             {
                 t += Time.deltaTime;
-                float u = Mathf.Clamp01(t / FadeInDuration);
+                float u = Mathf.Clamp01(PresentationTiming.Sample(t) / FadeInDuration);
                 u = u * u * (3f - 2f * u);
                 if (_dim != null) _dim.color = new Color(0f, 0f, 0.02f, DimAlpha * u);
                 Blink(t);
@@ -204,7 +210,7 @@ namespace KillingMahjong.UI.Effects
             if (_tile == null) return;
 
             // 0..1 を行ったり来たり。端をなめらかにして、ちかちかさせない
-            float phase = Mathf.PingPong(elapsed / (BlinkPeriod * 0.5f), 1f);
+            float phase = Mathf.PingPong(PresentationTiming.Sample(elapsed) / (BlinkPeriod * 0.5f), 1f);
             float eased = phase * phase * (3f - 2f * phase);
 
             if (_tileImage != null)

@@ -67,6 +67,9 @@ namespace KillingMahjong.UI
         private Coroutine currentAnimationCoroutine;
         private Coroutine buttonPressCoroutine;
         private System.Collections.Generic.List<AbilityItemUI> instantiatedItems = new System.Collections.Generic.List<AbilityItemUI>();
+
+        /// <summary>隠している能力の種類（<see cref="SetAbilityHidden"/>）。行を作り直すときもこれを見て隠す。</summary>
+        private readonly System.Collections.Generic.HashSet<string> _hiddenSkillTypes = new System.Collections.Generic.HashSet<string>();
         private AbilityItemUI currentSelection;
 
         // Real Data Class matching Python
@@ -111,9 +114,8 @@ namespace KillingMahjong.UI
             // 両シーンとも `activateButton` に `CloseButton` が入っていて、X を押すと
             // `CloseWindow` → `DeselectAll` → `OnActivateClicked` の順に走っていた。
             // 選択が消えたあとなので発動は空振りだが、繋がっていること自体が誤解のもと。
-            // 発動は「選んだ行をもう一度押す」（OnAbilitySelected）に一本化してある。
-            if (activateButton != null && activateButton != closeButton)
-                activateButton.onClick.AddListener(OnActivateClicked);
+            // 発動は選択後に表示する専用ボタンで受け付ける。
+            EnsureActivateButton();
 
             if (abilityWindow != null)
                 abilityWindow.anchoredPosition = hiddenPosition;
@@ -162,14 +164,10 @@ namespace KillingMahjong.UI
         private const float ListTopMargin = 4f;
 
         /// <summary>
-        /// 説明欄は**巻物の外（右側）**に出す（2026-08-31 に依頼者の指定で変更）。
-        /// 内枠の下に置いていたときは、閉じるボタンと場所を取り合っていた。
+        /// ベルルの頭上に置く、能力説明の吹き出し。
         /// </summary>
-        private const float DescPanelWidth = 150f;
-        private const float DescPanelHeight = 70f;
-
-        /// <summary>巻物の右端から説明欄までの間。</summary>
-        private const float DescPanelGap = 8f;
+        private const float DescPanelWidth = 276f;
+        private const float DescPanelHeight = 114f;
 
         /// <summary>
         /// 閉じるボタンの大きさと、内枠の下端からの余白。
@@ -198,6 +196,7 @@ namespace KillingMahjong.UI
         {
             get { return triggerButton != null ? triggerButton.transform as RectTransform : null; }
         }
+        public Sprite BellSprite => normalSprite;
 
         /// <summary>能力の一覧（行が並ぶ入れ物）の枠。「どれでも押して」と囲むのに使う。</summary>
         public RectTransform AbilityListRect
@@ -215,6 +214,9 @@ namespace KillingMahjong.UI
         /// </summary>
         public void SetAbilityHidden(string skillType, bool hidden)
         {
+            // **覚えておく。** 行は持ち点が変わるたびなどに作り直されるので、その場で隠すだけでは
+            // 作り直しで戻ってしまう（2026-10-22、能力を1つ試したあとの一覧に強襲が出ていた）
+            if (hidden) _hiddenSkillTypes.Add(skillType); else _hiddenSkillTypes.Remove(skillType);
             if (realAbilities == null || instantiatedItems == null) return;
             for (int i = 0; i < realAbilities.Count && i < instantiatedItems.Count; i++)
             {
@@ -256,6 +258,10 @@ namespace KillingMahjong.UI
                 return null;
             }
         }
+
+        /// <summary>いま選んでいる行。透視の種別選びのように、同じ能力の中で行が替わる場面でも選んだ行そのものを返す。</summary>
+        public RectTransform SelectedItemRect =>
+            currentSelection != null ? currentSelection.transform as RectTransform : null;
 
         public RectTransform GetAbilityItemRect(string skillType)
         {
@@ -309,29 +315,43 @@ namespace KillingMahjong.UI
         /// DialogueUI.ShowText でチュートリアルのセリフが上書きされ、
         /// 送りボタン待ちのまま進行が止まってしまう。
         /// </summary>
-        public bool IsDisplayOnly { get; set; }
+        private bool displayOnly;
+        public bool IsDisplayOnly
+        {
+            get => displayOnly;
+            set
+            {
+                displayOnly = value;
+                RefreshActivateButton();
+            }
+        }
 
         public void OnAbilitySelected(AbilityItemUI item)
         {
             if (IsDisplayOnly || !isWindowVisible || item == null || !instantiatedItems.Contains(item)) return;
 
-            if (currentSelection == item)
+            // チュートリアルで使えない行を押したら、先輩に理由を言わせる。行は選ばない
+            if (!item.IsUsable && TutorialUnusableClicked != null)
             {
-                // すでに選択されているものをもう一度クリックしたら発動とする
-                OnActivateClicked();
+                var uiMgr = FindFirstObjectByType<GameUIManager>();
+                if (uiMgr != null && uiMgr.IsTutorialMode)
+                {
+                    int index = instantiatedItems.IndexOf(item);
+                    string type = _perspectiveMenu != PerspectiveMenu.None ? SkillNames.Perspective
+                        : index >= 0 && index < realAbilities.Count ? realAbilities[index].skillType : null;
+                    TutorialUnusableClicked(type);
+                    return;
+                }
             }
-            else
+
+            if (currentSelection != item)
             {
                 if (currentSelection != null) currentSelection.Deselect();
                 currentSelection = item;
                 currentSelection.Select();
-
-                // **選んだら説明を出したままにする。**
-                // 説明欄はホバーで出し引きしているので、これが無いと
-                // 選んだ直後にカーソルを外しただけで、いま何を選んでいるのかの
-                // 説明が読めなくなる（説明文を行から追い出したぶんの穴）
-                ShowTooltip(currentSelection.Description);
             }
+            ShowTooltip(currentSelection.Description);
+            RefreshActivateButton();
         }
 
         public void DeselectAll()
@@ -341,22 +361,12 @@ namespace KillingMahjong.UI
                 currentSelection.Deselect();
                 currentSelection = null;
             }
+            RefreshActivateButton();
             HideTooltip();
         }
         private const string DescBoxName = "AbilityDescriptionBox";
         private const string DescFillName = "AbilityDescriptionFill";
         private const string DescTextName = "AbilityDescriptionText";
-
-        /// <summary>説明欄の面。行のタイルと同じ暗い紺。</summary>
-        private static readonly Color DescBoxColor = new Color32(0x1B, 0x23, 0x38, 0xE6);
-
-        /// <summary>説明欄の縁。**行と同じ色にする。**
-        /// 4行が縁を持つと、縁の有無が「一覧の仲間かどうか」の合図になる。
-        /// 説明欄だけ縁が無いと、別の透明なパネルが割り込んで見える。</summary>
-        private static readonly Color DescBorderColor = new Color32(0x35, 0x42, 0x70, 0xFF);
-
-        /// <summary>縁の太さ。行のタイルと同じ1ドット。</summary>
-        private const float DescBorder = 2f;
 
         /// <summary>閉じるボタンの縁。他の赤（コスト・HPバッジ）と同じ赤に揃える。</summary>
         private static readonly Color CloseBorderColor = new Color32(0xFF, 0x59, 0x59, 0xFF);
@@ -372,13 +382,16 @@ namespace KillingMahjong.UI
         /// </summary>
         public void ShowTooltip(string description)
         {
+            RefreshTransitionSuppression();
             HideLegacyTooltip();
 
             var text = EnsureDescriptionBox();
             if (text == null) return;
-            text.text = string.IsNullOrEmpty(description) ? DescPlaceholder : description;
+            text.text = string.IsNullOrEmpty(description) ? DescPlaceholder : description.Replace("\n", "");
             // 説明が無いときは箱ごと消す。案内文だけの箱が浮いて見えるのを避ける。
             SetDescriptionVisible(!string.IsNullOrEmpty(description));
+            // 表示した直後に当て直す。初めて表示されたときに TextMeshPro が字の大きさを既定へ戻すため
+            ApplyDescriptionStyle(text);
 
             // AbilityUI 全体を最前面化する。中身の表示順が壊れないようルート(this)のみ設定する
             Canvas rootCanvas = this.GetComponent<Canvas>();
@@ -402,6 +415,19 @@ namespace KillingMahjong.UI
         // 演出中に ShowTooltip が走っても 20/25 へ戻らないよう、
         // sortingOrder を書く箇所はすべてこのフラグを見ている。
         private bool _transitionSuppressed;
+        private GameUIManager transitionOwner;
+        private CanvasGroup transitionInputGroup;
+        private bool inputWasInteractable;
+
+        private void RefreshTransitionSuppression()
+        {
+            if (transitionOwner == null)
+                transitionOwner = FindFirstObjectByType<GameUIManager>(FindObjectsInactive.Include);
+            if (transitionOwner == null) return;
+            var phase = transitionOwner.PhaseTransitionUI;
+            bool covered = phase != null && phase.isActiveAndEnabled && phase.IsCoveringScreen;
+            SetSuppressedForTransition(transitionOwner.IsTransitioning || covered);
+        }
 
         /// <summary>フェーズ演出中だけ帯より下へ退避する。GameUIManager.SetIsTransitioning から呼ぶ。</summary>
         public void SetSuppressedForTransition(bool suppressed)
@@ -412,10 +438,22 @@ namespace KillingMahjong.UI
             Canvas rootCanvas = this.GetComponent<Canvas>();
             if (rootCanvas != null)
             {
+                rootCanvas.overrideSorting = true;
                 rootCanvas.sortingOrder = suppressed
                     ? UISortingOrders.AbilityDuringTransition
                     : (isWindowVisible ? UISortingOrders.InfoPanelHighlight : UISortingOrders.InfoPanelNormal);
             }
+            if (transitionInputGroup == null)
+            {
+                transitionInputGroup = GetComponent<CanvasGroup>();
+                if (transitionInputGroup == null) transitionInputGroup = gameObject.AddComponent<CanvasGroup>();
+            }
+            if (suppressed)
+            {
+                inputWasInteractable = transitionInputGroup.interactable;
+                transitionInputGroup.interactable = false;
+            }
+            else transitionInputGroup.interactable = inputWasInteractable;
 
             // 旧ツールチップ用の Canvas 退避はここにあったが、2026-08-24 に削除。
             // 説明欄はパネルの中に入ったので、ルートの sortingOrder だけで前後が決まる。
@@ -437,9 +475,10 @@ namespace KillingMahjong.UI
             if (text != null)
             {
                 bool hasSelection = currentSelection != null && !string.IsNullOrEmpty(currentSelection.Description);
-                text.text = hasSelection ? currentSelection.Description : DescPlaceholder;
+                text.text = hasSelection ? currentSelection.Description.Replace("\n", "") : DescPlaceholder;
                 // 選択が無いなら箱ごと消す。対局開始直後はここを通る。
                 SetDescriptionVisible(hasSelection);
+                ApplyDescriptionStyle(text);
             }
 
             Canvas rootCanvas = this.GetComponent<Canvas>();

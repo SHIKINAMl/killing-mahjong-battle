@@ -64,9 +64,20 @@ namespace KillingMahjong.UI
             bool localTurn = Managers.BoardStateManager.Instance != null &&
                              Managers.BoardStateManager.Instance.IsLocalTurn;
 
-            bool wanted = !tutorial &&
-                (phaseStatus == RoundStatus.HandSelection ||
-                 (phaseStatus == RoundStatus.Discard && localTurn));
+            // **チュートリアルでも手牌選択の枚数だけは出す**（2026-10-28 要望「通常の対局のように、残り13牌の表示がいるかも」）。
+            // ただし盤面を伏せている間（会話・黒帯）は山牌ごと隠れているので出さない
+            // **黒帯・市松模様が出ている間は出さない**（2026-10-29 要望「対局フェイズ開始時の黒帯が出るときに、
+            // 『山牌から1枚切る』って表示が出ているねん」）。覆いの途中でフェイズが打牌へ切り替わるので、
+            // 帯の上に案内だけが浮いていた
+            var transition = gameUIManager != null ? gameUIManager.PhaseTransitionUI : null;
+            bool covered = transition != null && transition.isActiveAndEnabled && transition.IsCoveringScreen;
+            bool wanted = !covered && (tutorial
+                ? phaseStatus == RoundStatus.HandSelection && IsWallShown()
+                : (phaseStatus == RoundStatus.HandSelection ||
+                   (phaseStatus == RoundStatus.Discard && localTurn)));
+            if (gameUIManager != null && (gameUIManager.IsRonInputPlaying ||
+                (gameUIManager.RonWaitPanel != null && gameUIManager.RonWaitPanel.activeInHierarchy)))
+                wanted = false;
 
             if (!wanted)
             {
@@ -83,10 +94,22 @@ namespace KillingMahjong.UI
                              Managers.BoardStateManager.Instance.CurrentHandTiles != null)
                             ? Managers.BoardStateManager.Instance.CurrentHandTiles.Count : 0;
 
+            // **牌交換で選んでいる間は、選んだ枚数を出す**（2026-10-29 要望「1/３とか何枚選べるかを示した方がいいかも」）。
+            // 手牌の枚数とは別の数なので、負の数にして「変わったか」の目印を分ける
+            var skills = gameUIManager != null ? gameUIManager.SkillController : null;
+            bool mulligan = skills != null && gameUIManager.IsMulliganSelection;
+            if (mulligan) handCount = -1 - skills.MulliganPickedCount;
+
             // 毎フレーム text を代入するとそのたびに文字が組み直されるので、変わったときだけ
             if (phaseStatus != _lastGuidePhase || handCount != _lastGuideHandCount)
             {
-                if (phaseStatus == RoundStatus.HandSelection)
+                if (mulligan)
+                {
+                    int picked = skills.MulliganPickedCount, limit = skills.MulliganPickLimit;
+                    string color = picked == limit ? "#7CE07C" : "#FFD24A";
+                    guide.text = $"交換する牌をえらぶ　<color={color}>{picked} / {limit}</color>";
+                }
+                else if (phaseStatus == RoundStatus.HandSelection)
                 {
                     string count = (handCount == HandSize)
                         ? $"<color=#7CE07C>{handCount} / {HandSize}</color>"
@@ -103,41 +126,110 @@ namespace KillingMahjong.UI
                 _lastGuideHandCount = handCount;
             }
 
-            PlaceGuideAboveWall(guide);
+            PlaceGuideAboveWall(guide, phaseStatus == RoundStatus.Discard && !mulligan);
             guide.gameObject.SetActive(true);
         }
 
-        /// <summary>手牌の枚数。ルール上13枚で固定</summary>
+        private readonly Vector3[] phaseGuideCorners = new Vector3[4];
+
         /// <summary>
         /// 案内を山牌のすぐ上に置く。
         ///
         /// 案内は ScreenSpace-Overlay の Canvas に下端中央アンカーで置いてあるので、
         /// 画面座標を scaleFactor で割れば、そのまま anchoredPosition.y になる。
         /// </summary>
-        private void PlaceGuideAboveWall(TMPro.TextMeshProUGUI guide)
+        private void PlaceGuideAboveWall(TMPro.TextMeshProUGUI guide, bool avoidRiver)
         {
-            if (_wallRect == null)
-            {
-                var go = GameObject.Find("WallContainer");
-                if (go != null) _wallRect = go.transform as RectTransform;
-            }
+            FindWallRect();
             if (_wallRect == null) return;
 
             var canvas = guide.canvas;
             if (canvas == null) return;
 
-            var corners = new Vector3[4];
-            _wallRect.GetWorldCorners(corners);
-            float topScreenY = RectTransformUtility.WorldToScreenPoint(null, corners[1]).y;
+            float topScreenY = float.NegativeInfinity;
+            var wall = gameUIManager != null ? gameUIManager.WallUI : null;
+            if (wall != null)
+            {
+                foreach (var tile in wall.GetWallSlots())
+                {
+                    if (tile == null || !tile.gameObject.activeInHierarchy) continue;
+                    topScreenY = Mathf.Max(topScreenY, ScreenTop(tile));
+                }
+            }
+            if (float.IsNegativeInfinity(topScreenY)) topScreenY = ScreenTop(_wallRect);
 
             float scale = Mathf.Approximately(canvas.scaleFactor, 0f) ? 1f : canvas.scaleFactor;
             float y = topScreenY / scale + PhaseGuideLift;
 
             var rt = guide.rectTransform;
-            if (!Mathf.Approximately(rt.anchoredPosition.y, y))
+            float x = 0f;
+            if (avoidRiver && gameUIManager != null)
             {
-                rt.anchoredPosition = new Vector2(0f, y);
+                // 卓の左側の空きへ寄せ、両方の河の左端と案内の右端を離す。
+                float left = Screen.width * 0.5f;
+                left = LeftOfRiver(gameUIManager.RiverUI, left);
+                left = LeftOfRiver(gameUIManager.EnemyRiverUI, left);
+                x = (left - Screen.width * 0.5f) / scale - guide.preferredWidth * 0.5f - 12f;
             }
+
+            var target = new Vector2(Mathf.Round(x), Mathf.Round(y));
+            if (rt.anchoredPosition != target) rt.anchoredPosition = target;
+        }
+
+        private float LeftOfRiver(RiverUI river, float left)
+        {
+            var bounds = river != null ? river.GetTilesBoundsRect() : null;
+            if (bounds == null) return left;
+            bounds.GetWorldCorners(phaseGuideCorners);
+            var camera = CanvasCamera(bounds);
+            foreach (var corner in phaseGuideCorners)
+                left = Mathf.Min(left, RectTransformUtility.WorldToScreenPoint(camera, corner).x);
+            return left;
+        }
+
+        private float ScreenTop(RectTransform target)
+        {
+            target.GetWorldCorners(phaseGuideCorners);
+            var camera = CanvasCamera(target);
+            float top = float.NegativeInfinity;
+            foreach (var corner in phaseGuideCorners)
+                top = Mathf.Max(top, RectTransformUtility.WorldToScreenPoint(camera, corner).y);
+            return top;
+        }
+
+        private static Camera CanvasCamera(RectTransform target)
+        {
+            var canvas = target.GetComponentInParent<Canvas>();
+            var root = canvas != null ? canvas.rootCanvas : null;
+            return root != null && root.renderMode != RenderMode.ScreenSpaceOverlay ? root.worldCamera : null;
+        }
+        /// <summary>山牌の器を探す（GameObject.Find は表示中の物しか見つけないので、見つかった物を覚えておく）</summary>
+        private void FindWallRect()
+        {
+            if (_wallRect != null) return;
+            _wallRect = gameUIManager != null ? gameUIManager.WallUI?.GuideTargetRect : null;
+            if (_wallRect != null) return;
+
+            var go = GameObject.Find("WallContainer");
+            if (go != null) _wallRect = go.transform as RectTransform;
+        }
+
+        /// <summary>山牌がいま画面に出ているか</summary>
+        private bool IsWallShown()
+        {
+            FindWallRect();
+            return _wallRect != null && _wallRect.gameObject.activeInHierarchy;
+        }
+
+        /// <summary>
+        /// 手牌ごと伏せられたら案内も消す。案内は手牌の外（一番上の Canvas）に置いてあり、
+        /// 手牌が止まると Update も止まって、出したまま残ってしまう（チュートリアルの盤面隠し）
+        /// </summary>
+        private void OnDisable()
+        {
+            if (_phaseGuide != null) _phaseGuide.gameObject.SetActive(false);
+            _lastGuidePhase = (RoundStatus)(-1);
+            _lastGuideHandCount = -1;
         }
     }
 }

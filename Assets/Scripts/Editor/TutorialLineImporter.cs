@@ -15,7 +15,7 @@ namespace KillingMahjong.EditorTools
     ///
     ///   1. 「書き出す」で今のセリフを TSV にする
     ///   2. Excel なりテキストエディタなりで **dialogue の列だけ** 直す
-    ///   3. 「取り込む」で `Assets/Resources/TutorialLines.asset` に入る
+    ///   3. 「取り込む」で `Assets/Resources/Tutorial/TutorialScenario.asset` に反映する
     ///   4. Play すると差し替わっている
     ///
     /// **id の列は書き換えないこと。** どのセリフを差し替えるかの目印で、
@@ -25,7 +25,7 @@ namespace KillingMahjong.EditorTools
     /// </summary>
     public class TutorialLineImporter : EditorWindow
     {
-        private const string AssetPath = "Assets/Resources/TutorialLines.asset";
+        private const string AssetPath = "Assets/Resources/Tutorial/TutorialScenario.asset";
         private const string DefaultTsvName = "tutorial_lines.tsv";
 
         private string _tsvPath = "";
@@ -44,7 +44,7 @@ namespace KillingMahjong.EditorTools
         {
             EditorGUILayout.LabelField("チュートリアル台本のセリフ", EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "構造（局数・能力の実演・ボタンの開放順）は TutorialScenario.BuildDefault() が持ったままです。\n" +
+                "実際に使う TutorialScenario.asset のセリフを編集します。\n" +
                 "ここで差し替わるのは text と speaker だけです。\n" +
                 "id が一致しない行は無視され、元のセリフが出ます。",
                 MessageType.Info);
@@ -96,9 +96,7 @@ namespace KillingMahjong.EditorTools
                 "台本セリフの書き出し", "", DefaultTsvName, "tsv");
             if (string.IsNullOrEmpty(path)) return;
 
-            // **既に取り込んだぶんも反映した状態で書き出す。**
-            // BuildDefault() の末尾で表を適用しているので、これで往復しても内容が戻らない。
-            var scenario = TutorialScenario.BuildDefault();
+            var scenario = AssetDatabase.LoadAssetAtPath<TutorialScenario>(AssetPath);
             var rows = TutorialLineTable.Dump(scenario);
 
             var sb = new StringBuilder();
@@ -147,7 +145,7 @@ namespace KillingMahjong.EditorTools
             // 台本を組み立てて、有効な ID の一覧を作る。
             // 打ち間違いをそのまま入れると「直したのに変わらない」で悩むことになる
             var valid = new HashSet<string>();
-            foreach (var r in TutorialLineTable.Dump(TutorialScenario.BuildDefault()))
+            foreach (var r in TutorialLineTable.Dump(AssetDatabase.LoadAssetAtPath<TutorialScenario>(AssetPath)))
             {
                 valid.Add(r.id);
             }
@@ -199,17 +197,18 @@ namespace KillingMahjong.EditorTools
                 return;
             }
 
-            var table = AssetDatabase.LoadAssetAtPath<TutorialLineTable>(AssetPath);
-            if (table == null)
+            var scenario = AssetDatabase.LoadAssetAtPath<TutorialScenario>(AssetPath);
+            if (scenario == null)
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(AssetPath));
-                table = CreateInstance<TutorialLineTable>();
-                AssetDatabase.CreateAsset(table, AssetPath);
-                sb.AppendLine($"アセットを作りました: {AssetPath}");
+                _report = "実使用の台本が見つかりません: " + AssetPath;
+                return;
             }
-
+            var table = CreateInstance<TutorialLineTable>();
             table.rows = rows;
-            EditorUtility.SetDirty(table);
+            Undo.RecordObject(scenario, "チュートリアル台本のTSV取り込み");
+            table.ApplyTo(scenario);
+            DestroyImmediate(table);
+            EditorUtility.SetDirty(scenario);
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 

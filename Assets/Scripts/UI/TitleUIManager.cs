@@ -36,11 +36,27 @@ namespace KillingMahjong.UI
                 // 以前はここで「見本の写し」（SavedRoomPreview）を捨て、RoomScreenUI が作り直していた。
                 // 写しはコードを変えても付いてこないので、置いてある物と再生時の物が食い違っていた。
                 OpenPreservedRoom();
+                // **チュートリアルを終えて来たときは、対局を選ぶ画面まで自動で開く**（2026-10-23 ユーザー指示
+                // 「チュートリアルが終わったらデバッグ部屋にシーンを移して、対局の選ぶところまで自動で開いて」）。
+                // 復活の経路は白い光を通してから開く
+                int returnFromTutorial = PlayerPrefs.GetInt(TutorialReturnToRoomKey, 0);
+                if (returnFromTutorial == TutorialNavigation.RevivalToMatchMenu
+                    || returnFromTutorial == TutorialNavigation.OpenMatchMenuInRoom)
+                {
+                    PlayerPrefs.DeleteKey(TutorialReturnToRoomKey);
+                    PlayerPrefs.Save();
+                    if (returnFromTutorial == TutorialNavigation.RevivalToMatchMenu)
+                        StartCoroutine(OpenMatchMenuAfterRevival());
+                    else
+                        OpenMatchMenu();
+                }
                 FinishSceneLoading();
                 return;
             }
 
             BuildTitleClickTarget();
+            TitleRankingBoardUI.Ensure(this);
+            SceneFirst.Report(nameof(TitleRankingBoardUI));
             ExhibitionIdleReturn.EnableSession();
 
             // 既存の帰還キーを一度だけ消費し、チュートリアル後は対局メニューへ進む。
@@ -49,16 +65,24 @@ namespace KillingMahjong.UI
             {
                 PlayerPrefs.DeleteKey(TutorialReturnToRoomKey);
                 PlayerPrefs.Save();
-                if (tutorialReturn == 2)
-                {
-                    SceneManager.LoadScene(RoomSceneName);
-                    return; // 移動先の Start がローディングを閉じる。
-                }
+                // 部屋（看板のある画面）から始めたチュートリアルでも、終わったら部屋には戻さず
+                // 対局メニューを開く（2026-10-23 プランナー指示「チュートリアルのあとはもうこの画面飛ばしていい」）。
+                // 以前は tutorialReturn == 2 で部屋シーンへ移していた
+                if (tutorialReturn == TutorialNavigation.RevivalToMatchMenu)
+                    StartCoroutine(OpenMatchMenuAfterRevival());
                 else
                     OpenMatchMenu();
             }
 
             FinishSceneLoading();
+        }
+
+        private System.Collections.IEnumerator OpenMatchMenuAfterRevival()
+        {
+            // 図の順序はタイトル、白い光、メニュー。通常の帰還はこの待ちを通さない。
+            var transition = TutorialRevivalUI.Create(transform);
+            try { yield return transition.PlayTitleReturn(OpenMatchMenu); }
+            finally { if (transition != null) transition.Close(); }
         }
 
         private static void FinishSceneLoading()
@@ -78,6 +102,7 @@ namespace KillingMahjong.UI
         /// **シーンの `onClick` はこのメソッド名で配線済みなので、名前は変えないこと。**
         /// 作り直すと配線が外れて「押しても何も起きない」状態になる。
         /// 展示用タイトルからはチュートリアルを最初から開始する。
+        /// ただし前にチュートリアルを始めたことがあれば、部屋の看板メニューへ送る（2026-11-04）。
         /// </summary>
         public void OnClickStartButton()
         {
@@ -87,6 +112,16 @@ namespace KillingMahjong.UI
                 return;
             }
             if (isStartingTutorial) return;
+
+            // 前にチュートリアルを始めたことがある人は、チュートリアルを飛ばして部屋の看板メニュー
+            // （対局へ・チュートリアル・コレクション）へ送る（2026-11-03 の会議の決定、2026-11-04 ユーザー判断）。
+            // チュートリアルをやり直したい人は、看板の「チュートリアル」から入れる。
+            if (TutorialManager.HasEverStarted())
+            {
+                OpenDebugRoom();
+                return;
+            }
+
             isStartingTutorial = true;
             if (titleClickTarget != null) titleClickTarget.SetActive(false);
             StartTutorialScene(0);
@@ -94,6 +129,17 @@ namespace KillingMahjong.UI
 
         private bool isStartingTutorial;
         private GameObject titleClickTarget;
+
+        /// <summary>
+        /// 展示のタイトルで、次の人を待っているところか（「どこを押しても始まる」が出ていて、
+        /// メニューも設定も開いていない）。ランキングと動画の画面はこの間だけ出す。
+        /// </summary>
+        public bool IsWaitingForVisitor =>
+            titleClickTarget != null && titleClickTarget.activeInHierarchy && !isStartingTutorial
+            && (optionUIPanel == null || !optionUIPanel.activeInHierarchy);
+
+        /// <summary>チュートリアルや別のシーンへ移り始めたか。暗転のあいだ、ランキングと動画の画面を出したままにするのに使う</summary>
+        public bool IsLeavingScene => isStartingTutorial || isLoadingScene;
 
         private const string TitleClickTargetName = "TitleClickToTutorial";
         private const string MatchShortcutName = "ルールを知っている方：対局へ";
@@ -186,7 +232,11 @@ namespace KillingMahjong.UI
         {
             BuildTitleClickTarget();
             titleClickTarget = null;
-            return lastBakeReport;
+            string report = lastBakeReport;
+            TitleRankingBoardUI.Ensure(this);
+            string board = SceneFirst.Report(nameof(TitleRankingBoardUI));
+            if (board.Length > 0) report = report.Length > 0 ? report + "、" + board : board;
+            return report;
         }
 
         /// <summary>このシーンが部屋（再生すると部屋の画面から始まる）か。焼き込みが見る。</summary>
@@ -280,6 +330,22 @@ namespace KillingMahjong.UI
 
         private void OpenMatchMenu()
         {
+            // **名前が無ければ、先に名前を書いてもらう**（2026-10-23 ユーザー指示）。名前を書く場所はチュートリアルの
+            // 契約書だけで、タイトルの「対局へ」や部屋から入ると名前なしで対局できていた。ここはタイトルと部屋の共通の入口。
+            // 書いている間は「どこでも押せば開始」を止めておく（ランキングと動画も引っ込む）。「もどる」なら元へ戻す
+            if (!KillingMahjong.Core.PlayerProfile.HasName)
+            {
+                bool targetWasActive = titleClickTarget != null && titleClickTarget.activeSelf;
+                if (titleClickTarget != null) titleClickTarget.SetActive(false);
+                var namePrompt = MatchNamePromptUI.Ensure();
+                SceneFirst.Report(nameof(MatchNamePromptUI));
+                namePrompt.Open(OpenMatchMenu, () =>
+                {
+                    if (titleClickTarget != null && targetWasActive) titleClickTarget.SetActive(true);
+                });
+                return;
+            }
+
             if (titleClickTarget != null) titleClickTarget.SetActive(false);
             var titleMenu = FindSceneObjectIncludingInactive("ボタン達");
             if (titleMenu != null) titleMenu.SetActive(false);

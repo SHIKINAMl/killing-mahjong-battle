@@ -22,7 +22,7 @@ namespace KillingMahjong.Managers
             // セリフの送り待ち中は触らせない。
             // ここで ShowInterruptMessage を出すと DialogueUI の本文を上書きして
             // 送りボタンの行が消え、進行が止まるので黙って弾く。
-            if (_isWaitingForLine) return false;
+            if (_isWaitingForLine || IsInstantRankCallPlaying) return false;
 
             if (!_round.allowManualHandSelection)
             {
@@ -44,6 +44,7 @@ namespace KillingMahjong.Managers
         public bool OnTryCompleteHandSelection()
         {
             if (_round == null) return false;
+            if (IsInstantRankCallPlaying) return false;
 
             // 押された時点でもう一度手牌を見る。13枚そろった瞬間の判定だけだと、
             // そのあと牌を入れ替えて満貫手に直しても決定できないままになる。
@@ -148,9 +149,29 @@ namespace KillingMahjong.Managers
 
             HasClickedAutoMangan = true;
 
-            SetupBoard(_round, _round.manganHandBaseIds);
+            // 配り直すと能力紹介で確定した牌交換まで消える。現在の山から手牌だけを選ぶ。
+            var board = BoardStateManager.Instance;
+            if (board != null)
+            {
+                board.SetLocalState(new List<int>(board.OriginalWallTiles),
+                    TutorialTiles.EncodeAll(_round.manganHandBaseIds, _round.doraBaseId),
+                    TutorialTiles.EncodeAll(_round.waitBaseIds, _round.doraBaseId));
+                if (gameUIManager != null) gameUIManager.RefreshBoardAfterTransition();
+            }
 
             if (gameUIManager != null) gameUIManager.ClearSelection();
+
+            // 本編と同じく、おまかせで13枚がそろったら役名（満貫など）を出す（2026-10-24）
+            if (gameUIManager != null && gameUIManager.HandSelectionController != null)
+                gameUIManager.HandSelectionController.RequestInstantRankCallNow();
+
+            StartCoroutine(FinishMockAutoMangan(_round));
+        }
+
+        private IEnumerator FinishMockAutoMangan(TutorialRoundData round)
+        {
+            yield return WaitForInstantRankCall();
+            if (_aborted || _round != round || !_isWaitingForHandSelectionComplete) yield break;
 
             // ここで初めて決定ボタンを出す
             SetHandButtonStage(HandButtonStage.AutoAndDecide);
@@ -159,10 +180,10 @@ namespace KillingMahjong.Managers
             if (_isWaitingForHandSelectionComplete && !_round.freeHandBuilding)
             {
                 // フロー図にある一言（2026-09-23 に足した）。矢印だけでは何を押すのか伝わらない
-                StartCoroutine(PlayLines(new List<TutorialLine>
+                yield return PlayLines(new List<TutorialLine>
                 {
                     new TutorialLine(DecidePromptLine),
-                }));
+                });
 
                 GuideTo(gameUIManager != null && gameUIManager.HandUI != null
                     ? gameUIManager.HandUI.DecideButtonRect : null);

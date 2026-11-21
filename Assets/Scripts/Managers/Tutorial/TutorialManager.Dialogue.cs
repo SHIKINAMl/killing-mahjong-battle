@@ -14,6 +14,15 @@ namespace KillingMahjong.Managers
 
         // ==================== セリフ表示 ====================
 
+        private bool IsInstantRankCallPlaying => gameUIManager != null
+            && gameUIManager.HandSelectionController != null
+            && gameUIManager.HandSelectionController.IsInstantRankCallPlaying;
+
+        private IEnumerator WaitForInstantRankCall()
+        {
+            while (!_aborted && IsInstantRankCallPlaying) yield return null;
+        }
+
         /// <summary>
         /// 台本のセリフを1行ずつ送る。シナリオ用コルーチンからのみ呼ばれるため、
         /// 同時に複数走ることはない（旧実装の多重起動によるコルーチン残留を防いでいる）。
@@ -25,6 +34,9 @@ namespace KillingMahjong.Managers
             foreach (var line in lines)
             {
                 if (line == null || string.IsNullOrEmpty(line.text)) continue;
+
+                yield return WaitForInstantRankCall();
+                if (_aborted) yield break;
 
                 // 音は台詞に合わせて動く（2026-09-11）。**文字を出す直前に当てる。**
                 // 表に無い台詞では何も起きず、直前の音がそのまま続く。
@@ -62,6 +74,10 @@ namespace KillingMahjong.Managers
                 _isWaitingForLine = false;
 
                 if (dialogueUI != null) dialogueUI.HideAdvanceOnAnyClick();
+                if (_round != null && _round.introFlashAfterLineIndex >= 0
+                    && _round.introFlashAfterLineIndex < _round.introLines.Count
+                    && ReferenceEquals(line, _round.introLines[_round.introFlashAfterLineIndex]))
+                    FlashScreen();
             }
         }
 
@@ -69,6 +85,12 @@ namespace KillingMahjong.Managers
         /// 操作を弾いたときの一言。送りボタンを使わないので PlayLines と競合しない。
         /// 連打されても直前のものを止めるだけで、コルーチンは残らない。
         /// </summary>
+        /// <summary>
+        /// プレイヤーの番を知らせる一言。フロー図で第1局の打牌ループにある言葉（TutorialManager.Progression）。
+        /// 第2局でも自分で打つ番に同じ言葉を使う（2026-10-29 バグ報告「セリフに『後輩ちゃんの番だよ』的なものがあったはず？」）
+        /// </summary>
+        private const string PlayerTurnLine = "次は後輩ちゃんねー";
+
         private void ShowInterruptMessage(string text)
         {
             if (string.IsNullOrEmpty(text)) return;

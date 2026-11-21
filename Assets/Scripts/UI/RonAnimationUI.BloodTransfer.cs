@@ -32,7 +32,7 @@ namespace KillingMahjong.UI
             TextMeshProUGUI source = flyMine ? myBetText : theirBetText;
             int fromValue = flyMine ? s.MyBet : s.TheirBet;
             int toValue = flyMine ? s.MyDelta : s.TheirDelta;
-            Color tint = flyMine ? AccentMine : AccentThem;
+            Color tint = HpNumberStyle.ColorForDelta(toValue);
 
             RectTransform target = null;
             if (flyMine) { if (playerInfo != null) target = playerInfo.HpAnchor; }
@@ -88,11 +88,10 @@ namespace KillingMahjong.UI
             GameObject flyObj = new GameObject("BloodValue");
             flyObj.transform.SetParent(stageRt, false);
             TextMeshProUGUI fly = flyObj.AddComponent<TextMeshProUGUI>();
-            fly.text = fromValue.ToString();
-            fly.color = tint;
+            HpNumberStyle.Apply(fly, toValue);
+            fly.text = fromValue.ToString("N0");
             fly.fontSize = BloodPeakFontSize;
             fly.alignment = TextAlignmentOptions.Center;
-            fly.fontStyle = FontStyles.Bold;
             fly.textWrappingMode = TextWrappingModes.NoWrap;
             // 盤面（赤い壁・緑の卓）の上を通るので、縁取りが無いと途中で読めなくなる
             fly.outlineWidth = 0.2f;
@@ -107,11 +106,12 @@ namespace KillingMahjong.UI
             GameObject noteObj = new GameObject("BloodNote");
             noteObj.transform.SetParent(flyRt, false);
             TextMeshProUGUI note = noteObj.AddComponent<TextMeshProUGUI>();
+            note.font = GameUiTypography.Body;
             note.text = BuildMultiplierNote(s, toValue);
             note.color = AccentGold;
             note.fontSize = 34f;
             note.alignment = TextAlignmentOptions.Center;
-            note.fontStyle = FontStyles.Bold;
+            note.fontStyle = FontStyles.Normal;
             note.textWrappingMode = TextWrappingModes.NoWrap;
             note.outlineWidth = 0.2f;
             note.outlineColor = new Color32(0, 0, 0, 255);
@@ -136,7 +136,7 @@ namespace KillingMahjong.UI
             const float riseTime = 0.35f;
             for (float t = 0; t < riseTime; t += Time.deltaTime)
             {
-                float p = Mathf.Clamp01(t / riseTime);
+                float p = Mathf.Clamp01(PresentationTiming.Sample(t) / riseTime);
                 float eased = 1f - Mathf.Pow(1f - p, 3f);
                 flyRt.position = Vector3.Lerp(startPos, centerPos, eased);
                 flyRt.localScale = Vector3.one * Mathf.Lerp(startScale, 1f, eased);
@@ -147,13 +147,25 @@ namespace KillingMahjong.UI
             flyRt.localScale = Vector3.one;
             if (panelContainer != null) Destroy(panelContainer);
 
+            // **場に出ていた血を、卓の上の血だまりとして見せる（2026-10-18）。**
+            // 「血を掛け合っている」ことを形で見せるため。数字の下、卓の真ん中に広がる。
+            // 大きさは場の血の額で決める（両者の賭け金の合計。8000 で最大）
+            // **本編の霧では出さない**（血は全身から弾けて霧散して終わる）。没案のホースの筋のときだけ出す
+            Effects.BloodPoolEffect pool = null;
+            if (PreviewStreamDrain)
+            {
+                pool = Effects.BloodPoolEffect.Create(stageRt, TablePoolPosition());
+                pool.transform.SetAsFirstSibling();
+                pool.SetTarget(Mathf.Clamp(PoolAmountFor(s.MyBet + s.TheirBet), 0.25f, 1f));
+            }
+
             // ② 数値が変わる。**潰れきった瞬間に入れ替える**ので、途中の混ざった数字が読めてしまわない
             string landed = FormatDelta(toValue);
             bool swapped = false;
             const float popTime = 0.25f;
             for (float t = 0; t < popTime; t += Time.deltaTime)
             {
-                float p = Mathf.Clamp01(t / popTime);
+                float p = Mathf.Clamp01(PresentationTiming.Sample(t) / popTime);
                 if (p < 0.5f)
                 {
                     float q = p / 0.5f;
@@ -185,6 +197,10 @@ namespace KillingMahjong.UI
             // 満貫サイズのまま静止。**ここが読ませる時間**
             yield return new WaitForSeconds(0.25f);
 
+            // 血を抜く前に、相手が一言しゃべる（2026-10-19）。
+            // **表が消えてから出す。** 表を出したまま喋らせると、吹き出しが表の裏に隠れて読めなかった（実機で確認）
+            yield return BloodDrawLineRoutine(prevLocalHp, newLocalHp, prevEnemyHp, newEnemyHp);
+
             // ③ 収縮しながらHPへ落ちる
             //
             // **落ちながら白へ寄せる（2026-08-29 の実機確認で決めた）。**
@@ -192,10 +208,15 @@ namespace KillingMahjong.UI
             // **飛ぶ数字の色は自分が #57C7E8、相手が #F2705A で、どちらも着地先とほぼ同じ色**なので、
             // 素の色のまま落とすと最後の数桁が背景に溶けて、いちばん見せたい着弾が読めなくなる。
             // 黒縁を太くするのは**ドット絵の細い字には効かない**ので採らなかった。
+            //
+            // **数字と一緒に、負けた側の全身から血が霧になって噴き出し、霧散する（2026-10-19 から本編）。**
+            // 以前の本編（2026-10-18〜）は、場の血だまりから勝った側の血袋へホースを通して流す筋だった。
+            // それは没案（ron.stream_local / ron.stream_enemy）として残してある
+            var streams = StartBloodStreams(stageRt, pool, s, playerInfo, enemyInfo, out var mist);
             const float diveTime = 0.30f;
             for (float t = 0; t < diveTime; t += Time.deltaTime)
             {
-                float p = Mathf.Clamp01(t / diveTime);
+                float p = Mathf.Clamp01(PresentationTiming.Sample(t) / diveTime);
                 float eased = p * p; // 落ちるほど速く
                 flyRt.position = Vector3.Lerp(centerPos, endPos, eased);
                 flyRt.localScale = Vector3.one * Mathf.Lerp(1f, landScale, eased);
@@ -208,17 +229,19 @@ namespace KillingMahjong.UI
             Destroy(flyObj);
 
             // ④ 着弾。**両方のHPの隣に増減が出て、両方のメーターが同時に動き出す**
-            if (playerInfo != null) SpawnHpDeltaLabel(stageRt, playerInfo.HpAnchor, s.MyDelta, AccentMine);
-            if (enemyInfo != null) SpawnHpDeltaLabel(stageRt, enemyInfo.HpAnchor, s.TheirDelta, AccentThem);
+            // 横に出す増減は「画面の血が動く量」。賭けた血は先に場へ出しているので、
+            // サーバーの増減とは違う（RonSettlementInfo.MyShownDelta）。動かない側（満貫で負けた側など）は出さない
+            if (playerInfo != null && s.MyShownDelta != 0) SpawnHpDeltaLabel(stageRt, playerInfo.HpAnchor, s.MyShownDelta);
+            if (enemyInfo != null && s.TheirShownDelta != 0) SpawnHpDeltaLabel(stageRt, enemyInfo.HpAnchor, s.TheirShownDelta);
 
-            PlayBloodSE(isLocalSide: true, delta: s.MyDelta, newHp: newLocalHp,
+            PlayBloodSE(isLocalSide: true, delta: s.MyShownDelta, newHp: newLocalHp,
                         maxHp: playerInfo != null ? playerInfo.MaxHp : 0);
 
             const float hpTime = 0.8f;
             bool enemySePlayed = false;
             for (float t = 0; t < hpTime; t += Time.deltaTime)
             {
-                float eased = 1f - Mathf.Pow(1f - Mathf.Clamp01(t / hpTime), 3f);
+                float eased = 1f - Mathf.Pow(1f - Mathf.Clamp01(PresentationTiming.Sample(t) / hpTime), 3f);
                 if (playerInfo != null) playerInfo.SetHP(Mathf.RoundToInt(Mathf.Lerp(prevLocalHp, newLocalHp, eased)));
                 if (enemyInfo != null) enemyInfo.SetHP(Mathf.RoundToInt(Mathf.Lerp(prevEnemyHp, newEnemyHp, eased)));
 
@@ -227,14 +250,14 @@ namespace KillingMahjong.UI
                 if (!enemySePlayed && t >= 0.12f)
                 {
                     enemySePlayed = true;
-                    PlayBloodSE(isLocalSide: false, delta: s.TheirDelta, newHp: newEnemyHp,
+                    PlayBloodSE(isLocalSide: false, delta: s.TheirShownDelta, newHp: newEnemyHp,
                                 maxHp: enemyInfo != null ? enemyInfo.MaxHp : 0);
                 }
                 yield return null;
             }
             if (!enemySePlayed)
             {
-                PlayBloodSE(isLocalSide: false, delta: s.TheirDelta, newHp: newEnemyHp,
+                PlayBloodSE(isLocalSide: false, delta: s.TheirShownDelta, newHp: newEnemyHp,
                             maxHp: enemyInfo != null ? enemyInfo.MaxHp : 0);
             }
 
@@ -243,11 +266,238 @@ namespace KillingMahjong.UI
 
             // 読み切るための間。**実機で見て一番余っていたので 1.00 → 0.50 に詰めた（8/29）**
             yield return new WaitForSeconds(0.5f);
+            // 血の最後の一滴が届くまで待つ（入れ物ごと消すと途中で消える）
+            foreach (var stream in streams)
+                if (stream != null) yield return stream.WaitDone();
+            if (mist != null) yield return mist.WaitDone();
 
             if (playerInfo != null) playerInfo.SuppressHpPopup = false;
             if (enemyInfo != null) enemyInfo.SuppressHpPopup = false;
             Destroy(stage);
             yield return new WaitForSeconds(0.2f);
+        }
+
+        /// <summary>血が流れている長さ[秒]。数字が落ちる 0.30秒と、メーターが動く 0.8秒に合わせる。</summary>
+        private const float BloodStreamSeconds = 1.0f;
+
+        /// <summary>この額（両者の賭け金の合計）で、卓の血だまりがいちばん大きくなる。</summary>
+        private const int PoolFullAmount = 8000;
+
+        private static float PoolAmountFor(int pot) => Mathf.Clamp01(pot / (float)PoolFullAmount);
+
+        /// <summary>卓の真ん中（山牌の手前）。800x600 で下から 32% の高さ。</summary>
+        private static Vector3 TablePoolPosition() => new Vector3(Screen.width * 0.5f, Screen.height * 0.32f, 0f);
+
+        // ホースの絵の位置（絵の左上を 0,0 とした割合）。血袋の絵のピクセルから測った（2026-10-18）。
+        // 相手: 点滴の下から伸びるピンクのチューブ。ENEHPUI_NO（640x2560）の x=300〜329、y=1942 から下の端まで
+        private static readonly Vector2 EnemyHoseMouthUv = new Vector2(0.491f, 0.759f);
+        // 自分: メーターの左上の針から右上へ伸びる黄色いホース。HPUI0heart（54x140）の (34,30)〜(53,17)
+        private static readonly Vector2 PlayerHoseMouthUv = new Vector2(0.63f, 0.21f);
+        private static readonly Vector2 PlayerHoseOuterUv = new Vector2(0.98f, 0.12f);
+
+        /// <summary>
+        /// 血袋のホース。<see cref="Mouth"/> は血袋につながっている所、<see cref="Outer"/> は血が宙へ出入りする所。
+        ///
+        /// **血袋の真ん中へ直接流していたのをやめた**（2026-10-18 のユーザー指示「ホースのところから流れ込んでる感じに」）。
+        /// </summary>
+        private struct BagHose
+        {
+            public Vector3 Mouth, Outer;
+        }
+
+        /// <summary>メーターの絵の中の点（左上が 0,0 の割合）を画面座標にする。縦横比を保つ設定なら、その余白も除く。</summary>
+        private static Vector3 GaugePoint(RectTransform gauge, Vector2 uv)
+        {
+            Rect r = ScreenRectOf(gauge);
+            var img = gauge.GetComponent<Image>();
+            if (img != null && img.preserveAspect && img.sprite != null && r.width > 0f && r.height > 0f)
+            {
+                float aspect = img.sprite.rect.width / img.sprite.rect.height;
+                if (r.width / r.height > aspect)
+                {
+                    float w = r.height * aspect;
+                    r = new Rect(r.center.x - w * 0.5f, r.y, w, r.height);
+                }
+                else
+                {
+                    float h = r.width / aspect;
+                    r = new Rect(r.x, r.center.y - h * 0.5f, r.width, h);
+                }
+            }
+            return new Vector3(r.xMin + uv.x * r.width, r.yMax - uv.y * r.height, 0f);
+        }
+
+        /// <summary>
+        /// 相手のチューブは牌の裏を通って卓へ下りている。卓の血だまりの高さを、宙へ出入りする所にする。
+        /// 自分のホースは右上へ伸びて画面の外へ出るので、見えている端を出入りする所にする。
+        /// </summary>
+        private static BagHose HoseOf(bool enemy, RectTransform gauge, Vector3 poolPos)
+        {
+            if (enemy)
+            {
+                Vector3 mouth = GaugePoint(gauge, EnemyHoseMouthUv);
+                Vector3 bottom = GaugePoint(gauge, new Vector2(EnemyHoseMouthUv.x, 1f));
+                return new BagHose { Mouth = mouth, Outer = new Vector3(mouth.x, Mathf.Clamp(poolPos.y, bottom.y, mouth.y), 0f) };
+            }
+            return new BagHose { Mouth = GaugePoint(gauge, PlayerHoseMouthUv), Outer = GaugePoint(gauge, PlayerHoseOuterUv) };
+        }
+
+        /// <summary>
+        /// 場の血だまり → 勝った側、と、負けた側の血袋 → 勝った側、の血の筋を流し始める。
+        /// どちらも勝っていない（増えた側がいない）ときは何も流さない。
+        /// </summary>
+        private List<Effects.BloodStreamEffect> StartBloodStreams(RectTransform stageRt, Effects.BloodPoolEffect pool,
+            RonSettlementInfo s, PlayerInfoUI playerInfo, EnemyInfoUI enemyInfo, out Effects.BloodMistEffect mist)
+        {
+            var list = new List<Effects.BloodStreamEffect>();
+            mist = null;
+
+            // 本編の霧: 負けた側の血が弾けて霧散するだけで終わる。卓にもホースにも流さない
+            // （2026-10-19「霧散するバージョンは、ホースにいかせなくていいです。ただ血が弾けているだけで終わっていいです」。
+            // 同日「血の演出は、体から血が霧散している演出にして」で没案から本編になった）。
+            //
+            // **負けた側は画面の増減（ShownDelta）ではなく、勝ち負けとサーバーの増減で決める。**
+            // 本編では賭けた血を賭けた時点で場へ出しているので、満貫で負けた側の画面の増減は ±0 になる。
+            // ShownDelta で判定していたら、演出プレビューでは出るのに本編の対局では霧が出なかった（2026-10-19 のユーザー指摘）
+            if (!PreviewStreamDrain)
+            {
+                bool localLost = !s.LocalWon;
+                int lost = localLost ? Mathf.Min(s.MyDelta, s.MyShownDelta) : Mathf.Min(s.TheirDelta, s.TheirShownDelta);
+                if (lost < 0)
+                    mist = StartBloodMist(stageRt, localLost ? null : enemyInfo,
+                                          Mathf.Lerp(0.7f, 1.8f, Mathf.Clamp01(-lost / 12000f)));
+                return list;
+            }
+
+            bool mineWins = s.MyShownDelta > 0;
+            bool theirsWins = s.TheirShownDelta > 0;
+            if (!mineWins && !theirsWins)
+            {
+                if (pool != null) pool.SetTarget(0f);
+                return list;
+            }
+
+            RectTransform winnerGauge = mineWins
+                ? (playerInfo != null ? playerInfo.HpGaugeAnchor : null)
+                : (enemyInfo != null ? enemyInfo.HpGaugeAnchor : null);
+            RectTransform loserGauge = mineWins
+                ? (enemyInfo != null ? enemyInfo.HpGaugeAnchor : null)
+                : (playerInfo != null ? playerInfo.HpGaugeAnchor : null);
+            int loserDelta = mineWins ? s.TheirShownDelta : s.MyShownDelta;
+            int winnerDelta = mineWins ? s.MyShownDelta : s.TheirShownDelta;
+
+            if (winnerGauge == null) return list;
+
+            Vector3 poolPos = pool != null ? pool.transform.position : TablePoolPosition();
+            BagHose winnerHose = HoseOf(!mineWins, winnerGauge, poolPos);
+            // 太さは勝った側に入る額で決める（満貫 2000 前後で 1、大きい手ほど太い）
+            float thick = Mathf.Lerp(0.8f, 2f, Mathf.Clamp01(winnerDelta / 12000f));
+
+            if (pool != null)
+            {
+                // 自分のホースは上から入るので高く弧を描く。相手のチューブは卓の上を横へ這わせる
+                list.Add(Effects.BloodStreamEffect.Pour(stageRt, poolPos, winnerHose.Mouth,
+                                                        BloodStreamSeconds, arc: mineWins ? 150f : 24f, thickness: thick,
+                                                        enterHoseAt: winnerHose.Outer));
+                pool.SetTarget(0f);
+            }
+
+            // 負けた側が賭け金より多く失う（倍率が掛かった）ときは、その血袋からも卓へ流す。
+            // **血袋から血袋へ直接流すと、筋がキャラの顔を横切った**（2026-10-18 の試写）。
+            // 卓の血だまりを通して勝った側へ渡すので、「血は場を通って奪われる」形にもそろう
+            if (loserDelta < 0 && loserGauge != null)
+            {
+                BagHose loserHose = HoseOf(mineWins, loserGauge, poolPos);
+                list.Add(Effects.BloodStreamEffect.Pour(stageRt, loserHose.Mouth, poolPos,
+                                                        BloodStreamSeconds, arc: mineWins ? 24f : 150f,
+                                                        thickness: Mathf.Lerp(0.7f, 1.8f, Mathf.Clamp01(-loserDelta / 12000f)),
+                                                        leaveHoseAt: loserHose.Outer));
+            }
+            return list;
+        }
+
+        /// <summary>
+        /// **没案**: 以前の本編だった、卓の血だまりから勝った側の血袋へホースを通して流す筋（2026-10-18〜19）。
+        /// 本編は全身から霧状に血が抜ける演出になった（2026-10-19「血の演出は、体から血が霧散している演出にして」）。
+        /// 演出コレクションの没案（ron.stream_local / ron.stream_enemy）だけが立てる。
+        /// </summary>
+        public static bool PreviewStreamDrain;
+
+        /// <summary>噴いた瞬間に体が赤く染まり、抜けたあと少し青白くなって戻る。色は必ず元へ戻す。</summary>
+        private static IEnumerator BleachBody(SpriteRenderer body)
+        {
+            Color original = body.color;
+            Color red = new Color(1f, 0.45f, 0.45f, original.a), pale = new Color(0.82f, 0.86f, 0.95f, original.a);
+            try
+            {
+                for (float t = 0f; t < 0.12f; t += Time.deltaTime) { if (body == null) yield break; body.color = red; yield return null; }
+                for (float t = 0f; t < 0.5f; t += Time.deltaTime)
+                {
+                    if (body == null) yield break;
+                    body.color = Color.Lerp(red, pale, PresentationTiming.Sample(t) / 0.5f);
+                    yield return null;
+                }
+                for (float t = 0f; t < 0.6f; t += Time.deltaTime)
+                {
+                    if (body == null) yield break;
+                    body.color = Color.Lerp(pale, original, PresentationTiming.Sample(t) / 0.6f);
+                    yield return null;
+                }
+            }
+            finally { if (body != null) body.color = original; }
+        }
+
+        /// <summary>
+        /// 噴き出す位置。相手は立ち絵の形（スプライトの三角形）の中から面積に比例して拾う。
+        /// 自分は画面に体が映っていないので、画面の下の縁と左右の下半分から噴かせる（一人称の自分の体）。
+        /// </summary>
+        private Effects.BloodMistEffect StartBloodMist(RectTransform stageRt, EnemyInfoUI enemyLoser,
+                                                             float amount)
+        {
+            var points = new List<Vector2>();
+            Vector2 center;
+            var body = enemyLoser != null ? enemyLoser.CharacterRenderer : null;
+            Camera cam = Camera.main;
+            if (body != null && body.sprite != null && cam != null)
+            {
+                var verts = body.sprite.vertices;
+                var tris = body.sprite.triangles;
+                var area = new List<float>();
+                float total = 0f;
+                for (int i = 0; i + 2 < tris.Length; i += 3)
+                {
+                    Vector2 a = verts[tris[i]], b = verts[tris[i + 1]], c = verts[tris[i + 2]];
+                    total += Mathf.Abs((b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y)) * 0.5f;
+                    area.Add(total);
+                }
+                // 卓より下（牌と卓に隠れている腰から下）からは噴かせない
+                float floor = Screen.height * 0.40f;
+                for (int n = 0; n < 600 && points.Count < 220 && total > 0f; n++)
+                {
+                    float pick = Random.value * total;
+                    int t = 0;
+                    while (t < area.Count - 1 && area[t] < pick) t++;
+                    Vector2 a = verts[tris[t * 3]], b = verts[tris[t * 3 + 1]], c = verts[tris[t * 3 + 2]];
+                    float r1 = Mathf.Sqrt(Random.value), r2 = Random.value;
+                    Vector2 local = (1f - r1) * a + r1 * (1f - r2) * b + r1 * r2 * c;
+                    Vector3 sp = cam.WorldToScreenPoint(body.transform.TransformPoint(local));
+                    if (sp.z > 0f && sp.y > floor) points.Add(sp);
+                }
+                center = cam.WorldToScreenPoint(body.bounds.center);
+                StartCoroutine(BleachBody(body));
+                if (enemyLoser.FaceRenderer != null) StartCoroutine(BleachBody(enemyLoser.FaceRenderer));
+            }
+            else
+            {
+                float w = Screen.width, h = Screen.height;
+                for (int n = 0; n < 120; n++) points.Add(new Vector2(Random.value * w, Random.Range(0f, h * 0.06f)));
+                for (int n = 0; n < 60; n++) points.Add(new Vector2(Random.Range(0f, w * 0.06f), Random.Range(0f, h * 0.7f)));
+                for (int n = 0; n < 60; n++) points.Add(new Vector2(w - Random.Range(0f, w * 0.06f), Random.Range(0f, h * 0.7f)));
+                center = new Vector2(w * 0.5f, h * 0.45f);
+            }
+            if (points.Count == 0) return null;
+            // 自分の体は画面の外（手前）にあるので、縁から内側へ噴かせる
+            return Effects.BloodMistEffect.Burst(stageRt, points, center, amount, inward: body == null);
         }
     }
 }

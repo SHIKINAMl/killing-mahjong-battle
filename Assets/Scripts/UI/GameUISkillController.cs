@@ -52,6 +52,7 @@ namespace KillingMahjong.UI
             IsMulliganSelection = true;
             ClearMulliganPicks();
             ShowMulliganUI();
+            ShowTutorialMulliganTargets();
         }
 
         private RectTransform _lastMulliganOutSlotRt;
@@ -83,8 +84,7 @@ namespace KillingMahjong.UI
 
         public void OnMulliganTileSelected(int tileId, RectTransform slotRt)
         {
-            // 本編は3枚選んでから送る（GameUISkillController.MulliganChoice.cs）。
-            // チュートリアルは通信の代役が1枚の形のままなので、下の今までの流れを通す
+            // 本編とチュートリアルで同じ3枚選択を使う。後者は通信せず台本へ渡す。
             if (TryPickForMulligan(tileId, slotRt)) return;
 
             IsMulliganSelection = false;
@@ -160,6 +160,7 @@ namespace KillingMahjong.UI
 
         private void HideMulliganUI()
         {
+            RestoreTutorialMulliganTargets();
             if (mulliganCanvas != null) mulliganCanvas.SetActive(false);
             if (uiManager != null)
             {

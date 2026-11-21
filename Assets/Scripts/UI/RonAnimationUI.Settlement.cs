@@ -29,17 +29,13 @@ namespace KillingMahjong.UI
         //  **速さを変えるときはここだけ触ればよい。** 以前はコードの中に
         //  0.12f や 0.8f が直接書いてあり、どれがどの間なのか分からなかった。
         //
-        //  とくに効くのは次の2つ:
-        //    - RowInterval … 役が1行ずつ入る間隔。ここが詰まると表が一瞬で埋まる
+        //  とくに効くのは最後の静止時間:
         //    - ReadHold    … 最後の静止。**パネルはこの直後に消える**ので、
         //                    表を読める最後の時間がここ
         // ------------------------------------------------------------
 
         /// <summary>枠がフェードインする時間。0.30 → 0.45</summary>
         private const float PanelFadeIn = 0.45f;
-
-        /// <summary>役の行が1行ずつ入る間隔。0.12 → 0.22</summary>
-        private const float RowInterval = 0.22f;
 
         /// <summary>合計翻数を出したあとの間。0.25 → 0.45</summary>
         private const float AfterTotalHan = 0.45f;
@@ -49,9 +45,6 @@ namespace KillingMahjong.UI
 
         /// <summary>素点・倍率ラベルを出したあとの間。0.18 → 0.30</summary>
         private const float AfterSideValue = 0.30f;
-
-        /// <summary>単騎待ちの行を出したあとの間。0.25 → 0.45</summary>
-        private const float AfterTanki = 0.45f;
 
         /// <summary>表を読み切らせる最後の静止。0.80 → 1.50</summary>
         private const float ReadHold = 1.5f;
@@ -106,20 +99,17 @@ namespace KillingMahjong.UI
             scaler.referenceResolution = new Vector2(800f, 600f);
             scaler.matchWidthOrHeight = 0f;
 
-            var hanTexts = new List<TextMeshProUGUI>();
             TextMeshProUGUI totalHanText, multiplierText;
             TextMeshProUGUI myBetText, theirBetText, myMultText, theirMultText;
-            TextMeshProUGUI tankiMine, tankiTheirs;
             TextMeshProUGUI myDeltaText, theirDeltaText, myHpText, theirHpText;
 
             CanvasGroup panelGroup = BuildSettlementPanel(containerRt, settlement,
-                hanTexts, out totalHanText, out multiplierText,
+                out totalHanText, out multiplierText,
                 out myBetText, out theirBetText, out myMultText, out theirMultText,
-                out tankiMine, out tankiTheirs,
                 out myDeltaText, out theirDeltaText, out myHpText, out theirHpText);
 
-            FillTutorialSettlementValues(settlement, hanTexts, totalHanText, multiplierText,
-                myBetText, theirBetText, myMultText, theirMultText, tankiMine, tankiTheirs);
+            FillTutorialSettlementValues(settlement, totalHanText, multiplierText,
+                myBetText, theirBetText, myMultText, theirMultText);
             panelGroup.alpha = 1f;
 
             _tutorialSettlementPanel = panelGroup.transform as RectTransform;
@@ -157,7 +147,7 @@ namespace KillingMahjong.UI
         {
             if (_tutorialSettlementPanel == null) return;
 
-            // 役の行数で高さが変わるので、寸法は確定させてから読む。
+            // 血の行を出すかどうかで高さが変わるので、寸法は確定させてから読む。
             LayoutRebuilder.ForceRebuildLayoutImmediate(_tutorialSettlementPanel);
             float w = _tutorialSettlementPanel.rect.width;
             float h = _tutorialSettlementPanel.rect.height;
@@ -231,7 +221,7 @@ namespace KillingMahjong.UI
             canvas.overrideSorting = true;
             canvas.sortingOrder = UISortingOrders.RonAnimation;
 
-            SpawnHpDeltaLabel(stageRt, enemyInfo.HpAnchor, -damage, AccentThem);
+            SpawnHpDeltaLabel(stageRt, enemyInfo.HpAnchor, -damage);
             StartCoroutine(FinishTutorialDamagePreview(scope, stage));
         }
 
@@ -246,27 +236,25 @@ namespace KillingMahjong.UI
             if (stage != null) Destroy(stage);
         }
 
-        private void FillTutorialSettlementValues(RonSettlementInfo settlement, List<TextMeshProUGUI> hanTexts,
+        private void FillTutorialSettlementValues(RonSettlementInfo settlement,
             TextMeshProUGUI totalHanText, TextMeshProUGUI multiplierText,
             TextMeshProUGUI myBetText, TextMeshProUGUI theirBetText,
-            TextMeshProUGUI myMultText, TextMeshProUGUI theirMultText,
-            TextMeshProUGUI tankiMine, TextMeshProUGUI tankiTheirs)
+            TextMeshProUGUI myMultText, TextMeshProUGUI theirMultText)
         {
-            for (int i = 0; i < hanTexts.Count && i < settlement.Rows.Count; i++)
-                hanTexts[i].text = settlement.ShowPerRowHan ? $"{settlement.Rows[i].Han}翻" : "";
-
-            string multiplier = "×" + settlement.Multiplier.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+            string multiplier = FormatMultiplier(settlement.Multiplier);
             if (totalHanText != null) totalHanText.text = $"{settlement.TotalHan}翻";
-            if (multiplierText != null) multiplierText.text = multiplier;
-            if (myBetText != null) myBetText.text = settlement.MyBet.ToString();
-            if (theirBetText != null) theirBetText.text = settlement.TheirBet.ToString();
-            if (myMultText != null) myMultText.text = multiplier;
-            if (theirMultText != null) theirMultText.text = multiplier;
+            if (multiplierText != null) multiplierText.text = settlement.ShowHpBalances ? "" : multiplier;
+            if (myBetText != null) myBetText.text = (settlement.ShowHpBalances ? settlement.MyHpBefore : settlement.MyBet).ToString();
+            if (theirBetText != null) theirBetText.text = (settlement.ShowHpBalances ? settlement.TheirHpBefore : settlement.TheirBet).ToString();
+            if (myMultText != null) myMultText.text = settlement.ShowHpBalances ? settlement.MyHpAfter.ToString() : multiplier;
+            if (theirMultText != null) theirMultText.text = settlement.ShowHpBalances ? settlement.TheirHpAfter.ToString() : multiplier;
 
-            if (settlement.IsTankiWait && tankiMine != null && tankiTheirs != null)
+            // 単騎待ちは負けた側の倍率が2倍になる。行は足さず、倍率の欄にそのまま出す。
+            var loserMult = settlement.LocalWon ? theirMultText : myMultText;
+            if (settlement.IsTankiWait && !settlement.ShowHpBalances && loserMult != null)
             {
-                tankiMine.text = settlement.LocalWon ? "-" : "×2";
-                tankiTheirs.text = settlement.LocalWon ? "×2" : "-";
+                loserMult.text = FormatMultiplier(settlement.Multiplier * 2f);
+                loserMult.color = AccentGold;
             }
         }
 
@@ -319,96 +307,123 @@ namespace KillingMahjong.UI
         }
 
         private IEnumerator SettlementRoutine(RectTransform containerRt, GameObject container, RonSettlementInfo s,
-            PlayerInfoUI playerInfo, EnemyInfoUI enemyInfo, int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp)
+            PlayerInfoUI playerInfo, EnemyInfoUI enemyInfo, int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp,
+            int ronTile = -1, bool previewOnly = false)
         {
-            // 役の帯は役目を終えている。パネルが同じ役名を翻数つきで出し直すので、
-            // 情報を落とさずに場所を空けられる。**宣言そのもの（1つずつ出る所）は上でやり終えている。**
-            var ribbon = containerRt.Find("YakuRibbon");
-            CanvasGroup ribbonGroup = null;
-            if (ribbon != null)
-            {
-                ribbonGroup = ribbon.gameObject.GetComponent<CanvasGroup>();
-                if (ribbonGroup == null) ribbonGroup = ribbon.gameObject.AddComponent<CanvasGroup>();
-            }
-
-            var hanTexts = new List<TextMeshProUGUI>();
+            // 役の紹介は斜め帯で完了している。表は合計翻数と血の精算へ進む。
             TextMeshProUGUI totalHanText, multiplierText;
             TextMeshProUGUI myBetText, theirBetText, myMultText, theirMultText;
-            TextMeshProUGUI tankiMine, tankiTheirs;
             TextMeshProUGUI myDeltaText, theirDeltaText, myHpText, theirHpText;
 
             CanvasGroup panelGroup = BuildSettlementPanel(containerRt, s,
-                hanTexts, out totalHanText, out multiplierText,
+                out totalHanText, out multiplierText,
                 out myBetText, out theirBetText, out myMultText, out theirMultText,
-                out tankiMine, out tankiTheirs,
                 out myDeltaText, out theirDeltaText, out myHpText, out theirHpText);
+
+            // 増減は先に表示し、単騎・強襲の内訳だけカットイン後に出す。
+            bool hasBonus = s.IsTankiWait || s.AssaultApplied;
+            bool assaultOnly = s.AssaultApplied && !s.IsTankiWait;
+            if (hasBonus) PrepareBonusSettlement(panelGroup.transform, s);
+            var deltaRow = myDeltaText.transform.parent;
+            if (assaultOnly) SetSettlementRowAlpha(deltaRow, 0f);
 
             // 枠がフェードインする。ここではまだ数字は入っていない
             const float fadeIn = PanelFadeIn;
             for (float t = 0; t < fadeIn; t += Time.deltaTime)
             {
-                float p = t / fadeIn;
+                float p = PresentationTiming.Sample(t) / fadeIn;
                 panelGroup.alpha = p;
-                if (ribbonGroup != null) ribbonGroup.alpha = 1f - p;
                 yield return null;
             }
             panelGroup.alpha = 1f;
-            if (ribbonGroup != null) ribbonGroup.alpha = 0f;
 
-            // ① 役ごとの翻数が上から入る
-            for (int i = 0; i < hanTexts.Count && i < s.Rows.Count; i++)
-            {
-                // **`飜`(U+98BB) は PixelMplus に入っていない。** 使うと □ になる。
-                // ゲームの他の表示テキスト（AbilityUI・チュートリアル）は `翻`(U+7FFB) を使っているので揃える。
-                // コード中のコメントや Tooltip には `飜` が残っているが、あれは画面に出ない。
-                hanTexts[i].text = s.ShowPerRowHan ? $"{s.Rows[i].Han}翻" : "";
-                yield return new WaitForSeconds(RowInterval);
-            }
-
-            // ② 合計と倍率
+            // ① 合計と倍率。役の紹介は直前の斜め帯で終えている。
             totalHanText.text = $"{s.TotalHan}翻";
             yield return new WaitForSeconds(AfterTotalHan);
-            multiplierText.text = "×" + s.Multiplier.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+            multiplierText.text = s.ShowHpBalances ? "" : "×" + s.Multiplier.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
             yield return new WaitForSeconds(AfterMultiplier);
 
             // ③ 素点と倍率が左右に入る
             string multLabel = "×" + s.Multiplier.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
-            myBetText.text = s.MyBet.ToString();
-            theirBetText.text = s.TheirBet.ToString();
+            myBetText.text = (s.ShowHpBalances ? s.MyHpBefore : s.MyBet).ToString();
+            theirBetText.text = (s.ShowHpBalances ? s.TheirHpBefore : s.TheirBet).ToString();
             yield return new WaitForSeconds(AfterSideValue);
-            myMultText.text = multLabel;
-            theirMultText.text = multLabel;
+            myMultText.text = s.ShowHpBalances ? s.MyHpAfter.ToString() : multLabel;
+            theirMultText.text = s.ShowHpBalances ? s.TheirHpAfter.ToString() : multLabel;
             yield return new WaitForSeconds(AfterSideValue);
 
-            // 単騎で倍になるのは負けた側だけ。**今まで画面のどこにも出ていなかった行。**
-            if (s.IsTankiWait && tankiMine != null && tankiTheirs != null)
+            if (hasBonus)
             {
-                // **ダッシュ `—`(U+2014) もフォントに無い。** ASCII のハイフンで代用する
-                tankiMine.text = s.LocalWon ? "-" : "×2";
-                tankiTheirs.text = s.LocalWon ? "×2" : "-";
-                yield return new WaitForSeconds(AfterTanki);
+                if (assaultOnly) SetSettlementRowAlpha(deltaRow, 1f);
+                yield return new WaitForSeconds(assaultOnly ? .75f : .50f);
+                yield return PlaySettlementBonus(containerRt, s, ronTile, playerInfo, enemyInfo);
+                yield return RevealBonusSettlement(panelGroup.transform, s);
             }
 
-            // ④ 表を読み切る間。**パネルはこのあと消える**ので、ここが表を見られる最後の時間。
-            //
-            // **`myDeltaText` / `theirDeltaText` / `myHpText` / `theirHpText` には何も入れない。**
-            // 血の増減はこの下の演出が答えとして出すもので、先にパネルへ書くと山が消える。
-            // 行そのものも `BuildSettlementPanel` で非アクティブにしてある（out は署名維持のために残している）。
-            if (KillingMahjong.Managers.AudioManager.Instance != null)
+            // ④ 最終の内訳を読む間。ボーナス無しは従来どおり飛ぶ数字で答えを示す。
+            // ボーナス有りはカットイン後の表でも確定額を示してから、既存の血移動へ進む。
+            if (!previewOnly && KillingMahjong.Managers.AudioManager.Instance != null)
             {
                 KillingMahjong.Managers.AudioManager.Instance.PlayRankVoice(s.RankName);
             }
 
             yield return new WaitForSeconds(ReadHold);
 
+            if (previewOnly) yield break;
+
             // ⑤ 血が動く。**パネルを消しながら**素点の数字を持ち出す
+            // 血を抜く直前に相手が一言しゃべる（BloodDrawLineRoutine）
             yield return BloodTransferRoutine(container, s, myBetText, theirBetText,
                 playerInfo, enemyInfo, prevLocalHp, newLocalHp, prevEnemyHp, newEnemyHp);
         }
 
+        /// <summary>相手が負けて血を抜かれるときのセリフ。</summary>
+        private const string EnemyBledLine = "「いいわ、血を抜きなさい」";
+        /// <summary>自分が負けて血を抜かれるときのセリフ。</summary>
+        private const string LocalBledLine = "「血を抜くわ」";
+        /// <summary>セリフを出し終えてから血を動かすまでの間[秒]。</summary>
+        private const float BloodDrawLineHold = 0.6f;
+        /// <summary>文字送りが終わらなくても、ここで打ち切って先へ進む[秒]。</summary>
+        private const float BloodDrawLineMaxWait = 3f;
+
+        /// <summary>
+        /// 清算の表を読ませたあと、血を抜く前に相手のセリフを出す（2026-10-19 のユーザー指示）。
+        /// 敵がダメージを受けるとき「いいわ、血を抜きなさい」、自分がダメージを受けるとき「血を抜くわ」。
+        ///
+        /// **チュートリアルでは出さない。** 吹き出しは台本が使っていて、ここで上書きすると台本の行が消える。
+        /// 演出コレクションの試写では、試写の舞台の吹き出しに出す。吹き出しが見つからなければ何もしない。
+        /// </summary>
+        private IEnumerator BloodDrawLineRoutine(int prevLocalHp, int newLocalHp, int prevEnemyHp, int newEnemyHp)
+        {
+            string line = newEnemyHp < prevEnemyHp ? EnemyBledLine
+                        : newLocalHp < prevLocalHp ? LocalBledLine
+                        : null;
+            if (line == null) yield break;
+
+            DialogueUI dialogue = null;
+            var rig = FindFirstObjectByType<EffectPreviewRig>();
+            if (rig != null && rig.ron == this) dialogue = rig.dialogue;
+            else
+            {
+                var uiMgr = FindFirstObjectByType<GameUIManager>();
+                if (uiMgr == null || uiMgr.IsTutorialMode) yield break;
+                dialogue = uiMgr.DialogueUI;
+            }
+            if (dialogue == null) yield break;
+
+            if (!dialogue.gameObject.activeSelf) dialogue.gameObject.SetActive(true);
+            dialogue.ShowText(line);
+
+            // 文字送りが始まるのは次のフレーム（DialogueUI.TypeMessageRoutine）
+            yield return null;
+            for (float t = 0f; DialogueUI.IsTalking && t < BloodDrawLineMaxWait; t += Time.deltaTime)
+                yield return null;
+            yield return new WaitForSeconds(BloodDrawLineHold);
+        }
+
         private static string FormatDelta(int v)
         {
-            return v > 0 ? "+" + v : v.ToString(); // 負号は int の表記がそのまま使える
+            return HpNumberStyle.FormatDelta(v);
         }
     }
 }

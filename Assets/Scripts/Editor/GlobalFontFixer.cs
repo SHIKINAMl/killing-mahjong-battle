@@ -90,7 +90,7 @@ public class GlobalFontFixer
             if (path.Contains("Backup")) continue;
 
             UnityEngine.SceneManagement.Scene scene = EditorSceneManager.OpenScene(path);
-            TMP_Text[] texts = Object.FindObjectsOfType<TMP_Text>(true);
+            TMP_Text[] texts = Object.FindObjectsByType<TMP_Text>(FindObjectsInactive.Include, FindObjectsSortMode.None);
 
             bool changed = false;
             foreach (var t in texts)

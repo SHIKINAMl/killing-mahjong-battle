@@ -24,6 +24,15 @@ namespace KillingMahjong.Managers
 
         private void CheckDiscardConditionsCore(int tileId, bool isLocalPlayer)
         {
+            discardRevision++;
+            capturingDiscard = true;
+            discardLogContext = (isLocalPlayer ? "自分の打牌：" : "相手の打牌：") + new KillingMahjong.TileData(tileId).GetTileName();
+            try { SelectDiscardReaction(tileId, isLocalPlayer); }
+            finally { capturingDiscard = false; }
+        }
+
+        private void SelectDiscardReaction(int tileId, bool isLocalPlayer)
+        {
             bool playedSpecial = false;
             var tData = new KillingMahjong.TileData(tileId);
 
@@ -33,7 +42,7 @@ namespace KillingMahjong.Managers
                 if (_round1DiscardCount == 1 && !isLocalPlayer) { playedSpecial = true; EnqueueCSVDialogue("相手が第１局目で先行"); }
                 else if (_round1DiscardCount == 2 && !isLocalPlayer) { playedSpecial = true; EnqueueCSVDialogue("相手が第一局目で後攻"); }
                 
-                if (_lastDiscardedTileId >= 0)
+                if (!playedSpecial && _lastDiscardedTileId >= 0)
                 {
                     var lastTile = new KillingMahjong.TileData(_lastDiscardedTileId);
                     if (tData.Category == lastTile.Category && tData.Number == lastTile.Number)
@@ -83,7 +92,7 @@ namespace KillingMahjong.Managers
             if (isLocalPlayer && PlayerActivityWatcher.Instance != null)
                 turnElapsed = PlayerActivityWatcher.Instance.TurnElapsedSeconds;
 
-            bool ruleHandled = Publish(ReactionEvent.Discard, NewContext()
+            bool ruleHandled = !playedSpecial && Publish(ReactionEvent.Discard, NewContext()
                 .Set(ReactionVars.IsMyDiscard, isLocalPlayer)
                 .Set(ReactionVars.TileSuit, SuitName(tData.Category))
                 .Set(ReactionVars.TileNumber, tData.Number)
@@ -105,26 +114,26 @@ namespace KillingMahjong.Managers
                 //   Discard_SafeTile … 「まずは無難な字牌から？」→ オタ風
                 //   Discard_RawYakuhai … 「生牌の字牌を切るなんて」→ 役牌
                 // スジ牌に対応するトリガーは無いので CSV のまま
-                if (!ruleHandled)
+                if (!playedSpecial)
                 {
                     if (tData.IsRedDora) { playedSpecial = true; PlayOrFallback(ReactionTrigger.Discard_RedDora, ReactionPriority.Situation, "プレイヤーが赤ドラを切った時"); }
-                    else if (isHonor && tData.Number >= 1 && tData.Number <= 4) { playedSpecial = true; PlayOrFallback(ReactionTrigger.Discard_SafeTile, ReactionPriority.Situation, "プレイヤーがオタ風を切った時"); }
+                    // 風牌というだけでは安全牌と断定できないため、この反応は選ばない。
                     else if (isHonor && tData.Number >= 5 && tData.Number <= 7) { playedSpecial = true; PlayOrFallback(ReactionTrigger.Discard_RawYakuhai, ReactionPriority.Situation, "プレイヤーが役牌を切った時"); }
                     else if (isMiddle) { playedSpecial = true; PlayOrFallback(ReactionTrigger.Discard_CenterTile, ReactionPriority.Situation, "プレイヤーがド真ん中の牌を切った時"); }
                     else if (isSameAsBefore) { playedSpecial = true; PlayOrFallback(ReactionTrigger.Discard_SameTileStreak, ReactionPriority.Situation, "プレイヤーが前の捨て牌と同じ牌を切った時"); }
-                    else if (isSuji) { playedSpecial = true; EnqueueCSVDialogue("プレイヤーがスジ牌を切った時"); }
+                    // スジだけを根拠に安全・正解と評価する発言は選ばない。
                 }
 
                 if (isHonor) _playerConsecutiveHonorCount++;
                 else _playerConsecutiveHonorCount = 0;
 
-                if (!ruleHandled && _playerConsecutiveHonorCount >= 3) { playedSpecial = true; PlayOrFallback(ReactionTrigger.Discard_HonorStreak, ReactionPriority.Situation, "プレイヤーが字牌を連続で切った時"); }
+                if (!playedSpecial && _playerConsecutiveHonorCount >= 3) { playedSpecial = true; PlayOrFallback(ReactionTrigger.Discard_HonorStreak, ReactionPriority.Situation, "プレイヤーが字牌を連続で切った時"); }
 
                 _playerDiscardHistory.Add(tileId);
             }
             else
             {
-                if (!ruleHandled && tData.IsRedDora) { playedSpecial = true; EnqueueCSVDialogue("敵が赤ドラを切る時"); }
+                if (!playedSpecial && tData.IsRedDora) { playedSpecial = true; EnqueueCSVDialogue("敵が赤ドラを切る時"); }
                 
                 bool isTsumogiri = _enemyDiscardHistory.Count > 0 && tileId == _lastDiscardedTileId; // 厳密なツモ切り判定はサーバーから来る情報に依存するため簡易化
                 
@@ -134,7 +143,7 @@ namespace KillingMahjong.Managers
             if (isTerminalOrHonor && !_firstTerminalHonorPlayed)
             {
                 _firstTerminalHonorPlayed = true;
-                if (!playedSpecial) { playedSpecial = true; EnqueueCSVDialogue("初めて一九字牌を切った時のセリフ"); }
+                // 端牌・字牌というだけで安全とは判断しない。
             }
             else if (!isHonor && tData.Number >= 2 && tData.Number <= 8 && !_firstMiddleTilePlayed)
             {

@@ -14,6 +14,7 @@ namespace KillingMahjong.UI
         {
             currentPhaseStatus = status;
             UpdateTurnIndicatorVisibility();
+            UpdateEnemyBeatDance(status);
 
             // 通常対局時、打牌フェイズ以外はBGMをくぐもらせる（ローパス）。
             // 開くとき・こもるときの秒数は AudioManager 側の既定に任せる
@@ -47,6 +48,18 @@ namespace KillingMahjong.UI
                     ApplyBgmFilterForCurrentPhase();
                 }
             }
+        }
+
+        /// <summary>
+        /// 女の子を曲の拍に合わせて動かす演出（2026-10-21、CPU 戦の「とくしゅ」だけのお試しだった）。
+        /// **2026-10-22 に没案にした（ユーザー指示「今は使わない」）。本編では動かさない。**
+        /// 動きは演出コレクションの没案「character.beat_dance」で見られる。
+        /// 戻すときは、手牌を選ぶあいだを Bob、打牌のあいだを Swap にする。
+        /// </summary>
+        private void UpdateEnemyBeatDance(RoundStatus status)
+        {
+            if (EnemyInfoUI == null) return;
+            EnemyInfoUI.SetBeatDance(BeatDanceAnimator.Mode.None);
         }
 
         /// <summary>保留キューでの識別名。後勝ちで畳みたいので固定の1本にする。</summary>

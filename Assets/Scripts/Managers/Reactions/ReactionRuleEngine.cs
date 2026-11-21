@@ -166,7 +166,11 @@ namespace KillingMahjong.Managers.Reactions
                 if (l != null && !string.IsNullOrEmpty(l.text)) usable.Add(l);
 
             if (usable.Count == 0) return null;
-            return usable[Random.Range(0, usable.Count)];
+            int index = Random.Range(0, usable.Count);
+            if (usable.Count > 1 && index == rule.lastLineIndex)
+                index = (index + Random.Range(1, usable.Count)) % usable.Count;
+            rule.lastLineIndex = index;
+            return usable[index];
         }
     }
 }

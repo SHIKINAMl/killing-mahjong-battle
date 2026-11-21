@@ -13,7 +13,7 @@ namespace KillingMahjong.Editor
         public static void FixAllCanvases()
         {
             // 1. 現在のシーン内の全てのCanvasScalerを取得
-            CanvasScaler[] sceneScalers = Object.FindObjectsOfType<CanvasScaler>(true);
+            CanvasScaler[] sceneScalers = Object.FindObjectsByType<CanvasScaler>(FindObjectsInactive.Include, FindObjectsSortMode.None);
             int count = 0;
 
             foreach (var scaler in sceneScalers)

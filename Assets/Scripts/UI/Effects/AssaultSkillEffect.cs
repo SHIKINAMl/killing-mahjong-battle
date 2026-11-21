@@ -100,7 +100,7 @@ namespace KillingMahjong.UI.Effects
             // ---- ① 暗転 ----
             for (float t = 0f; t < DimSeconds; t += Time.deltaTime)
             {
-                float p = Mathf.Sin(Mathf.Clamp01(t / DimSeconds) * Mathf.PI * 0.5f);
+                float p = Mathf.Sin(Mathf.Clamp01(PresentationTiming.Sample(t) / DimSeconds) * Mathf.PI * 0.5f);
                 SetStage(dim, casterCopy, casterColor, targetCopy, targetColor, p);
                 yield return null;
             }
@@ -110,7 +110,7 @@ namespace KillingMahjong.UI.Effects
             if (audio != null) audio.PlayHeartbeat(HeartbeatStrength.Strong, HeartbeatSpacing.Compact);
             for (float t = 0f; t < ChargeSeconds; t += Time.deltaTime)
             {
-                float p = Mathf.Clamp01(t / ChargeSeconds);
+                float p = Mathf.Clamp01(PresentationTiming.Sample(t) / ChargeSeconds);
                 // 前の8割でふくらみ、残りで縮む（引き金を引く溜め）
                 float r = p < 0.8f
                     ? Mathf.Lerp(0f, ChargeRadius, Mathf.Sin(p / 0.8f * Mathf.PI * 0.5f))
@@ -133,11 +133,11 @@ namespace KillingMahjong.UI.Effects
             }
 
             // ---- ③ 撃つ。筋を引いて、相手へ一直線 ----
-            if (audio != null) audio.PlaySynthSoundDual(SynthWaveType.Sine, SynthWaveType.Noise, 620f, 180f, 0.16f, 0.9f);
+            if (audio != null) audio.PlayAssaultSE();
             ScreenQuake.Play(5f, 0.1f);                       // 撃った反動
             for (float t = 0f; t < ShotSeconds; t += Time.deltaTime)
             {
-                float p = Mathf.Clamp01(t / ShotSeconds);
+                float p = Mathf.Clamp01(PresentationTiming.Sample(t) / ShotSeconds);
                 shapes.Begin();
                 DrawStreak(shapes, muzzle, to, p, ShotRadius, ShotRadius * 0.8f, 1f);
                 shapes.End();
@@ -147,15 +147,16 @@ namespace KillingMahjong.UI.Effects
             // ---- ④ 当たる。相手が跳ね、札が叩きつけられる。印が残る ----
             if (onHit != null) onHit();
             ScreenQuake.Play(14f, 0.22f);
-            if (audio != null) audio.PlaySynthSoundDual(SynthWaveType.Sine, SynthWaveType.Noise, 200f, 60f, 0.24f, 1.0f);
+            // 当たりは打撃音を低くして重く鳴らす
+            if (audio != null) audio.PlayStingerPitched("se_hit", 0.8f, AudioManager.PitchJitter.None);
             AssaultMarkUI.Show(targetHpAnchor);
 
             // 当たった所から輪が2つ広がり、しぶきが散る。札は大きい所から叩きつけられる。
             // 印（AssaultMarkUI）は暗転より奥に居て、白く光るまで見えない。そのあいだはここで同じ札を描く
             for (float t = 0f; t < HoldBeforeFlash; t += Time.deltaTime)
             {
-                float p = Mathf.Clamp01(t / 0.32f);
-                float slam = Mathf.Clamp01(t / SlamSeconds);
+                float p = Mathf.Clamp01(PresentationTiming.Sample(t) / 0.32f);
+                float slam = Mathf.Clamp01(PresentationTiming.Sample(t) / SlamSeconds);
 
                 shapes.Begin();
                 for (int k = 0; k < 2; k++)

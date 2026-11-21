@@ -46,11 +46,11 @@ namespace KillingMahjong.UI
 
         /// <summary>打牌フェイズで手牌を普段は隠し、ボタンを押している間だけ出すか。
         /// 打牌フェイズで捨てるのは山牌なので、手牌は参照情報でしかない</summary>
-        private const bool HideHandUntilPeek = true;
+        private static readonly bool HideHandUntilPeek = true;
 
         /// <summary>覗いている間に背景を暗くするか。
         /// 一瞬見るだけなので、暗くしない方が邪魔にならない</summary>
-        private const bool PeekUseDimmer = false;
+        private static readonly bool PeekUseDimmer = false;
 
         /// <summary>暗くする場合の濃さ（PeekUseDimmer が true のときだけ効く）</summary>
         private const float PeekDimAlpha = 0.55f;
@@ -59,7 +59,7 @@ namespace KillingMahjong.UI
 
         /// <summary>覗いている間、手牌を画面中央へ寄せて拡大するか。
         /// false なら普段いる場所（画面左下）にそのまま出る</summary>
-        private const bool PeekCenterOverlay = true;
+        private static readonly bool PeekCenterOverlay = true;
 
         /// <summary>覗いている間の手牌の位置。Canvas の中央が原点。
         /// 上げすぎるとキャラのセリフの吹き出しと被る</summary>
@@ -191,7 +191,7 @@ namespace KillingMahjong.UI
             for (float t = 0f; t < QuietFadeSeconds; t += Time.unscaledDeltaTime)
             {
                 if (quietGroup == null) yield break;
-                quietGroup.alpha = Mathf.Lerp(from, to, t / QuietFadeSeconds);
+                quietGroup.alpha = Mathf.Lerp(from, to, PresentationTiming.Sample(t) / QuietFadeSeconds);
                 yield return null;
             }
             if (quietGroup != null) quietGroup.alpha = to;
@@ -240,7 +240,7 @@ namespace KillingMahjong.UI
             while (elapsed < BattleStartRiseDuration)
             {
                 elapsed += Time.deltaTime;
-                float progress = Mathf.Clamp01(elapsed / BattleStartRiseDuration);
+                float progress = Mathf.Clamp01(PresentationTiming.Sample(elapsed) / BattleStartRiseDuration);
                 // 終点で減速させ、着弾の揺れのあとに手牌だけが跳ねないようにする。
                 progress = 1f - (1f - progress) * (1f - progress);
                 if (target != null)
@@ -282,7 +282,7 @@ namespace KillingMahjong.UI
         // **麻雀の常識では画面最下段＝自分の手牌**なので、初見はまず取り違える。
 
         /// <summary>案内を出すか。うるさければ false に</summary>
-        private const bool ShowPhaseGuide = true;
+        private static readonly bool ShowPhaseGuide = true;
 
         /// <summary>
         /// 山牌の上端から、どれだけ上に置くか。

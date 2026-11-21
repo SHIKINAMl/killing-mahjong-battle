@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using System.Collections.Generic;
 
 namespace KillingMahjong.UI
@@ -10,6 +10,8 @@ namespace KillingMahjong.UI
         [SerializeField] private GameObject tilePrefab;
         [SerializeField] private TileResourceManager tileResourceManager;
         [SerializeField] private TMPro.TextMeshProUGUI turnText; // 左上の打目表示用UI
+        [Tooltip("左上の打牌数の円グラフ。置いてあれば文字（turnText）の代わりにこちらを出す")]
+        [SerializeField] private TurnPieUI turnPie;
 
         [Header("Layout Settings")]
         [SerializeField] private float tileWidth = 50.0f;
@@ -34,6 +36,7 @@ namespace KillingMahjong.UI
         private const int MaxPerRow = 9;
 
         private List<Transform> discardedTiles = new List<Transform>();
+        private bool rebuildingRiver;
 
         /// <summary>
         /// いちばん最後に置いた牌。**ロン演出で「その牌だけ光らせる」ために使う**（2026-10-04）。
@@ -53,6 +56,7 @@ namespace KillingMahjong.UI
         }
 
         private RectTransform _tilesBoundsProxy;
+        private readonly Vector3[] tileBoundsCorners = new Vector3[4];
 
         /// <summary>
         /// いま置いてある牌ぜんぶを囲む矩形（2026-10-07）。
@@ -76,18 +80,16 @@ namespace KillingMahjong.UI
             bool any = false;
             Vector2 min = new Vector2(float.MaxValue, float.MaxValue);
             Vector2 max = new Vector2(float.MinValue, float.MinValue);
-            var corners = new Vector3[4];
-
             foreach (var t in discardedTiles)
             {
                 var rt = t as RectTransform;
                 if (rt == null || !rt.gameObject.activeInHierarchy) continue;
 
                 // 敵の河は180度回してあるので、ローカルの大きさではなく世界座標の四隅で測る
-                rt.GetWorldCorners(corners);
+                rt.GetWorldCorners(tileBoundsCorners);
                 for (int i = 0; i < 4; i++)
                 {
-                    Vector2 p = self.InverseTransformPoint(corners[i]);
+                    Vector2 p = self.InverseTransformPoint(tileBoundsCorners[i]);
                     min = Vector2.Min(min, p);
                     max = Vector2.Max(max, p);
                     any = true;
@@ -235,7 +237,7 @@ namespace KillingMahjong.UI
             UpdateTurnText();
             UpdateSiblingOrder();
 
-            PlayPlacedHeartbeat();
+            if (!rebuildingRiver) DiscardFeedbackDirector.Notify(this, isEnemyRiver, discardedTiles.Count);
             if (willFly) FinishVoltage(rt);
         }
 
@@ -271,7 +273,7 @@ namespace KillingMahjong.UI
             UpdateTurnText();
             UpdateSiblingOrder();
 
-            PlayPlacedHeartbeat();
+            if (!rebuildingRiver) DiscardFeedbackDirector.Notify(this, isEnemyRiver, discardedTiles.Count);
             if (willFly) FinishVoltage(rt);
         }
 
@@ -287,26 +289,6 @@ namespace KillingMahjong.UI
         }
 
         /// <summary>
-        /// 牌が河に置かれた直後の心音（弱・詰まった1拍）。
-        ///
-        /// **ここ1か所だけで鳴らす。** <see cref="AddTile"/> と
-        /// <see cref="AddExistingTile"/> は自分・相手・チュートリアルの
-        /// すべての打牌が通る場所なので、`GameUIManager.HandleDiscardEvent` や
-        /// `TutorialManager` 側にも足すと二重に鳴る。
-        ///
-        /// **鳴らすのは自分の打牌だけ**（2026-10-01 の指示）。
-        /// 相手の打牌でも鳴らしていたが、自分が切る緊張を表す音なので、
-        /// 両方で鳴ると打牌のたびに鳴り続けて意味が薄れる。
-        /// </summary>
-        private void PlayPlacedHeartbeat()
-        {
-            if (isEnemyRiver) return;
-
-            var audio = KillingMahjong.Managers.AudioManager.Instance;
-            if (audio != null) audio.PlayDiscardHeartbeat();
-        }
-
-        /// <summary>
         /// 牌を1枚置く前に呼ぶ。まだ出ていない牌なら、**記録だけ先に済ませて
         /// 段を上げるのは後回しにする**（光が着いてから上げるため）。
         /// すでに出ている牌なら、その場で段を落とす。
@@ -319,7 +301,9 @@ namespace KillingMahjong.UI
         {
             if (!KillingMahjong.Managers.VoltageSystem.IsNewTileType(tileId))
             {
+                int previous = KillingMahjong.Managers.VoltageSystem.GetPoints(isEnemyRiver);
                 KillingMahjong.Managers.VoltageSystem.NotifyDiscard(isEnemyRiver, tileId);
+                if (!rebuildingRiver && previous > 0) KillingMahjong.Managers.AudioManager.Instance?.PlayVoltageBreakSE();
                 return false;
             }
 
@@ -334,8 +318,7 @@ namespace KillingMahjong.UI
         private void FinishVoltage(RectTransform rt)
         {
             bool enemy = isEnemyRiver;
-            // **光が出せない場面でも同じ包みを通す。** 直に
-            // `ApplyDiscardResult` を呼ぶと、そちらの経路だけ心音が鳴らなくなる。
+            // 光が出せない場面でも同じ経路で反映し、段が上がった合図をそろえる。
             if (!VoltageTileFlightEffect.TryPlay(rt, enemy, () => ApplyVoltageWithHeartbeat(enemy)))
             {
                 ApplyVoltageWithHeartbeat(enemy);
@@ -343,7 +326,7 @@ namespace KillingMahjong.UI
         }
 
         /// <summary>
-        /// ゲージへ反映し、**実際にポイントが増えたときだけ**心音を鳴らす。
+        /// ゲージへ反映し、段が上がったときだけ短い合図を鳴らす。
         ///
         /// 増えたかどうかを前後で比べているのは、鳴らしてはいけない場合が
         /// 3つあるから。既出牌で途切れたとき（ここは `NotifyDiscard` 側を通るので
@@ -366,7 +349,7 @@ namespace KillingMahjong.UI
             if (afterPoints <= beforePoints) return;
 
             var audio = KillingMahjong.Managers.AudioManager.Instance;
-            if (audio != null) audio.PlayVoltageHeartbeat(afterLevel > beforeLevel);
+            if (audio != null) audio.PlayVoltageHeartbeat(afterLevel > beforeLevel, afterLevel);
         }
 
         private void ApplyRiverLayout(RectTransform rt)
@@ -452,11 +435,24 @@ namespace KillingMahjong.UI
         /// </summary>
         public RectTransform TurnTextRect
         {
-            get { return turnText != null ? turnText.rectTransform : null; }
+            get
+            {
+                if (turnPie != null) return turnPie.rectTransform;
+                return turnText != null ? turnText.rectTransform : null;
+            }
         }
 
         public void UpdateTurnText()
         {
+            // 円グラフがあれば、文字は出さずにこちらで見せる（2026-11-08 ユーザー指示。TurnPieUI の注記）
+            if (turnPie != null)
+            {
+                turnPie.Show(discardedTiles.Count,
+                    KillingMahjong.Managers.BoardStateManager.Instance.IsLocalPlayerFirstRound);
+                turnPie.gameObject.SetActive(true);
+                if (turnText != null) turnText.gameObject.SetActive(false);
+                return;
+            }
             if (turnText != null)
             {
                 int turnCount = discardedTiles.Count;
@@ -487,6 +483,7 @@ namespace KillingMahjong.UI
 
         public void Clear()
         {
+            DiscardFeedbackDirector.ResetForScene(gameObject.scene);
             // 局が切り替わって河が空になるので、ボルテージも履歴ごと捨てる。
             // 自分・相手の河は続けて Clear されるが、二度呼んでも害はない。
             KillingMahjong.Managers.VoltageSystem.ResetAll();
@@ -506,15 +503,35 @@ namespace KillingMahjong.UI
             discardedTiles.Clear();
         }
 
+        /// <summary>チュートリアルの分岐中に追加した牌だけを片付ける。既存の河は保持する。</summary>
+        internal System.Action CaptureTutorialCheckpoint()
+        {
+            int count = discardedTiles.Count;
+            return () => {
+                var manager = FindFirstObjectByType<GameUIManager>();
+                while (discardedTiles.Count > count)
+                {
+                    int last = discardedTiles.Count - 1;
+                    var tile = discardedTiles[last];
+                    discardedTiles.RemoveAt(last);
+                    if (tile == null) continue;
+                    if (manager != null && manager.VisualController != null)
+                        manager.VisualController.poolManager.ReturnTileToPool(tile.gameObject);
+                    else Destroy(tile.gameObject);
+                }
+                UpdateTurnText();
+                DiscardFeedbackDirector.ResetForScene(gameObject.scene);
+            };
+        }
+
         public void SetRiver(List<int> tileIds)
         {
             Clear();
             if (tileIds != null)
             {
-                foreach(int tileId in tileIds)
-                {
-                    AddTile(tileId);
-                }
+                rebuildingRiver = true;
+                try { foreach(int tileId in tileIds) AddTile(tileId); }
+                finally { rebuildingRiver = false; }
             }
             UpdateTurnText();
         }

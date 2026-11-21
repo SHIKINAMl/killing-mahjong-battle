@@ -24,6 +24,12 @@ namespace KillingMahjong.EngineData
         public string client_id;
         public bool is_cpu;
         public CpuOpponentData cpu;
+
+        /// <summary>
+        /// game_started の名前（2026-10-20）。名前を登録していない人・CPU は空（サーバーは null を送る）。
+        /// 画面に出すときは、空なら「名無し」や CPU の強さなどに置き換える。
+        /// </summary>
+        public string name;
     }
     [Serializable]
     public class CpuOpponentData { public string difficulty; }
@@ -538,9 +544,17 @@ namespace KillingMahjong.EngineData
         public bool EnemyScoreFound;
 
         /// <summary>
-        /// なぜ終わったか。`hp_zero` / `cumulative_earned_points` / `max_rounds` / `unknown`。
-        /// **実際にいちばん多いのは `unknown`**（最低賭け金を払えなくなった決着がここに落ちる）。
+        /// なぜ終わったか。`hp_zero` / `cumulative_earned_points` / `bet_unpayable` / `max_rounds` / `unknown`。
+        /// 賭け金を払えなくなった決着は、いまは `bet_unpayable` で届く（以前は `unknown` に落ちていた）。
         /// </summary>
         public string VictoryMethod = "";
+
+        /// <summary>
+        /// `bet_unpayable_players`（次の賭け金を払えずに負けた側）が届いたか、と自分／相手が入っていたか。
+        /// 決着理由 `bet_unpayable` のときは、**HP の大小ではなくこれで勝敗が決まる**（2026-10-17）。
+        /// </summary>
+        public bool BetUnpayableKnown;
+        public bool LocalBetUnpayable;
+        public bool EnemyBetUnpayable;
     }
 }

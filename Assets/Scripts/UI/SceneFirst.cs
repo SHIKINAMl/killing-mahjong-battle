@@ -101,6 +101,18 @@ namespace KillingMahjong.UI
             return null;
         }
 
+        /// <summary>いままでに作って、まだ知らせていない物の数。<see cref="ForgetSince"/> と組で使う</summary>
+        public static int CreatedCount => CreatedNames.Count;
+
+        /// <summary>
+        /// <paramref name="mark"/>（<see cref="CreatedCount"/> で取った数）より後に作った物を、知らせる一覧から外す。
+        /// シーンに置かなくてよい物を作ったとき用（実行時にできるボタンに付ける枠など。2026-10-23）
+        /// </summary>
+        public static void ForgetSince(int mark)
+        {
+            if (mark >= 0 && mark < CreatedNames.Count) CreatedNames.RemoveRange(mark, CreatedNames.Count - mark);
+        }
+
         /// <summary>
         /// 組み立ての終わりに呼ぶ。**再生中に**作った物があれば、シーンへ置き忘れているので知らせる。
         /// </summary>

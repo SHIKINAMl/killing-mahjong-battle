@@ -129,6 +129,29 @@ namespace KillingMahjong.UI
         private int _level;
         private bool _broken;
         private float _fieldOffset;
+        private float _ignitionProgress = 1f;
+        private bool _ignitionFromBelow;
+
+        internal void BeginIgnition()
+        {
+            _ignitionProgress = 0f;
+            _ignitionFromBelow = true;
+            if (_level > 0 && !_broken)
+            {
+                Reseed();
+                for (int i = 0; i < _particles.Length; i++) _particles[i].Age = 0f;
+            }
+            ApplyVisibility();
+            SetVerticesDirty();
+        }
+
+        internal void SetIgnitionProgress(float progress)
+        {
+            _ignitionProgress = Mathf.Clamp01(progress);
+            if (_ignitionProgress >= 1f) _ignitionFromBelow = false;
+            ApplyVisibility();
+            SetVerticesDirty();
+        }
 
         /// <summary>燃えている四角。**外周から粒を湧かせる**ので、大きさを毎回ここから読む。</summary>
         private RectTransform _pip;
@@ -232,7 +255,7 @@ namespace KillingMahjong.UI
         {
             // **破棄された段では燃やさない。** あそこは灰色で「落ちた」ことを示す場なので、
             // 炎が残っていると勢いがあるように見える。
-            bool show = _level > 0 && !_broken;
+            bool show = _level > 0 && !_broken && _ignitionProgress > 0f;
             if (gameObject.activeSelf != show) gameObject.SetActive(show);
         }
 
@@ -271,7 +294,13 @@ namespace KillingMahjong.UI
             float s = Random.value * perimeter;
 
             float x, y;
-            if (s < r.width)                      // 下辺
+            if (_ignitionFromBelow)
+            {
+                // 登場時だけは対象ブロックの下端から湧かせる。燃え始めた後は通常の外周へ戻す。
+                x = Random.Range(-hw, hw);
+                y = -hh - 2f;
+            }
+            else if (s < r.width)                      // 下辺
             {
                 x = -hw + s; y = -hh;
             }
@@ -313,7 +342,7 @@ namespace KillingMahjong.UI
 
         private void Update()
         {
-            if (_level <= 0 || _broken) return;
+            if (_level <= 0 || _broken || _ignitionProgress <= 0f) return;
 
             Tuning t = ByLevel[_level];
             if (_particles == null || _particles.Length != t.Count) Reseed();
@@ -336,6 +365,7 @@ namespace KillingMahjong.UI
                 // 上ほど速く、外へ広がる。炎は上で開く
                 float up = _particles[i].Age / _particles[i].Life;
                 v.y += t.Rise * (0.6f + 0.8f * up);
+                if (_ignitionFromBelow && up < .4f) v.y = Mathf.Max(v.y, t.Rise * .6f);
                 v.x *= 0.7f + 1.1f * up;
 
                 _particles[i].Pos += v * dt;
@@ -363,6 +393,7 @@ namespace KillingMahjong.UI
 
                 // 最後の2割で消す。ふっと無くなるより、薄れて終わるほうが炎に見える
                 if (up > 0.8f) c.a *= 1f - (up - 0.8f) / 0.2f;
+                c.a *= _ignitionProgress;
                 if (c.a <= 0.01f) continue;
 
                 // **座標も大きさも整数に丸める。** ドット絵の中で半端な位置に置くと、

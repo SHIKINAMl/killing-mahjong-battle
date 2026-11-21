@@ -259,7 +259,7 @@ namespace KillingMahjong.UI.Effects
         {
             // **実時間で回す。** 待機画面は時間が止まっていることがある
             float dt = Time.unscaledDeltaTime;
-            float t = Time.unscaledTime;
+            float t = PresentationTiming.Sample(Time.unscaledTime);
 
             UpdateLights(t);
             UpdateShadowAndParallax();

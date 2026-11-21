@@ -64,6 +64,12 @@ namespace KillingMahjong.Common
         /// <summary>展示用タイトルの全画面クリック受付。ローディングやメニューより奥。</summary>
         public const int TitleStartInput = 10;
 
+        /// <summary>
+        /// 展示のタイトル画面になったランキングと動画（2026-10-21。2026-10-23 からタイトルそのもの）。
+        /// 全画面クリック受付の**奥**。受付の上の「対局へ」「デバッグ部屋」のボタンを手前に出し、どこを押しても始まるようにする。
+        /// </summary>
+        public const int TitleRankingBoard = 9;
+
         /// <summary>DoraDisplayUI: ドラ表示牌 (WorldSpace Canvas)</summary>
         public const int DoraTile = 10;
 
@@ -84,6 +90,13 @@ namespace KillingMahjong.Common
         /// 覗いている間だけ HandPeekTiles+1 まで上げる（そうしないと中央へ寄せた手牌に隠れる）。
         /// 前面に置きっぱなしにすると、賭け金確定後の演出にボタンが被る</summary>
         public const int HandPeekButtonIdle = 17;
+
+        /// <summary>
+        /// MatchmakingUI: 部屋を作って合言葉を見せている間の待ち画面（2026-10-23）。
+        /// 相手の吹き出し(16)より手前に出し、挨拶の吹き出しが合言葉に被らないようにする。
+        /// 待っている間は手牌のボタン(17)は出ていないので同じ段でよい
+        /// </summary>
+        public const int MatchmakingPasscode = 17;
 
         /// <summary>BettingUI: ベット時の背景ディマー（BettingPanel より奥）</summary>
         public const int BettingDimmer = 19;
@@ -234,6 +247,12 @@ namespace KillingMahjong.Common
         public const int TitleMenuOverlay = 81;
 
         /// <summary>
+        /// MatchNamePromptUI: 名前を書かないまま対局へ進もうとしたときの名前の欄（2026-10-23）。
+        /// 対局メニュー(81)を開く前に出し、メニューと同時には出ないので同じ段に置く。部屋の画面(80)より手前
+        /// </summary>
+        public const int MatchNamePrompt = 81;
+
+        /// <summary>
         /// CollectionUI: タイトルの部屋から開くコレクション画面（音楽・CG・役）。
         ///
         /// 部屋の待機画面(80)と対戦メニュー(81)の**手前**に置く。全画面を覆うモーダルで、
@@ -245,14 +264,14 @@ namespace KillingMahjong.Common
         /// TutorialArchiveUI: オプションから開くチュートリアル資料。
         /// オプション画面より前で操作を受け、タイトルのコレクション画面とは重ならない。
         /// </summary>
-        public const int TutorialArchive = 83;
+        public const int TutorialArchive = 102;
 
         /// <summary>
         /// 資料の中で範囲を示す強調（2026-09-29）。**資料より手前に置く。**
-        /// 通常の `TutorialHighlight`(63) のままだと資料(83)の下に潜って見えない。
+        /// 通常の `TutorialHighlight` のままだと資料の下に潜って見えない。
         /// 実機で band を出しても画面に出ず、これで気づいた。
         /// </summary>
-        public const int TutorialArchiveHighlight = 84;
+        public const int TutorialArchiveHighlight = 103;
 
         /// <summary>WaitUI: 待ち牌表示を最前面に出す際のレイヤー</summary>
         public const int WaitDisplayFront = 84;
@@ -363,8 +382,14 @@ namespace KillingMahjong.Common
         /// 奥なのは、押している間もカーソルが見えていてよいため。</summary>
         public const int TutorialIntro = 98;
 
-        /// <summary>導入中の設定。会話送りと説明の覆いより手前で操作できるようにする。</summary>
-        public const int TutorialSettings = 99;
+        /// <summary>導入中の設定ボタン。問いかけの覆いより手前、資料と設定画面より奥。</summary>
+        public const int TutorialSettingsButton = 99;
+
+        /// <summary>チュートリアル資料。設定ボタンが資料に重ならないようにする。</summary>
+        public const int TutorialDocument = 100;
+
+        /// <summary>設定画面。設定ボタン・会話送り・資料の覆いより手前。</summary>
+        public const int TutorialSettings = 101;
 
         /// <summary>
         /// CustomCusor: 自前マウスカーソル。常に全UIより手前。
@@ -387,6 +412,9 @@ namespace KillingMahjong.Common
 
         /// <summary>チュートリアル動画の字幕。通常セリフと画面効果より手前。</summary>
         public const int TutorialSubtitle = 92;
+
+        /// <summary>チュートリアル復活の黒い空間。通常字幕・台詞より前、試写の操作より後ろ。</summary>
+        public const int TutorialRevival = 100;
 
         /// <summary>
         /// コレクションの演出の試写の操作欄（上の題名、下の「もう一度」「繰り返し」「一覧へ戻る」）。

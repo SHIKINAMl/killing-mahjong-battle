@@ -13,7 +13,7 @@ namespace KillingMahjong.UI
         private TMP_Text message;
         private bool returning;
 
-        public static SessionPrompt Show(string text, string actionLabel, Action action)
+        public static SessionPrompt Show(string text, string actionLabel, Action action, string cancelLabel = null)
         {
             var root = new GameObject("SessionPrompt", typeof(RectTransform), typeof(Canvas),
                 typeof(CanvasScaler), typeof(GraphicRaycaster), typeof(Image), typeof(SessionPrompt));
@@ -26,7 +26,26 @@ namespace KillingMahjong.UI
             root.GetComponent<Image>().color = new Color(0.04f, 0.01f, 0.02f, 0.96f);
             var prompt = root.GetComponent<SessionPrompt>();
             prompt.message = MakeText(root.transform, text, new Vector2(0f, 50f), new Vector2(700f, 180f));
-            CreateButton(root.transform, actionLabel, new Vector2(0f, -100f), action);
+            if (string.IsNullOrEmpty(cancelLabel))
+            {
+                CreateButton(root.transform, actionLabel, new Vector2(0f, -100f), action);
+            }
+            else
+            {
+                var cancel = CreateButton(root.transform, cancelLabel, new Vector2(-114f, -100f), () => Destroy(root));
+                var confirm = CreateButton(root.transform, actionLabel, new Vector2(114f, -100f), () =>
+                {
+                    root.SetActive(false);
+                    Destroy(root);
+                    action();
+                });
+                foreach (var button in new[] { cancel, confirm })
+                {
+                    var rect = (RectTransform)button.transform;
+                    rect.sizeDelta = new Vector2(200f, 50f);
+                    button.GetComponentInChildren<TMP_Text>().rectTransform.sizeDelta = rect.sizeDelta;
+                }
+            }
             return prompt;
         }
 
@@ -55,9 +74,7 @@ namespace KillingMahjong.UI
             rect.sizeDelta = size;
             rect.anchoredPosition = position;
             var text = obj.GetComponent<TextMeshProUGUI>();
-            TMP_FontAsset font = null;
-            foreach (var existing in FindObjectsByType<TMP_Text>(FindObjectsInactive.Include, FindObjectsSortMode.None))
-                if (existing != text && existing.font != null) { font = existing.font; break; }
+            TMP_FontAsset font = GameUiTypography.Body;
             if (font != null) text.font = font;
             text.text = value;
             text.fontSize = 24f;
@@ -84,7 +101,27 @@ namespace KillingMahjong.UI
             if (client != null) await Task.WhenAny(client.ResetConnectionAsync(), Task.Delay(2000));
             if (this == null) return;
             LoadingManager.Instance?.ForceHide();
-            SceneManager.LoadScene("タイトルシーン");
+            // タイトルではなくデバッグ部屋へ（2026-10-23 ユーザー指示「タイトルへは放置した時だけ行くようにして」）
+            SceneManager.LoadScene(TutorialNavigation.DebugRoomSceneName);
+        }
+
+        /// <summary>
+        /// 離席で戻るとき用。タイトルへ戻すのではなく、設定画面の「展示用リセット」と同じ初期化をかけて
+        /// 起動し直す（<see cref="Core.ExhibitionReset"/>。2026-10-23 ユーザー指示「5分経った時もそのリセット処理を入れて」）。
+        /// 対局中なら先に通信を切る。チュートリアル中でも飛ばす処理は通さない（進み具合ごと消すので）
+        /// </summary>
+        public async void ResetForNextVisitor()
+        {
+            if (returning) return;
+            returning = true;
+            foreach (var button in GetComponentsInChildren<Button>()) button.interactable = false;
+            TutorialNavigation.Cancel();
+            Managers.Tutorial.TutorialAudioDirector.ResetVisuals();
+            var client = WebSocketGameClientSample.Instance;
+            if (client != null) await Task.WhenAny(client.ResetConnectionAsync(), Task.Delay(2000));
+            if (this == null) return;
+            LoadingManager.Instance?.ForceHide();
+            Core.ExhibitionReset.Run();
         }
     }
 }

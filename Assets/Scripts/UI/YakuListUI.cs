@@ -85,9 +85,12 @@ namespace KillingMahjong.UI
 
         public void OpenYakuList()
         {
+            var owner = FindFirstObjectByType<GameUIManager>();
+            if (owner != null && (owner.IsRonInputPlaying ||
+                (owner.RonWaitPanel != null && owner.RonWaitPanel.activeInHierarchy))) return;
+
             if (yakuListPanel != null) yakuListPanel.SetActive(false);
             if (browser == null) browser = YakuSelectionUI.CreateBrowser();
-            var owner = FindFirstObjectByType<GameUIManager>();
             browser.ShowBrowser(CloseYakuList, owner != null ? owner.TileResourceManager : null,
                 _lastLocalBoost, _lastEnemyBoost);
         }
@@ -242,7 +245,7 @@ namespace KillingMahjong.UI
         /// <summary>自分の強化の枠のうち、この役の枠を伏せる。演出が届いたら <see cref="ReleaseLocalBoostChip"/> で戻す。</summary>
         public void HoldLocalBoostChip(string yakuName)
         {
-            _heldLocalYaku = string.IsNullOrEmpty(yakuName) ? null : yakuName;
+            _heldLocalYaku = string.IsNullOrEmpty(yakuName) ? null : YakuExamples.DisplayName(yakuName);
             _heldUntil = Time.unscaledTime + ChipHoldLimitSeconds;
             ApplyLocalChipHold();
         }
@@ -262,12 +265,13 @@ namespace KillingMahjong.UI
         public RectTransform LocalBoostChipOf(string yakuName)
         {
             if (localActiveBoostTexts == null || string.IsNullOrEmpty(yakuName)) return null;
+            string displayName = YakuExamples.DisplayName(yakuName);
 
             TextMeshProUGUI last = null;
             foreach (var text in localActiveBoostTexts)
             {
                 if (text == null || !text.gameObject.activeInHierarchy) continue;
-                if (text.text == yakuName) return text.transform.parent as RectTransform;
+                if (text.text == displayName) return text.transform.parent as RectTransform;
                 last = text;
             }
             return last != null && last.text.StartsWith("+") ? last.transform.parent as RectTransform : null;
@@ -291,7 +295,7 @@ namespace KillingMahjong.UI
         public void SpotlightLocalBoost(string yakuName, float seconds)
         {
             if (string.IsNullOrEmpty(yakuName)) return;
-            _spotlightYaku = yakuName;
+            _spotlightYaku = YakuExamples.DisplayName(yakuName);
             // 演出と同じ時計（Time.time）で数える。演出の明滅と足並みをそろえるため
             _spotlightUntil = Time.time + seconds;
             UpdateBoostData(_lastLocalBoost, _lastEnemyBoost);
@@ -535,7 +539,9 @@ namespace KillingMahjong.UI
 
             if (hasName)
             {
-                nameText.text = combined.Substring(0, plus);
+                // 役名はサーバーから届いたまま（断么九 など）。「么」はフォントに無く □ になるので、
+                // 表示用の名前（断幺九）にして出す（2026-10-24）
+                nameText.text = YakuExamples.DisplayName(combined.Substring(0, plus));
                 if (bonusText != null) bonusText.text = combined.Substring(plus);
             }
             else

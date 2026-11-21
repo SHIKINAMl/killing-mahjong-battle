@@ -4,6 +4,7 @@ using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
+using UnityEngine.UI;
 
 namespace KillingMahjong.Tests
 {
@@ -42,12 +43,14 @@ namespace KillingMahjong.Tests
             var row = new GameObject("IntroAbilityRow", typeof(RectTransform)); row.transform.SetParent(window.transform);
             item = row.AddComponent(Main("UI.AbilityItemUI"));
             ((IList)Field(ability, "instantiatedItems")).Add(item);
-            ability.GetType().GetProperty("TutorialActivationHandler", Members).SetValue(ability, activation);
+            ability.GetType().GetProperty("TutorialActivationHandler", Members)
+                .SetValue(ability, (Func<string, string, bool>)((type, _) => activation(type)));
+            Call(ability, "EnsureActivateButton");
             return ability;
         }
 
         [UnityTest]
-        public IEnumerator TutorialSelectionNeedsAnActualSecondActivation()
+        public IEnumerator TutorialSelectionNeedsTheActivateButton()
         {
             int accepted = 0;
             var ability = IntroAbility(type => { Assert.That(type, Is.EqualTo("mulligan")); accepted++; return true; }, out Component item);
@@ -55,6 +58,10 @@ namespace KillingMahjong.Tests
             Assert.That(accepted, Is.Zero, "選択だけで実演済みにしない");
             Assert.That(Get(ability, "SelectedSkillType"), Is.EqualTo("mulligan"));
             Call(ability, "OnAbilitySelected", item);
+            Assert.That(accepted, Is.Zero, "同じ行を押しても発動しない");
+            var activate = (Button)Field(ability, "activateButton");
+            Assert.That(activate.gameObject.activeSelf && activate.interactable, Is.True);
+            activate.onClick.Invoke();
             Assert.That(accepted, Is.EqualTo(1));
             Assert.That(Get(ability, "IsWindowOpen"), Is.False);
             Assert.That(Get(ability, "SelectedSkillType"), Is.Null);
@@ -66,7 +73,8 @@ namespace KillingMahjong.Tests
         {
             int attempts = 0;
             var ability = IntroAbility(type => { attempts++; return false; }, out Component item);
-            Call(ability, "OnAbilitySelected", item); Call(ability, "OnAbilitySelected", item);
+            Call(ability, "OnAbilitySelected", item);
+            ((Button)Field(ability, "activateButton")).onClick.Invoke();
             Assert.That(attempts, Is.EqualTo(1));
             Assert.That(Get(ability, "IsWindowOpen"), Is.True);
             Assert.That(Get(ability, "SelectedSkillType"), Is.EqualTo("mulligan"));
@@ -197,6 +205,7 @@ namespace KillingMahjong.Tests
             Send(swap); Send(Cast("perspective", 18200, "enemy", 4));
             Assert.That(Get(queue, "PendingCount"), Is.EqualTo(1));
             checker.SetActive(false);
+            float startedAt = Time.realtimeSinceStartup;
             var seen = new System.Collections.Generic.HashSet<int>();
             var labels = new System.Collections.Generic.List<string>();
             var positions = new System.Collections.Generic.List<float>();
@@ -238,6 +247,32 @@ namespace KillingMahjong.Tests
             Assert.That(exposed.SetEquals(new[] { 1, 3, 4 }), Is.True);
             Assert.That(Get(queue, "CurrentName"), Is.Null);
             Assert.That(Get(ui, "IsTransitioning"), Is.False);
+            Assert.That(Time.realtimeSinceStartup - startedAt, Is.LessThan(3.5f),
+                "連打の後に発動ごとの1秒待ちを繰り返さない");
+        }
+
+        [UnityTest]
+        public IEnumerator OverlappingShakesRestoreTheOriginalPositionAndCancelCleanly()
+        {
+            // ルートCanvasはレイアウトで座標が動く。揺れの原点復帰は固定Transformで検査する。
+            var targetObject = new GameObject("FixedShakeTarget");
+            targetObject.transform.SetParent(root.transform);
+            var target = targetObject.AddComponent(Main("UI.PhaseTransitionUI"));
+            ((Behaviour)target).enabled = false;
+            var origin = new Vector3(37f, -19f, 0f);
+            target.transform.localPosition = origin;
+            Call(target, "PlayScreenShake", 0.2f, 15f, Vector2.one);
+            yield return null;
+            Call(target, "PlayScreenShake", 0.15f, 20f, Vector2.one);
+            yield return new WaitForSeconds(0.3f);
+            Assert.That(Vector3.Distance(target.transform.localPosition, origin), Is.LessThan(0.001f));
+            Call(target, "PlayScreenShake", 1f, 20f, Vector2.one);
+            yield return null;
+            Call(target, "CancelTransitions");
+            Assert.That(Vector3.Distance(target.transform.localPosition, origin), Is.LessThan(0.001f));
+            Call(target, "PlayScreenShake", 0.05f, 5f, Vector2.one);
+            yield return new WaitForSeconds(0.1f);
+            Assert.That(Vector3.Distance(target.transform.localPosition, origin), Is.LessThan(0.001f));
         }
 
         [UnityTest]

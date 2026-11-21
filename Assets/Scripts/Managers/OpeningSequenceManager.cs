@@ -69,7 +69,16 @@ namespace KillingMahjong.Managers
             {
                 uiManager.EnemyInfoUI.CycleEnemy();
             }
+
+            // **契約書に名前を書くまでは設定のボタンを消す**（2026-10-23 ユーザー指示「名前書く前だけど、オプションボタンを
+            // そこだけ消して」）。設定には「デバッグ部屋へ」があり、名前を書かずに先へ進めてしまう。書いたら戻す（OnContractSigned）
+            _optionButton = uiManager != null && uiManager.OptionButtonRect != null ? uiManager.OptionButtonRect.gameObject : null;
+            if (_optionButton != null && _optionButton.activeSelf) _optionButton.SetActive(false);
+            else _optionButton = null;
         }
+
+        /// <summary>名前を書くまで消している設定のボタン。消していなければ null</summary>
+        private GameObject _optionButton;
 
         private IEnumerator SequenceRoutine()
         {
@@ -118,11 +127,20 @@ namespace KillingMahjong.Managers
                 if (cg != null) cg.alpha = 1f;
 
                 // ボタンはスライド完了まで押せないようにする
+                _paperShown = false;
                 largePaperNextButton.interactable = false;
                 largePaperNextButton.onClick.RemoveAllListeners();
-                largePaperNextButton.onClick.AddListener(() => {
-                    StartCoroutine(SlideOutLargePaperRoutine());
-                });
+                largePaperNextButton.onClick.AddListener(OnContractSigned);
+
+                // 「私＿＿＿」の名前の欄（2026-10-20）。名前を書くまで「次へ」は押せない
+                var label = largePaperNextButton.GetComponentInChildren<TMPro.TMP_Text>(true);
+                _nameInput = ContractNameField.Ensure(largePaperUI.transform, label != null ? label.font : null);
+                _nameInput.text = KillingMahjong.Core.PlayerProfile.Name;
+                _nameInput.onValueChanged.RemoveAllListeners();
+                _nameInput.onValueChanged.AddListener(_ => UpdateNextButton());
+                _nameInput.onSubmit.RemoveAllListeners();
+                _nameInput.onSubmit.AddListener(_ => { if (largePaperNextButton.interactable) OnContractSigned(); });
+                // 名前はパソコンのキーボードで打つ。画面に出していたキーボードは雰囲気に合わないので消した（2026-10-25）
 
                 StartCoroutine(SlideInLargePaperRoutine());
             }
@@ -165,7 +183,35 @@ namespace KillingMahjong.Managers
             pos.y = targetY;
             rt.anchoredPosition = pos;
 
-            largePaperNextButton.interactable = true;
+            _paperShown = true;
+            UpdateNextButton();
+            if (_nameInput != null) KillingMahjong.UI.WebImeInput.Focus(_nameInput);
+        }
+
+        private TMPro.TMP_InputField _nameInput;
+        private bool _paperShown;
+
+        /// <summary>「次へ」は、契約書が出きって、名前が書いてあるときだけ押せる。</summary>
+        private void UpdateNextButton()
+        {
+            if (largePaperNextButton == null) return;
+            bool hasName = _nameInput == null || KillingMahjong.Core.PlayerProfile.Normalize(_nameInput.text).Length > 0;
+            largePaperNextButton.interactable = _paperShown && hasName;
+        }
+
+        /// <summary>「次へ」（または入力欄で Enter）。名前を保存してから契約書を閉じる。</summary>
+        private void OnContractSigned()
+        {
+            if (!largePaperNextButton.interactable) return;
+            if (_nameInput != null)
+            {
+                KillingMahjong.Core.PlayerProfile.SetName(_nameInput.text);
+                _nameInput.DeactivateInputField();
+                _nameInput.interactable = false;
+            }
+            // 名前を書いたので設定のボタンを戻す
+            if (_optionButton != null) { _optionButton.SetActive(true); _optionButton = null; }
+            StartCoroutine(SlideOutLargePaperRoutine());
         }
 
         private IEnumerator SlideOutLargePaperRoutine()
@@ -204,16 +250,17 @@ namespace KillingMahjong.Managers
 
         private void OnDialogClosed()
         {
+            // 契約書が無くて飛ばしたときも、設定のボタンは必ず戻す
+            if (_optionButton != null) { _optionButton.SetActive(true); _optionButton = null; }
             StartCoroutine(ShowEnemyRoutine());
         }
 
         /// <summary>
         /// 契約書を閉じたあと。**ここでは立ち絵を出さない。**
         ///
-        /// 順序は「契約書を閉じる → 女の子がフェードイン → セリフ（と同時に曲）」
-        /// （2026-09-27 の指示。2026-09-12 のフロー図とは逆になっている）。
-        /// フェードインは <see cref="TutorialManager.CharacterRevealRequested"/> 経由で
-        /// TutorialManager が台詞を出す前に呼び戻してくる。
+        /// 順序は「契約書を閉じる → 最初の一言（と同時に曲） → 女の子 → 残りのセリフ」。
+        /// フラッシュは台本で指定した行の後に出す。
+        /// 出すのは <see cref="TutorialManager.CharacterRevealRequested"/> 経由で、TutorialManager が1行目のあとに呼び戻してくる。
         /// </summary>
         private IEnumerator ShowEnemyRoutine()
         {
@@ -264,11 +311,13 @@ namespace KillingMahjong.Managers
 
             ApplyEnemyAlpha(sprites, spriteAlpha, images, imageAlpha, 0f);
 
+            // フラッシュと同時に出すときはフェードしない（2026-10-30 バグ報告「先輩が出てくるのが早い」）
+            float fadeSeconds = tutorialManager != null && tutorialManager.CharacterRevealInstant ? 0f : EnemyFadeInSeconds;
             float elapsed = 0f;
-            while (elapsed < EnemyFadeInSeconds)
+            while (elapsed < fadeSeconds)
             {
                 elapsed += Time.deltaTime;
-                float t = Mathf.Clamp01(elapsed / EnemyFadeInSeconds);
+                float t = Mathf.Clamp01(elapsed / fadeSeconds);
                 // 立ち上がりを緩めて、滲み出てくるように見せる
                 ApplyEnemyAlpha(sprites, spriteAlpha, images, imageAlpha, t * t * (3f - 2f * t));
                 yield return null;
@@ -284,14 +333,8 @@ namespace KillingMahjong.Managers
             if (enemyCharacterObj.GetComponent<UI.TalkBobAnimator>() == null)
                 enemyCharacterObj.AddComponent<UI.TalkBobAnimator>();
 
-            // **髪の黄色だけを蛍光色に光らせる**（2026-09-30 のユーザー指示）。
-            // **フェードが終わってから付けること。** 先に付けると、上の
-            // `ApplyEnemyAlpha` が光の板まで掴んで不透明度を上書きしてしまう
-            // （あの配列はここより前に作られていて、光の板は入っていない）。
-            foreach (var sr in sprites)
-            {
-                UI.Effects.HairNeonGlow.Attach(sr);
-            }
+            // 髪のネオン（HairNeonGlow）は 2026-11-12 にユーザー指示で本編から外した。
+            // コレクションの没案からは今も試写できる。
         }
 
         private void NotifyRevealFinished()

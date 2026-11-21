@@ -12,14 +12,16 @@ using KillingMahjong.UI.Effects;
 namespace KillingMahjong.UI
 {
     /// <summary>既存素材で流局を再現する動画空間。通信・HP・戦績・対局の盤面には触れない。</summary>
-    public sealed class TutorialDrawReplayUI : MonoBehaviour
+    public sealed partial class TutorialDrawReplayUI : MonoBehaviour
     {
         public const string EffectId = "tutorial.draw_replay";
         public int StepIndex { get; private set; }
         public bool IsPaused { get; private set; }
         public string NormalText => normal != null ? normal.text : "";
-        private RectTransform viewport, progress;
-        private TextMeshProUGUI normal, marker, paused;
+        private RectTransform viewport, progress, seekKnob;
+        private TextMeshProUGUI normal, marker, paused, turnCounter;
+        private TurnPieUI turnPie;
+        private Material ownedMaterial;
         private Button advance;
         private TutorialSubtitleUI subtitles;
         private PhaseTransitionUI phase;
@@ -33,12 +35,17 @@ namespace KillingMahjong.UI
         private float tauntStarted;
         private static readonly Vector2 CharacterPosition = new Vector2(0, 15);
 
-        public static TutorialDrawReplayUI Create(Transform owner = null)
+        public static TutorialDrawReplayUI Create(Transform owner = null, EnemyInfoUI phoneOwner = null)
         {
             var go = new GameObject("TutorialDrawReplay", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler),
                 typeof(GraphicRaycaster), typeof(TutorialDrawReplayUI));
             if (owner != null) go.transform.SetParent(owner, false);
-            var ui = go.GetComponent<TutorialDrawReplayUI>(); ui.Build(); return ui;
+            var ui = go.GetComponent<TutorialDrawReplayUI>();
+            ui.phoneCharacter = phoneOwner != null ? phoneOwner.CharacterRenderer : null;
+            // 動画の中に、いまの自分の体力が少ないときの赤い縁取りと鼓動を出さない（2026-10-30 バグ報告）
+            Effects.HeartbeatEffect.SetHiddenForReplay(true);
+            ui.hidHeartbeat = true;
+            ui.Build(); return ui;
         }
 
         private RectTransform Box(string name, Transform parent, Vector2 size, Vector2 pos, Color color)
@@ -94,16 +101,35 @@ namespace KillingMahjong.UI
             foreach(var cv in p.GetComponentsInChildren<Canvas>(true)) { cv.overrideSorting=true; cv.sortingOrder=91; }
             foreach(var g in p.GetComponentsInChildren<Graphic>(true)) g.raycastTarget=false;
             phase.CancelTransitions();
-            normal = Label("ReplayNormalText",viewport,new Vector2(285,92),new Vector2(155,58),15);
-            normal.alignment=TextAlignmentOptions.TopLeft;
+            normal = CloneSceneDialogue();
+            if (normal == null)
+            {
+                normal = Label("ReplayNormalText",viewport,new Vector2(285,92),new Vector2(155,58),15);
+                normal.alignment=TextAlignmentOptions.TopLeft;
+            }
             marker=Label("ReplayNormalMarker",transform,new Vector2(24,24),new Vector2(295,30),20);
-            marker.text="▼"; marker.color=new Color32(224,40,40,255); marker.gameObject.SetActive(false);
+            // ▼は本編のセリフと同じ色（以前は赤で、字幕寄りの見た目になっていた）
+            marker.text="▼"; marker.color=normal.color; marker.gameObject.SetActive(false);
+            CloneSceneTurnCounter();
             var n=new GameObject("ReplayNoise",typeof(RectTransform),typeof(PixelShapeGraphic));
             n.transform.SetParent(viewport,false); ((RectTransform)n.transform).sizeDelta=new Vector2(800,600);
             noise=n.GetComponent<PixelShapeGraphic>(); noise.raycastTarget=false;
-            Box("SeekTrack",transform,new Vector2(764,3),new Vector2(0,-288),new Color32(72,72,72,255));
-            progress=Box("SeekProgress",transform,new Vector2(1,3),new Vector2(-382,-288),new Color32(224,40,40,255));
+            // シークバーは動画内の暗転（PhaseTransitionUI、91）より上の層に置く。同じ層だと
+            // 流局のあとの「２局目」の暗転で隠れていた（2026-10-24 プランナー指摘）
+            var seekLayer=new GameObject("ReplaySeekLayer",typeof(RectTransform),typeof(Canvas));
+            seekLayer.transform.SetParent(transform,false);
+            var sc=seekLayer.GetComponent<Canvas>(); sc.overrideSorting=true; sc.sortingOrder=92;
+            Stretch((RectTransform)seekLayer.transform);
+            Box("SeekTrack",seekLayer.transform,new Vector2(764,3),new Vector2(0,-288),new Color32(72,72,72,255));
+            progress=Box("SeekProgress",seekLayer.transform,new Vector2(1,3),new Vector2(-382,-288),new Color32(224,40,40,255));
             progress.pivot=new Vector2(0,.5f);
+            // 進んだ先に丸いつまみ（2026-10-29 バグ報告「シークバーはYOUtubeみたいな丸表示がほしいかも」）。ドットの丸で描く
+            var knob=new GameObject("SeekKnob",typeof(RectTransform),typeof(PixelShapeGraphic));
+            knob.transform.SetParent(seekLayer.transform,false);
+            seekKnob=(RectTransform)knob.transform; seekKnob.sizeDelta=new Vector2(16,16);
+            var knobShape=knob.GetComponent<PixelShapeGraphic>(); knobShape.raycastTarget=false;
+            knobShape.Begin(); knobShape.Disc(Vector2.zero,6f,new Color32(224,40,40,255)); knobShape.End();
+            SetSeekProgress(0f);
             var catcher=Box("ReplayAdvanceCatcher",transform,new Vector2(800,600),Vector2.zero,new Color(0,0,0,.001f));
             catcher.GetComponent<Image>().raycastTarget=true; advance=catcher.gameObject.AddComponent<Button>();
             advance.transition=Selectable.Transition.None; advance.onClick.AddListener(()=>advanced=true); catcher.gameObject.SetActive(false);
@@ -121,7 +147,133 @@ namespace KillingMahjong.UI
             pauseRect.offsetMin=Vector2.zero; pauseRect.offsetMax=Vector2.zero; pauseRect.localScale=Vector3.one;
             paused=Label("ReplayPaused",pauseLayer.transform,new Vector2(160,70),new Vector2(300,240),24);
             paused.text="Ⅱ\n再生停止"; paused.gameObject.SetActive(false);
+            BuildPhonePresentation();
         }
+        /// <summary>
+        /// 動画の中の通常セリフは、本編のセリフ欄（<see cref="DialogueUI"/> の吹き出し）を写して使う
+        /// （2026-10-23 プランナー指摘「セリフUIの形式が字幕表示に引っ張られてる」）。
+        /// 以前は自前の白い文字だけで、LOG の印も無く、字幕と見分けがつきにくかった。
+        /// 写すのは見た目だけ。押せる部品と動きは外す。本編の欄が見つからなければ null（自前の文字に戻す）。
+        /// </summary>
+        private TextMeshProUGUI CloneSceneDialogue()
+        {
+            var dialogue = FindFirstObjectByType<DialogueUI>(FindObjectsInactive.Include);
+            var panel = dialogue != null ? dialogue.PanelForCopy : null;
+            var sourceText = dialogue != null ? dialogue.TextForCopy : null;
+            if (panel == null || sourceText == null) return null;
+            int textIndex = IndexPath(panel.transform, sourceText.transform);
+            if (textIndex < 0) return null;
+            var copy = Instantiate(panel, viewport, true);
+            copy.name = "ReplayDialoguePanel";
+            copy.SetActive(true);
+            foreach (var m in copy.GetComponentsInChildren<MonoBehaviour>(true))
+                if (!(m is Graphic) && !(m is BaseMeshEffect) && !(m is LayoutElement) && !(m is TMP_SubMeshUI)) Destroy(m);
+            foreach (var g in copy.GetComponentsInChildren<Graphic>(true)) g.raycastTarget = false;
+            var text = FindByIndexPath(copy.transform, textIndex);
+            var t = text != null ? text.GetComponent<TextMeshProUGUI>() : null;
+            if (t == null) return null;
+            t.text = "";
+            t.maxVisibleCharacters = int.MaxValue;
+            // 本編のセリフと同じ黒い影（DialogueUI.ApplyShadow と同じ値）。写しの元が一度も喋っていないと
+            // 影がまだ付いていないので、ここで付ける。材質は写し専用にして本編へ伝えない
+            var mat = new Material(t.fontSharedMaterial);
+            mat.EnableKeyword("UNDERLAY_ON");
+            mat.SetColor("_UnderlayColor", Color.black);
+            mat.SetFloat("_UnderlayOffsetX", DialogueUI.UnderlayOffsetX);
+            mat.SetFloat("_UnderlayOffsetY", DialogueUI.UnderlayOffsetY);
+            mat.SetFloat("_UnderlayDilate", DialogueUI.UnderlayDilate);
+            mat.SetFloat("_UnderlaySoftness", DialogueUI.UnderlaySoftness);
+            t.fontSharedMaterial = mat;
+            ownedMaterial = mat;
+            t.UpdateMeshPadding();
+            return t;
+        }
+
+        /// <summary>
+        /// 打牌数（「後：十七打目」）を動画の中にも出す（2026-10-23 プランナー指摘「動画空間の時、打牌数をカウントするUIを表示するはず」）。
+        /// 本編の河の打牌数の文字を写す。流局の話なので、両者17打ち終える最後の1打の場面として「十七打目」にする
+        /// </summary>
+        private void CloneSceneTurnCounter()
+        {
+            RectTransform source = null;
+            foreach (var river in FindObjectsByType<RiverUI>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                if (river != null && river.TurnTextRect != null) { source = river.TurnTextRect; break; }
+            if (source == null)
+            {
+                // 河が無い場面（演出コレクションの試写など）では、本編の位置と大きさに合わせた文字で出す
+                turnCounter = Label("ReplayTurnCounter", viewport, new Vector2(300, 48), new Vector2(-240, 170), 32);
+                turnCounter.alignment = TextAlignmentOptions.Left;
+                turnCounter.color = new Color32(240, 232, 214, 255);
+                turnCounter.outlineWidth = .2f;
+                turnCounter.outlineColor = new Color32(30, 18, 14, 255);
+                SetTurnCounter(17);
+                return;
+            }
+            var copy = Instantiate(source.gameObject, viewport, true);
+            copy.name = "ReplayTurnCounter";
+            foreach (var m in copy.GetComponentsInChildren<MonoBehaviour>(true))
+                if (!(m is Graphic) && !(m is BaseMeshEffect) && !(m is TMP_SubMeshUI)) Destroy(m);
+            // 本編が円グラフ（TurnPieUI）なら、動画の中も同じ円グラフで出す
+            turnPie = copy.GetComponent<TurnPieUI>();
+            if (turnPie != null)
+            {
+                turnPie.raycastTarget = false;
+                SetTurnCounter(17);
+                copy.SetActive(true);
+                return;
+            }
+            turnCounter = copy.GetComponent<TextMeshProUGUI>();
+            if (turnCounter == null) { Destroy(copy); return; }
+            turnCounter.raycastTarget = false;
+            SetTurnCounter(17);
+            copy.SetActive(true);
+        }
+
+        /// <summary>動画の中の打牌数を出す。0 なら隠す。</summary>
+        private void SetTurnCounter(int turn)
+        {
+            if (turnPie != null)
+            {
+                turnPie.gameObject.SetActive(turn > 0);
+                if (turn > 0) turnPie.Show(turn - 1, false); // 「N打目」＝N-1打ち終えた。動画の後輩ちゃんは後攻
+                return;
+            }
+            if (turnCounter == null) return;
+            turnCounter.gameObject.SetActive(turn > 0);
+            if (turn > 0) turnCounter.text = "後：" + KanjiNumber(turn) + "打目";
+        }
+
+        private static string KanjiNumber(int n)
+        {
+            string[] digits = { "", "一", "二", "三", "四", "五", "六", "七", "八", "九" };
+            if (n < 10) return digits[n];
+            return (n / 10 == 1 ? "" : digits[n / 10]) + "十" + digits[n % 10];
+        }
+
+        /// <summary>子をたどる道筋を、兄弟の番号を桁に詰めた数で返す（深さ3まで）。見つからなければ -1。</summary>
+        private static int IndexPath(Transform root, Transform target)
+        {
+            var path = new System.Collections.Generic.List<int>();
+            for (var t = target; t != root; t = t.parent)
+            {
+                if (t == null) return -1;
+                path.Insert(0, t.GetSiblingIndex());
+            }
+            if (path.Count > 3) return -1;
+            int code = 0;
+            foreach (int i in path) code = code * 100 + i + 1;
+            return code;
+        }
+
+        private static Transform FindByIndexPath(Transform root, int code)
+        {
+            var path = new System.Collections.Generic.List<int>();
+            for (; code > 0; code /= 100) path.Insert(0, code % 100 - 1);
+            var t = root;
+            foreach (int i in path) { if (i < 0 || i >= t.childCount) return null; t = t.GetChild(i); }
+            return t;
+        }
+
         private static void Stretch(RectTransform rect)
         {
             rect.anchorMin=Vector2.zero; rect.anchorMax=Vector2.one;
@@ -131,9 +283,21 @@ namespace KillingMahjong.UI
         // シークバーは、最後のセリフでちょうど半分まで進んだところで終わる
         // （2026-10-15 のフロー図「動画のシークバーはまだ半分くらい残して終了」）。動画は途中で閉じられる
         private const int StepCount = 18;
+        private int stepCount = StepCount;
+        private float progressStart, progressEnd = .5f;
+        /// <summary>シークバーを全体の <paramref name="fraction"/>（0〜1）まで進め、丸いつまみをその先に置く。</summary>
+        private void SetSeekProgress(float fraction)
+        {
+            float width=764f*Mathf.Clamp01(fraction);
+            progress.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal,Mathf.Max(1f,width));
+            if(seekKnob!=null) seekKnob.anchoredPosition=new Vector2(-382f+Mathf.Round(width/2f)*2f,-288f);
+        }
         private IEnumerator Step(string text,bool subtitle,bool loud=false)
         {
-            StepIndex++; progress.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal,764f*.5f*Mathf.Min(StepIndex,StepCount)/StepCount); advanced=false;
+            StepIndex++;
+            // 「再生停止」のあいだはシークバーを進めない（2026-10-29 バグ報告「再生停止表示が出ているのにシークバーが動いている」）
+            if(!IsPaused) SetSeekProgress(Mathf.Lerp(progressStart, progressEnd, Mathf.Min(StepIndex, stepCount) / (float)stepCount));
+            advanced=false;
             if(subtitle) { marker.gameObject.SetActive(false); advance.gameObject.SetActive(false); subtitles.Show("先輩",text,()=>advanced=true); }
             else {
                 string formatted=TutorialEmphasis.Apply(text);
@@ -153,9 +317,9 @@ namespace KillingMahjong.UI
             tauntBobbing = false;
             SetCharacter("通常時身体", "通常顔");
             SetCharacterPosition(CharacterPosition);
-            automatic=autoAdvance; IsPaused=false; StepIndex=0; transform.localScale=Vector3.one*.4f;
-            for(float t=0;t<1;t+=Time.unscaledDeltaTime) { transform.localScale=Vector3.one*Mathf.SmoothStep(.4f,1,t); yield return null; }
-            transform.localScale=Vector3.one;
+            automatic=autoAdvance; IsPaused=false; StepIndex=0;
+            stepCount=StepCount; progressStart=0f; progressEnd=.5f;
+            yield return OpenFromPhone();
             // PhaseTransitionUI.Start が通常対局の層へ戻すので、初期化後に動画内の層を適用する。
             foreach(var cv in phase.GetComponentsInChildren<Canvas>(true)) {
                 cv.enabled=true; cv.overrideSorting=true; cv.sortingOrder=91;
@@ -171,7 +335,7 @@ namespace KillingMahjong.UI
             Vector2 from = girlBody.rectTransform.anchoredPosition;
             for (float t = 0; t < 1; t += Time.unscaledDeltaTime * 5)
             {
-                SetCharacterPosition(Vector2.Lerp(from, CharacterPosition, Mathf.SmoothStep(0, 1, t)));
+                SetCharacterPosition(Vector2.Lerp(from, CharacterPosition, Mathf.SmoothStep(0, 1, PresentationTiming.Progress(t * .2f, .2f))));
                 yield return null;
             }
             SetCharacterPosition(CharacterPosition);
@@ -190,8 +354,8 @@ namespace KillingMahjong.UI
             yield return Step("まぁ正直手牌選択までは普通のゲームと同じかな",true);
             yield return new WaitUntil(()=>handReady);
             bool dark=false; phase.PlayTransition("対局開始",null,new BettingCompletedInfo {
-                LocalBet=2000,EnemyBet=2000,LocalHpBefore=20000,EnemyHpBefore=20000,
-                LocalHpAfter=18000,EnemyHpAfter=18000,HasServerHealth=true
+                LocalBet=2000,EnemyBet=2000,LocalHpBefore=18000,EnemyHpBefore=18000,
+                LocalHpAfter=16000,EnemyHpAfter=16000,HasServerHealth=true
             },()=>dark=true,()=>{},false);
             limit=Time.realtimeSinceStartup+12; yield return new WaitUntil(()=>dark||Time.realtimeSinceStartup>=limit); yield return null;
             // 賭け金が出てくる黒い画面で止める。ここから先は 2026-10-15 のフロー図で足された、
@@ -213,7 +377,7 @@ namespace KillingMahjong.UI
             yield return Step("まぁ誰かがロンして流局を止めれば次からはまた自由に賭けれるから",true);
             yield return Step("そんな合計が元々賭けた額の何倍にも積みあがったりはしないけど",true);
             // スマホを引っ込めて動画空間終了（シークバーは半分残したまま）
-            for(float t=0;t<1;t+=Time.unscaledDeltaTime*2.5f) { transform.localScale=Vector3.one*Mathf.SmoothStep(1,.4f,t); yield return null; }
+            yield return ReturnToPhone();
         }
 
         /// <summary>動画で先輩が賭けている額。上の BettingCompletedInfo と同じ値。</summary>
@@ -242,6 +406,7 @@ namespace KillingMahjong.UI
         private void ShowNewWall()
         {
             board.ShowNewWall();
+            SetTurnCounter(0); // 配り直したので、手牌選択のあいだ打牌数は出さない（本編と同じ）
         }
         private IEnumerator BuildHand(Action completed)
         {
@@ -253,7 +418,7 @@ namespace KillingMahjong.UI
             {
                 float elapsed = Time.unscaledTime - tauntStarted;
                 // 3秒かけて一度だけ上がり、元の位置へ戻る。セリフ待ちが長くても繰り返さない。
-                float progress = Mathf.Clamp01(elapsed / 3f);
+                float progress = PresentationTiming.Progress(elapsed, 3f);
                 float offset = 6f * Mathf.Sin(Mathf.PI * Mathf.SmoothStep(0f, 1f, progress));
                 SetCharacterPosition(CharacterPosition + Vector2.up * Mathf.Round(offset));
                 if (progress >= 1f) { tauntBobbing = false; SetCharacterPosition(CharacterPosition); }
@@ -277,6 +442,13 @@ namespace KillingMahjong.UI
         {
             if (girlBody != null) girlBody.rectTransform.anchoredPosition = position;
             if (girlFace != null) girlFace.rectTransform.anchoredPosition = position;
+        }
+        private bool hidHeartbeat;
+
+        private void OnDestroy()
+        {
+            if (ownedMaterial != null) Destroy(ownedMaterial);
+            if (hidHeartbeat) { hidHeartbeat = false; Effects.HeartbeatEffect.SetHiddenForReplay(false); }
         }
         private void OnDisable() { tauntBobbing = false; SetCharacterPosition(CharacterPosition); StopAllCoroutines(); if(phase!=null) phase.CancelTransitions(); if(subtitles!=null) subtitles.Hide(); }
     }

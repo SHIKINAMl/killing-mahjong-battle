@@ -84,6 +84,13 @@ namespace KillingMahjong.Network.Handlers
                 board.UpdateHp(info.LocalHpAfter, info.EnemyHpAfter);
             }
 
+            // **賭けた血を場に出す（2026-10-17）。** サーバーは賭けた時点で HP を引かないが、
+            // 画面では賭けた分だけ血を減らして見せる。流局の続きの局でも毎局ここに来るので積み上がる。
+            // After は「サーバーの HP − 場の血」＝画面の血に置き直す（対局開始の画面がこの差を減らして見せる）
+            board.AddStakesOnTable(pBet, eBet);
+            info.LocalHpAfter = board.LocalPlayerHp;
+            info.EnemyHpAfter = board.EnemyPlayerHp;
+
             network.RaiseBettingComplete(info);
 
             // health が届かなかったときだけ、決済後の血を取り寄せる

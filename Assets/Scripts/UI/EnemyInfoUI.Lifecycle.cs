@@ -5,6 +5,78 @@ namespace KillingMahjong.UI
 {
     public partial class EnemyInfoUI
     {
+        public const string TutorialRevealEffectId = "tutorial.character_reveal";
+        private CharacterData tutorialOriginalCharacter, tutorialRevealedCharacter;
+
+        /// <summary>赤い服の女の子の文字送りの音の高さ。通常顔.asset の値とそろえる。</summary>
+        private const float RedGirlTextBlipStartHz = 392f, RedGirlTextBlipEndHz = 392f;
+
+        /// <summary>チュートリアルで先輩から本来の姿へ切り替える。共有アセットには書き込まない。</summary>
+        public System.Collections.IEnumerator RevealTutorialCharacter()
+        {
+            var body = Resources.Load<Sprite>("女の子/通常時身体");
+            var face = Resources.Load<Sprite>("女の子/通常顔");
+            if (body == null || face == null)
+                throw new System.InvalidOperationException("正体を見せるための立ち絵がありません。");
+            if (tutorialRevealedCharacter != null) yield break;
+            tutorialOriginalCharacter = characterData;
+            tutorialRevealedCharacter = ScriptableObject.CreateInstance<CharacterData>();
+            tutorialRevealedCharacter.characterName = "ヴァンちゃん";
+            // 文字送りの音は、本編の赤い服の女の子（通常顔.asset）と同じ高さ
+            tutorialRevealedCharacter.textBlipStartHz = RedGirlTextBlipStartHz;
+            tutorialRevealedCharacter.textBlipEndHz = RedGirlTextBlipEndHz;
+            tutorialRevealedCharacter.normalSprite = body;
+            tutorialRevealedCharacter.discardSprite = body;
+            tutorialRevealedCharacter.bodySprites.Add(new NamedSprite { id = "normal", sprite = body });
+            tutorialRevealedCharacter.faceSprites.Add(new NamedSprite { id = "normal", sprite = face });
+            tutorialRevealedCharacter.enableBlink = false;
+            if (blinkCoroutine != null) { StopCoroutine(blinkCoroutine); blinkCoroutine = null; }
+            if (reactionCoroutine != null) { StopCoroutine(reactionCoroutine); reactionCoroutine = null; }
+            if (bounceCoroutine != null) { StopCoroutine(bounceCoroutine); bounceCoroutine = null; }
+            Color bodyColor = characterRenderer != null ? characterRenderer.color : Color.white;
+            Color faceColor = faceRenderer != null ? faceRenderer.color : Color.white;
+            // 先輩が消えて女の子が浮かぶまで、合わせて 2.5 秒かける（2026-10-22 プランナー指摘
+            // 「先輩から女の子に変身するときは、結構2-3秒くらいかけてフェードしてもいい」。以前は 1 秒）
+            const float halfSeconds = 1.25f;
+            try
+            {
+                for (float t = 0; t < 1f; t += Time.unscaledDeltaTime / halfSeconds)
+                {
+                    SetPortraitAlpha(bodyColor, faceColor, 1f - Mathf.SmoothStep(0f, 1f, t));
+                    yield return null;
+                }
+                SetPortraitAlpha(bodyColor, faceColor, 0f);
+                ApplyCharacterData(tutorialRevealedCharacter);
+                for (float t = 0; t < 1f; t += Time.unscaledDeltaTime / halfSeconds)
+                {
+                    SetPortraitAlpha(bodyColor, faceColor, Mathf.SmoothStep(0f, 1f, t));
+                    yield return null;
+                }
+            }
+            finally { SetPortraitAlpha(bodyColor, faceColor, 1f); }
+        }
+
+        private void SetPortraitAlpha(Color body, Color face, float alpha)
+        {
+            if (characterRenderer != null) { body.a *= alpha; characterRenderer.color = body; }
+            if (faceRenderer != null) { face.a *= alpha; faceRenderer.color = face; }
+        }
+
+        public void RestoreTutorialCharacter()
+        {
+            if (tutorialRevealedCharacter == null) return;
+            ApplyCharacterData(tutorialOriginalCharacter);
+            Destroy(tutorialRevealedCharacter);
+            tutorialRevealedCharacter = null;
+            tutorialOriginalCharacter = null;
+            if (isActiveAndEnabled && blinkCoroutine == null) blinkCoroutine = StartCoroutine(BlinkRoutine());
+        }
+
+        private void OnDestroy()
+        {
+            if (tutorialRevealedCharacter != null) Destroy(tutorialRevealedCharacter);
+        }
+
         private void OnEnable()
         {
             if (blinkCoroutine == null)
@@ -15,6 +87,7 @@ namespace KillingMahjong.UI
 
         private void OnDisable()
         {
+            CancelDiscardAttention();
             if (blinkCoroutine != null)
             {
                 StopCoroutine(blinkCoroutine);
@@ -31,6 +104,7 @@ namespace KillingMahjong.UI
         /// </summary>
         public System.Collections.IEnumerator PlayDeathRoutine()
         {
+            CancelDiscardAttention();
             if (blinkCoroutine != null) { StopCoroutine(blinkCoroutine); blinkCoroutine = null; }
             if (reactionCoroutine != null) { StopCoroutine(reactionCoroutine); reactionCoroutine = null; }
             if (bounceCoroutine != null) { StopCoroutine(bounceCoroutine); bounceCoroutine = null; }
@@ -48,7 +122,7 @@ namespace KillingMahjong.UI
             while (elapsed < duration)
             {
                 elapsed += Time.deltaTime;
-                float p = Mathf.Clamp01(elapsed / duration);
+                float p = Mathf.Clamp01(PresentationTiming.Sample(elapsed) / duration);
                 // 落下は加速させる（等速だと「沈んでいく」ように見えて力が抜ける）
                 body.position = Vector3.Lerp(start, end, p * p);
                 yield return null;
@@ -56,11 +130,14 @@ namespace KillingMahjong.UI
             body.position = end;
         }
 
+        /// <summary>まばたきを止めておく（拍に合わせた動きのあいだ。<see cref="SetBeatDance"/>）。</summary>
+        private bool suppressBlink;
+
         private System.Collections.IEnumerator BlinkRoutine()
         {
             while (true)
             {
-                if (characterData == null || !characterData.enableBlink || faceRenderer == null)
+                if (characterData == null || !characterData.enableBlink || faceRenderer == null || suppressBlink)
                 {
                     yield return new WaitForSeconds(1.0f);
                     continue;
@@ -69,20 +146,20 @@ namespace KillingMahjong.UI
                 float waitTime = Random.Range(characterData.blinkIntervalMin, characterData.blinkIntervalMax);
                 yield return new WaitForSeconds(waitTime);
 
-                if (reactionCoroutine != null || faceRenderer.sprite != normalFaceSprite)
+                if (reactionCoroutine != null || discardAttention != null || faceRenderer.sprite != normalFaceSprite)
                     continue;
 
                 Sprite fullBlink = characterData.faceSprites?.Find(x => x.id == characterData.blinkFaceId)?.sprite;
 
                 if (fullBlink != null)
                 {
-                    if (faceRenderer.sprite == normalFaceSprite && reactionCoroutine == null)
+                    if (faceRenderer.sprite == normalFaceSprite && reactionCoroutine == null && discardAttention == null)
                     {
                         faceRenderer.sprite = fullBlink;
                         yield return new WaitForSeconds(0.12f);
                     }
 
-                    if (faceRenderer.sprite == fullBlink && reactionCoroutine == null)
+                    if (faceRenderer.sprite == fullBlink && reactionCoroutine == null && discardAttention == null)
                     {
                         faceRenderer.sprite = normalFaceSprite;
                     }
@@ -163,7 +240,15 @@ namespace KillingMahjong.UI
             CharacterVisualUtil.ResolveDefaultSprites(data, ref normalSprite, ref discardSprite, ref normalFaceSprite);
 
             CharacterVisualUtil.ApplyIfPresent(characterRenderer, normalSprite);
-            CharacterVisualUtil.ApplyIfPresent(faceRenderer, normalFaceSprite);
+
+            // 顔まで1枚に描いてある絵（顔の差分を持たないキャラ）は、顔の層を空にする。
+            // 残すと前のキャラの顔が新しい絵の上に重なる（2026-10-25、先輩の絵を1枚絵に替えたとき）
+            if (data.faceSprites == null || data.faceSprites.Count == 0)
+            {
+                normalFaceSprite = null;
+                if (faceRenderer != null) faceRenderer.sprite = null;
+            }
+            else CharacterVisualUtil.ApplyIfPresent(faceRenderer, normalFaceSprite);
         }
     }
 }

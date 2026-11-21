@@ -33,10 +33,24 @@ namespace KillingMahjong.UI
             onAdvance = advance;
             panel.gameObject.SetActive(true);
             string content = TutorialEmphasis.Apply(text);
-            subtitleText.text = speaker + "「" + content + "」";
+            subtitleText.text = speaker + "「" + content.Replace("\r", "").Replace("\n", " ") + "」";
             subtitleText.maxVisibleCharacters = int.MaxValue;
-            float width = subtitleText.GetPreferredValues(subtitleText.text, float.PositiveInfinity,
-                float.PositiveInfinity).x + leftPadding + rightPadding;
+            // 800x600の画面内に右の▼まで収める。行ごとに標準サイズへ戻してから測る。
+            subtitleText.fontSize = 20f;
+            Canvas.ForceUpdateCanvases();
+            var canvasRect = (RectTransform)GetComponentInParent<Canvas>().rootCanvas.transform;
+            float screenWidth = canvasRect.rect.width > 0f ? canvasRect.rect.width : 800f;
+            float maxWidth = Mathf.Max(1f, screenWidth - 80f);
+            float available = Mathf.Max(1f, maxWidth - leftPadding - rightPadding);
+            float textWidth = subtitleText.GetPreferredValues(subtitleText.text, float.PositiveInfinity,
+                float.PositiveInfinity).x;
+            while (textWidth > available && subtitleText.fontSize > 1f)
+            {
+                subtitleText.fontSize -= 1f;
+                textWidth = subtitleText.GetPreferredValues(subtitleText.text, float.PositiveInfinity,
+                    float.PositiveInfinity).x;
+            }
+            float width = Mathf.Min(maxWidth, textWidth + leftPadding + rightPadding);
             panel.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, width);
             subtitleText.ForceMeshUpdate();
             RemoveTextShadow();

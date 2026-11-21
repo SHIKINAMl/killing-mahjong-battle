@@ -5,11 +5,12 @@ using TMPro;
 
 namespace KillingMahjong.UI
 {
-    public class DialogueUI : MonoBehaviour
+    public partial class DialogueUI : MonoBehaviour
     {
         [Header("Main Dialogue")]
         [SerializeField] private TextMeshProUGUI dialogueText;
         [SerializeField] private GameObject dialoguePanel;
+        [SerializeField] private Image textReadabilityBackdrop;
 
         [Header("Log")]
         [SerializeField] private GameObject logPanel;
@@ -24,7 +25,16 @@ namespace KillingMahjong.UI
         private bool followLatestLog = true;
         private bool hasOpenedLog;
 
+        /// <summary>文字送りの音の高さを決めるために見る、画面の相手キャラ。</summary>
+        private EnemyInfoUI enemyInfo;
+
         public bool IsLogOpen => logPanel != null && logPanel.activeSelf;
+
+        /// <summary>セリフ欄そのもの。チュートリアルの動画（<see cref="TutorialDrawReplayUI"/>）が見た目を写すのに使う。触らないこと。</summary>
+        public GameObject PanelForCopy => dialoguePanel;
+
+        /// <summary>セリフの文字。<see cref="PanelForCopy"/> のどの子が文字かを知るためだけに出している。</summary>
+        public TextMeshProUGUI TextForCopy => dialogueText;
 
         /// <summary>
         /// いま1文字ずつ送っている最中か。**喋っているあいだだけ跳ねさせる**ために出している
@@ -56,6 +66,7 @@ namespace KillingMahjong.UI
             }
 
             ApplyBubbleSetting();
+            UpdateDialogueControlLayout();
         }
 
         /// <summary>
@@ -75,6 +86,7 @@ namespace KillingMahjong.UI
 
         private void Start()
         {
+            PrepareLogScrollbar();
             if (toggleLogButton != null) toggleLogButton.onClick.AddListener(ToggleLog);
             if (closeLogBackgroundButton != null) closeLogBackgroundButton.onClick.AddListener(CloseLog);
             logPanel.SetActive(false);
@@ -118,6 +130,7 @@ namespace KillingMahjong.UI
             // 文字のまわりに薄い四角が浮いて見える
             var shadow = dialoguePanel.GetComponent<Shadow>();
             if (shadow != null) shadow.enabled = show;
+            readabilityBackdropDirty = true;
         }
 
         // セリフの影の設定。対局シーンが2つ（UIテストシーン / OpeningScene）あるので
@@ -168,9 +181,14 @@ namespace KillingMahjong.UI
 
         public void ShowText(string text)
         {
+            // 波ダッシュ「〜」(U+301C) は吹き出しのフォント（PixelMplus10）に無く、□ になる。
+            // 同じ形の全角チルダ「～」(U+FF5E) はあるので差し替える（2026-10-23。CSV や反応ルールに書かれても化けないように）
+            if (!string.IsNullOrEmpty(text)) text = text.Replace('〜', '～');
+
             // **`StopAllCoroutines` で止めた分は `finally` が走らない。** 先に倒しておく。
             // 送りの途中で次のセリフが来たとき、旗が立ちっぱなしになるのを防ぐ。
             IsTalking = false;
+            typingRunning = false;
             StopAllCoroutines(); // 既存の文字送り演出などがあれば即座にキャンセルする
 
             ApplyShadow();
@@ -178,7 +196,7 @@ namespace KillingMahjong.UI
             if (dialogueText != null)
             {
                 // セリフの折り返しを有効化
-                dialogueText.enableWordWrapping = true;
+                dialogueText.textWrappingMode = TextWrappingModes.Normal;
                 // 長すぎる場合は省略記号などを出さずに、単に下にはみ出させる
                 dialogueText.overflowMode = TextOverflowModes.Overflow;
                 
@@ -187,24 +205,29 @@ namespace KillingMahjong.UI
             
             AddToLog(text);
             dialoguePanel.SetActive(true);
+            UpdateSpeechCover();
+            NoticeSpeech();
         }
 
         private System.Collections.IEnumerator TypeMessageRoutine(string fullText)
         {
             // 先に全文を TMP に解析させ、可視文字数だけを進める。
             // これなら <color> / <size> のタグそのものを文字送りで見せずに済む。
+            typingRunning = true;
             dialogueText.text = fullText;
             dialogueText.maxVisibleCharacters = 0;
             yield return null; // ShowText() が DialoguePanel を有効化した次フレームに解析する
             dialogueText.ForceMeshUpdate();
+            UpdateDialogueControlLayout();
 
             // **黒幕が降りているあいだは1文字ずつ送らない（2026-09-27 のユーザー指示）。**
             // 「第1局進行中...」で画面が真っ暗な裏でセリフ送りが走っていて、
             // 見えないのに送りの音だけが「ポポポポポ」と鳴っていた。
             // ここで全文を出してしまえば、音も鳴らず、待っている側も普通に先へ進む。
-            if (PhaseTransitionUI.IsScreenDarkened)
+            if (IsSpeechCovered)
             {
                 dialogueText.maxVisibleCharacters = int.MaxValue;
+                typingRunning = false;
                 yield break;
             }
 
@@ -217,8 +240,25 @@ namespace KillingMahjong.UI
             float nextSoundTime = 0f;
             int visibleCharacterCount = dialogueText.textInfo.characterCount;
 
+            // 音の高さは、いま画面にいる相手キャラで決める（2026-10-25）。金髪の先輩は低め、赤い服の女の子は高め
+            if (enemyInfo == null) enemyInfo = FindFirstObjectByType<EnemyInfoUI>();
+            var speaker = enemyInfo != null ? enemyInfo.CurrentCharacterData : null;
+            float blipStartHz = speaker != null ? speaker.TextBlipStart : CharacterData.DefaultTextBlipHz;
+            float blipEndHz = speaker != null ? speaker.TextBlipEnd : CharacterData.DefaultTextBlipHz;
+
             for (int i = 0; i < visibleCharacterCount; i++)
             {
+                while (!IsSpeechCovered && (OptionUI.AnyOpen || IsLogOpen)) yield return null;
+                // 途中で黒帯やスマホが重なった場合も、裏で読み上げ続けない。
+                // 台本の進行待ちを詰まらせないよう、ログと全文は残して送りだけ終える。
+                if (IsSpeechCovered)
+                {
+                    dialogueText.maxVisibleCharacters = int.MaxValue;
+                    typingRunning = false;
+                    IsTalking = false;
+                    yield break;
+                }
+                IsTalking = true;
                 dialogueText.maxVisibleCharacters = i + 1;
 
                 // 音が連続しすぎないように、一定間隔（例: 0.06秒）で鳴らす
@@ -236,7 +276,7 @@ namespace KillingMahjong.UI
                         //
                         // **1 を超えてよい。** AudioSource.PlayOneShot の volumeScale は
                         // 頭打ちにならない。実測で vol=3 がちょうど3.2倍、vol=10 が9.6倍になった。
-                        KillingMahjong.Managers.AudioManager.Instance.PlaySynthSound(KillingMahjong.Managers.SynthWaveType.Triangle, 330f, 330f, 0.03f, 5.0f);
+                        KillingMahjong.Managers.AudioManager.Instance.PlaySynthSound(KillingMahjong.Managers.SynthWaveType.Triangle, blipStartHz, blipEndHz, 0.03f, 5.0f);
                     }
                     nextSoundTime = Time.time + 0.06f;
                 }
@@ -245,6 +285,7 @@ namespace KillingMahjong.UI
             }
 
             dialogueText.maxVisibleCharacters = int.MaxValue;
+            typingRunning = false;
             IsTalking = false;
         }
 
@@ -260,6 +301,9 @@ namespace KillingMahjong.UI
         private void OnDisable()
         {
             IsTalking = false;
+            // 送りの途中で伏せられたらコルーチンは死ぬ。字数を途中で残すと、次に出したとき「大 のような切れ端が見える
+            typingRunning = false;
+            if (dialogueText != null) dialogueText.maxVisibleCharacters = int.MaxValue;
             if (logScrollRoutine != null) StopCoroutine(logScrollRoutine);
             logScrollRoutine = null;
         }
@@ -269,18 +313,98 @@ namespace KillingMahjong.UI
         {
             if (string.IsNullOrEmpty(skillType)) return;
             string text = (isLocalPlayer ? "自分" : "敵") + "：" + Common.SkillNames.GetDisplayName(skillType);
-            AddToLog(text, isLocalPlayer ? new Color32(63, 158, 239, 255) : new Color32(237, 72, 88, 255), isLocalPlayer);
+            var row = AddToLog(text, isLocalPlayer ? new Color32(63, 158, 239, 255) : new Color32(237, 72, 88, 255), isLocalPlayer);
+
+            // 役強化は、何を強化したかも書く（2026-10-25 のユーザー指示「ログで役強化した時、何を強化したのかというのもログに表示してほしい」）。
+            // skill_casted には役の名前が入っていないので、強化の一覧（BoardStateManager の LocalBoostHandBonus /
+            // EnemyBoostHandBonus。サーバーの状態の知らせで更新される）が増えたところで書き足す
+            if (skillType == Common.SkillNames.BoostHand && row != null)
+            {
+                // 状態の知らせが先に届いていたら、そのとき増えた役（少しだけ取っておいてある）を使う
+                var early = isLocalPlayer ? unclaimedLocalBoosts : unclaimedEnemyBoosts;
+                if (early.names.Count > 0 && Time.realtimeSinceStartup - early.at <= UnclaimedBoostSeconds)
+                {
+                    WriteBoostTargets(row, text, early.names);
+                    early.names.Clear();
+                }
+                else
+                {
+                    early.names.Clear();
+                    pendingBoostLogs.Add((isLocalPlayer, row, text));
+                }
+            }
         }
 
-        private void AddToLog(string text, Color? skillColor = null, bool isLocalPlayer = false)
+        // ---- 役強化のログに対象の役を書き足す ----
+        private readonly List<(bool local, TextMeshProUGUI row, string baseText)> pendingBoostLogs = new List<(bool, TextMeshProUGUI, string)>();
+        private Dictionary<string, int> seenLocalBoosts = new Dictionary<string, int>();
+        private Dictionary<string, int> seenEnemyBoosts = new Dictionary<string, int>();
+
+        /// <summary>
+        /// 強化の一覧が届いたら呼ぶ。前に見た一覧から増えた役を、書き足し待ちの役強化の行へ足す。
+        /// 書き足し待ちが無ければ、見た一覧を覚え直すだけ（局の初めに配られる強化はログに出さない）。
+        /// </summary>
+        public void ResolveBoostLog(Dictionary<string, int> local, Dictionary<string, int> enemy, bool openingBoosts = false)
         {
+            foreach (bool isLocal in new[] { true, false })
+            {
+                var added = BoostIncrease(isLocal ? local : enemy, isLocal ? seenLocalBoosts : seenEnemyBoosts);
+                if (added.Count == 0 || openingBoosts) continue;
+                int i = pendingBoostLogs.FindIndex(p => p.local == isLocal);
+                if (i >= 0)
+                {
+                    var (_, row, baseText) = pendingBoostLogs[i];
+                    WriteBoostTargets(row, baseText, added);
+                    pendingBoostLogs.RemoveAt(i);
+                }
+                else
+                {
+                    // 役強化の行より先に状態の知らせが来た。行が来るまで少しだけ取っておく
+                    var early = isLocal ? unclaimedLocalBoosts : unclaimedEnemyBoosts;
+                    early.names.Clear(); early.names.AddRange(added); early.at = Time.realtimeSinceStartup;
+                }
+            }
+            seenLocalBoosts = local != null ? new Dictionary<string, int>(local) : new Dictionary<string, int>();
+            seenEnemyBoosts = enemy != null ? new Dictionary<string, int>(enemy) : new Dictionary<string, int>();
+        }
+
+        /// <summary>状態の知らせと skill_casted は続けて届くので、この秒数より前に増えた役は別物とみなす。</summary>
+        private const float UnclaimedBoostSeconds = 3f;
+
+        private sealed class UnclaimedBoosts { public readonly List<string> names = new List<string>(); public float at; }
+        private readonly UnclaimedBoosts unclaimedLocalBoosts = new UnclaimedBoosts();
+        private readonly UnclaimedBoosts unclaimedEnemyBoosts = new UnclaimedBoosts();
+
+        private static List<string> BoostIncrease(Dictionary<string, int> now, Dictionary<string, int> seen)
+        {
+            var added = new List<string>();
+            if (now != null)
+                foreach (var kv in now)
+                    if (kv.Value > 0 && (!seen.TryGetValue(kv.Key, out int before) || kv.Value > before)) added.Add(kv.Key);
+            added.Sort(System.StringComparer.Ordinal);
+            return added;
+        }
+
+        private void WriteBoostTargets(TextMeshProUGUI row, string baseText, List<string> names)
+        {
+            string full = baseText + "（" + string.Join("・", names) + "）";
+            if (row != null) row.text = full;
+            int h = dialogueHistory.LastIndexOf(baseText);
+            if (h >= 0) dialogueHistory[h] = full;
+        }
+
+        private TextMeshProUGUI AddToLog(string text, Color? skillColor = null, bool isLocalPlayer = false)
+        {
+            TextMeshProUGUI created = null;
             dialogueHistory.Add(text);
+            AddLogSection();
             
             if (logContainer != null && logItemPrefab != null)
             {
                 var scroll = logContainer.GetComponentInParent<ScrollRect>(true);
                 bool visible = logPanel != null && logPanel.activeInHierarchy;
                 if (visible) followLatestLog = IsNearLatestLog(scroll);
+                if (!visible || !followLatestLog) unreadLogCount++;
                 var position = ((RectTransform)logContainer).anchoredPosition;
                 // 新しいログ枠（四角）を生成して配置
                 GameObject newLogItem = Instantiate(logItemPrefab, logContainer);
@@ -292,6 +416,8 @@ namespace KillingMahjong.UI
                 {
                     tmp.text = text;
                 }
+                created = tmp;
+                if (!skillColor.HasValue) StyleSpeechLog(newLogItem, tmp);
                 if (skillColor.HasValue)
                 {
                     var color = skillColor.Value;
@@ -309,6 +435,8 @@ namespace KillingMahjong.UI
 
                 if (visible) ScheduleLogScroll(scroll, position);
             }
+            reactionLogContext = null;
+            return created;
         }
 
         private static bool IsNearLatestLog(ScrollRect scroll)
@@ -362,6 +490,7 @@ namespace KillingMahjong.UI
         public void OpenLog()
         {
             logPanel.SetActive(true);
+            PrepareLogScrollbar();
             // 会話本体のCanvasは盤面用なので、ログだけを独立した描画順へ上げる。
             var canvas = logPanel.GetComponent<Canvas>();
             if (canvas == null) canvas = logPanel.AddComponent<Canvas>();
@@ -371,9 +500,61 @@ namespace KillingMahjong.UI
             if (logPanel.GetComponent<GraphicRaycaster>() == null)
                 logPanel.AddComponent<GraphicRaycaster>();
             var scroll = logContainer != null ? logContainer.GetComponentInParent<ScrollRect>(true) : null;
+            // 遡って読んでいるときに出す「最新へ戻る」▼（2026-10-29 要望）。シーンに置いてある物を使う
+            EnsureLogLatestButton();
             if (!hasOpenedLog) followLatestLog = true;
             hasOpenedLog = true;
             if (scroll != null && scroll.content != null) ScheduleLogScroll(scroll, scroll.content.anchoredPosition);
+        }
+
+        private void PrepareLogScrollbar()
+        {
+            var scroll = logContainer != null ? logContainer.GetComponentInParent<ScrollRect>(true) : null;
+            if (scroll == null) return;
+            var bar = scroll.verticalScrollbar;
+            if (bar == null) bar = scroll.GetComponentInChildren<Scrollbar>(true);
+            if (bar == null || bar.handleRect == null) return;
+            var rect = (RectTransform)bar.transform;
+            rect.anchorMin = new Vector2(1, 0);
+            rect.anchorMax = Vector2.one;
+            rect.pivot = new Vector2(1, .5f);
+            rect.sizeDelta = new Vector2(12, 0);
+            rect.anchoredPosition = Vector2.zero;
+            var area = bar.handleRect.parent as RectTransform;
+            if (area != null && area != rect)
+            {
+                area.anchorMin = Vector2.zero; area.anchorMax = Vector2.one;
+                area.offsetMin = area.offsetMax = Vector2.zero;
+            }
+            bar.handleRect.sizeDelta = Vector2.zero;
+            bar.direction = Scrollbar.Direction.BottomToTop;
+            scroll.verticalScrollbar = bar;
+            scroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
+            // AutoHideAndExpandViewportで枠が動かないよう、読む領域の幅は固定する。
+            if (scroll.viewport != null && scroll.viewport != scroll.transform)
+                scroll.viewport.offsetMax = new Vector2(-18, scroll.viewport.offsetMax.y);
+            PixelScrollBar.Attach(bar);
+        }
+
+        /// <summary>「最新へ戻る」▼をログの枠に置く。エディタでシーンへ焼き込むとき（LogLatestButtonBaker）にも使う。</summary>
+        public LogLatestButtonUI EnsureLogLatestButton()
+        {
+            var scroll = logContainer != null ? logContainer.GetComponentInParent<ScrollRect>(true) : null;
+            return scroll != null && logPanel != null ? LogLatestButtonUI.Ensure(logPanel.transform, scroll, this) : null;
+        }
+
+        /// <summary>ログを一番下（最新の行）まで戻し、以後は新しい行を追いかける。</summary>
+        public void JumpToLatestLog()
+        {
+            var scroll = logContainer != null ? logContainer.GetComponentInParent<ScrollRect>(true) : null;
+            if (scroll == null) return;
+            if (logScrollRoutine != null) StopCoroutine(logScrollRoutine);
+            logScrollRoutine = null;
+            Canvas.ForceUpdateCanvases();
+            scroll.StopMovement();
+            scroll.verticalNormalizedPosition = 0f;
+            followLatestLog = true;
+            unreadLogCount = 0;
         }
 
         public void CloseLog()
@@ -465,7 +646,7 @@ namespace KillingMahjong.UI
         /// 画面のどこをクリックしてもセリフが進むようにする（要望15）。
         /// 小さな OK ボタンを探して押させるより、読み終わったら適当に押すほうが速い。
         ///
-        /// 透明な全画面ボタンを最前面に置くので、**待っている間は他のUIが押せなくなる。**
+        /// 透明な全画面ボタンを最前面に置くので、ログ以外のUIは待っている間押せなくなる。
         /// 「役一覧を開かせる」のようにプレイヤーへ操作させたい場面では、
         /// セリフを送り終えてから（＝ここを閉じてから）誘導すること。
         /// </summary>
@@ -490,11 +671,15 @@ namespace KillingMahjong.UI
                 // 見えないが押せる板。alpha 0 だと Raycast に当たらないので極小の値を入れる
                 var img = advanceCatcherObj.AddComponent<Image>();
                 img.color = new Color(0f, 0f, 0f, 0.001f);
+                var filter = advanceCatcherObj.AddComponent<DialogueAdvanceRaycastFilter>();
+                filter.Owner = this;
+                filter.LogButton = toggleLogButton;
 
                 var btn = advanceCatcherObj.AddComponent<Button>();
                 btn.transition = Selectable.Transition.None;
                 btn.onClick.AddListener(() =>
                 {
+                    if (OptionUI.AnyOpen) return;
                     HideAdvanceOnAnyClick();
                     var action = onAdvanceClicked;
                     onAdvanceClicked = null;
@@ -543,6 +728,7 @@ namespace KillingMahjong.UI
 
             advanceMarkerObj.transform.SetAsLastSibling();
             advanceMarkerObj.SetActive(true);
+            UpdateAdvanceMarkerPosition();
         }
     }
 
@@ -558,7 +744,7 @@ namespace KillingMahjong.UI
         {
             if (target == null) return;
             var c = target.color;
-            c.a = Mathf.Lerp(0.25f, 1f, (Mathf.Sin(Time.unscaledTime / cycle * Mathf.PI * 2f) + 1f) * 0.5f);
+            c.a = Mathf.Lerp(0.25f, 1f, (Mathf.Sin(PresentationTiming.Sample(Time.unscaledTime) / cycle * Mathf.PI * 2f) + 1f) * 0.5f);
             target.color = c;
         }
     }

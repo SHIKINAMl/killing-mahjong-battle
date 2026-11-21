@@ -16,7 +16,7 @@ namespace KillingMahjong.UI
     /// OpeningScene）あり、河も自分・相手で2つずつあるので、シーンに持たせると
     /// 4か所を直すことになる（AGENTS.md §2、RiverUI の MaxPerRow と同じ理由）。
     /// </summary>
-    public class VoltageUI : MonoBehaviour
+    public partial class VoltageUI : MonoBehaviour
     {
         // ---- 調整値（シーンではなくここを触る）----
 
@@ -28,9 +28,12 @@ namespace KillingMahjong.UI
         // 帯の寸法。**プランナーの参考画像を実測して決めた。**
         // 参考画像は 402x304 で、帯は 幅40・高さ4・区画10px・隙間4px だった。
         // このゲームは 800x600 なので、およそ2倍にしてある。
-        private const float PipSize = 20f;     // 区画1つの横幅
-        private const float PipHeight = 8f;    // 帯の高さ
-        private const float PipGap = 8f;       // 区画の隙間
+        // 2026-11-14 ユーザー「ボルテージの位置がわかりずらいので、できれば相手のセリフの下に置きたい。
+        // 両方の大きさを少し小さくするなどしていれてくれ」→ 自分・相手とも約 0.8 倍に縮めた（20/8/8 → 16/7/6）。
+        // 高さだけ 7: 中の心臓が 8x7 ドットなので、6 だとはみ出す。7 なら上下とも整数の画素に乗る。
+        private const float PipSize = 16f;     // 区画1つの横幅
+        private const float PipHeight = 7f;    // 帯の高さ
+        private const float PipGap = 6f;       // 区画の隙間
 
         /// <summary>帯全体の幅。倍率をその上に乗せるのに使う。</summary>
         private const float PipRowWidth = PipCount * PipSize + (PipCount - 1) * PipGap;
@@ -50,13 +53,13 @@ namespace KillingMahjong.UI
         private static readonly int[] PointsPerTier = { 2, 3, 4, 5 };
 
         /// <summary>下段の区画の高さ。上段より薄くして、主役を上段に残す。</summary>
-        private const float ChargeHeight = 6f;
+        private const float ChargeHeight = 5f;
 
         /// <summary>下段の区画どうしの隙間。</summary>
-        private const float ChargeGap = 3f;
+        private const float ChargeGap = 2f;
 
         /// <summary>上段と下段の間隔。</summary>
-        private const float RowGap = 5f;
+        private const float RowGap = 4f;
 
         /// <summary>下段の区画は**常に上段と同じ幅に収める**ので、数で割って決める。</summary>
         private static float ChargePipWidth(int count)
@@ -66,7 +69,10 @@ namespace KillingMahjong.UI
         }
 
         /// <summary>倍率の文字の大きさ。参考画像では帯の5倍ほどの高さがあった。</summary>
-        private const float MultiplierFontSize = 30f;
+        private const float MultiplierFontSize = 24f;
+
+        /// <summary>帯の上端から倍率の下端までの高さ。炎が揺れるぶん空ける（0.8 倍に縮めたので 36 → 27.5。帯の高さ 7 の半分 3.5 と足して 31 の整数にする）。</summary>
+        private const float LabelLift = 27.5f;
 
         /// <summary>
         /// 置き場所。画面中央からのずれ。**敵と自分で左右に分ける。**
@@ -90,8 +96,20 @@ namespace KillingMahjong.UI
         /// </summary>
         private const float SelfPosX = -280f;
         private const float SelfPosY = -120f;
-        private const float EnemyPosX = 149f;
-        private const float EnemyPosY = -68f;
+        // 2026-11-14 ユーザー「ボルテージの位置がわかりずらいので、できれば相手のセリフの下に置きたい」。
+        // 下の 11/12 の壁の位置は、役一覧の下で誰の物か分かりにくかった。**セリフの真下、Log ボタンの右**へ戻す。
+        // セリフの枠は画面 x=422〜670、字の下地の下端 y≒257。Log ボタンは x≒470〜536・y≒250〜286。
+        // ゲージ（倍率の上端 y≒266〜下段の下端 y≒335、四角 x=569〜651）は、セリフの右寄りの真下で Log と並ぶ（近接・整列）。
+        // 相手の右の翼の先には重なるが、倍率は明るい橙なので暗い翼の上でも読める。
+        // （以下は 11/12 の記録）
+        // 2026-11-12 ユーザー「敵のボルテージがかぶっているので調整して」。
+        // 吹き出しの真下 (149, -68) は相手の右の翼に重なっていた。
+        // **吹き出しの右隣の壁**へ移す。吹き出し（DialoguePanel）の右端は画面 x=670、
+        // 上の役一覧の下端は y=165、右下の血袋と羽ペンは y=300 より下なので、
+        // 倍率の上端 y=184〜四角の下端 y=272、x=683〜787 がその間に収まる。
+        // 吹き出しのすぐ横なので「敵の物」という結び付き（近接）は残る。
+        private const float EnemyPosX = 210f;
+        private const float EnemyPosY = -27f;
 
         // 点いた四角の色は段ごとに変わるので、ここには持たない。
         // 配っているのは VoltageFlame.PipColorFor（2026-09-13）。
@@ -297,11 +315,11 @@ namespace KillingMahjong.UI
             labelRect.pivot = new Vector2(0.5f, 0f);
             // **帯の真上に大きく出す（参考画像どおり）。**
             // 炎は帯の上で揺れるので、そのぶんの高さを空けてから文字を置く。
-            labelRect.anchoredPosition = new Vector2(PipRowWidth * 0.5f, PipHeight * 0.5f + 36f);
+            labelRect.anchoredPosition = new Vector2(PipRowWidth * 0.5f, PipHeight * 0.5f + LabelLift);
             labelRect.sizeDelta = new Vector2(PipRowWidth + 40f, MultiplierFontSize + 6f);
 
             _multiplierText = label.GetComponent<TextMeshProUGUI>();
-            _multiplierText.font = BorrowJapaneseFont();
+            _multiplierText.font = LoadMultiplierFont();
             _multiplierText.fontSize = MultiplierFontSize;
             _multiplierText.alignment = TextAlignmentOptions.Center;
             _multiplierText.raycastTarget = false;
@@ -318,6 +336,7 @@ namespace KillingMahjong.UI
         private void OnDisable()
         {
             VoltageSystem.Changed -= Refresh;
+            CancelRevealPresentation();
         }
 
         private void Refresh()
@@ -331,6 +350,11 @@ namespace KillingMahjong.UI
             int points = VoltageSystem.GetPoints(_isEnemy);
             int from = VoltageSystem.GetPointsAtCurrentLevel(_isEnemy);
             int to = VoltageSystem.GetPointsForNextLevel(_isEnemy);
+            RenderFeedbackState(level, broken, points, from, to, VoltageSystem.GetMultiplier(_isEnemy));
+        }
+
+        private void RenderFeedbackState(int level, bool broken, int points, int from, int to, float multiplier)
+        {
             // progress は下段の区画の数で見せるので、ここでは使わない
 
             for (int i = 0; i < _pips.Length; i++)
@@ -361,7 +385,7 @@ namespace KillingMahjong.UI
             // **0段でも出す（2026-09-13、参考画像どおり）。**
             // 以前は等倍のとき空にしていたが、参考画像は倍率を常に見せる作りで、
             // 帯と文字が揃っているほうが「ここが何の表示か」が分かる。
-            _multiplierText.text = "×" + VoltageSystem.GetMultiplier(_isEnemy).ToString("0.0");
+            _multiplierText.text = "×" + multiplier.ToString("0.0");
             _multiplierText.color = broken ? TextBroken : TextOn;
         }
 
@@ -413,6 +437,20 @@ namespace KillingMahjong.UI
                 if (_chargePips[i] == null) continue;
                 _chargePips[i].color = i < filled ? onColor : PipOff;
             }
+        }
+
+        /// <summary>倍率の文字のフォント。Resources 直下からの相対パス（拡張子なし）。</summary>
+        private const string MultiplierFontPath = "x8y12pxDenkiChip/x8y12pxDenkiChip_Dynamic";
+
+        /// <summary>
+        /// 倍率は「でんきチップ」で出す（MnoAさんの要望、2026-09-18）。
+        /// このフォントは教育漢字1〜4年までしか無く本文には使えないが、倍率は `×` と数字と `.` だけなので足りる。
+        /// 読めなかったときは、画面の日本語フォントを借りる。
+        /// </summary>
+        private static TMP_FontAsset LoadMultiplierFont()
+        {
+            var font = Resources.Load<TMP_FontAsset>(MultiplierFontPath);
+            return font != null ? font : BorrowJapaneseFont();
         }
 
         /// <summary>

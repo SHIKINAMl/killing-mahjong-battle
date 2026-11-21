@@ -18,45 +18,32 @@ namespace KillingMahjong.UI
                 boxTr.SetParent(abilityWindow, false);
             }
 
-            // 縁は箱そのものの地の色。内側に面を1枚敷く（行のタイルと同じ作り）
+            // ベルルの上に置き、口元へ向かう尻尾を下に伸ばす。
             var boxImg = boxTr.GetComponent<Image>();
-            boxImg.sprite = null;
-            boxImg.color = DescBorderColor;
+            boxImg.enabled = false;
             boxImg.raycastTarget = false;
-
-            var fillTr = boxTr.Find(DescFillName) as RectTransform;
-            if (fillTr == null)
-            {
-                var fillGo = new GameObject(DescFillName, typeof(RectTransform), typeof(Image));
-                fillTr = (RectTransform)fillGo.transform;
-                fillTr.SetParent(boxTr, false);
-            }
-            var fillImg = fillTr.GetComponent<Image>();
-            fillImg.sprite = null;
-            fillImg.color = DescBoxColor;
-            fillImg.raycastTarget = false;
-            fillTr.anchorMin = Vector2.zero;
-            fillTr.anchorMax = Vector2.one;
-            fillTr.offsetMin = new Vector2(DescBorder, DescBorder);
-            fillTr.offsetMax = new Vector2(-DescBorder, -DescBorder);
-            fillTr.localScale = Vector3.one;
-            fillTr.SetAsFirstSibling();
-
-            // **巻物の外（右側）に出す**（2026-08-31）。
-            // 内枠の下に置いていたときは、閉じるボタンと場所を取り合っていた。
-            // 左上を基準にして、巻物の右端から DescPanelGap だけ離し、内枠の上端に頭を揃える。
-            // 巻物の幅はシーンの値なので、定数に焼かず実物から取る。
-            float windowHalfWidth = abilityWindow.rect.width * 0.5f;
-
-            boxTr.anchorMin = new Vector2(0.5f, 0.5f);
-            boxTr.anchorMax = new Vector2(0.5f, 0.5f);
+            var legacyFill = boxTr.Find(DescFillName);
+            if (legacyFill != null) legacyFill.gameObject.SetActive(false);
+            boxTr.anchorMin = boxTr.anchorMax = new Vector2(.5f, .5f);
             boxTr.pivot = new Vector2(0f, 1f);
             boxTr.sizeDelta = new Vector2(DescPanelWidth, DescPanelHeight);
-            boxTr.anchoredPosition = new Vector2(
-                windowHalfWidth + DescPanelGap,
-                PanelInnerCenter.y + PanelInnerHeight * 0.5f);
+            boxTr.anchoredPosition = new Vector2(-18f, 271f);
             boxTr.localScale = Vector3.one;
-
+            var art = boxTr.Find("SpeechOutline") as RectTransform;
+            if (art == null)
+            {
+                art = new GameObject("SpeechOutline", typeof(RectTransform), typeof(Effects.PixelShapeGraphic))
+                    .GetComponent<RectTransform>();
+                art.SetParent(boxTr, false);
+            }
+            art.anchorMin = art.anchorMax = new Vector2(0f, 1f);
+            art.pivot = new Vector2(0f, 1f);
+            art.anchoredPosition = Vector2.zero;
+            art.sizeDelta = boxTr.sizeDelta;
+            art.SetAsFirstSibling();
+            var shape = art.GetComponent<Effects.PixelShapeGraphic>();
+            shape.raycastTarget = false;
+            DrawSkillSpeech(shape);
             var textTr = boxTr.Find(DescTextName) as RectTransform;
             TMPro.TextMeshProUGUI text;
             if (textTr == null)
@@ -74,29 +61,100 @@ namespace KillingMahjong.UI
 
             textTr.anchorMin = Vector2.zero;
             textTr.anchorMax = Vector2.one;
-            textTr.offsetMin = new Vector2(4f, 3f);
-            textTr.offsetMax = new Vector2(-4f, -3f);
+            textTr.offsetMin = new Vector2(12f, 12f);
+            textTr.offsetMax = new Vector2(-12f, -12f);
             textTr.localScale = Vector3.one;
 
-            // **折り返して全文を出す。** 46文字の「強襲」が最長で、
-            // 128 幅・44 高に 9px で 4 行なら収まる。収まらない分は自動で縮む。
-            //
-            // **`Overflow` にしないこと。** 自動縮小の下限(7px)でも入らない文言を
-            // 足したとき、はみ出した行が巻物の枠を突き抜けて盤面に出てしまう。
-            // `Truncate` なら最悪でも欄の中で切れて止まる。
-            text.margin = Vector4.zero;
-            text.color = Color.white;
-            text.alignment = TMPro.TextAlignmentOptions.TopLeft;
-            text.textWrappingMode = TMPro.TextWrappingModes.Normal;
-            text.overflowMode = TMPro.TextOverflowModes.Truncate;
-            text.enableAutoSizing = true;
-            text.fontSizeMax = 10f;
-            text.fontSizeMin = 7f;
+            // 文字は吹き出しの内側に収め、尻尾と縁には重ねない。
+            ApplyDescriptionStyle(text);
             text.raycastTarget = false;
 
             _descText = text;
             return _descText;
         }
+
+        /// <summary>
+        /// 説明の字の大きさなどを当てる。**出すたびに当て直す**（2026-10-22）。
+        ///
+        /// ユーザーがチュートリアルを遊んでいる最中に見ると、自動縮小の幅が TextMeshPro の既定の 18〜72 に戻っていた。
+        /// 18 より小さくならないので「字が大きすぎて文が入りきらない」（3行目で切れる）状態になっていた。
+        /// 戻した経路は特定できていない（作り直しを非表示のまま行っても再現しなかった）ので、作るときだけでなく、
+        /// 説明を出すたびに（表示した直後に）当て直す。
+        /// </summary>
+        private static void ApplyDescriptionStyle(TMPro.TextMeshProUGUI text)
+        {
+            text.margin = Vector4.zero;
+            text.color = new Color32(0x21, 0x0B, 0x0B, 0xFF);
+            text.alignment = TMPro.TextAlignmentOptions.TopLeft;
+            text.textWrappingMode = TMPro.TextWrappingModes.Normal;
+            text.overflowMode = TMPro.TextOverflowModes.Truncate;
+            text.enableAutoSizing = true;
+            text.fontSizeMax = 16f;
+            text.fontSizeMin = 13f;
+        }
+        // 既存UIと同じ2px単位。半透明や影を重ねず、輪郭を一重にする。
+        private static void DrawSkillSpeech(Effects.PixelShapeGraphic shape)
+        {
+            const float tailX = 18f;
+            var edge = new Color32(0x51, 0x19, 0x19, 0xFF);
+            var fill = new Color32(0xFF, 0x93, 0x93, 0xFF);
+            shape.Begin();
+            // 中心をベルルへ向けた、段階的に細くなる尻尾。
+            for (int row = 0; row < 10; row++)
+            {
+                float half = 12f - row;
+                shape.Box(tailX - half, -DescPanelHeight - row * 2f - 2f,
+                    tailX + half, -DescPanelHeight - row * 2f, edge);
+                if (row < 8)
+                    shape.Box(tailX + 2f - half, -DescPanelHeight - row * 2f - 2f,
+                        tailX - 2f + half, -DescPanelHeight - row * 2f, fill);
+            }
+            // 左上を原点とするRectTransformなので、本文は下向きの座標。
+            for (int row = 0; row < (int)DescPanelHeight / 2; row++)
+            {
+                float y = -row * 2f;
+                int near = Mathf.Min(row, (int)DescPanelHeight / 2 - 1 - row);
+                float inset = near == 0 ? 10f : near == 1 ? 6f : near == 2 ? 4f : 2f;
+                shape.Box(inset, y - 2f, DescPanelWidth - inset, y, edge);
+                if (near > 0)
+                    shape.Box(inset + 2f, y - 2f, DescPanelWidth - inset - 2f, y, fill);
+            }
+            // 尻尾の付け根だけは本文とつなぐ。
+            shape.Box(tailX - 10f, -DescPanelHeight, tailX + 10f, -DescPanelHeight + 2f, fill);
+            shape.End();
+        }
+        private void EnsureActivateButton()
+        {
+            if (abilityWindow == null) return;
+
+            if (activateButton == null || activateButton == closeButton)
+            {
+                float bottom = PanelInnerCenter.y - PanelInnerHeight * 0.5f;
+                activateButton = SessionPrompt.CreateButton(abilityWindow, "発動",
+                    new Vector2(PanelInnerCenter.x + 19f,
+                        bottom + CloseButtonBottomMargin + CloseButtonSize * 0.5f), OnActivateClicked);
+                var rect = (RectTransform)activateButton.transform;
+                rect.sizeDelta = new Vector2(108f, 36f);
+                var label = activateButton.GetComponentInChildren<TMPro.TMP_Text>();
+                label.rectTransform.sizeDelta = rect.sizeDelta;
+                label.fontSize = 18f;
+                activateButton.image.color = new Color32(43, 51, 94, 255);
+                activateButton.gameObject.AddComponent<UIButtonHoverEffect>();
+            }
+            else activateButton.onClick.AddListener(OnActivateClicked);
+
+            RefreshActivateButton();
+        }
+
+        private void RefreshActivateButton()
+        {
+            if (activateButton == null || activateButton == closeButton) return;
+            bool selected = currentSelection != null;
+            activateButton.gameObject.SetActive(selected);
+            activateButton.interactable = selected && !IsDisplayOnly
+                && currentSelection.IsUsable && currentSelection.IsAffordable;
+        }
+
         private void HideLegacyTooltip()
         {
             if (tooltipText != null && !string.IsNullOrEmpty(tooltipText.text)) tooltipText.text = "";
@@ -129,7 +187,7 @@ namespace KillingMahjong.UI
             rt.pivot = new Vector2(0.5f, 0.5f);
             rt.sizeDelta = new Vector2(CloseButtonSize, CloseButtonSize);
             rt.anchoredPosition = new Vector2(
-                PanelInnerCenter.x,
+                PanelInnerCenter.x - 56f,
                 innerBottom + CloseButtonBottomMargin + CloseButtonSize * 0.5f);
             rt.localScale = Vector3.one;
 
@@ -229,12 +287,12 @@ namespace KillingMahjong.UI
             }
             var fill = fillTr.GetComponent<Image>();
             fill.sprite = null;
-            fill.color = DescBoxColor;
+            fill.color = new Color32(0x1B, 0x23, 0x38, 0xE6);
             fill.raycastTarget = false;
             fillTr.anchorMin = Vector2.zero;
             fillTr.anchorMax = Vector2.one;
-            fillTr.offsetMin = new Vector2(DescBorder, DescBorder);
-            fillTr.offsetMax = new Vector2(-DescBorder, -DescBorder);
+            fillTr.offsetMin = new Vector2(2f, 2f);
+            fillTr.offsetMax = new Vector2(-2f, -2f);
             fillTr.localScale = Vector3.one;
             fillTr.SetAsFirstSibling();
         }

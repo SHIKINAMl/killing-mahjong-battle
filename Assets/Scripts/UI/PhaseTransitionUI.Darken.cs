@@ -10,9 +10,10 @@ namespace KillingMahjong.UI
         /// 暗転まわりの一発物を鳴らす（2026-09-11）。`Resources/Stingers/` から読む。
         ///
         /// **繋ぎの尺は `checkerFadeDuration` に合わせて作ってある。**
-        /// `br_riser` は 1.0 秒かけて上がり切った瞬間にキックが着地する。
+        /// `br_riser` と局開始用の `br_round_riser` は、明転開始から約1秒で打音が鳴る。
         /// 市松模様が晴れる瞬間と打点を合わせるためなので、
         /// `checkerFadeDuration` を変えたら音も作り直すこと。ずれると打点だけ遅れて聞こえる。
+        /// 流局や掛け金確定の切り替えと、局開始の暗転・明転は別の音源を使う。
         /// </summary>
         private void PlayTransitionStinger(string name)
         {
@@ -90,6 +91,10 @@ namespace KillingMahjong.UI
         /// 先に終わっていた場合はこの旗に積んでおく。
         /// </summary>
         private bool _fadeOutPendingUntilDarkened;
+        private bool _useRoundStartRevealSound;
+        private float roundStartTextVisibleUntil;
+        private Coroutine darkenTextRoutine;
+        private const float MinimumRoundTitleSeconds = 1f;
 
         /// <summary>
         /// 暗転が降りきるのを待ってから晴らす。<see cref="PlayRoundStartFadeOut"/> が
@@ -111,7 +116,6 @@ namespace KillingMahjong.UI
             }
 
             isDarkened = false;
-            IsScreenDarkened = false;
             yield return StartCoroutine(RoundStartFadeOutRoutine(onComplete));
         }
 
@@ -121,6 +125,7 @@ namespace KillingMahjong.UI
             // （進行管理の BeginRoundStart）。配牌が暗転より先に終わっている場合に
             // ここで倒すと、「もう待っていないのに山を置く」が復活する。
             ResetVisuals();
+            _useRoundStartRevealSound = true;
 
             // 濃さを抑える。ResetVisuals のあとに当てないと戻される
             if (fullScreenCheckerImage != null)
@@ -130,8 +135,8 @@ namespace KillingMahjong.UI
                 fullScreenCheckerImage.color = c;
             }
 
-            // 市松模様フェードイン (暗転)。落ちていくスイープを重ねる
-            PlayTransitionStinger("br_fall");
+            // 市松模様が暗くなるところに、布と短い打音を合わせる。
+            PlayTransitionStinger("br_round_fall");
             if (fullScreenCheckerImage != null) fullScreenCheckerImage.gameObject.SetActive(true);
             if (checkerMaterial != null)
             {
@@ -142,7 +147,7 @@ namespace KillingMahjong.UI
             float t = 0;
             while (t < checkerFadeDuration)
             {
-                if (checkerMaterial != null) checkerMaterial.SetFloat("_Progress", t / checkerFadeDuration);
+                if (checkerMaterial != null) checkerMaterial.SetFloat("_Progress", PresentationTiming.Sample(t) / checkerFadeDuration);
                 t += Time.deltaTime;
                 yield return null;
             }
@@ -153,28 +158,24 @@ namespace KillingMahjong.UI
             var additionalCallbacks = _additionalRoundStartDarkenedCallbacks;
             _additionalRoundStartDarkenedCallbacks = null;
             additionalCallbacks?.Invoke();
-            IsDarkenTransitioning = false;
 
-            // ドン！とテキスト表示。画面揺れと同じ「着弾」なので打撃音を当てる
-            if (centerText != null)
+            // 局名を描画するまで文字を透明にしておく。空なら暗転だけを出す。
+            if (centerText != null && !string.IsNullOrEmpty(text))
             {
-                PlayTransitionStinger("br_blackout");
-                centerText.text = text;
-                centerText.gameObject.SetActive(true);
+                // 第2局以降で波紋を出せるときは、ひとつ前の局の数字で出してから送る（PhaseTransitionUI.RoundRipple）
+                centerText.text = RoundTitleBeforeFlip(text);
                 centerText.color = Color.white;
+                centerText.alpha = 0f;
+                centerText.gameObject.SetActive(true);
             }
 
-            // 盤面リセットと黒幕の準備を終えてから、進行管理へ反映可能を通知する。
-            onReady?.Invoke();
-            var additionalReadyCallbacks = _additionalRoundStartReadyCallbacks;
-            _additionalRoundStartReadyCallbacks = null;
-            additionalReadyCallbacks?.Invoke();
-
             if (centerText != null)
             {
-                // **局名は、中央にぱっと出すだけ（2026-10-11 のユーザー指示）。**
+                // **局名は、中央に置いて大きさは変えない（2026-10-11 のユーザー指示）。**
                 // それまでは3倍の大きさから 0.4 秒で縮めて着弾させ、画面を揺らしていた。
-                // 手前から中央へ文字が飛んでくるように見えるので、やめた。着弾が無いので揺れも外した
+                // 手前から中央へ文字が飛んでくるように見えるので、やめた。着弾が無いので揺れも外した。
+                // 出し方は帯の文字と同じく、1字ずつ時間差で少し浮かせて出す（2026-10-25 のユーザー指示
+                // 「一局目などの遷移の演出を作っていたのですが、それが適応されていなかった」）。下の 1 フレーム後に始める
                 centerText.transform.localScale = Vector3.one;
             }
 
@@ -184,6 +185,32 @@ namespace KillingMahjong.UI
             // 片付けは配牌後の RoundStartFadeOutRoutine が Hide でやっている。
             // **片付けが先に走っていたら、もう置かない。** 置いても片付ける人がいない
             ShowRoundStartWaitTiles();
+
+            // **1フレーム後に文字の形を渡し直す**（2026-10-24）。チュートリアルの「２局目」が、エディターの外からの
+            // 撮影では暗転の間ずっと写らなかった（文字の形は正しく渡っていて、渡し直すと写る）。本編は直後に
+            // 裏牌の山を置くので描き直しが走るが、チュートリアルは山を置かない。描き直しを自前で一度起こしておく
+            yield return null;
+            if (centerText != null && centerText.gameObject.activeInHierarchy && !string.IsNullOrEmpty(text))
+            {
+                centerText.ForceMeshUpdate();
+                // その場でぱっと出す（2026-10-26 のユーザー指示。以前は1字ずつ浮かせていた）
+                centerText.alpha = 1f;
+                PlayTransitionStinger("br_blackout");
+                roundStartTextVisibleUntil = Time.unscaledTime + MinimumRoundTitleSeconds;
+                // 数字を送って波紋を出す。晴らす側（RoundStartFadeOutRoutine）は darkenTextRoutine が終わるまで待つ
+                if (CanPlayRoundNumberRipple(text))
+                {
+                    if (darkenTextRoutine != null) StopCoroutine(darkenTextRoutine);
+                    darkenTextRoutine = StartCoroutine(RoundNumberRippleRoutine(text));
+                }
+            }
+
+            // 局名を描画してから通知する。通知内で配牌が完了しても表示時間を数えられる。
+            IsDarkenTransitioning = false;
+            onReady?.Invoke();
+            var additionalReadyCallbacks = _additionalRoundStartReadyCallbacks;
+            _additionalRoundStartReadyCallbacks = null;
+            additionalReadyCallbacks?.Invoke();
         }
 
         /// <summary>局名を出したあとに置く裏牌の高さ。**画面の下端から測る**（待ち画面と同じ）。</summary>
@@ -212,6 +239,7 @@ namespace KillingMahjong.UI
             // 前の局で積んだままになっていたら降ろす。立てっぱなしだと
             // 次の「降りている最中の配牌完了」を拾い損ねる
             _fadeOutPendingUntilDarkened = false;
+            roundStartTextVisibleUntil = 0f;
         }
 
         /// <summary>待機用の牌を片付け、後から再配置しないようにする。</summary>
@@ -226,21 +254,28 @@ namespace KillingMahjong.UI
 
         private IEnumerator RoundStartFadeOutRoutine(Action onComplete)
         {
+            // 局名の差し替えが終わり、全文が見えてから最低1秒を確保する。
+            while (darkenTextRoutine != null || Time.unscaledTime < roundStartTextVisibleUntil)
+                yield return null;
+            ClearRoundRipple();
+            IsScreenDarkened = false;
+
             // 配牌が完了したら、局名と一緒に手混ぜ用の牌の山も消す。
             // 呼び出し元（PlayRoundStartFadeOut）が先に済ませているが、
             // 直接呼ばれても困らないようにここでも通しておく。
             MarkRoundStartCleanupDone();
 
-            // テキストを隠す
-            if (centerText != null) centerText.gameObject.SetActive(false);
+            // テキストを隠す。パッと消さず、薄くして消す（2026-10-25）
+            yield return HideBandText();
             if (horizontalLineRt != null) horizontalLineRt.gameObject.SetActive(false);
 
-            // 市松模様フェードアウト (晴れる)。上がり切ったところでキックが着地する
-            PlayTransitionStinger("br_riser");
+            // 流局後もここで明転するので、局名を出す経路から来たときは専用の音を鳴らす。
+            PlayTransitionStinger(_useRoundStartRevealSound ? "br_round_riser" : "br_riser");
+            _useRoundStartRevealSound = false;
             float t = 0;
             while (t < checkerFadeDuration)
             {
-                if (checkerMaterial != null) checkerMaterial.SetFloat("_Progress", 1f - (t / checkerFadeDuration));
+                if (checkerMaterial != null) checkerMaterial.SetFloat("_Progress", 1f - (PresentationTiming.Sample(t) / checkerFadeDuration));
                 t += Time.deltaTime;
                 yield return null;
             }

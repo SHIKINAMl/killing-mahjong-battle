@@ -132,7 +132,7 @@ namespace KillingMahjong.UI
             float elapsed = 0f;
             while (elapsed < duration)
             {
-                float t = elapsed / duration;
+                float t = PresentationTiming.Sample(elapsed) / duration;
                 // イーズアウト（ゆっくり止まる）
                 float ease = 1f - Mathf.Pow(1f - t, 3f);
 

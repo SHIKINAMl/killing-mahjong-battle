@@ -219,7 +219,7 @@ namespace KillingMahjong.UI
             while (t < flashDuration)
             {
                 t += Time.deltaTime;
-                float p = Mathf.Clamp01(t / flashDuration);
+                float p = PresentationTiming.Progress(t, flashDuration);
 
                 // 一気に出て、速く落ちてから尾を引く
                 float a = p < attack

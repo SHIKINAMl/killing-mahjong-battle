@@ -31,9 +31,14 @@ namespace KillingMahjong.UI.Effects
         public static IEnumerator Play(PhaseTransitionUI phase, CharacterData character, IReadOnlyList<SkillCastedData> casts)
         {
             var names = new List<string>();
+            var types = new List<string>();
             foreach (var cast in casts)
-                if (cast != null && !string.IsNullOrEmpty(cast.skillType)) names.Add(SkillNames.GetDisplayName(cast.skillType));
-            if (phase != null) yield return phase.PlayEnemySkillBurstRoutine(names, character);
+                if (cast != null && !string.IsNullOrEmpty(cast.skillType))
+                {
+                    names.Add(SkillNames.GetDisplayName(cast.skillType));
+                    types.Add(cast.skillType);
+                }
+            if (phase != null) yield return phase.PlayEnemySkillBurstRoutine(names, character, types);
         }
 
         // 旧・集約表示は没案の試写からだけ呼ぶ。

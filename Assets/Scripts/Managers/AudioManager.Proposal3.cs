@@ -602,6 +602,10 @@ namespace KillingMahjong.Managers
             double freq = clip.frequency;
             double length = clip.samples / freq;
 
+#if !UNITY_WEBGL || UNITY_EDITOR
+            // Web の圧縮ループ音源は再生位置の取得値が不正になることがある。
+            // その値へ合わせ直すと小節の時計が巻き戻り、次の曲を予約できない。
+            // Web では予約時の位置と DSP 時計だけで進める。
             double now = AudioSettings.dspTime;
             if (now > _p3AnchorDsp + 0.05 && deck.isPlaying)
             {
@@ -615,6 +619,7 @@ namespace KillingMahjong.Managers
                     _p3AnchorSample = deck.timeSamples;
                 }
             }
+#endif
 
             return PositiveMod(_p3AnchorSample / freq + (dsp - _p3AnchorDsp), length);
         }
@@ -682,7 +687,10 @@ namespace KillingMahjong.Managers
             if (t.Bpm <= 0f) return 0.0;
 
             double bar = 60.0 / t.Bpm * t.BeatsPerBar;
-            double into = src.time % bar;
+            double position = src.time;
+            // Web の圧縮音源が不正な位置を返した場合も、切替待ちを続けない。
+            if (double.IsNaN(position) || double.IsInfinity(position)) return 0.0;
+            double into = position % bar;
             return bar - into;
         }
 

@@ -162,14 +162,8 @@ namespace KillingMahjong.UI
                     && (owner.DialogueUI == null || !owner.DialogueUI.IsLogOpen)));
             bool overInfo = canHover && presentation.alpha > .001f && info != null && info.alpha > .001f
                 && Contains((RectTransform)info.transform, point);
-            bool overRoles = canHover && roleConditions.IsHovered && Contains((RectTransform)roleConditions.transform, point);
-            bool overCandidate = false;
-            if (canHover && presentation.alpha > .001f)
-                foreach (var card in cards) if (Contains(card, point)) { overCandidate = true; break; }
-            bool bridge = canHover && roleConditions.IsHovered && IsRoleHoverBridge(point);
-            bool roleHover = overInfo || (roleConditions.IsHovered && (overRoles || overCandidate || bridge));
             bool show = hoverHand == null || forceVisible || IsTransferring;
-            show |= overInfo || overRoles || bridge;
+            show |= overInfo;
             if (!show)
             {
                 foreach (var tile in hoverHand.GetHandSlots()) if (Contains(tile, point)) { show = true; break; }
@@ -183,8 +177,9 @@ namespace KillingMahjong.UI
                 : Mathf.MoveTowards(presentation.alpha, show ? 1 : 0, Time.unscaledDeltaTime / .08f);
             presentation.blocksRaycasts = show && !IsTransferring;
             presentation.interactable = show && !IsTransferring;
-            roleConditions.SetHovered(roleHover);
-            string focused = overRoles ? roleConditions.GetHoveredRole(point) : null;
+            // 条件の詳細は立ち絵を覆うため開かない。左の役名と対応する牌の強調は残す。
+            roleConditions.SetHovered(false);
+            string focused = null;
             int lineIndex = -1;
             if (overInfo && Contains(yakuText.rectTransform, point)) focused = RoleAtLeftPoint(point, out lineIndex);
             roleConditions.SetFocusedRole(focused);
@@ -349,7 +344,7 @@ namespace KillingMahjong.UI
                 info.alpha = Mathf.Clamp01(elapsed / .2f);
                 for (int i = 0; i < cards.Count; i++)
                 {
-                    float u = Mathf.Clamp01((elapsed - i * .085f) / .2f);
+                    float u = Mathf.Clamp01(PresentationTiming.Sample(elapsed - i * .085f) / .2f);
                     float ease = 1 - Mathf.Pow(1 - u, 3);
                     cards[i].anchoredPosition = positions[i] + new Vector2(42, -8) * (1 - ease);
                     groups[i].alpha = Mathf.Min(1, u * 3);
@@ -421,6 +416,8 @@ namespace KillingMahjong.UI
             go.transform.SetParent(transform, false);
             var rt = go.GetComponent<RectTransform>(); rt.sizeDelta = new Vector2(800, 600);
             pixels = go.GetComponent<PixelShapeGraphic>(); pixels.raycastTarget = false;
+            var flightAudio = HandSelectionFeedbackAudio.CreateWaitTransferSource(go, false);
+            var arrivalAudio = HandSelectionFeedbackAudio.CreateWaitTransferSource(go, true);
             var ids = new List<int>(); var nonMangan = new List<int>();
             foreach (var w in waits) { ids.Add(w.tile); if (!w.mangan_or_more) nonMangan.Add(w.tile); }
             bool finished = false;
@@ -433,11 +430,14 @@ namespace KillingMahjong.UI
                 {
                     int count = Mathf.Min(3, waits.Length - page * 3);
                     target.PrepareArrivalPage(page);
+                    if (flightAudio.clip != null) flightAudio.Play();
                     var starts = new Vector2[count]; var ends = new Vector2[count]; var arrived = new bool[count];
                     for (int i = 0; i < count; i++) { starts[i] = Center(cards[page * 3 + i]); ends[i] = Center(target.GetArrivalTileRect(i)); }
                     float duration = .70f + (count - 1) * .055f;
                     for (float t = 0; t < duration + Time.deltaTime && stamp == version; t += Time.deltaTime)
                     {
+                        HandSelectionFeedbackAudio.UpdateWaitTransferVolume(flightAudio);
+                        HandSelectionFeedbackAudio.UpdateWaitTransferVolume(arrivalAudio);
                         pixels.Begin();
                         for (int i = 0; i < count; i++)
                         {
@@ -447,10 +447,18 @@ namespace KillingMahjong.UI
                             groups[index].alpha = 0;
                             if (raw >= 1)
                             {
-                                if (!arrived[i]) { arrived[i] = true; LastArrivalFrame = Time.frameCount; target.RevealArrivalTile(i); ArrivalCount++; }
+                                if (!arrived[i])
+                                {
+                                    arrived[i] = true;
+                                    LastArrivalFrame = Time.frameCount;
+                                    target.RevealArrivalTile(i);
+                                    if (arrivalAudio.clip != null) arrivalAudio.PlayOneShot(arrivalAudio.clip);
+                                    ArrivalCount++;
+                                }
                                 continue;
                             }
-                            float u = raw < .5f ? 4 * raw * raw * raw : 1 - Mathf.Pow(-2 * raw + 2, 3) / 2;
+                            float visual = PresentationTiming.Progress(t - i * .055f, .70f);
+                            float u = visual < .5f ? 4 * visual * visual * visual : 1 - Mathf.Pow(-2 * visual + 2, 3) / 2;
                             DrawFlight(index, starts[i], ends[i], u);
                         }
                         pixels.End();
@@ -465,7 +473,15 @@ namespace KillingMahjong.UI
             {
                 if (!finished && target != null) target.Hide();
                 IsTransferring = false;
-                ClearFlight();
+                if (finished && pixels != null)
+                {
+                    // 最後の着地音の余韻だけ残す。演出自体の待ち時間は増やさない。
+                    pixels.enabled = false;
+                    go.transform.SetParent(null, false);
+                    Destroy(go, .12f);
+                    pixels = null;
+                }
+                else ClearFlight();
             }
             Hide();
         }

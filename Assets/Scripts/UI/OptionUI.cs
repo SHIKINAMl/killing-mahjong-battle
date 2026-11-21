@@ -11,6 +11,19 @@ namespace KillingMahjong.UI
     /// </summary>
     public class OptionUI : MonoBehaviour
     {
+        private static readonly System.Collections.Generic.HashSet<OptionUI> instances =
+            new System.Collections.Generic.HashSet<OptionUI>();
+
+        /// <summary>資料を含む設定操作中は、背面の会話送りに入力を渡さない。</summary>
+        public static bool AnyOpen
+        {
+            get
+            {
+                foreach (var option in instances)
+                    if (option != null && option.IsOpen) return true;
+                return false;
+            }
+        }
         [Header("Audio Settings (Sliders)")]
         [SerializeField] private Slider bgmSlider;
         [SerializeField] private Slider seSlider;
@@ -31,12 +44,18 @@ namespace KillingMahjong.UI
 
         [Header("Buttons")]
         [SerializeField] private Button closeButton; // 変更を保持して閉じる
-        [SerializeField] private Button returnToTitleButton; // タイトル（または別シーン）に戻る
+        [SerializeField] private Button returnToTitleButton; // デバッグ部屋（returnSceneName のシーン）へ移る。名前は昔の「タイトルへ」のまま
         [SerializeField] private Button quitButton; // ゲーム終了
 
         // 既存のタイトルボタンをひな形にして実行時に追加する。
         private Button tutorialArchiveButton;
         private TutorialArchiveUI tutorialArchiveUI;
+
+        // 展示用の初期化は左上に置き、実行前に消える項目を確認する。
+        private Button exhibitionResetButton;
+
+        private SessionPrompt settingsConfirmation;
+        private const string ExhibitionResetText = "展示用リセット";
 
         // 対局BGMの選択欄。**解像度の選択欄をひな形にして実行時に作る。**
         // シーンに置くと、対局シーンとOpeningSceneの2つを同じように直す必要があり、
@@ -61,8 +80,10 @@ namespace KillingMahjong.UI
         [Header("Scene Transition Settings")]
         [Tooltip("このシーンで『戻る』ボタンを表示するかどうか")]
         [SerializeField] private bool showReturnButton = true;
+        // 2026-10-23 のユーザー指示「設定でタイトルではなく、デバッグ部屋に移行するようにして」で
+        // タイトルシーンから部屋シーンへ。ボタンの文字も「Title」から「デバッグ部屋へ」にした（OptionUI.prefab と各シーン）
         [Tooltip("『戻る』ボタンを押したときに遷移するシーン名")]
-        [SerializeField] private string returnSceneName = "タイトルシーン";
+        [SerializeField] private string returnSceneName = "部屋シーン";
 
         private CanvasGroup _canvasGroup;
         private RectTransform _rectTransform;
@@ -91,10 +112,15 @@ namespace KillingMahjong.UI
 
         private void Awake()
         {
+            instances.Add(this);
             _canvasGroup = GetComponent<CanvasGroup>();
             if (_canvasGroup == null) _canvasGroup = gameObject.AddComponent<CanvasGroup>();
             
             _rectTransform = GetComponent<RectTransform>();
+
+            PixelSettingsSlider.Attach(bgmSlider);
+            PixelSettingsSlider.Attach(seSlider);
+            PixelSettingsSlider.Attach(voiceSlider);
 
             // 配下のすべてのボタンにホバーエフェクトを自動追加
             Button[] allButtons = GetComponentsInChildren<Button>(true);
@@ -113,6 +139,14 @@ namespace KillingMahjong.UI
 
             // タイトルへ戻るクリック処理を登録する前に資料ボタンを複製する。
             CreateTutorialArchiveButton();
+            CreateExhibitionResetButton();
+            if (returnToTitleButton != null && FindFirstObjectByType<GameUIManager>() != null)
+            {
+                var label = returnToTitleButton.GetComponentInChildren<TMP_Text>(true);
+                if (label != null) label.text = "部屋へ戻る";
+            }
+            NavigationBadgeButton.Apply(returnToTitleButton, NavigationBadgeButton.Symbol.Match);
+            NavigationBadgeButton.Apply(tutorialArchiveButton, NavigationBadgeButton.Symbol.Book);
             BuildSettingRows();
 
             // --- スライダーのイベント登録 ---
@@ -140,6 +174,13 @@ namespace KillingMahjong.UI
 
         private void OnDestroy()
         {
+            instances.Remove(this);
+            if (settingsConfirmation != null) Destroy(settingsConfirmation.gameObject);
+            // 「タイトルへ戻る」は閉じるアニメーションを始めた直後にシーンを読み替えるので、途中で破棄される。
+            // 残った動きが破棄された相手に触れて DOTween の safe mode が拾っていた（missing target が2件）ので、ここで止める。
+            if (_rectTransform != null) _rectTransform.DOKill();
+            if (_canvasGroup != null) _canvasGroup.DOKill();
+
             // 資料は独立した Overlay Canvas なので、オプションだけが破棄された場合にも残さない。
             if (tutorialArchiveUI != null)
             {
@@ -160,6 +201,13 @@ namespace KillingMahjong.UI
             Debug.Log("[OptionUI] Open() が呼ばれました。");
             _isOpen = true;
             gameObject.SetActive(true);
+
+            // 設定だけを独立した描画順へ上げる。会話送りの透明な膜や誘導マスクに操作を奪わせない。
+            var canvas = GetComponent<Canvas>();
+            if (canvas == null) canvas = gameObject.AddComponent<Canvas>();
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = KillingMahjong.Common.UISortingOrders.TutorialSettings;
+            if (GetComponent<GraphicRaycaster>() == null) gameObject.AddComponent<GraphicRaycaster>();
             
             if (_canvasGroup == null) 
             {
@@ -184,7 +232,10 @@ namespace KillingMahjong.UI
             
             if (KillingMahjong.Managers.AudioManager.Instance != null)
             {
-                KillingMahjong.Managers.AudioManager.Instance.PlayPaperSlideSE();
+                // 牌を盤に置く「コトッ」を 8bit 風にした音（2026-10-19、以前は紙をめくる音）。
+                // グラスの「チン」や扉の音との重ねもゲームで聞き比べたうえで、ユーザーがこれに決めた
+                KillingMahjong.Managers.AudioManager.Instance.PlayStinger("se_settings",
+                    KillingMahjong.Managers.AudioManager.PitchJitter.VerySmall);
             }
 
             // 確実に画面中央に配置
@@ -206,6 +257,12 @@ namespace KillingMahjong.UI
         public void Close()
         {
             _isOpen = false;
+            if (settingsConfirmation != null)
+            {
+                settingsConfirmation.gameObject.SetActive(false);
+                Destroy(settingsConfirmation.gameObject);
+                settingsConfirmation = null;
+            }
             if (_canvasGroup == null) return;
 
             _canvasGroup.blocksRaycasts = false;
@@ -218,7 +275,9 @@ namespace KillingMahjong.UI
             
             if (KillingMahjong.Managers.AudioManager.Instance != null)
             {
-                KillingMahjong.Managers.AudioManager.Instance.PlayPaperSlideSE();
+                // 開くときと同じ音を、少し低く鳴らして区別する
+                KillingMahjong.Managers.AudioManager.Instance.PlayStingerPitched("se_settings", 0.89f,
+                    KillingMahjong.Managers.AudioManager.PitchJitter.None);
             }
 
             _rectTransform.DOScale(Vector3.one * 0.9f, 0.15f).SetEase(Ease.InQuad).SetUpdate(true);
@@ -544,6 +603,51 @@ namespace KillingMahjong.UI
             tutorialArchiveButton.onClick.AddListener(OpenTutorialArchive);
         }
 
+        /// <summary>
+        /// 展示用の初期化ボタンを作る（2026-10-22、ユーザー指示。置き場所は設定画面）。
+        /// 名前・勝敗の記録・チュートリアルの進み具合を消して、ゲームを起動し直す（<see cref="Core.ExhibitionReset"/>）。
+        /// 「タイトルへ」と同じ見た目を、閉じるボタンと反対の左上の隅に小さく置く。
+        /// 実行前に確認を出し、設定画面に戻る選択肢も用意する。
+        /// </summary>
+        private void CreateExhibitionResetButton()
+        {
+            if (exhibitionResetButton != null || returnToTitleButton == null) return;
+
+            GameObject buttonObject = Instantiate(returnToTitleButton.gameObject, returnToTitleButton.transform.parent, false);
+            buttonObject.name = "ExhibitionResetButton";
+            var rect = (RectTransform)buttonObject.transform;
+            rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, 152f);
+            rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, 40f);
+            rect.anchoredPosition = new Vector2(-305f, 255f);
+            exhibitionResetButton = buttonObject.GetComponent<Button>();
+            exhibitionResetButton.image.color = new Color32(56, 48, 56, 255);
+            exhibitionResetButton.onClick.RemoveAllListeners();
+
+            var exhibitionResetLabel = buttonObject.GetComponentInChildren<TMP_Text>(true);
+            if (exhibitionResetLabel != null)
+            {
+                exhibitionResetLabel.text = ExhibitionResetText;
+                exhibitionResetLabel.enableAutoSizing = true;
+                exhibitionResetLabel.fontSizeMin = 10f;
+                exhibitionResetLabel.fontSizeMax = 14f;
+            }
+
+            if (buttonObject.GetComponent<UIButtonHoverEffect>() == null)
+            {
+                buttonObject.AddComponent<UIButtonHoverEffect>();
+            }
+
+            exhibitionResetButton.onClick.AddListener(OnExhibitionResetClicked);
+        }
+
+        private void OnExhibitionResetClicked()
+        {
+            if (Core.ExhibitionReset.Running || settingsConfirmation != null) return;
+            settingsConfirmation = SessionPrompt.Show(
+                "名前・勝敗の記録・チュートリアルの進み具合を消しますか？",
+                "初期化する", Core.ExhibitionReset.Run, "やめる");
+        }
+
         private void ArrangeSystemButtons()
         {
             // 「タイトルへ」と「チュートリアル資料」を同じ段に並べる。
@@ -591,6 +695,20 @@ namespace KillingMahjong.UI
         }
 
         public void ReturnToScene()
+        {
+            if (settingsConfirmation != null) return;
+            if (FindFirstObjectByType<GameUIManager>() != null)
+            {
+                settingsConfirmation = SessionPrompt.Show(
+                    "今の対局を抜けて、部屋に戻りますか？",
+                    "部屋へ戻る", LoadReturnScene, "キャンセル");
+                return;
+            }
+
+            LoadReturnScene();
+        }
+
+        private void LoadReturnScene()
         {
             SaveAndClose();
             if (!string.IsNullOrEmpty(returnSceneName))

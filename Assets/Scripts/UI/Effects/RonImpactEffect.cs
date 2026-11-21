@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Collections.Generic;
-using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using KillingMahjong.Common;
@@ -8,16 +7,26 @@ using KillingMahjong.Common;
 namespace KillingMahjong.UI.Effects
 {
     /// <summary>
-    /// ロン入力直後の手振り、破裂吹き出し、体力表示の揺れ。
+    /// ロン入力直後の手振り、相手背後の閃光、宣言の文字、体力表示の揺れ。
     /// 画面、盤面、立ち絵には ScreenQuake / ScreenFlash を使わない。
+    /// 勢いは背後の閃光、宣言の叩きつけ、音と体力表示の揺れで出す。
     /// </summary>
     public static class RonImpactEffect
     {
         private const float HandFrameSeconds = 0.22f;
-        private const float HandRiseSeconds = 0.14f;
-        private const float HpShakeSeconds = 0.30f;
-        private const float CalloutHoldSeconds = 0.56f;
-        private const float HpShakePixels = 12f;
+        private const float InputDimSeconds = 0.14f;
+        // 2026-10-18「自分からロンする時の勢いも強くして」で、揺れと間を大きくした（前は 0.30秒 / 0.56秒 / 12px）
+        private const float HpShakeSeconds = 0.45f;
+        private const float CalloutHoldSeconds = 0.70f;
+        private const float HpShakePixels = 22f;
+
+        /// <summary>吹き出しを叩きつけるときの、出始めの大きさ（倍）と、そこから落ちる時間。</summary>
+        private const float SlamFromScale = 1.40f;
+        private const float SlamSeconds = 0.06f;
+        /// <summary>当たった瞬間に潰れた形で止める時間（ヒットストップ）。</summary>
+        private const float HitStopSeconds = 0.07f;
+        /// <summary>吹き出しの震えの幅[px]。だんだん収まる。</summary>
+        private const float CalloutTremblePixels = 6f;
 
         private static readonly string[] HandFrameNames =
         {
@@ -26,19 +35,68 @@ namespace KillingMahjong.UI.Effects
             "UI/RonHands/ron_hand_03",
         };
 
+        // ---- ボタン・手・吹き出しを1つの流れにつなぐ（2026-11-15 ユーザー指示） ----
+        // 「せっかく吹き出しが出るならロンボタンと吹き出し、また手の部分も全部演出としてつながっている感じに」。
+        // 押したボタンはすぐ消し、画面下の手が指を伸ばして
+        // 背後の閃光から「ロン！」の宣言へつなぐ。
+
+        private const float HandWidth = 800f;
+        private const float HandHeight = 600f;
+        private const float SettlementDimAlpha = 0.35f;
+
         /// <summary>
-        /// 手1、手2を順に出し、手3への切り替えと同じフレームで「ロン!!!」を出す。
-        /// 体力表示だけを同時に一度揺らしてから、既存の決着処理へ返す。
+        /// 画面下に手1・手2・手3を順に出し、指さしから背後の閃光へつなぐ。
+        /// 相手の背後に閃光を走らせて「ロン！」を叩きつけ、決着処理へ返す。
+        /// <paramref name="ronButton"/> が無いとき（試写など）は画面の真ん中にボタンがあるものとして動かす。
         /// </summary>
-        public static IEnumerator Play(MonoBehaviour runner, IList<RectTransform> hpPanels)
+        public static IEnumerator Play(MonoBehaviour runner, IList<RectTransform> hpPanels, RectTransform ronButton = null,
+            System.Action onImpact = null, System.Func<bool> waitingForResponse = null,
+            PresentationScope owner = null)
         {
             if (runner == null) yield break;
+            using var scope = new PresentationScope(Debug.LogException);
+            owner?.AddCleanup(scope.Dispose);
+            yield return scope.Run(PlayCore(runner, hpPanels, ronButton, onImpact, waitingForResponse, scope));
+        }
 
-            GameObject overlay = CreateOverlay(out RectTransform overlayRt);
+        private static IEnumerator PlayCore(MonoBehaviour runner, IList<RectTransform> hpPanels,
+            RectTransform ronButton, System.Action onImpact, System.Func<bool> waitingForResponse,
+            PresentationScope scope)
+        {
+            GameObject overlay = scope.Own(CreateOverlay(out RectTransform overlayRt));
+            Sprite handSprite = null;
+            scope.AddCleanup(() =>
+            {
+                if (handSprite != null) Object.Destroy(handSprite);
+            });
+            var shade = CreateImage("RonInputDim", overlayRt);
+            shade.rectTransform.anchorMin = Vector2.zero;
+            shade.rectTransform.anchorMax = Vector2.one;
+            shade.rectTransform.offsetMin = shade.rectTransform.offsetMax = Vector2.zero;
+            shade.color = new Color(0f, 0f, 0f, RonChanceEffect.GetDimAlpha(SettlementDimAlpha));
+            RonChanceEffect.HideCurrent();
+            // 作ったばかりの Canvas はまだ大きさが決まっていないので、CanvasScaler（800x600・Expand）と同じ式で測る
+            float overlayScale = Mathf.Max(0.0001f, Mathf.Min(Screen.width / 800f, Screen.height / 600f));
+
+            // ボタンの絵は残さず、宣言の配置用に元の位置だけを読む。
+            Vector2 dropPosition = Vector2.zero;
+            if (ronButton != null)
+            {
+                var sourceCanvas = ronButton.GetComponentInParent<Canvas>()?.rootCanvas;
+                var camera = sourceCanvas != null && sourceCanvas.renderMode != RenderMode.ScreenSpaceOverlay
+                    ? sourceCanvas.worldCamera : null;
+                var corners = new Vector3[4];
+                ronButton.GetWorldCorners(corners);
+                Vector2 lowerLeft = RectTransformUtility.WorldToScreenPoint(camera, corners[0]);
+                Vector2 upperRight = RectTransformUtility.WorldToScreenPoint(camera, corners[2]);
+                Vector2 screen = (lowerLeft + upperRight) * 0.5f;
+                dropPosition = (screen - new Vector2(Screen.width, Screen.height) * .5f) / overlayScale;
+            }
+
+            // 原画は画面下端まで描かれている。3枚の位置を揃えたまま切り替える。
             Image handImage = CreateImage("RonHand", overlayRt);
             handImage.preserveAspect = true;
-            SetRect(handImage.rectTransform, Vector2.zero, new Vector2(800f, 600f));
-            // 画像内の腕は下端まで描かれている。中央基準では縦長の画面で腕が浮く。
+            SetRect(handImage.rectTransform, Vector2.zero, new Vector2(HandWidth, HandHeight));
             handImage.rectTransform.anchorMin = handImage.rectTransform.anchorMax = new Vector2(.5f, 0);
             handImage.rectTransform.pivot = new Vector2(.5f, 0);
 
@@ -46,8 +104,6 @@ namespace KillingMahjong.UI.Effects
             var audio = KillingMahjong.Managers.AudioManager.Instance;
             if (audio != null) audio.PlayRonInputSore();
 
-            bool displayedAnyHand = false;
-            Sprite handSprite = null;
             for (int i = 0; i < HandFrameNames.Length; i++)
             {
                 Texture2D handTexture = Resources.Load<Texture2D>(HandFrameNames[i]);
@@ -57,30 +113,29 @@ namespace KillingMahjong.UI.Effects
                     continue;
                 }
 
-                Sprite previousHandSprite = handImage.sprite;
-                handSprite = Sprite.Create(
-                    handTexture,
-                    new Rect(0f, 0f, handTexture.width, handTexture.height),
-                    new Vector2(0.5f, 0.5f),
-                    100f);
+                Sprite previousHandSprite = handSprite;
+                handSprite = Sprite.Create(handTexture, new Rect(0f, 0f, handTexture.width, handTexture.height),
+                    new Vector2(0.5f, 0.5f), 100f);
                 handImage.sprite = handSprite;
                 if (previousHandSprite != null) Object.Destroy(previousHandSprite);
-                handImage.gameObject.SetActive(true);
-                displayedAnyHand = true;
-                if (i == 0) yield return RaiseHandFromBottom(handImage.rectTransform);
+                if (i == 0) yield return FadeInputShade(shade);
                 else if (i < HandFrameNames.Length - 1) yield return new WaitForSeconds(HandFrameSeconds);
             }
 
-            if (!displayedAnyHand) handImage.gameObject.SetActive(false);
+            if (handSprite == null) handImage.gameObject.SetActive(false);
+            shade.color = new Color(0f, 0f, 0f, SettlementDimAlpha);
 
-            Texture2D burstTexture = CreateBurstTexture();
-            Sprite burstSprite = Sprite.Create(
-                burstTexture,
-                new Rect(0f, 0f, burstTexture.width, burstTexture.height),
-                new Vector2(0.5f, 0.5f),
-                100f);
-            CreateBurstCallout(overlayRt, burstSprite);
-            if (audio != null) audio.PlayRonInputRon();
+            SpriteRenderer backFlash = CreateBackFlash(scope);
+            yield return PrimeStrike(shade, backFlash);
+            RectTransform callout = CreateRonTitle(overlayRt, dropPosition + new Vector2(0f, -18f), scope);
+            callout.localScale = Vector3.one * SlamFromScale;
+            shade.color = new Color(0f, 0f, 0f, SettlementDimAlpha);
+            // 光のピーク・宣言・声・着弾音を同じコマに揃える。
+            if (audio != null)
+            {
+                audio.PlayRonInputRon();
+                audio.PlayImpactSE();
+            }
 
             if (hpPanels != null)
             {
@@ -91,25 +146,171 @@ namespace KillingMahjong.UI.Effects
                 }
             }
 
-            yield return new WaitForSeconds(CalloutHoldSeconds);
-            Object.Destroy(overlay);
-            if (handSprite != null) Object.Destroy(handSprite);
-            Object.Destroy(burstSprite);
-            Object.Destroy(burstTexture);
+            onImpact?.Invoke();
+            yield return SlamCallout(callout, CalloutHoldSeconds, backFlash);
+            if (waitingForResponse != null)
+            {
+                callout.gameObject.SetActive(false);
+                handImage.gameObject.SetActive(false);
+                float until = Time.unscaledTime + 1f;
+                while (waitingForResponse() && Time.unscaledTime < until) yield return null;
+            }
+
         }
 
-        private static IEnumerator RaiseHandFromBottom(RectTransform hand)
+        private static SpriteRenderer CreateBackFlash(PresentationScope scope)
         {
-            float start = -hand.rect.height;
-            hand.anchoredPosition = new Vector2(0, start);
-            for (float elapsed = 0; elapsed < HandFrameSeconds; elapsed += Time.deltaTime)
+            SpriteRenderer portrait = null;
+            foreach (var enemy in Object.FindObjectsByType<EnemyInfoUI>(FindObjectsSortMode.None))
             {
-                float progress = Mathf.Clamp01(elapsed / HandRiseSeconds);
-                float eased = 1 - Mathf.Pow(1 - progress, 3);
-                hand.anchoredPosition = new Vector2(0, Mathf.Round(Mathf.Lerp(start, 0, eased)));
+                var candidate = enemy.CharacterRenderer;
+                if (candidate != null && candidate.enabled && candidate.gameObject.activeInHierarchy)
+                {
+                    portrait = candidate;
+                    break;
+                }
+            }
+            var camera = Camera.main;
+            Texture2D texture = Resources.Load<Texture2D>("UI/RonCallout/ron_back_flash");
+            if (portrait == null || camera == null || texture == null) return null;
+
+            Sprite sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height),
+                new Vector2(.5f, .5f), 100f);
+            scope.AddCleanup(() => { if (sprite != null) Object.Destroy(sprite); });
+            var flash = scope.Own(new GameObject("RonFlashBehindEnemy"));
+            flash.layer = portrait.gameObject.layer;
+            var renderer = flash.AddComponent<SpriteRenderer>();
+            renderer.sprite = sprite;
+            renderer.sharedMaterial = portrait.sharedMaterial;
+            renderer.sortingLayerID = portrait.sortingLayerID;
+            renderer.sortingOrder = portrait.sortingOrder;
+            renderer.spriteSortPoint = SpriteSortPoint.Pivot;
+            Vector3 screen = camera.WorldToScreenPoint(portrait.bounds.center);
+            // 原画の顔と肩がある上寄りを横切る。画面比によらず横幅を合わせる。
+            screen.y = Mathf.Clamp(screen.y + Screen.height * .17f, Screen.height * .52f, Screen.height * .72f);
+            float depth = camera.WorldToScreenPoint(portrait.bounds.center).z + .05f;
+            screen.z = depth;
+            Vector3 center = camera.ScreenToWorldPoint(screen);
+            Vector3 left = camera.ScreenToWorldPoint(new Vector3(0, screen.y, depth));
+            Vector3 right = camera.ScreenToWorldPoint(new Vector3(Screen.width, screen.y, depth));
+            float width = Vector3.Distance(left, right);
+            float size = width / sprite.bounds.size.x;
+            flash.transform.position = center;
+            flash.transform.localScale = new Vector3(size * 1.1f, size * .8f, 1);
+            renderer.enabled = false;
+            return renderer;
+        }
+
+        private static IEnumerator PrimeStrike(Image shade, SpriteRenderer flash)
+        {
+            // 短い暗さを挟み、左から走った光が相手の背後で伸び切る。
+            shade.color = new Color(0f, 0f, 0f, .62f);
+            yield return new WaitForSeconds(.067f);
+            if (flash == null) yield break;
+
+            var home = flash.transform.position;
+            var scale = flash.transform.localScale;
+            float width = flash.sprite.bounds.size.x * scale.x;
+            flash.enabled = true;
+            flash.transform.position = home + Vector3.left * width * .36f;
+            flash.transform.localScale = new Vector3(scale.x * .28f, scale.y * .25f, 1);
+            yield return new WaitForSeconds(.033f);
+            flash.transform.position = home + Vector3.left * width * .12f;
+            flash.transform.localScale = new Vector3(scale.x * .72f, scale.y * .55f, 1);
+            yield return new WaitForSeconds(.033f);
+            flash.transform.position = home;
+            flash.transform.localScale = scale;
+        }
+
+        private static void FadeBackFlash(SpriteRenderer flash, float elapsed, Vector3 peakScale)
+        {
+            if (flash == null) return;
+            float tail = Mathf.Clamp01((elapsed - .045f) / .12f);
+            flash.color = new Color(1, 1, 1, 1 - tail);
+            flash.transform.localScale = new Vector3(peakScale.x * (1 + tail * .08f),
+                peakScale.y * Mathf.Lerp(1, .08f, tail), 1);
+            flash.enabled = tail < 1;
+        }
+
+        private static RectTransform CreateRonTitle(RectTransform root, Vector2 position, PresentationScope scope)
+        {
+            var group = new GameObject("RonDeclaration", typeof(RectTransform));
+            group.transform.SetParent(root, false);
+            var rect = (RectTransform)group.transform;
+            SetRect(rect, position, new Vector2(360f, 160f));
+            rect.localRotation = Quaternion.Euler(0, 0, 7f);
+            Texture2D texture = Resources.Load<Texture2D>("UI/RonCallout/ron_declaration");
+            if (texture == null) return rect;
+            Sprite sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height),
+                new Vector2(.5f, .5f), 100f);
+            scope.AddCleanup(() => { if (sprite != null) Object.Destroy(sprite); });
+            var text = CreateImage("RonText", rect);
+            text.sprite = sprite;
+            SetRect(text.rectTransform, Vector2.zero, new Vector2(360f, 160f));
+            return rect;
+        }
+        /// <summary>
+        /// 閃光と同時に宣言を叩きつけ、短い余震の後は文字を止めて読ませる。
+        /// </summary>
+        private static IEnumerator SlamCallout(RectTransform callout, float total, SpriteRenderer backFlash)
+        {
+            Vector2 home = callout.anchoredPosition;
+            Vector3 peakScale = backFlash != null ? backFlash.transform.localScale : Vector3.one;
+
+            float t = 0f;
+            while (t < SlamSeconds)
+            {
+                float k = PresentationTiming.Sample(t) / SlamSeconds;
+                callout.localScale = Vector3.one * Mathf.Lerp(SlamFromScale, 1f, k * k);
+                FadeBackFlash(backFlash, t, peakScale);
+                t += Time.deltaTime;
                 yield return null;
             }
-            hand.anchoredPosition = Vector2.zero;
+
+            // ヒットストップ。潰れた形のまま止める
+            callout.localScale = new Vector3(1.12f, 0.86f, 1f);
+            yield return new WaitForSeconds(HitStopSeconds);
+
+            float rest = Mathf.Max(0.1f, total - SlamSeconds - HitStopSeconds);
+            float nextJitter = 0f;
+            Vector2 jitter = Vector2.zero;
+            t = 0f;
+            while (t < rest && callout != null)
+            {
+                // 少し行き過ぎてから戻る
+                float settle = Mathf.Clamp01(PresentationTiming.Sample(t) / 0.16f);
+                float over = Mathf.Sin(settle * Mathf.PI) * 0.08f;
+                callout.localScale = Vector3.Lerp(new Vector3(1.12f, 0.86f, 1f), Vector3.one, settle) + Vector3.one * over;
+
+                // 震えはコマ打ち（毎秒15回）
+                if (t < .10f && t >= nextJitter)
+                {
+                    float amp = CalloutTremblePixels * (1f - t / .10f);
+                    jitter = new Vector2(Mathf.Round(Random.Range(-amp, amp)), Mathf.Round(Random.Range(-amp, amp)));
+                    nextJitter = t + 1f / 15f;
+                }
+                if (t >= .10f) jitter = Vector2.zero;
+                callout.anchoredPosition = home + jitter;
+                FadeBackFlash(backFlash, SlamSeconds + HitStopSeconds + t, peakScale);
+
+                t += Time.deltaTime;
+                yield return null;
+            }
+            callout.anchoredPosition = home;
+            callout.localScale = Vector3.one;
+            if (backFlash != null) backFlash.enabled = false;
+        }
+
+        private static IEnumerator FadeInputShade(Image shade)
+        {
+            float startDimAlpha = shade.color.a;
+            for (float elapsed = 0; elapsed < HandFrameSeconds; elapsed += Time.deltaTime)
+            {
+                float progress = Mathf.Clamp01(PresentationTiming.Sample(elapsed) / InputDimSeconds);
+                float eased = 1 - Mathf.Pow(1 - progress, 3);
+                shade.color = new Color(0f, 0f, 0f, Mathf.Lerp(startDimAlpha, SettlementDimAlpha, eased));
+                yield return null;
+            }
         }
 
         private static GameObject CreateOverlay(out RectTransform overlayRt)
@@ -145,34 +346,6 @@ namespace KillingMahjong.UI.Effects
             return image;
         }
 
-        private static void CreateBurstCallout(RectTransform parent, Sprite burstSprite)
-        {
-            Vector2 position = new Vector2(202f, 62f);
-
-            Image outline = CreateImage("RonBurstOutline", parent);
-            outline.sprite = burstSprite;
-            outline.color = new Color32(52, 19, 25, 255);
-            SetRect(outline.rectTransform, position, new Vector2(292f, 234f));
-
-            Image inner = CreateImage("RonBurstInner", parent);
-            inner.sprite = burstSprite;
-            inner.color = new Color32(255, 248, 225, 255);
-            SetRect(inner.rectTransform, position, new Vector2(252f, 202f));
-
-            GameObject textObject = new GameObject("RonBurstText", typeof(RectTransform), typeof(TextMeshProUGUI));
-            textObject.transform.SetParent(parent, false);
-            TextMeshProUGUI text = textObject.GetComponent<TextMeshProUGUI>();
-            text.text = "\u30ed\u30f3!!!";
-            text.fontSize = 57f;
-            text.fontStyle = FontStyles.Bold;
-            text.color = new Color32(46, 17, 24, 255);
-            text.alignment = TextAlignmentOptions.Center;
-            text.enableWordWrapping = false;
-            text.raycastTarget = false;
-            SetRect(text.rectTransform, position, new Vector2(230f, 138f));
-            text.rectTransform.localRotation = Quaternion.Euler(0f, 0f, -5f);
-        }
-
         private static void SetRect(RectTransform rect, Vector2 position, Vector2 size)
         {
             rect.anchorMin = new Vector2(0.5f, 0.5f);
@@ -187,10 +360,15 @@ namespace KillingMahjong.UI.Effects
         /// 外側と内側で同じスプライトを重ね、濃色の太枠を作る。
         /// 戦況グラフのロンの吹き出し（MatchMomentumUI）も同じ形を使う。
         /// </summary>
-        internal static Texture2D CreateBurstTexture()
+        internal static Texture2D CreateBurstTexture() => CreateBurstTexture(1, 0f);
+
+        /// <param name="dot">1ドットを何単位にするか。絵はこの分だけ小さく作る</param>
+        /// <param name="inset">形を内側へ縮める幅（単位）。縁の内側の面を作るときに使う</param>
+        internal static Texture2D CreateBurstTexture(int dot, float inset)
         {
-            const int width = 292;
-            const int height = 234;
+            dot = Mathf.Max(1, dot);
+            int width = 292 / dot;
+            int height = 234 / dot;
             const int pointCount = 20;
             Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
             texture.filterMode = FilterMode.Point;
@@ -208,7 +386,7 @@ namespace KillingMahjong.UI.Effects
             {
                 float angle = (-90f + 360f * i / pointCount) * Mathf.Deg2Rad;
                 float baseRadius = i % 2 == 0 ? 112f : 88f;
-                float radius = baseRadius * jitter[i];
+                float radius = (baseRadius * jitter[i] - inset) / dot;
                 px[i] = width * 0.5f + Mathf.Cos(angle) * radius;
                 py[i] = height * 0.5f + Mathf.Sin(angle) * radius;
             }
@@ -253,7 +431,7 @@ namespace KillingMahjong.UI.Effects
             while (elapsed < HpShakeSeconds && target != null)
             {
                 elapsed += Time.deltaTime;
-                float progress = Mathf.Clamp01(elapsed / HpShakeSeconds);
+                float progress = Mathf.Clamp01(PresentationTiming.Sample(elapsed) / HpShakeSeconds);
                 float decay = 1f - progress;
                 float offset = Mathf.Sin(progress * Mathf.PI * 8f) * amplitude * decay;
                 var shake = new Vector2(offset, -offset * 0.35f);

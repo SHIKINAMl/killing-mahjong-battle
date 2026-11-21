@@ -18,8 +18,11 @@ namespace KillingMahjong.UI
         /// </summary>
         private static string BuildMultiplierNote(RonSettlementInfo s, int flownDelta)
         {
+            if (s.ShowHpBalances) return "";
             string note = "×" + s.Multiplier.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
             bool flownIsLoser = flownDelta < 0;
+            if (!flownIsLoser && s.VoltageMultiplier > 0f)
+                note += " ×" + s.VoltageMultiplier.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
             if (s.IsTankiWait && flownIsLoser) note += " ×2";
             if (s.AssaultApplied && flownIsLoser) note += " +強襲";
             return note;
@@ -50,7 +53,7 @@ namespace KillingMahjong.UI
         /// <summary>数字の箱の高さ（Canvas の単位）。位置の計算にも使う。</summary>
         private const float HpDeltaBoxHeight = 44f;
 
-        private TextMeshProUGUI SpawnHpDeltaLabel(RectTransform parent, RectTransform anchor, int delta, Color tint)
+        private TextMeshProUGUI SpawnHpDeltaLabel(RectTransform parent, RectTransform anchor, int delta)
         {
             if (anchor == null) return null;
 
@@ -58,9 +61,8 @@ namespace KillingMahjong.UI
             go.transform.SetParent(parent, false);
             TextMeshProUGUI text = go.AddComponent<TextMeshProUGUI>();
             text.text = FormatDelta(delta);
-            text.color = tint;
+            HpNumberStyle.Apply(text, delta);
             text.fontSize = 30f;
-            text.fontStyle = FontStyles.Bold;
             text.textWrappingMode = TextWrappingModes.NoWrap;
             text.alignment = TextAlignmentOptions.Center;
             text.outlineWidth = 0.2f;
@@ -127,7 +129,7 @@ namespace KillingMahjong.UI
             for (float t = 0; t < appear; t += Time.deltaTime)
             {
                 if (rt == null) yield break;
-                float p = Mathf.Clamp01(t / appear);
+                float p = Mathf.Clamp01(PresentationTiming.Sample(t) / appear);
                 text.alpha = p;
                 rt.localScale = Vector3.one * Mathf.Lerp(1.4f, 1f, 1f - Mathf.Pow(1f - p, 3f));
                 rt.position = basePos + new Vector3(0f, Mathf.Lerp(-10f, 0f, p), 0f);

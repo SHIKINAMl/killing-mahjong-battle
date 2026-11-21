@@ -19,7 +19,7 @@ namespace KillingMahjong.UI
         // シーン側には (31, 69) が入っているが、ここで上書きするので画面には出ない。
         // **動かすときはシーンではなくこの値を変えること**（シーンが2つあるため。AGENTS.md §2）。
         private static readonly Vector2 HpTextAnchoredPosition = new Vector2(52f, 37f);
-        private static readonly Vector2 HpTextSize = new Vector2(72f, 18f);
+        private static readonly Vector2 HpTextSize = new Vector2(72f, 22f);
         private static readonly Vector4 HpTextMargin = new Vector4(2f, 0f, 2f, 0f);
 
         /// <summary>
@@ -47,6 +47,12 @@ namespace KillingMahjong.UI
 
             HideCoverBars(meter);
             MoveBagBehindBlood(meter);
+            // 数値も袋本体の子にする。現在の見た目を保ち、以後の移動・拡縮は親から継承する。
+            if (hpText != null)
+            {
+                if (hpText.transform.parent != meter) hpText.transform.SetParent(meter, true);
+                hpText.transform.SetAsLastSibling();
+            }
         }
 
         /// <summary>体力の数値を、袋上部の黒い表示欄の内側へ固定する。</summary>
@@ -58,16 +64,18 @@ namespace KillingMahjong.UI
             rect.anchorMin = new Vector2(0.5f, 0.5f);
             rect.anchorMax = new Vector2(0.5f, 0.5f);
             rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = HpTextAnchoredPosition;
+            // 初回だけ従来のHPPanel座標を使う。組み替え後に呼び直しても位置を二重補正しない。
+            bool attached = hpFillImage != null && rect.parent == hpFillImage.transform.parent;
+            if (!attached) rect.anchoredPosition = HpTextAnchoredPosition;
             rect.sizeDelta = HpTextSize;
 
             hpText.margin = HpTextMargin;
-            hpText.enableWordWrapping = false;
+            hpText.textWrappingMode = TextWrappingModes.NoWrap;
             hpText.alignment = TextAlignmentOptions.Center;
-            hpText.fontSize = 11f;
+            hpText.fontSize = 16f;
             hpText.enableAutoSizing = true;
-            hpText.fontSizeMin = 9f;
-            hpText.fontSizeMax = 11f;
+            hpText.fontSizeMin = 14f;
+            hpText.fontSizeMax = 16f;
         }
 
         /// <summary>黒い横線3本の覆いを見えなくする。</summary>

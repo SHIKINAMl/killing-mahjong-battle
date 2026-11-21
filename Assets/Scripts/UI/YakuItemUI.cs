@@ -86,6 +86,8 @@ namespace KillingMahjong.UI
             // 一覧は役名だけを並べる。説明はカーソルを合わせたときに吹き出しで出す。
             // showDescription を ON にすると、以前どおり常に併記する。
             _description = YakuInfo.GetDescription(yakuName);
+            // 画面には表示用の名前で出す。「么」はフォントに無く □ になるので「幺」へ置き換わる（2026-10-24）
+            string shownName = YakuExamples.DisplayName(yakuName);
             string description = showDescription ? _description : "";
 
             // ホバーを拾うには、この項目のどこかに raycastTarget が要る。
@@ -99,15 +101,15 @@ namespace KillingMahjong.UI
                 descriptionText.text = description;
                 // 説明を出さないときは行そのものを畳んで、名前だけが並ぶようにする
                 descriptionText.gameObject.SetActive(showDescription);
-                if (yakuNameText != null) yakuNameText.text = yakuName;
+                if (yakuNameText != null) yakuNameText.text = shownName;
             }
             else if (yakuNameText != null)
             {
                 // 専用テキストがPrefabに用意されていない場合でも読めるように、
                 // リッチテキストで役名の下へ小さく差し込む（Prefab改修なしで機能させるため）。
                 yakuNameText.text = string.IsNullOrEmpty(description)
-                    ? yakuName
-                    : $"{yakuName}\n<size={inlineDescriptionSizePercent}%>{description}</size>";
+                    ? shownName
+                    : $"{shownName}\n<size={inlineDescriptionSizePercent}%>{description}</size>";
             }
 
             if (localBoostText != null)

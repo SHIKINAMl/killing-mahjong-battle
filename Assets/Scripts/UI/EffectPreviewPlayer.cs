@@ -184,8 +184,9 @@ namespace KillingMahjong.UI
         {
             var image = new GameObject(label, typeof(RectTransform), typeof(Image), typeof(Button)).GetComponent<Image>();
             image.transform.SetParent(transform, false); image.color = new Color32(52, 30, 42, 255);
-            // 本編と同じ下端の手牌を隠さないよう、試写操作はヘッダー直下へ置く。
-            image.rectTransform.sizeDelta = new Vector2(190, 29); image.rectTransform.anchoredPosition = new Vector2(x, 246);
+            // 試写操作は画面の下端に置く（2026-10-17 のユーザー指示「以前と同じように下に配置して」）。
+            // 10-15 に手牌を隠さないようヘッダー直下へ移したが、元の位置へ戻した
+            image.rectTransform.sizeDelta = new Vector2(190, 29); image.rectTransform.anchoredPosition = new Vector2(x, -283);
             image.GetComponent<Button>().onClick.AddListener(() => action());
             return Text(image.transform, label, Vector2.zero, new Vector2(190, 29), 16);
         }

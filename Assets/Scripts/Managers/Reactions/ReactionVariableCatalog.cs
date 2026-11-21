@@ -105,6 +105,9 @@ namespace KillingMahjong.Managers.Reactions
     {
         private static readonly ReactionVarInfo[] Common =
         {
+            new ReactionVarInfo("discard_turn", "打牌の巡目", VarKind.Number, "公開された打牌回数から数える。序盤・終盤の反応用"),
+            new ReactionVarInfo("voltage_level", "自分のボルテージ段階", VarKind.Number, "表示用に受け取った現在の段階"),
+            new ReactionVarInfo("enemy_voltage_level", "相手のボルテージ段階", VarKind.Number, "表示用に受け取った現在の段階"),
             new ReactionVarInfo(ReactionVars.RoundNumber, "何局目か", VarKind.Number, "1 から数える"),
             new ReactionVarInfo(ReactionVars.MyHp, "自分の血", VarKind.Number, "対局開始時は 20000"),
             new ReactionVarInfo(ReactionVars.EnemyHp, "相手の血", VarKind.Number, "対局開始時は 20000"),

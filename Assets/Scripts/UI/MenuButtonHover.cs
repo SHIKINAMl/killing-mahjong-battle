@@ -7,10 +7,12 @@ namespace KillingMahjong.UI
     public class MenuButtonHover : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerDownHandler, IPointerUpHandler
     {
         // 旧シーンの設定値は保持。現在の見た目はUIFrameCatalogのIDで管理する。
+#pragma warning disable CS0414 // 読まないが、シーンに保存された値を残すために置いている
         [SerializeField] private float hoverScale = 1.05f, pressedScale = .98f, speed = 14f;
         [SerializeField] private Color hoverTextColor = new Color32(255,120,110,255);
         [SerializeField] private Color hoverOutlineColor = new Color32(220,40,40,200);
         [SerializeField] private string markerText = "▶";
+#pragma warning restore CS0414
         private UIInteractionFeedback feedback;
         private void Awake() { feedback = UIInteractionFeedback.Attach(gameObject); }
         private void OnEnable() {

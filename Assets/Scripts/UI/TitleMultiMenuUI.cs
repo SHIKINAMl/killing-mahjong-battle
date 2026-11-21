@@ -219,11 +219,11 @@ namespace KillingMahjong.UI
             // その場合は join を直接送る
             if (!client.IsConnected)
             {
-                client.ConnectAsync();
+                _ = client.ConnectAsync();
             }
             else
             {
-                client.SendAsync(MatchJoinRequest.BuildJoinJson());
+                _ = client.SendAsync(MatchJoinRequest.BuildJoinJson());
             }
 
             float deadline = Time.realtimeSinceStartup + JoinTimeoutSeconds;
@@ -248,7 +248,7 @@ namespace KillingMahjong.UI
             SetPasswordError(error != null ? TranslateJoinError(error) : "サーバーから応答がありません");
 
             // 部屋は消費されていないので、畳んで入力し直せるようにする
-            client.ResetConnectionAsync();
+            _ = client.ResetConnectionAsync();
 
             if (_passwordInput != null)
             {

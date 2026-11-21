@@ -18,13 +18,30 @@ namespace KillingMahjong.Managers
             yield return PlaySceneBreakAndWait();
             yield return PlayLines(new List<TutorialLine> {
                 new TutorialLine("んで…流局が起こるとどうなるかというと……"),
+            });
+            // 動画を見せるあいだは、スマホを差し出す絵にする（2026-10-25 プランナー支給）
+            SetSeniorPose(SeniorPhonePose);
+            yield return PlayLines(new List<TutorialLine> {
                 new TutorialLine("ちょっと長いし、アタシの昔の対戦動画があるからこれで見よっか"),
             });
-            // 差し出すポーズの専用素材は未受領のため、現在の立ち絵を保持する。
             ClearGuide();
-            var replay=TutorialDrawReplayUI.Create(transform);
+            var replay=TutorialDrawReplayUI.Create(transform, gameUIManager != null ? gameUIManager.EnemyInfoUI : null);
             try { yield return replay.Play(); }
-            finally { if(replay!=null) replay.Close(); }
+            finally
+            {
+                if(replay!=null) replay.Close();
+                // 動画が終わってもスマホを差し出したまま（2026-10-28 要望「動画が終わった後の立ち絵はスマホを差し出している先輩の画像で」）。
+                // 「わかったかな？」の受け答えまで続け、RunAfterDrawVideo で戻す。途中で抜けたときだけここで戻す
+                if (_aborted) SetSeniorPose(SeniorNormalPose);
+            }
+        }
+
+        /// <summary>先輩の立ち絵の差分（チュートリアル女の子.asset の bodySprites の id）。</summary>
+        private const string SeniorNormalPose = "通常", SeniorPhonePose = "スマホ";
+
+        private void SetSeniorPose(string poseId)
+        {
+            if (gameUIManager != null && gameUIManager.EnemyInfoUI != null) gameUIManager.EnemyInfoUI.SetBodyPose(poseId);
         }
 
         // ---- 動画のあと（2026-10-15 のフロー図で足された） ----
@@ -35,7 +52,7 @@ namespace KillingMahjong.Managers
         //  → フラッシュ →「さっきの動画の女の子は誰なのか」→ BGM止まる
         //  →「動画の続きを見てみる？」→ 分岐「対局動画の続きを見ますか？」
         //
-        // **分岐の先はまだ図に無い。** どちらを選んでも、これまでの第2局の続きへ戻す。
+        // 分岐と復帰は2026-10-18版に従う。いいえはDEADEND、はいは動画後半と正体の会話へ。
 
         private const string DrawUnderstoodQuestion = "だいたい流局についてはわかったかな？";
         private const string DrawUnderstoodLabel = "わかった";
@@ -57,7 +74,7 @@ namespace KillingMahjong.Managers
         };
 
         /// <summary>
-        /// 「流局説明用UI」の**仮の板**。ボルテージのときと同じく、絵が届くまで「ここに入ります」とだけ出す。
+        /// 「流局説明用UI」の**控えの板**。絵（<see cref="DrawPanelSpritePath"/>）が読めなかったときだけ出る。
         /// 文面は企画の領分なので書かない。**AIで絵を描かないこと。**
         /// </summary>
         private const string DrawPanelTitle = "流局の説明";
@@ -67,8 +84,12 @@ namespace KillingMahjong.Managers
             "画像が届いたら差し替えます",
         };
 
-        /// <summary>流局説明用UIの絵。Resources 直下からの相対パス（拡張子なし）。まだ無いので null。</summary>
-        private const string DrawPanelSpritePath = null;
+        /// <summary>
+        /// 流局説明用UIの絵。Resources 直下からの相対パス（拡張子なし）。
+        /// 冒頭のルール説明で見せる「まとめ④ 流局と持ち越し」を、ここでも使ってよいと言われた（2026-10-18）。
+        /// 上の文字板は、絵が読めなかったときの控え。
+        /// </summary>
+        private const string DrawPanelSpritePath = "Tutorial/ゲームの流れ_まとめ4";
 
         private static readonly List<TutorialLine> DrawCannotPayLines = new List<TutorialLine>
         {
@@ -97,7 +118,7 @@ namespace KillingMahjong.Managers
 
         /// <summary>
         /// 「対局動画の続きを見ますか？」の答え。0=はい / 1=いいえ / -1=まだ聞いていない。
-        /// **この先はまだフロー図に無い。** 続きが描かれたら、ここで分ける。
+        /// いいえはDEADEND No1へ進み、復帰後に再び選ぶ。
         /// </summary>
         private int _watchRestAnswer = -1;
 
@@ -112,6 +133,8 @@ namespace KillingMahjong.Managers
             int understood = -1;
             yield return AskYesNo(DrawUnderstoodQuestion, a => understood = a, DrawUnderstoodLabel, DrawDifficultLabel);
             yield return PlayLines(understood == 0 ? DrawUnderstoodLines : DrawDifficultLines);
+            // 動画のあとから続けていたスマホの絵を、まとめに入るところで戻す
+            SetSeniorPose(SeniorNormalPose);
             yield return PlayLines(DrawSummaryLeadLines);
 
             // 流局説明用UI表示 → プレイヤーが閉じる
@@ -146,17 +169,7 @@ namespace KillingMahjong.Managers
             yield return new WaitForSeconds(discardInterval);
 
             yield return PlayLines(DrawSafeLines);
-            FlashScreen();
-            yield return new WaitForSeconds(0.35f);
-            yield return PlayLines(DrawWhoIsGirlLines);
-
-            // BGM止まる
-            if (AudioManager.Instance != null) AudioManager.Instance.CutBgmImmediately();
-
-            yield return AskYesNo(WatchRestQuestion, a => _watchRestAnswer = a);
-
-            // ここから先はフロー図に無い。黙ったまま続けないよう、曲だけ戻しておく
-            if (AudioManager.Instance != null) AudioManager.Instance.PlayTutorialBgm("tut_lesson");
+            yield return RunWatchRestBranch(data);
         }
     }
 }

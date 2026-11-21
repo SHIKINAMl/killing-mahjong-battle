@@ -71,6 +71,10 @@ namespace KillingMahjong.Managers
 
         private int _playerHp;
         private int _enemyHp;
+        // 本編のServerHpと同じ総体力。場に預けた分は表示するときだけ除く。
+        private int PlayerShownHp => Mathf.Max(0, _playerHp - _playerStake);
+        private int EnemyShownHp => Mathf.Max(0, _enemyHp - _enemyStake);
+        private int _playerHpBeforeBet, _enemyHpBeforeBet;
 
         // --- 賭け金 ---
         // 賭け金は確定した時点で両者の血から引かれ、場に積まれる（＝賭けた分は先に払う）。
@@ -140,8 +144,8 @@ namespace KillingMahjong.Managers
         /// <summary>
         /// 『自動』ボタンを**見せるだけで押させない**か（2026-09-23 のユーザー指示）。
         ///
-        /// 自力で満貫手を作れた人には、紹介のあいだ『おまかせ』を見せるが、
-        /// 押されると台本の手牌に置き換わってしまう。紹介の4秒とセリフの間は押させない。
+        /// 自力で満貫手を作れた人には、紹介後も『おまかせ』を残す。
+        /// 押されると台本の手牌に置き換わってしまうので、決定まで押させない。
         /// </summary>
         public bool IsAutoButtonLocked { get; set; }
 
@@ -149,12 +153,6 @@ namespace KillingMahjong.Managers
         public bool IsDecideButtonVisible =>
             _handButtonStage == HandButtonStage.AutoAndDecide ||
             _handButtonStage == HandButtonStage.DecideOnly;
-
-        /// <summary>既定のセリフ。台本側の onHandFilledLines が空のときに使う。</summary>
-        private static readonly List<TutorialLine> DefaultHandFilledLines = new List<TutorialLine>
-        {
-            new TutorialLine("今回は自動で選んであげるわ。"),
-        };
 
         /// <summary>
         /// 現在の局で打牌が禁止されている牌種（-1 でなし）。
@@ -173,6 +171,18 @@ namespace KillingMahjong.Managers
         public List<int> GetCurrentWaitTileIds()
         {
             if (_round == null || !HasClickedAutoMangan) return new List<int>();
+            return TutorialTiles.EncodeAll(_round.waitBaseIds, _round.doraBaseId);
+        }
+
+        /// <summary>
+        /// 13枚そろった瞬間の役名表示（即席満貫以上判定）に使う待ち牌。
+        /// **いまの13枚が台本の満貫手なら、『おまかせ』を押す前でも返す。** GetCurrentWaitTileIds は
+        /// 押すまで空を返すので、自分で満貫を組んでも役名が出なかった（2026-10-24 プランナー指摘
+        /// 「チュートリアルで即席満貫以上判定システムが効いていない」）。満貫手でなければ空＝何も出さない
+        /// </summary>
+        public List<int> GetRankCallWaitTileIds()
+        {
+            if (_round == null || !IsSelfMadeManganHand()) return new List<int>();
             return TutorialTiles.EncodeAll(_round.waitBaseIds, _round.doraBaseId);
         }
 
@@ -197,8 +207,27 @@ namespace KillingMahjong.Managers
             PlayerPrefs.Save();
         }
 
+        /// <summary>
+        /// チュートリアルを一度でも始めたか（途中でやめても立つ）。
+        ///
+        /// 2026-11-03 の会議（議事録「11/3」）:「2回目の起動時に、チュートリアルスキップで
+        /// メインメニュー画面に飛ばす」。判定は「一度でも始めたら」（2026-11-04 ユーザー判断）。
+        /// 展示では <see cref="KillingMahjong.Core.ExhibitionReset"/> が来場者ごとに消すので、
+        /// 次の人はまたチュートリアルから始まる。
+        /// </summary>
+        private const string EverStartedKey = "Tutorial_EverStarted";
+
+        /// <summary>前にチュートリアルを始めたことがあるか。この旗より前に遊んだ人は、進み具合で見る。</summary>
+        public static bool HasEverStarted()
+        {
+            return PlayerPrefs.GetInt(EverStartedKey, 0) == 1 || GetSavedProgress() > 0;
+        }
+
         public void StartTutorial()
         {
+            PlayerPrefs.SetInt(EverStartedKey, 1);
+            PlayerPrefs.Save();
+
             int requestedRound = PlayerPrefs.GetInt(RequestedStartRoundKey, -1);
             if (requestedRound >= 0)
             {
@@ -228,6 +257,7 @@ namespace KillingMahjong.Managers
 
         public void StartTutorialFrom(int roundIndex)
         {
+            CloseRevivalFinale();
             _scenario = scenario != null ? scenario : TutorialScenario.BuildDefault();
             _scenario.Validate();
 
@@ -238,6 +268,7 @@ namespace KillingMahjong.Managers
             _playerHp = _scenario.playerStartHp;
             _enemyHp = _scenario.enemyStartHp;
             _aborted = false;
+            _reachedFlowEnd = false;
 
             _playerStake = 0;
             _enemyStake = 0;
@@ -267,14 +298,18 @@ namespace KillingMahjong.Managers
             if (roundIndex <= 0) SetFirstRoundChromeVisible(false);
 
             if (_scenarioRoutine != null) StopCoroutine(_scenarioRoutine);
+            if (gameUIManager != null && gameUIManager.EnemyInfoUI != null)
+                gameUIManager.EnemyInfoUI.RestoreTutorialCharacter();
             RestoreIntroSettings();
             if (_askExperienceAfterIntro) RaiseIntroSettings();
-            _scenarioRoutine = StartCoroutine(ScenarioRoutine(Mathf.Max(0, roundIndex)));
+            _scenarioRoutine = StartCoroutine(ScenarioRoutine(
+                Mathf.Clamp(roundIndex, 0, Mathf.Max(0, _scenario.rounds.Count - 1))));
         }
 
         /// <summary>チュートリアルを打ち切ってタイトルへ戻す（スキップボタン用）。</summary>
         public void SkipTutorial()
         {
+            CloseRevivalFinale();
             KillingMahjong.UI.TutorialNavigation.Cancel();
             _aborted = true;
             RestoreIntroSettings();
@@ -297,8 +332,9 @@ namespace KillingMahjong.Managers
             // ScreenTint は DontDestroyOnLoad なので、抜かないと**次のシーンまで引きずる。**
             Tutorial.TutorialAudioDirector.ResetVisuals();
 
-            string sceneName = _scenario != null ? _scenario.titleSceneName : "タイトルシーン";
-            SceneManager.LoadScene(sceneName);
+            // 抜けたらデバッグ部屋へ。台本には移動先を持たせない（2026-10-23 ユーザー指示「タイトルへは放置した時だけ行くようにして」）。
+            // タイトル（ランキングと動画の画面）へは、放置したときのリセットでしか行かない
+            SceneManager.LoadScene(KillingMahjong.UI.TutorialNavigation.DebugRoomSceneName);
         }
 
     }

@@ -18,7 +18,6 @@ namespace KillingMahjong.UI
         private Effects.BoostHandSkillEffect _boostEffect;
         private Effects.AssaultSkillEffect _assaultEffect;
         private readonly HashSet<TransitionLockSet.Lease> skillTransitions = new HashSet<TransitionLockSet.Lease>();
-        private readonly HashSet<System.Action<StatusData>> skillStatusHandlers = new HashSet<System.Action<StatusData>>();
 
         public void CancelPendingSkillRequest()
         {
@@ -51,9 +50,7 @@ namespace KillingMahjong.UI
             _skillRunGeneration++;
             foreach (var lease in skillTransitions) lease.Dispose();
             skillTransitions.Clear();
-            if (NetworkMessageHandler.Instance != null)
-                foreach (var handler in skillStatusHandlers) NetworkMessageHandler.Instance.OnStatusReceived -= handler;
-            skillStatusHandlers.Clear();
+
             CancelPendingSkillRequest();
             CancelSkillSelection();
         }
@@ -81,6 +78,14 @@ namespace KillingMahjong.UI
             {
                 StartCoroutine(HandleSkillCastedRoutine(data));
                 return;
+            }
+
+            if (data.skillType == "boost_hand")
+            {
+                // status の問い合わせと演出の順番待ちより先に、強化状況を控える。
+                var boosts = CurrentBoosts(data.player_id == SkillLocalPlayerId);
+                data.BoostsBeforeCast = boosts != null
+                    ? new Dictionary<string, int>(boosts) : new Dictionary<string, int>();
             }
 
             var queue = Effects.EffectQueue.Instance;
@@ -130,6 +135,23 @@ namespace KillingMahjong.UI
             yield return HandleSkillCastedRoutine(data, skipCutin);
         }
 
+        private static Dictionary<string, int> CurrentBoosts(bool local)
+        {
+            var board = BoardStateManager.Instance;
+            return local ? board?.LocalBoostHandBonus : board?.EnemyBoostHandBonus;
+        }
+
+        private static string FindBoostIncrease(Dictionary<string, int> before, Dictionary<string, int> after)
+        {
+            if (after == null) return null;
+            foreach (var entry in after)
+            {
+                before.TryGetValue(entry.Key, out int prior);
+                if (entry.Value > prior) return entry.Key;
+            }
+            return null;
+        }
+
         private string SkillLocalPlayerId => NetworkMessageHandler.Instance != null
             ? NetworkMessageHandler.Instance.LocalPlayerId : "tutorial-local";
 
@@ -162,14 +184,15 @@ namespace KillingMahjong.UI
 
             // 能力麻雀の核であるスキル発動が完全に無音だったため、種類別の音を鳴らす
             var audioMgr = Managers.AudioManager.Instance;
-            if (audioMgr != null) audioMgr.PlaySkillSE(data.skillType);
+            if (!skipCutin && audioMgr != null) audioMgr.PlaySkillSE(data.skillType);
 
             // **発動の手応えは揺れで出す（2026-09-13）。**
             // 上のフラッシュを止めたとき、合図が音だけになっていた。
             // 音は切ってあることがある（`AudioManager.AudioEnabled`）ので、
             // 無音でも「何かが起きた」と分かる合図が要る。
             // ロンより弱くする。能力は局に何度も飛ぶので、同じ強さだと疲れる。
-            Effects.ScreenQuake.Play(12f, 0.22f);
+            // カットイン側が着弾を担当する。連打の終了後に同じ揺れを再生しない。
+            if (!skipCutin && uiManager.PhaseTransitionUI == null) Effects.ScreenQuake.Play(12f, 0.22f);
 
             string localPlayerId = SkillLocalPlayerId;
             bool isLocalPlayer = (data.player_id == localPlayerId);
@@ -187,54 +210,22 @@ namespace KillingMahjong.UI
             string subText = null;
 
             // 役強化で強まった役の名前。発動後の演出でも出すので、外に出しておく
-            string boostedYakuName = uiManager.IsTutorialMode ? data.yaku_name : "";
+            string boostedYakuName = data.yaku_name;
 
             if (data.skillType == "boost_hand" && !uiManager.IsTutorialMode)
             {
-                var oldLocalBonus = Managers.BoardStateManager.Instance.LocalBoostHandBonus != null ?
-                    new Dictionary<string, int>(Managers.BoardStateManager.Instance.LocalBoostHandBonus) : new Dictionary<string, int>();
-                var oldEnemyBonus = Managers.BoardStateManager.Instance.EnemyBoostHandBonus != null ?
-                    new Dictionary<string, int>(Managers.BoardStateManager.Instance.EnemyBoostHandBonus) : new Dictionary<string, int>();
-
-                bool statusReceived = false;
-                System.Action<KillingMahjong.EngineData.StatusData> onStatus = (statusData) => { statusReceived = true; };
-                NetworkMessageHandler.Instance.OnStatusReceived += onStatus;
-                skillStatusHandlers.Add(onStatus);
-
-                float timeout = 2.0f;
-                try
+                float until = Time.unscaledTime + 2f;
+                while (string.IsNullOrEmpty(boostedYakuName) && data.BoostsBeforeCast != null)
                 {
-                    while (!statusReceived && timeout > 0)
-                    {
-                        timeout -= Time.deltaTime;
-                        yield return null;
-                        if (!ownedLock.IsActive) yield break;
-                    }
+                    boostedYakuName = FindBoostIncrease(data.BoostsBeforeCast, CurrentBoosts(isLocalPlayer));
+                    if (!string.IsNullOrEmpty(boostedYakuName) || Time.unscaledTime >= until) break;
+                    yield return null;
+                    if (!ownedLock.IsActive) yield break;
                 }
-                finally
-                {
-                    NetworkMessageHandler.Instance.OnStatusReceived -= onStatus;
-                    skillStatusHandlers.Remove(onStatus);
-                }
-
-                var newLocalBonus = Managers.BoardStateManager.Instance.LocalBoostHandBonus ?? new Dictionary<string, int>();
-                var newEnemyBonus = Managers.BoardStateManager.Instance.EnemyBoostHandBonus ?? new Dictionary<string, int>();
-
-                var targetOldBonus = isLocalPlayer ? oldLocalBonus : oldEnemyBonus;
-                var targetNewBonus = isLocalPlayer ? newLocalBonus : newEnemyBonus;
-
-                foreach (var kvp in targetNewBonus)
-                {
-                    if (!targetOldBonus.ContainsKey(kvp.Key) || targetOldBonus[kvp.Key] < kvp.Value)
-                    {
-                        boostedYakuName = kvp.Key;
-                        break;
-                    }
-                }
-
                 if (!string.IsNullOrEmpty(boostedYakuName))
                 {
-                    subText = $"<color=yellow>{boostedYakuName}</color>";
+                    // 自分の役名は後続の札で示す。相手側はカットインで知らせる。
+                    if (!isLocalPlayer) subText = $"<color=yellow>{YakuExamples.DisplayName(boostedYakuName)}</color>";
 
                     // 右上の一覧は返事が届いた時点でもう新しい値になっている。演出の最後に役名が
                     // そこへ飛んでいくので、届くまでその枠だけ伏せておく（戻すのは演出。上限つき）
@@ -303,18 +294,18 @@ namespace KillingMahjong.UI
             // 古いサーバーに繋いだときに血が 0 へ飛ぶのを防ぐため。
             {
                 var board = Managers.BoardStateManager.Instance;
-                int localHp = board.LocalPlayerHp;
-                int enemyHp = board.EnemyPlayerHp;
+                int localHp = board.LocalServerHp;
+                int enemyHp = board.EnemyServerHp;
 
                 // 払った血の量は「支払い前」を控えないと出せない。
                 // 反応（Skill_HighCostPaid / Skill_NearDeathByCost）の判定に使う
-                int hpBeforeCast = isLocalPlayer ? localHp : enemyHp;
+                int hpBeforeCast = isLocalPlayer ? board.LocalPlayerHp : board.EnemyPlayerHp;
 
                 // **引き算はしない。** サーバーが払ったあとの血を送ってくる。
                 // 以前は health が無いときに `血 − cost` で自前計算していたが、
                 // クライアントが辻褄を合わせるとサーバー側の誤りが画面に出なくなる。
                 // 届かないときは動かさず、警告だけ出して次の status に任せる
-                if (data.health > 0)
+                if (data.health > 0 || uiManager.IsTutorialMode && data.health == 0)
                 {
                     if (isLocalPlayer) localHp = data.health;
                     else enemyHp = data.health;
@@ -347,8 +338,8 @@ namespace KillingMahjong.UI
                 }
             }
 
-            // 体力が減る様子をしっかり見せるためのタメ（待機）
-            yield return new WaitForSeconds(1.0f);
+            // 単発はHPの変化を短く見せて固有演出へ。連打は各件の空待ちを挟まない。
+            if (!skipCutin) yield return new WaitForSeconds(0.2f);
             if (!ownedLock.IsActive) yield break;
 
             // --- 以降、実際のアビリティ効果（透視以外も含む）を実行 ---
@@ -362,7 +353,8 @@ namespace KillingMahjong.UI
                     if (uiManager.VisualController != null)
                     {
                         // 演出を見せるため、アニメーション完了を待つ
-                        yield return StartCoroutine(uiManager.VisualController.PlayPerspectiveAnimation(newlyExposed));
+                        // チュートリアルは明滅を待たずに先輩のセリフへ進む（本編は今までどおり待つ）
+                        yield return StartCoroutine(uiManager.VisualController.PlayPerspectiveAnimation(newlyExposed, uiManager.IsTutorialMode));
                         if (!ownedLock.IsActive) yield break;
 
                     }
@@ -400,9 +392,14 @@ namespace KillingMahjong.UI
                     _boostEffect = Effects.BoostHandSkillEffect.Create();
                     if (_boostEffect != null)
                     {
-                        var cutin = uiManager.PhaseTransitionUI;
-                        yield return _boostEffect.Play(boostedYakuName, uiManager.YakuListUI,
-                            cutin != null ? cutin.PlayerCutinSprite : null);
+                        if (uiManager.IsTutorialMode)
+                        {
+                            var cutin = uiManager.PhaseTransitionUI;
+                            yield return _boostEffect.Play(boostedYakuName, uiManager.YakuListUI,
+                                cutin != null ? cutin.PlayerCutinSprite : null);
+                        }
+                        else
+                            yield return _boostEffect.PlayAfterCutin(boostedYakuName, uiManager.YakuListUI);
                         _boostEffect = null;
                         if (!ownedLock.IsActive) yield break;
                     }
@@ -461,21 +458,18 @@ namespace KillingMahjong.UI
                         // 同じ牌IDは山に複数あるので、牌IDで探すと別の牌を書き換えてしまう。
                         // ここを怠ると OriginalWallTiles がサーバーとズレ、
                         // 位置で牌を特定する処理（TileInteraction.WallIndex）が次の交換で誤動作する。
+                        // 交換した位置が手牌に入っていれば、手牌の側もそこで持ち替わる（値では探さない）
                         bool syncedByIndex = stateMgr.ReplaceWallTileAt(targetHandIndex, newTileId);
                         if (!syncedByIndex)
                         {
                             // index が使えない場合だけ、従来どおり牌IDで辻褄を合わせる
                             int wallIdx = stateMgr.CurrentWallTiles.IndexOf(oldTileId);
                             if (wallIdx >= 0) stateMgr.CurrentWallTiles[wallIdx] = newTileId;
-                        }
-
-                        // 交換した牌が手牌に入っていた場合は、手牌側も入れ替える。
-                        // 手牌は「山から選んだ13枚」なので、山の同期とは別に持ち替えが要る。
-                        if (stateMgr.CurrentHandTiles.Contains(oldTileId))
-                        {
-                            stateMgr.CurrentHandTiles.Remove(oldTileId);
-                            stateMgr.CurrentHandTiles.Add(newTileId);
-                            stateMgr.SortTileIds(stateMgr.CurrentHandTiles);
+                            else if (stateMgr.CurrentHandTiles.Remove(oldTileId))
+                            {
+                                stateMgr.CurrentHandTiles.Add(newTileId);
+                                stateMgr.SortTileIds(stateMgr.CurrentHandTiles);
+                            }
                         }
 
                         Debug.Log($"[Mulligan] AFTER  wall = {Join(stateMgr.CurrentWallTiles)}");

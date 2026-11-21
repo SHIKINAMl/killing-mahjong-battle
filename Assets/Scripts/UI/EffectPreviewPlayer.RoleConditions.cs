@@ -8,6 +8,11 @@ namespace KillingMahjong.UI
     {
         private IEnumerator PreviewRoleConditions()
         {
+            if (EffectId == HandRoleConditionsUI.EffectId)
+            {
+                yield return PreviewRoleTileSupport();
+                yield break;
+            }
             var reveal = HandWaitRevealUI.Ensure(rig.transform);
             var data = new[] {
                 new WaitData { tile=1, han=9, mangan_or_more=true, multiplier=2, multiplier_label="倍満", yaku=new[]{"平和","清一色","一盃口","立直"} },

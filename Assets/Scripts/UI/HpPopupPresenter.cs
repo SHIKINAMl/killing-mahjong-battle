@@ -125,7 +125,7 @@ namespace KillingMahjong.UI
 
         private void SpawnPopup(int amount)
         {
-            if (canvasRoot == null) return;
+            if (canvasRoot == null || !canvasRoot.gameObject.activeInHierarchy) return;
 
             GameObject popupObj;
             if (prefab != null)
@@ -156,8 +156,7 @@ namespace KillingMahjong.UI
             DamagePopupUI popup = popupObj.GetComponent<DamagePopupUI>();
             if (popup != null)
             {
-                Color c = amount > 0 ? Color.green : Color.red;
-                popup.Setup(amount, c);
+                popup.Setup(amount);
             }
         }
     }

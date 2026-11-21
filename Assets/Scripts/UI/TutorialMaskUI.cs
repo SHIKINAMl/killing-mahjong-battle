@@ -156,13 +156,16 @@ namespace KillingMahjong.UI
             }
         }
 
+        private int presentationFrame = -1;
+
         private void Update()
         {
+            bool render = PresentationTiming.IsNewFrame(ref presentationFrame, Time.unscaledTime);
             if (!Mathf.Approximately(_alpha, _targetAlpha))
             {
                 float step = fadeDuration > 0f ? Time.unscaledDeltaTime / fadeDuration : 1f;
                 _alpha = Mathf.MoveTowards(_alpha, _targetAlpha, step);
-                ApplyAlpha(_alpha);
+                if (render || Mathf.Approximately(_alpha, _targetAlpha)) ApplyAlpha(_alpha);
 
                 if (_alpha <= 0f && _targetAlpha <= 0f)
                 {
@@ -189,7 +192,7 @@ namespace KillingMahjong.UI
                 _holeRect = target;
             }
 
-            ApplyHole(_holeRect);
+            if (render) ApplyHole(_holeRect);
         }
 
         /// <summary>ターゲットの矩形を Canvas ローカルに変換し、余白を足した「穴」を返す。</summary>

@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
+using System.Collections.Generic;
 
 namespace KillingMahjong.UI.Effects
 {
@@ -49,8 +50,31 @@ namespace KillingMahjong.UI.Effects
         // 現在表示している赤ビネットの濃さ。フェード中の値を引き継ぐために保持する
         private float currentAlpha = 0f;
 
+        // ---- チュートリアルの動画の中では出さない（2026-10-30 バグ報告「自分のHPが低いと出る演出が、動画空間にも反映されてる」）----
+        // 動画は別の場面なので、いまの自分の体力の赤い縁取りと鼓動を重ねない。体力の判定はそのまま続け、見せ方だけ止める
+        private static readonly HashSet<HeartbeatEffect> instances = new HashSet<HeartbeatEffect>();
+        private static int hideRequests;
+
+        /// <summary>動画を開いたら true、閉じたら false。入れ子にしてよい（数えている）</summary>
+        public static void SetHiddenForReplay(bool hide)
+        {
+            hideRequests = Mathf.Max(0, hideRequests + (hide ? 1 : -1));
+            foreach (var effect in instances) if (effect != null) effect.ApplyReplayHidden();
+        }
+
+        private static bool HiddenForReplay => hideRequests > 0;
+
+        private void ApplyReplayHidden()
+        {
+            foreach (var canvas in GetComponentsInChildren<Canvas>(true)) canvas.enabled = !HiddenForReplay;
+        }
+
+        private void OnDestroy() { instances.Remove(this); }
+
         private void Awake()
         {
+            instances.Add(this);
+            ApplyReplayHidden();
             // 初期状態では透明にしておく
             InitVignette(redVignette);
             InitVignette(blackVignette);
@@ -154,7 +178,7 @@ namespace KillingMahjong.UI.Effects
             while (t < fadeDuration)
             {
                 t += Time.deltaTime;
-                float progress = Mathf.Clamp01(t / fadeDuration);
+                float progress = Mathf.Clamp01(PresentationTiming.Sample(t) / fadeDuration);
 
                 // SmoothStep でじんわり立ち上げる
                 float eased = progress * progress * (3f - 2f * progress);
@@ -201,14 +225,14 @@ namespace KillingMahjong.UI.Effects
 
         private void PlayHeartbeatSound()
         {
+            if (HiddenForReplay) return;
             if (KillingMahjong.Managers.AudioManager.Instance != null)
             {
-                // 心臓の鼓動（低くて丸い音）
-                // SynthWaveType は AudioSynth.cs と同じ KillingMahjong.Managers 名前空間にある
-                KillingMahjong.Managers.AudioManager.Instance.PlaySynthSoundDual(
-                    KillingMahjong.Managers.SynthWaveType.Sine,
-                    KillingMahjong.Managers.SynthWaveType.Triangle,
-                    150f, 60f, 0.2f, 1.0f);
+                // 心臓の鼓動。合成音から、Freesound（CC0）の心音2つを重ねたものに替えた（2026-10-19）。
+                // 打牌の心音とは別の素材にしてあり、体力が少ない状態だと耳で分かる。
+                // 1割以下では 0.6 秒おきに鳴るので、音は 0.55 秒で切ってある
+                KillingMahjong.Managers.AudioManager.Instance.PlayStinger("se_lowhp_heartbeat",
+                    KillingMahjong.Managers.AudioManager.PitchJitter.None);
             }
         }
 

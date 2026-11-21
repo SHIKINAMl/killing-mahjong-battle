@@ -41,8 +41,8 @@ namespace KillingMahjong.Managers
             }
 
             // 増減は GameRules の式で決まる。得る額と失う額は別計算なので一致しない。
-            int prevEnemyHp = _enemyHp;
-            int prevPlayerHp = _playerHp;
+            int prevEnemyHp = EnemyShownHp;
+            int prevPlayerHp = PlayerShownHp;
 
             int han = GetWinnerHan(data, isPlayerWin: true);
 
@@ -57,8 +57,9 @@ namespace KillingMahjong.Managers
             int loss = GameRules.CalculateLoserLoss(theirBet, han, data.isTankiWin);
             ClearStakes();
 
-            _playerHp = prevPlayerHp + gain;
-            _enemyHp = Mathf.Max(0, prevEnemyHp - loss);
+            // 総体力には清算分だけを反映する。預け分はClearStakesで解放されるため、二重に返さない。
+            _playerHp += gain;
+            _enemyHp = Mathf.Max(0, _enemyHp - loss);
 
             var settlementInfo = BuildSettlementInfo(
                 data, isLocalWin: true, han: han, myBet: myBet, theirBet: theirBet,
@@ -85,7 +86,7 @@ namespace KillingMahjong.Managers
                 prevEnemyHp: prevEnemyHp, newEnemyHp: _enemyHp,
                 displayScore: settlement,
                 scoreFormula: BuildScoreFormula(myBet, han),
-                settlement: isFirstTutorialRound ? null : settlementInfo,
+                settlement: settlementInfo,
                 suppressSettlementPanel: isFirstTutorialRound,
                 deferHpUpdate: isFirstTutorialRound));
 
@@ -208,8 +209,8 @@ namespace KillingMahjong.Managers
             var lossSettlement = BuildSettlementInfo(
                 data, isLocalWin: false, han: han, myBet: myBet, theirBet: theirBet,
                 carryRounds: carryRounds, myDelta: -previewLoss, theirDelta: previewGain,
-                prevLocalHp: prevPlayerHp, newLocalHp: Mathf.Max(0, prevPlayerHp - previewLoss),
-                prevEnemyHp: prevEnemyHp, newEnemyHp: prevEnemyHp + previewGain);
+                prevLocalHp: prevPlayerHp, newLocalHp: Mathf.Max(0, prevPlayerHp + myBet - previewLoss),
+                prevEnemyHp: prevEnemyHp, newEnemyHp: prevEnemyHp + theirBet + previewGain);
 
             if (ronUI != null)
             {
@@ -273,8 +274,8 @@ namespace KillingMahjong.Managers
             SetPhase(RoundStatus.Agari);
 
             // 手順⑯: 単騎で上がられると失う額が2倍になる（GameRules.CalculateLoserLoss）
-            int prevPlayerHp = _playerHp;
-            int prevEnemyHp = _enemyHp;
+            int prevPlayerHp = PlayerShownHp;
+            int prevEnemyHp = EnemyShownHp;
 
             int han = GetWinnerHan(data, isPlayerWin: false);
 
@@ -287,8 +288,8 @@ namespace KillingMahjong.Managers
             int loss = GameRules.CalculateLoserLoss(myBet, han, data.isTankiWin);
             ClearStakes();
 
-            _playerHp = Mathf.Max(0, prevPlayerHp - loss);
-            _enemyHp = prevEnemyHp + gain;
+            _playerHp = Mathf.Max(0, _playerHp - loss);
+            _enemyHp += gain;
 
             // 演出に出す額は「自分の血がどれだけ動いたか」に合わせる
             int settlement = loss;
@@ -347,7 +348,7 @@ namespace KillingMahjong.Managers
         /// 役の行は本編と同じ <c>GameUIPhaseController.FillYakuRows</c> に任せる。
         /// 台本の役名と翻数が噛み合っていなければ、あちらが行ごとの翻数を伏せて合計だけ出す。
         ///
-        /// **強襲はチュートリアルに出てこない**ので常に無し。
+        /// 第2局の強襲による決着は BuildScriptedDefeatSettlement が組み立てる。この汎用経路には乗せない。
         /// </summary>
         private static UI.RonSettlementInfo BuildSettlementInfo(
             TutorialRoundData data, bool isLocalWin, int han, int myBet, int theirBet, int carryRounds,

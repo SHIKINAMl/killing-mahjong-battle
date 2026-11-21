@@ -6,6 +6,16 @@ namespace KillingMahjong.UI
 {
     public partial class AbilityUI
     {
+        /// <summary>本編とコレクションで同じ能力説明を読む。</summary>
+        public System.Collections.Generic.IEnumerable<string> SkillExplanations
+        {
+            get
+            {
+                EnsureAbilities();
+                foreach (var ability in realAbilities) yield return ability.description;
+            }
+        }
+
         private void EnsureAbilities()
         {
             if (realAbilities != null) return;
@@ -15,13 +25,13 @@ namespace KillingMahjong.UI
             realAbilities = new System.Collections.Generic.List<AbilityData>
             {
                 new AbilityData(SkillNames.Mulligan, SkillNames.GetDisplayName(SkillNames.Mulligan),
-                    "牌を3枚出し、出した3枚と山札の3枚の6枚から、残す3枚を選ぶ。"),
+                    "まずは3枚、選んでね。\nその3枚と山札の3枚、\n合わせて6枚の中から\n残す3枚を選べるよ。"),
                 new AbilityData(SkillNames.Perspective, SkillNames.GetDisplayName(SkillNames.Perspective),
-                    "種別を選ぶか、ランダムで、相手の山の未公開牌を最大3枚公開する。"),
+                    "相手の山の未公開牌を\n最大3枚、透かして見れるよ。\n種別を選ぶか、\nランダムか決めてね。"),
                 new AbilityData(SkillNames.BoostHand, SkillNames.GetDisplayName(SkillNames.BoostHand),
-                    "指定した役を含むアガリの倍率を1段上げる。1つの役につき1回。"),
+                    "指定の役を含むアガリの\n倍率を1段上げるよ。\n1つの役につき1回ね。"),
                 new AbilityData(SkillNames.Assault, SkillNames.GetDisplayName(SkillNames.Assault),
-                    "この局は上がっても点を得ない。代わりに、得るはずだった額を相手への追加ダメージにする。1局1回。")
+                    "この局はアガっても\n点をもらえないよ。\nもらうはずだった点は\n相手への追加ダメージに。\n使えるのは1局1回ね。")
 
                 // **特殊勝利は載せない（2026-08-14 に廃止の指示）。**
                 // サーバー側の enum・HP_COST_TABLE・special_victory_won の処理は残っているので、
@@ -56,6 +66,9 @@ namespace KillingMahjong.UI
         /// </summary>
         private string GetUnusableReason(string skillType)
         {
+            var ui = TutorialUnusableReason != null ? FindFirstObjectByType<GameUIManager>() : null;
+            if (ui != null && ui.IsTutorialMode && TutorialUnusableReason != null)
+                return TutorialUnusableReason(skillType);
             if (skillType != SkillNames.Assault) return null;
 
             var board = KillingMahjong.Managers.BoardStateManager.Instance;
@@ -86,6 +99,7 @@ namespace KillingMahjong.UI
             // **選択は行と一緒に消える。** 行を作り直しているので、
             // 参照を残すと破棄済みのオブジェクトを掴んだままになる
             currentSelection = null;
+            RefreshActivateButton();
 
             LayoutContentContainer();
 
@@ -129,8 +143,14 @@ namespace KillingMahjong.UI
                     rt.anchoredPosition3D = new Vector3(0f, -currentY, 0f);
                 }
 
-                currentY += RowHeight + RowSpacing;
                 instantiatedItems.Add(itemObj);
+                // 隠している能力は作り直しても隠したまま。場所も詰める
+                if (_hiddenSkillTypes.Contains(data.skillType))
+                {
+                    itemObj.gameObject.SetActive(false);
+                    continue;
+                }
+                currentY += RowHeight + RowSpacing;
             }
         }
 

@@ -174,11 +174,20 @@ namespace KillingMahjong.UI
                 horizontalLineRt.gameObject.SetActive(false);
             }
 
-            if (centerText != null) centerText.gameObject.SetActive(false);
+            // 帯の文字は薄くして消すので、途中で切られると透明のまま残る。次に出すときのために戻す
+            if (centerText != null) { centerText.gameObject.SetActive(false); centerText.alpha = 1f; }
             if (hpBetContainer != null) hpBetContainer.SetActive(false);
         }
 
         private PlayerInfoUI targetPlayerInfoUI;
+
+        /// <summary>
+        /// 黒帯（一本線）か市松模様の覆いが、いま画面に出ているか。
+        /// 手牌の上の案内（HandUI.PhaseGuide）が、覆いの上に出ないようにするのに使う
+        /// </summary>
+        public bool IsCoveringScreen =>
+            (fullScreenCheckerImage != null && fullScreenCheckerImage.gameObject.activeInHierarchy)
+            || (horizontalLineRt != null && horizontalLineRt.gameObject.activeInHierarchy);
 
         public void PlayTransition(string roundName, PlayerInfoUI playerInfoUI, KillingMahjong.EngineData.BettingCompletedInfo bet, Action onMidpoint, Action onComplete, bool? displayIsLocalTurn = null)
         {
@@ -209,15 +218,21 @@ namespace KillingMahjong.UI
         {
             skillPresentations.CancelAll();
             StopAllCoroutines();
+            ResetScreenShake();
             isDarkened = false;
             IsDarkenTransitioning = false;
             IsScreenDarkened = false;
             _additionalRoundStartDarkenedCallbacks = null;
             _additionalRoundStartReadyCallbacks = null;
+            darkenTextRoutine = null;
+            ClearRoundRipple();
+            ResetRoundRippleState();
+            roundStartTextVisibleUntil = 0f;
             _roundStartCleanupDone = false;
+            _useRoundStartRevealSound = false;
             if (fullScreenCheckerImage != null) fullScreenCheckerImage.gameObject.SetActive(false);
             if (horizontalLineRt != null) horizontalLineRt.gameObject.SetActive(false);
-            if (centerText != null) centerText.gameObject.SetActive(false);
+            if (centerText != null) { centerText.gameObject.SetActive(false); centerText.alpha = 1f; }
             if (promptText != null) promptText.gameObject.SetActive(false);
             if (hpBetContainer != null) hpBetContainer.SetActive(false);
             Effects.TileClatterEffect.Hide(transform as RectTransform);
@@ -261,6 +276,7 @@ namespace KillingMahjong.UI
                 return;
             }
             isDarkened = true;
+            roundStartTextVisibleUntil = 0f;
             IsScreenDarkened = true;
             IsDarkenTransitioning = true;
             StartCoroutine(RoundStartDarkenRoutine(text, onDarkened, onReady));
@@ -287,8 +303,7 @@ namespace KillingMahjong.UI
             // 折り返すので、**そろった盤面が暗転にかぶる前に見えてしまう**
             // （ユーザー報告「暗転する前に全部そろっている画面が映っています」）。
             //
-            // ここで待つのは「降りきるまで」だけ。**待ちを増やしているのではなく、
-            // 順番を戻しているだけ**で、降りきったあとはすぐ晴らしに入る。
+            // 降りきってから局名の表示時間を確保し、そのあと晴らす。
             if (IsDarkenTransitioning)
             {
                 if (!_fadeOutPendingUntilDarkened)
@@ -305,16 +320,38 @@ namespace KillingMahjong.UI
                 return;
             }
             isDarkened = false;
-            IsScreenDarkened = false;
             StartCoroutine(RoundStartFadeOutRoutine(onComplete));
         }
 
         public void ChangeDarkenText(string text)
         {
-            if (isDarkened && centerText != null)
+            // 局頭の数字送り・波紋の最中は止めずに受ける（PhaseTransitionUI.RoundRipple）
+            if (isDarkened && centerText != null && TryDeferDarkenTextForRipple(text)) return;
+            if (isDarkened && centerText != null && centerText.text != text)
             {
-                centerText.text = text;
+                // 暗転中の文字は、薄くして消してから全文を短くフェードして出す。
+                if (isActiveAndEnabled)
+                {
+                    if (darkenTextRoutine != null) StopCoroutine(darkenTextRoutine);
+                    darkenTextRoutine = StartCoroutine(SwapDarkenText(text));
+                }
+                else centerText.text = text;
             }
+        }
+
+        private System.Collections.IEnumerator SwapDarkenText(string text)
+        {
+            ClearRoundRipple();
+            yield return HideBandText();
+            // 差し替えた文字に局の数字があれば、ここでも数字送りと波紋を出す（PhaseTransitionUI.RoundRipple）。
+            // 本編の第1局は「対局開始」の暗転から「第1局進行中...」へ、この差し替えで数字が出る（2026-11-21）
+            bool ripple = CanPlayRoundNumberRipple(text);
+            yield return RevealBandText(ripple ? RoundTitleBeforeFlip(text) : text);
+            roundStartTextVisibleUntil = string.IsNullOrEmpty(text)
+                ? 0f : Time.unscaledTime + MinimumRoundTitleSeconds;
+            // 波紋の終わり（FinishRoundRipple）が darkenTextRoutine を片付ける
+            if (ripple) { yield return RoundNumberRippleRoutine(text); yield break; }
+            darkenTextRoutine = null;
         }
 
 
@@ -333,6 +370,9 @@ namespace KillingMahjong.UI
         /// <param name="onComplete">演出完了コールバック</param>
         [Header("Effects Settings")]
         [SerializeField] private Sprite bloodSplatterSprite;
+
+        /// <summary>カットインの血飛沫の絵。和了の点数表も同じ絵で模様を付ける（RonAnimationUI）。</summary>
+        public Sprite BloodSplatterSprite => bloodSplatterSprite;
         [SerializeField] private Color dimmerColor = new Color(0, 0, 0, 0.7f);
         /// <summary>
         /// 自分のスキルで出す専用の絵。画面の何割まで使ってよいか。
@@ -343,6 +383,15 @@ namespace KillingMahjong.UI
         /// 計算で確かめてある。
         /// </summary>
         private const float CutinSpriteWidthRatio = 0.85f;
+
+        /// <summary>自分のカットインの絵（ベルル）を、画面の幅のこの割合だけ左へ寄せる。右上の能力名を避けるため</summary>
+        private const float CutinSpriteLeftShift = 0.19f;
+
+        /// <summary>
+        /// 自分のカットインの絵を、これだけ小さくする。左へ寄せるだけだと左の翼が画面から切れるので、
+        /// 少し縮めて、左の翼を画面に残したまま右の翼を能力名の手前で止める
+        /// </summary>
+        private const float CutinSpriteShrink = 0.88f;
         private const float CutinSpriteHeightRatio = 0.78f;
 
         [SerializeField] private Sprite playerCutinSprite;
@@ -427,7 +476,7 @@ namespace KillingMahjong.UI
         }
 
         // 背景と立ち絵は共有し、発動名を順番に叩き込む。退出の合図は全段で共有する。
-        public IEnumerator PlayEnemySkillBurstRoutine(IReadOnlyList<string> names, CharacterData character)
+        public IEnumerator PlayEnemySkillBurstRoutine(IReadOnlyList<string> names, CharacterData character, IReadOnlyList<string> skillTypes = null)
         {
             if (names == null || names.Count == 0) yield break;
             using (var scope = skillPresentations.Begin())
@@ -436,6 +485,9 @@ namespace KillingMahjong.UI
                 int completed = 0;
                 for (int i = 0; i < names.Count && scope.IsActive; i++)
                 {
+                    // 発動音は名前が登場する瞬間に。後段の通知適用では繰り返さない。
+                    if (skillTypes != null && i < skillTypes.Count && Managers.AudioManager.Instance != null)
+                        Managers.AudioManager.Instance.PlaySkillSE(skillTypes[i]);
                     var routine = StartCoroutine(scope.Run(SkillCutinVisualsRoutine(scope, names[i], false,
                         character, 2f, () => completed++, null, i, names.Count, () => exit)));
                     scope.AddCleanup(() => { if (this != null && routine != null) StopCoroutine(routine); });
@@ -525,14 +577,7 @@ namespace KillingMahjong.UI
             bgStripeObj.transform.SetParent(containerRt, false);
             Image stripeImg = bgStripeObj.AddComponent<Image>();
             
-            if (isLocalPlayer)
-            {
-                stripeImg.color = new Color32(10, 80, 200, 255); // 鮮やかな青
-            }
-            else
-            {
-                stripeImg.color = new Color32(180, 10, 10, 255); // 鮮やかな赤
-            }
+            stripeImg.enabled = false; // 単色帯は描かず、ドットの帯の絵を子に置く。
 
             RectTransform stripeRt = bgStripeObj.GetComponent<RectTransform>();
             // 画面を覆い尽くす長方形から、帯状（バナー）に変更
@@ -544,15 +589,10 @@ namespace KillingMahjong.UI
             Vector2 stripeStart = new Vector2(0, -3000f);
             stripeRt.anchoredPosition = stripeStart;
 
-            // 濃い色の帯が背景に溶けないよう黒で縁取る。
-            // 帯はこのあと動かすので、縁も同じ動きに含める。
-            var stripeEdge = KillingMahjong.Visuals.UIEdgeOutline.AddBehind(stripeRt, 10f);
-            if (stripeEdge != null)
-            {
-                bgElements.Add(stripeEdge);
-                bgStartPos.Add(stripeStart);
-                bgTargetPos.Add(stripeTarget);
-            }
+            // 縁もPNGへ描き込む。背景だけは帯の回転を相殺し、2倍のまま描く。
+            // **スキルはロンとは別の絵（2026-10-20、ユーザー指示）。** べた塗りに本棚の本と同じディザを入れ、
+            // 外の枠は太い黒線。相手は赤、自分は青（tools/CutinPixelArt/skill.mjs）
+            RectTransform stripePicture = Effects.CutinPixelBackgroundUI.Attach(stripeRt, isLocalPlayer ? "skill_band_blue" : "skill_band_red");
 
             bgElements.Add(stripeRt);
             bgStartPos.Add(stripeStart);
@@ -567,7 +607,8 @@ namespace KillingMahjong.UI
                     splatterObj.transform.SetParent(containerRt, false);
                     Image spImg = splatterObj.AddComponent<Image>();
                     spImg.sprite = bloodSplatterSprite;
-                    spImg.color = isLocalPlayer ? new Color32(10, 80, 200, 180) : new Color32(180, 10, 10, 180);
+                    // 帯の色を暗くした色。帯の上で沈んで見える
+                    spImg.color = isLocalPlayer ? new Color32(18, 40, 100, 180) : new Color32(100, 14, 20, 180);
                     spImg.preserveAspect = true;
 
                     RectTransform spRt = splatterObj.GetComponent<RectTransform>();
@@ -650,14 +691,15 @@ namespace KillingMahjong.UI
 
                     // 幅・高さの両方で頭打ちにして、狭いほうに合わせる
                     float fit = Mathf.Min(areaW * CutinSpriteWidthRatio / spriteW,
-                                          areaH * CutinSpriteHeightRatio / spriteH);
+                                          areaH * CutinSpriteHeightRatio / spriteH) * CutinSpriteShrink;
                     portraitRt.localScale = new Vector3(fit, fit, 1f);
 
-                    // 画面中央。看板を掲げる絵なので、寄せずに真ん中で見せる
+                    // 看板を掲げる絵なので真ん中近くに置くが、**少し左へ寄せる**。
+                    // 真ん中だと右の翼が右上の能力名（右寄せ）にかぶっていた（2026-10-17 のユーザー指示）
                     portraitRt.pivot = new Vector2(0.5f, 0.5f);
                     portraitRt.anchorMin = new Vector2(0.5f, 0.5f);
                     portraitRt.anchorMax = new Vector2(0.5f, 0.5f);
-                    portraitTargetPos = Vector2.zero;
+                    portraitTargetPos = new Vector2(-areaW * CutinSpriteLeftShift, 0f);
                     portraitStartPos = portraitTargetPos + new Vector2(0f, -areaH);
                 }
                 else
@@ -686,30 +728,58 @@ namespace KillingMahjong.UI
                     // 帯と同じ形の「切り抜き枠」を重ね、立ち絵をその子にする。帯そのものの子にしないのは、
                     // 帯のすぐ上に血飛沫が描かれるため（子にすると、立ち絵の上に血飛沫が乗る）。
                     // 枠は帯と同じ動きをさせるので、立ち絵は帯に乗ったまま下から突き上がってくる
-                    var maskObj = new GameObject("PortraitMask", typeof(RectTransform), typeof(Image), typeof(Mask));
-                    maskObj.transform.SetParent(containerRt, false);
-                    var maskRt = (RectTransform)maskObj.transform;
-                    maskRt.sizeDelta = stripeRt.sizeDelta;
-                    maskRt.localRotation = stripeRt.localRotation;
-                    maskRt.anchoredPosition = stripeStart;
-                    maskObj.GetComponent<Image>().raycastTarget = false;
-                    maskObj.GetComponent<Mask>().showMaskGraphic = false;   // 枠そのものは描かない
-                    bgElements.Add(maskRt);
-                    bgStartPos.Add(stripeStart);
-                    bgTargetPos.Add(stripeTarget);
-
-                    portraitObj.transform.SetParent(maskRt, false);
-                    portraitRt.anchorMin = new Vector2(0.5f, 0.5f);
-                    portraitRt.anchorMax = new Vector2(0.5f, 0.5f);
-
-                    // 枠は傾いているので、立ち絵は逆へ同じだけ回してまっすぐ立たせる。
-                    // 置く位置も、画面の向きで決めた値を枠の向きへ直す
-                    portraitRt.localRotation = Quaternion.Euler(0f, 0f, -CutinStripeTilt);
+                    //
+                    // **型は帯の絵の形そのもの（2026-10-21、ユーザー指示「カットインの外に体が出ているのでマスクして」）。**
+                    // 以前は帯の四角（6000×600 を傾けたもの）で切っていたが、見えている帯はドット絵（斜めの縁と黒い枠）で、
+                    // 四角より細い。絵の透明な所から体がはみ出していた。帯の絵と同じ絵を型にし、帯の絵に重ね続ける
                     Vector2 onScreen = EnemyCutinPortraitPosition * k;
-                    float rad = CutinStripeTilt * Mathf.Deg2Rad;
-                    Vector2 inBand = new Vector2(
-                        onScreen.x * Mathf.Cos(rad) + onScreen.y * Mathf.Sin(rad),
-                        -onScreen.x * Mathf.Sin(rad) + onScreen.y * Mathf.Cos(rad));
+                    Vector2 inBand;
+                    var pictureImage = stripePicture != null ? stripePicture.GetComponent<RawImage>() : null;
+                    if (pictureImage != null && pictureImage.texture != null)
+                    {
+                        var maskObj = new GameObject("PortraitMask", typeof(RectTransform), typeof(RawImage), typeof(Mask),
+                            typeof(Effects.CutinMaskFollower));
+                        maskObj.transform.SetParent(containerRt, false);
+                        var maskImage = maskObj.GetComponent<RawImage>();
+                        maskImage.texture = pictureImage.texture;
+                        maskImage.raycastTarget = false;
+                        maskObj.GetComponent<Mask>().showMaskGraphic = false;   // 型そのものは描かない
+                        maskObj.GetComponent<Effects.CutinMaskFollower>().Follow(stripePicture);
+
+                        portraitObj.transform.SetParent(maskObj.transform, false);
+                        portraitRt.anchorMin = new Vector2(0.5f, 0.5f);
+                        portraitRt.anchorMax = new Vector2(0.5f, 0.5f);
+                        // 帯の絵は画面に対してまっすぐなので、立ち絵も回さず、画面の向きの位置のまま置く
+                        portraitRt.localRotation = Quaternion.identity;
+                        inBand = onScreen;
+                    }
+                    else
+                    {
+                        // 帯の絵が無いときは、前と同じく帯の四角で切る
+                        var maskObj = new GameObject("PortraitMask", typeof(RectTransform), typeof(Image), typeof(Mask));
+                        maskObj.transform.SetParent(containerRt, false);
+                        var maskRt = (RectTransform)maskObj.transform;
+                        maskRt.sizeDelta = stripeRt.sizeDelta;
+                        maskRt.localRotation = stripeRt.localRotation;
+                        maskRt.anchoredPosition = stripeStart;
+                        maskObj.GetComponent<Image>().raycastTarget = false;
+                        maskObj.GetComponent<Mask>().showMaskGraphic = false;   // 枠そのものは描かない
+                        bgElements.Add(maskRt);
+                        bgStartPos.Add(stripeStart);
+                        bgTargetPos.Add(stripeTarget);
+
+                        portraitObj.transform.SetParent(maskRt, false);
+                        portraitRt.anchorMin = new Vector2(0.5f, 0.5f);
+                        portraitRt.anchorMax = new Vector2(0.5f, 0.5f);
+
+                        // 枠は傾いているので、立ち絵は逆へ同じだけ回してまっすぐ立たせる。
+                        // 置く位置も、画面の向きで決めた値を枠の向きへ直す
+                        portraitRt.localRotation = Quaternion.Euler(0f, 0f, -CutinStripeTilt);
+                        float rad = CutinStripeTilt * Mathf.Deg2Rad;
+                        inBand = new Vector2(
+                            onScreen.x * Mathf.Cos(rad) + onScreen.y * Mathf.Sin(rad),
+                            -onScreen.x * Mathf.Sin(rad) + onScreen.y * Mathf.Cos(rad));
+                    }
 
                     // 帯の中では動かさない（帯ごと出入りする）
                     portraitTargetPos = inBand;
@@ -856,7 +926,7 @@ namespace KillingMahjong.UI
 
             while (t < impactDuration)
             {
-                float progress = t / impactDuration;
+                float progress = PresentationTiming.Sample(t) / impactDuration;
                 // 「下からばっ！と突き上げる」ので、最初に速く動いて着地で減速するイーズアウトを使う。
                 // ここを Pow(progress, 3f) のイーズインにすると、移動距離が 3000px あるぶん
                 // 序盤は画面外でほとんど動いて見えず、最後の3割で一気に飛び込む。
@@ -903,7 +973,7 @@ namespace KillingMahjong.UI
             float outDuration = 0.2f;
             while (t < outDuration)
             {
-                float progress = t / outDuration;
+                float progress = PresentationTiming.Sample(t) / outDuration;
                 float easeIn = progress * progress * progress;
 
                 dimmerImg.color = new Color(0, 0, 0, 0.85f * (1f - progress));

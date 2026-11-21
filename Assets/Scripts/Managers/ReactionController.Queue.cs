@@ -16,9 +16,13 @@ namespace KillingMahjong.Managers
             float elapsed = 0f;
             yield return null; // 最初のフレームでのクリック誤爆を防ぐ
 
+            // 読み時間は全文が出てから数える。盤面の操作クリックでは会話を飛ばさない。
+            while (dialogueUI != null && dialogueUI.IsTyping) yield return null;
+            if (dialogueUI != null) duration = Mathf.Clamp(dialogueUI.VisibleCharacterCount * .07f, 1.5f, duration);
+
             while (elapsed < duration)
             {
-                if (dialogueUI != null && dialogueUI.IsLogOpen)
+                if ((dialogueUI != null && dialogueUI.IsLogOpen) || OptionUI.AnyOpen)
                 {
                     yield return null;
                     continue;
@@ -33,7 +37,7 @@ namespace KillingMahjong.Managers
                     if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame) isClicked = true;
                     if (Touchscreen.current != null && Touchscreen.current.primaryTouch.press.wasPressedThisFrame) isClicked = true;
 
-                    if (isClicked)
+                    if (isClicked && dialogueUI != null && dialogueUI.IsPointerOverText())
                     {
                         break;
                     }
@@ -81,7 +85,8 @@ namespace KillingMahjong.Managers
             if (priority == ReactionPriority.Ambient) _lastAmbientAt = now;
 
             _queuedTriggers.Add(trigger);
-            reactionQueue.Enqueue(() => _currentReaction = StartCoroutine(ProcessTriggerReaction(trigger, formatArg)));
+            QueueContextual(() => ProcessTriggerReaction(trigger, formatArg),
+                () => _queuedTriggers.Remove(trigger), priority != ReactionPriority.Progress);
             if (!isProcessingReactions) ProcessNextReaction();
             return true;
         }
@@ -104,7 +109,7 @@ namespace KillingMahjong.Managers
             if (dialogueUI != null)
             {
                 dialogueUI.gameObject.SetActive(true);
-                dialogueUI.ShowText(text.Contains("「") ? text : $"「{text}」");
+                ShowReactionText(text);
             }
 
             yield return WaitWhileLogIsOpen(duration);
@@ -117,16 +122,15 @@ namespace KillingMahjong.Managers
 
         private void EnqueueDiscardReactionCore(int tileId, bool isLocalPlayer, string tileName)
         {
+            if (Time.unscaledTime < nextOrdinaryDiscardAt || isProcessingReactions || reactionQueue.Count > 0) return;
+            nextOrdinaryDiscardAt = Time.unscaledTime + (_playerDiscardHistory.Count >= 12 ? 14f : 8f);
             string conditionBase = isLocalPlayer ? "プレイヤーが打牌した時" : "相手が打牌した時";
-            int randomIdx = UnityEngine.Random.Range(1, 6);
+            // 通常の一打では焦り・安全性・手の強さを推測しない。既存の中立的な行だけ使う。
+            int randomIdx = isLocalPlayer ? 3 : (lastOrdinaryEnemyLine == 1 ? 4 : 1);
+            if (!isLocalPlayer) lastOrdinaryEnemyLine = randomIdx;
             string condition = $"{conditionBase}{randomIdx}";
             
             var entry = Managers.DialogueManager.Instance.GetDialogueEntry(condition);
-            if (entry == null)
-            {
-                entry = Managers.DialogueManager.Instance.GetDialogueEntry(conditionBase);
-                condition = conditionBase;
-            }
 
             if (entry != null && (!string.IsNullOrEmpty(entry.Dialogue1) || !string.IsNullOrEmpty(entry.Dialogue2)))
             {
@@ -142,22 +146,19 @@ namespace KillingMahjong.Managers
                     });
                 }
             }
-            else
-            {
-                reactionQueue.Enqueue(() => _currentReaction = StartCoroutine(ProcessLegacyDiscardEvent(tileId, isLocalPlayer, tileName)));
-                if (!isProcessingReactions)
-                {
-                    ProcessNextReaction();
-                }
-            }
+            // 対応する既存セリフが無い場合は、無関係な汎用発言で埋めない。
         }
 
         private void EnqueueFormattedCSVDialogueCore(string condition, string formatArg, bool clearPrevious = true, Action onComplete = null)
         {
+            float previous;
+            if (capturingDiscard && discardCsvTimes.TryGetValue(condition, out previous) && Time.unscaledTime - previous < 20f)
+                return;
             var entry = Managers.DialogueManager.Instance.GetDialogueEntry(condition);
             if (entry != null && (!string.IsNullOrEmpty(entry.Dialogue1) || !string.IsNullOrEmpty(entry.Dialogue2)))
             {
-                if (clearPrevious) ClearReactions();
+                if (capturingDiscard) discardCsvTimes[condition] = Time.unscaledTime;
+                if (clearPrevious && !capturingDiscard) ClearReactions();
 
                 if (!string.IsNullOrEmpty(entry.Dialogue1))
                 {
@@ -165,7 +166,7 @@ namespace KillingMahjong.Managers
                     string safeExpr = entry.Expression;
                     string safePose = entry.Pose;
                     bool isLast = string.IsNullOrEmpty(entry.Dialogue2);
-                    reactionQueue.Enqueue(() => _currentReaction = StartCoroutine(ProcessCSVDialogue(safeText1, safePose, safeExpr, isLast ? onComplete : null)));
+                    QueueContextual(() => ProcessCSVDialogue(safeText1, safePose, safeExpr, isLast ? onComplete : null), isLast ? onComplete : null);
                 }
 
                 if (!string.IsNullOrEmpty(entry.Dialogue2))
@@ -173,7 +174,7 @@ namespace KillingMahjong.Managers
                     string safeText2 = string.Format(entry.Dialogue2, formatArg);
                     string safeExpr = entry.Expression;
                     string safePose = entry.Pose;
-                    reactionQueue.Enqueue(() => _currentReaction = StartCoroutine(ProcessCSVDialogue(safeText2, safePose, safeExpr, onComplete)));
+                    QueueContextual(() => ProcessCSVDialogue(safeText2, safePose, safeExpr, onComplete), onComplete);
                 }
                 
                 if (!isProcessingReactions) ProcessNextReaction();
@@ -199,7 +200,7 @@ namespace KillingMahjong.Managers
             if (dialogueUI != null)
             {
                 dialogueUI.gameObject.SetActive(true);
-                dialogueUI.ShowText(text.Contains("「") ? text : $"「{text}」");
+                ShowReactionText(text);
             }
             if (enemyInfoUI != null)
             {

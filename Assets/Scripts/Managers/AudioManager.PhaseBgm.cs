@@ -95,9 +95,13 @@ namespace KillingMahjong.Managers
 
             // **チュートリアルの曲。** ここに載っていないと拍の時計が動かず、
             // 揺れ（`FloatingAnimator`）も音に合わせられない。
-            // `tut_lesson` は `km-docs/tools/compose.py` で作っていて、
-            // **135.00 ちょうど・1拍目がサンプル0**。実測ではなく設計値。
+            // `tut_lesson` は 2026-10-16 に作り直した（ピアノ・ドラムは SoundFont、
+            // ベースは `km-docs/tools/compose.py` の合成音。音の位置は全部拍ちょうど）。
+            // **135.00 ちょうど・1拍目がサンプル0・24小節**。実測ではなく設計値。
             { "tut_lesson",       new Tempo(135f, 4) },
+            // チュートリアルの対局のあいだに流す曲（2026-10-23 ユーザー採用、弦を控えめにした v2）。
+            // **144 BPM・4拍子・24小節・40 秒**。設計値。`tut_lesson` とはテンポが違うので重ねない
+            { "tut_lesson_battle", new Tempo(144f, 4) },
 
             // プランナー採用の2曲（2026-09-26）。**AudioManager.PairBgm.cs がここから拍を引く。**
             // 2本は同じ素材から書き出した同尺・同テンポ・同調で、それが重ねられる条件。
@@ -582,6 +586,10 @@ namespace KillingMahjong.Managers
         /// <summary>
         /// 台本の指示でBGMを差し替える。**小節頭を待たず、頭から鳴らす。**
         /// 曲ごとにテンポも長さも違うので、再生位置の引き継ぎはしない。
+        ///
+        /// **同じ曲がもう鳴っていれば何もしない（2026-10-23）。** 説明用と対局用の曲を行き来するので、
+        /// 同じ曲を指定し直すたびに頭出しすると、続いているはずの曲が途中で戻って聞こえる。
+        /// 止まっている（断ち切った後など）ときは頭から鳴らす。
         /// </summary>
         public void PlayTutorialBgm(string name)
         {
@@ -590,6 +598,7 @@ namespace KillingMahjong.Managers
 
             var clip = GetPhaseBgmClip(name);
             if (clip == null) return;
+            if (IsTutorialBgmPlaying(name)) return;
 
             if (bgmSwapCoroutine != null) { StopCoroutine(bgmSwapCoroutine); bgmSwapCoroutine = null; }
             currentPhaseBgmName = name;
@@ -601,6 +610,53 @@ namespace KillingMahjong.Managers
             bgmSource.timeSamples = 0;
             bgmSource.volume = BgmMaster;
             bgmSource.Play();
+        }
+
+        /// <summary>
+        /// チュートリアルの曲を**ゆっくり**入れ替える。いまの曲を <paramref name="fadeOutSeconds"/> かけて消し、
+        /// 次の曲を頭から <paramref name="fadeInSeconds"/> かけて上げる（2026-10-30 プランナー「ゆっくり遷移VERを見せて」）。
+        /// 同じ曲がもう鳴っていれば何もしない
+        /// </summary>
+        public void PlayTutorialBgmSlow(string name, float fadeOutSeconds, float fadeInSeconds)
+        {
+            if (!CanPlay) return;
+            if (bgmSource == null || string.IsNullOrEmpty(name)) return;
+            var clip = GetPhaseBgmClip(name);
+            if (clip == null || IsTutorialBgmPlaying(name)) return;
+            if (bgmSwapCoroutine != null) StopCoroutine(bgmSwapCoroutine);
+            bgmSwapCoroutine = StartCoroutine(SlowTutorialBgmSwap(name, clip, fadeOutSeconds, fadeInSeconds));
+        }
+
+        private IEnumerator SlowTutorialBgmSwap(string name, AudioClip clip, float fadeOutSeconds, float fadeInSeconds)
+        {
+            float from = bgmSource.isPlaying ? bgmSource.volume : 0f;
+            for (float t = 0f; t < fadeOutSeconds && from > 0f; t += Time.unscaledDeltaTime)
+            {
+                bgmSource.volume = Mathf.Lerp(from, 0f, t / fadeOutSeconds);
+                yield return null;
+            }
+            currentPhaseBgmName = name;
+            StopProposal3();
+            bgmSource.clip = clip;
+            bgmSource.loop = true;
+            bgmSource.timeSamples = 0;
+            bgmSource.volume = 0f;
+            bgmSource.Play();
+            for (float t = 0f; t < fadeInSeconds; t += Time.unscaledDeltaTime)
+            {
+                bgmSource.volume = Mathf.Lerp(0f, BgmMaster, t / fadeInSeconds);
+                yield return null;
+            }
+            bgmSource.volume = BgmMaster;
+            bgmSwapCoroutine = null;
+        }
+
+        /// <summary>チュートリアルの曲 <paramref name="name"/> がいま鳴っているか。</summary>
+        public bool IsTutorialBgmPlaying(string name)
+        {
+            if (bgmSource == null || string.IsNullOrEmpty(name) || currentPhaseBgmName != name) return false;
+            var clip = GetPhaseBgmClip(name);
+            return clip != null && bgmSource.clip == clip && bgmSource.isPlaying;
         }
 
         /// <summary>

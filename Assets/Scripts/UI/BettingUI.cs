@@ -32,9 +32,9 @@ namespace KillingMahjong.UI
         private string[] enemyDialogueLines = new string[]
         {
             "ふふっ、そんな麻雀で私に勝てるとでも？",
-            "ん〜？ どーしたのー？ 早く賭けなよぉ♡",
+            "ん～？ どーしたのー？ 早く賭けなよぉ♡",
             "震えてるよ？ 怖いの？",
-            "全額いっちゃう？ いっくわけないかぁ〜雑魚だもんね♡",
+            "全額いっちゃう？ いっくわけないかぁ～雑魚だもんね♡",
             "ざぁこ♡ ざぁこ♡ よわよわ雀士♡"
         };
         private DialogueUI dialogueUI;
@@ -66,11 +66,10 @@ namespace KillingMahjong.UI
         /// <summary>
         /// 賭け金テキストの中心からどれだけ下げるか。
         ///
-        /// **枠の下と Confirm の間はほとんど空いていない**（実測で 6.25 しかない）。
-        /// 単純に「枠の高さぶん下げる」と Confirm の裏に回って読めなくなるので、
-        /// 実機で合わせたこの値をそのまま持つ。
+        /// **2026-10-25 に中の配置を組み直して 20 → 36。** 確定を最下段へ下げて入力欄との間を空けたので、
+        /// 予想報酬は入力欄の下の外に出す（20 では入力欄の下半分に重なっていた）。
         /// </summary>
-        private const float RewardOffsetY = 20f;
+        private const float RewardOffsetY = 36f;
 
         /// <summary>行の高さ。賭け金と同じ 50 にすると文字が下に寄って Confirm に被る</summary>
         private const float RewardHeight = 20f;
@@ -303,7 +302,7 @@ namespace KillingMahjong.UI
 
             while (elapsed < duration)
             {
-                float progress = duration <= 0f ? 1f : elapsed / duration;
+                float progress = duration <= 0f ? 1f : PresentationTiming.Sample(elapsed) / duration;
                 float eased = progress * progress * (3f - 2f * progress);
                 hpBarPanel.anchoredPosition = Vector2.Lerp(startPos, targetPos, eased);
                 elapsed += Time.deltaTime;
@@ -356,6 +355,7 @@ namespace KillingMahjong.UI
             this.currentMoney = currentHp;
             this.currentBet = bettingUnit; // Reset bet to minimum
             this.onConfirmAction = onConfirm;
+            _outcomePreviewAllowed = true;   // チュートリアル用の入口（Fixed / Free）はこのあと下ろす
 
             if (confirmButton != null) confirmButton.interactable = true;
 
@@ -375,13 +375,11 @@ namespace KillingMahjong.UI
             gameObject.SetActive(true);
             ShowDimmer();
             UpdateUI();
+            var fx = EnsureStakeFx();
+            if (fx != null) fx.Begin(currentBet, currentMoney);
             StartPanelSlideIn();
             
-            // Start Auto Dialogue
-            if (dialogueUI != null && enemyDialogueLines.Length > 0)
-            {
-                autoDialogueCoroutine = StartCoroutine(AutoDialogueRoutine());
-            }
+            // スマホの操作中は相手を喋らせない。台本のセリフとログは DialogueUI 側で扱う。
         }
 
         /// <summary>矢印UIの誘導先として使う決定ボタンの RectTransform。</summary>
@@ -404,6 +402,8 @@ namespace KillingMahjong.UI
             }
 
             currentBet = Mathf.Max(0, fixedBet);
+            _outcomePreviewAllowed = false;
+            if (_stakeFx != null) _stakeFx.End();
 
             if (increaseBetButton != null) increaseBetButton.interactable = false;
             if (decreaseBetButton != null) decreaseBetButton.interactable = false;
@@ -423,11 +423,20 @@ namespace KillingMahjong.UI
         {
             ShowBettingPhase(initialHp, currentHp, 0, onConfirm);
 
+            // **チュートリアルでは持ち点を全部は賭けさせない**（2026-10-29 バグ報告「HPが5000の時に5000賭けられてしまう」）。
+            // 上限を「持ち点 − 1単位」に下げる。本編はサーバーの決まり（持ち点ちょうどまで賭けられる）のまま
+            int belowAll = (currentHp - 1) / bettingUnit * bettingUnit;
+            if (belowAll >= bettingUnit) maxBet = Mathf.Min(maxBet, belowAll);
+
             if (autoDialogueCoroutine != null)
             {
                 StopCoroutine(autoDialogueCoroutine);
                 autoDialogueCoroutine = null;
             }
+
+            _outcomePreviewAllowed = false;
+            if (_stakeFx != null) _stakeFx.End();
+            UpdateUI();
         }
 
         /// <summary>矢印UIの誘導先として使う「賭け金アップ」ボタンの RectTransform。</summary>
@@ -464,8 +473,20 @@ namespace KillingMahjong.UI
             ConfirmBet();
         }
 
+        /// <summary>
+        /// パネルを触れなくする（チュートリアルで、代わりに額を下げて決定するあいだ。2026-10-23）。
+        /// 切ったあとの `ForceSetBet` はボタンを灰色のままにし、`PressConfirm` はそのまま押せる
+        /// </summary>
+        public void LockInput()
+        {
+            LockBetButtons();
+            SetPanelInputEnabled(false);
+        }
+
         public void HideBettingPhase(bool immediate = false)
         {
+            if (_stakeFx != null) _stakeFx.End();
+
             if (autoDialogueCoroutine != null)
             {
                 StopCoroutine(autoDialogueCoroutine);
@@ -579,13 +600,19 @@ namespace KillingMahjong.UI
             //
             // 手牌決定ダイアログのランク表示（GameUIHandSelectionController）も
             // もともと `wait.han` と `wait.mangan_or_more` を見ているので、そちらに揃える。
+            //
+            // **倍率もサーバーの `multiplier` を使う**（2026-10-17）。役強化は飜数を上げずに
+            // 倍率の段を上げる方式になったので、飜数から倍率を引くと強化ぶんが抜ける
+            // （強化済みの4飜で、実際は1.5倍なのに1倍の額が出ていた）。
             int maxHan = 0;
+            float maxMultiplier = 0f;
             bool isManganOrMore = false;
             if (isTenpai)
             {
                 foreach (var wait in Managers.BoardStateManager.Instance.LocalWaitDataList)
                 {
                     if (wait.han > maxHan) maxHan = wait.han;
+                    if (wait.multiplier > maxMultiplier) maxMultiplier = wait.multiplier;
                     if (wait.mangan_or_more) isManganOrMore = true;
                 }
             }
@@ -597,20 +624,29 @@ namespace KillingMahjong.UI
                 currentBetText.text = currentBet.ToString();
             }
 
+            // 実際の精算と同じ計算を使う（端数処理が違うと表示と結果がずれる）。
+            // 古いサーバーで multiplier が来ないときだけ飜数から引く
+            // 演出コレクションには手牌が無いので、見本の倍率で上がれる手として見せる
+            if (!isTenpai && PreviewWinMultiplier > 0f)
+            {
+                isTenpai = isManganOrMore = true;
+                maxMultiplier = PreviewWinMultiplier;
+            }
+            bool canWin = isTenpai && isManganOrMore;
+            int reward = !canWin ? -1 : maxMultiplier > 0f
+                ? GameRules.CalculateWinnerGain(currentBet, maxMultiplier)
+                : GameRules.CalculateWinnerGain(currentBet, maxHan);
+            // 強襲を撃った局は、獲得が 0 になって同じ額が相手への追加ダメージに回る
+            var boardState = Managers.BoardStateManager.Instance;
+            bool assault = boardState != null && boardState.LocalAssaultUsedThisRound;
+
             var rewardText = EnsureExpectedRewardText();
             if (rewardText != null)
             {
-                if (isTenpai && isManganOrMore)
-                {
-                    // 実際の精算と同じ計算を使う（端数処理が違うと表示と結果がずれる）
-                    int reward = GameRules.CalculateWinnerGain(currentBet, maxHan);
-                    rewardText.text = $"予想報酬: {reward}";
-                }
-                else
-                {
-                    rewardText.text = "";
-                }
+                rewardText.text = !canWin ? "" : assault ? $"強襲ダメージ: +{reward}" : $"予想報酬: {reward}";
             }
+
+            UpdateOutcomePreview(reward, assault, maxMultiplier);
             
             // Disable buttons appropriately
             increaseBetButton.interactable = (currentBet + bettingUnit <= maxBet && currentBet + bettingUnit <= currentMoney);
@@ -624,11 +660,88 @@ namespace KillingMahjong.UI
             }
         }
 
+        /// <summary>
+        /// 「賭けたあとの血」の札（<see cref="BetOutcomePreviewUI"/>）を、いまの額に合わせる。
+        /// チュートリアルでは出さない（あちらは賭けた時点で血を引く精算で、本編と数字が合わないため。
+        /// 2026-10-17 の調査の問題3。精算をどちらに揃えるか決まったら出してよい）。
+        /// </summary>
+        private void UpdateOutcomePreview(int reward, bool assault, float multiplier)
+        {
+            // 血の演出（説明ではなく体で見せる方）。額を変えるたびに重さを渡す
+            var fx = EnsureStakeFx();
+            // 予想報酬の札を隠すチュートリアルでも、額と背景の血量は連動させる。
+            if (fx != null) fx.SetStake(currentBet, currentMoney);
+
+            if (_outcomePreview == null) _outcomePreview = BetOutcomePreviewUI.Ensure(PreviewParent(transform));
+            if (_outcomePreview == null) return;
+
+            // 説明の札は出さない（2026-10-17「説明口調すぎます。演出で見せて」）。
+            // 部品と計算は残してあるので、戻すなら ShowOutcomeCard を true にする
+            bool showCard = (ShowOutcomeCard || PreviewOutcomeCard) && _outcomePreviewAllowed;
+            _outcomePreview.gameObject.SetActive(showCard);
+            if (!showCard) return;
+
+            // 管のいちばん上 = いまの血（または初期の血）に、最大額で勝ったぶんを足した量
+            int top = Mathf.Max(initialMoney, currentMoney) + Mathf.RoundToInt(maxBet * Mathf.Max(1f, multiplier));
+            _outcomePreview.SetOutcome(currentMoney, currentBet, reward, assault, top);
+        }
+
+        /// <summary>札を置く親。スマホ型の枠（BettingPanel）の子にして、一緒に出入りさせる。</summary>
+        public static Transform PreviewParent(Transform bettingUiRoot)
+        {
+            var panel = SceneFirst.FindChild(bettingUiRoot, "BettingPanel");
+            return panel != null ? panel.transform : bettingUiRoot;
+        }
+
+        private BetOutcomePreviewUI _outcomePreview;
+        private bool _outcomePreviewAllowed = true;
+        private static readonly bool ShowOutcomeCard = false;
+
+        /// <summary>演出コレクションで没案の札を見せるときだけ立てる。</summary>
+        public static bool PreviewOutcomeCard;
+
+        /// <summary>演出コレクション用。0 より大きいと、手牌が無くてもこの倍率で上がれる手として扱う。</summary>
+        public static float PreviewWinMultiplier;
+
+        /// <summary>
+        /// 掛け金を自分で選ぶ本編と同じ形で開く（演出コレクション用）。煽りのセリフは止める。
+        /// </summary>
+        public void ShowPreviewBettingPhase(int hp)
+        {
+            ShowBettingPhase(hp, hp, 0, amount => { });
+            if (autoDialogueCoroutine != null) { StopCoroutine(autoDialogueCoroutine); autoDialogueCoroutine = null; }
+        }
+
+        private Effects.BetStakeFx _stakeFx;
+
+        /// <summary>
+        /// 血の演出の部品。賭け金の数字が載っている紺の枠（BetMoneyText の親）に血を溜め、
+        /// 揺らすのはパネルの中身（「角度調整」）。パネル自体は出入りのアニメーションが動かすので触らない。
+        /// </summary>
+        private Effects.BetStakeFx EnsureStakeFx()
+        {
+            if (_stakeFx != null) return _stakeFx;
+            if (currentBetText == null) return null;
+            var betBox = currentBetText.rectTransform.parent as RectTransform;
+            RectTransform shake = null;
+            for (Transform t = betBox; t != null && t != transform; t = t.parent)
+            {
+                if (t.parent == hpBarPanel) { shake = t as RectTransform; break; }
+            }
+            _stakeFx = Effects.BetStakeFx.Ensure(transform, betBox, shake);
+            return _stakeFx;
+        }
+
+        /// <summary>シーンに部品を置くとき（SceneFirstBaker）に呼ぶ。</summary>
+        public void EnsureStakeFxForEditor() => EnsureStakeFx();
+
         private void ConfirmBet()
         {
             // Lock UI
             LockBetButtons();
             SetPanelInputEnabled(false);
+
+            if (_stakeFx != null) _stakeFx.End();
 
             var audio = Managers.AudioManager.Instance;
             if (audio != null) audio.PlayBetConfirmSE();

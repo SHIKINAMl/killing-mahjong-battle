@@ -40,6 +40,7 @@ namespace KillingMahjong.UI
 
         private Vector3 _initialPosition;
         private float _phase;
+        private int presentationFrame = -1;
         private float _weight;      // 0=止まっている 1=跳ねている
         private float _hopHeight;
         private bool _measured;
@@ -83,6 +84,7 @@ namespace KillingMahjong.UI
             }
 
             _phase += Time.deltaTime * hopsPerSecond * Mathf.PI;
+            if (!PresentationTiming.IsNewFrame(ref presentationFrame, Time.time)) return;
             float hop = Mathf.Abs(Mathf.Sin(_phase)) * _hopHeight * _weight;
             transform.localPosition = _initialPosition + new Vector3(0f, hop, 0f);
         }

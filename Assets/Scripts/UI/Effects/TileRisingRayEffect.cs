@@ -194,7 +194,7 @@ namespace KillingMahjong.UI.Effects
             {
                 if (!_rays[i].Alive) continue;
 
-                float t = Mathf.Clamp01(_rays[i].Age / Mathf.Max(0.0001f, _rays[i].Life));
+                float t = Mathf.Clamp01(PresentationTiming.Sample(_rays[i].Age) / Mathf.Max(0.0001f, _rays[i].Life));
 
                 // **伸びきってから薄れる。** 伸びながら消すと、ただの明滅に見える。
                 float grow = t < GrowPortion

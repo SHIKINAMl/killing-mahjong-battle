@@ -103,6 +103,52 @@ namespace KillingMahjong.Managers
             return true;
         }
 
+        /// <summary>
+        /// 1拍目が曲の頭からずれている曲の拍（BPM, 1拍目の秒）。拍の表（Tempos）には載せていない曲
+        /// （「賭けの合図」。測った値は AudioManager.Drums.cs の BeatGrids と同じ）。
+        /// </summary>
+        private static readonly System.Collections.Generic.Dictionary<string, Vector2> OffsetBeatGrids =
+            new System.Collections.Generic.Dictionary<string, Vector2>
+        {
+            { "bgm_kake_1", new Vector2(135.10f, 0.283f) },
+            { "bgm_kake_2", new Vector2(134.25f, 0.152f) },
+        };
+
+        /// <summary>
+        /// いま何拍目か。<see cref="TryGetBeatPosition"/> に加えて、1拍目がずれている曲（賭けの合図）も数える
+        /// （2026-10-21、とくしゅの CPU 戦で女の子を拍に合わせて動かすため）。
+        /// ほかの演出の拍の扱いは変えないよう、別の口にしてある。
+        /// </summary>
+        public bool TryGetMusicBeat(out double beats)
+        {
+            if (TryGetBeatPosition(out beats)) return true;
+            var src = BeatClockSource;
+            if (src == null || src.clip == null) return false;
+            if (!OffsetBeatGrids.TryGetValue(src.clip.name, out Vector2 grid)) return false;
+            beats = (SmoothedTime(src) - grid.y) * grid.x / 60.0;
+            return true;
+        }
+
+        /// <summary>
+        /// 曲のドラムが入る拍（曲の頭から数えた拍）。それより前はイントロで、ドラムが無い（2026-10-21、波形を測った値）。
+        /// 賭けの合図 I は 9.0 秒（20拍目＝6小節目の頭）でキックが入る（7.5〜9 秒は盛り上がりの前振り）。
+        /// 賭けの合図 II は 5.75 秒からハイハット、6.0 秒（13拍目）でキックが入る。
+        /// </summary>
+        private static readonly System.Collections.Generic.Dictionary<string, double> GrooveStartBeats =
+            new System.Collections.Generic.Dictionary<string, double>
+        {
+            { "bgm_kake_1", 20.0 },
+            { "bgm_kake_2", 13.0 },
+        };
+
+        /// <summary>いま鳴っている曲のドラムが入る拍。分からない曲は 0（最初から入っている扱い）。</summary>
+        public double MusicGrooveStartBeat()
+        {
+            var src = BeatClockSource;
+            if (src == null || src.clip == null) return 0;
+            return GrooveStartBeats.TryGetValue(src.clip.name, out double beat) ? beat : 0;
+        }
+
         private int _beatCacheFrame = -1;
         private double _beatCacheValue;
         private bool _beatCacheOk;

@@ -76,23 +76,10 @@ namespace KillingMahjong.Managers
             synth.Prewarm(SynthWaveType.Sawtooth, SynthWaveType.Noise, true, 220f, 1760f, 0.28f);
             synth.Prewarm(SynthWaveType.Square, SynthWaveType.Noise, true, 1200f, 90f, 0.9f);
 
-            // 賭け金確定・回復
+            // 賭け金確定
             synth.Prewarm(SynthWaveType.Square, SynthWaveType.Sine, true, 523f, 1046f, 0.28f);
-            synth.Prewarm(SynthWaveType.Sine, SynthWaveType.Triangle, true, 440f, 1320f, 0.35f);
 
-            // ダメージ音・打撃音は残HP割合で周波数と長さが変わるので、代表的な5段を用意する。
-            // PlayDamageSE / PlayHitSE と同じ式で作ること（式を変えたらここも合わせる）。
-            for (int i = 0; i <= 4; i++)
-            {
-                float ratio = i * 0.25f;
-
-                float dmgStart = Mathf.Lerp(260f, 600f, ratio);
-                float dmgDuration = Mathf.Lerp(0.42f, 0.28f, ratio);
-                synth.Prewarm(SynthWaveType.Sawtooth, SynthWaveType.Noise, true, dmgStart, dmgStart * 0.25f, dmgDuration);
-
-                float hitStart = Mathf.Lerp(520f, 900f, ratio);
-                synth.Prewarm(SynthWaveType.Square, SynthWaveType.Noise, true, hitStart, hitStart * 0.35f, 0.22f);
-            }
+            // ダメージ音・打撃音・回復音は素材（Resources/Stingers）に替えたので、ここでは作らない（2026-10-19）
         }
 
     }

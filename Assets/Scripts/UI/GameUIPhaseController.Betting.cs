@@ -162,8 +162,7 @@ namespace KillingMahjong.UI
             if (!IsCurrentBettingTransition(transition) || transition.Stage != BettingStage.Playing) return;
             transition.Stage = BettingStage.Covered;
             uiManager.RunCoveredBoardUpdate(() => {
-                if (uiManager.RiverUI != null) uiManager.RiverUI.Clear();
-                if (uiManager.EnemyRiverUI != null) uiManager.EnemyRiverUI.Clear();
+                // 河は局頭のClearAllTilesで片付け済み。開始演出中に届いた打牌を残す。
                 if (uiManager.WaitUI != null) uiManager.WaitUI.gameObject.SetActive(false);
                 if (uiManager.CurrentPhaseStatus == RoundStatus.Betting) UpdatePhaseStatus(RoundStatus.Discard);
                 RefreshBettingBoard(includeEnemyHand: true);

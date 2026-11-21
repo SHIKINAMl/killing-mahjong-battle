@@ -82,12 +82,14 @@ namespace KillingMahjong.UI
 
         public void SetCharacterSprite(Sprite sprite)
         {
+            CancelDiscardAttention();
             // SetBodyPoseかSetFaceExpressionを本来は推奨するが、旧互換として残す
             CharacterVisualUtil.ApplyIfPresent(characterRenderer, sprite);
         }
 
         public void SetBodyPose(string poseId)
         {
+            CancelDiscardAttention();
             if (characterData == null || characterRenderer == null) return;
             if (CharacterVisualUtil.TryFindBodySprite(characterData, poseId, out var sprite))
             {
@@ -97,6 +99,7 @@ namespace KillingMahjong.UI
 
         public void SetFaceExpression(string expressionId)
         {
+            CancelDiscardAttention();
             if (characterData == null || faceRenderer == null) return;
             if (CharacterVisualUtil.TryFindFaceSprite(characterData, expressionId, out var sprite))
             {
@@ -117,8 +120,34 @@ namespace KillingMahjong.UI
             }
         }
 
+        /// <summary>
+        /// 立ち絵をスライムのように跳ねさせ続ける・止める（2026-10-21）。チュートリアルで牌を選んでいるあいだに使う。
+        /// 止めると、その瞬間に元の形・位置へ戻る（<see cref="SlimeBounceAnimator"/>）。
+        /// </summary>
+        public void SetIdleSlimeBounce(bool on)
+        {
+            CancelDiscardAttention();
+            SlimeBounceAnimator.Set(characterRenderer, on);
+        }
+
+        /// <summary>
+        /// 曲の拍に合わせた動き（弾み・左右の揺れ・目を閉じた笑顔との切り替え）を始める・止める（2026-10-21、お試し。
+        /// 2026-10-22 に没案にしたので、いまは演出コレクションからだけ呼ぶ）。
+        /// <see cref="BeatDanceAnimator"/>。止めると位置と顔を元に戻す。
+        /// リアクションの顔を出している間は、笑顔に替えない（気分の違う顔が交互に出て、表情がころころ変わって見えた）。
+        /// </summary>
+        public void SetBeatDance(BeatDanceAnimator.Mode mode)
+        {
+            CancelDiscardAttention();
+            // 拍に合わせて動いているあいだは、まばたきを止める（拍と関係なく目を閉じた絵が混ざって、拍が崩れて見えた）
+            suppressBlink = mode != BeatDanceAnimator.Mode.None;
+            BeatDanceAnimator.Set(characterRenderer, faceRenderer, mode,
+                () => reactionCoroutine == null && faceRenderer != null && faceRenderer.sprite == normalFaceSprite);
+        }
+
         public void PlayBounceAnimation(float duration = 0.5f)
         {
+            CancelDiscardAttention();
             if (characterRenderer == null) return;
             if (bounceCoroutine != null) StopCoroutine(bounceCoroutine);
             // 引数で渡されたduration（例: 5秒）に関わらず、インスペクターで設定した時間で一瞬跳ねる
@@ -134,7 +163,7 @@ namespace KillingMahjong.UI
             while (elapsed < durationToBounce)
             {
                 elapsed += Time.deltaTime;
-                float yOffset = Mathf.Sin(elapsed * bounceSpeed) * bounceHeight;
+                float yOffset = Mathf.Sin(PresentationTiming.Sample(elapsed) * bounceSpeed) * bounceHeight;
                 characterRenderer.transform.localPosition = originalPosition + new Vector3(0, yOffset, 0);
                 yield return null;
             }

@@ -45,6 +45,7 @@ namespace KillingMahjong.UI.Effects
         private Image _blood;
         private Image _neon;
         private float _phase;
+        private int presentationFrame = -1;
 
         /// <summary>
         /// <paramref name="blood"/> の上に蛍光色の光を足す。二重に呼んでも増えない。
@@ -110,6 +111,7 @@ namespace KillingMahjong.UI.Effects
             SyncShape();
 
             _phase += Time.deltaTime * PulsePerSecond * Mathf.PI * 2f;
+            if (!PresentationTiming.IsNewFrame(ref presentationFrame, Time.time)) return;
             float t = (Mathf.Sin(_phase) + 1f) * 0.5f;
             ApplyPower(Mathf.Lerp(PowerMin, PowerMax, t));
         }

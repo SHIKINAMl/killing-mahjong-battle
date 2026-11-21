@@ -49,6 +49,7 @@ namespace KillingMahjong.UI
                 RankName = rankName,
                 TotalHan = liq.han,
                 Multiplier = liq.multiplier,
+                VoltageMultiplier = liq.voltage_multiplier,
                 CarryRounds = liq.carry_over_draw_count + 1,
                 IsTankiWait = liq.is_tanki_wait,
                 AssaultApplied = liq.assault_applied,
@@ -103,7 +104,12 @@ namespace KillingMahjong.UI
                 int baseHan = KillingMahjong.GameRules.GetBaseHan(e.BaseName);
                 if (baseHan < 0) allKnown = false;
 
-                int rowHan = (Mathf.Max(baseHan, 0) + e.Boost) * e.Count;
+                // **役強化は翻を足さない。** サーバーでは強化は翻数ではなく精算の段階を上げる
+                // （mahjong_engine/engine/game_engine.py の _calc_agari_han / promoted_tier）。
+                // 強化ぶんを翻に足していたため合計がサーバーの han と合わず、強化した役があると
+                // 役ごとの翻がすべて伏せられていた（2026-10-25 のユーザー指摘「清算の時、役の翻が表示されないときがある」）。
+                // 強化は「+1」の列に別に出す
+                int rowHan = Mathf.Max(baseHan, 0) * e.Count;
                 rowSum += rowHan;
 
                 // 最後の枠は「他N役」に使うので、あふれると分かった時点で畳む
@@ -189,7 +195,10 @@ namespace KillingMahjong.UI
             string mult = liq.multiplier.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
 
             // 答えもサーバーの winner_gain をそのまま置く。掛け算し直さない
-            return $"{liq.winner_bet} × {mult} = {liq.winner_gain}";
+            string voltage = liq.voltage_multiplier > 0f
+                ? " × " + liq.voltage_multiplier.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)
+                : "";
+            return $"{liq.winner_bet} × {mult}{voltage} = {liq.winner_gain}";
         }
     }
 }

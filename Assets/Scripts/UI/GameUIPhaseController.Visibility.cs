@@ -207,22 +207,12 @@ namespace KillingMahjong.UI
         {
             if (uiManager.DoraDisplayUI == null) return;
 
-            // チュートリアルではドラ表示牌を扱わないので常に隠す
-            if (uiManager.IsTutorialMode)
-            {
-                uiManager.DoraDisplayUI.Hide();
-                return;
-            }
-
-            int doraId = Managers.BoardStateManager.Instance.CurrentDoraId;
-            if (doraId >= 0)
-            {
-                uiManager.DoraDisplayUI.ShowDora(doraId);
-            }
-            else
-            {
-                uiManager.DoraDisplayUI.Hide();
-            }
+            // **ドラの牌の表示（左の壁ぎわの「ドラ」と光る牌）は出さない（2026-10-25）。**
+            // 部屋の中（3D）に置かれていて手前の UI にたびたび隠れ、牌も小さくて分かりにくかった。
+            // プランナーの判断で「表示は消してよい。ドラはいまあるエフェクトで示すだけ」。
+            // ドラは、手牌・山の牌そのものに付く光（DoraShine。TileVisual.SetTile が付ける）で示す。
+            // 戻すときは、ここで BoardStateManager.CurrentDoraId を ShowDora に渡せばよい
+            uiManager.DoraDisplayUI.Hide();
         }
 
         public void SetMatchUIVisibility(bool visible)

@@ -1,0 +1,15 @@
+{
+  "name": "cutin-pixel-art",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate": "node generate.mjs",
+    "verify": "node verify.mjs",
+    "skill": "node skill.mjs",
+    "settlement": "node settlement.mjs"
+  },
+  "dependencies": {
+    "image-to-pixel": "3.1.0",
+    "pngjs": "7.0.0"
+  }
+}

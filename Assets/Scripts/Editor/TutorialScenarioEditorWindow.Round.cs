@@ -31,8 +31,9 @@ namespace KillingMahjong.EditorTools
             EditorGUILayout.Space();
 
             bool endOn = _roundIndex == -1;
-            int endCount = _asset.endingLines == null ? 0 : _asset.endingLines.Count;
-            if (GUILayout.Toggle(endOn, "全局終了後  (" + endCount + ")", "Button") != endOn)
+            var revival = _asset.revival;
+            int endCount = revival == null ? 0 : revival.enemyLines.Count + revival.monologueLines.Count + revival.beruruLines.Count;
+            if (GUILayout.Toggle(endOn, "敗北から復活  (" + endCount + ")", "Button") != endOn)
             {
                 _roundIndex = -1;
                 GUI.FocusControl(null);
@@ -69,10 +70,14 @@ namespace KillingMahjong.EditorTools
 
             if (_roundIndex == -1)
             {
-                EditorGUILayout.LabelField("全局終了後", EditorStyles.boldLabel);
-                if (_asset.endingLines == null) _asset.endingLines = new List<TutorialLine>();
-                DrawLineList("ending", "エンディング", "すべての局が終わったあと。このあとタイトルへ戻る",
-                    _asset.endingLines, v => _asset.endingLines = v);
+                EditorGUILayout.LabelField("敗北から復活", EditorStyles.boldLabel);
+                if (_asset.revival == null) _asset.revival = new TutorialRevivalData();
+                DrawLineList("revival.enemyLines", "敗北後の会話", "正体の会話とロンの後に表示",
+                    _asset.revival.enemyLines, v => _asset.revival.enemyLines = v);
+                DrawLineList("revival.monologueLines", "主人公のモノローグ", "暗転後、ベルが現れるまで",
+                    _asset.revival.monologueLines, v => _asset.revival.monologueLines = v);
+                DrawLineList("revival.beruruLines", "復活後の会話", "復活演出の後、対局選択へ移るまで",
+                    _asset.revival.beruruLines, v => _asset.revival.beruruLines = v);
                 EditorGUILayout.EndScrollView();
                 EditorGUILayout.EndVertical();
                 return;
