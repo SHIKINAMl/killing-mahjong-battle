@@ -79,7 +79,10 @@ namespace KillingMahjong.UI.Effects
 
             Shader.SetGlobalVector(LightPosId, pos);
             Shader.SetGlobalVector(LightParamsId, prm);
-            Shader.SetGlobalColor(LightColorId, color);
+            // 色はリニアの値にして渡す（Pixel Art Lighter と同じ。ツールは light = linear(Light Color)）。
+            // SetGlobalColor のままだと赤い光の緑・青が 0.3 前後で掛かり、赤い光なのに白っぽくなった（2026-11-21、メインメニュー）。
+            // 白い光（対局画面）はどちらでも同じ値なので見た目は変わらない
+            Shader.SetGlobalVector(LightColorId, (Vector4)color.linear);
         }
     }
 }

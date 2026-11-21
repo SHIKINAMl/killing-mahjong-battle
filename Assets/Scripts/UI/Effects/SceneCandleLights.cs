@@ -61,7 +61,7 @@ namespace KillingMahjong.UI.Effects
                 var p = candles[i].position;
                 _pos[i] = new Vector4(p.x, p.y, height, 1f);
                 _params[i] = new Vector4(0f, intensity * f, radius, 0f);
-                _color[i] = color;
+                _color[i] = color.linear;   // ツールと同じくリニアの値で掛ける（SceneLight と同じ）
             }
             Shader.SetGlobalVectorArray(PosId, _pos);
             Shader.SetGlobalVectorArray(ParamsId, _params);
