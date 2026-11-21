@@ -152,7 +152,7 @@ namespace KillingMahjong.UI
             CreateHeading(_friendPanel.transform, "フレンドマッチ", ItemHeight * 2f);
             CreateMenuItem(_friendPanel.transform, "部屋を作る", ItemHeight * 0.9f, OnPrivateCreateSelected);
             CreateMenuItem(_friendPanel.transform, "あいことばで入る", -ItemHeight * 0.2f, ShowPasswordPanel);
-            CreateMenuItem(_friendPanel.transform, "もどる", -ItemHeight * 2.1f, ShowModePanel);
+            CreateMenuItem(_friendPanel.transform, "もどる", -ItemHeight * 2.1f, BackFromFriendPanel);
 
             _friendPanel.SetActive(false);
         }

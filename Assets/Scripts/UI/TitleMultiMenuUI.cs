@@ -76,9 +76,33 @@ namespace KillingMahjong.UI
             if (_root == null) Build();
             if (_root == null) return;
 
+            _friendOnly = false;
             SetTruthNameHookVisible(false);
             _root.SetActive(true);
             ShowModePanel();
+        }
+
+        /// <summary>
+        /// 友達との対局の入口（部屋を作る／あいことばで入る）だけを出す。
+        /// メインメニュー（<see cref="MainMenuUI"/>、2026-11-21）は電話の絵が「よび出した友達と」の入口なので、
+        /// 野良・フレンド・CPU を選ぶ最初の画面は飛ばす。「もどる」で閉じる。
+        /// </summary>
+        public void OpenFriend(Action<MatchJoinMode> onDecided, Action onClosed = null)
+        {
+            Open(onDecided, onClosed);
+            if (_root == null) return;
+            _friendOnly = true;
+            ShowFriendPanel();
+        }
+
+        /// <summary><see cref="OpenFriend"/> で開いたか（そのときは最初の画面へ戻さず閉じる）。</summary>
+        private bool _friendOnly;
+
+        private void BackFromFriendPanel()
+        {
+            if (_isCheckingRoom) return;
+            if (_friendOnly) Close();
+            else ShowModePanel();
         }
 
         public void Close()
