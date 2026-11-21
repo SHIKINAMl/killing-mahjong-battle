@@ -19,6 +19,8 @@ Shader "KM/LitArt"
         _MaxLight ("Max Brightness (multiplier)", Range(0.5,10)) = 10
         // 上からの補助光（SceneFillLight）の受け方。0 で受けない。いまは卓だけ 1
         _FillScale ("Fill Light Scale", Range(0,2)) = 0
+        // ろうそくの小さな光（SceneCandleLights）の受け方。場面に置いていなければ何も起きない
+        _CandleScale ("Candle Light Scale", Range(0,2)) = 1
 
         _StencilComp ("Stencil Comparison", Float) = 8
         _Stencil ("Stencil ID", Float) = 0
@@ -99,6 +101,13 @@ Shader "KM/LitArt"
             float4 _KMFillParams;
             float4 _KMFillColor;
 
+            // SceneCandleLights が渡す値（絵の中のろうそく。最大4つ）。並びは _KMLight* と同じ
+            float _KMCandleCount;
+            float4 _KMCandlePos[4];
+            float4 _KMCandleParams[4];
+            float4 _KMCandleColor[4];
+            float _CandleScale;
+
             // Pixel Art Lighter と同じ、1灯ぶんの光の当たり方（遠くの明るさは含まない）
             float3 DirectLight(float3 n, float2 uv, float4 pos, float4 prm, float4 col, float aspect)
             {
@@ -148,6 +157,11 @@ Shader "KM/LitArt"
                 float3 light = _KMLightParams.x + _DirectScale * DirectLight(n, uv, _KMLightPos, _KMLightParams, _KMLightColor, aspect);
                 if (_KMFillPos.w > 0.5 && _FillScale > 0)
                     light += _FillScale * DirectLight(n, uv, _KMFillPos, _KMFillParams, _KMFillColor, aspect);
+                for (int ci = 0; ci < 4; ci++)
+                {
+                    if (ci < _KMCandleCount)
+                        light += _CandleScale * DirectLight(n, uv, _KMCandlePos[ci], _KMCandleParams[ci], _KMCandleColor[ci], aspect);
+                }
                 light = min(light, _MaxLight);
                 albedo.rgb *= light;
                 return albedo;
