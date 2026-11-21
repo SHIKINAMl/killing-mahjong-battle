@@ -25,7 +25,13 @@ namespace KillingMahjong.UI
     ///   0.00s  字がその場でフェードイン（0.2秒）。同時に、字の下の UI が薄くなる
     ///   1.05s  字が消え始め（0.25秒）、薄くした UI も戻る
     ///
-    /// 縁の明るさは、ろうそく（<see cref="Effects.SceneLight"/>）のちらつきに合わせて少し揺らす。
+    /// **字にはろうそく（<see cref="Effects.SceneLight"/>）の光を当てる（2026-11-21「この即席満貫の文字には光を当てて、
+    /// いい感じの影を作ってほしい」）。** 字ごとに3枚重ねる:
+    ///   ・影: 光と反対側へずらした、ぼかした暗い縁（光から遠いほど長い）
+    ///   ・地: 少し暗い象牙色の縁（光の当たらない側）
+    ///   ・光: 明るい縁を、光の来る側だけ柔らかく切り抜いて重ねる（RectMask2D のぼかし）
+    /// 光の向き・影のずれ・明るさは毎フレーム光の位置とちらつきから決めるので、炎が揺れると一緒に揺れる。
+    /// 場面に光が無いとき（チュートリアルなど）は、画面の上の中央から照らしているものとして描く。
     /// **全長は前と同じ約1.3秒。** この表示は手牌を1枚入れ替えるたびに出るので、長くすると待たされる。
     ///
     /// **出ている最中にもう一度呼ばれたら、前の表示をフェードアウトで消してから新しく出す**
@@ -87,10 +93,35 @@ namespace KillingMahjong.UI
         private const float MaxDimWidthRatio = 0.8f;
 
         private CanvasGroup _group;
-        private TextMeshProUGUI _left;
-        private TextMeshProUGUI _right;
-        private Material _leftMaterial;
-        private Material _rightMaterial;
+        /// <summary>1文字ぶん。奥から 影・地・光（切り抜き枠の中）。</summary>
+        private class Glyph
+        {
+            public RectTransform Root;
+            public TextMeshProUGUI Shadow, Base, Lit;
+            public Material ShadowMat, BaseMat, LitMat;
+            public RectTransform LitMask;
+        }
+
+        private Glyph _leftGlyph;
+        private Glyph _rightGlyph;
+        private TextMeshProUGUI _left => _leftGlyph.Base;
+        private TextMeshProUGUI _right => _rightGlyph.Base;
+
+        /// <summary>光の当たらない側の縁の明るさ（象牙色に掛ける）。</summary>
+        private const float ShadeSide = 0.45f;
+        /// <summary>光の当たる側の縁の色（ろうそくの暖かい白）。</summary>
+        private static readonly Color LitColor = new Color(1f, 0.97f, 0.86f, 1f);
+        /// <summary>影の色と濃さ。</summary>
+        private static readonly Color ShadowColor = new Color(0.06f, 0f, 0.02f, 1f);
+        private const float ShadowOpacity = 0.9f;
+        /// <summary>影のずれの長さ（800x600 基準）。光から遠い字ほど伸ばす。</summary>
+        private const float ShadowLength = 20f;
+        /// <summary>影のぼかし（TMP の縁のやわらかさ）。</summary>
+        private const float ShadowSoftness = 0.35f;
+        private const float ShadowOutlineWidth = 0.32f;
+        /// <summary>光の切り抜きを光の側へずらす量と、境目のぼかし（文字の高さに対する割合）。</summary>
+        private const float LitShift = 0.42f;
+        private const float LitSoftness = 0.55f;
         private Coroutine _routine;
 
         /// <summary>薄くした UI と、薄くする前の濃さ。</summary>
@@ -131,17 +162,55 @@ namespace KillingMahjong.UI
             _group.interactable = false;
 
             var font = Resources.Load<TMP_FontAsset>("PixelMplus10_DynamicFixed");
-            _left = BuildLabel("Left", -GlyphOffsetX, font, out _leftMaterial);
-            _right = BuildLabel("Right", GlyphOffsetX, font, out _rightMaterial);
+            _leftGlyph = BuildGlyph("Left", -GlyphOffsetX, font);
+            _rightGlyph = BuildGlyph("Right", GlyphOffsetX, font);
         }
 
-        private TextMeshProUGUI BuildLabel(string name, float offsetX, TMP_FontAsset font, out Material material)
+        private Glyph BuildGlyph(string name, float offsetX, TMP_FontAsset font)
+        {
+            float box = GlyphSize * 1.4f;
+            var root = NewRect(name, transform);
+            root.anchorMin = root.anchorMax = root.pivot = new Vector2(0.5f, 0.5f);
+            root.anchoredPosition = new Vector2(offsetX, GlyphCenterY);
+            root.sizeDelta = new Vector2(box, box);
+
+            var g = new Glyph { Root = root };
+            g.Shadow = BuildLabel("Shadow", root, font, out g.ShadowMat);
+            g.Base = BuildLabel("Base", root, font, out g.BaseMat);
+
+            // 光は、光の側へずらした枠（ぼかし付き）で切り抜く。字は枠と逆へずらして元の位置に留める
+            g.LitMask = NewRect("LitMask", root);
+            g.LitMask.anchorMin = g.LitMask.anchorMax = g.LitMask.pivot = new Vector2(0.5f, 0.5f);
+            g.LitMask.sizeDelta = new Vector2(box, box);
+            var mask = g.LitMask.gameObject.AddComponent<RectMask2D>();
+            int soft = Mathf.RoundToInt(GlyphSize * LitSoftness);
+            mask.softness = new Vector2Int(soft, soft);
+            g.Lit = BuildLabel("Lit", g.LitMask, font, out g.LitMat);
+
+            if (g.ShadowMat != null)
+            {
+                // 影は縁より少し太く、ぼかす（細いままだと字の縁に隠れて見えない）
+                g.ShadowMat.SetFloat(ShaderUtilities.ID_OutlineWidth, ShadowOutlineWidth);
+                g.ShadowMat.SetFloat(ShaderUtilities.ID_OutlineSoftness, ShadowSoftness);
+            }
+            g.Shadow.UpdateMeshPadding();
+            return g;
+        }
+
+        private static RectTransform NewRect(string name, Transform parent)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            return (RectTransform)go.transform;
+        }
+
+        private TextMeshProUGUI BuildLabel(string name, Transform parent, TMP_FontAsset font, out Material material)
         {
             var go = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
-            go.transform.SetParent(transform, false);
+            go.transform.SetParent(parent, false);
             var rect = (RectTransform)go.transform;
             rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = new Vector2(offsetX, GlyphCenterY);
+            rect.anchoredPosition = Vector2.zero;
             rect.sizeDelta = new Vector2(GlyphSize * 1.4f, GlyphSize * 1.4f);
 
             var label = go.GetComponent<TextMeshProUGUI>();
@@ -206,10 +275,9 @@ namespace KillingMahjong.UI
             }
 
             int half = Mathf.Max(1, rankName.Length / 2);
-            _left.text = rankName.Substring(0, half);
-            _right.text = half < rankName.Length ? rankName.Substring(half) : string.Empty;
-            _left.ForceMeshUpdate();
-            _right.ForceMeshUpdate();
+            SetGlyphText(_leftGlyph, rankName.Substring(0, half));
+            SetGlyphText(_rightGlyph, half < rankName.Length ? rankName.Substring(half) : string.Empty);
+            ApplyLighting();
 
             // 字と重なっている UI を探して、字と一緒に薄くする
             CollectCovered();
@@ -233,6 +301,57 @@ namespace KillingMahjong.UI
 
             RestoreDimmed();
             _routine = null;
+        }
+
+        private static void SetGlyphText(Glyph g, string text)
+        {
+            g.Shadow.text = g.Base.text = g.Lit.text = text;
+            g.Shadow.ForceMeshUpdate();
+            g.Base.ForceMeshUpdate();
+            g.Lit.ForceMeshUpdate();
+        }
+
+        /// <summary>
+        /// 光を当てる。光の位置（画面の px）から、字ごとに光の向き・影のずれ・明るさを決める。
+        /// </summary>
+        private void ApplyLighting()
+        {
+            var light = KillingMahjong.UI.Effects.SceneLight.Current;
+            bool hasLight = light != null && light.isActiveAndEnabled;
+            Vector2 lightScreen = hasLight ? light.ScreenPosition : new Vector2(Screen.width * 0.5f, Screen.height * 0.8f);
+            float flicker = hasLight ? light.ShadowFlicker : 1f;
+            // ShadowFlicker は 1 の前後に数%揺れる。縁はそれより少し大きめに揺らして、炎に照らされて見えるようにする
+            float k = Mathf.Clamp(0.94f + (flicker - 1f) * 1.5f, 0.82f, 1.06f);
+
+            var root = (RectTransform)transform;
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(root, lightScreen, null, out Vector2 lightLocal)) return;
+            LightGlyph(_leftGlyph, lightLocal, k, flicker);
+            LightGlyph(_rightGlyph, lightLocal, k, flicker);
+        }
+
+        private static void LightGlyph(Glyph g, Vector2 lightLocal, float k, float flicker)
+        {
+            Vector2 center = g.Root.anchoredPosition;
+            Vector2 toLight = lightLocal - center;
+            float dist = toLight.magnitude;
+            Vector2 dir = dist > 1e-3f ? toLight / dist : Vector2.up;
+
+            // 光: 枠を光の側へずらし、字は逆へずらして元の位置に留める
+            Vector2 shift = dir * GlyphSize * LitShift;
+            g.LitMask.anchoredPosition = shift;
+            g.Lit.rectTransform.anchoredPosition = -shift;
+
+            // 影: 光と反対へ。光から遠い字ほど少し長く（LitArtDropShadow と同じ考え方）
+            float stretch = Mathf.Clamp(dist / 300f, 0.7f, 1.6f);
+            Vector2 off = -dir * ShadowLength * stretch;
+            g.Shadow.rectTransform.anchoredPosition = new Vector2(Mathf.Round(off.x), Mathf.Round(off.y));
+
+            var shade = BoneColor * ShadeSide * k; shade.a = 1f;
+            var lit = LitColor * k; lit.a = 1f;
+            var sh = ShadowColor; sh.a = ShadowOpacity * Mathf.Clamp01(flicker);
+            if (g.BaseMat != null) g.BaseMat.SetColor(ShaderUtilities.ID_OutlineColor, shade);
+            if (g.LitMat != null) g.LitMat.SetColor(ShaderUtilities.ID_OutlineColor, lit);
+            if (g.ShadowMat != null) g.ShadowMat.SetColor(ShaderUtilities.ID_OutlineColor, sh);
         }
 
         /// <summary>
@@ -308,17 +427,7 @@ namespace KillingMahjong.UI
         {
             if (_group == null) return;
 
-            if (_group.alpha > 0f)
-            {
-                var light = KillingMahjong.UI.Effects.SceneLight.Current;
-                float flicker = light != null && light.isActiveAndEnabled ? light.ShadowFlicker : 1f;
-                // ShadowFlicker は 1 の前後に数%揺れる。縁はそれより少し大きめに揺らして、炎に照らされて見えるようにする
-                float k = Mathf.Clamp(0.94f + (flicker - 1f) * 1.5f, 0.82f, 1f);
-                var c = BoneColor * k;
-                c.a = 1f;
-                if (_leftMaterial != null) _leftMaterial.SetColor(ShaderUtilities.ID_OutlineColor, c);
-                if (_rightMaterial != null) _rightMaterial.SetColor(ShaderUtilities.ID_OutlineColor, c);
-            }
+            if (_group.alpha > 0f) ApplyLighting();
 
             if (_routine != null || _group.alpha <= 0f)
             {
