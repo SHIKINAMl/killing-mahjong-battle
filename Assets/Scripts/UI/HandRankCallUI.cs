@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using KillingMahjong.Common;
 using TMPro;
 using UnityEngine;
@@ -11,27 +12,21 @@ namespace KillingMahjong.UI
     ///
     /// 手牌を13枚そろえた時点で、その手が満貫以上になり得るなら、
     /// 届きうる中で**いちばん上の格**（満貫／跳満／倍満／役満）を画面へ一瞬出す。
+    /// 役名はどれも2文字なので、1文字目を左・2文字目を右に置く。
     ///
-    /// **出し方は参考映像の演出を写した**（2026-09-29 のユーザー指示）。
-    /// 役名はどれも2文字なので、1文字目を左・2文字目を右に置き、
-    /// **特大から縮んで定位置に着弾**させ、着いた瞬間に白く光らせる。
+    /// **見せ方（2026-11-21 に作り直し）。**
+    /// 前は白く塗りつぶした特大の字＋画面全体の白い光で、点滴の袋・役一覧・セリフに
+    /// 白いかたまりが被さり「ごちゃごちゃした印象」と言われた。暗幕で周りを落とす案は
+    /// 「画面を暗くするというより表現をうまくして」と退けられ、**縁だけの字（中を透かす）**が選ばれた。
+    /// そこから、このゲームになじむように次の形にした。
     ///
-    /// 参考動画（ユーザー提供・30fps）から測った元の構成:
+    ///   0.00s  象牙色の縁だけの字が、少し大きめ（1.7倍）から縮んで着く
+    ///   0.28s  着弾。字の中が血の赤で満ち、縁が白く光る（画面全体は光らせない）。字の下から血が数滴たれる
+    ///   〜0.85s 血が下へ抜けて、縁だけが残る
+    ///   1.05s  消え始める（0.25秒）
     ///
-    ///   0.00s  1文字目が左から特大で出る
-    ///   0.55s  縮んで着弾
-    ///   0.60s  白フラッシュ（2コマ・画面の88%が白）／2文字目が右から出る
-    ///   1.23s  2文字目が着弾
-    ///   1.30s  白フラッシュ（1コマ・94%）
-    ///   1.37s  1.5秒ほど静止
-    ///
-    /// **そのままの尺（約3秒）では使えない。** この表示は手牌を1枚入れ替えるたびに
-    /// 出るので、3秒の演出が毎回入ると牌を選び直すのが待たされる。
-    /// ユーザーの指示で**左右を同時に入れて全長1.3秒**へ詰めてある。
-    /// 元の「片方ずつ・2回光る」に戻したくなったら <see cref="SlamSeconds"/> 付近を見ること。
-    ///
-    /// **文字は画面高の35%**。参考動画は50%だが、そのままだと手牌と山牌が隠れて
-    /// 牌が選べなくなる（この表示は手牌選択中に出る）。
+    /// 縁の明るさは、ろうそく（<see cref="Effects.SceneLight"/>）のちらつきに合わせて少し揺らす。
+    /// **全長は前と同じ約1.3秒。** この表示は手牌を1枚入れ替えるたびに出るので、長くすると待たされる。
     ///
     /// **出ている最中にもう一度呼ばれたら、前の表示をフェードアウトで消してから新しく出す**
     /// （フロー図の「if既に役名表示が出ているか → YES → 前の役名表示がフェードアウトで消える」）。
@@ -40,14 +35,20 @@ namespace KillingMahjong.UI
     /// </summary>
     public class HandRankCallUI : MonoBehaviour
     {
-        /// <summary>特大から定位置まで縮む時間。参考動画の 0.55 秒を詰めた値。</summary>
-        private const float SlamSeconds = 0.40f;
+        /// <summary>少し大きめから定位置まで縮む時間。</summary>
+        private const float SlamSeconds = 0.28f;
 
-        /// <summary>出はじめの大きさ（定位置に対する倍率）。画面からはみ出す大きさにする。</summary>
-        private const float SlamStartScale = 2.6f;
+        /// <summary>出はじめの大きさ（定位置に対する倍率）。前の 2.6 は画面からはみ出して周りを覆っていた。</summary>
+        private const float SlamStartScale = 1.7f;
 
-        /// <summary>着弾してから消え始めるまで。</summary>
-        private const float HoldSeconds = 0.90f;
+        /// <summary>着弾してから血が抜け始めるまで（満ちた赤を一瞬見せる）。</summary>
+        private const float FillHoldSeconds = 0.08f;
+
+        /// <summary>血が下へ抜けきるまで。</summary>
+        private const float DrainSeconds = 0.5f;
+
+        /// <summary>着弾してから消え始めるまで（血が抜ける時間を含む）。</summary>
+        private const float HoldSeconds = 0.77f;
 
         /// <summary>消えるまで。</summary>
         private const float FadeOutSeconds = 0.25f;
@@ -55,27 +56,14 @@ namespace KillingMahjong.UI
         /// <summary>差し替えのときに前の表示を消す時間。待たせすぎないよう短くする。</summary>
         private const float ReplaceFadeSeconds = 0.15f;
 
-        /// <summary>
-        /// 着弾の白フラッシュ。参考動画では**2コマだけほぼ真っ白**（画面の88%が235以上）で、
-        /// そのあと4コマほどかけて戻っていた。30fps の2コマ＝0.067秒。
-        /// </summary>
-        private const float FlashHoldSeconds = 0.067f;
-        private const float FlashFadeSeconds = 0.13f;
-        /// <summary>
-        /// **0.9 では文字まで白に溶ける。** 参考動画では光っている最中も
-        /// 「無」「罪」がはっきり読めたままだった。黒縁を付けたうえで 0.78 に抑える。
-        /// </summary>
-        private const float FlashPeakAlpha = 0.78f;
+        /// <summary>着弾で縁が白く光ってから象牙色へ戻るまで。</summary>
+        private const float GlintSeconds = 0.22f;
 
         /// <summary>
-        /// 黒縁の太さ。
-        ///
-        /// **0.35 では字が潰れる（2026-09-29 に録画で確認）。**
-        /// 参考動画の文字は縁が太いが、あちらは線の太い明朝体。
-        /// こちらは `PixelMplus10` で、10px の字を21倍に伸ばしているため線が細く、
-        /// 0.35 だと縁どうしがくっついて「役」「満」が塗りつぶれた塊になっていた。
+        /// 縁の太さ。字は `PixelMplus10` の 10px を21倍に伸ばしているので線が細く、
+        /// 太くしすぎると縁どうしがくっついて「満」の中が埋まる（0.35 で潰れた、2026-09-29）。
         /// </summary>
-        private const float OutlineWidth = 0.16f;
+        private const float OutlineWidth = 0.2f;
 
         /// <summary>
         /// 文字の高さ（800x600 基準）。**画面高の35%。**
@@ -84,29 +72,41 @@ namespace KillingMahjong.UI
         private const float GlyphSize = 210f;
 
         /// <summary>
-        /// 文字の中心の横位置（画面中央から左右へ）。
-        /// **画面の端に寄せて、中央を空ける。** 中央には相手の立ち絵が居る。
+        /// 文字の中心の横位置（画面中央から左右へ）。画面の端に寄せて、中央（相手の立ち絵）を空ける。
+        /// `PixelMplus10` の字は em 枠の中で左に寄っていて、276 より外だと左の字が画面端で切れる（2026-09-29）。
         /// </summary>
-        /// <remarks>
-        /// **288 では左の字が画面端で切れた（2026-09-29 に実測）。**
-        /// `PixelMplus10` の字は em 枠の中で 11px ほど左に寄っていて、左右対称に置いても
-        /// 左だけがはみ出す。276 まで内側へ寄せると、4つの役名すべてが枠に収まる。
-        /// </remarks>
         private const float GlyphOffsetX = 276f;
 
-        /// <summary>
-        /// 文字の中心の縦位置（中央から上へ）。**帯を出していた頃と同じ高さ。**
-        /// 山牌の段と手牌の段を避けられることが確認済みの値。
-        /// </summary>
+        /// <summary>文字の中心の縦位置（中央から上へ）。山牌の段と手牌の段を避けられる高さ。</summary>
         private const float GlyphCenterY = 104f;
 
+        /// <summary>縁の色。真っ白だと UI の白と同じ強さで目立つので、骨のような象牙色にする。</summary>
+        private static readonly Color BoneColor = new Color(0.96f, 0.90f, 0.80f, 1f);
+
+        /// <summary>字の中に満ちる血の色。点滴の袋の赤より暗く、壁の赤より明るい。</summary>
+        private static readonly Color BloodColor = new Color(0.72f, 0.02f, 0.07f, 1f);
+
+        /// <summary>たれる血の数（左右それぞれ）と、1滴の大きさ（800x600 基準）。字のドットの太さに合わせる。</summary>
+        private const int DripsPerGlyph = 3;
+        private static readonly Vector2 DripSize = new Vector2(10f, 20f);
+        private const float DripSeconds = 0.6f;
+        private const float DripFallDistance = 70f;
+
+        private class Glyph
+        {
+            public RectTransform Root;
+            public RectTransform Mask;
+            public TextMeshProUGUI Fill;
+            public TextMeshProUGUI Outline;
+            public Material OutlineMaterial;
+        }
+
         private CanvasGroup _group;
-        private Image _flash;
-        private TextMeshProUGUI _leftLabel;
-        private TextMeshProUGUI _rightLabel;
-        private RectTransform _leftRect;
-        private RectTransform _rightRect;
+        private Glyph _left;
+        private Glyph _right;
         private Coroutine _routine;
+        private Color _outlineBase = BoneColor;
+        private readonly List<Image> _drips = new List<Image>();
 
         public static HandRankCallUI Create()
         {
@@ -137,70 +137,86 @@ namespace KillingMahjong.UI
             _group.blocksRaycasts = false;
             _group.interactable = false;
 
-            // **フラッシュは文字より先に作る＝文字の奥に来る。**
-            // 参考動画では、白くなっている最中も文字は読めたままだった。
-            // 手前に被せると、いちばん見せたい瞬間に文字が消える。
-            var flashObject = new GameObject("Flash", typeof(RectTransform), typeof(Image));
-            flashObject.transform.SetParent(transform, false);
-            var flashRect = (RectTransform)flashObject.transform;
-            flashRect.anchorMin = Vector2.zero;
-            flashRect.anchorMax = Vector2.one;
-            flashRect.offsetMin = Vector2.zero;
-            flashRect.offsetMax = Vector2.zero;
-            _flash = flashObject.GetComponent<Image>();
-            _flash.color = new Color(1f, 1f, 1f, 0f);
-            _flash.raycastTarget = false;
-
-            _leftLabel = BuildLabel("Left", -GlyphOffsetX, out _leftRect);
-            _rightLabel = BuildLabel("Right", GlyphOffsetX, out _rightRect);
+            var font = Resources.Load<TMP_FontAsset>("PixelMplus10_DynamicFixed");
+            _left = BuildGlyph("Left", -GlyphOffsetX, font);
+            _right = BuildGlyph("Right", GlyphOffsetX, font);
         }
 
-        private TextMeshProUGUI BuildLabel(string name, float offsetX, out RectTransform rect)
+        /// <summary>
+        /// 1文字ぶん。奥から「血（下から切り抜く枠の中）」「縁だけの字」の順に重ねる。
+        /// 大きさの演出は Root ごと縮めるので、血と縁はずれない。
+        /// </summary>
+        private Glyph BuildGlyph(string name, float offsetX, TMP_FontAsset font)
         {
-            var labelObject = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
-            labelObject.transform.SetParent(transform, false);
+            float box = GlyphSize * 1.4f; // 特大のときも切られないよう、1文字ぶんより広く取っておく
 
-            rect = (RectTransform)labelObject.transform;
-            rect.anchorMin = new Vector2(0.5f, 0.5f);
-            rect.anchorMax = new Vector2(0.5f, 0.5f);
-            rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = new Vector2(offsetX, GlyphCenterY);
-            // 特大のときも切られないよう、1文字ぶんより広く取っておく
-            rect.sizeDelta = new Vector2(GlyphSize * 1.4f, GlyphSize * 1.4f);
+            var root = NewRect(name, transform);
+            root.anchorMin = root.anchorMax = root.pivot = new Vector2(0.5f, 0.5f);
+            root.anchoredPosition = new Vector2(offsetX, GlyphCenterY);
+            root.sizeDelta = new Vector2(box, box);
 
-            var label = labelObject.GetComponent<TextMeshProUGUI>();
-            label.font = Resources.Load<TMP_FontAsset>("PixelMplus10_DynamicFixed");
+            // 血は、下端を固定した枠（RectMask2D）の高さを縮めて「下へ抜ける」ように見せる
+            var mask = NewRect("BloodMask", root);
+            mask.anchorMin = mask.anchorMax = mask.pivot = new Vector2(0.5f, 0f);
+            mask.anchoredPosition = Vector2.zero;
+            mask.sizeDelta = new Vector2(box, box);
+            mask.gameObject.AddComponent<RectMask2D>();
+
+            var fill = NewLabel("Blood", mask, font, box);
+            var fillRect = fill.rectTransform;
+            fillRect.anchorMin = fillRect.anchorMax = fillRect.pivot = new Vector2(0.5f, 0f);
+            fillRect.anchoredPosition = Vector2.zero;
+            fill.color = BloodColor;
+
+            var outline = NewLabel("Outline", root, font, box);
+            var outlineRect = outline.rectTransform;
+            outlineRect.anchorMin = outlineRect.anchorMax = outlineRect.pivot = new Vector2(0.5f, 0.5f);
+            outlineRect.anchoredPosition = Vector2.zero;
+            outline.color = Color.white;
+            var mat = ApplyOutlineOnly(outline);
+
+            return new Glyph { Root = root, Mask = mask, Fill = fill, Outline = outline, OutlineMaterial = mat };
+        }
+
+        private static RectTransform NewRect(string name, Transform parent)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            return (RectTransform)go.transform;
+        }
+
+        private static TextMeshProUGUI NewLabel(string name, Transform parent, TMP_FontAsset font, float box)
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
+            go.transform.SetParent(parent, false);
+            var label = go.GetComponent<TextMeshProUGUI>();
+            label.rectTransform.sizeDelta = new Vector2(box, box);
+            label.font = font;
             label.fontSize = GlyphSize;
+            label.fontStyle = FontStyles.Bold;
             label.alignment = TextAlignmentOptions.Center;
             label.raycastTarget = false;
-            label.fontStyle = FontStyles.Bold;
-            // **白抜き＋太い黒縁。** 参考動画と同じ。
-            // 盤面の緑・牌の白・立ち絵のどれに重なっても輪郭が残る。
-            label.color = Color.white;
-            ApplyOutline(label);
             return label;
         }
 
         /// <summary>
-        /// 太い黒縁を付ける。
+        /// 縁だけの字にする（中は透明）。
         ///
         /// **`outlineWidth` / `outlineColor` に値を入れるだけでは1本も描かれない。**
-        /// TMP はマテリアルの `OUTLINE_ON` キーワードが立っていないと縁を無視する
-        /// （`DialogueUI.ApplyShadow` の `UNDERLAY_ON` と同じ罠）。
-        /// 2026-09-29 に録画で確認した — 値は 0.35 が入っているのに文字は真っ白のままで、
-        /// 白フラッシュに重なった瞬間、文字が画面から消えていた。
-        ///
+        /// TMP はマテリアルの `OUTLINE_ON` キーワードが立っていないと縁を無視する（2026-09-29 に録画で確認）。
         /// `fontMaterial` は**この文字専用の複製**を返すので、共有のフォント資産は汚さない。
         /// </summary>
-        private static void ApplyOutline(TextMeshProUGUI label)
+        private static Material ApplyOutlineOnly(TextMeshProUGUI label)
         {
             var mat = label.fontMaterial;
-            if (mat == null) return;
+            if (mat == null) return null;
 
             mat.EnableKeyword("OUTLINE_ON");
+            mat.SetColor(ShaderUtilities.ID_FaceColor, new Color(1f, 1f, 1f, 0f));
             mat.SetFloat(ShaderUtilities.ID_OutlineWidth, OutlineWidth);
-            mat.SetColor(ShaderUtilities.ID_OutlineColor, Color.black);
+            mat.SetColor(ShaderUtilities.ID_OutlineColor, BoneColor);
             label.UpdateMeshPadding();
+            return mat;
         }
 
         /// <summary>
@@ -221,8 +237,9 @@ namespace KillingMahjong.UI
         public void HideImmediate()
         {
             if (_routine != null) { StopCoroutine(_routine); _routine = null; }
+            StopAllCoroutines();
             if (_group != null) _group.alpha = 0f;
-            if (_flash != null) _flash.color = new Color(1f, 1f, 1f, 0f);
+            ClearDrips();
         }
 
         private IEnumerator ShowRoutine(string rankName)
@@ -232,14 +249,14 @@ namespace KillingMahjong.UI
             {
                 yield return FadeTo(0f, ReplaceFadeSeconds);
             }
+            ClearDrips();
 
             SplitRank(rankName);
-            _flash.color = new Color(1f, 1f, 1f, 0f);
+            SetBlood(0f);
+            _outlineBase = BoneColor;
             _group.alpha = 1f;
 
-            // ---- 特大から定位置へ ----
-            // **中心は動かさず、大きさだけ落とす。** 参考動画の「無」も、
-            // 左端に掛かったまま右端だけが内側へ寄ってきていた（＝その場で縮んでいた）。
+            // ---- 少し大きめから定位置へ ----
             float t = 0f;
             while (t < SlamSeconds)
             {
@@ -248,20 +265,38 @@ namespace KillingMahjong.UI
                 // 最後で強く減速させて、止まった感じを出す
                 float e = 1f - Mathf.Pow(1f - u, 4f);
                 float scale = Mathf.Lerp(SlamStartScale, 1f, e);
-                _leftRect.localScale = Vector3.one * scale;
-                _rightRect.localScale = Vector3.one * scale;
+                _left.Root.localScale = Vector3.one * scale;
+                _right.Root.localScale = Vector3.one * scale;
                 yield return null;
             }
-            _leftRect.localScale = Vector3.one;
-            _rightRect.localScale = Vector3.one;
+            _left.Root.localScale = Vector3.one;
+            _right.Root.localScale = Vector3.one;
 
-            // ---- 着弾の白フラッシュ ----
+            // ---- 着弾：血が満ち、縁が光り、血がたれる ----
             KillingMahjong.UI.Effects.HandSelectionFeedbackAudio.PlayRankImpact();
-            StartCoroutine(FlashRoutine());
+            SetBlood(1f);
+            StartCoroutine(GlintRoutine());
+            SpawnDrips(_left);
+            SpawnDrips(_right);
 
-            yield return new WaitForSecondsRealtime(HoldSeconds);
+            // ---- 血が下へ抜ける ----
+            float elapsed = 0f;
+            while (elapsed < FillHoldSeconds) { elapsed += Step(); yield return null; }
+            for (float d = 0f; d < DrainSeconds; )
+            {
+                d += Step();
+                elapsed += Step();
+                float u = Mathf.Clamp01(PresentationTiming.Sample(d) / DrainSeconds);
+                // はじめはゆっくり、だんだん速く抜ける
+                SetBlood(1f - u * u);
+                yield return null;
+            }
+            SetBlood(0f);
+
+            while (elapsed < HoldSeconds) { elapsed += Step(); yield return null; }
             yield return FadeTo(0f, FadeOutSeconds);
 
+            ClearDrips();
             _routine = null;
         }
 
@@ -272,47 +307,112 @@ namespace KillingMahjong.UI
         private void SplitRank(string rankName)
         {
             int half = Mathf.Max(1, rankName.Length / 2);
-            _leftLabel.text = rankName.Substring(0, half);
-            _rightLabel.text = half < rankName.Length ? rankName.Substring(half) : string.Empty;
+            string l = rankName.Substring(0, half);
+            string r = half < rankName.Length ? rankName.Substring(half) : string.Empty;
+            _left.Fill.text = _left.Outline.text = l;
+            _right.Fill.text = _right.Outline.text = r;
         }
 
-        private IEnumerator FlashRoutine()
+        /// <summary>字の中の血の量（1 で満ちている、0 で空）。下端を固定した枠の高さで切り抜く。</summary>
+        private void SetBlood(float amount)
         {
-            _flash.color = new Color(1f, 1f, 1f, FlashPeakAlpha);
-
-            // **秒だけで保持すると、重い環境では一度も描かれずに終わる。**
-            // ScreenFlash が同じ理由で必ず yield しているのに倣う。
-            float held = 0f;
-            do
+            foreach (var g in new[] { _left, _right })
             {
-                yield return null;
-                held += Time.unscaledDeltaTime;
+                var size = g.Mask.sizeDelta;
+                // 枠は字より広い（1.4倍）。0〜1 を字の下端〜上端（中心から ±0.4 字ぶん）に当てる。
+                // 枠いっぱいに当てると、抜け始めの間は字の上の何もない所を削るだけで、止まって見える
+                float a = Mathf.Clamp01(amount);
+                float bottom = g.Root.sizeDelta.y * 0.5f - GlyphSize * 0.4f;
+                size.y = a <= 0f ? 0f : bottom + GlyphSize * 0.8f * a;
+                g.Mask.sizeDelta = size;
+                g.Fill.enabled = amount > 0.001f;
             }
-            while (held < FlashHoldSeconds);
+        }
 
-            float t = 0f;
-            while (t < FlashFadeSeconds)
+        /// <summary>着弾の瞬間、縁を白く光らせて象牙色へ戻す。画面全体は光らせない（周りの UI を巻き込まない）。</summary>
+        private IEnumerator GlintRoutine()
+        {
+            for (float t = 0f; t < GlintSeconds; )
             {
                 t += Step();
-                float u = Mathf.Clamp01(PresentationTiming.Sample(t) / FlashFadeSeconds);
-                if (_flash == null) yield break;
-                _flash.color = new Color(1f, 1f, 1f, FlashPeakAlpha * (1f - u));
+                float u = Mathf.Clamp01(PresentationTiming.Sample(t) / GlintSeconds);
+                _outlineBase = Color.Lerp(Color.white, BoneColor, u * u);
                 yield return null;
             }
-            _flash.color = new Color(1f, 1f, 1f, 0f);
+            _outlineBase = BoneColor;
+        }
+
+        /// <summary>字の下の縁から、血を数滴たらす。位置は毎回少し変える。</summary>
+        private void SpawnDrips(Glyph g)
+        {
+            float half = GlyphSize * 0.32f;
+            for (int i = 0; i < DripsPerGlyph; i++)
+            {
+                var rect = NewRect("Drip", g.Root);
+                rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+                rect.pivot = new Vector2(0.5f, 1f);
+                rect.sizeDelta = DripSize;
+                // 字の下端あたり（左右に散らす）。ドットの格子に合わせて 10 刻みにする
+                float x = Mathf.Round(Random.Range(-half, half) / 10f) * 10f;
+                float y = -GlyphSize * 0.36f;
+                rect.anchoredPosition = new Vector2(x, y);
+                var img = rect.gameObject.AddComponent<Image>();
+                img.color = BloodColor;
+                img.raycastTarget = false;
+                _drips.Add(img);
+                StartCoroutine(DripRoutine(img, y, Random.Range(0f, 0.12f), Random.Range(0.7f, 1.15f)));
+            }
+        }
+
+        private IEnumerator DripRoutine(Image img, float startY, float delay, float speed)
+        {
+            for (float w = 0f; w < delay; w += Step()) yield return null;
+            var rect = img.rectTransform;
+            for (float t = 0f; t < DripSeconds; )
+            {
+                t += Step();
+                if (img == null) yield break;
+                float u = Mathf.Clamp01(t / DripSeconds);
+                // 垂れて伸びながら落ち、途中から薄れる。位置はドットの格子（5 刻み）に合わせる
+                float fall = DripFallDistance * speed * u * u;
+                rect.anchoredPosition = new Vector2(rect.anchoredPosition.x, Mathf.Round((startY - fall) / 5f) * 5f);
+                rect.sizeDelta = new Vector2(DripSize.x, Mathf.Round(DripSize.y * (1f + u) / 5f) * 5f);
+                var c = BloodColor;
+                c.a = u < 0.5f ? 1f : 1f - (u - 0.5f) * 2f;
+                img.color = c;
+                yield return null;
+            }
+            if (img != null) img.enabled = false;
+        }
+
+        private void ClearDrips()
+        {
+            foreach (var d in _drips) if (d != null) Destroy(d.gameObject);
+            _drips.Clear();
         }
 
         /// <summary>
-        /// **出しっぱなしを防ぐ保険（2026-09-20）。**
-        ///
-        /// コルーチンが外から止められる（対局が終わって別の演出がオブジェクトを触る等）と、
-        /// 最後に当てた alpha のまま画面に残る。実際に決着画面へ役名が残ったことがある。
-        /// 動いている手続きが無いのに見えていたら、ここで静かに消す。
+        /// 毎フレーム：縁の明るさをろうそくのちらつきに合わせる。
+        /// あわせて**出しっぱなしを防ぐ保険（2026-09-20）**。コルーチンが外から止められると、
+        /// 最後に当てた alpha のまま画面に残る（決着画面へ役名が残ったことがある）。
         /// </summary>
         private void Update()
         {
-            if (_routine != null || _group == null || _group.alpha <= 0f) return;
+            if (_group == null) return;
 
+            if (_group.alpha > 0f)
+            {
+                var light = KillingMahjong.UI.Effects.SceneLight.Current;
+                float flicker = light != null && light.isActiveAndEnabled ? light.ShadowFlicker : 1f;
+                // ShadowFlicker は 1 の前後に数%揺れる。縁はそれより少し大きめに揺らして、炎に照らされて見えるようにする
+                float k = Mathf.Clamp(0.94f + (flicker - 1f) * 1.5f, 0.82f, 1f);
+                var c = _outlineBase * k;
+                c.a = 1f;
+                foreach (var g in new[] { _left, _right })
+                    if (g.OutlineMaterial != null) g.OutlineMaterial.SetColor(ShaderUtilities.ID_OutlineColor, c);
+            }
+
+            if (_routine != null || _group.alpha <= 0f) return;
             _group.alpha = Mathf.MoveTowards(_group.alpha, 0f, Time.unscaledDeltaTime / FadeOutSeconds);
         }
 
@@ -332,8 +432,7 @@ namespace KillingMahjong.UI
         /// <summary>
         /// 1フレームで進めてよい時間。**引っかかった直後に飛ばさないための頭打ち。**
         /// 画面が一度止まると、再開したフレームの `unscaledDeltaTime` に止まっていた分が
-        /// まとめて乗り、0.4秒の着弾が1〜2コマで終わってしまう
-        /// （`TutorialButtonIntroUI` で実際に起きたのと同じ）。
+        /// まとめて乗り、短い演出が1〜2コマで終わってしまう（`TutorialButtonIntroUI` で実際に起きた）。
         /// </summary>
         private static float Step()
         {
