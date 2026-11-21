@@ -392,6 +392,11 @@ namespace KillingMahjong.UI
                     }
 
                     wallSlots.Add(slot);
+                    // 重なり順も並びどおり（左から右、上の段から下の段）にする。牌の影（TileVisual の Shadow）は
+                    // 右下へ 3px はみ出すので、左の牌が右の牌より後に描かれると、右の牌の左端に影が乗る。
+                    // 手牌から山へ戻した牌は SetParent で末尾に付くため、「並べ直す」のあとにこれが起きていた
+                    // （2026-10-29 バグ報告「並べ直しを使うと牌に謎の影ができる」）
+                    slot.SetAsLastSibling();
                     slot.gameObject.SetActive(true);
 
                     // 同一カテゴリ内なら隙間なし、最後の牌ならカテゴリ間の隙間を追加
