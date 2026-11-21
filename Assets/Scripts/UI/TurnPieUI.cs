@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using KillingMahjong.UI.Effects;
 
@@ -24,6 +25,10 @@ namespace KillingMahjong.UI
     ///     （15打目は5打ごとの節目でもあるが、こちらを優先する）
     ///   ・打ち切り（残り0）: 暗い赤の輪が1つ、ゆっくり広がって脈が止まる
     /// 輪は円グラフと同じ板に描く（新しい部品は足さない）。
+    ///
+    /// **円の真ん中に、今のターンの数字を出す（2026-11-22 ユーザー指示「ターン数を表す円グラフのところは
+    /// 現在のターンの数字表示してほしい」）。** これから打つのが何打目か（1〜17。打ち切りのあとは 17）。
+    /// 文字はシーンに置いた子（TurnNumber）で、ここは数字を入れるだけ。
     /// </summary>
     public class TurnPieUI : PixelShapeGraphic
     {
@@ -40,6 +45,8 @@ namespace KillingMahjong.UI
         [SerializeField] private Color secondNextColor = new Color32(170, 210, 255, 255);
         [SerializeField] private Color emptyColor = new Color32(26, 14, 16, 220);
         [SerializeField] private Color edgeColor = new Color32(12, 6, 8, 255);
+        [Tooltip("円の真ん中に出す、今のターンの数字（シーンの子 TurnNumber）。空なら数字は出さない")]
+        [SerializeField] private TMP_Text numberLabel;
 
         /// <summary>残りわずかの輪と脈の色（役名表示の血と同じ系統）。</summary>
         private static readonly Color BloodColor = new Color(0.80f, 0.05f, 0.10f, 1f);
@@ -81,12 +88,22 @@ namespace KillingMahjong.UI
             _shownOnce = true;
             if (advanced) PlayAdvance(next);
             else { _ripples.Clear(); _sliceFlashStart = -10f; }
+            UpdateNumber();
             Redraw();
+        }
+
+        /// <summary>今のターン（これから打つのが何打目か）。打ち切りのあとは最後の 17 のまま。</summary>
+        public int CurrentTurn => Mathf.Min(_discarded + 1, DiscardsPerPlayer);
+
+        private void UpdateNumber()
+        {
+            if (numberLabel != null) numberLabel.text = CurrentTurn.ToString();
         }
 
         protected override void OnEnable()
         {
             base.OnEnable();
+            UpdateNumber();
             Redraw();
         }
 
@@ -94,6 +111,7 @@ namespace KillingMahjong.UI
         protected override void OnValidate()
         {
             base.OnValidate();
+            UpdateNumber();
             Redraw();
         }
 #endif
