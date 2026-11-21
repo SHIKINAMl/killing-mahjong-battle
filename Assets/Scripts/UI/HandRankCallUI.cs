@@ -17,7 +17,7 @@ namespace KillingMahjong.UI
     /// **見せ方（2026-11-21 に作り直し）。**
     /// 前は白く塗りつぶした特大の字＋画面全体の白い光で、点滴の袋・役一覧・セリフに
     /// 白いかたまりが被さり「ごちゃごちゃした印象」「かぶってる感」と言われた。ユーザーが選んだ形:
-    ///   ・**象牙色の縁だけの字**（中を透かす）。暗幕で画面全体を落とす案は退けられた
+    ///   ・象牙色の字（前は縁だけで中を透かしていたが、のちに中も塗った。下の「段」）。暗幕で画面全体を落とす案は退けられた
     ///   ・**字の下に重なっている UI だけを薄くして道を空ける**（案 A）。字が消えるのに合わせて戻す
     ///   ・**字は位置も大きさも変えず、その場でフェードインする**（「血が抜ける演出よりは、
     ///     文字の位置が変わらないフェードインしてほしい」）。特大から縮む動き・血の演出はやめた
@@ -26,10 +26,13 @@ namespace KillingMahjong.UI
     ///   1.05s  字が消え始め（0.25秒）、薄くした UI も戻る
     ///
     /// **字にはろうそく（<see cref="Effects.SceneLight"/>）の光を当てる（2026-11-21「この即席満貫の文字には光を当てて、
-    /// いい感じの影を作ってほしい」）。** 字ごとに3枚重ねる:
-    ///   ・影: 光と反対側へずらした、ぼかした暗い縁（光から遠いほど長い）
-    ///   ・地: 少し暗い象牙色の縁（光の当たらない側）
-    ///   ・光: 明るい縁を、光の来る側だけ柔らかく切り抜いて重ねる（RectMask2D のぼかし）
+    /// いい感じの影を作ってほしい」）。**
+    /// **中は塗る。字の層を光と反対へ段々にずらして重ねる（2026-11-21「中身空白ではなく、
+    /// 階層がずれてちゃんと塗られているようにして」）。** 字ごとに奥から:
+    ///   ・影: いちばん奥。ぼかした暗い字（光から遠いほど長い）
+    ///   ・段: 血の赤から暗い赤へ、光と反対へ1段ずつずらして塗った字（<see cref="DepthLayers"/> 枚）
+    ///   ・面: 少し暗い象牙色で塗った字（光の当たらない側）
+    ///   ・光: 明るい象牙色の字を、光の来る側だけ柔らかく切り抜いて重ねる（RectMask2D のぼかし）
     /// 光の向き・影のずれ・明るさは毎フレーム光の位置とちらつきから決めるので、炎が揺れると一緒に揺れる。
     /// 場面に光が無いとき（チュートリアルなど）は、画面の上の中央から照らしているものとして描く。
     /// **全長は前と同じ約1.3秒。** この表示は手牌を1枚入れ替えるたびに出るので、長くすると待たされる。
@@ -56,12 +59,6 @@ namespace KillingMahjong.UI
 
         /// <summary>字の下に重なっている UI を、どこまで薄くするか（1 で元のまま）。</summary>
         private const float CoveredAlpha = 0.18f;
-
-        /// <summary>
-        /// 縁の太さ。字は `PixelMplus10` の 10px を21倍に伸ばしているので線が細く、
-        /// 太くしすぎると縁どうしがくっついて「満」の中が埋まる（0.35 で潰れた、2026-09-29）。
-        /// </summary>
-        private const float OutlineWidth = 0.2f;
 
         /// <summary>
         /// 文字の高さ（800x600 基準）。**画面高の35%。**
@@ -93,22 +90,31 @@ namespace KillingMahjong.UI
         private const float MaxDimWidthRatio = 0.8f;
 
         private CanvasGroup _group;
-        /// <summary>1文字ぶん。奥から 影・地・光（切り抜き枠の中）。</summary>
+        /// <summary>1文字ぶん。奥から 影・段（奥→手前）・面・光（切り抜き枠の中）。</summary>
         private class Glyph
         {
             public RectTransform Root;
             public TextMeshProUGUI Shadow, Base, Lit;
             public Material ShadowMat, BaseMat, LitMat;
+            public TextMeshProUGUI[] Depth;
+            public Material[] DepthMats;
             public RectTransform LitMask;
         }
+
+        /// <summary>面の後ろに重ねる段の数と、1段のずれ（800x600 基準）。</summary>
+        private const int DepthLayers = 3;
+        private const float DepthStep = 7f;
+        /// <summary>段の色。手前ほど明るい血の赤、奥ほど暗い赤。</summary>
+        private static readonly Color DepthNearColor = new Color(0.72f, 0.06f, 0.10f, 1f);
+        private static readonly Color DepthFarColor = new Color(0.26f, 0.01f, 0.04f, 1f);
 
         private Glyph _leftGlyph;
         private Glyph _rightGlyph;
         private TextMeshProUGUI _left => _leftGlyph.Base;
         private TextMeshProUGUI _right => _rightGlyph.Base;
 
-        /// <summary>光の当たらない側の縁の明るさ（象牙色に掛ける）。</summary>
-        private const float ShadeSide = 0.45f;
+        /// <summary>光の当たらない側の面の明るさ（象牙色に掛ける）。段の赤と分かれる程度に明るく残す。</summary>
+        private const float ShadeSide = 0.7f;
         /// <summary>光の当たる側の縁の色（ろうそくの暖かい白）。</summary>
         private static readonly Color LitColor = new Color(1f, 0.97f, 0.86f, 1f);
         /// <summary>影の色と濃さ。</summary>
@@ -176,6 +182,11 @@ namespace KillingMahjong.UI
 
             var g = new Glyph { Root = root };
             g.Shadow = BuildLabel("Shadow", root, font, out g.ShadowMat);
+            // 段は奥（ずれの大きい物）から並べ、手前の段が上に描かれるようにする
+            g.Depth = new TextMeshProUGUI[DepthLayers];
+            g.DepthMats = new Material[DepthLayers];
+            for (int i = DepthLayers - 1; i >= 0; i--)
+                g.Depth[i] = BuildLabel("Depth" + (i + 1), root, font, out g.DepthMats[i]);
             g.Base = BuildLabel("Base", root, font, out g.BaseMat);
 
             // 光は、光の側へずらした枠（ぼかし付き）で切り抜く。字は枠と逆へずらして元の位置に留める
@@ -220,28 +231,36 @@ namespace KillingMahjong.UI
             label.alignment = TextAlignmentOptions.Center;
             label.raycastTarget = false;
             label.color = Color.white;
-            material = ApplyOutlineOnly(label);
+            material = ApplySolid(label);
             return label;
         }
 
         /// <summary>
-        /// 縁だけの字にする（中は透明）。
+        /// 中まで塗った字にする（色は <see cref="SetSolidColor"/>）。
         ///
         /// **`outlineWidth` / `outlineColor` に値を入れるだけでは1本も描かれない。**
         /// TMP はマテリアルの `OUTLINE_ON` キーワードが立っていないと縁を無視する（2026-09-29 に録画で確認）。
         /// `fontMaterial` は**この文字専用の複製**を返すので、共有のフォント資産は汚さない。
         /// </summary>
-        private static Material ApplyOutlineOnly(TextMeshProUGUI label)
+        private static Material ApplySolid(TextMeshProUGUI label)
         {
             var mat = label.fontMaterial;
             if (mat == null) return null;
 
             mat.EnableKeyword("OUTLINE_ON");
-            mat.SetColor(ShaderUtilities.ID_FaceColor, new Color(1f, 1f, 1f, 0f));
-            mat.SetFloat(ShaderUtilities.ID_OutlineWidth, OutlineWidth);
-            mat.SetColor(ShaderUtilities.ID_OutlineColor, BoneColor);
+            // 中を塗ると、縁で太らせた分だけ字のすき間（「貫」の口、「満」の線の間）がつぶれる（2026-11-21 に撮って確認）。
+            // 塗った字は太らせない。縁を使うのは影だけ（ぼかしのため）
+            mat.SetFloat(ShaderUtilities.ID_OutlineWidth, 0f);
+            SetSolidColor(mat, BoneColor);
             label.UpdateMeshPadding();
             return mat;
+        }
+
+        private static void SetSolidColor(Material mat, Color color)
+        {
+            if (mat == null) return;
+            mat.SetColor(ShaderUtilities.ID_FaceColor, color);
+            mat.SetColor(ShaderUtilities.ID_OutlineColor, color);
         }
 
         /// <summary>
@@ -306,6 +325,7 @@ namespace KillingMahjong.UI
         private static void SetGlyphText(Glyph g, string text)
         {
             g.Shadow.text = g.Base.text = g.Lit.text = text;
+            foreach (var d in g.Depth) { d.text = text; d.ForceMeshUpdate(); }
             g.Shadow.ForceMeshUpdate();
             g.Base.ForceMeshUpdate();
             g.Lit.ForceMeshUpdate();
@@ -341,17 +361,27 @@ namespace KillingMahjong.UI
             g.LitMask.anchoredPosition = shift;
             g.Lit.rectTransform.anchoredPosition = -shift;
 
-            // 影: 光と反対へ。光から遠い字ほど少し長く（LitArtDropShadow と同じ考え方）
+            // 段: 光と反対へ1段ずつずらす（字が奥へ積み重なって見える）
+            for (int i = 0; i < g.Depth.Length; i++)
+            {
+                Vector2 d = -dir * DepthStep * (i + 1);
+                g.Depth[i].rectTransform.anchoredPosition = new Vector2(Mathf.Round(d.x), Mathf.Round(d.y));
+                float f = g.Depth.Length > 1 ? i / (float)(g.Depth.Length - 1) : 0f;
+                var dc = Color.Lerp(DepthNearColor, DepthFarColor, f) * k; dc.a = 1f;
+                SetSolidColor(g.DepthMats[i], dc);
+            }
+
+            // 影: いちばん奥の段のさらに先へ。光から遠い字ほど少し長く（LitArtDropShadow と同じ考え方）
             float stretch = Mathf.Clamp(dist / 300f, 0.7f, 1.6f);
-            Vector2 off = -dir * ShadowLength * stretch;
+            Vector2 off = -dir * (DepthStep * DepthLayers + ShadowLength * stretch);
             g.Shadow.rectTransform.anchoredPosition = new Vector2(Mathf.Round(off.x), Mathf.Round(off.y));
 
             var shade = BoneColor * ShadeSide * k; shade.a = 1f;
             var lit = LitColor * k; lit.a = 1f;
             var sh = ShadowColor; sh.a = ShadowOpacity * Mathf.Clamp01(flicker);
-            if (g.BaseMat != null) g.BaseMat.SetColor(ShaderUtilities.ID_OutlineColor, shade);
-            if (g.LitMat != null) g.LitMat.SetColor(ShaderUtilities.ID_OutlineColor, lit);
-            if (g.ShadowMat != null) g.ShadowMat.SetColor(ShaderUtilities.ID_OutlineColor, sh);
+            SetSolidColor(g.BaseMat, shade);
+            SetSolidColor(g.LitMat, lit);
+            SetSolidColor(g.ShadowMat, sh);
         }
 
         /// <summary>
