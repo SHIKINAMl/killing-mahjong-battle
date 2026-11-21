@@ -226,6 +226,7 @@ namespace KillingMahjong.UI
             _additionalRoundStartReadyCallbacks = null;
             darkenTextRoutine = null;
             ClearRoundRipple();
+            ResetRoundRippleState();
             roundStartTextVisibleUntil = 0f;
             _roundStartCleanupDone = false;
             _useRoundStartRevealSound = false;
@@ -324,6 +325,8 @@ namespace KillingMahjong.UI
 
         public void ChangeDarkenText(string text)
         {
+            // 局頭の数字送り・波紋の最中は止めずに受ける（PhaseTransitionUI.RoundRipple）
+            if (isDarkened && centerText != null && TryDeferDarkenTextForRipple(text)) return;
             if (isDarkened && centerText != null && centerText.text != text)
             {
                 // 暗転中の文字は、薄くして消してから全文を短くフェードして出す。
@@ -340,9 +343,14 @@ namespace KillingMahjong.UI
         {
             ClearRoundRipple();
             yield return HideBandText();
-            yield return RevealBandText(text);
+            // 差し替えた文字に局の数字があれば、ここでも数字送りと波紋を出す（PhaseTransitionUI.RoundRipple）。
+            // 本編の第1局は「対局開始」の暗転から「第1局進行中...」へ、この差し替えで数字が出る（2026-11-21）
+            bool ripple = CanPlayRoundNumberRipple(text);
+            yield return RevealBandText(ripple ? RoundTitleBeforeFlip(text) : text);
             roundStartTextVisibleUntil = string.IsNullOrEmpty(text)
                 ? 0f : Time.unscaledTime + MinimumRoundTitleSeconds;
+            // 波紋の終わり（FinishRoundRipple）が darkenTextRoutine を片付ける
+            if (ripple) { yield return RoundNumberRippleRoutine(text); yield break; }
             darkenTextRoutine = null;
         }
 

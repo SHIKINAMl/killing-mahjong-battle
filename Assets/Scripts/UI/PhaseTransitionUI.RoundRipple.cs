@@ -13,6 +13,11 @@ namespace KillingMahjong.UI
     ///   0.65s  止まった数字から、輪が3重に広がって薄れる（約0.8秒）
     ///
     /// 第1局は送る前の数字が無いので、波紋だけを出す。
+    ///
+    /// **本編の出し方（2026-11-21 に本番の流れで確認して直した）:**
+    ///   ・第1局: 暗転の文字は「対局開始」で、配牌待ちの差し替えで「第1局進行中...」が出る → 差し替え（SwapDarkenText）で波紋
+    ///   ・第2局以降: 暗転の「第N局...」が出た同じフレームに「第N局進行中...」への差し替えが来る →
+    ///     止めずに受け（<see cref="TryDeferDarkenTextForRipple"/>）、「第N-1局進行中...」から送る
     /// 輪はドット絵の格子に寄せた点で描き、色は象牙色と血の赤（役名表示と同じ色）。
     ///
     /// 輪を描く板（<see cref="roundNumberRipple"/>）はシーンに置いてある。**置いていないシーン
@@ -64,10 +69,63 @@ namespace KillingMahjong.UI
             return text.Substring(0, start) + FormatDigits(number - 1, fullWidth) + text.Substring(start + length);
         }
 
+        /// <summary>
+        /// 数字送りと波紋の最中か。最中に来た文字の差し替え（<see cref="ChangeDarkenText"/>）は、
+        /// 波紋を止めずに <see cref="TryDeferDarkenTextForRipple"/> で受ける。
+        /// </summary>
+        private bool _roundRippleRunning;
+        /// <summary>数字を送ったあとの文字。送る前に差し替えが来たら、こちらを書き換える。</summary>
+        private string _roundRippleTarget;
+        /// <summary>もう新しい数字へ送り終えたか。</summary>
+        private bool _roundRippleFlipped;
+        /// <summary>送り終えたあとに来た差し替え。波紋が終わってから、いつもの差し替えで出す。</summary>
+        private string _pendingDarkenText;
+
+        /// <summary>
+        /// 波紋の最中に来た文字の差し替えを受ける（受けたら true）。
+        ///
+        /// **本編は、局名を出した同じフレームで「第N局進行中...」へ差し替えに来る**（配牌待ちの表示、
+        /// GameUIPhaseController.ShowDealingWaitUI）。以前はここで波紋のコルーチンを止めていたので、
+        /// 本編では数字送りも波紋も一度も出ていなかった（2026-11-21「波紋が出ていないような気がします」）。
+        ///   ・まだ数字を送る前: 差し替え後の文字の「ひとつ前の数字」に置き直し、そのまま差し替え後の文字へ送る
+        ///   ・送り終えたあと: 波紋が終わってから、いつもの差し替え（薄くして出し直す）をする
+        /// </summary>
+        private bool TryDeferDarkenTextForRipple(string text)
+        {
+            if (!_roundRippleRunning) return false;
+            if (!_roundRippleFlipped && CanPlayRoundNumberRipple(text))
+            {
+                centerText.text = RoundTitleBeforeFlip(text);
+                centerText.ForceMeshUpdate();
+                _roundRippleTarget = text;
+            }
+            else if (_roundRippleTarget != text)
+            {
+                _pendingDarkenText = text;
+            }
+            return true;
+        }
+
+        /// <summary>波紋の状態を忘れる（暗転の取り消しのとき）。</summary>
+        private void ResetRoundRippleState()
+        {
+            _roundRippleRunning = false;
+            _roundRippleFlipped = false;
+            _roundRippleTarget = null;
+            _pendingDarkenText = null;
+        }
+
         /// <summary>数字送り（必要なら）と波紋。<paramref name="text"/> は送ったあとの文字（本来の局名）。</summary>
         private IEnumerator RoundNumberRippleRoutine(string text)
         {
-            bool flip = centerText.text != text;
+            _roundRippleRunning = true;
+            _roundRippleFlipped = false;
+            _roundRippleTarget = text;
+            _pendingDarkenText = null;
+
+            // 同じフレームに来る差し替え（上の説明）を先に受けてから、送るかどうかを決める
+            yield return null;
+            bool flip = centerText.text != _roundRippleTarget;
 
             if (flip)
             {
@@ -77,7 +135,8 @@ namespace KillingMahjong.UI
                 yield return MoveDigits(RoundFlipOutSeconds, u => new Vector2(u * u * RoundFlipTravel, 1f - u));
 
                 // 新しい数字に差し替え、下から入れて止める（速く入って減速）
-                centerText.text = text;
+                centerText.text = _roundRippleTarget;
+                _roundRippleFlipped = true;
                 centerText.ForceMeshUpdate();
                 yield return MoveDigits(RoundFlipInSeconds, u =>
                 {
@@ -86,6 +145,7 @@ namespace KillingMahjong.UI
                 });
                 centerText.ForceMeshUpdate();
             }
+            _roundRippleFlipped = true;
 
             // ---- 波紋 ----
             if (!DigitBounds(out Vector2 center, out float height)) { FinishRoundRipple(); yield break; }
@@ -119,7 +179,12 @@ namespace KillingMahjong.UI
             ClearRoundRipple();
             // 送り終えた数字を最低でも少し見せてから晴らす
             roundStartTextVisibleUntil = Mathf.Max(roundStartTextVisibleUntil, Time.unscaledTime + 0.25f);
-            darkenTextRoutine = null;
+            string pending = _pendingDarkenText;
+            ResetRoundRippleState();
+            // 送り終えたあとに来た差し替えは、ここで出す（晴らす側は darkenTextRoutine が終わるまで待つ）
+            darkenTextRoutine = pending != null && centerText != null && centerText.text != pending && isActiveAndEnabled
+                ? StartCoroutine(SwapDarkenText(pending))
+                : null;
         }
 
         /// <summary>輪を消す（暗転の取り消し・文字の差し替え・明転のとき）。</summary>
