@@ -39626,7 +39626,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5474931286746725664, guid: 178497effc5e5394797171d6683e03a3, type: 3}
       propertyPath: returnSceneName
-      value: "\u90E8\u5C4B\u30B7\u30FC\u30F3"
+      value: "\u30E1\u30A4\u30F3\u30E1\u30CB\u30E5\u30FC\u30B7\u30FC\u30F3"
       objectReference: {fileID: 0}
     - target: {fileID: 6161398653147757975, guid: 178497effc5e5394797171d6683e03a3, type: 3}
       propertyPath: m_AnchorMax.x

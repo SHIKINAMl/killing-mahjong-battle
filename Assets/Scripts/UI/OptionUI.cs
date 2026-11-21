@@ -83,7 +83,9 @@ namespace KillingMahjong.UI
         // 2026-10-23 のユーザー指示「設定でタイトルではなく、デバッグ部屋に移行するようにして」で
         // タイトルシーンから部屋シーンへ。ボタンの文字も「Title」から「デバッグ部屋へ」にした（OptionUI.prefab と各シーン）
         [Tooltip("『戻る』ボタンを押したときに遷移するシーン名")]
-        [SerializeField] private string returnSceneName = "部屋シーン";
+        // 2026-11-21「設定ボタンのへやに戻る、でメインメニューシーンに戻って」で、部屋シーンからメインメニューシーンへ
+        // （OptionUI.prefab と UIテストシーン・タイトルシーン・部屋シーン。OpeningScene は未コミットの変更があるため未変更）
+        [SerializeField] private string returnSceneName = "メインメニューシーン";
 
         private CanvasGroup _canvasGroup;
         private RectTransform _rectTransform;
