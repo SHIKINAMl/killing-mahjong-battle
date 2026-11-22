@@ -27,7 +27,8 @@ namespace KillingMahjong.UI
     /// 輪は円グラフと同じ板に描く（新しい部品は足さない）。
     ///
     /// **円の真ん中に、今のターンの数字を出す（2026-11-22 ユーザー指示「ターン数を表す円グラフのところは
-    /// 現在のターンの数字表示してほしい」）。** これから打つのが何打目か（1〜17。打ち切りのあとは 17）。
+    /// 現在のターンの数字表示してほしい」）。** 数字は**残りのターン数**で、17 から 1 打ごとに減り、打ち切りで 0
+    /// （2026-11-22 Discord「数字が増えるんじゃなくて、減る方式でお願いします」。前は何打目かを 1〜17 で増やしていた）。
     /// 文字はシーンに置いた子（TurnNumber）で、ここは数字を入れるだけ。
     ///
     /// **相手の番のあいだは、塗りを赤にする（2026-11-22「相手ターンの時はあかいろにしてほしい」）。**
@@ -103,7 +104,8 @@ namespace KillingMahjong.UI
 
         private void UpdateNumber()
         {
-            if (numberLabel != null) numberLabel.text = CurrentTurn.ToString();
+            // 残りのターン数（減っていく）。何打目か（CurrentTurn）ではない
+            if (numberLabel != null) numberLabel.text = Remaining.ToString();
         }
 
         protected override void OnEnable()
