@@ -10,7 +10,7 @@ namespace KillingMahjong.UI.Effects
         private static float lastRoleAt = float.NegativeInfinity;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetSession() { lastRoleAt = float.NegativeInfinity; }
+        private static void ResetSession() { lastRoleAt = float.NegativeInfinity; rankMissCount = 0; }
 
         public static void PlayRoleEntry()
         {
@@ -39,8 +39,18 @@ namespace KillingMahjong.UI.Effects
             var audio = AudioManager.Instance;
             if (audio == null || !audio.AudioEnabled) return;
             if (rankMiss == null) rankMiss = Resources.Load<AudioClip>("Se/HandSelection/rank_miss");
-            if (rankMiss != null) audio.PlaySE(rankMiss);
+            // 【仮・聞き比べ用】2026-11-22「この2つを実際の画面で聴き比べしたい」。鳴るたびに B → C → B … と交互にする。
+            // rank_miss = B（Incorrect Buzzer）、rank_miss_c = C（Wrong Answer Buzzer）。決まったら C の分と交互をやめる。
+            if (rankMissC == null) rankMissC = Resources.Load<AudioClip>("Se/HandSelection/rank_miss_c");
+            bool useC = rankMissC != null && (rankMissCount++ % 2 == 1);
+            var clip = useC ? rankMissC : rankMiss;
+            if (clip == null) return;
+            Debug.Log("[ブー聞き比べ] " + (useC ? "C（Wrong Answer Buzzer）" : "B（Incorrect Buzzer）") + " を鳴らした");
+            audio.PlaySE(clip);
         }
+
+        private static AudioClip rankMissC;
+        private static int rankMissCount;
 
         // 移送のオブジェクトに持たせることで、中断したときは音も一緒に止まる。
         public static AudioSource CreateWaitTransferSource(GameObject owner, bool arrival)
