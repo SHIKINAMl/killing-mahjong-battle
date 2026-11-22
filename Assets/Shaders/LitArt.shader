@@ -21,6 +21,8 @@ Shader "KM/LitArt"
         _FillScale ("Fill Light Scale", Range(0,2)) = 0
         // ろうそくの小さな光（SceneCandleLights）の受け方。場面に置いていなければ何も起きない
         _CandleScale ("Candle Light Scale", Range(0,2)) = 1
+        // 絵が画面の上で回る物（対局待ちの牌）用。1 にすると、法線を絵の回転・反転に合わせて回す
+        [Toggle] _RotateNormals ("Rotate Normals With Sprite", Float) = 0
 
         _StencilComp ("Stencil Comparison", Float) = 8
         _Stencil ("Stencil ID", Float) = 0
@@ -107,6 +109,7 @@ Shader "KM/LitArt"
             float4 _KMCandleParams[4];
             float4 _KMCandleColor[4];
             float _CandleScale;
+            float _RotateNormals;
 
             // Pixel Art Lighter と同じ、1灯ぶんの光の当たり方（遠くの明るさは含まない）
             float3 DirectLight(float3 n, float2 uv, float4 pos, float4 prm, float4 col, float aspect)
@@ -151,6 +154,25 @@ Shader "KM/LitArt"
 
                 float2 uv = IN.screenPos.xy / max(IN.screenPos.w, 1e-5);
                 float aspect = _ScreenParams.x / _ScreenParams.y;
+
+                // 絵が回っている物（対局待ちの牌）は、法線の向き（絵の右・絵の上）を画面の向きへ直す（2026-11-22）。
+                // UI は同じ Canvas の絵を1つのメッシュにまとめるので、物ごとの回転は行列から取れない。
+                // 代わりに「画面を1画素動くと絵の座標がどれだけ動くか」（ddx/ddy）から、絵の右と上が画面のどちらかを求める。
+                // 画面側も同じく ddx/ddy で測るので、上下の向きの違い（D3D と GL）を気にしなくてよい
+                if (_RotateNormals > 0.5)
+                {
+                    float2 ux = ddx(IN.texcoord), uy = ddy(IN.texcoord);
+                    float2 sx = ddx(uv), sy = ddy(uv);
+                    float det = ux.x * uy.y - uy.x * ux.y;
+                    if (abs(det) > 1e-12)
+                    {
+                        float2 tu = (sx * uy.y - sy * ux.y) / det;      // 絵の右（u が増える向き）を画面の uv で
+                        float2 tv = (-sx * uy.x + sy * ux.x) / det;     // 絵の上（v が増える向き）
+                        tu.x *= aspect; tv.x *= aspect;                  // 画面の縦横比をそろえてから向きだけ取る
+                        float2 nxy = n.x * normalize(tu) + n.y * normalize(tv);
+                        n = normalize(float3(nxy, n.z));
+                    }
+                }
 
                 // Pixel Art Lighter（v3.6.1 renderPixels）と同じ式。プロジェクトはリニア色空間なので、
                 // ここでの色はツールの albedoLinear と同じ扱いになる

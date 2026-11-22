@@ -67,6 +67,7 @@ namespace KillingMahjong.UI.Effects
         {
             var sprites = LoadTileSprites();
             var bag = new List<Sprite>(sprites);
+            var litMaterial = LitTileMaterial();
             var random = new System.Random(GetInstanceID());
             for (int i = 0; i < Count; i++)
             {
@@ -74,6 +75,7 @@ namespace KillingMahjong.UI.Effects
                 var rt = (RectTransform)go.transform;
                 rt.SetParent(transform, false); rt.sizeDelta = Vector2.one * 42f;
                 var image = go.GetComponent<Image>(); image.raycastTarget = false; image.preserveAspect = true;
+                if (litMaterial != null) image.material = litMaterial;
                 if (bag.Count == 0) bag.AddRange(sprites);
                 if (bag.Count > 0) { int pick = random.Next(bag.Count); image.sprite = bag[pick]; bag.RemoveAt(pick); }
                 else image.color = new Color32(238, 232, 214, 255);
@@ -187,6 +189,19 @@ namespace KillingMahjong.UI.Effects
                 }
             }
             return kept.ToArray();
+        }
+
+        /// <summary>
+        /// 牌に光を当てる材質（2026-11-22「ノーマルマップを使えば、もっとリアルな感じで牌を動かすとかできるのでは」）。
+        /// 寝かせた牌（〜自身打）は32枚とも同じ形なので、法線マップ1枚（tile_discard_normal）を全部で使う。
+        /// 法線は牌の回転に合わせて回す（KM/LitArt の _RotateNormals）。混ぜて向きが変わると、光の当たる縁が変わる。
+        /// 立てた牌（Hand）は形が違うので当てない。場面に SceneLight が無ければ、材質は元の絵のまま描く。
+        /// </summary>
+        public static bool UseLighting = true;
+        private static Material LitTileMaterial()
+        {
+            if (!UseLighting || _art != TileArt.Discard) return null;
+            return Resources.Load<Material>("Lighting/LitArt_Tile");
         }
 
         private const string TileFolder = "麻雀牌";
