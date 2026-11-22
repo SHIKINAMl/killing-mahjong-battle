@@ -303,7 +303,8 @@ namespace KillingMahjong.UI
         /// <summary>
         /// 待ちの一覧から、**届きうる中でいちばん上の格**を役名として出す（2026-09-20 の仕様書）。
         ///
-        /// 満貫に届かないなら何も出さない（フロー図の「if それが満貫以上であるか → NO → なにもしない」）。
+        /// 満貫に届かないなら役名は出さず、「ブー」を鳴らす（2026-11-22「満貫以上ではなかった場合、ブーという効果音を
+        /// 鳴らしてほしい」。前はフロー図の「NO → なにもしない」どおり無音だった）。聴牌していない（待ちが無い）ときも鳴らす。
         /// 倍率は 満貫1 / 跳満1.5 / 倍満2 / 三倍満3 / 役満4（<see cref="Managers.GameRules.GetMultiplier"/>）。
         /// **フロー図は三倍満を分けていない**ので、3倍は「倍満以上」に含めて倍満と出す。
         /// </summary>
@@ -311,7 +312,7 @@ namespace KillingMahjong.UI
         {
             // 待ち牌は役名のスタンプと独立。満貫未満・待ちなしも表示できる。
             _waitReveal?.Show(waits ?? System.Array.Empty<WaitData>(), uiManager.TileResourceManager, false);
-            if (waits == null || waits.Length == 0) return;
+            if (waits == null || waits.Length == 0) { Effects.HandSelectionFeedbackAudio.PlayRankMiss(); return; }
 
             float best = 0f;
             bool manganOrMore = false;
@@ -322,7 +323,7 @@ namespace KillingMahjong.UI
                 if (waits[i].multiplier > best) best = waits[i].multiplier;
             }
 
-            if (!manganOrMore) return;
+            if (!manganOrMore) { Effects.HandSelectionFeedbackAudio.PlayRankMiss(); return; }
 
             string rank;
             if (best >= 4f) rank = "役満";

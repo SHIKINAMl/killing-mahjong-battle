@@ -6,7 +6,7 @@ namespace KillingMahjong.UI.Effects
     /// <summary>手牌選択の表示に同期する短いSE。本編とコレクションで共用する。</summary>
     public static class HandSelectionFeedbackAudio
     {
-        private static AudioClip roleEntry, rankImpact, waitFlight, waitArrival;
+        private static AudioClip roleEntry, rankImpact, rankMiss, waitFlight, waitArrival;
         private static float lastRoleAt = float.NegativeInfinity;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -28,6 +28,18 @@ namespace KillingMahjong.UI.Effects
             if (audio == null || !audio.AudioEnabled) return;
             if (rankImpact == null) rankImpact = Resources.Load<AudioClip>("Se/HandSelection/rank_impact");
             if (rankImpact != null) audio.PlaySE(rankImpact);
+        }
+
+        /// <summary>
+        /// 13枚そろえた手が満貫に届かなかったときの「ブー」（2026-11-22 の依頼）。
+        /// 音のファイル（Se/HandSelection/rank_miss）が無ければ鳴らさない。
+        /// </summary>
+        public static void PlayRankMiss()
+        {
+            var audio = AudioManager.Instance;
+            if (audio == null || !audio.AudioEnabled) return;
+            if (rankMiss == null) rankMiss = Resources.Load<AudioClip>("Se/HandSelection/rank_miss");
+            if (rankMiss != null) audio.PlaySE(rankMiss);
         }
 
         // 移送のオブジェクトに持たせることで、中断したときは音も一緒に止まる。

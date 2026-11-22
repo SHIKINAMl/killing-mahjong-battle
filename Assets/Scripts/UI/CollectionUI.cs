@@ -323,6 +323,7 @@ namespace KillingMahjong.UI
             ManagerClip("hoverSE",      "選択",               "牌にカーソル"),
             new Track("Se/HandSelection", "role_entry",  "役条件の登場"),
             new Track("Se/HandSelection", "rank_impact", "役名・待ち牌の着弾"),
+            new Track("Se/HandSelection", "rank_miss",   "満貫に届かない（ブー）"),
             new Track("Stingers", "se_reselect", "並べ直す"),
             new Track("Stingers", "se_bet_tick_1",  "賭け金の増減　低"),
             new Track("Stingers", "se_bet_tick_2",  "賭け金の増減　中"),
