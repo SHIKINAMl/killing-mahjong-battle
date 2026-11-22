@@ -562,10 +562,12 @@ namespace KillingMahjong.UI
                 TextMeshProUGUI name = Txt(rowGo.transform, "Name", YakuExamples.DisplayName(yaku), new Vector2(-30f, 0f),
                     new Vector2(ListWidth - 76f, 22f), 16f, TextAlignmentOptions.Left, TextMain);
                 name.rectTransform.sizeDelta = new Vector2(ListWidth - 76f, 22f);
-                name.fontSize = 16f;
+                // 役名は大きめ（2026-11-22「役の文字の大きさをもうちょっと大きく」。前は 16）
+                name.fontSize = AllRowNameFontSize;
                 HandTypeBadge badge = BuildBoost(rowGo.transform, "BoostTag");
                 HandTypeBadge enemyBadge = BuildBoost(rowGo.transform, "EnemyBoostTag");
-                BuildRowType(rowGo.transform, name, HandArchetype.Of(yaku));
+                // 型の札は一覧の行には付けない。右の役名の行の右端に、選んだ役のぶんだけ出す
+                // （2026-11-22「左の一覧に入れるのではなく、右の上にある名前のところに…手帳の右端に置いてほしい」）
 
                 int index = i;
                 button.onClick.RemoveAllListeners();
@@ -588,19 +590,32 @@ namespace KillingMahjong.UI
             _allContent = content;
         }
 
-        // ---- 役名の横の型の札（2026-10-15、ユーザーの指示「型はその役名の横に文字のアイコンを」） ----
+        // ---- 型の札（2026-10-15「型はその役名の横に文字のアイコンを」） ----
+        // 2026-11-22 に、役一覧では一覧の各行から外し、右の役名の行の右端へ移した（見た目がわかりづらいと言われた）。
 
+        /// <summary>「+1」の札の文字の大きさ。</summary>
         private const float RowTypeFontSize = 12f;
+        /// <summary>役一覧の左の行の役名の大きさ（前は 16）。</summary>
+        private const float AllRowNameFontSize = 18f;
+        /// <summary>右の役名の行に置く型の札の文字。役名（28）に対して小さく、ちょこんと乗せる。</summary>
+        private const float DetailTypeFontSize = 11f;
 
-        private void BuildRowType(Transform row, TextMeshProUGUI name, HandArchetype.Info info)
+        /// <summary>
+        /// 役一覧で、型の札を右の役名の行の右端（手帳のページの右端）に置く。
+        /// 役名の下の線（YakuNameRule）の上に、札の下の辺を載せる。
+        /// </summary>
+        private void PlaceDetailTypeBadgeAtRight()
         {
-            HandTypeBadge badge = HandTypeBadge.Ensure(row, "TypeBadge", RowTypeFontSize, _font, true, out _);
-            badge.Show(info, NotebookTag(info));
-            var rt = (RectTransform)badge.transform;
+            var rt = (RectTransform)_typeBadge.transform;
             rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
-            rt.pivot = new Vector2(0f, 0.5f);
-            PositionTypeBadge(badge, name, 4f);
+            rt.pivot = new Vector2(1f, 0f);
+            rt.anchoredPosition = new Vector2(DetailCenterX + DetailWidth * 0.5f, DetailNameRuleY + 3f);
+            var label = _typeBadge.GetComponentInChildren<TMP_Text>(true);
+            if (label != null) label.fontSize = DetailTypeFontSize;
         }
+
+        /// <summary>役名の下の線の高さ（<see cref="BuildDetail"/> の YakuNameRule）。</summary>
+        private const float DetailNameRuleY = 140f;
 
         private static void PositionTypeBadge(HandTypeBadge badge, TMP_Text name, float gap)
         {
@@ -622,7 +637,7 @@ namespace KillingMahjong.UI
                 new Vector2(DetailWidth, 40f), 28f, TextAlignmentOptions.Left, TextMain);
             _hanText = Txt(parent, "YakuHan", "", new Vector2(DetailCenterX, 162f),
                 new Vector2(DetailWidth, 30f), 19f, TextAlignmentOptions.Right, TextMain);
-            Img(parent, "YakuNameRule", PanelEdge, new Vector2(DetailCenterX, 140f), new Vector2(DetailWidth, 1f));
+            Img(parent, "YakuNameRule", PanelEdge, new Vector2(DetailCenterX, DetailNameRuleY), new Vector2(DetailWidth, 1f));
 
             _descText = Txt(parent, "YakuDesc", "", new Vector2(DetailCenterX, 108f),
                 new Vector2(DetailWidth, 48f), 16f, TextAlignmentOptions.TopLeft, TextMain, out bool madeDesc);
@@ -789,13 +804,14 @@ namespace KillingMahjong.UI
                     : "";
             }
 
-            // 閲覧では型の札を一覧の各行で見せる。
+            // 役一覧（閲覧）では、型の札を役名の行の右端に小さく置く（2026-11-22。前は一覧の各行に付けていた）。
+            // 役強化では今までどおり役名のすぐ横（右端には「倍率1段上げ・…まで」が出るため）。
             var type = HandArchetype.Of(yaku);
             if (_typeBadge != null)
             {
-                _typeBadge.Show(_browseOnly ? null : type, NotebookTag(type));
-                if (!_browseOnly && type != null && _nameText != null)
-                    PositionTypeBadge(_typeBadge, _nameText, 10f);
+                _typeBadge.Show(type, NotebookTag(type));
+                if (type != null && _browseOnly) PlaceDetailTypeBadgeAtRight();
+                else if (type != null && _nameText != null) PositionTypeBadge(_typeBadge, _nameText, 10f);
             }
         }
 
