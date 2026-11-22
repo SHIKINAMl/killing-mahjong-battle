@@ -67,17 +67,46 @@ namespace KillingMahjong.UI.Effects
         {
             var sprites = LoadTileSprites();
             var bag = new List<Sprite>(sprites);
+            var litMaterial = LitTileMaterial();
+            if (litMaterial != null)
+            {
+                // 牌ごとの傾き・照り返し（TileLightMotion）を Shader へ送るチャンネル
+                var c = GetComponentInParent<Canvas>();
+                TileLightMotion.EnableChannel(c);
+                if (c != null) TileLightMotion.EnableChannel(c.rootCanvas);
+            }
             var random = new System.Random(GetInstanceID());
+            // 接地の影の層。全部の牌より奥に描くので、牌より先に（いちばん上の子として）置く
+            RectTransform shadowLayer = null;
+            if (UseContactShadows)
+            {
+                var layerGo = new GameObject(ShadowLayerName, typeof(RectTransform));
+                shadowLayer = (RectTransform)layerGo.transform;
+                shadowLayer.SetParent(transform, false);
+                shadowLayer.anchorMin = shadowLayer.anchorMax = new Vector2(.5f, .5f);
+                shadowLayer.sizeDelta = Vector2.zero; shadowLayer.anchoredPosition = Vector2.zero;
+                shadowLayer.SetAsFirstSibling();
+            }
             for (int i = 0; i < Count; i++)
             {
                 var go = new GameObject("Tile" + i, typeof(RectTransform), typeof(Image));
                 var rt = (RectTransform)go.transform;
                 rt.SetParent(transform, false); rt.sizeDelta = Vector2.one * 42f;
                 var image = go.GetComponent<Image>(); image.raycastTarget = false; image.preserveAspect = true;
+                if (litMaterial != null) { image.material = litMaterial; if (UseMotionLighting) go.AddComponent<TileLightMotion>(); }
                 if (bag.Count == 0) bag.AddRange(sprites);
                 if (bag.Count > 0) { int pick = random.Next(bag.Count); image.sprite = bag[pick]; bag.RemoveAt(pick); }
                 else image.color = new Color32(238, 232, 214, 255);
                 tiles.Add(rt);
+                if (shadowLayer != null)
+                {
+                    var sg = new GameObject("Shade" + i, typeof(RectTransform), typeof(Image));
+                    var srt = (RectTransform)sg.transform;
+                    srt.SetParent(shadowLayer, false); srt.sizeDelta = rt.sizeDelta;
+                    var si = sg.GetComponent<Image>(); si.raycastTarget = false; si.preserveAspect = true;
+                    si.sprite = image.sprite; si.color = ShadowColor;
+                    shadows.Add(srt);
+                }
             }
             builtArt = _art; builtArtGeneration = _artGeneration;
             EnsurePhysics(true);
@@ -91,13 +120,37 @@ namespace KillingMahjong.UI.Effects
                 if (child != null && child.name.StartsWith("Tile") &&
                     child.GetComponent<Image>() != null && child.gameObject.activeSelf) tiles.Add(child);
             }
+            shadows.Clear();
+            var layer = transform.Find(ShadowLayerName);
+            if (layer != null) for (int i = 0; i < layer.childCount; i++) shadows.Add((RectTransform)layer.GetChild(i));
+        }
+
+        // ---- 接地の影（2026-11-22「牌の動きもうちょっと麻雀卓の生地の部分に触れながら動いている感じに」） ----
+        // 牌の真下に、同じ形の薄い黒をぴったり付ける。離さず・ぼかさないので、布に載ったまま滑って見える。
+        // 光は画面の上（奥）から来るので、影は手前（下）へ少しだけ出す。
+        public static bool UseContactShadows = true;
+        private const string ShadowLayerName = "ContactShadows";
+        private static readonly Color ShadowColor = new Color(0f, 0f, 0f, .38f);
+        private static readonly Vector2 ShadowOffset = new Vector2(0f, -2.5f);
+        private readonly List<RectTransform> shadows = new List<RectTransform>();
+
+        private void LateUpdate()
+        {
+            int n = Mathf.Min(tiles.Count, shadows.Count);
+            for (int i = 0; i < n; i++)
+            {
+                var t = tiles[i]; var s = shadows[i];
+                if (t == null || s == null) continue;
+                s.anchoredPosition = t.anchoredPosition + ShadowOffset;
+                s.localRotation = t.localRotation;
+            }
         }
         private void Rebuild()
         {
             DisposePhysics();
             for (int i = transform.childCount - 1; i >= 0; i--)
             { var child = transform.GetChild(i).gameObject; child.SetActive(false); Destroy(child); }
-            tiles.Clear(); Build();
+            tiles.Clear(); shadows.Clear(); Build();
         }
         private void EnsurePhysics(bool scatter)
         {
@@ -187,6 +240,21 @@ namespace KillingMahjong.UI.Effects
                 }
             }
             return kept.ToArray();
+        }
+
+        /// <summary>
+        /// 牌に光を当てる材質（2026-11-22「ノーマルマップを使えば、もっとリアルな感じで牌を動かすとかできるのでは」）。
+        /// 寝かせた牌（〜自身打）は32枚とも同じ形なので、法線マップ1枚（tile_discard_normal）を全部で使う。
+        /// 法線は牌の回転に合わせて回す（KM/LitArt の _RotateNormals）。混ぜて向きが変わると、光の当たる縁が変わる。
+        /// 立てた牌（Hand）は形が違うので当てない。場面に SceneLight が無ければ、材質は元の絵のまま描く。
+        /// </summary>
+        public static bool UseLighting = true;
+        /// <summary>動きを光で見せる（押されると傾いて揺れる・ぶつかると縁が光る。<see cref="TileLightMotion"/>）。</summary>
+        public static bool UseMotionLighting = true;
+        private static Material LitTileMaterial()
+        {
+            if (!UseLighting || _art != TileArt.Discard) return null;
+            return Resources.Load<Material>("Lighting/LitArt_Tile");
         }
 
         private const string TileFolder = "麻雀牌";

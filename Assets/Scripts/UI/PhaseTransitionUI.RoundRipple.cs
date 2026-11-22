@@ -10,9 +10,10 @@ namespace KillingMahjong.UI
     ///
     ///   0.00s  「第(N-1)局目」が、いつもどおりその場でぱっと出る
     ///   0.35s  数字だけが上へ抜けて消え、下から新しい数字が入って止まる（約0.3秒）
-    ///   0.65s  止まった数字から、輪が3重に広がって薄れる（約0.8秒）
     ///
-    /// 第1局は送る前の数字が無いので、波紋だけを出す。
+    /// **輪（波紋）は外した（2026-11-22「波紋が過剰演出だと言われた。数字がガクンとスロットみたいに動くのは
+    /// そのままで、波紋は消してほしい」）。** 前は止まった数字から輪が3重に広がっていた。
+    /// 第1局は送る前の数字が無いので、何も動かない（前は波紋だけを出していた）。
     ///
     /// **本編の出し方（2026-11-21 に本番の流れで確認して直した）:**
     ///   ・第1局: 暗転の文字は「対局開始」で、配牌待ちの差し替えで「第1局進行中...」が出る → 差し替え（SwapDarkenText）で波紋
@@ -34,20 +35,6 @@ namespace KillingMahjong.UI
         private const float RoundFlipInSeconds = 0.18f;
         /// <summary>数字が上下に動く距離（文字の高さに対する割合）。</summary>
         private const float RoundFlipTravel = 0.6f;
-
-        private const int RippleCount = 3;
-        private const float RippleInterval = 0.12f;
-        private const float RippleSeconds = 0.8f;
-        /// <summary>輪の広がり（数字の高さに対する倍率）。</summary>
-        private const float RippleStartRadius = 0.6f;
-        private const float RippleEndRadius = 2.6f;
-        /// <summary>ドットの格子と、輪の太さ（Canvas の単位）。</summary>
-        private const float RippleGrid = 4f;
-        private const float RippleThicknessStart = 6f;
-        private const float RippleThicknessEnd = 3f;
-
-        private static readonly Color RippleBone = new Color(0.96f, 0.90f, 0.80f, 1f);
-        private static readonly Color RippleBlood = new Color(0.80f, 0.05f, 0.10f, 1f);
 
         /// <summary>数字送りと波紋を出せるか（輪の板がシーンにあり、文字に数字があるか）。</summary>
         private bool CanPlayRoundNumberRipple(string text)
@@ -147,30 +134,7 @@ namespace KillingMahjong.UI
             }
             _roundRippleFlipped = true;
 
-            // ---- 波紋 ----
-            if (!DigitBounds(out Vector2 center, out float height)) { FinishRoundRipple(); yield break; }
-
-            roundNumberRipple.gameObject.SetActive(true);
-            float total = RippleSeconds + RippleInterval * (RippleCount - 1);
-            for (float t = 0f; t < total; t += Mathf.Min(Time.unscaledDeltaTime, 1f / 30f))
-            {
-                float st = PresentationTiming.Sample(t);
-                roundNumberRipple.Begin();
-                for (int k = 0; k < RippleCount; k++)
-                {
-                    float u = (st - k * RippleInterval) / RippleSeconds;
-                    if (u < 0f || u > 1f) continue;
-                    float e = 1f - (1f - u) * (1f - u);
-                    float radius = height * Mathf.Lerp(RippleStartRadius, RippleEndRadius, e);
-                    float thick = Mathf.Round(Mathf.Lerp(RippleThicknessStart, RippleThicknessEnd, u) / 1f);
-                    var c = k == 1 ? RippleBlood : RippleBone;
-                    c.a = Mathf.Pow(1f - u, 1.4f);
-                    roundNumberRipple.PixelRing(center, radius, thick, RippleGrid, c);
-                }
-                roundNumberRipple.End();
-                yield return null;
-            }
-
+            // 送ったあとの輪（波紋）は外した（2026-11-22「波紋が過剰演出だと言われた。数字がスロットみたいに動くのはそのままで、波紋は消して」）
             FinishRoundRipple();
         }
 
@@ -231,32 +195,6 @@ namespace KillingMahjong.UI
                 }
             }
             centerText.UpdateVertexData(TMP_VertexDataUpdateFlags.Vertices | TMP_VertexDataUpdateFlags.Colors32);
-        }
-
-        /// <summary>数字の中心（輪の板の座標）と、数字の高さ。</summary>
-        private bool DigitBounds(out Vector2 center, out float height)
-        {
-            center = Vector2.zero; height = 0f;
-            var info = centerText.textInfo;
-            if (!FindDigits(centerText.text, out int start, out int length)) return false;
-            Vector3 min = new Vector3(float.MaxValue, float.MaxValue), max = new Vector3(float.MinValue, float.MinValue);
-            for (int i = start; i < start + length && i < info.characterCount; i++)
-            {
-                var ch = info.characterInfo[i];
-                if (!ch.isVisible) continue;
-                min = Vector3.Min(min, ch.bottomLeft); max = Vector3.Max(max, ch.topRight);
-            }
-            if (min.x > max.x) return false;
-
-            var rippleRect = roundNumberRipple.rectTransform;
-            Vector3 worldMin = centerText.rectTransform.TransformPoint(min);
-            Vector3 worldMax = centerText.rectTransform.TransformPoint(max);
-            Vector2 a = rippleRect.InverseTransformPoint(worldMin), b = rippleRect.InverseTransformPoint(worldMax);
-            center = (a + b) * 0.5f;
-            // 輪の点を格子に乗せるため、中心も格子に寄せる
-            center = new Vector2(Mathf.Round(center.x / RippleGrid) * RippleGrid, Mathf.Round(center.y / RippleGrid) * RippleGrid);
-            height = Mathf.Abs(b.y - a.y);
-            return height > 0f;
         }
 
         /// <summary>文字の中の最初の数字の並び（半角・全角）。</summary>

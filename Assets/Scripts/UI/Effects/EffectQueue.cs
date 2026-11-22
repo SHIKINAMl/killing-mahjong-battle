@@ -95,6 +95,9 @@ namespace KillingMahjong.UI.Effects
             }
         }
 
+        /// <summary>実体があれば返す。**作らない**（場面を閉じる途中で呼んでも、新しい物を作って残さない）。</summary>
+        public static EffectQueue Existing => _instance;
+
         /// <summary>いま流している演出の名前。無ければ null。</summary>
         public string CurrentName { get { return _current != null ? _current.Name : null; } }
 

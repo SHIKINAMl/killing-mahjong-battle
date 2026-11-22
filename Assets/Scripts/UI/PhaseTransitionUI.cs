@@ -125,6 +125,11 @@ namespace KillingMahjong.UI
             // **立てたまま消さない。** 残ると次の場面でセリフ送りが効かなくなる
             IsScreenDarkened = false;
 
+            // 案内の文字の「出ています」の届けを取り下げる。演出の順番待ち（EffectQueue）は場面をまたいで残るので、
+            // 残すと次の演出が来たときに、消えたこの画面の CutPromptText が呼ばれて MissingReferenceException になる
+            // （2026-11-22「へやに戻るをしまくるとこのエラーが出ます」）
+            ReleasePromptShowing();
+
 
             // 複製は自分で捨てる。放っておくと再生のたびに積もる
             if (checkerMaterialInstance != null)
@@ -448,6 +453,8 @@ namespace KillingMahjong.UI
         /// <summary>案内の文字をその場で消す。出ていなければ何もしない。</summary>
         internal void CutPromptText()
         {
+            // 画面がもう消えていたら何もしない（取り下げ前に呼ばれたときの保険）
+            if (this == null) { _promptRoutine = null; _promptShowing = null; return; }
             if (_promptRoutine != null) StopCoroutine(_promptRoutine);
             _promptRoutine = null;
             ReleasePromptShowing();
@@ -459,7 +466,7 @@ namespace KillingMahjong.UI
             if (_promptShowing == null) return;
             var showing = _promptShowing;
             _promptShowing = null;
-            var queue = Effects.EffectQueue.Instance;
+            var queue = Effects.EffectQueue.Existing;
             if (queue != null) queue.Unregister(showing);
         }
 

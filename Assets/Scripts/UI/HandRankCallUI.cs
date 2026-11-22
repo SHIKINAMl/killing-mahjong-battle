@@ -19,6 +19,7 @@ namespace KillingMahjong.UI
     /// 白いかたまりが被さり「ごちゃごちゃした印象」「かぶってる感」と言われた。ユーザーが選んだ形:
     ///   ・象牙色の字（前は縁だけで中を透かしていたが、のちに中も塗った。下の「段」）。暗幕で画面全体を落とす案は退けられた
     ///   ・**字の下に重なっている UI だけを薄くして道を空ける**（案 A）。字が消えるのに合わせて戻す
+    ///     （2026-11-22 から、重なった部品の入っている**まとまりごと**薄くする。部品ごとだと同じ物の中で半端に残った）
     ///   ・**字は位置も大きさも変えず、その場でフェードインする**（「血が抜ける演出よりは、
     ///     文字の位置が変わらないフェードインしてほしい」）。特大から縮む動き・血の演出はやめた
     ///
@@ -396,25 +397,89 @@ namespace KillingMahjong.UI
             if (areas.Count == 0) return;
 
             float maxWidth = Screen.width * MaxDimWidthRatio;
-            var corners = new Vector3[4];
             foreach (var g in FindObjectsByType<Graphic>(FindObjectsSortMode.None))
             {
-                if (g == null || !g.isActiveAndEnabled || g.canvas == null || _dimmed.ContainsKey(g)) continue;
-                var root = g.canvas.rootCanvas;
-                if (root == null || NeverDimCanvases.Contains(root.name) || g.transform.IsChildOf(transform)) continue;
-
-                Camera cam = root.renderMode == RenderMode.ScreenSpaceOverlay ? null : root.worldCamera;
-                g.rectTransform.GetWorldCorners(corners);
-                Vector2 a = RectTransformUtility.WorldToScreenPoint(cam, corners[0]);
-                Vector2 b = RectTransformUtility.WorldToScreenPoint(cam, corners[2]);
-                var r = Rect.MinMaxRect(Mathf.Min(a.x, b.x), Mathf.Min(a.y, b.y), Mathf.Max(a.x, b.x), Mathf.Max(a.y, b.y));
-                if (r.width > maxWidth) continue;
+                if (!CanDim(g) || _dimmed.ContainsKey(g)) continue;
+                if (!TryScreenRect(g, out Rect r) || r.width > maxWidth) continue;
 
                 bool overlaps = false;
                 foreach (var area in areas) if (area.Overlaps(r)) { overlaps = true; break; }
                 if (!overlaps) continue;
 
+                // **重なった部品だけでなく、その部品の入っているまとまりごと薄くする**（2026-11-22
+                // 「半透明になっているものとなっていないものがある。これの徹底をちゃんとして」）。
+                // 前は部品1つずつ字と重なるかで決めていたので、役一覧の板は薄いのに上の札と見出しは濃い、
+                // 体力の袋は薄いのに数字と管は濃い、のように同じ物の中で半端になっていた
+                Transform unit = DimUnitOf(g);
+                if (!_dimUnits.Contains(unit)) _dimUnits.Add(unit);
+                DimUnder(unit);
+            }
+        }
+
+        /// <summary>薄くした まとまり。出ている間に表示された部品も、ここから拾って同じに薄くする。</summary>
+        private readonly List<Transform> _dimUnits = new List<Transform>();
+
+        /// <summary>まとまりの大きさの上限（画面に対する割合）。これより大きい親はまとまりにしない（手牌・卓など）。</summary>
+        private const float MaxUnitWidthRatio = 0.45f;
+        private const float MaxUnitHeightRatio = 0.7f;
+
+        private bool CanDim(Graphic g)
+        {
+            if (g == null || !g.isActiveAndEnabled || g.canvas == null) return false;
+            var root = g.canvas.rootCanvas;
+            return root != null && !NeverDimCanvases.Contains(root.name) && !g.transform.IsChildOf(transform);
+        }
+
+        private static readonly Vector3[] Corners = new Vector3[4];
+
+        private static bool TryScreenRect(Graphic g, out Rect r)
+        {
+            r = default;
+            var root = g.canvas != null ? g.canvas.rootCanvas : null;
+            if (root == null) return false;
+            Camera cam = root.renderMode == RenderMode.ScreenSpaceOverlay ? null : root.worldCamera;
+            g.rectTransform.GetWorldCorners(Corners);
+            Vector2 a = RectTransformUtility.WorldToScreenPoint(cam, Corners[0]);
+            Vector2 b = RectTransformUtility.WorldToScreenPoint(cam, Corners[2]);
+            r = Rect.MinMaxRect(Mathf.Min(a.x, b.x), Mathf.Min(a.y, b.y), Mathf.Max(a.x, b.x), Mathf.Max(a.y, b.y));
+            return true;
+        }
+
+        /// <summary>
+        /// 部品の入っている「まとまり」（役一覧・相手の体力・自分の体力・台詞など）。
+        /// 親をたどり、中に見えている部品を全部囲んでも画面の一部（幅45%・高さ70%まで）に収まる、いちばん上の親。
+        /// 大きすぎる親（手牌や卓まで入る入れ物）まで上がると、字と関係ない物まで薄くなるので止める。
+        /// </summary>
+        private Transform DimUnitOf(Graphic g)
+        {
+            Transform unit = g.transform;
+            Transform rootCanvas = g.canvas.rootCanvas.transform;
+            float maxW = Screen.width * MaxUnitWidthRatio, maxH = Screen.height * MaxUnitHeightRatio;
+            for (Transform p = g.transform.parent; p != null && p != rootCanvas; p = p.parent)
+            {
+                bool any = false; Rect u = default;
+                foreach (var c in p.GetComponentsInChildren<Graphic>(false))
+                {
+                    if (!c.isActiveAndEnabled || !TryScreenRect(c, out Rect r)) continue;
+                    u = any ? Rect.MinMaxRect(Mathf.Min(u.xMin, r.xMin), Mathf.Min(u.yMin, r.yMin),
+                        Mathf.Max(u.xMax, r.xMax), Mathf.Max(u.yMax, r.yMax)) : r;
+                    any = true;
+                }
+                if (!any || u.width > maxW || u.height > maxH) break;
+                unit = p;
+            }
+            return unit;
+        }
+
+        /// <summary>まとまりの中の、見えている部品を薄くする側に入れる（まだ入っていない物だけ）。</summary>
+        private void DimUnder(Transform unit)
+        {
+            if (unit == null) return;
+            foreach (var g in unit.GetComponentsInChildren<Graphic>(false))
+            {
+                if (!CanDim(g) || _dimmed.ContainsKey(g)) continue;
                 _dimmed[g] = g.canvasRenderer.GetAlpha();
+                g.canvasRenderer.SetAlpha(_dimmed[g] * Mathf.Lerp(1f, CoveredAlpha, _dimAmount));
             }
         }
 
@@ -445,7 +510,20 @@ namespace KillingMahjong.UI
             foreach (var pair in _dimmed)
                 if (pair.Key != null) pair.Key.canvasRenderer.SetAlpha(pair.Value);
             _dimmed.Clear();
+            _dimUnits.Clear();
             _dimAmount = 0f;
+        }
+
+        /// <summary>
+        /// 薄くしている間、毎フレーム当て直す。ボタンの色の切り替え（押せる/押せない・カーソル）は
+        /// 濃さも一緒に戻してしまうので、1回当てただけだとボタンだけ濃く戻ることがある。
+        /// 出ている間に表示された部品（札が増えた・台詞が出た）も、同じまとまりなら薄くする。
+        /// </summary>
+        private void KeepDimmed()
+        {
+            if (_dimmed.Count == 0 || _dimAmount <= 0f) return;
+            foreach (var unit in _dimUnits) DimUnder(unit);
+            SetDim(_dimAmount);
         }
 
         /// <summary>
@@ -458,6 +536,7 @@ namespace KillingMahjong.UI
             if (_group == null) return;
 
             if (_group.alpha > 0f) ApplyLighting();
+            KeepDimmed();
 
             if (_routine != null || _group.alpha <= 0f)
             {

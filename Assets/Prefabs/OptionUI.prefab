@@ -261,7 +261,7 @@ MonoBehaviour:
   returnToTitleButton: {fileID: 9166685223636238862}
   quitButton: {fileID: 47264401268662596}
   showReturnButton: 1
-  returnSceneName: "\u90E8\u5C4B\u30B7\u30FC\u30F3"
+  returnSceneName: "\u30E1\u30A4\u30F3\u30E1\u30CB\u30E5\u30FC\u30B7\u30FC\u30F3"
 --- !u!225 &1547131274103323127
 CanvasGroup:
   m_ObjectHideFlags: 0

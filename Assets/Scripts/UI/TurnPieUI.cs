@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using KillingMahjong.UI.Effects;
 
@@ -24,6 +25,14 @@ namespace KillingMahjong.UI
     ///     （15打目は5打ごとの節目でもあるが、こちらを優先する）
     ///   ・打ち切り（残り0）: 暗い赤の輪が1つ、ゆっくり広がって脈が止まる
     /// 輪は円グラフと同じ板に描く（新しい部品は足さない）。
+    ///
+    /// **円の真ん中に、今のターンの数字を出す（2026-11-22 ユーザー指示「ターン数を表す円グラフのところは
+    /// 現在のターンの数字表示してほしい」）。** 数字は**残りのターン数**で、17 から 1 打ごとに減り、打ち切りで 0
+    /// （2026-11-22 Discord「数字が増えるんじゃなくて、減る方式でお願いします」。前は何打目かを 1〜17 で増やしていた）。
+    /// 文字はシーンに置いた子（TurnNumber）で、ここは数字を入れるだけ。
+    ///
+    /// **相手の番のあいだは、塗りを赤にする（2026-11-22「相手ターンの時はあかいろにしてほしい」）。**
+    /// 自分の番に戻ると、先攻＝金・後攻＝青に戻る。
     /// </summary>
     public class TurnPieUI : PixelShapeGraphic
     {
@@ -38,8 +47,13 @@ namespace KillingMahjong.UI
         [SerializeField] private Color firstNextColor = new Color32(255, 232, 160, 255);
         [SerializeField] private Color secondColor = new Color32(72, 132, 220, 255);
         [SerializeField] private Color secondNextColor = new Color32(170, 210, 255, 255);
+        [Tooltip("相手の番のときの塗りの色（2026-11-22「相手ターンの時はあかいろにしてほしい」）")]
+        [SerializeField] private Color opponentColor = new Color32(206, 44, 54, 255);
+        [SerializeField] private Color opponentNextColor = new Color32(255, 150, 156, 255);
         [SerializeField] private Color emptyColor = new Color32(26, 14, 16, 220);
         [SerializeField] private Color edgeColor = new Color32(12, 6, 8, 255);
+        [Tooltip("円の真ん中に出す、今のターンの数字（シーンの子 TurnNumber）。空なら数字は出さない")]
+        [SerializeField] private TMP_Text numberLabel;
 
         /// <summary>残りわずかの輪と脈の色（役名表示の血と同じ系統）。</summary>
         private static readonly Color BloodColor = new Color(0.80f, 0.05f, 0.10f, 1f);
@@ -81,12 +95,23 @@ namespace KillingMahjong.UI
             _shownOnce = true;
             if (advanced) PlayAdvance(next);
             else { _ripples.Clear(); _sliceFlashStart = -10f; }
+            UpdateNumber();
             Redraw();
+        }
+
+        /// <summary>今のターン（これから打つのが何打目か）。打ち切りのあとは最後の 17 のまま。</summary>
+        public int CurrentTurn => Mathf.Min(_discarded + 1, DiscardsPerPlayer);
+
+        private void UpdateNumber()
+        {
+            // 残りのターン数（減っていく）。何打目か（CurrentTurn）ではない
+            if (numberLabel != null) numberLabel.text = Remaining.ToString();
         }
 
         protected override void OnEnable()
         {
             base.OnEnable();
+            UpdateNumber();
             Redraw();
         }
 
@@ -94,6 +119,7 @@ namespace KillingMahjong.UI
         protected override void OnValidate()
         {
             base.OnValidate();
+            UpdateNumber();
             Redraw();
         }
 #endif
@@ -112,7 +138,7 @@ namespace KillingMahjong.UI
         private void PlayAdvance(int discarded)
         {
             int remaining = DiscardsPerPlayer - discarded;
-            Color done = _first ? firstColor : secondColor;
+            Color done = DoneColor;
             float t = Now;
 
             if (remaining <= 0)
@@ -147,9 +173,19 @@ namespace KillingMahjong.UI
             _ripples.Add(new Ripple { Start = start, Seconds = seconds, From = from, To = to, Thickness = thickness, Color = color });
         }
 
+        /// <summary>相手の番か。相手の番のあいだは、塗りを赤にする（先攻・後攻の金・青の代わり）。</summary>
+        private bool _opponentTurn;
+
+        /// <summary>塗った切れの色。相手の番は赤、自分の番は先攻＝金・後攻＝青。</summary>
+        private Color DoneColor => _opponentTurn ? opponentColor : (_first ? firstColor : secondColor);
+
         private void Update()
         {
             if (!Application.isPlaying) return;
+            // 番が替わったら色を塗り直す（BoardStateManager.IsLocalTurn を毎フレーム見る）
+            var board = KillingMahjong.Managers.BoardStateManager.Instance;
+            bool opponent = board != null && !board.IsLocalTurn;
+            if (opponent != _opponentTurn) { _opponentTurn = opponent; Redraw(); }
             _clock += Mathf.Min(Time.unscaledDeltaTime, 1f / 30f);
             // 輪が出ている間・光っている間・終わり際の脈がある間だけ描き直す
             if (_ripples.Count > 0 || Now - _sliceFlashStart < SliceFlashSeconds || IsEnding) Redraw();
@@ -180,8 +216,8 @@ namespace KillingMahjong.UI
         {
             const float cell = 2f; // 1ドット＝2単位
             float slice = 360f / DiscardsPerPlayer;
-            Color done = _first ? firstColor : secondColor;
-            Color next = _first ? firstNextColor : secondNextColor;
+            Color done = DoneColor;
+            Color next = _opponentTurn ? opponentNextColor : (_first ? firstNextColor : secondNextColor);
 
             float beat = Heartbeat();
             Color edge = Color.Lerp(edgeColor, BloodColor, beat);
