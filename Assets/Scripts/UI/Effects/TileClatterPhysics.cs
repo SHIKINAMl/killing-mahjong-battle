@@ -13,6 +13,15 @@ namespace KillingMahjong.UI.Effects
         private static readonly Vector2[] Normals = { Vector2.right, Vector2.left, Vector2.up, Vector2.down,
             new Vector2(1, 1.414f).normalized, new Vector2(-1, 1.414f).normalized };
         private static readonly float Diagonal = (186f + 1.414f * 205) / Scale / Mathf.Sqrt(1 + 1.414f * 1.414f);
+        // ---- 布（フェルト）の上の滑り方（2026-11-22「もうちょっと麻雀卓の生地の部分に触れながら動いている感じに」） ----
+        // 前は「速さに比例して弱まる」減速（linearDamping 8）が主で、すーっと伸びて氷の上のように止まっていた。
+        // 布の上は「速さによらず一定に引きずられる」摩擦が主なので、そちらを強くし、比例の減速は弱める。
+        // ずずっと滑って、遅くなったところですっと止まる。回転も同じ。
+        private const float FeltLinearDamping = 3f, FeltAngularDamping = 4f;
+        /// <summary>一定の摩擦（物理の単位/秒²）。速さ 5（200px/秒）なら約0.2秒で止まる。前は 2.5。</summary>
+        private const float FeltFriction = 22f;
+        /// <summary>回転の一定の摩擦（度/秒²）。前は 100。</summary>
+        private const float FeltSpinFriction = 520f;
         private static readonly float[] Limits = { 390f / Scale, 390f / Scale, 203f / Scale, -12f / Scale, Diagonal, Diagonal };
         private readonly List<RectTransform> visuals;
         private readonly Vector2 origin;
@@ -52,7 +61,7 @@ namespace KillingMahjong.UI.Effects
                 for (int i = 0; i < tiles.Count; i++)
                 {
                     var rb = NewObject("ContactTile" + i).AddComponent<Rigidbody2D>();
-                    rb.gravityScale = 0; rb.mass = .035f; rb.linearDamping = 8; rb.angularDamping = 9;
+                    rb.gravityScale = 0; rb.mass = .035f; rb.linearDamping = FeltLinearDamping; rb.angularDamping = FeltAngularDamping;
                     rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous; rb.sleepMode = RigidbodySleepMode2D.StartAwake;
                     var box = rb.gameObject.AddComponent<BoxCollider2D>(); box.sharedMaterial = material;
                     // 全32枚の寝かせた既存画像のalpha外周を実測した寸法。
@@ -160,8 +169,8 @@ namespace KillingMahjong.UI.Effects
                 physics.Simulate(FixedStep); SolveConstraints(4);
                 for (int i = 0; i < bodies.Length; i++)
                 {
-                    bodies[i].linearVelocity = Vector2.MoveTowards(Vector2.ClampMagnitude(bodies[i].linearVelocity, 20), Vector2.zero, 2.5f * FixedStep);
-                    bodies[i].angularVelocity = Mathf.MoveTowards(Mathf.Clamp(bodies[i].angularVelocity, -170, 170), 0, 100 * FixedStep);
+                    bodies[i].linearVelocity = Vector2.MoveTowards(Vector2.ClampMagnitude(bodies[i].linearVelocity, 20), Vector2.zero, FeltFriction * FixedStep);
+                    bodies[i].angularVelocity = Mathf.MoveTowards(Mathf.Clamp(bodies[i].angularVelocity, -170, 170), 0, FeltSpinFriction * FixedStep);
                 }
                 accumulator -= FixedStep;
             }
@@ -172,12 +181,12 @@ namespace KillingMahjong.UI.Effects
             UpdateMotion(Mathf.Min(deltaTime, .05f));
         }
         // ---- 光で見せる動き（2026-11-22「ジャラジャラは…動きもノーマルマップで特徴づけられませんか」） ----
-        /// <summary>傾きの上限（tan。0.27 ≒ 15度）。これより倒すと、輪郭が変わらないのに光だけ大きく動いて嘘っぽい。</summary>
-        private const float MaxTilt = .27f;
-        /// <summary>速さ（物理の単位/秒）に掛けて、傾きの目標にする。5 単位/秒（200px/秒）で 0.2。</summary>
-        private const float TiltPerSpeed = .04f;
-        /// <summary>傾きのばね。止まると目標が 0 になり、行き過ぎて2〜3回揺れる（約2.5回/秒）。</summary>
-        private const float TiltSpring = 250f, TiltDamping = 9f;
+        /// <summary>傾きの上限（tan。0.12 ≒ 7度）。布に触れたまま滑って見えるよう小さく（前は 0.27 で、浮いて見えた）。</summary>
+        private const float MaxTilt = .12f;
+        /// <summary>速さ（物理の単位/秒）に掛けて、傾きの目標にする。5 単位/秒（200px/秒）で 0.1。</summary>
+        private const float TiltPerSpeed = .02f;
+        /// <summary>傾きのばね。布に載っているので、止まったら揺れずに戻す（ほぼ臨界減衰）。</summary>
+        private const float TiltSpring = 250f, TiltDamping = 32f;
         /// <summary>照り返しを出す速さの急な変化（単位/秒）と、消える早さ（秒）。</summary>
         private const float GlintImpact = 2.5f, GlintFull = 9f, GlintFade = .12f;
 
