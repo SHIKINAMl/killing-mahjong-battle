@@ -68,6 +68,13 @@ namespace KillingMahjong.UI.Effects
             var sprites = LoadTileSprites();
             var bag = new List<Sprite>(sprites);
             var litMaterial = LitTileMaterial();
+            if (litMaterial != null)
+            {
+                // 牌ごとの傾き・照り返し（TileLightMotion）を Shader へ送るチャンネル
+                var c = GetComponentInParent<Canvas>();
+                TileLightMotion.EnableChannel(c);
+                if (c != null) TileLightMotion.EnableChannel(c.rootCanvas);
+            }
             var random = new System.Random(GetInstanceID());
             for (int i = 0; i < Count; i++)
             {
@@ -75,7 +82,7 @@ namespace KillingMahjong.UI.Effects
                 var rt = (RectTransform)go.transform;
                 rt.SetParent(transform, false); rt.sizeDelta = Vector2.one * 42f;
                 var image = go.GetComponent<Image>(); image.raycastTarget = false; image.preserveAspect = true;
-                if (litMaterial != null) image.material = litMaterial;
+                if (litMaterial != null) { image.material = litMaterial; if (UseMotionLighting) go.AddComponent<TileLightMotion>(); }
                 if (bag.Count == 0) bag.AddRange(sprites);
                 if (bag.Count > 0) { int pick = random.Next(bag.Count); image.sprite = bag[pick]; bag.RemoveAt(pick); }
                 else image.color = new Color32(238, 232, 214, 255);
@@ -198,6 +205,8 @@ namespace KillingMahjong.UI.Effects
         /// 立てた牌（Hand）は形が違うので当てない。場面に SceneLight が無ければ、材質は元の絵のまま描く。
         /// </summary>
         public static bool UseLighting = true;
+        /// <summary>動きを光で見せる（押されると傾いて揺れる・ぶつかると縁が光る。<see cref="TileLightMotion"/>）。</summary>
+        public static bool UseMotionLighting = true;
         private static Material LitTileMaterial()
         {
             if (!UseLighting || _art != TileArt.Discard) return null;

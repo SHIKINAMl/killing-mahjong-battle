@@ -26,6 +26,11 @@ namespace KillingMahjong.UI.Effects
         private readonly Rigidbody2D hand;
         private readonly CircleCollider2D handCollider;
         private bool disposed, hasPointer, contactArmed;
+        // 光で見せる動き（TileLightMotion）。牌ごとの傾き・その速さ・照り返し・前の速さ
+        private readonly TileLightMotion[] motions;
+        private readonly Vector2[] tilt, tiltVelocity, lastVelocity;
+        private readonly float[] glint;
+        private bool motionActive;
         private Vector2 lastPointer;
         private float accumulator;
         public string SceneName => scene.name;
@@ -38,6 +43,10 @@ namespace KillingMahjong.UI.Effects
             material = new PhysicsMaterial2D("TileClatterFelt") { friction = .58f, bounciness = 0 };
             bodies = new Rigidbody2D[tiles.Count]; colliders = new BoxCollider2D[tiles.Count];
             centers = new Vector2[tiles.Count]; radii = new float[tiles.Count];
+            motions = new TileLightMotion[tiles.Count];
+            tilt = new Vector2[tiles.Count]; tiltVelocity = new Vector2[tiles.Count]; lastVelocity = new Vector2[tiles.Count];
+            glint = new float[tiles.Count];
+            for (int i = 0; i < tiles.Count; i++) motions[i] = tiles[i] != null ? tiles[i].GetComponent<TileLightMotion>() : null;
             try
             {
                 for (int i = 0; i < tiles.Count; i++)
@@ -137,7 +146,13 @@ namespace KillingMahjong.UI.Effects
             else ResetPointer();
             bool awake = false;
             for (int i = 0; i < bodies.Length; i++) if (!bodies[i].IsSleeping()) { awake = true; break; }
-            if (!awake && !moving) { lastPointer = target; accumulator = 0; return; }
+            if (!awake && !moving)
+            {
+                lastPointer = target; accumulator = 0;
+                // 止まったあとも、揺れと照り返しが落ち着くまでは動かす
+                if (motionActive) UpdateMotion(Mathf.Min(deltaTime, .05f));
+                return;
+            }
             accumulator += Mathf.Min(deltaTime, .05f); int steps = Mathf.FloorToInt((accumulator + .0000001f) / FixedStep);
             for (int s = 0; s < steps; s++)
             {
@@ -154,7 +169,46 @@ namespace KillingMahjong.UI.Effects
             // 動いていない／収束済みなら1周で抜ける。
             if (steps > 0) SolveConstraints(192);
             lastPointer = target; Render();
+            UpdateMotion(Mathf.Min(deltaTime, .05f));
         }
+        // ---- 光で見せる動き（2026-11-22「ジャラジャラは…動きもノーマルマップで特徴づけられませんか」） ----
+        /// <summary>傾きの上限（tan。0.27 ≒ 15度）。これより倒すと、輪郭が変わらないのに光だけ大きく動いて嘘っぽい。</summary>
+        private const float MaxTilt = .27f;
+        /// <summary>速さ（物理の単位/秒）に掛けて、傾きの目標にする。5 単位/秒（200px/秒）で 0.2。</summary>
+        private const float TiltPerSpeed = .04f;
+        /// <summary>傾きのばね。止まると目標が 0 になり、行き過ぎて2〜3回揺れる（約2.5回/秒）。</summary>
+        private const float TiltSpring = 250f, TiltDamping = 9f;
+        /// <summary>照り返しを出す速さの急な変化（単位/秒）と、消える早さ（秒）。</summary>
+        private const float GlintImpact = 2.5f, GlintFull = 9f, GlintFade = .12f;
+
+        private void UpdateMotion(float dt)
+        {
+            if (dt <= 0) return;
+            bool any = false;
+            for (int i = 0; i < bodies.Length; i++)
+            {
+                if (motions[i] == null) continue;
+                Vector2 v = bodies[i].linearVelocity;
+                // ぶつかった・押された瞬間（速さが急に変わった）に照り返し
+                float jolt = (v - lastVelocity[i]).magnitude;
+                lastVelocity[i] = v;
+                if (jolt > GlintImpact) glint[i] = Mathf.Max(glint[i], Mathf.Clamp01(jolt / GlintFull));
+                glint[i] *= Mathf.Exp(-dt / GlintFade);
+                if (glint[i] < .01f) glint[i] = 0;
+
+                // 進む向きへ傾く。ばねで追うので、止まると揺れて落ち着く
+                Vector2 goal = Vector2.ClampMagnitude(v * TiltPerSpeed, MaxTilt);
+                Vector2 accel = -TiltSpring * (tilt[i] - goal) - TiltDamping * tiltVelocity[i];
+                tiltVelocity[i] += accel * dt;
+                tilt[i] = Vector2.ClampMagnitude(tilt[i] + tiltVelocity[i] * dt, MaxTilt);
+                if (tilt[i].sqrMagnitude < 1e-6f && tiltVelocity[i].sqrMagnitude < 1e-5f) { tilt[i] = Vector2.zero; tiltVelocity[i] = Vector2.zero; }
+
+                motions[i].Set(tilt[i], glint[i]);
+                if (glint[i] > 0 || tilt[i] != Vector2.zero || tiltVelocity[i] != Vector2.zero) any = true;
+            }
+            motionActive = any;
+        }
+
         private void SolveConstraints(int passes)
         {
             for (int pass = 0; pass < passes; pass++)

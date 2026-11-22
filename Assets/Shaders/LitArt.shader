@@ -72,6 +72,8 @@ Shader "KM/LitArt"
                 float4 vertex   : POSITION;
                 float4 color    : COLOR;
                 float2 texcoord : TEXCOORD0;
+                // 対局待ちの牌だけが使う（TileLightMotion）。x,y: 傾き（画面の向き）、z: ぶつかった照り返し。ほかの絵では 0
+                float4 motion   : TEXCOORD1;
             };
 
             struct v2f
@@ -80,6 +82,7 @@ Shader "KM/LitArt"
                 fixed4 color     : COLOR;
                 float2 texcoord  : TEXCOORD0;
                 float4 screenPos : TEXCOORD1;
+                float4 motion    : TEXCOORD2;
             };
 
             sampler2D _MainTex;
@@ -131,6 +134,7 @@ Shader "KM/LitArt"
                 OUT.texcoord = IN.texcoord;
                 OUT.color = IN.color * _Color;
                 OUT.screenPos = ComputeScreenPos(OUT.vertex);
+                OUT.motion = IN.motion;
                 return OUT;
             }
 
@@ -172,6 +176,8 @@ Shader "KM/LitArt"
                         float2 nxy = n.x * normalize(tu) + n.y * normalize(tv);
                         n = normalize(float3(nxy, n.z));
                     }
+                    // 牌の傾き（押されて進む向きへ倒れる・止まると揺れる）。面ごと同じだけ倒す
+                    n = normalize(float3(n.xy + IN.motion.xy * n.z, n.z));
                 }
 
                 // Pixel Art Lighter（v3.6.1 renderPixels）と同じ式。プロジェクトはリニア色空間なので、
@@ -186,6 +192,16 @@ Shader "KM/LitArt"
                 }
                 light = min(light, _MaxLight);
                 albedo.rgb *= light;
+
+                // ぶつかった瞬間の照り返し（牌だけ）。光の来る側を向いた縁ほど明るく、白を足す
+                if (_RotateNormals > 0.5 && IN.motion.z > 0.001)
+                {
+                    float2 toLight = float2(_KMLightPos.x, 1.0 - _KMLightPos.y) - uv;
+                    toLight.x *= aspect;
+                    float facing = saturate(dot(n.xy, normalize(toLight + 1e-5))) * 2.2;
+                    float glint = IN.motion.z * saturate(facing + 0.15);
+                    albedo.rgb += glint * 0.55 * _KMLightColor.rgb;
+                }
                 return albedo;
             }
             ENDCG
