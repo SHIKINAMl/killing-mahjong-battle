@@ -6,8 +6,6 @@ using KillingMahjong.Network;
 
 namespace KillingMahjong.UI
 {
-    /// <summary>募集中の部屋の一覧の1件（右のページ）。今は入れる元が無い。</summary>
-    public sealed class OpenRoom { public string code; public string host; }
 
     /// <summary>
     /// フレンドマッチの「条件を整える」の先、ルームマッチング画面（2026-11-23 仮案スレッド、プランナーの
@@ -15,11 +13,11 @@ namespace KillingMahjong.UI
     /// 「コードは作成後に待機画面で出す」）。
     ///
     ///   左のページ: ルームコード（作るまでは「-----」）・部屋の条件・「ルームを作成」
-    ///   右のページ: 募集中の部屋の一覧の枠。「参加」でその部屋のコードで入る
+    ///   右のページ: 募集中の部屋の一覧。**見た目だけ**（帯と「参加」の札を絵のとおりに置くだけで、押しても何もしない）
     ///
-    /// **右の一覧はまだ空のまま。サーバーへは問い合わせない。** サーバーは別の担当者の物で、こちらから変えない
-    /// （2026-11-24 ユーザー指示「サーバー側はこちらのものではないので、勝手にいじらないで」）。
-    /// 一覧を返す仕組みがサーバーにできたら、<see cref="SetRoomList"/> に部屋を渡せば並ぶ。
+    /// **サーバーに問い合わせる部分が無いところは、動きを作らず見た目だけにする**（2026-11-24 ユーザー指示
+    /// 「サーバー側はこちらのものではないので、勝手にいじらないで」「サーバーに問い合わせる部分がないなら、
+    /// そこは無視して作らないように。仮に見た目だけ作る」）。部屋の一覧を返す仕組みはサーバーに無い。
     ///
     /// **部屋の条件はまだ対局に効かない（見た目だけ）。** 能力の有無・最大局数・初期HP・最大賭け金・賭け金の単位・
     /// 勝利点数（プランナーが挙げた項目）を選べるが、サーバーへは送っていない。初期値は今の決まり
@@ -41,7 +39,6 @@ namespace KillingMahjong.UI
         private static readonly Color RoomErrorText = new Color32(172, 50, 50, 255);
 
         private const float SettingRowHeight = 36f;
-        private const float RoomRowStep = 80f;
 
         /// <summary>部屋の条件の1項目。値は <see cref="Choices"/> の中から選ぶ。見た目だけでサーバーへは送らない。</summary>
         private sealed class RoomSetting
@@ -67,10 +64,6 @@ namespace KillingMahjong.UI
 
         private TMP_Text _roomCodeText;
         private TMP_Text _roomStatus;
-        private TMP_Text _roomListStatus;
-        private RectTransform _roomListContent;
-        private GameObject _roomRowTemplate;
-        private readonly List<GameObject> _roomRows = new List<GameObject>();
 
         /// <summary>元の 400x300 の絵の四角（左上 x0,y0 ～ 右下 x1,y1）を、800x600 基準の中心と大きさに直す。</summary>
         private static void PixelRect(RectTransform rt, float x0, float y0, float x1, float y1)
@@ -329,104 +322,43 @@ namespace KillingMahjong.UI
 
         // ------------------------------------------------------------------
 
+        /// <summary>
+        /// 右のページの部屋の帯と「参加」の札。案の絵の位置（400x300 の座標）にそのまま置く。
+        /// いちばん下の帯はページの下端で切れている（絵のとおり。切れた分は画像の下を落とす）。
+        /// </summary>
+        private static readonly int[] RoomRowTops = { 45, 82, 122, 163, 206, 251 };
+        private static readonly int[] RoomRowLefts = { 214, 214, 214, 215, 215, 216 };
+
         private void BuildRoomList(Transform root)
         {
-            var scroll = SceneFirst.Child(root, "Rooms", out bool made, typeof(RectTransform), typeof(ScrollRect));
-            var view = SceneFirst.Child(scroll.transform, "Viewport", out bool madeView,
-                typeof(RectTransform), typeof(RectMask2D), typeof(Image));
-            var content = SceneFirst.Child(view.transform, "Content", out bool madeContent, typeof(RectTransform));
-            if (made)
+            const int rowW = 141, rowH = 29, pageBottom = 274;
+            for (int i = 0; i < RoomRowTops.Length; i++)
             {
-                PixelRect(scroll.GetComponent<RectTransform>(), 210, 40, 362, 272);
-                Stretch(view.GetComponent<RectTransform>());
-                view.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0f);
-                var crt = content.GetComponent<RectTransform>();
-                crt.anchorMin = new Vector2(0f, 1f); crt.anchorMax = new Vector2(1f, 1f); crt.pivot = new Vector2(0.5f, 1f);
-                crt.anchoredPosition = Vector2.zero;
-                crt.sizeDelta = Vector2.zero;
-                var sr = scroll.GetComponent<ScrollRect>();
-                sr.horizontal = false;
-                sr.viewport = view.GetComponent<RectTransform>();
-                sr.content = crt;
-                sr.movementType = ScrollRect.MovementType.Clamped;
-                sr.scrollSensitivity = 24f;
+                int x0 = RoomRowLefts[i], y0 = RoomRowTops[i];
+                int y1 = Mathf.Min(y0 + rowH, pageBottom);
+                var row = Art(root, "RoomRow" + i, "RoomRow", x0, y0, x0 + rowW, y1, false);
+                ClipBottom(row, y1 - y0, rowH);
+
+                // 札は帯の左端から 107、上端から 7（案の絵の1段目）
+                int tx0 = x0 + 107, ty0 = y0 + 7;
+                int ty1 = Mathf.Min(ty0 + 17, pageBottom);
+                var tag = Art(root, "RoomJoin" + i, "RoomJoinTag", tx0, ty0, tx0 + 30, ty1, false);
+                ClipBottom(tag, ty1 - ty0, 17);
             }
-            _roomListContent = content.GetComponent<RectTransform>();
+        }
 
-            // 1行の型（帯＋部屋の名前＋参加）。一覧はこれを写して並べる
-            _roomRowTemplate = SceneFirst.Child(root, "RoomRowTemplate", out bool madeRow, typeof(RectTransform), typeof(RawImage));
-            if (madeRow)
-            {
-                var rt = _roomRowTemplate.GetComponent<RectTransform>();
-                rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 1f); rt.pivot = new Vector2(0.5f, 1f);
-                rt.sizeDelta = new Vector2(282f, 58f);
-                var raw = _roomRowTemplate.GetComponent<RawImage>();
-                raw.texture = Resources.Load<Texture2D>(FriendCallResourceDir + "RoomRow");
-                raw.raycastTarget = false;
-
-                var host = BoardLabel(_roomRowTemplate.transform, "Host", "", 16f, TextAlignmentOptions.Left, 0, 0, 0, 0);
-                var hrt = host.rectTransform;
-                hrt.anchorMin = new Vector2(0f, 0.5f); hrt.anchorMax = new Vector2(0f, 0.5f); hrt.pivot = new Vector2(0f, 0.5f);
-                hrt.anchoredPosition = new Vector2(14f, 9f); hrt.sizeDelta = new Vector2(180f, 22f);
-                var code = BoardLabel(_roomRowTemplate.transform, "Code", "", 14f, TextAlignmentOptions.Left, 0, 0, 0, 0);
-                var cort = code.rectTransform;
-                cort.anchorMin = new Vector2(0f, 0.5f); cort.anchorMax = new Vector2(0f, 0.5f); cort.pivot = new Vector2(0f, 0.5f);
-                cort.anchoredPosition = new Vector2(14f, -11f); cort.sizeDelta = new Vector2(180f, 20f);
-
-                var join = SceneFirst.Child(_roomRowTemplate.transform, "Join", out _, typeof(RectTransform), typeof(RawImage), typeof(Button));
-                var jrt = join.GetComponent<RectTransform>();
-                Center(jrt, new Vector2(60f, 34f));
-                jrt.anchoredPosition = new Vector2(103f, -2f);
-                var jraw = join.GetComponent<RawImage>();
-                jraw.texture = Resources.Load<Texture2D>(FriendCallResourceDir + "RoomJoinTag");
-                join.GetComponent<Button>().targetGraphic = jraw;
-            }
-            _roomRowTemplate.SetActive(false);
-
-            _roomListStatus = BoardLabel(root, "RoomsStatus", "", 16f, TextAlignmentOptions.Center, 214, 140, 358, 170);
-            _roomListStatus.text = "";
+        /// <summary>下が切れた絵は、縦に縮めず下を落とす。</summary>
+        private static void ClipBottom(GameObject obj, int shown, int full)
+        {
+            var raw = obj.GetComponent<RawImage>();
+            float v = (float)shown / full;
+            raw.uvRect = new Rect(0f, 1f - v, 1f, v);
         }
 
         private void ShowRoomMatching()
         {
-            SetRoomList(null);
-            _roomListStatus.text = "";
             if (_roomStatus != null) _roomStatus.text = "";
             if (_roomCodeText != null) _roomCodeText.text = new string('-', MatchJoinRequest.PasswordLength);
-        }
-
-        private void SetRoomList(OpenRoom[] rooms)
-        {
-            foreach (var r in _roomRows) if (r != null) Destroy(r);
-            _roomRows.Clear();
-            if (rooms == null || _roomRowTemplate == null) { if (_roomListContent != null) _roomListContent.sizeDelta = Vector2.zero; return; }
-
-            for (int i = 0; i < rooms.Length; i++)
-            {
-                var room = rooms[i];
-                var row = Instantiate(_roomRowTemplate, _roomListContent);
-                row.name = "Room_" + room.code;
-                row.SetActive(true);
-                var rt = row.GetComponent<RectTransform>();
-                rt.anchoredPosition = new Vector2(0f, -10f - RoomRowStep * i);
-                row.transform.Find("Host").GetComponent<TMP_Text>().text =
-                    string.IsNullOrEmpty(room.host) ? "名無し" : room.host;
-                row.transform.Find("Code").GetComponent<TMP_Text>().text = room.code;
-                var join = row.transform.Find("Join").gameObject;
-                UIInteractionFeedback.Attach(join);
-                string code = room.code;
-                OnClick(join, () => JoinListedRoom(code));
-                _roomRows.Add(row);
-            }
-            _roomListContent.sizeDelta = new Vector2(0f, 10f + RoomRowStep * rooms.Length);
-        }
-
-        private void JoinListedRoom(string code)
-        {
-            if (_isCheckingRoom || _hasDecided) return;
-            if (!MatchJoinRequest.IsValidPassword(code)) return;
-            MatchJoinRequest.RequestPrivateJoin(code);
-            StartCoroutine(JoinPrivateRoomRoutine());
         }
     }
 }
