@@ -92,7 +92,9 @@ namespace KillingMahjong.UI
             Open(onDecided, onClosed);
             if (_root == null) return;
             _friendOnly = true;
-            ShowFriendPanel();
+            // メインメニューの電話からは、プランナーの構図のフレンドマッチ画面を出す（TitleMultiMenuUI.FriendCall.cs）
+            if (_friendCall != null) ShowFriendCallMain();
+            else ShowFriendPanel();
         }
 
         /// <summary><see cref="OpenFriend"/> で開いたか（そのときは最初の画面へ戻さず閉じる）。</summary>
@@ -120,6 +122,7 @@ namespace KillingMahjong.UI
             // 確認の返事を待っている間に画面を替えると、結果の行き先が消える
             if (_isCheckingRoom) return;
 
+            HideFriendCall();
             if (_modePanel != null) _modePanel.SetActive(true);
             if (_friendPanel != null) _friendPanel.SetActive(false);
             if (_passwordPanel != null) _passwordPanel.SetActive(false);
@@ -134,6 +137,7 @@ namespace KillingMahjong.UI
         {
             if (_isCheckingRoom) return;
 
+            HideFriendCall();
             if (_modePanel != null) _modePanel.SetActive(false);
             if (_friendPanel != null) _friendPanel.SetActive(true);
             if (_passwordPanel != null) _passwordPanel.SetActive(false);
@@ -144,6 +148,7 @@ namespace KillingMahjong.UI
         {
             if (_isCheckingRoom) return;
 
+            HideFriendCall();
             if (_modePanel != null) _modePanel.SetActive(false);
             if (_friendPanel != null) _friendPanel.SetActive(false);
             if (_passwordPanel != null) _passwordPanel.SetActive(true);
@@ -190,7 +195,8 @@ namespace KillingMahjong.UI
         {
             if (_isCheckingRoom || _hasDecided) return;
 
-            string input = _passwordInput != null ? _passwordInput.text : "";
+            var field = ActiveCodeInput;
+            string input = field != null ? field.text : "";
 
             // サーバーにも同じ検証があるが、弾かれてから気づくと
             // 「押したのに何も起きない」に見える。手元で理由を出す
@@ -274,10 +280,11 @@ namespace KillingMahjong.UI
             // 部屋は消費されていないので、畳んで入力し直せるようにする
             _ = client.ResetConnectionAsync();
 
-            if (_passwordInput != null)
+            var field = ActiveCodeInput;
+            if (field != null)
             {
-                _passwordInput.Select();
-                _passwordInput.ActivateInputField();
+                field.Select();
+                field.ActivateInputField();
             }
             _isCheckingRoom = false;
         }
@@ -326,12 +333,14 @@ namespace KillingMahjong.UI
 
         private void SetPasswordError(string text)
         {
-            if (_passwordError != null) _passwordError.text = text;
+            var label = ActiveCodeError;
+            if (label != null) label.text = text;
         }
 
         private void SetStatus(string text)
         {
-            if (_passwordStatus != null) _passwordStatus.text = text;
+            var label = ActiveCodeStatus;
+            if (label != null) label.text = text;
         }
 
         private void SetTruthNameHookVisible(bool visible)

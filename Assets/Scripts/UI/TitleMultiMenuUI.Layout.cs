@@ -49,6 +49,7 @@ namespace KillingMahjong.UI
             BuildFriendPanel();
             BuildPasswordPanel();
             BuildCpuPanel();
+            BuildFriendCallPanel();
 
             _lastBakeReport = SceneFirst.Report("TitleMultiMenuUI");
         }
