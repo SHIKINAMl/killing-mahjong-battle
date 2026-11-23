@@ -6,13 +6,20 @@ using KillingMahjong.Network;
 
 namespace KillingMahjong.UI
 {
+    /// <summary>募集中の部屋の一覧の1件（右のページ）。今は入れる元が無い。</summary>
+    public sealed class OpenRoom { public string code; public string host; }
+
     /// <summary>
     /// フレンドマッチの「条件を整える」の先、ルームマッチング画面（2026-11-23 仮案スレッド、プランナーの
     /// 「06_roommaching.aseprite」。2026-11-24 ユーザー指示「まず見た目だけ」「右は募集中の部屋の一覧」
     /// 「コードは作成後に待機画面で出す」）。
     ///
     ///   左のページ: ルームコード（作るまでは「-----」）・部屋の条件・「ルームを作成」
-    ///   右のページ: 募集中の部屋（<see cref="RoomListFetcher"/> で 5秒ごとに取り直す）。「参加」でその部屋に入る
+    ///   右のページ: 募集中の部屋の一覧の枠。「参加」でその部屋のコードで入る
+    ///
+    /// **右の一覧はまだ空のまま。サーバーへは問い合わせない。** サーバーは別の担当者の物で、こちらから変えない
+    /// （2026-11-24 ユーザー指示「サーバー側はこちらのものではないので、勝手にいじらないで」）。
+    /// 一覧を返す仕組みがサーバーにできたら、<see cref="SetRoomList"/> に部屋を渡せば並ぶ。
     ///
     /// **部屋の条件はまだ対局に効かない（見た目だけ）。** 能力の有無・最大局数・初期HP・最大賭け金・賭け金の単位・
     /// 勝利点数（プランナーが挙げた項目）を選べるが、サーバーへは送っていない。初期値は今の決まり
@@ -33,7 +40,6 @@ namespace KillingMahjong.UI
         private static readonly Color ScrollHandle = new Color32(132, 126, 135, 255);
         private static readonly Color RoomErrorText = new Color32(172, 50, 50, 255);
 
-        private const float RoomListInterval = 5f;
         private const float SettingRowHeight = 36f;
         private const float RoomRowStep = 80f;
 
@@ -64,10 +70,7 @@ namespace KillingMahjong.UI
         private TMP_Text _roomListStatus;
         private RectTransform _roomListContent;
         private GameObject _roomRowTemplate;
-        private RoomListFetcher _roomFetcher;
-        private float _nextRoomFetchAt;
         private readonly List<GameObject> _roomRows = new List<GameObject>();
-        private bool _roomListEverLoaded;
 
         /// <summary>元の 400x300 の絵の四角（左上 x0,y0 ～ 右下 x1,y1）を、800x600 基準の中心と大きさに直す。</summary>
         private static void PixelRect(RectTransform rt, float x0, float y0, float x1, float y1)
@@ -386,39 +389,11 @@ namespace KillingMahjong.UI
 
         private void ShowRoomMatching()
         {
-            _roomListEverLoaded = false;
             SetRoomList(null);
-            _roomListStatus.text = "さがしています…";
-            _nextRoomFetchAt = 0f;
+            _roomListStatus.text = "";
             if (_roomStatus != null) _roomStatus.text = "";
             if (_roomCodeText != null) _roomCodeText.text = new string('-', MatchJoinRequest.PasswordLength);
         }
-
-        private void UpdateRoomMatching()
-        {
-            if (_friendCallConditions == null || !_friendCallConditions.activeInHierarchy) return;
-            if (Time.realtimeSinceStartup < _nextRoomFetchAt) return;
-            if (_roomFetcher == null) _roomFetcher = gameObject.GetComponent<RoomListFetcher>();
-            if (_roomFetcher == null) _roomFetcher = gameObject.AddComponent<RoomListFetcher>();
-            if (_roomFetcher.IsBusy) return;
-            _nextRoomFetchAt = float.MaxValue;
-            _roomFetcher.Fetch((ok, rooms) =>
-            {
-                _nextRoomFetchAt = Time.realtimeSinceStartup + RoomListInterval;
-                if (_friendCallConditions == null || !_friendCallConditions.activeInHierarchy) return;
-                if (!ok)
-                {
-                    // 一度取れていれば、前の一覧を出したままにする
-                    if (!_roomListEverLoaded) _roomListStatus.text = "一覧を取れませんでした";
-                    return;
-                }
-                _roomListEverLoaded = true;
-                SetRoomList(rooms);
-                _roomListStatus.text = rooms.Length == 0 ? "募集中の部屋はありません" : "";
-            });
-        }
-
-        private void Update() => UpdateRoomMatching();
 
         private void SetRoomList(OpenRoom[] rooms)
         {
