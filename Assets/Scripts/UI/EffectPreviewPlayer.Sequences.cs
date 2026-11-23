@@ -103,7 +103,8 @@ namespace KillingMahjong.UI
                     yield return rig.phase.PlaySkillCutinAnimationRoutine("特殊勝利", true, rig.player.CurrentCharacterData); break;
                 case "phase.dealing":
                     bool dark = false;
-                    rig.phase.PlayRoundStartDarken("配牌", onReady: () => dark = true);
+                    // 本編の第2局と同じ文字。「第1局...」から数字がガクンと送られる（PhaseTransitionUI.RoundRipple）
+                    rig.phase.PlayRoundStartDarken("第2局...", onReady: () => dark = true);
                     yield return Until(() => dark);
                     yield return new WaitForSeconds(1f);
                     bool light = false; rig.phase.PlayRoundStartFadeOut(() => light = true);

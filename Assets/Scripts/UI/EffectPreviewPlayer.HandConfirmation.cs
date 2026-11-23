@@ -43,6 +43,8 @@ namespace KillingMahjong.UI
                 rt.GetComponent<TileVisual>().SetTile(Tile(hand[i]), rig.tiles.GetTileSprite(Tile(hand[i])), rig.tiles);
             }
             if (!needsReview && EffectId != "hand.wait_transfer") rank.ShowRank("役満");
+            // 満貫に届かない・待ちなしは、本編と同じく役名を出さずに「ブー」（GameUIHandSelectionController.ShowRankCall）
+            if (needsReview) Effects.HandSelectionFeedbackAudio.PlayRankMiss();
             reveal.Show(data, rig.tiles, EffectId != "hand.wait_transfer");
             yield return new WaitForSeconds(2.5f);
             if (EffectId == "hand.wait_reveal") yield break;

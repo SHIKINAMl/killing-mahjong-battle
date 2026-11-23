@@ -342,16 +342,47 @@ namespace KillingMahjong.UI
                     rt.anchoredPosition = Vector2.zero;
                     rt.localScale = Vector3.one * 3f;
                     pie.raycastTarget = false;
-                    pie.gameObject.SetActive(true);
-                    foreach (bool first in new[] { true, false })
+                    // 真ん中の数字（残りのターン数）。シーンの円グラフを写したときは、その TurnNumber が付いてくる
+                    if (!pie.HasNumberLabel)
                     {
-                        for (int n = 0; n <= TurnPieUI.DiscardsPerPlayer; n++)
-                        {
-                            pie.Show(n, first);
-                            yield return new WaitForSeconds(.18f);
-                        }
-                        yield return new WaitForSeconds(.8f);
+                        var label = new GameObject("TurnNumber", typeof(RectTransform), typeof(TMPro.TextMeshProUGUI)).GetComponent<TMPro.TextMeshProUGUI>();
+                        label.transform.SetParent(pie.transform, false);
+                        var lrt = label.rectTransform;
+                        lrt.anchorMin = Vector2.zero; lrt.anchorMax = Vector2.one; lrt.offsetMin = lrt.offsetMax = Vector2.zero;
+                        label.font = GameUiTypography.Body; // 本編の TurnNumber と同じ字・同じ影付きの材質
+                        var underlay = Resources.Load<Material>("PixelMplus10_Underlay");
+                        if (underlay != null) label.fontSharedMaterial = underlay;
+                        label.fontSize = 20; label.alignment = TMPro.TextAlignmentOptions.Center;
+                        label.color = new Color32(255, 248, 236, 255); label.raycastTarget = false;
+                        label.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
+                        pie.BindPreviewNumberLabel(label);
                     }
+                    pie.gameObject.SetActive(true);
+                    // 本編と同じ順に進める: 自分の番（金・青）→ 1打 → 相手の番（赤）→ 相手が打つ → 自分の番 …
+                    // 数字は残りのターン数で 17 から減る。5打ごと・残り3から1の演出もこの間に出る
+                    // （2026-11-23「演出が変わったところをコレクションに」。前は先攻・後攻の色を0.18秒ずつ塗るだけだった）
+                    pie.PreviewOpponentTurn = false;
+                    pie.Show(0, true);
+                    yield return new WaitForSeconds(.8f);
+                    for (int n = 1; n <= TurnPieUI.DiscardsPerPlayer; n++)
+                    {
+                        pie.Show(n, true);
+                        pie.PreviewOpponentTurn = true;
+                        yield return new WaitForSeconds(n >= TurnPieUI.DiscardsPerPlayer - 3 ? .9f : .4f);
+                        if (n == TurnPieUI.DiscardsPerPlayer) break;
+                        pie.PreviewOpponentTurn = false;
+                        yield return new WaitForSeconds(n >= TurnPieUI.DiscardsPerPlayer - 4 ? .9f : .3f);
+                    }
+                    yield return new WaitForSeconds(1.2f);
+                    // 後攻の色（青）。後攻は相手の番から始まる
+                    pie.PreviewOpponentTurn = true;
+                    pie.Show(0, false);
+                    yield return new WaitForSeconds(.8f);
+                    pie.PreviewOpponentTurn = false;
+                    yield return new WaitForSeconds(.8f);
+                    pie.Show(1, false);
+                    pie.PreviewOpponentTurn = true;
+                    yield return new WaitForSeconds(1f);
                     yield break;
                 }
                 default: throw new ArgumentException("再生方法が未登録です: " + EffectId);

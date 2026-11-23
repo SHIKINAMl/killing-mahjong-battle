@@ -179,12 +179,30 @@ namespace KillingMahjong.UI
         /// <summary>塗った切れの色。相手の番は赤、自分の番は先攻＝金・後攻＝青。</summary>
         private Color DoneColor => _opponentTurn ? opponentColor : (_first ? firstColor : secondColor);
 
+        /// <summary>
+        /// コレクションの試写用。盤面が無いので、相手の番かどうかをこちらで決める（null で盤面に従う）。
+        /// </summary>
+        public bool? PreviewOpponentTurn { get; set; }
+
+        /// <summary>
+        /// コレクションの試写用。シーンに置いた円グラフが無い場面では数字の子も無いので、試写が作った字を渡す。
+        /// 本編・チュートリアルはシーンの TurnNumber を使う。
+        /// </summary>
+        public void BindPreviewNumberLabel(TMP_Text label)
+        {
+            numberLabel = label;
+            UpdateNumber();
+        }
+
+        /// <summary>数字の字を持っているか（試写が足すかどうかを決める）。</summary>
+        public bool HasNumberLabel => numberLabel != null;
+
         private void Update()
         {
             if (!Application.isPlaying) return;
             // 番が替わったら色を塗り直す（BoardStateManager.IsLocalTurn を毎フレーム見る）
             var board = KillingMahjong.Managers.BoardStateManager.Instance;
-            bool opponent = board != null && !board.IsLocalTurn;
+            bool opponent = PreviewOpponentTurn ?? (board != null && !board.IsLocalTurn);
             if (opponent != _opponentTurn) { _opponentTurn = opponent; Redraw(); }
             _clock += Mathf.Min(Time.unscaledDeltaTime, 1f / 30f);
             // 輪が出ている間・光っている間・終わり際の脈がある間だけ描き直す

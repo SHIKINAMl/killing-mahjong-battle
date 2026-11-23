@@ -21,13 +21,14 @@ namespace KillingMahjong.UI
     ///     止めずに受け（<see cref="TryDeferDarkenTextForRipple"/>）、「第N-1局進行中...」から送る
     /// 輪はドット絵の格子に寄せた点で描き、色は象牙色と血の赤（役名表示と同じ色）。
     ///
-    /// 輪を描く板（<see cref="roundNumberRipple"/>）はシーンに置いてある。**置いていないシーン
-    /// （チュートリアル）では、数字送りも波紋も出さず今までどおりにする。**
+    /// 輪を描く板（<see cref="roundNumberRipple"/>）は本編のシーンにだけ置いてある。輪を外したので、
+    /// **数字送りは板の無い場面（チュートリアル・コレクションの試写）でも出す**（2026-11-23「演出が変わったところを
+    /// チュートリアルとコレクションに」。前は板が無いと数字送りも出さず、チュートリアルの「２局目」は動かなかった）。
     /// 文字は 1 字ずつ浮かせない（2026-10-26 のユーザー指示「その場でぱっと出す」）。動くのは数字だけ。
     /// </summary>
     public partial class PhaseTransitionUI
     {
-        [SerializeField, Tooltip("局頭の「第N局目」の数字から出る波紋を描く板。空なら数字送りも波紋も出さない")]
+        [SerializeField, Tooltip("局頭の「第N局目」の数字から出る波紋を描く板（輪はいまは出さない。空でも数字送りは出る）")]
         private Effects.PixelShapeGraphic roundNumberRipple;
 
         private const float RoundFlipDelay = 0.35f;
@@ -36,10 +37,10 @@ namespace KillingMahjong.UI
         /// <summary>数字が上下に動く距離（文字の高さに対する割合）。</summary>
         private const float RoundFlipTravel = 0.6f;
 
-        /// <summary>数字送りと波紋を出せるか（輪の板がシーンにあり、文字に数字があるか）。</summary>
+        /// <summary>数字送りを出せるか（文字に数字があるか）。輪の板の有無は問わない。</summary>
         private bool CanPlayRoundNumberRipple(string text)
         {
-            return roundNumberRipple != null && centerText != null && FindDigits(text, out _, out _);
+            return centerText != null && FindDigits(text, out _, out _);
         }
 
         /// <summary>
