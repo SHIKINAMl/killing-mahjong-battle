@@ -225,7 +225,12 @@ namespace KillingMahjong.Managers
 
                     if (data.freeHandBuilding)
                     {
-                        yield return StartCoroutine(PlayLines(lines));
+                        // **満貫に届いていないときは何も言わない**（2026-11-23 のユーザー指示
+                        // 「満貫に届いていない時はそのセリフを言わずにスルーするようにしてほしい」）。
+                        // 届かないと役名の代わりに「ブー」が鳴るのに、直後に「よーしできたね」と褒めていた。
+                        // 決定を押せば本編と同じ確認（満貫未満でよいか）が出るので、案内はそちらに任せる。
+                        if (selfMadeMangan)
+                            yield return StartCoroutine(PlayLines(lines));
                     }
                     else
                     {
