@@ -16,8 +16,7 @@ namespace KillingMahjong.UI
     /// 切り出しただけ（Resources/UI/FriendMatch/）。絵が来たら画像を差し替える。
     /// 配置は元の 400x300 の絵の座標を 2倍（800x600 基準）にしたもの。
     ///
-    /// 「条件を整える」の先（部屋の設定）は、中身が決まるまで仮。部屋はまだ作らず、コードの欄は空のまま。
-    /// 「部屋を開く」で今までの『部屋を作る』と同じく部屋を作り、対局シーンで相手を待つ（コードはそこで出る）。
+    /// 「条件を整える」の先は、ルームマッチング画面（TitleMultiMenuUI.RoomMatching.cs）。
     ///
     /// タイトル・部屋シーンの「対局する」→「フレンドマッチ」は、今までの文字のメニュー（FriendPanel）のまま。
     /// </summary>
@@ -34,11 +33,15 @@ namespace KillingMahjong.UI
 
         /// <summary>いま合言葉を打っている欄（今までの入力画面か、フレンドマッチの画面か）。</summary>
         private TMP_InputField ActiveCodeInput =>
-            _friendCall != null && _friendCall.activeSelf ? _callCodeInput : _passwordInput;
+            IsRoomMatchingShown ? null
+            : _friendCall != null && _friendCall.activeSelf ? _callCodeInput : _passwordInput;
         private TMP_Text ActiveCodeError =>
-            _friendCall != null && _friendCall.activeSelf ? _callError : _passwordError;
+            IsRoomMatchingShown ? _roomStatus
+            : _friendCall != null && _friendCall.activeSelf ? _callError : _passwordError;
         private TMP_Text ActiveCodeStatus =>
-            _friendCall != null && _friendCall.activeSelf ? _callStatus : _passwordStatus;
+            IsRoomMatchingShown ? _roomStatus
+            : _friendCall != null && _friendCall.activeSelf ? _callStatus : _passwordStatus;
+        private bool IsRoomMatchingShown => _friendCallConditions != null && _friendCallConditions.activeInHierarchy;
 
         private void BuildFriendCallPanel()
         {
@@ -57,7 +60,7 @@ namespace KillingMahjong.UI
             }
 
             BuildFriendCallMain();
-            BuildFriendCallConditions();
+            BuildRoomMatching();
 
             _friendCall.SetActive(false);
         }
@@ -86,39 +89,6 @@ namespace KillingMahjong.UI
                 ShowFriendCallConditions);
 
             PlaceBackItem(CreateMenuItem(parent, "もどる", 0f, BackFromFriendPanel));
-        }
-
-        private void BuildFriendCallConditions()
-        {
-            _friendCallConditions = SceneFirst.Child(_friendCall.transform, "Conditions", out bool made, typeof(RectTransform));
-            if (made) Stretch(_friendCallConditions.GetComponent<RectTransform>());
-            var parent = _friendCallConditions.transform;
-
-            // 見出しは「条件を整える」の文字をそのまま左上へ
-            var heading = SceneFirst.Child(parent, "Heading", out bool madeHeading, typeof(RectTransform), typeof(RawImage));
-            if (madeHeading)
-            {
-                var rt = heading.GetComponent<RectTransform>();
-                Center(rt, new Vector2(214f, 44f));
-                rt.anchoredPosition = new Vector2(-168f, 150f);
-                var raw = heading.GetComponent<RawImage>();
-                raw.texture = Resources.Load<Texture2D>(FriendCallResourceDir + "FriendCallConditions");
-                raw.raycastTarget = false;
-            }
-
-            // 対戦用のコードの欄。部屋はまだ作らないので、仮の印だけ
-            var code = CreateCodeBox(parent, "Code", new Vector2(-116f, 67f), editable: false);
-            var codeText = code.GetComponentInChildren<TMP_Text>(true);
-            if (codeText != null && madeHeading)
-            {
-                codeText.text = new string('-', MatchJoinRequest.PasswordLength);
-                codeText.color = new Color(MenuText.r, MenuText.g, MenuText.b, 0.45f);
-            }
-
-            var open = CreateMenuItem(parent, "部屋を開く", 0f, OnPrivateCreateSelected);
-            if (made) open.GetComponent<RectTransform>().anchoredPosition = new Vector2(-116f, 10f);
-
-            PlaceBackItem(CreateMenuItem(parent, "もどる", 0f, ShowFriendCallMain));
         }
 
         /// <summary>画面左下の「もどる」。作ったときだけ位置を決める（置いてあれば動かさない）。</summary>
@@ -232,6 +202,7 @@ namespace KillingMahjong.UI
             if (_isCheckingRoom || _friendCall == null) return;
             _friendCallMain.SetActive(false);
             _friendCallConditions.SetActive(true);
+            ShowRoomMatching();
         }
 
         /// <summary>文字のメニュー（最初の画面・フレンド・合言葉・CPU）をすべて伏せる。</summary>

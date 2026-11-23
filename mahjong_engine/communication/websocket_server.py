@@ -426,6 +426,12 @@ class WebSocketGameServer:
 				await self._handle_my_records(client_id)
 			return
 
+		if msg_type == "rooms":
+			client_id = self._client_id_by_socket.get(websocket)
+			if client_id:
+				await self._handle_list_rooms(client_id)
+			return
+
 		if msg_type == "action":
 			client_id = self._client_id_by_socket.get(websocket)
 			if client_id:
@@ -565,6 +571,26 @@ class WebSocketGameServer:
 			await self._send_to_client(client_id, {"type": "error", "message": "Records are unavailable"})
 			return
 		await self._send_to_client(client_id, {"type": "my_records", "data": result})
+
+	MAX_LISTED_ROOMS = 20
+
+	async def _handle_list_rooms(self, client_id: str) -> None:
+		"""
+		募集中のフレンドマッチの部屋（private_create で作られ、まだ相手が来ていない部屋）を返す。
+		メインメニューのルームマッチング画面の右の一覧に出す（2026-11-24）。新しい順、最大 MAX_LISTED_ROOMS 件。
+		返す: rooms {rooms: [{code, host}]}。host は名乗った名前（無ければ空）。自分の部屋は入れない。
+		入るときは、今までどおり join の private_join に code を渡す。
+		"""
+		rooms: List[Dict[str, str]] = []
+		async with self._lock:
+			for password, host_id in reversed(list(self._private_room_by_password.items())):
+				if host_id == client_id or host_id not in self._socket_by_client_id:
+					continue
+				identity = self._identity_by_client.get(host_id)
+				rooms.append({"code": password, "host": (identity.name if identity and identity.name else "")})
+				if len(rooms) >= self.MAX_LISTED_ROOMS:
+					break
+		await self._send_to_client(client_id, {"type": "rooms", "data": {"rooms": rooms}})
 
 	def _normalize_join_payload(self, payload: Any) -> Dict[str, Any]:
 		if isinstance(payload, dict):
