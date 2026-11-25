@@ -61,6 +61,7 @@ namespace KillingMahjong.UI
             float body = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / BlocksReadyAt));
             if (_revealCharge != null) _revealCharge.alpha = body;
             if (_revealMultiplier != null) _revealMultiplier.alpha = body;
+            if (_plate != null) _plate.alpha = body; // 自分の下地も区画と一緒に出す
         }
 
         /// <summary>実際のポイントは変えず、左右の表示だけを順に点火する。</summary>

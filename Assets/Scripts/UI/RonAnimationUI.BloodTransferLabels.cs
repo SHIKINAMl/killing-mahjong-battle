@@ -57,18 +57,14 @@ namespace KillingMahjong.UI
         {
             if (anchor == null) return null;
 
-            GameObject go = new GameObject("HpDelta");
-            go.transform.SetParent(parent, false);
-            TextMeshProUGUI text = go.AddComponent<TextMeshProUGUI>();
+            // 縁は InkedText で付ける（TMP の縁取りはドット字体に描かれない。2026-11-25）
+            TextMeshProUGUI text = InkedText.Create(parent, "HpDelta", 2f, out RectTransform rt);
             text.text = FormatDelta(delta);
             HpNumberStyle.Apply(text, delta);
             text.fontSize = 30f;
             text.textWrappingMode = TextWrappingModes.NoWrap;
             text.alignment = TextAlignmentOptions.Center;
-            text.outlineWidth = 0.2f;
-            text.outlineColor = new Color32(0, 0, 0, 255);
 
-            RectTransform rt = go.GetComponent<RectTransform>();
             rt.sizeDelta = new Vector2(280f, HpDeltaBoxHeight);
 
             // 箱の中心を、HPの表示の中心の真上に置く

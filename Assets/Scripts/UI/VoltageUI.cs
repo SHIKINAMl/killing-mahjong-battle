@@ -94,7 +94,10 @@ namespace KillingMahjong.UI
         /// 下端が 314〜324 の間を往復する。倍率ラベルの上端は 308 で固定なので、
         /// **すき間は 6〜16px の間で変わる。** 16px はいちばん離れた瞬間の値。
         /// </summary>
-        private const float SelfPosX = -280f;
+        // 2026-11-25 ユーザー「自分のボルテージゲージも背景にかぶって見にくい」→ 下地を敷き、-280 から左へ 56 寄せた。
+        // -280 だと相手の左の翼の先（画面 x≒125・y≒365〜395、800x600）が倍率と区画の上に乗っていた。
+        // -336 で下地は x≒13〜115。翼の先と 10px 空き、画面の左端とも 13px 空く
+        private const float SelfPosX = -336f;
         private const float SelfPosY = -120f;
         // 2026-11-14 ユーザー「ボルテージの位置がわかりずらいので、できれば相手のセリフの下に置きたい」。
         // 下の 11/12 の壁の位置は、役一覧の下で誰の物か分かりにくかった。**セリフの真下、Log ボタンの右**へ戻す。
@@ -250,6 +253,7 @@ namespace KillingMahjong.UI
         private void Build(bool isEnemy)
         {
             _isEnemy = isEnemy;
+            if (!isEnemy) BuildPlate();
             _pips = new Image[PipCount];
             _pipFills = new Image[PipCount];
             _flames = new VoltageFlame[PipCount];
@@ -325,6 +329,58 @@ namespace KillingMahjong.UI
             _multiplierText.raycastTarget = false;
 
             Refresh();
+        }
+
+        // ---- 自分のゲージの下地（2026-11-25）----
+        //
+        // ユーザー「自分のボルテージゲージも背景にかぶって見にくい」。
+        // 自分のゲージは暗い赤の壁と卓の縁の上にあり、消えている区画（PipOff の暗い赤）は壁と同じ色で見えず、
+        // 倍率の字も壁の横線や相手の翼の先に重なっていた（録画で確認）。
+        // **ゲージの後ろにだけ、角を1段落とした暗い下地を敷く。** 枠線や見出しは付けない（UI っぽくしない）。
+        // 相手のゲージは今回の指摘の外なので、そのまま。
+
+        /// <summary>下地の色。縁の色（InkedText.Ink）と同じ墨色を半透明で。</summary>
+        private static readonly Color PlateColor = new Color32(20, 10, 16, 225);
+
+        // 下地の範囲（ゲージの左端・中心が 0）。下段の下端 -8〜倍率の箱の上端 61 を、上下左右に少し余して囲む。
+        // **整数で持つ**（半画素にかかると滲む）。角は 2 だけ削る
+        private const float PlateLeft = -10f, PlateRight = PipRowWidth + 10f;
+        private const float PlateBottom = -14f, PlateTop = 62f, PlateCorner = 2f;
+
+        private CanvasGroup _plate;
+
+        private void BuildPlate()
+        {
+            var plate = new GameObject("Plate", typeof(RectTransform), typeof(CanvasGroup));
+            var plateRect = (RectTransform)plate.transform;
+            plateRect.SetParent(transform, false);
+            plateRect.SetAsFirstSibling();   // 区画・炎・倍率より奥
+            plateRect.anchorMin = plateRect.anchorMax = new Vector2(0f, 0.5f);
+            plateRect.pivot = Vector2.zero;
+            plateRect.anchoredPosition = Vector2.zero;
+            plateRect.sizeDelta = Vector2.zero;
+            _plate = plate.GetComponent<CanvasGroup>();
+            _plate.interactable = false;
+            _plate.blocksRaycasts = false;
+
+            // 重ねると半透明が濃くなるので、重ならない3枚に分ける（真ん中・上の縁・下の縁）
+            PlatePiece(plateRect, PlateLeft, PlateBottom + PlateCorner, PlateRight, PlateTop - PlateCorner);
+            PlatePiece(plateRect, PlateLeft + PlateCorner, PlateTop - PlateCorner, PlateRight - PlateCorner, PlateTop);
+            PlatePiece(plateRect, PlateLeft + PlateCorner, PlateBottom, PlateRight - PlateCorner, PlateBottom + PlateCorner);
+        }
+
+        private static void PlatePiece(RectTransform parent, float left, float bottom, float right, float top)
+        {
+            var go = new GameObject("Piece", typeof(RectTransform), typeof(Image));
+            var rt = (RectTransform)go.transform;
+            rt.SetParent(parent, false);
+            rt.anchorMin = rt.anchorMax = Vector2.zero;
+            rt.pivot = Vector2.zero;
+            rt.anchoredPosition = new Vector2(left, bottom);
+            rt.sizeDelta = new Vector2(right - left, top - bottom);
+            var image = go.GetComponent<Image>();
+            image.color = PlateColor;
+            image.raycastTarget = false;
         }
 
         private void OnEnable()

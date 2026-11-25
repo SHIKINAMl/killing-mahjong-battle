@@ -85,27 +85,22 @@ namespace KillingMahjong.UI
             float landScale = BloodLandFontSize / BloodPeakFontSize;
 
             // 飛ぶ数字。**素点の複製**なので、元の行は最後まで消えない（パネルごと消えるだけ）
-            GameObject flyObj = new GameObject("BloodValue");
-            flyObj.transform.SetParent(stageRt, false);
-            TextMeshProUGUI fly = flyObj.AddComponent<TextMeshProUGUI>();
+            // **縁は InkedText で付ける（2026-11-25）。** TMP の outlineWidth はドット字体に描かれず、
+            // 水色・赤の字が娘の服や血袋の上で溶けていた（ユーザー「血を獲得したり失ったりするときの数字が見にくい」）。
+            // 縁の太さは字の大きさ 150 に対して 8（DenkiChip の1ドットの半分強）
+            TextMeshProUGUI fly = InkedText.Create(stageRt, "BloodValue", 8f, out RectTransform flyRt);
             HpNumberStyle.Apply(fly, toValue);
             fly.text = fromValue.ToString("N0");
             fly.fontSize = BloodPeakFontSize;
             fly.alignment = TextAlignmentOptions.Center;
             fly.textWrappingMode = TextWrappingModes.NoWrap;
-            // 盤面（赤い壁・緑の卓）の上を通るので、縁取りが無いと途中で読めなくなる
-            fly.outlineWidth = 0.2f;
-            fly.outlineColor = new Color32(0, 0, 0, 255);
-            RectTransform flyRt = flyObj.GetComponent<RectTransform>();
             flyRt.sizeDelta = new Vector2(1000f, 260f);
             flyRt.position = startPos;
             flyRt.localScale = Vector3.one * startScale;
 
             // 何が掛かってこの数字になったのか。**大きい数字の下に小さく出す**（8/29 に許可を取った）。
             // 数字の子にしてあるので、拡大・収縮も一緒に付いてくる
-            GameObject noteObj = new GameObject("BloodNote");
-            noteObj.transform.SetParent(flyRt, false);
-            TextMeshProUGUI note = noteObj.AddComponent<TextMeshProUGUI>();
+            TextMeshProUGUI note = InkedText.Create(flyRt, "BloodNote", 2f, out RectTransform noteRt);
             note.font = GameUiTypography.Body;
             note.text = BuildMultiplierNote(s, toValue);
             note.color = AccentGold;
@@ -113,10 +108,7 @@ namespace KillingMahjong.UI
             note.alignment = TextAlignmentOptions.Center;
             note.fontStyle = FontStyles.Normal;
             note.textWrappingMode = TextWrappingModes.NoWrap;
-            note.outlineWidth = 0.2f;
-            note.outlineColor = new Color32(0, 0, 0, 255);
             note.alpha = 0f; // 数値が変わる瞬間まで出さない
-            RectTransform noteRt = noteObj.GetComponent<RectTransform>();
             noteRt.anchorMin = new Vector2(0.5f, 0f);
             noteRt.anchorMax = new Vector2(0.5f, 0f);
             noteRt.pivot = new Vector2(0.5f, 1f);
@@ -226,7 +218,7 @@ namespace KillingMahjong.UI
                 note.alpha = 1f - p; // 注記は途中で用済み
                 yield return null;
             }
-            Destroy(flyObj);
+            Destroy(flyRt.gameObject);
 
             // ④ 着弾。**両方のHPの隣に増減が出て、両方のメーターが同時に動き出す**
             // 横に出す増減は「画面の血が動く量」。賭けた血は先に場へ出しているので、
