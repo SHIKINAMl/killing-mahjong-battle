@@ -36,7 +36,7 @@ namespace KillingMahjong.UI
                 if (_flames[i] != null) _flames[i].BeginIgnition();
             }
             _revealCharge = RevealGroup(_chargeRow);
-            _revealMultiplier = RevealGroup(_multiplierText);
+            _revealMultiplier = RevealGroup(_multiplierRoot != null ? (Component)_multiplierRoot : _multiplierText); // 自分は縁ごと消す
             ApplyReveal(0f);
         }
 
@@ -61,7 +61,6 @@ namespace KillingMahjong.UI
             float body = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / BlocksReadyAt));
             if (_revealCharge != null) _revealCharge.alpha = body;
             if (_revealMultiplier != null) _revealMultiplier.alpha = body;
-            if (_plate != null) _plate.alpha = body; // 自分の下地も区画と一緒に出す
         }
 
         /// <summary>実際のポイントは変えず、左右の表示だけを順に点火する。</summary>

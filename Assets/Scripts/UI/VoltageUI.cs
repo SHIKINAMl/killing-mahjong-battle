@@ -94,9 +94,9 @@ namespace KillingMahjong.UI
         /// 下端が 314〜324 の間を往復する。倍率ラベルの上端は 308 で固定なので、
         /// **すき間は 6〜16px の間で変わる。** 16px はいちばん離れた瞬間の値。
         /// </summary>
-        // 2026-11-25 ユーザー「自分のボルテージゲージも背景にかぶって見にくい」→ 下地を敷き、-280 から左へ 56 寄せた。
+        // 2026-11-25 ユーザー「自分のボルテージゲージも背景にかぶって見にくい」→ -280 から左へ 56 寄せた。
         // -280 だと相手の左の翼の先（画面 x≒125・y≒365〜395、800x600）が倍率と区画の上に乗っていた。
-        // -336 で下地は x≒13〜115。翼の先と 10px 空き、画面の左端とも 13px 空く
+        // -336 でゲージは x≒23〜105（倍率の箱は 3〜125）。翼の先から離れ、画面の左端とも空く
         private const float SelfPosX = -336f;
         private const float SelfPosY = -120f;
         // 2026-11-14 ユーザー「ボルテージの位置がわかりずらいので、できれば相手のセリフの下に置きたい」。
@@ -138,6 +138,9 @@ namespace KillingMahjong.UI
         /// <summary>点いたブロックの中で脈打つ心臓（2026-09-30 の指示）。中身は VoltageHeart.cs。</summary>
         private VoltageHeart[] _hearts;
         private TextMeshProUGUI _multiplierText;
+        private RectTransform _multiplierRoot;
+        private Outline[] _pipRims;
+        private Outline[] _chargeRims;
 
         /// <summary>
         /// 画面左の空きに1つ作る。すでにあれば作り直さない。
@@ -253,9 +256,9 @@ namespace KillingMahjong.UI
         private void Build(bool isEnemy)
         {
             _isEnemy = isEnemy;
-            if (!isEnemy) BuildPlate();
             _pips = new Image[PipCount];
             _pipFills = new Image[PipCount];
+            _pipRims = new Outline[PipCount];
             _flames = new VoltageFlame[PipCount];
             _hearts = new VoltageHeart[PipCount];
 
@@ -274,6 +277,7 @@ namespace KillingMahjong.UI
                 var image = pip.GetComponent<Image>();
                 image.raycastTarget = false;   // 牌のクリック判定を吸わない
                 _pips[i] = image;
+                _pipRims[i] = AddRim(image);
 
                 // **次の段までの途中を、区画の中に左から塗る（2026-09-13）。**
                 // 仕様書どおりだと、次の段まで2枚・3枚・4枚・5枚と要る。
@@ -311,9 +315,20 @@ namespace KillingMahjong.UI
             _chargeRow.sizeDelta = new Vector2(PipRowWidth, ChargeHeight);
 
             // 倍率は四角の上に、四角の並びの中央に乗せる（ユーザーの指示 2026-09-08）。
-            var label = new GameObject("Multiplier", typeof(RectTransform), typeof(TextMeshProUGUI));
-            var labelRect = (RectTransform)label.transform;
-            labelRect.SetParent(transform, false);
+            // 自分の倍率は墨の縁を付ける（2026-11-25。上の「自分のゲージの縁」）
+            RectTransform labelRect;
+            if (isEnemy)
+            {
+                var label = new GameObject("Multiplier", typeof(RectTransform), typeof(TextMeshProUGUI));
+                labelRect = (RectTransform)label.transform;
+                labelRect.SetParent(transform, false);
+                _multiplierText = label.GetComponent<TextMeshProUGUI>();
+            }
+            else
+            {
+                _multiplierText = InkedText.Create(transform, "Multiplier", 2f, out labelRect);
+            }
+            _multiplierRoot = labelRect;
             labelRect.anchorMin = new Vector2(0f, 0.5f);
             labelRect.anchorMax = new Vector2(0f, 0.5f);
             labelRect.pivot = new Vector2(0.5f, 0f);
@@ -322,7 +337,6 @@ namespace KillingMahjong.UI
             labelRect.anchoredPosition = new Vector2(PipRowWidth * 0.5f, PipHeight * 0.5f + LabelLift);
             labelRect.sizeDelta = new Vector2(PipRowWidth + 40f, MultiplierFontSize + 6f);
 
-            _multiplierText = label.GetComponent<TextMeshProUGUI>();
             _multiplierText.font = LoadMultiplierFont();
             _multiplierText.fontSize = MultiplierFontSize;
             _multiplierText.alignment = TextAlignmentOptions.Center;
@@ -331,56 +345,38 @@ namespace KillingMahjong.UI
             Refresh();
         }
 
-        // ---- 自分のゲージの下地（2026-11-25）----
+        // ---- 自分のゲージの縁（2026-11-25）----
         //
         // ユーザー「自分のボルテージゲージも背景にかぶって見にくい」。
-        // 自分のゲージは暗い赤の壁と卓の縁の上にあり、消えている区画（PipOff の暗い赤）は壁と同じ色で見えず、
-        // 倍率の字も壁の横線や相手の翼の先に重なっていた（録画で確認）。
-        // **ゲージの後ろにだけ、角を1段落とした暗い下地を敷く。** 枠線や見出しは付けない（UI っぽくしない）。
+        // 自分のゲージは暗い赤の壁の上にあり、消えている区画（PipOff の暗い赤）は壁と同じ色で見えなかった（録画で確認）。
+        // 最初は後ろに暗い下地を敷いたが、プランナー（yabazaemon）に「ボルテージに影つけるのはちょっとダサいかな…」と言われて外した。
+        // **下地は敷かず、ゲージそのものに縁を付ける。** 区画は1画素の縁、倍率の字は精算の数字と同じ墨の縁（InkedText）。
         // 相手のゲージは今回の指摘の外なので、そのまま。
 
-        /// <summary>下地の色。縁の色（InkedText.Ink）と同じ墨色を半透明で。</summary>
-        private static readonly Color PlateColor = new Color32(20, 10, 16, 225);
+        /// <summary>自分の消えている区画の縁。暗い中身の周りを、壁より明るい色で1画素囲む。</summary>
+        private static readonly Color SelfOffRim = new Color32(168, 116, 98, 255);
 
-        // 下地の範囲（ゲージの左端・中心が 0）。下段の下端 -8〜倍率の箱の上端 61 を、上下左右に少し余して囲む。
-        // **整数で持つ**（半画素にかかると滲む）。角は 2 だけ削る
-        private const float PlateLeft = -10f, PlateRight = PipRowWidth + 10f;
-        private const float PlateBottom = -14f, PlateTop = 62f, PlateCorner = 2f;
+        /// <summary>自分の点いている区画の縁。段の色が壁から浮くよう、墨で囲む。</summary>
+        private static readonly Color SelfLitRim = InkedText.Ink;
 
-        private CanvasGroup _plate;
+        /// <summary>自分の消えている区画の中身。壁より暗くして、縁との差で形を見せる。</summary>
+        private static readonly Color SelfPipOff = new Color32(29, 13, 22, 230);
 
-        private void BuildPlate()
+        private Color OffColor => _isEnemy ? PipOff : SelfPipOff;
+
+        /// <summary>自分の区画にだけ縁を付ける。Outline は画像の後ろに描かれるので、炎や心臓は隠さない。</summary>
+        private Outline AddRim(Image image)
         {
-            var plate = new GameObject("Plate", typeof(RectTransform), typeof(CanvasGroup));
-            var plateRect = (RectTransform)plate.transform;
-            plateRect.SetParent(transform, false);
-            plateRect.SetAsFirstSibling();   // 区画・炎・倍率より奥
-            plateRect.anchorMin = plateRect.anchorMax = new Vector2(0f, 0.5f);
-            plateRect.pivot = Vector2.zero;
-            plateRect.anchoredPosition = Vector2.zero;
-            plateRect.sizeDelta = Vector2.zero;
-            _plate = plate.GetComponent<CanvasGroup>();
-            _plate.interactable = false;
-            _plate.blocksRaycasts = false;
-
-            // 重ねると半透明が濃くなるので、重ならない3枚に分ける（真ん中・上の縁・下の縁）
-            PlatePiece(plateRect, PlateLeft, PlateBottom + PlateCorner, PlateRight, PlateTop - PlateCorner);
-            PlatePiece(plateRect, PlateLeft + PlateCorner, PlateTop - PlateCorner, PlateRight - PlateCorner, PlateTop);
-            PlatePiece(plateRect, PlateLeft + PlateCorner, PlateBottom, PlateRight - PlateCorner, PlateBottom + PlateCorner);
+            if (_isEnemy || image == null) return null;
+            var rim = image.gameObject.AddComponent<Outline>();
+            rim.effectDistance = new Vector2(1f, -1f);
+            rim.useGraphicAlpha = true;
+            return rim;
         }
 
-        private static void PlatePiece(RectTransform parent, float left, float bottom, float right, float top)
+        private static void SetRim(Outline rim, bool lit)
         {
-            var go = new GameObject("Piece", typeof(RectTransform), typeof(Image));
-            var rt = (RectTransform)go.transform;
-            rt.SetParent(parent, false);
-            rt.anchorMin = rt.anchorMax = Vector2.zero;
-            rt.pivot = Vector2.zero;
-            rt.anchoredPosition = new Vector2(left, bottom);
-            rt.sizeDelta = new Vector2(right - left, top - bottom);
-            var image = go.GetComponent<Image>();
-            image.color = PlateColor;
-            image.raycastTarget = false;
+            if (rim != null) rim.effectColor = lit ? SelfLitRim : SelfOffRim;
         }
 
         private void OnEnable()
@@ -423,7 +419,8 @@ namespace KillingMahjong.UI
                 // 色は炎と同じ表から配ってもらう（2箇所に書かないため）。
                 _pips[i].color = lit
                     ? (broken ? PipBroken : VoltageFlame.PipColorFor(level))
-                    : PipOff;
+                    : OffColor;
+                if (_pipRims != null) SetRim(_pipRims[i], lit);
 
                 // **炎は点いた四角にだけ。** 段が上がるほど、どの炎も激しくなる。
                 // 「本数が増える」と「1本ずつ強くなる」の両方で段の差を出している。
@@ -464,6 +461,7 @@ namespace KillingMahjong.UI
                     Destroy(_chargeRow.GetChild(i).gameObject);
 
                 _chargePips = new Image[need];
+                _chargeRims = new Outline[need];
                 float w = ChargePipWidth(need);
                 for (int i = 0; i < need; i++)
                 {
@@ -479,6 +477,7 @@ namespace KillingMahjong.UI
                     var img = go.GetComponent<Image>();
                     img.raycastTarget = false;   // 牌のクリック判定を吸わない
                     _chargePips[i] = img;
+                    _chargeRims[i] = AddRim(img);
                 }
                 _chargeTier = level;
             }
@@ -491,7 +490,8 @@ namespace KillingMahjong.UI
             for (int i = 0; i < _chargePips.Length; i++)
             {
                 if (_chargePips[i] == null) continue;
-                _chargePips[i].color = i < filled ? onColor : PipOff;
+                _chargePips[i].color = i < filled ? onColor : OffColor;
+                if (_chargeRims != null && i < _chargeRims.Length) SetRim(_chargeRims[i], i < filled);
             }
         }
 
