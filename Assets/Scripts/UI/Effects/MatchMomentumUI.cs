@@ -33,7 +33,7 @@ namespace KillingMahjong.UI.Effects
         // - 台は右上の役一覧と同じ紙（Resources/UI.png）。上に「役一覧」の札が掛かっていない下半分を切り出し、
         //   上下に反転した2枚で1枚の紙にする。**元の絵は変えない**（切り出して読むだけ）
         // - 線は紙と同じドットの格子で描く（小さなテクスチャに点を打ち、Point で拡大）。なめらかな斜線にしない
-        // - ロンの点には、精算で使っている血しぶきの絵を押して「ロン」と書く（勝った側の色）
+        // - ロンの点には、線と同じドットで描いた血のしずくを置いて「ロン」と書く（勝った側の色。下の DropPattern）
         // - 逆転の「?」はやめた。線が交わるのを見れば分かる（字や記号を最小限に）
         // シーンの Backdrop（黒い四角）は残してあり、出すときに隠す。OpeningScene にも同じ物があるため
 
@@ -56,8 +56,31 @@ namespace KillingMahjong.UI.Effects
         private static readonly Color32 PlayerInk = new Color32(38, 72, 168, 255);
         private static readonly Color32 EnemyInk = new Color32(176, 32, 44, 255);
 
-        /// <summary>血しぶきの大きさ（満貫のとき）。紙のドットで 30。</summary>
-        private const float StainDots = 30f;
+        /// <summary>
+        /// ロンの点に置く血のしずく（紙のドットで 9x12。上が先、# が血、+ が光、- が影）。
+        /// 精算の血しぶきの絵を縮めて押していたが、ユーザー「ロンの血が汚すぎます」（2026-11-26）。
+        /// 紙の上で黒い汚れに見えたので、線と同じドットで描いた、輪郭のはっきりしたしずくにした。
+        /// </summary>
+        private static readonly string[] DropPattern =
+        {
+            "....#....",
+            "....#....",
+            "...###...",
+            "...###...",
+            "..#####..",
+            ".##+####.",
+            ".#+#####.",
+            "#++#####-",
+            "#+######-",
+            "#######--",
+            ".#####--.",
+            "..#---...",
+        };
+
+        /// <summary>しずくの丸い所の真ん中（下から数えた行）。ここを線の点に合わせる。</summary>
+        private const float DropBulbRow = 3.5f;
+
+        private static Texture2D playerDrop, enemyDrop;
 
         private static Sprite paperHalf;
         private RectTransform paper;
@@ -446,50 +469,70 @@ namespace KillingMahjong.UI.Effects
             image.raycastTarget = false;
         }
 
+        /// <summary>しずくの絵を作る（色ごとに1枚、使い回す）。</summary>
+        private static Texture2D DropTexture(bool player)
+        {
+            var cached = player ? playerDrop : enemyDrop;
+            if (cached != null) return cached;
+            Color32 ink = player ? PlayerInk : EnemyInk;
+            Color32 light = Color32.Lerp(ink, new Color32(255, 255, 255, 255), 0.45f);
+            Color32 shade = Color32.Lerp(ink, new Color32(0, 0, 0, 255), 0.35f);
+            int w = DropPattern[0].Length, h = DropPattern.Length;
+            var pixels = new Color32[w * h];
+            for (int row = 0; row < h; row++)
+                for (int x = 0; x < w; x++)
+                {
+                    char c = DropPattern[row][x];
+                    // テクスチャは下の行から並ぶ
+                    pixels[(h - 1 - row) * w + x] = c == '#' ? ink : c == '+' ? light : c == '-' ? shade : default;
+                }
+            var texture = new Texture2D(w, h, TextureFormat.RGBA32, false)
+            {
+                filterMode = FilterMode.Point,
+                wrapMode = TextureWrapMode.Clamp,
+                name = player ? "MomentumDropPlayer" : "MomentumDropEnemy"
+            };
+            texture.SetPixels32(pixels);
+            texture.Apply(false, true);
+            if (player) playerDrop = texture; else enemyDrop = texture;
+            return texture;
+        }
+
         /// <summary>
-        /// ロンの点ごとに血しぶきを押す（伸びる線が届くまで隠しておく）。
+        /// ロンの点ごとに血のしずくを置く（伸びる線が届くまで隠しておく）。
         /// 置くのはロンした側の線の上。色はその側の色。大きさはロンの強さ。
         /// </summary>
         private void PlaceRonCallouts(IList<RonMark> ronMarks, Vector2Int[] pGrid, Vector2Int[] eGrid, int maxPoints,
             System.Func<Vector2Int, Vector2> toLocal, float width, float height)
         {
             if (ronMarks == null || maxPoints < 2) return;
-            var blue = Resources.Load<Sprite>("UI/Settlement/settlement_splatter_blue");
-            var red = Resources.Load<Sprite>("UI/Settlement/settlement_splatter_red");
+            int dropW = DropPattern[0].Length, dropH = DropPattern.Length;
 
             foreach (var mark in ronMarks)
             {
                 var grid = mark.IsLocalWin ? pGrid : eGrid;
                 if (mark.Index < 1 || mark.Index >= grid.Length) continue;
 
-                var go = new GameObject("RonStain", typeof(RectTransform));
+                var go = new GameObject("RonDrop", typeof(RectTransform), typeof(RawImage));
                 var rt = (RectTransform)go.transform;
                 rt.SetParent(graphContainer, false);
-                float size = StainDots * ArtPixel;
-                rt.sizeDelta = new Vector2(size, size);
+                var size = new Vector2(dropW * ArtPixel, dropH * ArtPixel);
+                rt.sizeDelta = size;
+                // しずくの丸い所を点に合わせる（大きくなるときもそこを中心にふくらむ）
+                rt.pivot = new Vector2(0.5f, DropBulbRow / dropH);
                 spawnedUIElements.Add(go);
+                var drop = go.GetComponent<RawImage>();
+                drop.texture = DropTexture(mark.IsLocalWin);
+                drop.raycastTarget = false;
 
-                var stain = new GameObject("Stain", typeof(RectTransform), typeof(Image));
-                var stainRect = (RectTransform)stain.transform;
-                stainRect.SetParent(rt, false);
-                stainRect.anchorMin = Vector2.zero;
-                stainRect.anchorMax = Vector2.one;
-                stainRect.offsetMin = stainRect.offsetMax = Vector2.zero;
-                var stainImage = stain.GetComponent<Image>();
-                stainImage.sprite = mark.IsLocalWin ? blue : red;
-                stainImage.preserveAspect = true;
-                stainImage.raycastTarget = false;
-                if (stainImage.sprite == null) stainImage.color = mark.IsLocalWin ? (Color)PlayerInk : (Color)EnemyInk;
-
-                // 「ロン」は血しぶきの上に、その側のインクで書き添える（紙に書いた字に見せる。縁取りはしない）。
-                // 白抜きで血しぶきに重ねると、しぶきの芯より字が大きく、「ロ」が紙の上で四角い枠に見えた
+                // 「ロン」はしずくの上に、その側のインクで書き添える（紙に書いた字に見せる。縁取りはしない）
                 var labelObject = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
                 var labelRect = (RectTransform)labelObject.transform;
                 labelRect.SetParent(rt, false);
-                labelRect.anchorMin = labelRect.anchorMax = new Vector2(0.5f, 0.5f);
+                labelRect.anchorMin = labelRect.anchorMax = new Vector2(0.5f, 1f);
                 labelRect.pivot = new Vector2(0.5f, 0f);
-                labelRect.sizeDelta = new Vector2(size * 1.6f, 30f);
-                labelRect.anchoredPosition = new Vector2(0f, size * 0.32f);
+                labelRect.sizeDelta = new Vector2(80f, 30f);
+                labelRect.anchoredPosition = new Vector2(0f, ArtPixel);
                 var label = labelObject.GetComponent<TextMeshProUGUI>();
                 // 見出し（圧倒的優勢）と同じ字
                 label.font = statusText != null && statusText.font != null ? statusText.font : KillingMahjong.UI.GameUiTypography.Body;
@@ -500,13 +543,32 @@ namespace KillingMahjong.UI.Effects
                 label.textWrappingMode = TextWrappingModes.NoWrap;
                 label.raycastTarget = false;
 
-                // 点の上に押す。大きくなっても紙からはみ出さないよう、中心を枠の内側へ寄せる
+                // しずくは点からずらさない（ずらすと線の先から離れて、どのロンか分からなくなる）。
+                // 左右と下だけ、しずくが枠から出ないように寄せる。上は紙の余白があるので寄せない
                 float scale = RankScale(mark.Rank);
-                float half = size * 0.5f * scale;
                 Vector2 at = toLocal(grid[mark.Index]);
-                at.x = Mathf.Clamp(at.x, -width * 0.5f + half * 0.6f, width * 0.5f - half * 0.6f);
-                at.y = Mathf.Clamp(at.y, -height * 0.5f + half * 0.6f, height * 0.5f - half * 0.6f);
+                float halfW = size.x * 0.5f * scale, below = size.y * rt.pivot.y * scale;
+                at.x = Mathf.Clamp(at.x, -width * 0.5f + halfW, width * 0.5f - halfW);
+                at.y = Mathf.Max(at.y, -height * 0.5f + below);
                 rt.anchoredPosition = at;
+
+                // 字の上に余白が無い（紙の縁にかかる）ときは、字をしずくの左に書く
+                const float LabelHalfWidth = 24f, LabelHeight = 30f, PaperRoomAbove = 30f;
+                float labelTop = at.y + (size.y * (1f - rt.pivot.y) + ArtPixel + LabelHeight) * scale;
+                if (labelTop > height * 0.5f + PaperRoomAbove)
+                {
+                    labelRect.anchorMin = labelRect.anchorMax = new Vector2(0f, rt.pivot.y);
+                    labelRect.pivot = new Vector2(1f, 0.5f);
+                    labelRect.anchoredPosition = new Vector2(-ArtPixel, 0f);
+                    label.alignment = TextAlignmentOptions.Right;
+                }
+                else
+                {
+                    // 上に書くとき、字が左右の枠から出るなら内側へずらす
+                    float overflow = Mathf.Max(0f, at.x + LabelHalfWidth * scale - width * 0.5f)
+                                   - Mathf.Max(0f, -width * 0.5f - (at.x - LabelHalfWidth * scale));
+                    labelRect.anchoredPosition = new Vector2(-overflow / scale, ArtPixel);
+                }
 
                 go.SetActive(false);
                 ronCallouts.Add(new RonCallout { Rect = rt, Scale = scale,
