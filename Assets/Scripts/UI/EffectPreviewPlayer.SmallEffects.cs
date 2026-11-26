@@ -294,6 +294,11 @@ namespace KillingMahjong.UI
                             new Effects.MatchMomentumUI.RonMark { Index = 2, IsLocalWin = false, Rank = "満貫" },
                             new Effects.MatchMomentumUI.RonMark { Index = 4, IsLocalWin = true, Rank = "跳満" },
                             new Effects.MatchMomentumUI.RonMark { Index = 6, IsLocalWin = true, Rank = "役満" } });
+                    // 本編はクリックで閉じる振り返りの紙（2026-11-26）。試写では8秒見せたら閉じる
+                    float momentumShown = 0f;
+                    while (rig.momentum != null && rig.momentum.IsShowing && momentumShown < 8f)
+                    { momentumShown += Time.unscaledDeltaTime; yield return null; }
+                    if (rig.momentum != null && rig.momentum.IsShowing) rig.momentum.Dismiss();
                     yield return new WaitUntil(() => rig.momentum == null || !rig.momentum.IsShowing);
                     break;
                 case "dora.float":

@@ -176,7 +176,7 @@ namespace KillingMahjong.UI
             if (matchMomentumUI != null && playerHpHistory.Count >= 2)
             {
                 matchMomentumUI.ShowMomentum(playerHpHistory, enemyHpHistory, ronHistoryMarks);
-                // 線が伸び終わり、表示とフェードが完了してから結果へ進む。
+                // 振り返りの紙をクリックで閉じ、フェードが終わってから結果へ進む（2026-11-26）。
                 yield return new WaitUntil(() => matchMomentumUI == null || !matchMomentumUI.IsShowing);
             }
 
