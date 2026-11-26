@@ -190,10 +190,12 @@ namespace KillingMahjong.UI.Effects
             foreach (var callout in ronCallouts)
                 if (callout != null) callout.gameObject.SetActive(true);
             UpdateStatusText(playerHpHistory, enemyHpHistory);
+            if (statusText != null) statusText.rectTransform.localScale = Vector3.zero; // 紙が出てから押す（StampHeadline）
             ShowClickCatcher();
 
             dismissed = false;
             yield return StartCoroutine(FadeRoutine(1f));
+            yield return StartCoroutine(StampHeadline());
 
             // クリックされるまで待つ。出てすぐのクリックは受けない
             float shown = 0f;
@@ -263,6 +265,127 @@ namespace KillingMahjong.UI.Effects
             }
         }
 
+        // ---- ドパれる紙（2026-11-27）----
+        //
+        // プランナー「横に点数とかつけられんかな」「図が全然ドパれないからもっとドパれるようにしてほしいかも」。
+        // 出したまま・クリックで閉じる形は変えず（「動画にして瞬間的に表示するものでもない」）、紙そのものを派手にする。
+        // - 左に血の量の目盛り（0・半分・上）と点線。線は目盛りのぶん右から始める
+        // - 2本の線のあいだを、上にいる側の色で網目に塗る（どこで勝っていたかが面で見える）
+        // - ロンの字に、そのロンで増えた血の量を添える（跳満 +12,000）
+        // - 紙が出たら見出し（圧倒的優勢など）を判子のように押す。音つき・紙が少し揺れる。押すのはこの一度だけ
+        // - 最後の血の量の字を少し大きく（26 だと見出しの「圧倒的優勢」にぶつかった）
+
+        /// <summary>見出しを押す時間（大きい所から元の大きさへ）。</summary>
+        private const float StampSeconds = 0.14f;
+
+        private IEnumerator StampHeadline()
+        {
+            if (statusText == null || string.IsNullOrEmpty(statusText.text)) yield break;
+            var head = statusText.rectTransform;
+            float t = 0f;
+            while (t < StampSeconds)
+            {
+                t += Time.unscaledDeltaTime;
+                float k = Mathf.Clamp01(t / StampSeconds);
+                head.localScale = Vector3.one * Mathf.Lerp(2.2f, 1f, k * k);
+                yield return null;
+            }
+            head.localScale = Vector3.one;
+            KillingMahjong.Managers.AudioManager.Instance?.PlayImpactSE();
+
+            // 紙を数コマだけドット単位で揺らす
+            if (paper != null)
+            {
+                Vector2 home = paper.anchoredPosition;
+                Vector2 graphHome = graphContainer != null ? graphContainer.anchoredPosition : Vector2.zero;
+                float[] offsets = { 2f, -2f, 1f, -1f, 0f };
+                foreach (float o in offsets)
+                {
+                    var d = new Vector2(0f, o * ArtPixel);
+                    paper.anchoredPosition = home + d;
+                    if (graphContainer != null) graphContainer.anchoredPosition = graphHome + d;
+                    head.anchoredPosition += d;
+                    yield return new WaitForSecondsRealtime(0.035f);
+                    head.anchoredPosition -= d;
+                }
+                paper.anchoredPosition = home;
+                if (graphContainer != null) graphContainer.anchoredPosition = graphHome;
+            }
+        }
+
+        /// <summary>目盛りの字を置く幅（紙のドット）。線はこの右から始める。</summary>
+        private const int AxisDots = 26;
+
+        private static readonly Color32 GuideInk = new Color32(214, 198, 150, 255);
+
+        /// <summary>目盛りの上の値。きりのよい数に切り上げる（20,000 なら 5,000 刻み、それより上は 10,000 刻み）。</summary>
+        private static int NiceTop(int maxHp)
+        {
+            int step = maxHp <= 20000 ? 5000 : 10000;
+            return Mathf.Max(step, Mathf.CeilToInt(maxHp / (float)step) * step);
+        }
+
+        /// <summary>折れ線の、列ごとの高さ（点のあいだは直線で結ぶ）。点より左右は -1。</summary>
+        private static int[] ColumnHeights(Vector2Int[] points, int cols)
+        {
+            var ys = new int[cols];
+            for (int x = 0; x < cols; x++) ys[x] = -1;
+            for (int i = 0; i + 1 < points.Length; i++)
+            {
+                var a = points[i]; var b = points[i + 1];
+                for (int x = a.x; x <= b.x && x < cols; x++)
+                {
+                    float k = b.x == a.x ? 1f : (x - a.x) / (float)(b.x - a.x);
+                    ys[x] = Mathf.RoundToInt(Mathf.Lerp(a.y, b.y, k));
+                }
+            }
+            if (points.Length == 1 && points[0].x < cols) ys[points[0].x] = points[0].y;
+            return ys;
+        }
+
+        /// <summary>2本の線のあいだを、上にいる側の色の網目（市松）で塗る。線を描く前に呼ぶ。</summary>
+        private static void FillLead(Color32[] pixels, int cols, int rows, Vector2Int[] pGrid, Vector2Int[] eGrid)
+        {
+            int[] py = ColumnHeights(pGrid, cols), ey = ColumnHeights(eGrid, cols);
+            var paperColor = new Color32(250, 244, 214, 255);
+            Color32 pTint = Color32.Lerp(paperColor, PlayerInk, 0.55f), eTint = Color32.Lerp(paperColor, EnemyInk, 0.45f);
+            for (int x = 0; x < cols; x++)
+            {
+                if (py[x] < 0 || ey[x] < 0 || py[x] == ey[x]) continue;
+                Color32 tint = py[x] > ey[x] ? pTint : eTint;
+                int lo = Mathf.Min(py[x], ey[x]) + 2, hi = Mathf.Max(py[x], ey[x]);
+                for (int y = lo; y < hi && y < rows; y++)
+                    if (((x + y) & 1) == 0) pixels[y * cols + x] = tint;
+            }
+        }
+
+        /// <summary>目盛りの点線（1ドットおき）。</summary>
+        private static void GuideLine(Color32[] pixels, int cols, int rows, int y, int fromX)
+        {
+            if (y < 0 || y >= rows) return;
+            for (int x = fromX; x < cols; x += 2) pixels[y * cols + x] = GuideInk;
+        }
+
+        private void PlaceAxisLabel(int value, float localY, float axisRight, float width)
+        {
+            var go = new GameObject("Axis" + value, typeof(RectTransform), typeof(TextMeshProUGUI));
+            var rect = (RectTransform)go.transform;
+            rect.SetParent(graphContainer, false);
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(1f, 0.5f);
+            rect.sizeDelta = new Vector2(70f, 20f);
+            rect.anchoredPosition = new Vector2(axisRight - width * 0.5f, localY);
+            spawnedUIElements.Add(go);
+            var label = go.GetComponent<TextMeshProUGUI>();
+            label.font = statusText != null && statusText.font != null ? statusText.font : KillingMahjong.UI.GameUiTypography.Body;
+            label.text = value.ToString("N0");
+            label.fontSize = 14f;
+            label.color = new Color32(130, 112, 80, 255);
+            label.alignment = TextAlignmentOptions.Right;
+            label.textWrappingMode = TextWrappingModes.NoWrap;
+            label.raycastTarget = false;
+        }
+
         private void SetGraphProgress(float progress)
         {
             // 線はドットの格子ごとに伸ばす（途中で半ドットにかからない）
@@ -303,15 +426,26 @@ namespace KillingMahjong.UI.Effects
             int maxHp = 1;
             foreach (int hp in pHistory) if (hp > maxHp) maxHp = hp;
             foreach (int hp in eHistory) if (hp > maxHp) maxHp = hp;
+            maxHp = NiceTop(maxHp);
 
-            // 紙のドットの格子。線は2ドットの太さなので、上と右に1ドット空ける
-            int cols = Mathf.Max(4, Mathf.RoundToInt(width / ArtPixel));
+            // 紙のドットの格子。線は2ドットの太さなので、上と右に1ドット空ける。左は目盛りの字のぶん空ける
+            int cols = Mathf.Max(AxisDots + 4, Mathf.RoundToInt(width / ArtPixel));
             int rows = Mathf.Max(4, Mathf.RoundToInt(height / ArtPixel));
             revealCell = width / cols;
-            Vector2Int[] pGrid = ToGrid(pHistory, maxPoints, maxHp, cols, rows);
-            Vector2Int[] eGrid = ToGrid(eHistory, maxPoints, maxHp, cols, rows);
+            Vector2Int[] pGrid = ToGrid(pHistory, maxPoints, maxHp, cols, rows, AxisDots);
+            Vector2Int[] eGrid = ToGrid(eHistory, maxPoints, maxHp, cols, rows, AxisDots);
 
             var pixels = new Color32[cols * rows];
+            // 目盛りの点線 → 勝っている側の網目 → 線 の順に重ねる
+            float cellX0 = width / cols, cellY0 = height / rows;
+            for (int tick = 0; tick <= 2; tick++)
+            {
+                int value = maxHp * tick / 2;
+                int gy = Mathf.RoundToInt(value / (float)maxHp * (rows - 2));
+                GuideLine(pixels, cols, rows, gy, AxisDots);
+                PlaceAxisLabel(value, (gy + 1f) * cellY0 - height * 0.5f, (AxisDots - 2) * cellX0, width);
+            }
+            FillLead(pixels, cols, rows, pGrid, eGrid);
             // 相手を先に描き、重なったところは自分の線を上にする
             PlotPolyline(pixels, cols, rows, eGrid, EnemyInk);
             PlotPolyline(pixels, cols, rows, pGrid, PlayerInk);
@@ -350,7 +484,7 @@ namespace KillingMahjong.UI.Effects
             float cellX = width / cols, cellY = height / rows;
             System.Func<Vector2Int, Vector2> toLocal = g =>
                 new Vector2((g.x + 1f) * cellX - width * 0.5f, (g.y + 1f) * cellY - height * 0.5f);
-            PlaceRonCallouts(ronMarks, pGrid, eGrid, maxPoints, toLocal, width, height);
+            PlaceRonCallouts(ronMarks, pGrid, eGrid, maxPoints, toLocal, width, height, pHistory, eHistory);
 
             // 最後の血の量を、紙の上の帯（見出しの左右）に書く。グラフの中に書くと線やしずくに重なる
             PlaceFinalAmount("あなた", pHistory[pHistory.Count - 1], PlayerInk, true);
@@ -372,8 +506,8 @@ namespace KillingMahjong.UI.Effects
             spawnedUIElements.Add(go);
             var label = go.GetComponent<TextMeshProUGUI>();
             label.font = statusText != null && statusText.font != null ? statusText.font : KillingMahjong.UI.GameUiTypography.Body;
-            label.text = who + "　" + amount.ToString("N0");
-            label.fontSize = 20f;
+            label.text = who + " " + amount.ToString("N0");
+            label.fontSize = 22f;
             label.color = ink;
             label.alignment = left ? TextAlignmentOptions.Left : TextAlignmentOptions.Right;
             label.textWrappingMode = TextWrappingModes.NoWrap;
@@ -381,12 +515,12 @@ namespace KillingMahjong.UI.Effects
         }
 
         /// <summary>HP の並びを紙の格子の点にする。原点は左下。</summary>
-        private static Vector2Int[] ToGrid(List<int> history, int maxPoints, int maxHp, int cols, int rows)
+        private static Vector2Int[] ToGrid(List<int> history, int maxPoints, int maxHp, int cols, int rows, int left)
         {
             var points = new Vector2Int[history.Count];
             for (int i = 0; i < history.Count; i++)
             {
-                int x = maxPoints > 1 ? Mathf.RoundToInt(i * (cols - 2) / (float)(maxPoints - 1)) : 0;
+                int x = left + (maxPoints > 1 ? Mathf.RoundToInt(i * (cols - 2 - left) / (float)(maxPoints - 1)) : 0);
                 int y = Mathf.RoundToInt(Mathf.Clamp01(history[i] / (float)maxHp) * (rows - 2));
                 points[i] = new Vector2Int(x, y);
             }
@@ -514,7 +648,7 @@ namespace KillingMahjong.UI.Effects
         /// 置くのはロンした側の線の上。色はその側の色。大きさはロンの強さ。
         /// </summary>
         private void PlaceRonCallouts(IList<RonMark> ronMarks, Vector2Int[] pGrid, Vector2Int[] eGrid, int maxPoints,
-            System.Func<Vector2Int, Vector2> toLocal, float width, float height)
+            System.Func<Vector2Int, Vector2> toLocal, float width, float height, List<int> pHistory, List<int> eHistory)
         {
             if (ronMarks == null || maxPoints < 2) return;
             int dropW = DropPattern[0].Length, dropH = DropPattern.Length;
@@ -549,6 +683,13 @@ namespace KillingMahjong.UI.Effects
                 // 見出し（圧倒的優勢）と同じ字
                 label.font = statusText != null && statusText.font != null ? statusText.font : KillingMahjong.UI.GameUiTypography.Body;
                 label.text = string.IsNullOrEmpty(mark.Rank) ? "ロン" : mark.Rank;
+                // そのロンで増えた血の量（ロンした側の、前の点からの差）
+                var history = mark.IsLocalWin ? pHistory : eHistory;
+                if (history != null && mark.Index < history.Count)
+                {
+                    int gain = history[mark.Index] - history[mark.Index - 1];
+                    if (gain > 0) label.text += " +" + gain.ToString("N0");
+                }
                 label.fontSize = 20f;
                 label.color = mark.IsLocalWin ? (Color)PlayerInk : (Color)EnemyInk;
                 label.alignment = TextAlignmentOptions.Center;
@@ -570,7 +711,20 @@ namespace KillingMahjong.UI.Effects
                 const float LabelHeight = 30f, PaperRoomAbove = 30f;
                 float labelHalfWidth = labelRect.sizeDelta.x * 0.5f;
                 float labelTop = at.y + (size.y * (1f - rt.pivot.y) + ArtPixel) * scale + LabelHeight;
-                if (labelTop > height * 0.5f + PaperRoomAbove)
+                // ロンした側の線がもう一方より下にあるときは、字をしずくの下に書く
+                // （上に書くと、上の線と、あいだの網目に重なる）
+                var other = mark.IsLocalWin ? eGrid : pGrid;
+                bool otherAbove = mark.Index < other.Length && other[mark.Index].y > grid[mark.Index].y;
+                float labelBottom = at.y - below - ArtPixel * scale - LabelHeight;
+                if (otherAbove && labelBottom > -height * 0.5f)
+                {
+                    labelRect.anchorMin = labelRect.anchorMax = new Vector2(0.5f, 0f);
+                    labelRect.pivot = new Vector2(0.5f, 1f);
+                    float overflow = Mathf.Max(0f, at.x + labelHalfWidth - width * 0.5f)
+                                   - Mathf.Max(0f, -width * 0.5f - (at.x - labelHalfWidth));
+                    labelRect.anchoredPosition = new Vector2(-overflow / scale, -ArtPixel);
+                }
+                else if (labelTop > height * 0.5f + PaperRoomAbove)
                 {
                     labelRect.anchorMin = labelRect.anchorMax = new Vector2(0f, rt.pivot.y);
                     labelRect.pivot = new Vector2(1f, 0.5f);
@@ -660,7 +814,11 @@ namespace KillingMahjong.UI.Effects
             reveal = null;
             if (lineTexture != null) Destroy(lineTexture);
             lineTexture = null;
-            if (statusText != null) statusText.text = "";
+            if (statusText != null)
+            {
+                statusText.text = "";
+                statusText.rectTransform.localScale = Vector3.one;
+            }
         }
     }
 }
