@@ -27,7 +27,7 @@ namespace KillingMahjong.UI.Effects
         // プランナー「グラフを見たい人の心理としては、対局の結果を振り返りたいことだけだから、
         // 動画にして瞬間的に表示するものでもない気がする」（2人の人型の案には「コミカルすぎる」）。
         // それまでは、線が左から伸び（ピッという音つき）、2秒で勝手に消える「演出」だった。
-        // - 最初から全部描いた状態で出す。伸びる動き・音はなし
+        // - 最初から全部描いた状態で出す。伸びる動き・音はなし（→ 2026-11-27 ユーザーの指示で線を引く形に戻した。DrawLines）
         // - クリックするまで閉じない（右下の ▼ が合図。ED の本文と同じ印）
         // - 振り返りに要るものだけ書き添える：ロンの点に役の名前（満貫・跳満…）、線の右端に最後の血の量
         // - 出てすぐのクリックは受けない（結果を待って連打していた指で、見る前に閉じないように）
@@ -122,7 +122,28 @@ namespace KillingMahjong.UI.Effects
         }
 
         /// <summary>ロンの点に置いたしずく（字つき）。</summary>
-        private readonly List<RectTransform> ronCallouts = new List<RectTransform>();
+        private readonly List<RonCallout> ronCallouts = new List<RonCallout>();
+
+        private struct RonCallout
+        {
+            public RectTransform Rect;
+            /// <summary>線がここまで引かれたら出す（0〜1、グラフの幅で測る）。</summary>
+            public float Progress;
+            public float Scale;
+        }
+
+        /// <summary>大差がついた点（線がここまで引かれたら派手にする）。</summary>
+        private readonly List<BigSwing> bigSwings = new List<BigSwing>();
+
+        /// <summary>最後の血の量（線を引き終えてから出す）。</summary>
+        private readonly List<GameObject> finalLabels = new List<GameObject>();
+
+        private struct BigSwing
+        {
+            public float Progress;
+            /// <summary>差を広げた側（あなたなら青、あいてなら赤で光らせる）。</summary>
+            public bool ByPlayer;
+        }
 
         /// <summary>
         /// 吹き出しの大きさをロンの強さで変える（2026-10-15 のユーザーの要望）。
@@ -184,17 +205,16 @@ namespace KillingMahjong.UI.Effects
 
         private IEnumerator DisplayRoutine(List<int> playerHpHistory, List<int> enemyHpHistory, IList<RonMark> ronMarks)
         {
-            // 最初から全部描いた状態で出す（振り返るための紙なので、伸ばして見せない）
+            // 目盛りだけの紙を出してから、線を左から右へ引く（DrawLines）。引き終えたら見出しを押す
             DrawGraph(playerHpHistory, enemyHpHistory, ronMarks);
-            SetGraphProgress(1f);
-            foreach (var callout in ronCallouts)
-                if (callout != null) callout.gameObject.SetActive(true);
+            SetGraphProgress(0f);
             UpdateStatusText(playerHpHistory, enemyHpHistory);
-            if (statusText != null) statusText.rectTransform.localScale = Vector3.zero; // 紙が出てから押す（StampHeadline）
+            if (statusText != null) statusText.rectTransform.localScale = Vector3.zero; // 引き終えてから押す（StampHeadline）
             ShowClickCatcher();
 
             dismissed = false;
             yield return StartCoroutine(FadeRoutine(1f));
+            yield return StartCoroutine(DrawLines());
             yield return StartCoroutine(StampHeadline());
 
             // クリックされるまで待つ。出てすぐのクリックは受けない
@@ -274,6 +294,153 @@ namespace KillingMahjong.UI.Effects
         // - ロンの字に、そのロンで増えた血の量を添える（跳満 +12,000）
         // - 紙が出たら見出し（圧倒的優勢など）を判子のように押す。音つき・紙が少し揺れる。押すのはこの一度だけ
         // - 最後の血の量の字を少し大きく（26 だと見出しの「圧倒的優勢」にぶつかった）
+
+        // ---- 線を引く・大差で派手に（2026-11-27）----
+        //
+        // ユーザー「線を一括で表示するんじゃなくて、左から右に引いてくれないか」「デカく差がついた時には派手な感じで」。
+        // 紙のまま・クリックで閉じる形は変えず、出だしだけ線を引いて見せる。
+        // - 目盛りだけの紙が出てから、2本の線を左から右へ同時に引く（網目も一緒に）。ロンの点の前後は少しゆっくり
+        // - ロンの点に線が届いたら、しずくがぽんと出る（強い役ほど低い音）
+        // - 1回で差が大きく動いた点（目盛りの上の値の BigSwingRatio 以上）では、線が一瞬止まり、
+        //   差を広げた側の色で紙が光り、紙が大きく揺れ、ドンと鳴る
+        // - 引いている途中のクリックは「最後まで飛ばす」（見たい人を待たせない）。閉じるのは次のクリック
+
+        /// <summary>線を引き終えるまでの時間（ロンでゆっくりになるぶんは別）。</summary>
+        private const float DrawSeconds = 1.6f;
+        /// <summary>ロンの点の前後（進み具合で測る幅）と、点の上での速さの倍率。</summary>
+        private const float RonSlowRange = 0.06f;
+        private const float RonSlowSpeed = 0.3f;
+        private const float RonPopSeconds = 0.16f;
+        /// <summary>この割合（目盛りの上の値に対して）以上、1回で差が動いたら大差。</summary>
+        private const float BigSwingRatio = 0.3f;
+        /// <summary>大差の点で線を止める時間。</summary>
+        private const float BigSwingHoldSeconds = 0.24f;
+        /// <summary>引いている音を鳴らす間隔（紙のドットの列）。</summary>
+        private const int PenSoundEveryColumns = 8;
+
+        private IEnumerator DrawLines()
+        {
+            if (reveal == null || graphContainer == null) yield break;
+            ronCallouts.Sort((a, b) => a.Progress.CompareTo(b.Progress));
+            bigSwings.Sort((a, b) => a.Progress.CompareTo(b.Progress));
+            var audio = KillingMahjong.Managers.AudioManager.Instance;
+            float width = graphContainer.rect.width;
+            int nextRon = 0, nextSwing = 0, lastSoundColumn = AxisDots;
+            // 線は目盛りの右から始まるので、そこまでは最初から見せる
+            float progress = revealCell > 0f && width > 0f ? AxisDots * revealCell / width : 0f;
+            while (progress < 1f && !dismissed) // 途中のクリックは最後まで飛ばす
+            {
+                float next = Mathf.Min(1f, progress + Time.unscaledDeltaTime / DrawSeconds * RonSpeedAt(progress));
+                bool swing = nextSwing < bigSwings.Count && next >= bigSwings[nextSwing].Progress;
+                if (swing) next = Mathf.Max(progress, bigSwings[nextSwing].Progress);
+                progress = next;
+                SetGraphProgress(progress);
+                PopRonsUpTo(progress, ref nextRon, audio);
+                if (swing)
+                {
+                    // 大差の点に届いたら、そこで止めて派手にする
+                    yield return StartCoroutine(BigSwingBurst(bigSwings[nextSwing++].ByPlayer));
+                    continue;
+                }
+                int column = revealCell > 0f ? Mathf.FloorToInt(progress * width / revealCell) : 0;
+                if (audio != null && column - lastSoundColumn >= PenSoundEveryColumns)
+                {
+                    lastSoundColumn = column;
+                    audio.PlayStingerPitched("se_graph_tick", 1f, KillingMahjong.Managers.AudioManager.PitchJitter.VerySmall, 0.35f);
+                }
+                yield return null;
+            }
+
+            // 飛ばしたとき・引き終えたときは全部見せる
+            bool skipped = dismissed;
+            SetGraphProgress(1f);
+            for (; nextRon < ronCallouts.Count; nextRon++)
+            {
+                var callout = ronCallouts[nextRon];
+                if (callout.Rect == null) continue;
+                callout.Rect.gameObject.SetActive(true);
+                callout.Rect.localScale = Vector3.one * callout.Scale;
+            }
+            if (!skipped) yield return new WaitForSecondsRealtime(RonPopSeconds);
+            // 最後の血の量は、線が右端に着いてから出す（先に出すと結果が分かってしまう）
+            foreach (var label in finalLabels)
+                if (label != null) label.SetActive(true);
+            dismissed = false; // 飛ばしたクリックで閉じない
+        }
+
+        private void PopRonsUpTo(float progress, ref int nextRon, KillingMahjong.Managers.AudioManager audio)
+        {
+            while (nextRon < ronCallouts.Count && progress >= ronCallouts[nextRon].Progress)
+                StartCoroutine(PopRonCallout(ronCallouts[nextRon++], audio));
+        }
+
+        /// <summary>線の伸びる速さの倍率。ロンの点の前後だけ下げる。</summary>
+        private float RonSpeedAt(float progress)
+        {
+            float speed = 1f;
+            foreach (var callout in ronCallouts)
+            {
+                float distance = Mathf.Abs(progress - callout.Progress) / RonSlowRange;
+                if (distance >= 1f) continue;
+                speed = Mathf.Min(speed, Mathf.Lerp(RonSlowSpeed, 1f, Mathf.SmoothStep(0f, 1f, distance)));
+            }
+            return speed;
+        }
+
+        /// <summary>小さく出て一度ふくらみ、ロンの強さの大きさに落ち着く。強いロンほど低い音。</summary>
+        private IEnumerator PopRonCallout(RonCallout callout, KillingMahjong.Managers.AudioManager audio)
+        {
+            if (callout.Rect == null) yield break;
+            callout.Rect.gameObject.SetActive(true);
+            audio?.PlayStingerPitched("se_ron_pop", 1f / callout.Scale, KillingMahjong.Managers.AudioManager.PitchJitter.None);
+            float t = 0f;
+            while (t < RonPopSeconds && callout.Rect != null)
+            {
+                float k = t / RonPopSeconds;
+                float s = k < 0.6f ? Mathf.Lerp(0.3f, 1.3f, k / 0.6f) : Mathf.Lerp(1.3f, 1f, (k - 0.6f) / 0.4f);
+                callout.Rect.localScale = Vector3.one * (s * callout.Scale);
+                yield return null;
+                t += Time.unscaledDeltaTime;
+            }
+            if (callout.Rect != null) callout.Rect.localScale = Vector3.one * callout.Scale;
+        }
+
+        /// <summary>大差の点：線を止め、差を広げた側の色で紙を光らせ、大きく揺らしてドンと鳴らす。</summary>
+        private IEnumerator BigSwingBurst(bool byPlayer)
+        {
+            KillingMahjong.Managers.AudioManager.Instance?.PlayImpactSE();
+            Color32 ink = byPlayer ? PlayerInk : EnemyInk;
+
+            // 光：グラフの枠いっぱいにその側の色を重ね、すぐ引かせる
+            var flashObject = new GameObject("BigSwingFlash", typeof(RectTransform), typeof(Image));
+            var flash = (RectTransform)flashObject.transform;
+            flash.SetParent(graphContainer, false);
+            flash.anchorMin = Vector2.zero;
+            flash.anchorMax = Vector2.one;
+            flash.offsetMin = flash.offsetMax = Vector2.zero;
+            spawnedUIElements.Add(flashObject);
+            var flashImage = flashObject.GetComponent<Image>();
+            flashImage.raycastTarget = false;
+
+            Vector2 home = paper != null ? paper.anchoredPosition : Vector2.zero;
+            Vector2 graphHome = graphContainer.anchoredPosition;
+            // 揺れ：判子より大きく、横にも振る（ドット単位）
+            Vector2[] offsets = { new Vector2(4, 3), new Vector2(-4, -3), new Vector2(3, -2), new Vector2(-3, 2), new Vector2(1, -1), Vector2.zero };
+            float step = BigSwingHoldSeconds / offsets.Length;
+            for (int i = 0; i < offsets.Length && !dismissed; i++)
+            {
+                var d = offsets[i] * ArtPixel;
+                if (paper != null) paper.anchoredPosition = home + d;
+                graphContainer.anchoredPosition = graphHome + d;
+                // 薄く重ねると紙のクリーム色と混ざって灰色に濁るので、最初の2コマは濃く塗ってから引かせる
+                float k = i / (float)(offsets.Length - 1);
+                flashImage.color = new Color32(ink.r, ink.g, ink.b, (byte)Mathf.RoundToInt(i < 2 ? 210f - 50f * i : 120f * (1f - k)));
+                yield return new WaitForSecondsRealtime(step);
+            }
+            if (paper != null) paper.anchoredPosition = home;
+            graphContainer.anchoredPosition = graphHome;
+            flashImage.color = Color.clear;
+        }
 
         /// <summary>見出しを押す時間（大きい所から元の大きさへ）。</summary>
         private const float StampSeconds = 0.14f;
@@ -458,7 +625,7 @@ namespace KillingMahjong.UI.Effects
             lineTexture.SetPixels32(pixels);
             lineTexture.Apply(false, true);
 
-            // 線を見せる窓（振り返りの紙では最初から全幅。SetGraphProgress(1)）
+            // 線を見せる窓（左から広げて線を引いて見せる。DrawLines）
             var revealObject = new GameObject("InkReveal", typeof(RectTransform), typeof(RectMask2D));
             reveal = (RectTransform)revealObject.transform;
             reveal.SetParent(graphContainer, false);
@@ -485,10 +652,25 @@ namespace KillingMahjong.UI.Effects
             System.Func<Vector2Int, Vector2> toLocal = g =>
                 new Vector2((g.x + 1f) * cellX - width * 0.5f, (g.y + 1f) * cellY - height * 0.5f);
             PlaceRonCallouts(ronMarks, pGrid, eGrid, maxPoints, toLocal, width, height, pHistory, eHistory);
+            FindBigSwings(pHistory, eHistory, pGrid, maxHp, toLocal, width);
 
             // 最後の血の量を、紙の上の帯（見出しの左右）に書く。グラフの中に書くと線やしずくに重なる
             PlaceFinalAmount("あなた", pHistory[pHistory.Count - 1], PlayerInk, true);
             PlaceFinalAmount("あいて", eHistory[eHistory.Count - 1], EnemyInk, false);
+        }
+
+        /// <summary>1回で差（あなた − あいて）が BigSwingRatio 以上動いた点を探す。</summary>
+        private void FindBigSwings(List<int> pHistory, List<int> eHistory, Vector2Int[] pGrid, int maxHp,
+            System.Func<Vector2Int, Vector2> toLocal, float width)
+        {
+            bigSwings.Clear();
+            int n = Mathf.Min(Mathf.Min(pHistory.Count, eHistory.Count), pGrid.Length);
+            for (int i = 1; i < n; i++)
+            {
+                int change = (pHistory[i] - eHistory[i]) - (pHistory[i - 1] - eHistory[i - 1]);
+                if (Mathf.Abs(change) < maxHp * BigSwingRatio) continue;
+                bigSwings.Add(new BigSwing { Progress = (toLocal(pGrid[i]).x + width * 0.5f) / width, ByPlayer = change > 0 });
+            }
         }
 
         /// <summary>グラフの枠の上端から、見出しの高さまでの距離（見出しと同じ高さに並べる）。</summary>
@@ -504,6 +686,8 @@ namespace KillingMahjong.UI.Effects
             rect.sizeDelta = new Vector2(200f, 30f);
             rect.anchoredPosition = new Vector2(0f, FinalAmountAboveGraph);
             spawnedUIElements.Add(go);
+            finalLabels.Add(go);
+            go.SetActive(false); // DrawLines の終わりで出す
             var label = go.GetComponent<TextMeshProUGUI>();
             label.font = statusText != null && statusText.font != null ? statusText.font : KillingMahjong.UI.GameUiTypography.Body;
             label.text = who + " " + amount.ToString("N0");
@@ -741,7 +925,8 @@ namespace KillingMahjong.UI.Effects
 
                 rt.localScale = Vector3.one * scale;
                 go.SetActive(false);
-                ronCallouts.Add(rt);
+                // 線がしずくの点（寄せる前の位置）まで引かれたら出す
+                ronCallouts.Add(new RonCallout { Rect = rt, Progress = (toLocal(grid[mark.Index]).x + width * 0.5f) / width, Scale = scale });
             }
         }
 
@@ -802,6 +987,8 @@ namespace KillingMahjong.UI.Effects
             }
             spawnedUIElements.Clear();
             ronCallouts.Clear();
+            bigSwings.Clear();
+            finalLabels.Clear();
             if (nextMark != null) Destroy(nextMark.gameObject);
             nextMark = null;
             if (clickCatcher != null) Destroy(clickCatcher.gameObject);
