@@ -22,7 +22,56 @@ namespace KillingMahjong.UI.Effects
 
         private List<GameObject> spawnedUIElements = new List<GameObject>();
         private const float GrowthDuration = 1.5f;
-        private const int GrowthPulseCount = 24;
+
+        // ---- 記録計のペンで描く（2026-11-26）----
+        //
+        // ユーザー「グラフの動きや音がAIくさい。どこかでグラフの映像を探して、それを参考に動きを作って」。
+        // 参考にしたのは、嘘発見器（ポリグラフ）や記録計の、紙の上をペンが走って線を引く動き。
+        // 以前は「線の先が一定の速さで伸び、24回ピッと音程が上がっていく」だけで、動かしている物が無かった。
+        // - 線を引くのは、左から右へ走る2本のペン（自分は青、相手は赤）。ペンの先が線の先
+        // - 血の量が変わった所で線は段になる（斜めにならさない）。値は局のあいだ変わらないため
+        // - ペンは重さのある針なので、段では少し行きすぎてから戻る（下の PenStiffness・PenDamping）。
+        //   引いた線にもその揺れが残る
+        // - 走り始めにペンを紙へ下ろし、描き終えたら持ち上げる
+        // - ピッという音はやめた。ペンの音は素材を聞き比べて決める（se_graph_pen が入っていれば鳴らす）
+
+        /// <summary>ペンのばねの強さと減り方（1回の計算ごと）。行きすぎは段の高さの1割5分ほど、5〜6ドットで落ち着く。</summary>
+        private const float PenStiffness = 0.3f;
+        private const float PenDamping = 0.37f;
+        private const int PenSubsteps = 3;
+
+        /// <summary>段を、点の何列手前から始めるか。ばねが落ち着くまでの列数。</summary>
+        private const int PenLeadColumns = 5;
+
+        /// <summary>ペンを下ろす・持ち上げる高さ（紙のドット）と時間。</summary>
+        private const float PenLiftDots = 4f;
+        private const float PenLiftSeconds = 0.12f;
+
+        /// <summary>ペンの音を鳴らす間隔（紙のドットで何列ごとか）。</summary>
+        private const int PenSoundEveryColumns = 6;
+
+        /// <summary>ペンの絵（紙のドットで 7x13。下の真ん中が先。o が軸、+ が光、# がインク）。</summary>
+        private static readonly string[] PenPattern =
+        {
+            "..ooo..",
+            ".ooooo.",
+            ".o+ooo.",
+            ".o+ooo.",
+            ".o+ooo.",
+            ".ooooo.",
+            ".o###o.",
+            ".ooooo.",
+            ".ooooo.",
+            "..o+o..",
+            "..o#o..",
+            "...#...",
+            "...#...",
+        };
+
+        private float[] playerTrace, enemyTrace;
+        private RectTransform playerPen, enemyPen;
+        private CanvasGroup pens;
+        private float penLift;
         public bool IsShowing { get; private set; }
 
         // ---- 紙に描く（2026-11-25）----
@@ -200,29 +249,56 @@ namespace KillingMahjong.UI.Effects
         {
             if (reveal == null) yield break;
             ronCallouts.Sort((a, b) => a.Progress.CompareTo(b.Progress));
+
+            // ペンを紙に下ろす
+            yield return StartCoroutine(LiftPens(1f, 0f));
+
             int nextRon = 0;
             float progress = 0f;
-            int lastPulse = -1;
             int presentationFrame = -1;
+            int lastSoundColumn = 0;
+            var penSound = Resources.Load<AudioClip>("Stingers/se_graph_pen") != null;
             while (progress < 1f)
             {
-                // ロンの点に近づくと線の伸びがスローになり、点を過ぎると元の速さへ戻る
+                // ロンの点に近づくとペンがゆっくりになり、点を過ぎると元の速さへ戻る
                 // （2026-10-15 のユーザーの指摘「止まるのではなく、ロンで少しスローになる感じに」）
                 progress = Mathf.Min(1f, progress + Time.deltaTime / GrowthDuration * RonSpeedAt(progress));
                 while (nextRon < ronCallouts.Count && progress >= ronCallouts[nextRon].Progress)
                     StartCoroutine(PopRonCallout(ronCallouts[nextRon++]));
                 if (progress >= 1f || PresentationTiming.IsNewFrame(ref presentationFrame, Time.time))
                     SetGraphProgress(progress);
-                int pulse = Mathf.FloorToInt(progress * (GrowthPulseCount - 1));
-                if (pulse != lastPulse)
+                int column = Mathf.FloorToInt(progress * (playerTrace != null ? playerTrace.Length : 1));
+                if (penSound && column - lastSoundColumn >= PenSoundEveryColumns)
                 {
-                    PlayGrowthPulse(pulse);
-                    lastPulse = pulse;
+                    lastSoundColumn = column;
+                    var audio = KillingMahjong.Managers.AudioManager.Instance;
+                    if (audio != null)
+                        audio.PlayStingerPitched("se_graph_pen", 1f, KillingMahjong.Managers.AudioManager.PitchJitter.VerySmall);
                 }
                 yield return null;
             }
-            // 吹き出しが弾け終わるまでは待つ（決着のロンは最後の点なので、伸び終わりと同時に出る）
+            // しずくが弾け終わるまでは待つ（決着のロンは最後の点なので、描き終わりと同時に出る）。そのあとペンを上げる
             yield return new WaitForSeconds(RonPopSeconds);
+            yield return StartCoroutine(LiftPens(0f, 1f));
+        }
+
+        /// <summary>ペンを下ろす（1→0）・持ち上げる（0→1）。上がっているほど薄くする。</summary>
+        private IEnumerator LiftPens(float from, float to)
+        {
+            if (pens == null) yield break;
+            float t = 0f;
+            while (t < PenLiftSeconds)
+            {
+                float k = PresentationTiming.Sample(t) / PenLiftSeconds;
+                penLift = Mathf.Lerp(from, to, k);
+                pens.alpha = 1f - penLift;
+                PlacePens();
+                yield return null;
+                t += Time.deltaTime;
+            }
+            penLift = to;
+            pens.alpha = 1f - penLift;
+            PlacePens();
         }
 
         /// <summary>
@@ -267,18 +343,6 @@ namespace KillingMahjong.UI.Effects
             if (callout.Rect != null) callout.Rect.localScale = Vector3.one * callout.Scale;
         }
 
-        private static void PlayGrowthPulse(int pulse)
-        {
-            var audio = KillingMahjong.Managers.AudioManager.Instance;
-            if (audio == null) return;
-            // 線が伸びるにつれて高くなる。最後の1回で1オクターブ上に届く。
-            // 合成の三角波（2オクターブ上がる）から Freesound（CC0）の電子音2つを重ねたものに替えた（2026-10-19）。
-            // 録音を2オクターブも上げると細くキンキンするので、上がり幅は1オクターブにしてある
-            float pitch = Mathf.Pow(2f, pulse / (float)(GrowthPulseCount - 1));
-            audio.PlayStingerPitched("se_graph_tick", pitch,
-                KillingMahjong.Managers.AudioManager.PitchJitter.None);
-        }
-
         private void SetGraphProgress(float progress)
         {
             // 線はドットの格子ごとに伸ばす（途中で半ドットにかからない）
@@ -286,6 +350,31 @@ namespace KillingMahjong.UI.Effects
             float width = graphContainer.rect.width;
             float shown = revealCell > 0f ? Mathf.Round(progress * width / revealCell) * revealCell : progress * width;
             reveal.sizeDelta = new Vector2(Mathf.Min(shown, width), 0f);
+            PlacePens();
+        }
+
+        /// <summary>ペンの先を、いま描いている列の線の上に置く。</summary>
+        private void PlacePens()
+        {
+            if (reveal == null || graphContainer == null || playerTrace == null) return;
+            float width = graphContainer.rect.width, height = graphContainer.rect.height;
+            int cols = playerTrace.Length;
+            float cellX = width / cols, cellY = height / Mathf.Max(1, Mathf.RoundToInt(height / ArtPixel));
+            // 見えている線の右端の列（線は2ドットの太さで、列 c と c+1 にかかる）
+            int column = Mathf.Clamp(Mathf.RoundToInt(reveal.sizeDelta.x / cellX) - 2, 0, cols - 1);
+            float lift = penLift * PenLiftDots * cellY;
+            PlacePen(enemyPen, enemyTrace, column, cellX, cellY, width, height, lift);
+            PlacePen(playerPen, playerTrace, column, cellX, cellY, width, height, lift);
+        }
+
+        private static void PlacePen(RectTransform pen, float[] trace, int column, float cellX, float cellY,
+            float width, float height, float lift)
+        {
+            if (pen == null || trace == null) return;
+            // 先の1ドットが線（行 y と y+1）の上の段に重なるように置く
+            float y = Mathf.Round(trace[Mathf.Min(column, trace.Length - 1)]);
+            pen.anchoredPosition = new Vector2((column + 1f) * cellX - width * 0.5f,
+                (y + 1f) * cellY - height * 0.5f + lift);
         }
 
         private void OnDisable()
@@ -327,10 +416,15 @@ namespace KillingMahjong.UI.Effects
             Vector2Int[] pGrid = ToGrid(pHistory, maxPoints, maxHp, cols, rows);
             Vector2Int[] eGrid = ToGrid(eHistory, maxPoints, maxHp, cols, rows);
 
+            // ペンが実際に通る道（段と行きすぎを含む）。描く線もペンの位置もこれを使う
+            playerTrace = PenTrace(pGrid, cols, rows);
+            enemyTrace = PenTrace(eGrid, cols, rows);
+            int lastColumn = Mathf.Max(pGrid[pGrid.Length - 1].x, eGrid[eGrid.Length - 1].x);
+
             var pixels = new Color32[cols * rows];
             // 相手を先に描き、重なったところは自分の線を上にする
-            PlotPolyline(pixels, cols, rows, eGrid, EnemyInk);
-            PlotPolyline(pixels, cols, rows, pGrid, PlayerInk);
+            PlotPolyline(pixels, cols, rows, TracePoints(enemyTrace, lastColumn), EnemyInk);
+            PlotPolyline(pixels, cols, rows, TracePoints(playerTrace, lastColumn), PlayerInk);
             lineTexture = new Texture2D(cols, rows, TextureFormat.RGBA32, false)
             {
                 filterMode = FilterMode.Point,
@@ -367,6 +461,87 @@ namespace KillingMahjong.UI.Effects
             System.Func<Vector2Int, Vector2> toLocal = g =>
                 new Vector2((g.x + 1f) * cellX - width * 0.5f, (g.y + 1f) * cellY - height * 0.5f);
             PlaceRonCallouts(ronMarks, pGrid, eGrid, maxPoints, toLocal, width, height);
+
+            // ペンはしずくより手前に置く。描き始めるまでは持ち上げて隠しておく
+            var pensObject = new GameObject("Pens", typeof(RectTransform), typeof(CanvasGroup));
+            var pensRect = (RectTransform)pensObject.transform;
+            pensRect.SetParent(graphContainer, false);
+            pensRect.anchorMin = pensRect.anchorMax = new Vector2(0.5f, 0.5f);
+            pensRect.sizeDelta = Vector2.zero;
+            spawnedUIElements.Add(pensObject);
+            pens = pensObject.GetComponent<CanvasGroup>();
+            pens.blocksRaycasts = false;
+            pens.interactable = false;
+            enemyPen = CreatePen(pensRect, "EnemyPen", EnemyInk);
+            playerPen = CreatePen(pensRect, "PlayerPen", PlayerInk);
+            penLift = 1f;
+            pens.alpha = 0f;
+        }
+
+        private static RectTransform CreatePen(RectTransform parent, string name, Color32 ink)
+        {
+            int w = PenPattern[0].Length, h = PenPattern.Length;
+            Color32 body = Color32.Lerp(ink, new Color32(0, 0, 0, 255), 0.55f);
+            Color32 light = Color32.Lerp(ink, new Color32(255, 255, 255, 255), 0.5f);
+            var pixels = new Color32[w * h];
+            for (int row = 0; row < h; row++)
+                for (int x = 0; x < w; x++)
+                {
+                    char c = PenPattern[row][x];
+                    pixels[(h - 1 - row) * w + x] = c == 'o' ? body : c == '+' ? light : c == '#' ? ink : default;
+                }
+            var texture = new Texture2D(w, h, TextureFormat.RGBA32, false)
+            {
+                filterMode = FilterMode.Point,
+                wrapMode = TextureWrapMode.Clamp,
+                name = name
+            };
+            texture.SetPixels32(pixels);
+            texture.Apply(false, true);
+
+            var go = new GameObject(name, typeof(RectTransform), typeof(RawImage));
+            var rt = (RectTransform)go.transform;
+            rt.SetParent(parent, false);
+            rt.sizeDelta = new Vector2(w * ArtPixel, h * ArtPixel);
+            // 先（いちばん下の1ドット）の真ん中を位置に合わせる
+            rt.pivot = new Vector2(0.5f, 0.5f / h);
+            var image = go.GetComponent<RawImage>();
+            image.texture = texture;
+            image.raycastTarget = false;
+            return rt;
+        }
+
+        /// <summary>
+        /// ペンの通る道を列ごとに求める。目標は「次の点の列に来るまで前の値のまま」の段。
+        /// ペンはばねで目標を追うので、段では少し行きすぎてから戻る。
+        /// </summary>
+        private static float[] PenTrace(Vector2Int[] points, int cols, int rows)
+        {
+            var trace = new float[cols];
+            float y = points[0].y, v = 0f;
+            int segment = 0;
+            for (int c = 0; c < cols; c++)
+            {
+                // 段は点の数列手前から始める。点の上ではペンが新しい値に落ち着いている（しずくと線がずれない）
+                while (segment + 1 < points.Length && c >= points[segment + 1].x - PenLeadColumns) segment++;
+                float target = points[segment].y;
+                for (int s = 0; s < PenSubsteps; s++)
+                {
+                    v = (v + (target - y) * PenStiffness) * (1f - PenDamping);
+                    y += v;
+                }
+                // 紙の外へは出ない（記録計の針も端で止まる）
+                trace[c] = Mathf.Clamp(y, 0f, rows - 2);
+            }
+            return trace;
+        }
+
+        private static Vector2Int[] TracePoints(float[] trace, int lastColumn)
+        {
+            int count = Mathf.Min(trace.Length, lastColumn + 1);
+            var points = new Vector2Int[count];
+            for (int c = 0; c < count; c++) points[c] = new Vector2Int(c, Mathf.RoundToInt(trace[c]));
+            return points;
         }
 
         /// <summary>HP の並びを紙の格子の点にする。原点は左下。</summary>
@@ -634,6 +809,14 @@ namespace KillingMahjong.UI.Effects
             spawnedUIElements.Clear();
             ronCallouts.Clear();
             reveal = null;
+            foreach (var pen in new[] { playerPen, enemyPen })
+            {
+                var image = pen != null ? pen.GetComponent<RawImage>() : null;
+                if (image != null && image.texture != null) Destroy(image.texture);
+            }
+            playerPen = enemyPen = null;
+            pens = null;
+            playerTrace = enemyTrace = null;
             if (lineTexture != null) Destroy(lineTexture);
             lineTexture = null;
             if (statusText != null) statusText.text = "";
