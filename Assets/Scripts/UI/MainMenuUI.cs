@@ -81,7 +81,34 @@ namespace KillingMahjong.UI
             if (!EnsureName(OnFriend)) return;
             if (_multiMenu == null) _multiMenu = GetComponent<TitleMultiMenuUI>();
             if (_multiMenu == null) _multiMenu = gameObject.AddComponent<TitleMultiMenuUI>();
+            if (_isOpeningFriend) return;
             SetMenuInteractable(false);
+            StartCoroutine(OpenFriendOverBlurredRoom());
+        }
+
+        /// <summary>
+        /// 友達対戦の画面の後ろに、いまの部屋をぼかして敷く（2026-11-27 プランナーの案
+        /// 「UIとか全部消したメインメニュー背景を表示 → ぼかし → 半透明の黒い膜 → 電話の絵を上から置く」）。
+        /// 部屋の上の字（Labels）と押す所（Buttons）を1コマだけ消して画面を写し、すぐ戻す。
+        /// </summary>
+        private System.Collections.IEnumerator OpenFriendOverBlurredRoom()
+        {
+            _isOpeningFriend = true;
+            var hidden = new System.Collections.Generic.List<GameObject>();
+            var room = menuGroup != null ? menuGroup.transform.parent : null; // menuGroup は Room/Buttons に付いている
+            if (room != null)
+                foreach (var name in RoomOverlayNames)
+                {
+                    var part = room.Find(name);
+                    if (part != null && part.gameObject.activeSelf) { part.gameObject.SetActive(false); hidden.Add(part.gameObject); }
+                }
+            yield return new WaitForEndOfFrame();
+            Texture2D blurred = null;
+            try { blurred = ScreenBlurCapture.Capture(); }
+            catch (System.Exception e) { Debug.LogWarning("[MainMenu] 部屋の絵を写せませんでした: " + e.Message); }
+            foreach (var part in hidden) if (part != null) part.SetActive(true);
+            _isOpeningFriend = false;
+
             _multiMenu.OpenFriend(mode =>
             {
                 Debug.Log($"[MainMenu] 友達と対局（{mode}）。{matchSceneName} へ");
@@ -89,8 +116,12 @@ namespace KillingMahjong.UI
             }, () =>
             {
                 if (!_isLoadingScene) SetMenuInteractable(true);
-            });
+            }, blurred);
         }
+
+        /// <summary>ぼかした背景に写さない物（部屋の上の字と、透明なボタン）。シーンの Room の下の名前。</summary>
+        private static readonly string[] RoomOverlayNames = { "Labels", "Buttons" };
+        private bool _isOpeningFriend;
 
         // ---- ギャラリー ----
 

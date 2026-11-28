@@ -87,14 +87,23 @@ namespace KillingMahjong.UI
         /// メインメニュー（<see cref="MainMenuUI"/>、2026-11-21）は電話の絵が「よび出した友達と」の入口なので、
         /// 野良・フレンド・CPU を選ぶ最初の画面は飛ばす。「もどる」で閉じる。
         /// </summary>
-        public void OpenFriend(Action<MatchJoinMode> onDecided, Action onClosed = null)
+        /// <param name="backdrop">友達対戦の画面の後ろに敷く絵（メインメニューをぼかした物）。この画面が持ち、閉じるときに捨てる</param>
+        public void OpenFriend(Action<MatchJoinMode> onDecided, Action onClosed = null, Texture2D backdrop = null)
         {
             Open(onDecided, onClosed);
-            if (_root == null) return;
+            if (_root == null) { if (backdrop != null) Destroy(backdrop); return; }
             _friendOnly = true;
             // メインメニューの電話からは、プランナーの構図のフレンドマッチ画面を出す（TitleMultiMenuUI.FriendCall.cs）
-            if (_friendCall != null) ShowFriendCallMain();
-            else ShowFriendPanel();
+            if (_friendCall != null)
+            {
+                SetFriendCallBackdrop(backdrop);
+                ShowFriendCallMain();
+            }
+            else
+            {
+                if (backdrop != null) Destroy(backdrop);
+                ShowFriendPanel();
+            }
         }
 
         /// <summary><see cref="OpenFriend"/> で開いたか（そのときは最初の画面へ戻さず閉じる）。</summary>
@@ -111,6 +120,7 @@ namespace KillingMahjong.UI
         {
             CancelCpuJoin();
             if (_root != null) _root.SetActive(false);
+            ReleaseFriendCallBlur();
             SetTruthNameHookVisible(true);
             _onClosed?.Invoke();
         }

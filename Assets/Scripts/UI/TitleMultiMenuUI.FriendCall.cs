@@ -24,6 +24,46 @@ namespace KillingMahjong.UI
     {
         private const string FriendCallResourceDir = "UI/FriendMatch/";
 
+        // ---- 友達対戦の背景（2026-11-28）----
+        //
+        // プランナー（11/27 スレッド「友達対戦画面、ライティングなし」）:
+        // 「メインメニュー画面を背景絵で使い回せんかなと思案中。UIとか全部消したメインメニュー背景を表示 →
+        //   ぼかしを入れたあと半透明の黒い膜をかける → この画像（電話と卓の絵）を上から置く」
+        // - Backdrop: 電話を押した瞬間のメインメニュー（字とボタンを消した部屋）を写し取ってぼかした絵（MainMenuUI → ScreenBlurCapture）
+        // - Film: 半透明の黒い膜
+        // - Art: プランナーの FightwithFriendUi.png。書き出しの背景が白で塗られていたので、白い字以外の白だけを透明にした
+        //   （絵の色は変えていない。作り方は km-docs/tools/friend_call_art/key_art.py）
+        // - 押せる字（真名を告げる・条件を整える）は、同じ絵の層を切り出した物を同じ位置に重ねてある（見た目は変わらない）
+
+        /// <summary>黒い膜の濃さ。</summary>
+        private static readonly Color FriendCallFilmColor = new Color(0f, 0f, 0f, 0.5f);
+
+        private RawImage _friendCallBackdrop;
+        private Texture _friendCallBackdropDefault;
+        /// <summary>開いている間だけ持つ、ぼかした部屋の絵（閉じたら捨てる）。</summary>
+        private Texture2D _friendCallBlur;
+
+        /// <summary>背景に敷く絵を決める。null なら置いてある控えの絵に戻す。渡した絵は閉じるときに捨てる。</summary>
+        private void SetFriendCallBackdrop(Texture2D blurred)
+        {
+            ReleaseFriendCallBlur();
+            _friendCallBlur = blurred;
+            if (_friendCallBackdrop != null)
+            {
+                _friendCallBackdrop.texture = blurred != null ? blurred : _friendCallBackdropDefault;
+                _friendCallBackdrop.color = Color.white;
+            }
+        }
+
+        private void ReleaseFriendCallBlur()
+        {
+            if (_friendCallBlur == null) return;
+            if (_friendCallBackdrop != null && _friendCallBackdrop.texture == _friendCallBlur)
+                _friendCallBackdrop.texture = _friendCallBackdropDefault;
+            Destroy(_friendCallBlur);
+            _friendCallBlur = null;
+        }
+
         private GameObject _friendCall;
         private GameObject _friendCallMain;
         private GameObject _friendCallConditions;
@@ -48,7 +88,8 @@ namespace KillingMahjong.UI
             _friendCall = SceneFirst.Child(_root.transform, "FriendCall", out bool madeCall, typeof(RectTransform));
             if (madeCall) Stretch(_friendCall.GetComponent<RectTransform>());
 
-            // 背景（参考の絵）。下のメニューの暗幕より前に全面へ敷く
+            // 背景。メインメニューから開くときは、開く直前の部屋をぼかした絵に差し替える（OpenFriend の backdrop）。
+            // 置いてある絵（参考の写真）は、ぼかした絵が無いときの控え
             var backdrop = SceneFirst.Child(_friendCall.transform, "Backdrop", out bool madeBackdrop,
                 typeof(RectTransform), typeof(RawImage));
             if (madeBackdrop)
@@ -57,6 +98,28 @@ namespace KillingMahjong.UI
                 var raw = backdrop.GetComponent<RawImage>();
                 raw.texture = Resources.Load<Texture2D>(FriendCallResourceDir + "FriendCallBackdrop");
                 raw.raycastTarget = true; // 後ろのメニューを押させない
+            }
+            _friendCallBackdrop = backdrop.GetComponent<RawImage>();
+            _friendCallBackdropDefault = _friendCallBackdrop.texture;
+
+            // 半透明の黒い膜と、電話の絵（2026-11-27 プランナーの案。下の「友達対戦の背景」）
+            var film = SceneFirst.Child(_friendCall.transform, "Film", out bool madeFilm, typeof(RectTransform), typeof(Image));
+            if (madeFilm)
+            {
+                Stretch(film.GetComponent<RectTransform>());
+                var image = film.GetComponent<Image>();
+                image.color = FriendCallFilmColor;
+                image.raycastTarget = false;
+                film.transform.SetSiblingIndex(backdrop.transform.GetSiblingIndex() + 1);
+            }
+            var art = SceneFirst.Child(_friendCall.transform, "Art", out bool madeArt, typeof(RectTransform), typeof(RawImage));
+            if (madeArt)
+            {
+                Stretch(art.GetComponent<RectTransform>());
+                var raw = art.GetComponent<RawImage>();
+                raw.texture = Resources.Load<Texture2D>(FriendCallResourceDir + "FriendCallArt");
+                raw.raycastTarget = false;
+                art.transform.SetSiblingIndex(film.transform.GetSiblingIndex() + 1);
             }
 
             BuildFriendCallMain();
@@ -217,6 +280,7 @@ namespace KillingMahjong.UI
         private void HideFriendCall()
         {
             if (_friendCall != null) _friendCall.SetActive(false);
+            ReleaseFriendCallBlur();
         }
     }
 }
